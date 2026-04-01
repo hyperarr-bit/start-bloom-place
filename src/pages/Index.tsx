@@ -205,7 +205,6 @@ const Index = () => {
               <>
                 <MonthTurnover onOpenMonth={setOpenMonth} />
                 <FinancialSummary
-                <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}
                   totalDebts={totalDebts}

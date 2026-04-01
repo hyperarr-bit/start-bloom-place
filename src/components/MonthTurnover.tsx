@@ -188,18 +188,34 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
       {prevHasData && (
         <button
           onClick={triggerRecap}
-          className="w-full bg-card rounded-lg border border-border p-3 flex items-center gap-3 hover:bg-muted/30 transition-colors text-left"
+          className="w-full bg-card rounded-lg border border-border overflow-hidden hover:bg-muted/20 transition-colors text-left"
         >
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <Calendar className="w-5 h-5 text-primary" />
+          <div className="bg-accent/20 px-4 py-2 flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[11px] font-bold tracking-wide uppercase">Resumo de {prevMonth}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold">Resumo de {prevMonth}</p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              Toque para ver como foi seu mês e preparar {currentMonth}
+          <div className="px-4 py-3 space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <p className="text-[10px] text-muted-foreground">Receitas</p>
+                <p className="text-xs font-bold tabular-nums text-green-400">R$ {prevData.receitas.toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground">Despesas</p>
+                <p className="text-xs font-bold tabular-nums text-red-400">R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR")}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-muted-foreground">Saldo</p>
+                <p className={`text-xs font-bold tabular-nums ${prevBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {prevBalance >= 0 ? "+" : ""}R$ {prevBalance.toLocaleString("pt-BR")}
+                </p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Toque para ver detalhes e preparar {currentMonth}
             </p>
           </div>
-          <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
         </button>
       )}
 

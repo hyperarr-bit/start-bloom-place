@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar, Trophy, Flame, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, CalendarCheck, Trophy, Flame, Target, CheckCircle, FileText, Receipt, CreditCard, StickyNote, DollarSign } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, BASE_FINANCE_KEYS, getPrefixedKeys } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];

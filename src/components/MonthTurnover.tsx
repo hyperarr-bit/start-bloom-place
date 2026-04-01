@@ -542,7 +542,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     animate={{ scale: 1 }}
                     className="text-center py-4"
                   >
-                    <p className="text-sm font-bold text-emerald-500">✅ Dados copiados com sucesso!</p>
+                    <p className="text-sm font-bold text-success flex items-center justify-center gap-1.5"><CheckCircle className="w-4 h-4" /> Dados copiados com sucesso!</p>
                   </motion.div>
                 ) : (
                   <div className="flex gap-2 pt-1">

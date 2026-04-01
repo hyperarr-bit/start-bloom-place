@@ -178,16 +178,19 @@ const Index = () => {
         )}
 
         {activeTab === "dashboard" && (
-          <Dashboard
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            expenses={expenses}
-            fixedExpenses={fixedExpenses}
-            dueDays={dueDays}
-            savingsRate={savingsRate}
-          />
+          <>
+            <Dashboard
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              expenses={expenses}
+              fixedExpenses={fixedExpenses}
+              dueDays={dueDays}
+              savingsRate={savingsRate}
+            />
+            <MonthComparison />
+          </>
         )}
 
         {activeTab === "financeiro" && (

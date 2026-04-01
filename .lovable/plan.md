@@ -1,46 +1,49 @@
 
 
-## Redesign da Retrospectiva de Mês — Alinhamento Visual
+## Por que o banner de lembretes NÃO aparece
 
-### Problemas identificados
+Analisei os dados da sua conta e o código. O banner **funciona corretamente** — o problema é que ele não tem nada para mostrar.
 
-1. **Cores hardcoded** — O modal usa `emerald-500`, `red-500`, `amber-500` diretamente, enquanto o resto do app usa tokens semânticos (`card-receitas`, `card-despesas`, `success`, `destructive`, `accent`).
-2. **Emojis inconsistentes** — Mistura de emojis Unicode (📊✅🏆📋📑📝💰🚀🤝⚖️💪) com ícones Lucide, sem critério claro. O app usa emojis nas tabs mas Lucide icons nos cards.
-3. **Gradientes destoantes** — O modal usa gradientes coloridos (`from-amber-400/20`, `from-emerald-400/20`) que não existem em nenhum outro lugar do app. O app é flat com `bg-card`, `bg-muted`, borders sutis.
-4. **Tipografia inconsistente** — `text-[9px]`, `text-[10px]`, `text-[11px]` excessivos. O app usa `text-xs` e `text-sm` padrão.
-5. **Estilo do banner** — Gradiente `from-primary/5 to-primary/10` destoa dos cards do `FinancialSummary` que usam os tokens `card-receitas`, etc.
+### Diagnóstico
 
-### Plano de correção (1 arquivo: `MonthTurnover.tsx`)
+Seus vencimentos (`finance-dueDays`) no mês de Abril:
+- Dia 1: sem contas
+- Dia 5: sem contas  
+- Dia 10: "Tuauei" (não paga) — **9 dias de distância**
+- Dia 15: sem contas
+- Dia 18: "Vencimento cartão" (não paga) — **17 dias de distância**
 
-**Banner:**
-- Trocar gradiente por estilo flat `bg-card border-border` consistente com o app
-- Usar ícone Lucide `CalendarCheck` em vez de emoji `📊`
+O hook `useBillReminders` usa `REMINDER_DAYS_AHEAD = 3`, ou seja, só mostra contas que vencem em **até 3 dias**. Hoje é dia 1, então nenhuma conta se qualifica.
 
-**Modal - Step Recap:**
-- Header: trocar gradiente colorido por `bg-muted/50 border-border` — limpo e neutro
-- Cards de Receita/Despesa: usar tokens do app (`bg-card-receitas`, `text-card-receitas-text`, `border-card-receitas-border` / `bg-card-despesas`, etc.)
-- Card de Saldo: usar `bg-card-investimentos` (positivo) ou `bg-card-dividas` (negativo) com os respectivos tokens
-- Stats extras (contas pagas, economia): manter `bg-muted/30` com ícones Lucide sem emojis
-- Mensagem motivacional: `bg-muted/50 border-border` em vez de gradientes coloridos
-- Remover emojis soltos no texto (📊, 🤝) — usar apenas ícones Lucide coerentes
-- Botões: manter estilo atual (já usa Button do shadcn)
+O banner retorna `null` na linha 18: `if (bills.length === 0) return null`.
 
-**Modal - Step Copy:**
-- Trocar emojis nos labels (✅📑📝💰) por ícones Lucide inline pequenos ou simplesmente remover
-- Manter checkboxes como estão (já usam shadcn)
-- Mensagem de sucesso: trocar `✅` por ícone `CheckCircle` Lucide
+### Plano de correção
 
-**Modal - Step Badges:**
-- Cards de badge: trocar `bg-amber-500/10 border-amber-500/20` por `bg-accent/10 border-accent/20` (usa o accent rosa do app)
-- Trocar emoji 🏆 do header por ícone `Trophy` Lucide (já importado)
+**Arquivo: `src/hooks/use-bill-reminders.ts`**
 
-**Emojis mantidos apenas onde fazem sentido semântico:**
-- Nos ícones de badge (`badge.icon`) — pois são badges/conquistas, emojis são o conteúdo
-- Remover todos os outros emojis decorativos
+1. Criar dois modos de filtragem:
+   - `getUpcomingBills()` — mantém o filtro de 3 dias (para notificações push)
+   - `getAllMonthBills()` — retorna **todas** as contas não pagas do mês, com `daysUntil` calculado
 
-**Tipografia:**
-- Padronizar para `text-xs` e `text-sm`, eliminar `text-[9px]`, `text-[10px]`, `text-[11px]`
+2. Exportar `getAllMonthBills` no retorno do hook
 
-### Resultado
-Modal e banner visualmente integrados com o design system do app — cores semânticas, ícones Lucide consistentes, sem gradientes estranhos, tipografia padronizada.
+**Arquivo: `src/components/finance/BillReminderBanner.tsx`**
+
+1. Usar `getAllMonthBills()` em vez de `getUpcomingBills()` para decidir se o banner aparece
+2. Reorganizar a exibição em seções:
+   - **Vencidas** (vermelho) — contas com `daysUntil < 0`
+   - **Hoje** (âmbar) — contas com `daysUntil === 0`
+   - **Próximos 3 dias** (azul) — contas com `daysUntil` entre 1 e 3
+   - **Este mês** (cinza/muted) — contas restantes do mês, em texto mais sutil
+3. Manter o banner sempre visível enquanto houver contas não pagas no mês
+4. Urgência visual proporcional: se só tem contas distantes, o banner fica discreto (cinza/muted), sem alarme visual
+5. Alinhar identidade visual com tokens do design system (mesma correção feita no MonthTurnover)
+
+**Arquivo: `src/pages/Index.tsx`**
+- Sem alteração necessária — já renderiza o banner no lugar certo
+
+### Resultado esperado
+- No dia 1 de Abril, o banner aparece mostrando "Tuauei (dia 10)" e "Vencimento cartão (dia 18)" de forma discreta
+- Conforme as datas se aproximam (3 dias antes), a urgência visual aumenta automaticamente
+- Contas vencidas ficam em destaque vermelho
 

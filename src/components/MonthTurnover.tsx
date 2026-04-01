@@ -504,15 +504,35 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     </div>
                   </label>
 
-                  <div className="flex items-center gap-3 p-3.5 rounded-xl border border-border/50 bg-muted/10 opacity-60">
-                    <Checkbox checked={false} disabled />
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">❌ Copiar receitas</p>
+                      <p className="text-xs font-bold">💰 Copiar receitas</p>
                       <p className="text-[10px] text-muted-foreground">
-                        Valores podem variar entre meses
+                        Salário, freelance, etc. — valores podem variar ({prevIncomesCount} itens)
                       </p>
                     </div>
-                  </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyInstallments} onCheckedChange={(v) => setCopyInstallments(!!v)} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">📑 Copiar parcelas/dívidas</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Parcelas em andamento continuam no novo mês ({prevInstallmentsCount} itens)
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">📝 Copiar notas</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Anotações e lembretes financeiros ({prevNotesCount} itens)
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
                 {copied ? (

@@ -447,7 +447,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       onOpenMonth?.(prevMonth);
                     }}
                   >
-                    📄 Ver detalhes
+                    <FileText className="w-3.5 h-3.5" />
+                    Ver detalhes
                   </Button>
                   <Button
                     size="sm"
@@ -455,7 +456,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     onClick={() => setStep("copy")}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    Começar {currentMonth}! 🚀
+                    Começar {currentMonth}
                   </Button>
                 </div>
               </motion.div>

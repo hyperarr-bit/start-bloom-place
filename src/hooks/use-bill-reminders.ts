@@ -26,7 +26,7 @@ export function useBillReminders() {
   const { get } = useUserData();
   const notifiedRef = useRef(false);
 
-  const getUpcomingBills = useCallback((): UpcomingBill[] => {
+  const getBillsWithFilter = useCallback((maxDaysAhead?: number): UpcomingBill[] => {
     const dueDays = get<DueDay[]>("finance-dueDays", []);
     const today = new Date().getDate();
     const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -39,7 +39,7 @@ export function useBillReminders() {
           let daysUntil = d.day - today;
           if (daysUntil < -5) daysUntil += daysInMonth; // wrap to next month
           const isPastDue = daysUntil < 0;
-          if (daysUntil <= REMINDER_DAYS_AHEAD) {
+          if (maxDaysAhead === undefined || daysUntil <= maxDaysAhead) {
             results.push({ name: b.name, day: d.day, daysUntil, isPastDue });
           }
         });
@@ -47,6 +47,14 @@ export function useBillReminders() {
 
     return results.sort((a, b) => a.daysUntil - b.daysUntil);
   }, [get]);
+
+  const getUpcomingBills = useCallback((): UpcomingBill[] => {
+    return getBillsWithFilter(REMINDER_DAYS_AHEAD);
+  }, [getBillsWithFilter]);
+
+  const getAllMonthBills = useCallback((): UpcomingBill[] => {
+    return getBillsWithFilter();
+  }, [getBillsWithFilter]);
 
   const requestNotificationPermission = useCallback(async () => {
     if (!("Notification" in window)) return false;
@@ -109,6 +117,7 @@ export function useBillReminders() {
 
   return {
     getUpcomingBills,
+    getAllMonthBills,
     requestNotificationPermission,
     notificationSupported: typeof window !== "undefined" && "Notification" in window,
     notificationPermission: typeof window !== "undefined" && "Notification" in window

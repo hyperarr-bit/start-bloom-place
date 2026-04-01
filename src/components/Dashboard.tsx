@@ -347,7 +347,10 @@ export const Dashboard = ({
 
       {/* Patrimony Evolution */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3">💰 EVOLUÇÃO DO PATRIMÔNIO</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <LineChart className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold uppercase tracking-wider">EVOLUÇÃO DO PATRIMÔNIO</h3>
+        </div>
         {patrimonyData.length > 0 ? (
           <ResponsiveContainer width="100%" height={150}>
             <AreaChart data={patrimonyData}>

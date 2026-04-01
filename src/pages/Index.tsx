@@ -275,16 +275,19 @@ const Index = () => {
         )}
 
         {activeTab === "relatorios" && (
-          <Reports
-            incomes={incomes}
-            expenses={expenses}
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            setIncomes={setIncomes}
-            setExpenses={setExpenses}
-          />
+          <>
+            <MonthComparison />
+            <Reports
+              incomes={incomes}
+              expenses={expenses}
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              setIncomes={setIncomes}
+              setExpenses={setExpenses}
+            />
+          </>
         )}
 
         {activeTab === "saude" && (

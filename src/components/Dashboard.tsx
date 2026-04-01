@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb } from "lucide-react";
+import { useUserData } from "@/hooks/use-user-data";
+import { getMonthTotals } from "@/components/finance/storage-keys";
 
 interface Expense {
   id: string;
@@ -59,6 +61,9 @@ const categoryLabels: Record<string, string> = {
   outros: "Outros",
 };
 
+const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+const MONTH_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
 export const Dashboard = ({
   totalIncome,
   totalExpenses,
@@ -70,6 +75,8 @@ export const Dashboard = ({
   annualData,
   savingsRate,
 }: DashboardProps) => {
+  const { get } = useUserData();
+
   // Expense by category for pie chart (variable + fixed)
   const expensesByCategory = useMemo(() => {
     const grouped: Record<string, number> = {};
@@ -86,31 +93,50 @@ export const Dashboard = ({
       .sort((a, b) => b.value - a.value);
   }, [expenses, fixedExpenses]);
 
-  // Bar chart data for monthly comparison
+  // Bar chart data from REAL monthly data (last 6 months + current)
   const monthlyBarData = useMemo(() => {
-    return annualData
-      .filter((d) => d.receitas > 0 || d.custosFixos > 0 || d.custosVariaveis > 0)
-      .slice(0, 6)
-      .map((d) => ({
-        month: d.month.substring(0, 3),
-        Receitas: d.receitas,
-        Despesas: d.custosFixos + d.custosVariaveis,
-        Saldo: d.receitas - d.custosFixos - d.custosVariaveis - d.dividas,
-      }));
-  }, [annualData]);
+    const currentMonthIdx = new Date().getMonth();
+    const results: { month: string; Receitas: number; Despesas: number }[] = [];
 
-  // Patrimony evolution (cumulative savings)
+    for (let i = 5; i >= 0; i--) {
+      const idx = (currentMonthIdx - i + 12) % 12;
+      const monthName = MONTH_NAMES[idx];
+      const totals = getMonthTotals(monthName, (key, fallback) => get(key, fallback));
+      const totalDesp = totals.custosFixos + totals.custosVariaveis;
+
+      if (totals.receitas > 0 || totalDesp > 0) {
+        results.push({
+          month: MONTH_SHORT[idx],
+          Receitas: totals.receitas,
+          Despesas: totalDesp,
+        });
+      }
+    }
+
+    return results;
+  }, [get]);
+
+  // Patrimony evolution from REAL data (cumulative saldo)
   const patrimonyData = useMemo(() => {
+    const currentMonthIdx = new Date().getMonth();
     let accumulated = totalInvestments;
-    return annualData
-      .filter((d) => d.receitas > 0)
-      .slice(0, 6)
-      .map((d) => {
-        const saving = d.receitas - d.custosFixos - d.custosVariaveis - d.dividas;
-        accumulated += saving * 0.2; // Assume 20% saved
-        return { month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) };
-      });
-  }, [annualData, totalInvestments]);
+    const results: { month: string; Patrimônio: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const idx = (currentMonthIdx - i + 12) % 12;
+      const monthName = MONTH_NAMES[idx];
+      const totals = getMonthTotals(monthName, (key, fallback) => get(key, fallback));
+      const totalDesp = totals.custosFixos + totals.custosVariaveis;
+      const saldo = totals.receitas - totalDesp;
+
+      if (totals.receitas > 0 || totalDesp > 0) {
+        accumulated += saldo;
+        results.push({ month: MONTH_SHORT[idx], Patrimônio: Math.round(accumulated) });
+      }
+    }
+
+    return results;
+  }, [get, totalInvestments]);
 
   // Smart alerts
   const alerts = useMemo(() => {
@@ -294,8 +320,8 @@ export const Dashboard = ({
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receitas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Despesas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -312,14 +338,14 @@ export const Dashboard = ({
             <AreaChart data={patrimonyData}>
               <defs>
                 <linearGradient id="colorPatrimony" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
-              <Area type="monotone" dataKey="Patrimônio" stroke="#8b5cf6" fill="url(#colorPatrimony)" strokeWidth={2} />
+              <Area type="monotone" dataKey="Patrimônio" stroke="hsl(var(--primary))" fill="url(#colorPatrimony)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (

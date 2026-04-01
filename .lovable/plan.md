@@ -1,49 +1,39 @@
 
 
-## Por que o banner de lembretes NÃO aparece
+## Plano: Corrigir banner de lembretes + melhorar cores dos gráficos
 
-Analisei os dados da sua conta e o código. O banner **funciona corretamente** — o problema é que ele não tem nada para mostrar.
+### Problema 1: Banner não aparece
+O `BillReminderBanner` está renderizado **apenas na Dashboard** (linha 181 do Index.tsx). O código e a lógica estão corretos — ele busca todas as contas do mês via `getAllMonthBills()`. O problema pode ser que os dados não estão sendo lidos corretamente via `useUserData` (Supabase) ou o componente está montando antes dos dados carregarem.
 
-### Diagnóstico
+**Correção:**
+- Adicionar o banner **também na aba "Meu Financeiro"** (antes do `FinancialSummary`, após o `MonthTurnover`)
+- No hook `use-bill-reminders.ts`, adicionar um re-check quando os dados do Supabase carregarem (o `useEffect` atual roda uma vez mas pode executar antes do fetch completar)
+- No `BillReminderBanner`, trocar o `useEffect` com `useState` por um `useMemo` direto, ou adicionar dependency no loading state do userData
 
-Seus vencimentos (`finance-dueDays`) no mês de Abril:
-- Dia 1: sem contas
-- Dia 5: sem contas  
-- Dia 10: "Tuauei" (não paga) — **9 dias de distância**
-- Dia 15: sem contas
-- Dia 18: "Vencimento cartão" (não paga) — **17 dias de distância**
+### Problema 2: Cores feias no gráfico Receitas x Despesas
+O `MonthlyHistory` usa `hsl(var(--card-receitas-text))` e `hsl(var(--card-despesas-text))` para as barras. No modo claro, receitas-text é um amarelo escuro (`45 60% 30%`) e despesas-text é um roxo escuro (`250 50% 35%`) — cores opacas e sem vida para barras de gráfico.
 
-O hook `useBillReminders` usa `REMINDER_DAYS_AHEAD = 3`, ou seja, só mostra contas que vencem em **até 3 dias**. Hoje é dia 1, então nenhuma conta se qualifica.
+**Correção:**
+- Receitas: usar um verde vibrante `hsl(142 55% 42%)` (chart-2, verde investimentos) — mais intuitivo que amarelo para "ganhos"
+- Despesas: usar o rosa/vermelho do design system `hsl(330 65% 50%)` (chart-1, cor de dívidas) — intuitivo para "gastos"
+- Alternativa: usar cores com opacidade adequada para barras (mais saturadas, não os tons de texto)
 
-O banner retorna `null` na linha 18: `if (bills.length === 0) return null`.
+### Arquivos a modificar
 
-### Plano de correção
+**`src/pages/Index.tsx`**
+- Adicionar `<BillReminderBanner />` dentro da aba "financeiro", logo após `<MonthTurnover />`
 
-**Arquivo: `src/hooks/use-bill-reminders.ts`**
+**`src/components/finance/BillReminderBanner.tsx`**
+- Melhorar o useEffect para reagir a mudanças nos dados (não apenas mount)
+- Usar intervalo ou subscription para garantir que dados do Supabase carregaram
 
-1. Criar dois modos de filtragem:
-   - `getUpcomingBills()` — mantém o filtro de 3 dias (para notificações push)
-   - `getAllMonthBills()` — retorna **todas** as contas não pagas do mês, com `daysUntil` calculado
+**`src/components/finance/MonthlyHistory.tsx`**
+- Trocar cores das barras do BarChart:
+  - Receitas: `hsl(var(--chart-2))` (verde) 
+  - Despesas: `hsl(var(--chart-1))` (rosa/vermelho)
+- Cores mais vibrantes e intuitivas (verde = entrada, vermelho = saída)
 
-2. Exportar `getAllMonthBills` no retorno do hook
-
-**Arquivo: `src/components/finance/BillReminderBanner.tsx`**
-
-1. Usar `getAllMonthBills()` em vez de `getUpcomingBills()` para decidir se o banner aparece
-2. Reorganizar a exibição em seções:
-   - **Vencidas** (vermelho) — contas com `daysUntil < 0`
-   - **Hoje** (âmbar) — contas com `daysUntil === 0`
-   - **Próximos 3 dias** (azul) — contas com `daysUntil` entre 1 e 3
-   - **Este mês** (cinza/muted) — contas restantes do mês, em texto mais sutil
-3. Manter o banner sempre visível enquanto houver contas não pagas no mês
-4. Urgência visual proporcional: se só tem contas distantes, o banner fica discreto (cinza/muted), sem alarme visual
-5. Alinhar identidade visual com tokens do design system (mesma correção feita no MonthTurnover)
-
-**Arquivo: `src/pages/Index.tsx`**
-- Sem alteração necessária — já renderiza o banner no lugar certo
-
-### Resultado esperado
-- No dia 1 de Abril, o banner aparece mostrando "Tuauei (dia 10)" e "Vencimento cartão (dia 18)" de forma discreta
-- Conforme as datas se aproximam (3 dias antes), a urgência visual aumenta automaticamente
-- Contas vencidas ficam em destaque vermelho
+### Resultado
+- Banner de contas visível tanto na Dashboard quanto no Meu Financeiro
+- Gráfico com cores intuitivas: verde para receitas, rosa/vermelho para despesas
 

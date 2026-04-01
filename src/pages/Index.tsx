@@ -183,7 +183,6 @@ const Index = () => {
             expenses={expenses}
             fixedExpenses={fixedExpenses}
             dueDays={dueDays}
-            annualData={annualData}
             savingsRate={savingsRate}
           />
         )}

@@ -36,8 +36,8 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
     return acc;
   }, {});
 
-  const activeCats = categories.filter(c => budgets[c.value] || spentByCategory[c.value]);
-  const unsetCats = categories.filter(c => !budgets[c.value]);
+  const activeCats = categories.filter(c => budgets[c.value] || spentByCategory[c.value] || editing === c.value);
+  const unsetCats = categories.filter(c => !budgets[c.value] && editing !== c.value);
 
   const startEdit = (cat: string) => {
     setEditing(cat);
@@ -76,7 +76,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
           <span className="text-xs font-bold tracking-wide uppercase">Limites por Categoria</span>
         </div>
 
-        {!hasBudgets && activeCats.length === 0 ? (
+        {!hasBudgets && activeCats.length === 0 && !editing ? (
           <EmptyState
             icon={Target}
             title="Sem limites definidos"

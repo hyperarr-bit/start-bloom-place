@@ -21,6 +21,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const [step, setStep] = useState<"recap" | "copy" | "badges">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
   const [copyBills, setCopyBills] = useState(true);
+  const [copyIncomes, setCopyIncomes] = useState(false);
+  const [copyInstallments, setCopyInstallments] = useState(true);
+  const [copyNotes, setCopyNotes] = useState(false);
   const [copied, setCopied] = useState(false);
   const [archived, setArchived] = useState(false);
 
@@ -85,6 +88,24 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const prevFixedCount = (() => {
     const keys = getFinanceStorageKeys(prevMonth);
     const raw = get(keys.fixed, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
+  const prevIncomesCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.incomes, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
+  const prevInstallmentsCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.installments, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
+  const prevNotesCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.notes, []);
     return Array.isArray(raw) ? raw.length : 0;
   })();
 
@@ -170,7 +191,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   }, [loaded, lastSeenMonth]);
 
   // copyToMonth using useUserData
-  const copyToMonth = useCallback((fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean }) => {
+  const copyToMonth = useCallback((fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean; incomes: boolean; installments: boolean; notes: boolean }) => {
     const fromKeys = getFinanceStorageKeys(fromMonth);
     const toKeys = getFinanceStorageKeys(toMonth);
 
@@ -190,6 +211,30 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
           bills: (d.bills || []).map((b: any) => ({ ...b, id: Date.now().toString() + Math.random(), paid: false })),
         }));
         setData(toKeys.dueDays, days);
+      }
+    }
+
+    if (options.incomes) {
+      const incomes = get(fromKeys.incomes, []);
+      if (Array.isArray(incomes) && incomes.length > 0) {
+        const items = incomes.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.incomes, items);
+      }
+    }
+
+    if (options.installments) {
+      const installments = get(fromKeys.installments, []);
+      if (Array.isArray(installments) && installments.length > 0) {
+        const items = installments.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.installments, items);
+      }
+    }
+
+    if (options.notes) {
+      const notes = get(fromKeys.notes, []);
+      if (Array.isArray(notes) && notes.length > 0) {
+        const items = notes.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.notes, items);
       }
     }
   }, [get, setData]);
@@ -226,7 +271,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const message = getMessage();
 
   const handleCopy = () => {
-    copyToMonth(prevMonth, currentMonth, { fixed: copyFixed, bills: copyBills });
+    copyToMonth(prevMonth, currentMonth, { fixed: copyFixed, bills: copyBills, incomes: copyIncomes, installments: copyInstallments, notes: copyNotes });
     setCopied(true);
     setTimeout(() => {
       if (badges.length > 0) {
@@ -459,15 +504,35 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     </div>
                   </label>
 
-                  <div className="flex items-center gap-3 p-3.5 rounded-xl border border-border/50 bg-muted/10 opacity-60">
-                    <Checkbox checked={false} disabled />
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">❌ Copiar receitas</p>
+                      <p className="text-xs font-bold">💰 Copiar receitas</p>
                       <p className="text-[10px] text-muted-foreground">
-                        Valores podem variar entre meses
+                        Salário, freelance, etc. — valores podem variar ({prevIncomesCount} itens)
                       </p>
                     </div>
-                  </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyInstallments} onCheckedChange={(v) => setCopyInstallments(!!v)} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">📑 Copiar parcelas/dívidas</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Parcelas em andamento continuam no novo mês ({prevInstallmentsCount} itens)
+                      </p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">📝 Copiar notas</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Anotações e lembretes financeiros ({prevNotesCount} itens)
+                      </p>
+                    </div>
+                  </label>
                 </div>
 
                 {copied ? (
@@ -495,7 +560,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       size="sm"
                       className="flex-1 text-xs gap-1.5 h-10 rounded-xl"
                       onClick={handleCopy}
-                      disabled={!copyFixed && !copyBills}
+                      disabled={!copyFixed && !copyBills && !copyIncomes && !copyInstallments && !copyNotes}
                     >
                       <Copy className="w-3.5 h-3.5" />
                       Preparar {currentMonth}

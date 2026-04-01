@@ -393,11 +393,11 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
                   className={`rounded-xl p-4 text-center border ${
-                    prevBalance >= 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"
+                    prevBalance >= 0 ? "bg-card-investimentos border-card-investimentos-border" : "bg-card-dividas border-card-dividas-border"
                   }`}
                 >
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Saldo</span>
-                  <p className={`text-2xl font-bold mt-1 ${prevBalance >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Saldo</span>
+                  <p className={`text-2xl font-bold mt-1 ${prevBalance >= 0 ? "text-card-investimentos-text" : "text-card-dividas-text"}`}>
                     {prevBalance >= 0 ? "+" : "-"}R$ {Math.abs(prevBalance).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </motion.div>

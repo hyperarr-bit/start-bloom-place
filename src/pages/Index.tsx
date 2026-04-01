@@ -196,6 +196,7 @@ const Index = () => {
             ) : (
               <>
                 <MonthTurnover onOpenMonth={setOpenMonth} />
+                <BillReminderBanner />
                 <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}

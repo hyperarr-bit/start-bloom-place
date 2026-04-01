@@ -177,17 +177,24 @@ const Index = () => {
         )}
 
         {activeTab === "dashboard" && (
-          <Dashboard
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            expenses={expenses}
-            fixedExpenses={fixedExpenses}
-            dueDays={dueDays}
-            annualData={annualData}
-            savingsRate={savingsRate}
-          />
+          <>
+            <BillReminderBanner />
+            <Dashboard
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              expenses={expenses}
+              fixedExpenses={fixedExpenses}
+              dueDays={dueDays}
+              annualData={annualData}
+              savingsRate={savingsRate}
+            />
+            <MonthlyHistory onOpenMonth={(month) => {
+              setOpenMonth(month);
+              setActiveTab("financeiro");
+            }} />
+          </>
         )}
 
         {activeTab === "financeiro" && (

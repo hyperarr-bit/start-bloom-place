@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb } from "lucide-react";
+import { useUserData } from "@/hooks/use-user-data";
+import { getMonthTotals } from "@/components/finance/storage-keys";
 
 interface Expense {
   id: string;

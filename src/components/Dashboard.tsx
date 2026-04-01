@@ -1,6 +1,9 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb } from "lucide-react";
+import { getMonthTotals } from "@/components/finance/storage-keys";
+
+const ALL_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 interface Expense {
   id: string;
@@ -13,14 +16,6 @@ interface Expense {
 interface DueDay {
   day: number;
   bills: { id: string; name: string; paid: boolean }[];
-}
-
-interface AnnualData {
-  month: string;
-  receitas: number;
-  custosFixos: number;
-  custosVariaveis: number;
-  dividas: number;
 }
 
 interface FixedExpense {
@@ -40,7 +35,6 @@ interface DashboardProps {
   expenses: Expense[];
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
-  annualData: AnnualData[];
   savingsRate: number;
 }
 

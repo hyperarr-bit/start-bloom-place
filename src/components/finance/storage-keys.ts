@@ -39,50 +39,22 @@ export const getFinanceStorageKeys = (month: string) => {
   };
 };
 
-/** Base (current-month) storage keys */
-export const BASE_FINANCE_KEYS = {
-  incomes: "finance-incomes",
-  expenses: "finance-expenses",
-  fixed: "finance-fixed-expenses",
-  dueDays: "finance-dueDays",
-  notes: "finance-notes",
-  installments: "finance-installments",
-} as const;
-
-/** Prefixed keys for a specific month (always prefixed, even if current) */
-export const getPrefixedKeys = (month: string) => {
-  const key = getMonthKey(month);
-  return {
-    incomes: `finance-month-${key}-incomes`,
-    expenses: `finance-month-${key}-expenses`,
-    fixed: `finance-month-${key}-fixed`,
-    dueDays: `finance-month-${key}-dueDays`,
-    notes: `finance-month-${key}-notes`,
-    installments: `finance-month-${key}-installments`,
-  };
-};
-
-type DataGetter = (key: string, fallback: any) => any;
-
-const localStorageGetter: DataGetter = (key, fallback) => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch { return fallback; }
-};
-
 /**
- * Read month totals. Accepts an optional getter function (e.g. from useUserData)
- * to read from the correct data source instead of localStorage directly.
+ * Read month totals from localStorage for AnnualBudget
  */
-export const getMonthTotals = (month: string, getter?: DataGetter) => {
-  const get = getter || localStorageGetter;
+export const getMonthTotals = (month: string) => {
   const keys = getFinanceStorageKeys(month);
+  const parse = (k: string) => {
+    try {
+      const raw = localStorage.getItem(k);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  };
 
-  const incomes = get(keys.incomes, []);
-  const expenses = get(keys.expenses, []);
-  const fixed = get(keys.fixed, []);
-  const installments = get(keys.installments, []);
+  const incomes = parse(keys.incomes);
+  const expenses = parse(keys.expenses);
+  const fixed = parse(keys.fixed);
+  const installments = parse(keys.installments);
 
   return {
     receitas: incomes.reduce((s: number, i: any) => s + (i.value || 0), 0),

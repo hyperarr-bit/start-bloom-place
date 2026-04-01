@@ -1,1 +1,0 @@
-UPDATE user_data SET value = '"Marco-2026"', updated_at = now() WHERE user_id = '2c896992-6849-4ca6-9a66-5c2414bb9424' AND key = 'finance-last-seen-month';

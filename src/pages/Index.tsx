@@ -25,9 +25,6 @@ import { Gamification } from "@/components/Gamification";
 import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
-import { BillReminderBanner } from "@/components/finance/BillReminderBanner";
-import { MonthlyHistory } from "@/components/finance/MonthlyHistory";
-import { MonthComparison } from "@/components/finance/MonthComparison";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -178,23 +175,17 @@ const Index = () => {
         )}
 
         {activeTab === "dashboard" && (
-          <>
-            <Dashboard
-              totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
-              totalDebts={totalDebts}
-              totalInvestments={totalInvestments}
-              expenses={expenses}
-              fixedExpenses={fixedExpenses}
-              dueDays={dueDays}
-              annualData={annualData}
-              savingsRate={savingsRate}
-            />
-            <MonthlyHistory onOpenMonth={(month) => {
-              setOpenMonth(month);
-              setActiveTab("financeiro");
-            }} />
-          </>
+          <Dashboard
+            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            totalDebts={totalDebts}
+            totalInvestments={totalInvestments}
+            expenses={expenses}
+            fixedExpenses={fixedExpenses}
+            dueDays={dueDays}
+            annualData={annualData}
+            savingsRate={savingsRate}
+          />
         )}
 
         {activeTab === "financeiro" && (
@@ -203,8 +194,7 @@ const Index = () => {
               <MonthlySheet month={openMonth} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
-            <MonthTurnover onOpenMonth={setOpenMonth} />
-                <BillReminderBanner />
+                <MonthTurnover onOpenMonth={setOpenMonth} />
                 <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}
@@ -275,19 +265,16 @@ const Index = () => {
         )}
 
         {activeTab === "relatorios" && (
-          <>
-            <MonthComparison />
-            <Reports
-              incomes={incomes}
-              expenses={expenses}
-              totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
-              totalDebts={totalDebts}
-              totalInvestments={totalInvestments}
-              setIncomes={setIncomes}
-              setExpenses={setExpenses}
-            />
-          </>
+          <Reports
+            incomes={incomes}
+            expenses={expenses}
+            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            totalDebts={totalDebts}
+            totalInvestments={totalInvestments}
+            setIncomes={setIncomes}
+            setExpenses={setExpenses}
+          />
         )}
 
         {activeTab === "saude" && (

@@ -1,60 +1,74 @@
 
 
-## Auditoria Visual Completa + Guia de Padronização
+## Plano: 8 Melhorias para o CORE App
 
-### Diagnóstico: O que está errado
+### 1. PWA — App instalável no celular
+- Criar `public/manifest.json` com nome, ícones, cores e `display: standalone`
+- Criar `public/sw.js` (service worker básico com cache de assets)
+- Registrar service worker em `src/main.tsx`
+- Adicionar `<link rel="manifest">` e meta tags no `index.html`
+- Adicionar prompt "Instalar app" na Home quando disponível
 
-Analisei **todos os módulos** do app. A identidade original é clara: **Notion-like, minimalista, Inter font, cards com `bg-card` + `border-border`, emojis como ícones semânticos nas tabs, cores neutras com acentos sutis via tokens CSS.**
+### 2. Empty States — Telas vazias com ilustração e CTA
+- Criar componente reutilizável `src/components/EmptyState.tsx` com ícone, título, descrição e botão de ação
+- Aplicar em: `IncomeTable`, `ExpenseTable`, `FixedExpensesTable`, `FinancialGoals`, `InstallmentTracker`, `InvestmentsTracker`, `WishlistItems`
+- Cada empty state terá um ícone contextual e texto motivacional em português
 
-O módulo de Finanças está destoando porque:
+### 3. Micro-interações e animações de feedback
+- Adicionar `framer-motion` animations ao adicionar/remover itens nas tabelas (layout animations)
+- Animação de confetti/pulse ao completar uma meta ou marcar conta como paga
+- Transições suaves nos cards do Dashboard ao carregar dados
+- Botões com `whileTap={{ scale: 0.95 }}` nos componentes principais
 
-1. **Dashboard com cores hardcoded de circo** — `COLORS = ["#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#6366f1", "#14b8a6"]` para o PieChart. São 8 cores vibrantes arbitrárias que não pertencem ao design system.
+### 4. Recuperação de senha
+- Adicionar link "Esqueci minha senha" na página `Auth.tsx`
+- Criar página `src/pages/ResetPassword.tsx` com campo de email para envio do link
+- Criar página `src/pages/UpdatePassword.tsx` para definir nova senha (recebe token via URL)
+- Adicionar `resetPassword` no `use-auth.tsx` usando `supabase.auth.resetPasswordForEmail`
+- Adicionar rotas `/reset-password` e `/update-password` no `App.tsx`
 
-2. **Gráficos duplicados e excessivos** — A Dashboard tem "Receitas vs Despesas" + "Evolução do Patrimônio", e logo abaixo o MonthlyHistory repete "Receitas vs Despesas" + "Evolução do Saldo". São **4 gráficos** dizendo a mesma coisa em estilos diferentes.
+### 5. Dashboard com gráficos melhorados
+- Adicionar gráfico de evolução mensal (linha) no Dashboard usando `recharts` (já disponível via shadcn chart)
+- Gráfico de pizza para distribuição de despesas por categoria
+- Card de tendência mostrando se gastos estão subindo ou descendo vs mês anterior
+- Indicador visual de saúde financeira (gauge/termômetro)
 
-3. **MonthComparison** — Um componente pesado com seletores, barras e detalhamentos que quebra o ritmo minimalista. Ele pertence à aba Relatórios, não à Dashboard.
+### 6. Gamificação aprimorada
+- Adicionar sistema de badges/conquistas no componente `Gamification.tsx`
+- Badges: "Primeira meta", "7 dias seguidos", "Investidor iniciante", "Sem dívidas"
+- Animação de desbloqueio com modal celebratório
+- Persistir badges no `usePersistedState`
 
-4. **Emojis na Dashboard** — `📊 GASTOS POR CATEGORIA`, `📈 RECEITAS VS DESPESAS`, `💰 EVOLUÇÃO DO PATRIMÔNIO` — emojis decorativos em headers. Nos outros módulos (Saúde, Rotina), emojis aparecem **apenas nas tabs** e em quick actions com função semântica, nunca como decoração de títulos de seção.
+### 7. Sincronização offline melhorada
+- Implementar queue de operações offline em `src/hooks/use-offline-queue.ts`
+- Detectar estado online/offline com `navigator.onLine` e evento listeners
+- Mostrar banner "Modo offline" quando desconectado
+- Sincronizar dados pendentes quando voltar online
 
-5. **Padrão dos outros módulos** — Saúde usa `text-xs font-bold uppercase tracking-wider` sem emojis nos títulos internos. Cards com tokens semânticos (`--saude-blue`, `--saude-green`). O Dashboard financeiro deveria seguir o mesmo tom.
+### 8. Dark mode refinado
+- Revisar variáveis CSS do dark mode em `index.css` para melhor contraste
+- Ajustar cards financeiros (receitas, despesas, dívidas, investimentos) no dark mode
+- Garantir que gráficos e badges respeitem o tema
+- Melhorar bordas e sombras no dark mode
 
-### O que os outros módulos fazem certo
+### Detalhes técnicos
 
-```text
-Módulo       | Emojis                        | Cores           | Estilo
-─────────────┼───────────────────────────────┼─────────────────┼──────────────
-Saúde        | Só nas tabs (⚡⚖️🏥🛠️)        | Tokens semânticos | Cards 2xl, sóbrio
-Rotina       | Mood emojis (função)          | Tailwind padrão  | Grid limpo
-Dieta        | Meal emojis (🌅🍽️🍎🌙)       | Suaves com dark   | Notion-like
-Treino       | Muscle emojis (🦵🍑💪)        | Exercise colors   | Listas limpas
-Finanças     | Em todos os títulos!!          | Hardcoded hex     | Gráficos demais
-```
+**Arquivos novos:**
+- `public/manifest.json`, `public/sw.js`
+- `src/components/EmptyState.tsx`
+- `src/pages/ResetPassword.tsx`, `src/pages/UpdatePassword.tsx`
+- `src/hooks/use-offline-queue.ts`
 
-### Plano de Correção
+**Arquivos modificados:**
+- `index.html` — meta tags PWA
+- `src/main.tsx` — registro do service worker
+- `src/App.tsx` — novas rotas
+- `src/pages/Auth.tsx` — link "Esqueci minha senha"
+- `src/hooks/use-auth.tsx` — função resetPassword
+- `src/index.css` — refinamento dark mode
+- `src/components/Gamification.tsx` — sistema de badges
+- `src/components/Dashboard.tsx` — gráficos
+- Tabelas financeiras — empty states e micro-interações
 
-**Arquivo: `src/components/Dashboard.tsx`**
-
-1. **Remover emojis dos títulos** — `📊 GASTOS POR CATEGORIA` → `GASTOS POR CATEGORIA` (usar ícone Lucide `PieChart` inline como os alertas já fazem)
-2. **Cores do PieChart** — trocar os 8 hex hardcoded por uma paleta derivada dos chart tokens + tons neutros:
-   - `hsl(var(--chart-1))` (rosa), `hsl(var(--chart-2))` (verde), `hsl(var(--chart-3))` (amarelo), `hsl(var(--chart-4))` (roxo), `hsl(var(--chart-5))` (dourado), mais 3 tons de `--muted-foreground` com opacidades
-3. **Remover gráfico "Receitas vs Despesas"** da Dashboard — já existe no MonthlyHistory abaixo, duplicação
-4. **Manter "Evolução do Patrimônio"** pois é único e útil
-5. **Padronizar headers** — usar `<div className="flex items-center gap-2"><Icon className="w-4 h-4 text-muted-foreground" /><h3 className="text-xs font-bold uppercase tracking-wider">TÍTULO</h3></div>`
-
-**Arquivo: `src/components/finance/MonthlyHistory.tsx`**
-
-6. **Manter como está** — já usa tokens corretos (`chart-1`, `chart-2`, `primary`), sem emojis, design limpo
-
-**Arquivo: `src/pages/Index.tsx`**
-
-7. **Mover MonthComparison** da aba Dashboard para a aba Relatórios — é uma ferramenta de análise, não um resumo rápido
-8. **Tabs** — manter emojis nas tabs (📊💰📈❤️✈️🧮🏆📋💚) pois seguem o padrão dos outros módulos
-
-**Arquivo: `src/components/finance/BillReminderBanner.tsx`**
-
-9. Verificar se segue o padrão visual (sem emojis decorativos, usar ícones Lucide)
-
-### Resultado esperado
-
-Dashboard financeiro com a mesma energia do resto do app: limpo, Notion-like, cards sóbrios com acentos de cor sutis via tokens. Emojis **apenas** nas tabs. Gráficos sem duplicação. MonthComparison na aba certa (Relatórios).
+**Dependências:** Nenhuma nova (recharts já está disponível via shadcn/chart, framer-motion já instalado)
 

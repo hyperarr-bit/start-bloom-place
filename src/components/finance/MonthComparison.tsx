@@ -10,16 +10,18 @@ const ALL_MONTHS = [
 ];
 
 const categoryLabels: Record<string, string> = {
-  vestuario: "Vestuário",
-  restaurante: "Restaurante",
-  educacao: "Educação",
-  presente: "Presentes",
-  lazer: "Lazer",
-  eletrodomesticos: "Eletrodomésticos",
-  mercado: "Mercado",
-  transporte: "Transporte",
-  saude: "Saúde",
-  outros: "Outros",
+  alimentacao: "Alimentação", restaurante: "Restaurante", mercado: "Mercado",
+  transporte: "Transporte", combustivel: "Combustível", lazer: "Lazer",
+  entretenimento: "Entretenimento", saude: "Saúde", farmacia: "Farmácia",
+  vestuario: "Vestuário", beleza: "Beleza", educacao: "Educação",
+  eletronicos: "Eletrônicos", servicos: "Serviços", delivery: "Delivery",
+  presente: "Presentes", casa: "Casa", pets: "Pets", filhos: "Filhos",
+  viagem: "Viagem", moradia: "Moradia", contas_casa: "Contas da Casa",
+  condominio: "Condomínio", seguro: "Seguro", plano_saude: "Plano de Saúde",
+  assinaturas: "Assinaturas", internet_telefone: "Internet/Telefone",
+  academia: "Academia", transporte_fixo: "Transporte Fixo",
+  fatura_cartao: "Fatura Cartão", financiamento: "Financiamento",
+  pensao: "Pensão", outros: "Outros",
 };
 
 const COLORS = [

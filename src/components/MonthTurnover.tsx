@@ -599,14 +599,14 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 + i * 0.15 }}
-                      className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                      className="flex items-center gap-3 p-3.5 rounded-xl bg-accent/10 border border-accent/20"
                     >
                       <span className="text-2xl">{badge.icon}</span>
                       <div className="flex-1">
                         <p className="text-xs font-bold">{badge.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{badge.description}</p>
+                        <p className="text-xs text-muted-foreground">{badge.description}</p>
                       </div>
-                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <Trophy className="w-4 h-4 text-accent" />
                     </motion.div>
                   ))}
                 </div>

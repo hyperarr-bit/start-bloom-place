@@ -138,7 +138,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
           <div className="space-y-2">
             {Object.entries(byType).map(([type, data]) => {
               const percentage = (data.current / totalCurrentValue) * 100;
-              const typeInfo = typeLabels[type];
+              const typeInfo = typeLabels[type] || typeLabels.outros;
               const returnVal = data.current - data.invested;
               return (
                 <div key={type} className="flex items-center gap-3">
@@ -241,7 +241,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             investments.map((inv) => {
               const returnVal = inv.currentValue - inv.investedAmount;
               const returnPct = (returnVal / inv.investedAmount) * 100;
-              const typeInfo = typeLabels[inv.type];
+              const typeInfo = typeLabels[inv.type] || typeLabels.outros;
               return (
                 <div key={inv.id} className="p-3 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">

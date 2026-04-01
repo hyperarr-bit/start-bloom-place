@@ -161,7 +161,7 @@ export const MonthComparison = () => {
           Sem dados para comparar. Preencha pelo menos um mês.
         </p>
       ) : (
-        <div className="px-4 pb-4 space-y-3">
+        <div className="space-y-3">
           {/* Summary grid */}
           <div className="grid grid-cols-3 gap-2 text-center">
             {/* Receitas */}

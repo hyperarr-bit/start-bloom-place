@@ -342,18 +342,17 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                 exit={{ opacity: 0, y: -20 }}
                 className="p-6 space-y-4"
               >
-                {/* Header celebratório */}
-                <div className={`text-center space-y-2 rounded-xl p-4 -mx-1 bg-gradient-to-b ${toneColors[message.tone]} border`}>
+                {/* Header */}
+                <div className="text-center space-y-2 rounded-xl p-4 -mx-1 bg-muted/50 border border-border">
                   <motion.div
                     initial={{ scale: 0, rotate: -20 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    className="text-5xl"
                   >
-                    {message.emoji}
+                    {toneIcons[message.tone]}
                   </motion.div>
                   <h2 className="text-lg font-bold">{prevMonth} acabou!</h2>
-                  <p className="text-[11px] text-muted-foreground">Aqui está seu resumo 📊</p>
+                  <p className="text-xs text-muted-foreground">Aqui está seu resumo financeiro</p>
                 </div>
 
                 {/* Cards de receita e despesa */}

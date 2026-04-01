@@ -242,28 +242,24 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const getMessage = () => {
     if (prevBalance > 0 && savingsRate >= 30) {
       return {
-        emoji: "🏆",
         text: `Parabéns! Você economizou ${savingsRate.toFixed(0)}% da renda em ${prevMonth}. Continue assim!`,
         tone: "great" as const,
       };
     }
     if (prevBalance > 0) {
       return {
-        emoji: "✅",
         text: `Bom trabalho! Você fechou ${prevMonth} no positivo. Vamos manter o ritmo em ${currentMonth}!`,
         tone: "good" as const,
       };
     }
     if (prevBalance === 0) {
       return {
-        emoji: "⚖️",
         text: `${prevMonth} ficou no zero a zero. Que tal traçar uma meta de economia para ${currentMonth}?`,
         tone: "neutral" as const,
       };
     }
     return {
-      emoji: "💪",
-      text: `Seus gastos superaram a renda em ${prevMonth}. Que tal revisar os custos variáveis? Estamos juntos! 🤝`,
+      text: `Seus gastos superaram a renda em ${prevMonth}. Que tal revisar os custos variáveis? Estamos juntos!`,
       tone: "tough" as const,
     };
   };

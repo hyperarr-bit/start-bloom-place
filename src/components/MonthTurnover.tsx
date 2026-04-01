@@ -528,8 +528,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">📝 Copiar notas</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><StickyNote className="w-3.5 h-3.5 text-muted-foreground" /> Copiar notas</p>
+                      <p className="text-xs text-muted-foreground">
                         Anotações e lembretes financeiros ({prevNotesCount} itens)
                       </p>
                     </div>

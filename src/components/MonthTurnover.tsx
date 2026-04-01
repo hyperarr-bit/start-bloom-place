@@ -308,21 +308,21 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
       {prevHasData && (
         <button
           onClick={triggerRecap}
-          className="w-full bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20 p-3.5 flex items-center gap-3 hover:from-primary/10 hover:to-primary/15 transition-all text-left group"
+          className="w-full bg-card rounded-xl border border-border p-3.5 flex items-center gap-3 hover:bg-muted/50 transition-all text-left group"
         >
-          <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-            <Calendar className="w-5 h-5 text-primary" />
+          <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <CalendarCheck className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold">📊 Resumo de {prevMonth}</p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              Toque para ver como foi seu mês e preparar {currentMonth}
+            <p className="text-xs font-bold">Resumo de {prevMonth}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Toque para ver como foi seu mês
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {prevBalance >= 0
-              ? <span className="text-[10px] font-bold text-emerald-500">+R$ {prevBalance.toLocaleString("pt-BR")}</span>
-              : <span className="text-[10px] font-bold text-destructive">-R$ {Math.abs(prevBalance).toLocaleString("pt-BR")}</span>
+              ? <span className="text-xs font-bold text-card-receitas-text">+R$ {prevBalance.toLocaleString("pt-BR")}</span>
+              : <span className="text-xs font-bold text-card-dividas-text">-R$ {Math.abs(prevBalance).toLocaleString("pt-BR")}</span>
             }
             <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
           </div>

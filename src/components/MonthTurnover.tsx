@@ -91,6 +91,24 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
     return Array.isArray(raw) ? raw.length : 0;
   })();
 
+  const prevIncomesCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.incomes, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
+  const prevInstallmentsCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.installments, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
+  const prevNotesCount = (() => {
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.notes, []);
+    return Array.isArray(raw) ? raw.length : 0;
+  })();
+
   const totalExpenses = prevData.custosFixos + prevData.custosVariaveis;
   const prevBalance = prevData.receitas - totalExpenses - prevData.dividas;
 

@@ -1,96 +1,133 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 0 0% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 15%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 0 0% 20%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 40 20% 96%;
+    --secondary-foreground: 0 0% 15%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 40 15% 95%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 330 65% 50%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 142 55% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --card-receitas: 45 80% 90%;
+    --card-receitas-border: 45 70% 75%;
+    --card-receitas-text: 45 60% 30%;
+
+    --card-despesas: 250 60% 90%;
+    --card-despesas-border: 250 50% 78%;
+    --card-despesas-text: 250 50% 35%;
+
+    --card-dividas: 330 65% 90%;
+    --card-dividas-border: 330 55% 78%;
+    --card-dividas-text: 330 55% 35%;
+
+    --card-investimentos: 142 50% 88%;
+    --card-investimentos-border: 142 45% 72%;
+    --card-investimentos-text: 142 45% 28%;
+
+    --income: 45 60% 94%;
+    --income-foreground: 45 50% 25%;
+
+    --expense: 330 50% 94%;
+    --expense-foreground: 330 50% 35%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 20%;
 
     --radius: 0.5rem;
 
+    --chart-1: 330 65% 50%;
+    --chart-2: 142 55% 42%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 250 60% 55%;
+    --chart-5: 45 80% 50%;
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --background: 220 10% 6%;
+    --foreground: 0 0% 94%;
+    --card: 220 10% 9%;
+    --card-foreground: 0 0% 94%;
+    --popover: 220 10% 9%;
+    --popover-foreground: 0 0% 94%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 220 10% 8%;
+    --secondary: 220 8% 14%;
+    --secondary-foreground: 0 0% 94%;
+    --muted: 220 8% 14%;
+    --muted-foreground: 0 0% 55%;
+    --accent: 330 65% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 55% 48%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+    --card-receitas: 45 35% 14%;
+    --card-receitas-border: 45 40% 25%;
+    --card-receitas-text: 45 65% 72%;
+    --card-despesas: 250 25% 15%;
+    --card-despesas-border: 250 30% 28%;
+    --card-despesas-text: 250 55% 75%;
+    --card-dividas: 330 25% 15%;
+    --card-dividas-border: 330 30% 28%;
+    --card-dividas-text: 330 55% 75%;
+    --card-investimentos: 142 25% 13%;
+    --card-investimentos-border: 142 30% 24%;
+    --card-investimentos-text: 142 50% 68%;
+    --income: 45 25% 13%;
+    --income-foreground: 45 55% 72%;
+    --expense: 330 25% 13%;
+    --expense-foreground: 330 55% 72%;
+    --border: 220 8% 16%;
+    --input: 220 8% 16%;
+    --ring: 0 0% 80%;
+    --sidebar-background: 220 10% 7%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 224 76% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 220 8% 14%;
+    --sidebar-accent-foreground: 0 0% 92%;
+    --sidebar-border: 220 8% 14%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -100,6 +137,108 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+@layer components {
+  .table-header-dark {
+    @apply bg-foreground text-background font-semibold text-center py-2.5 text-xs uppercase tracking-widest;
+  }
+
+  .table-header-pink {
+    @apply bg-accent text-accent-foreground font-semibold text-center py-2.5 text-xs uppercase tracking-widest;
+  }
+
+  .table-cell {
+    @apply px-3 py-2 border-b border-border text-sm;
+  }
+
+  .category-badge {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .due-card {
+    @apply rounded-lg p-3 border border-border;
+  }
+
+  .notion-tab {
+    @apply px-4 py-1.5 text-sm border border-border rounded-sm cursor-pointer transition-colors;
+  }
+
+  .notion-tab-active {
+    @apply bg-foreground text-background;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  @keyframes jiggle {
+    0%, 100% { transform: rotate(-0.7deg); }
+    50% { transform: rotate(0.7deg); }
+  }
+
+  .animate-jiggle {
+    animation: jiggle 0.15s ease-in-out infinite;
+  }
+
+  /* ===== Skincare Module Accent Colors ===== */
+  :root {
+    --sk-mint: 150 60% 42%;
+    --sk-lavender: 245 40% 60%;
+    --sk-coral: 6 80% 58%;
+  }
+
+  .dark {
+    --sk-mint: 150 80% 65%;
+    --sk-lavender: 245 58% 80%;
+    --sk-coral: 6 100% 69%;
+  }
+
+  .sk-card {
+    @apply bg-card rounded-2xl p-4 border border-border shadow-sm;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px hsla(6, 100%, 69%, 0.4); }
+    50% { box-shadow: 0 0 20px hsla(6, 100%, 69%, 0.7); }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* ===== Saúde Module Accent Colors ===== */
+  :root {
+    --saude-green: 145 70% 40%;
+    --saude-blue: 200 80% 45%;
+    --saude-yellow: 45 90% 48%;
+    --saude-red: 0 75% 50%;
+    --saude-card: 0 0% 96%;
+    --saude-muted: 0 0% 45%;
+  }
+
+  .dark {
+    --saude-green: 145 100% 50%;
+    --saude-blue: 186 100% 50%;
+    --saude-yellow: 50 100% 50%;
+    --saude-red: 0 100% 59%;
+    --saude-card: 0 0% 15%;
+    --saude-muted: 0 0% 60%;
+  }
+
+  .saude-card {
+    @apply bg-card rounded-2xl p-4 border border-border shadow-sm;
   }
 }

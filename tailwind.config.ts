@@ -47,6 +47,51 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        income: {
+          DEFAULT: "hsl(var(--income))",
+          foreground: "hsl(var(--income-foreground))",
+        },
+        expense: {
+          DEFAULT: "hsl(var(--expense))",
+          foreground: "hsl(var(--expense-foreground))",
+        },
+        "card-receitas": {
+          DEFAULT: "hsl(var(--card-receitas))",
+          border: "hsl(var(--card-receitas-border))",
+          text: "hsl(var(--card-receitas-text))",
+        },
+        "card-despesas": {
+          DEFAULT: "hsl(var(--card-despesas))",
+          border: "hsl(var(--card-despesas-border))",
+          text: "hsl(var(--card-despesas-text))",
+        },
+        "card-dividas": {
+          DEFAULT: "hsl(var(--card-dividas))",
+          border: "hsl(var(--card-dividas-border))",
+          text: "hsl(var(--card-dividas-text))",
+        },
+        "card-investimentos": {
+          DEFAULT: "hsl(var(--card-investimentos))",
+          border: "hsl(var(--card-investimentos-border))",
+          text: "hsl(var(--card-investimentos-text))",
+        },
+        "sk-mint": "hsl(var(--sk-mint, 120 100% 80%))",
+        "sk-lavender": "hsl(var(--sk-lavender, 245 58% 90%))",
+        "sk-coral": "hsl(var(--sk-coral, 6 100% 69%))",
+        "saude-green": "hsl(var(--saude-green))",
+        "saude-blue": "hsl(var(--saude-blue))",
+        "saude-yellow": "hsl(var(--saude-yellow))",
+        "saude-red": "hsl(var(--saude-red))",
+        "saude-card": "hsl(var(--saude-card))",
+        "saude-muted": "hsl(var(--saude-muted))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -65,25 +110,22 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },

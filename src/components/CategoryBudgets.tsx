@@ -36,8 +36,8 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
     return acc;
   }, {});
 
-  const activeCats = categories.filter(c => budgets[c.value] || spentByCategory[c.value]);
-  const unsetCats = categories.filter(c => !budgets[c.value]);
+  const activeCats = categories.filter(c => budgets[c.value] || spentByCategory[c.value] || editing === c.value);
+  const unsetCats = categories.filter(c => !budgets[c.value] && editing !== c.value);
 
   const startEdit = (cat: string) => {
     setEditing(cat);

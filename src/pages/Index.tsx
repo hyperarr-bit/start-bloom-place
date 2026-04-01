@@ -194,7 +194,6 @@ const Index = () => {
               setOpenMonth(month);
               setActiveTab("financeiro");
             }} />
-            <MonthComparison />
           </>
         )}
 

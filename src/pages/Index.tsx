@@ -179,7 +179,6 @@ const Index = () => {
         {activeTab === "dashboard" && (
           <>
             <Dashboard
-            <Dashboard
               totalIncome={totalIncome}
               totalExpenses={totalExpenses}
               totalDebts={totalDebts}

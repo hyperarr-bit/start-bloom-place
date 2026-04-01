@@ -100,9 +100,9 @@ export function useBillReminders() {
     }
   }, []);
 
-  // Auto-check and notify on mount
+  // Auto-check and notify once data is loaded
   useEffect(() => {
-    if (notifiedRef.current) return;
+    if (!loaded || notifiedRef.current) return;
     notifiedRef.current = true;
 
     const timer = setTimeout(() => {
@@ -113,7 +113,7 @@ export function useBillReminders() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [getUpcomingBills, sendBrowserNotification]);
+  }, [loaded, getUpcomingBills, sendBrowserNotification]);
 
   return {
     getUpcomingBills,

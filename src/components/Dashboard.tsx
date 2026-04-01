@@ -291,7 +291,10 @@ export const Dashboard = ({
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Expense Pie Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">📊 GASTOS POR CATEGORIA</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <PieChartIcon className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold uppercase tracking-wider">GASTOS POR CATEGORIA</h3>
+          </div>
           {expensesByCategory.length > 0 ? (
             <div className="flex items-center gap-4">
               <ResponsiveContainer width="50%" height={180}>

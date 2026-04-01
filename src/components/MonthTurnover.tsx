@@ -190,7 +190,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
           onClick={triggerRecap}
           className="w-full bg-card rounded-lg border border-border overflow-hidden hover:bg-muted/20 transition-colors text-left"
         >
-          <div className="bg-accent/20 px-4 py-2 flex items-center gap-2">
+          <div className="bg-muted/40 px-4 py-2 flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-[11px] font-bold tracking-wide uppercase">Resumo de {prevMonth}</span>
             <ArrowRight className="w-3.5 h-3.5 text-muted-foreground ml-auto" />

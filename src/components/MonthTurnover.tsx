@@ -191,7 +191,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   }, [loaded, lastSeenMonth]);
 
   // copyToMonth using useUserData
-  const copyToMonth = useCallback((fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean }) => {
+  const copyToMonth = useCallback((fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean; incomes: boolean; installments: boolean; notes: boolean }) => {
     const fromKeys = getFinanceStorageKeys(fromMonth);
     const toKeys = getFinanceStorageKeys(toMonth);
 
@@ -211,6 +211,30 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
           bills: (d.bills || []).map((b: any) => ({ ...b, id: Date.now().toString() + Math.random(), paid: false })),
         }));
         setData(toKeys.dueDays, days);
+      }
+    }
+
+    if (options.incomes) {
+      const incomes = get(fromKeys.incomes, []);
+      if (Array.isArray(incomes) && incomes.length > 0) {
+        const items = incomes.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.incomes, items);
+      }
+    }
+
+    if (options.installments) {
+      const installments = get(fromKeys.installments, []);
+      if (Array.isArray(installments) && installments.length > 0) {
+        const items = installments.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.installments, items);
+      }
+    }
+
+    if (options.notes) {
+      const notes = get(fromKeys.notes, []);
+      if (Array.isArray(notes) && notes.length > 0) {
+        const items = notes.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.notes, items);
       }
     }
   }, [get, setData]);

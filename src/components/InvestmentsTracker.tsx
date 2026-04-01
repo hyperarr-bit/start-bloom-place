@@ -138,7 +138,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
           <div className="space-y-2">
             {Object.entries(byType).map(([type, data]) => {
               const percentage = (data.current / totalCurrentValue) * 100;
-              const typeInfo = typeLabels[type];
+              const typeInfo = typeLabels[type] || typeLabels.outros;
               const returnVal = data.current - data.invested;
               return (
                 <div key={type} className="flex items-center gap-3">

@@ -324,7 +324,10 @@ export const Dashboard = ({
 
         {/* Monthly Bar Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">📈 RECEITAS VS DESPESAS</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold uppercase tracking-wider">RECEITAS VS DESPESAS</h3>
+          </div>
           {monthlyBarData.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={monthlyBarData}>

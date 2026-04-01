@@ -259,7 +259,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       <p className="text-sm font-medium">{inv.name}</p>
                       <div className="flex items-center gap-4 mt-1 text-xs">
                         <span className="text-muted-foreground">
-                          Investido: R$ {inv.investedAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          Investido: R$ {(inv.investedAmount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </span>
                         <span className={returnVal >= 0 ? "text-green-400" : "text-red-400"}>
                           Retorno: {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} ({returnPct.toFixed(2)}%)

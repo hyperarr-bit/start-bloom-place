@@ -11,7 +11,7 @@ const categories = [
   { value: "lazer", label: "Lazer", color: "bg-purple-100/80 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300", bar: "bg-purple-500" },
   { value: "saude", label: "Saúde", color: "bg-green-100/80 text-green-700 dark:bg-green-500/15 dark:text-green-300", bar: "bg-green-500" },
   { value: "educacao", label: "Educação", color: "bg-teal-100/80 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300", bar: "bg-teal-500" },
-  { value: "vestuario", label: "Vestuário", color: "bg-pink-100/80 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300", bar: "bg-pink-500" },
+  { value: "vestuario", label: "Vestuário", color: "bg-violet-100/80 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300", bar: "bg-violet-500" },
   { value: "eletronicos", label: "Eletrônicos", color: "bg-red-100/80 text-red-600 dark:bg-red-500/15 dark:text-red-300", bar: "bg-red-500" },
   { value: "presente", label: "Presente", color: "bg-fuchsia-100/80 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300", bar: "bg-fuchsia-500" },
   { value: "beleza", label: "Beleza", color: "bg-violet-100/80 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300", bar: "bg-violet-500" },
@@ -71,7 +71,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
     <div className="animate-fade-in space-y-4">
       {/* Header */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="bg-accent/20 px-4 py-2.5 flex items-center gap-2">
+        <div className="bg-muted/40 px-4 py-2.5 flex items-center gap-2">
           <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-bold tracking-wide uppercase">Limites por Categoria</span>
         </div>

@@ -129,7 +129,7 @@ export const MonthComparison = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border p-4 animate-fade-in">
-      <h3 className="text-xs font-bold mb-3">📊 COMPARAÇÃO MENSAL</h3>
+      <h3 className="text-xs font-bold mb-3">📈 COMPARAÇÃO MENSAL</h3>
 
       {/* Month selectors */}
       <div className="flex items-center gap-2 mb-3">

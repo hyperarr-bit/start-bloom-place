@@ -475,8 +475,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <motion.div
                     initial={{ y: -10 }}
                     animate={{ y: 0 }}
-                    className="text-4xl"
-                  >📋</motion.div>
+                  >
+                    <Copy className="w-8 h-8 text-primary mx-auto" />
+                  </motion.div>
                   <h2 className="text-lg font-bold">Preparar {currentMonth}</h2>
                   <p className="text-xs text-muted-foreground">
                     Quer copiar seus custos fixos de {prevMonth} para {currentMonth}?

@@ -1,74 +1,50 @@
 
 
-## Plano: 8 Melhorias para o CORE App
+## Por que a Virada de Mês não funciona
 
-### 1. PWA — App instalável no celular
-- Criar `public/manifest.json` com nome, ícones, cores e `display: standalone`
-- Criar `public/sw.js` (service worker básico com cache de assets)
-- Registrar service worker em `src/main.tsx`
-- Adicionar `<link rel="manifest">` e meta tags no `index.html`
-- Adicionar prompt "Instalar app" na Home quando disponível
+Encontrei **3 bugs** no componente `MonthTurnover.tsx`:
 
-### 2. Empty States — Telas vazias com ilustração e CTA
-- Criar componente reutilizável `src/components/EmptyState.tsx` com ícone, título, descrição e botão de ação
-- Aplicar em: `IncomeTable`, `ExpenseTable`, `FixedExpensesTable`, `FinancialGoals`, `InstallmentTracker`, `InvestmentsTracker`, `WishlistItems`
-- Cada empty state terá um ícone contextual e texto motivacional em português
+### Bug 1: Condição nunca é verdadeira na primeira vez
+Linha 127:
+```js
+if (lastSeenMonth && lastSeenMonth !== currentKey && prevHasData) {
+```
+Na primeira vez, `lastSeenMonth` é `""` (string vazia = falsy), então a condição falha. Logo em seguida (linha 130-132), o valor é atualizado para `"Abril-2026"`. Na próxima visita, `lastSeenMonth === currentKey`, então também não mostra. **O modal nunca aparece.**
 
-### 3. Micro-interações e animações de feedback
-- Adicionar `framer-motion` animations ao adicionar/remover itens nas tabelas (layout animations)
-- Animação de confetti/pulse ao completar uma meta ou marcar conta como paga
-- Transições suaves nos cards do Dashboard ao carregar dados
-- Botões com `whileTap={{ scale: 0.95 }}` nos componentes principais
+### Bug 2: `getMonthTotals` lê direto do localStorage
+A função `getMonthTotals` em `storage-keys.ts` usa `localStorage.getItem()` direto, mas os dados são gerenciados pelo `useUserData` (que armazena no Supabase + cache local). Se o usuário nunca usou as chaves com prefixo de mês (`finance-month-marco-*`), os dados de Março estarão nas chaves base (`finance-incomes`, etc.) — mas `getMonthTotals("Março")` busca nas chaves prefixadas. Resultado: `prevHasData` é sempre `false` para o mês anterior se era o mês corrente quando os dados foram inseridos.
 
-### 4. Recuperação de senha
-- Adicionar link "Esqueci minha senha" na página `Auth.tsx`
-- Criar página `src/pages/ResetPassword.tsx` com campo de email para envio do link
-- Criar página `src/pages/UpdatePassword.tsx` para definir nova senha (recebe token via URL)
-- Adicionar `resetPassword` no `use-auth.tsx` usando `supabase.auth.resetPasswordForEmail`
-- Adicionar rotas `/reset-password` e `/update-password` no `App.tsx`
+### Bug 3: `copyToMonth` também usa localStorage direto
+Mesmo problema — lê/escreve `localStorage` diretamente em vez de usar o `useUserData`.
 
-### 5. Dashboard com gráficos melhorados
-- Adicionar gráfico de evolução mensal (linha) no Dashboard usando `recharts` (já disponível via shadcn chart)
-- Gráfico de pizza para distribuição de despesas por categoria
-- Card de tendência mostrando se gastos estão subindo ou descendo vs mês anterior
-- Indicador visual de saúde financeira (gauge/termômetro)
+---
 
-### 6. Gamificação aprimorada
-- Adicionar sistema de badges/conquistas no componente `Gamification.tsx`
-- Badges: "Primeira meta", "7 dias seguidos", "Investidor iniciante", "Sem dívidas"
-- Animação de desbloqueio com modal celebratório
-- Persistir badges no `usePersistedState`
+## Plano de Correção
 
-### 7. Sincronização offline melhorada
-- Implementar queue de operações offline em `src/hooks/use-offline-queue.ts`
-- Detectar estado online/offline com `navigator.onLine` e evento listeners
-- Mostrar banner "Modo offline" quando desconectado
-- Sincronizar dados pendentes quando voltar online
+### 1. Corrigir a lógica de detecção de virada de mês
+- Mudar a condição: se `lastSeenMonth` está vazio OU diferente do mês atual, e o mês anterior tem dados → mostrar modal
+- Separar o conceito de "primeira visita" (não mostrar) de "virada de mês" (mostrar)
+- Lógica correta: se `lastSeenMonth` não está vazio E é diferente do currentKey → virada detectada
 
-### 8. Dark mode refinado
-- Revisar variáveis CSS do dark mode em `index.css` para melhor contraste
-- Ajustar cards financeiros (receitas, despesas, dívidas, investimentos) no dark mode
-- Garantir que gráficos e badges respeitem o tema
-- Melhorar bordas e sombras no dark mode
+### 2. Corrigir `getMonthTotals` para o mês anterior
+- O mês anterior (Março) era o mês corrente quando o usuário inseriu dados, então os dados estão nas chaves base (`finance-incomes`, etc.), não nas chaves prefixadas
+- Ajustar `getMonthTotals` para considerar isso: quando o mês pedido era o "mês corrente do período anterior", buscar nas chaves base arquivadas
+- Alternativa mais simples: ao detectar virada de mês, **primeiro arquivar** os dados do mês que acabou (mover das chaves base para chaves prefixadas) antes de calcular totais
 
-### Detalhes técnicos
+### 3. Implementar "arquivamento" automático na virada
+- Quando detectar que virou o mês, copiar os dados das chaves base para as chaves do mês anterior (prefixadas)
+- Limpar as chaves base para o novo mês começar limpo
+- Usar `useUserData().set()` em vez de `localStorage` direto
 
-**Arquivos novos:**
-- `public/manifest.json`, `public/sw.js`
-- `src/components/EmptyState.tsx`
-- `src/pages/ResetPassword.tsx`, `src/pages/UpdatePassword.tsx`
-- `src/hooks/use-offline-queue.ts`
+### 4. Garantir que `copyToMonth` use o sistema correto
+- Atualizar para usar `useUserData` em vez de `localStorage` direto
 
-**Arquivos modificados:**
-- `index.html` — meta tags PWA
-- `src/main.tsx` — registro do service worker
-- `src/App.tsx` — novas rotas
-- `src/pages/Auth.tsx` — link "Esqueci minha senha"
-- `src/hooks/use-auth.tsx` — função resetPassword
-- `src/index.css` — refinamento dark mode
-- `src/components/Gamification.tsx` — sistema de badges
-- `src/components/Dashboard.tsx` — gráficos
-- Tabelas financeiras — empty states e micro-interações
+### Arquivos a modificar
+- `src/components/MonthTurnover.tsx` — lógica do useEffect, arquivamento, usar useUserData
+- `src/components/finance/storage-keys.ts` — ajustar `getMonthTotals` para aceitar um getter customizado
 
-**Dependências:** Nenhuma nova (recharts já está disponível via shadcn/chart, framer-motion já instalado)
+### Resultado esperado
+- No dia 1º de Abril, ao abrir a aba Finanças, o modal de recap de Março aparece automaticamente
+- O wizard de cópia funciona corretamente
+- Os dados são persistidos via Supabase (não localStorage direto)
 

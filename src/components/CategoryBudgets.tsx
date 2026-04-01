@@ -76,7 +76,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
           <span className="text-xs font-bold tracking-wide uppercase">Limites por Categoria</span>
         </div>
 
-        {!hasBudgets && activeCats.length === 0 ? (
+        {!hasBudgets && activeCats.length === 0 && !editing ? (
           <EmptyState
             icon={Target}
             title="Sem limites definidos"

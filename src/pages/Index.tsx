@@ -26,6 +26,7 @@ import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
+import { MonthComparison } from "@/components/finance/MonthComparison";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -177,16 +178,19 @@ const Index = () => {
         )}
 
         {activeTab === "dashboard" && (
-          <Dashboard
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            expenses={expenses}
-            fixedExpenses={fixedExpenses}
-            dueDays={dueDays}
-            savingsRate={savingsRate}
-          />
+          <>
+            <Dashboard
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              expenses={expenses}
+              fixedExpenses={fixedExpenses}
+              dueDays={dueDays}
+              savingsRate={savingsRate}
+            />
+            <MonthComparison />
+          </>
         )}
 
         {activeTab === "financeiro" && (

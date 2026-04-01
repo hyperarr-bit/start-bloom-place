@@ -117,6 +117,7 @@ export function useBillReminders() {
 
   return {
     getUpcomingBills,
+    getAllMonthBills,
     requestNotificationPermission,
     notificationSupported: typeof window !== "undefined" && "Notification" in window,
     notificationPermission: typeof window !== "undefined" && "Notification" in window

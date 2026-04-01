@@ -27,6 +27,7 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { BillReminderBanner } from "@/components/finance/BillReminderBanner";
 import { MonthlyHistory } from "@/components/finance/MonthlyHistory";
+import { MonthComparison } from "@/components/finance/MonthComparison";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -178,7 +179,6 @@ const Index = () => {
 
         {activeTab === "dashboard" && (
           <>
-            <BillReminderBanner />
             <Dashboard
               totalIncome={totalIncome}
               totalExpenses={totalExpenses}
@@ -194,6 +194,7 @@ const Index = () => {
               setOpenMonth(month);
               setActiveTab("financeiro");
             }} />
+            <MonthComparison />
           </>
         )}
 

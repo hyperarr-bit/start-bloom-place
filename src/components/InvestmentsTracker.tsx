@@ -241,7 +241,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             investments.map((inv) => {
               const returnVal = inv.currentValue - inv.investedAmount;
               const returnPct = (returnVal / inv.investedAmount) * 100;
-              const typeInfo = typeLabels[inv.type];
+              const typeInfo = typeLabels[inv.type] || typeLabels.outros;
               return (
                 <div key={inv.id} className="p-3 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">

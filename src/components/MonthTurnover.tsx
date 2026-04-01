@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
-import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar, Trophy, Flame, Target } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, CalendarCheck, Trophy, Flame, Target, CheckCircle, FileText, Receipt, CreditCard, StickyNote, DollarSign } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, BASE_FINANCE_KEYS, getPrefixedKeys } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -242,28 +242,24 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const getMessage = () => {
     if (prevBalance > 0 && savingsRate >= 30) {
       return {
-        emoji: "🏆",
         text: `Parabéns! Você economizou ${savingsRate.toFixed(0)}% da renda em ${prevMonth}. Continue assim!`,
         tone: "great" as const,
       };
     }
     if (prevBalance > 0) {
       return {
-        emoji: "✅",
         text: `Bom trabalho! Você fechou ${prevMonth} no positivo. Vamos manter o ritmo em ${currentMonth}!`,
         tone: "good" as const,
       };
     }
     if (prevBalance === 0) {
       return {
-        emoji: "⚖️",
         text: `${prevMonth} ficou no zero a zero. Que tal traçar uma meta de economia para ${currentMonth}?`,
         tone: "neutral" as const,
       };
     }
     return {
-      emoji: "💪",
-      text: `Seus gastos superaram a renda em ${prevMonth}. Que tal revisar os custos variáveis? Estamos juntos! 🤝`,
+      text: `Seus gastos superaram a renda em ${prevMonth}. Que tal revisar os custos variáveis? Estamos juntos!`,
       tone: "tough" as const,
     };
   };
@@ -295,11 +291,11 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
     setShowRecap(true);
   };
 
-  const toneColors = {
-    great: "from-amber-400/20 to-yellow-500/10 border-amber-400/40",
-    good: "from-emerald-400/20 to-green-500/10 border-emerald-400/40",
-    neutral: "from-blue-400/20 to-sky-500/10 border-blue-400/40",
-    tough: "from-orange-400/20 to-red-500/10 border-orange-400/40",
+  const toneIcons = {
+    great: <Trophy className="w-8 h-8 text-accent" />,
+    good: <CheckCircle className="w-8 h-8 text-card-receitas-text" />,
+    neutral: <Target className="w-8 h-8 text-primary" />,
+    tough: <Flame className="w-8 h-8 text-card-dividas-text" />,
   };
 
   return (
@@ -308,21 +304,21 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
       {prevHasData && (
         <button
           onClick={triggerRecap}
-          className="w-full bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl border border-primary/20 p-3.5 flex items-center gap-3 hover:from-primary/10 hover:to-primary/15 transition-all text-left group"
+          className="w-full bg-card rounded-xl border border-border p-3.5 flex items-center gap-3 hover:bg-muted/50 transition-all text-left group"
         >
-          <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-            <Calendar className="w-5 h-5 text-primary" />
+          <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <CalendarCheck className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold">📊 Resumo de {prevMonth}</p>
-            <p className="text-[10px] text-muted-foreground truncate">
-              Toque para ver como foi seu mês e preparar {currentMonth}
+            <p className="text-xs font-bold">Resumo de {prevMonth}</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Toque para ver como foi seu mês
             </p>
           </div>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {prevBalance >= 0
-              ? <span className="text-[10px] font-bold text-emerald-500">+R$ {prevBalance.toLocaleString("pt-BR")}</span>
-              : <span className="text-[10px] font-bold text-destructive">-R$ {Math.abs(prevBalance).toLocaleString("pt-BR")}</span>
+              ? <span className="text-xs font-bold text-card-receitas-text">+R$ {prevBalance.toLocaleString("pt-BR")}</span>
+              : <span className="text-xs font-bold text-card-dividas-text">-R$ {Math.abs(prevBalance).toLocaleString("pt-BR")}</span>
             }
             <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
@@ -342,18 +338,17 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                 exit={{ opacity: 0, y: -20 }}
                 className="p-6 space-y-4"
               >
-                {/* Header celebratório */}
-                <div className={`text-center space-y-2 rounded-xl p-4 -mx-1 bg-gradient-to-b ${toneColors[message.tone]} border`}>
+                {/* Header */}
+                <div className="text-center space-y-2 rounded-xl p-4 -mx-1 bg-muted/50 border border-border">
                   <motion.div
                     initial={{ scale: 0, rotate: -20 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                    className="text-5xl"
                   >
-                    {message.emoji}
+                    {toneIcons[message.tone]}
                   </motion.div>
                   <h2 className="text-lg font-bold">{prevMonth} acabou!</h2>
-                  <p className="text-[11px] text-muted-foreground">Aqui está seu resumo 📊</p>
+                  <p className="text-xs text-muted-foreground">Aqui está seu resumo financeiro</p>
                 </div>
 
                 {/* Cards de receita e despesa */}
@@ -362,13 +357,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20"
+                    className="rounded-xl p-3 bg-card-receitas border border-card-receitas-border"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <TrendingUp className="w-3 h-3 text-emerald-500" />
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Receitas</span>
+                      <TrendingUp className="w-3 h-3 text-card-receitas-text" />
+                      <span className="text-xs text-card-receitas-text font-medium">Receitas</span>
                     </div>
-                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    <p className="text-sm font-bold text-card-receitas-text">
                       R$ {prevData.receitas.toLocaleString("pt-BR")}
                     </p>
                   </motion.div>
@@ -376,13 +371,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.35 }}
-                    className="rounded-xl p-3 bg-red-500/10 border border-red-500/20"
+                    className="rounded-xl p-3 bg-card-despesas border border-card-despesas-border"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <TrendingDown className="w-3 h-3 text-red-500" />
-                      <span className="text-[10px] text-red-600 dark:text-red-400 font-medium">Despesas</span>
+                      <TrendingDown className="w-3 h-3 text-card-despesas-text" />
+                      <span className="text-xs text-card-despesas-text font-medium">Despesas</span>
                     </div>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                    <p className="text-sm font-bold text-card-despesas-text">
                       R$ {totalExpenses.toLocaleString("pt-BR")}
                     </p>
                   </motion.div>
@@ -394,11 +389,11 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.4 }}
                   className={`rounded-xl p-4 text-center border ${
-                    prevBalance >= 0 ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"
+                    prevBalance >= 0 ? "bg-card-investimentos border-card-investimentos-border" : "bg-card-dividas border-card-dividas-border"
                   }`}
                 >
-                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Saldo</span>
-                  <p className={`text-2xl font-bold mt-1 ${prevBalance >= 0 ? "text-emerald-500" : "text-destructive"}`}>
+                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Saldo</span>
+                  <p className={`text-2xl font-bold mt-1 ${prevBalance >= 0 ? "text-card-investimentos-text" : "text-card-dividas-text"}`}>
                     {prevBalance >= 0 ? "+" : "-"}R$ {Math.abs(prevBalance).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </motion.div>
@@ -409,7 +404,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/30 border border-border/50">
                       <Target className="w-3.5 h-3.5 text-primary" />
                       <div>
-                        <span className="text-[9px] text-muted-foreground block">Contas pagas</span>
+                        <span className="text-xs text-muted-foreground block">Contas pagas</span>
                         <span className="text-xs font-bold">
                           {prevBillsInfo.paid}/{prevBillsInfo.total} ({Math.round((prevBillsInfo.paid / prevBillsInfo.total) * 100)}%)
                         </span>
@@ -418,9 +413,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   )}
                   {savingsRate > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/30 border border-border/50">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" />
+                      <Flame className="w-3.5 h-3.5 text-accent" />
                       <div>
-                        <span className="text-[9px] text-muted-foreground block">Economia</span>
+                        <span className="text-xs text-muted-foreground block">Economia</span>
                         <span className="text-xs font-bold">{savingsRate.toFixed(0)}% da renda</span>
                       </div>
                     </div>
@@ -432,7 +427,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5 }}
-                  className={`rounded-xl p-3 bg-gradient-to-r ${toneColors[message.tone]} border`}
+                  className="rounded-xl p-3 bg-muted/50 border border-border"
                 >
                   <p className="text-xs text-center leading-relaxed">{message.text}</p>
                 </motion.div>
@@ -448,7 +443,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       onOpenMonth?.(prevMonth);
                     }}
                   >
-                    📄 Ver detalhes
+                    <FileText className="w-3.5 h-3.5" />
+                    Ver detalhes
                   </Button>
                   <Button
                     size="sm"
@@ -456,7 +452,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     onClick={() => setStep("copy")}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    Começar {currentMonth}! 🚀
+                    Começar {currentMonth}
                   </Button>
                 </div>
               </motion.div>
@@ -475,8 +471,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <motion.div
                     initial={{ y: -10 }}
                     animate={{ y: 0 }}
-                    className="text-4xl"
-                  >📋</motion.div>
+                  >
+                    <Copy className="w-8 h-8 text-primary mx-auto" />
+                  </motion.div>
                   <h2 className="text-lg font-bold">Preparar {currentMonth}</h2>
                   <p className="text-xs text-muted-foreground">
                     Quer copiar seus custos fixos de {prevMonth} para {currentMonth}?
@@ -487,8 +484,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyFixed} onCheckedChange={(v) => setCopyFixed(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">✅ Copiar custos fixos</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><Receipt className="w-3.5 h-3.5 text-muted-foreground" /> Copiar custos fixos</p>
+                      <p className="text-xs text-muted-foreground">
                         Aluguel, contas, assinaturas ({prevFixedCount} itens)
                       </p>
                     </div>
@@ -497,8 +494,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyBills} onCheckedChange={(v) => setCopyBills(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">✅ Copiar vencimentos</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><CalendarCheck className="w-3.5 h-3.5 text-muted-foreground" /> Copiar vencimentos</p>
+                      <p className="text-xs text-muted-foreground">
                         Contas por dia de vencimento (marcadas como não pagas)
                       </p>
                     </div>
@@ -507,8 +504,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">💰 Copiar receitas</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> Copiar receitas</p>
+                      <p className="text-xs text-muted-foreground">
                         Salário, freelance, etc. — valores podem variar ({prevIncomesCount} itens)
                       </p>
                     </div>
@@ -517,8 +514,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyInstallments} onCheckedChange={(v) => setCopyInstallments(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">📑 Copiar parcelas/dívidas</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><CreditCard className="w-3.5 h-3.5 text-muted-foreground" /> Copiar parcelas/dívidas</p>
+                      <p className="text-xs text-muted-foreground">
                         Parcelas em andamento continuam no novo mês ({prevInstallmentsCount} itens)
                       </p>
                     </div>
@@ -527,8 +524,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <label className="flex items-center gap-3 p-3.5 rounded-xl border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
                     <div className="flex-1">
-                      <p className="text-xs font-bold">📝 Copiar notas</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-xs font-bold flex items-center gap-1.5"><StickyNote className="w-3.5 h-3.5 text-muted-foreground" /> Copiar notas</p>
+                      <p className="text-xs text-muted-foreground">
                         Anotações e lembretes financeiros ({prevNotesCount} itens)
                       </p>
                     </div>
@@ -541,7 +538,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     animate={{ scale: 1 }}
                     className="text-center py-4"
                   >
-                    <p className="text-sm font-bold text-emerald-500">✅ Dados copiados com sucesso!</p>
+                    <p className="text-sm font-bold text-success flex items-center justify-center gap-1.5"><CheckCircle className="w-4 h-4" /> Dados copiados com sucesso!</p>
                   </motion.div>
                 ) : (
                   <div className="flex gap-2 pt-1">
@@ -584,8 +581,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     initial={{ scale: 0, rotate: -30 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: "spring", stiffness: 200 }}
-                    className="text-5xl"
-                  >🏆</motion.div>
+                  >
+                    <Trophy className="w-8 h-8 text-accent mx-auto" />
+                  </motion.div>
                   <h2 className="text-lg font-bold">Conquistas Desbloqueadas!</h2>
                   <p className="text-xs text-muted-foreground">Você ganhou novas badges</p>
                 </div>
@@ -597,14 +595,14 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.2 + i * 0.15 }}
-                      className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20"
+                      className="flex items-center gap-3 p-3.5 rounded-xl bg-accent/10 border border-accent/20"
                     >
                       <span className="text-2xl">{badge.icon}</span>
                       <div className="flex-1">
                         <p className="text-xs font-bold">{badge.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{badge.description}</p>
+                        <p className="text-xs text-muted-foreground">{badge.description}</p>
                       </div>
-                      <Trophy className="w-4 h-4 text-amber-500" />
+                      <Trophy className="w-4 h-4 text-accent" />
                     </motion.div>
                   ))}
                 </div>
@@ -615,7 +613,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   onClick={handleClose}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Vamos lá, {currentMonth}! 🚀
+                  Vamos lá, {currentMonth}!
                 </Button>
               </motion.div>
             )}

@@ -295,11 +295,11 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
     setShowRecap(true);
   };
 
-  const toneColors = {
-    great: "from-amber-400/20 to-yellow-500/10 border-amber-400/40",
-    good: "from-emerald-400/20 to-green-500/10 border-emerald-400/40",
-    neutral: "from-blue-400/20 to-sky-500/10 border-blue-400/40",
-    tough: "from-orange-400/20 to-red-500/10 border-orange-400/40",
+  const toneIcons = {
+    great: <Trophy className="w-8 h-8 text-accent" />,
+    good: <CheckCircle className="w-8 h-8 text-card-receitas-text" />,
+    neutral: <Target className="w-8 h-8 text-primary" />,
+    tough: <Flame className="w-8 h-8 text-card-dividas-text" />,
   };
 
   return (

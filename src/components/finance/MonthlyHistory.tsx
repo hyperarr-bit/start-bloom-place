@@ -80,8 +80,8 @@ export const MonthlyHistory = ({ onOpenMonth }: MonthlyHistoryProps) => {
               formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`}
               contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))" }}
             />
-            <Bar dataKey="receitas" name="Receitas" fill="hsl(var(--card-receitas-text))" radius={[4, 4, 0, 0]} barSize={16} />
-            <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--card-despesas-text))" radius={[4, 4, 0, 0]} barSize={16} />
+            <Bar dataKey="receitas" name="Receitas" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} barSize={16} />
+            <Bar dataKey="despesas" name="Despesas" fill="hsl(var(--chart-1))" radius={[4, 4, 0, 0]} barSize={16} />
           </BarChart>
         </ResponsiveContainer>
       </div>

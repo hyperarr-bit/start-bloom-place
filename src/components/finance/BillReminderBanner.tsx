@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, BellRing, AlertTriangle, ChevronDown, ChevronUp, Calendar, Clock, CalendarDays } from "lucide-react";
 import { useBillReminders, UpcomingBill } from "@/hooks/use-bill-reminders";

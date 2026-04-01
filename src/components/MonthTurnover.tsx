@@ -9,29 +9,77 @@ import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const copyToMonth = (fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean }) => {
+const readLocalKey = (key: string) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+};
+
+const countItems = (key: string) => {
+  const data = readLocalKey(key);
+  return Array.isArray(data) ? data.length : 0;
+};
+
+const copyToMonth = (fromMonth: string, toMonth: string, options: {
+  fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
+}) => {
   const fromKeys = getFinanceStorageKeys(fromMonth);
   const toKeys = getFinanceStorageKeys(toMonth);
+  const newId = () => Date.now().toString() + Math.random();
 
   if (options.fixed) {
-    const fixed = localStorage.getItem(fromKeys.fixed);
-    if (fixed) {
-      const items = JSON.parse(fixed).map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+    const data = readLocalKey(fromKeys.fixed);
+    if (data) {
+      const items = data.map((i: any) => ({ ...i, id: newId() }));
       localStorage.setItem(toKeys.fixed, JSON.stringify(items));
     }
   }
 
   if (options.bills) {
-    const dueDays = localStorage.getItem(fromKeys.dueDays);
-    if (dueDays) {
-      const days = JSON.parse(dueDays).map((d: any) => ({
+    const data = readLocalKey(fromKeys.dueDays);
+    if (data) {
+      const days = data.map((d: any) => ({
         ...d,
-        bills: d.bills.map((b: any) => ({ ...b, id: Date.now().toString() + Math.random(), paid: false })),
+        bills: d.bills.map((b: any) => ({ ...b, id: newId(), paid: false })),
       }));
       localStorage.setItem(toKeys.dueDays, JSON.stringify(days));
     }
   }
+
+  if (options.incomes) {
+    const data = readLocalKey(fromKeys.incomes);
+    if (data) {
+      const items = data.map((i: any) => ({
+        ...i,
+        id: newId(),
+        date: new Date().toISOString().split("T")[0],
+      }));
+      localStorage.setItem(toKeys.incomes, JSON.stringify(items));
+    }
+  }
+
+  if (options.categoryBudgets) {
+    const fromKey = `finance-month-${getMonthKey(fromMonth)}-category-budgets`;
+    const toKey = isCurrentMonthCheck(toMonth)
+      ? "finance-category-budgets"
+      : `finance-month-${getMonthKey(toMonth)}-category-budgets`;
+    const baseBudgets = readLocalKey("finance-category-budgets");
+    const monthBudgets = readLocalKey(fromKey);
+    const data = monthBudgets || baseBudgets;
+    if (data) localStorage.setItem(toKey, JSON.stringify(data));
+  }
+
+  if (options.notes) {
+    const data = readLocalKey(fromKeys.notes);
+    if (data) {
+      const items = data.map((n: any) => ({ ...n, id: newId() }));
+      localStorage.setItem(toKeys.notes, JSON.stringify(items));
+    }
+  }
 };
+
+const isCurrentMonthCheck = (month: string) => month === getCurrentMonthName();
 
 interface MonthTurnoverProps {
   onOpenMonth?: (month: string) => void;
@@ -43,6 +91,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const [step, setStep] = useState<"recap" | "copy">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
   const [copyBills, setCopyBills] = useState(true);
+  const [copyIncomes, setCopyIncomes] = useState(true);
+  const [copyCategoryBudgets, setCopyCategoryBudgets] = useState(true);
+  const [copyNotes, setCopyNotes] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const currentMonth = getCurrentMonthName();
@@ -53,27 +104,26 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const prevData = getMonthTotals(prevMonth);
   const prevHasData = prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0;
 
-  // Count fixed expenses for the copy wizard
-  const prevFixedCount = (() => {
-    try {
-      const keys = getFinanceStorageKeys(prevMonth);
-      const raw = localStorage.getItem(keys.fixed);
-      return raw ? JSON.parse(raw).length : 0;
-    } catch { return 0; }
-  })();
+  const prevKeys = getFinanceStorageKeys(prevMonth);
+  const prevFixedCount = countItems(prevKeys.fixed);
+  const prevIncomesCount = countItems(prevKeys.incomes);
+  const prevNotesCount = countItems(prevKeys.notes);
 
   const prevBalance = prevData.receitas - prevData.custosFixos - prevData.custosVariaveis - prevData.dividas;
 
-  // Count bills
   const prevBillsInfo = (() => {
-    try {
-      const keys = getFinanceStorageKeys(prevMonth);
-      const raw = localStorage.getItem(keys.dueDays);
-      if (!raw) return { total: 0, paid: 0 };
-      const days = JSON.parse(raw);
-      const allBills = days.flatMap((d: any) => d.bills || []);
-      return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
-    } catch { return { total: 0, paid: 0 }; }
+    const data = readLocalKey(prevKeys.dueDays);
+    if (!data) return { total: 0, paid: 0 };
+    const allBills = data.flatMap((d: any) => d.bills || []);
+    return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
+  })();
+
+  const hasCategoryBudgets = (() => {
+    const base = readLocalKey("finance-category-budgets");
+    const monthKey = `finance-month-${getMonthKey(prevMonth)}-category-budgets`;
+    const month = readLocalKey(monthKey);
+    const data = month || base;
+    return data && Object.keys(data).length > 0;
   })();
 
   useEffect(() => {
@@ -106,7 +156,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const message = getMessage();
 
   const handleCopy = () => {
-    copyToMonth(prevMonth, currentMonth, { fixed: copyFixed, bills: copyBills });
+    copyToMonth(prevMonth, currentMonth, {
+      fixed: copyFixed,
+      bills: copyBills,
+      incomes: copyIncomes,
+      categoryBudgets: copyCategoryBudgets,
+      notes: copyNotes,
+    });
     setCopied(true);
     setTimeout(() => {
       setShowRecap(false);
@@ -124,6 +180,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
     setStep("recap");
     setShowRecap(true);
   };
+
+  const anySelected = copyFixed || copyBills || copyIncomes || copyCategoryBudgets || copyNotes;
 
   return (
     <>
@@ -208,6 +266,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   </div>
                 )}
 
+                {savingsRate > 0 && (
+                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/30">
+                    <span className="text-xs text-muted-foreground">Taxa de economia</span>
+                    <span className="text-xs font-bold">{savingsRate.toFixed(0)}%</span>
+                  </div>
+                )}
+
                 <div className="rounded-lg p-3 bg-primary/5 border border-primary/20">
                   <p className="text-xs text-center">{message.text}</p>
                 </div>
@@ -252,7 +317,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
+                  {/* Custos Fixos */}
                   <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyFixed} onCheckedChange={(v) => setCopyFixed(!!v)} />
                     <div className="flex-1">
@@ -264,21 +330,62 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     <Copy className="w-4 h-4 text-muted-foreground" />
                   </label>
 
+                  {/* Vencimentos */}
                   <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
                     <Checkbox checked={copyBills} onCheckedChange={(v) => setCopyBills(!!v)} />
                     <div className="flex-1">
                       <p className="text-xs font-bold">Vencimentos</p>
                       <p className="text-[10px] text-muted-foreground">
-                        Contas por dia de vencimento (marcadas como não pagas)
+                        Contas por dia ({prevBillsInfo.total} contas, marcadas como não pagas)
                       </p>
                     </div>
                     <Copy className="w-4 h-4 text-muted-foreground" />
                   </label>
+
+                  {/* Receitas */}
+                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                    <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold">Receitas</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Salário, freelances, etc. ({prevIncomesCount} fontes)
+                      </p>
+                    </div>
+                    <Copy className="w-4 h-4 text-muted-foreground" />
+                  </label>
+
+                  {/* Limites por Categoria */}
+                  {hasCategoryBudgets && (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                      <Checkbox checked={copyCategoryBudgets} onCheckedChange={(v) => setCopyCategoryBudgets(!!v)} />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold">Limites por Categoria</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Tetos de gasto definidos por categoria
+                        </p>
+                      </div>
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </label>
+                  )}
+
+                  {/* Notas */}
+                  {prevNotesCount > 0 && (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                      <Checkbox checked={copyNotes} onCheckedChange={(v) => setCopyNotes(!!v)} />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold">Notas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Lembretes e anotações ({prevNotesCount} notas)
+                        </p>
+                      </div>
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </label>
+                  )}
                 </div>
 
                 <div className="rounded-lg p-2 bg-muted/30">
                   <p className="text-[10px] text-muted-foreground text-center">
-                    💡 Receitas não são copiadas — valores podem variar entre meses
+                    💡 Valores podem ser ajustados após a cópia
                   </p>
                 </div>
 
@@ -304,7 +411,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       size="sm"
                       className="flex-1 text-xs gap-1"
                       onClick={handleCopy}
-                      disabled={!copyFixed && !copyBills}
+                      disabled={!anySelected}
                     >
                       <Copy className="w-3 h-3" />
                       Copiar para {currentMonth}

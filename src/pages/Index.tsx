@@ -178,7 +178,7 @@ const Index = () => {
 
         {activeTab === "dashboard" && (
           <>
-            <BillReminderBanner />
+            <Dashboard
             <Dashboard
               totalIncome={totalIncome}
               totalExpenses={totalExpenses}

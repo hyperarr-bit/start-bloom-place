@@ -6,14 +6,11 @@ import { Button } from "@/components/ui/button";
 
 export const BillReminderBanner = () => {
   const { getAllMonthBills, requestNotificationPermission, notificationSupported, notificationPermission } = useBillReminders();
-  const [bills, setBills] = useState<UpcomingBill[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [permAsked, setPermAsked] = useState(false);
 
-  useEffect(() => {
-    setBills(getAllMonthBills());
-  }, [getAllMonthBills]);
+  const bills = useMemo(() => getAllMonthBills(), [getAllMonthBills]);
 
   if (dismissed || bills.length === 0) return null;
 

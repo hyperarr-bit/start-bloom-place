@@ -408,7 +408,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/30 border border-border/50">
                       <Target className="w-3.5 h-3.5 text-primary" />
                       <div>
-                        <span className="text-[9px] text-muted-foreground block">Contas pagas</span>
+                        <span className="text-xs text-muted-foreground block">Contas pagas</span>
                         <span className="text-xs font-bold">
                           {prevBillsInfo.paid}/{prevBillsInfo.total} ({Math.round((prevBillsInfo.paid / prevBillsInfo.total) * 100)}%)
                         </span>
@@ -417,9 +417,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   )}
                   {savingsRate > 0 && (
                     <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/30 border border-border/50">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" />
+                      <Flame className="w-3.5 h-3.5 text-accent" />
                       <div>
-                        <span className="text-[9px] text-muted-foreground block">Economia</span>
+                        <span className="text-xs text-muted-foreground block">Economia</span>
                         <span className="text-xs font-bold">{savingsRate.toFixed(0)}% da renda</span>
                       </div>
                     </div>

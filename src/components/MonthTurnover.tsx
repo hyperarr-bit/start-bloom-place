@@ -431,7 +431,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.5 }}
-                  className={`rounded-xl p-3 bg-gradient-to-r ${toneColors[message.tone]} border`}
+                  className="rounded-xl p-3 bg-muted/50 border border-border"
                 >
                   <p className="text-xs text-center leading-relaxed">{message.text}</p>
                 </motion.div>

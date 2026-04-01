@@ -361,13 +361,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="rounded-xl p-3 bg-emerald-500/10 border border-emerald-500/20"
+                    className="rounded-xl p-3 bg-card-receitas border border-card-receitas-border"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <TrendingUp className="w-3 h-3 text-emerald-500" />
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Receitas</span>
+                      <TrendingUp className="w-3 h-3 text-card-receitas-text" />
+                      <span className="text-xs text-card-receitas-text font-medium">Receitas</span>
                     </div>
-                    <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                    <p className="text-sm font-bold text-card-receitas-text">
                       R$ {prevData.receitas.toLocaleString("pt-BR")}
                     </p>
                   </motion.div>
@@ -375,13 +375,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.35 }}
-                    className="rounded-xl p-3 bg-red-500/10 border border-red-500/20"
+                    className="rounded-xl p-3 bg-card-despesas border border-card-despesas-border"
                   >
                     <div className="flex items-center gap-1.5 mb-1">
-                      <TrendingDown className="w-3 h-3 text-red-500" />
-                      <span className="text-[10px] text-red-600 dark:text-red-400 font-medium">Despesas</span>
+                      <TrendingDown className="w-3 h-3 text-card-despesas-text" />
+                      <span className="text-xs text-card-despesas-text font-medium">Despesas</span>
                     </div>
-                    <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                    <p className="text-sm font-bold text-card-despesas-text">
                       R$ {totalExpenses.toLocaleString("pt-BR")}
                     </p>
                   </motion.div>

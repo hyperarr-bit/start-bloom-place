@@ -560,7 +560,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                       size="sm"
                       className="flex-1 text-xs gap-1.5 h-10 rounded-xl"
                       onClick={handleCopy}
-                      disabled={!copyFixed && !copyBills}
+                      disabled={!copyFixed && !copyBills && !copyIncomes && !copyInstallments && !copyNotes}
                     >
                       <Copy className="w-3.5 h-3.5" />
                       Preparar {currentMonth}

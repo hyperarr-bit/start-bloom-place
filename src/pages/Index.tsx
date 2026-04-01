@@ -26,6 +26,7 @@ import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { BillReminderBanner } from "@/components/finance/BillReminderBanner";
+import { MonthlyHistory } from "@/components/finance/MonthlyHistory";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -176,17 +177,24 @@ const Index = () => {
         )}
 
         {activeTab === "dashboard" && (
-          <Dashboard
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            expenses={expenses}
-            fixedExpenses={fixedExpenses}
-            dueDays={dueDays}
-            annualData={annualData}
-            savingsRate={savingsRate}
-          />
+          <>
+            <BillReminderBanner />
+            <Dashboard
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              expenses={expenses}
+              fixedExpenses={fixedExpenses}
+              dueDays={dueDays}
+              annualData={annualData}
+              savingsRate={savingsRate}
+            />
+            <MonthlyHistory onOpenMonth={(month) => {
+              setOpenMonth(month);
+              setActiveTab("financeiro");
+            }} />
+          </>
         )}
 
         {activeTab === "financeiro" && (
@@ -196,7 +204,6 @@ const Index = () => {
             ) : (
               <>
                 <MonthTurnover onOpenMonth={setOpenMonth} />
-                <BillReminderBanner />
                 <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}

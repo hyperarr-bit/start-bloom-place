@@ -21,6 +21,9 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const [step, setStep] = useState<"recap" | "copy" | "badges">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
   const [copyBills, setCopyBills] = useState(true);
+  const [copyIncomes, setCopyIncomes] = useState(false);
+  const [copyInstallments, setCopyInstallments] = useState(true);
+  const [copyNotes, setCopyNotes] = useState(false);
   const [copied, setCopied] = useState(false);
   const [archived, setArchived] = useState(false);
 

@@ -1,72 +1,52 @@
 
 
-# Análise da Identidade Visual — Módulo de Finanças
+# Metas de Economia por Categoria
 
-Analisei meticulosamente todos os componentes do módulo de finanças. Vou salvar as regras de design como memória do projeto para garantir consistência em tudo que for criado a partir de agora.
-
----
-
-## Padrões Identificados
-
-### Layout e Estrutura
-- **Container**: `max-w-7xl mx-auto px-4 py-5 space-y-5`
-- **Header fixo**: `border-b border-border bg-card sticky top-0 z-50`
-- **Título**: `text-base font-bold tracking-tight`, formato "CORE — MÓDULO"
-- **Tabs**: classe `notion-tab` (custom), texto `text-[11px]`, emojis apenas nas labels das tabs
-- **Grid responsivo**: `grid grid-cols-2 lg:grid-cols-4 gap-3`
-
-### Cards e Containers
-- **Card padrão**: `bg-card rounded-lg border border-border p-4`
-- **Animação de entrada**: `animate-fade-in` em todos os componentes
-- **Card com cor semântica**: usa tokens `bg-card-receitas`, `bg-card-despesas`, `bg-card-dividas`, `bg-card-investimentos` com `border-*-border` e `text-*-text`
-
-### Tabelas
-- **Container**: `bg-card rounded-lg overflow-hidden border border-border`
-- **Header colorido**: faixa com `bg-income py-2 px-4` + texto `font-bold text-sm tracking-wide`
-- **Cabeçalho da tabela**: `border-b border-border bg-muted/30`, texto `text-xs font-medium text-muted-foreground`
-- **Linha de input novo**: `bg-muted/20`, inputs transparentes `border-0 bg-transparent shadow-none px-0 focus-visible:ring-0`
-- **Rodapé**: `border-t border-border`, label "SUM" ou "TOTAL" + valor em `font-bold tabular-nums`
-- **Linhas**: `border-b border-border/50 hover:bg-muted/20 transition-colors`
-- **Badges de categoria**: `category-badge` (custom class: `px-2.5 py-0.5 rounded-full text-xs font-medium`)
-
-### Tipografia
-- **Títulos de seção**: `text-xs font-bold`, UPPERCASE, com `tracking-wide` ou `tracking-widest`
-- **Labels**: `text-xs text-muted-foreground`
-- **Micro-texto**: `text-[10px] text-muted-foreground`
-- **Valores monetários**: `tabular-nums`, formatados com `toLocaleString("pt-BR")`
-- **Lucide icons**: `w-3.5 h-3.5` em ações, `w-4 h-4` em headers, `w-8 h-8` em stat cards (com opacidade `/30`)
-
-### Cores (nunca hex hardcoded nos componentes novos)
-- **Receitas/positivo**: `text-green-400` (dashboard) ou tokens `card-receitas`
-- **Despesas/negativo**: `text-red-400` ou tokens `card-despesas`
-- **Dívidas**: `text-orange-400` ou tokens `card-dividas`
-- **Investimentos**: `text-purple-400` ou tokens `card-investimentos`
-- **Alertas**: `bg-orange-500/10 border-orange-500/20` (warning), `bg-green-500/10` (success), `bg-blue-500/10` (info)
-
-### Interações
-- **Botão de ação**: ícone `Plus` em `text-muted-foreground hover:text-foreground`
-- **Botão de deletar**: `Trash2` em `text-muted-foreground hover:text-destructive`, aparece com `opacity-0 group-hover:opacity-100`
-- **Dialogs**: `max-w-md w-[92vw] p-0`, conteúdo com `p-6 space-y-5`, animação Framer Motion `opacity/y`
-- **Empty states**: texto centralizado `text-xs text-muted-foreground` + subtexto `text-[10px]`
-
-### Componentes UI usados
-- `Button` (shadcn) com `variant="outline" size="sm" text-xs`
-- `Input` com `h-7 text-xs`
-- `Select` (shadcn) para dropdowns
-- `Checkbox` com `h-3.5 w-3.5 rounded-full`
-- `Progress` (shadcn) para barras
-- `Dialog/DialogContent` para modais
-- Recharts para gráficos (`PieChart`, `BarChart`, `AreaChart`)
+Criar um componente `CategoryBudgets` que permite definir limites de gasto por categoria e acompanhar o progresso com barras visuais.
 
 ---
 
-## Plano de Implementação
+## Como funciona
 
-Vou criar/atualizar um arquivo de memória detalhado com todas essas regras para que qualquer novo componente siga exatamente o mesmo padrão.
+O usuário define um teto de gasto para cada categoria (Alimentação, Transporte, Lazer, etc.). O componente calcula automaticamente quanto já foi gasto no mês atual com base nos dados de `expenses` e exibe barras de progresso coloridas por categoria.
 
-### Arquivo a criar
-**`mem://design/finance-identity`** — Guia completo da identidade visual do módulo de finanças, incluindo todos os padrões de cards, tabelas, tipografia, cores, interações e componentes.
+---
 
-### Arquivo a atualizar
-**`mem://index.md`** — Adicionar referência ao novo arquivo de memória.
+## Interface
+
+- Header com faixa colorida (`bg-accent/20`) e título "LIMITES POR CATEGORIA" + ícone `Gauge` (Lucide)
+- Lista de categorias com:
+  - Badge colorido da categoria (reutilizando as cores já definidas em `ExpenseTable`)
+  - Barra de progresso: verde se < 75%, amarelo se 75-99%, vermelho se >= 100%
+  - Texto: "R$ gasto / R$ limite" em `tabular-nums text-xs`
+- Botão para adicionar/editar limite de cada categoria via input inline
+- Empty state: "Defina limites para controlar seus gastos por categoria"
+
+---
+
+## Detalhes técnicos
+
+### Novo arquivo
+**`src/components/CategoryBudgets.tsx`**
+- Props: `expenses` (array de despesas do mês), categorias com cores do `ExpenseTable`
+- Estado persistido via `usePersistedState("finance-category-budgets", {})`
+- Formato: `Record<string, number>` (ex: `{ alimentacao: 500, transporte: 200 }`)
+- Calcula gasto por categoria com `expenses.filter(e => e.category === cat).reduce(...)`
+- Segue todos os padrões: `animate-fade-in`, `bg-card rounded-lg border border-border`, ícones `w-3.5 h-3.5`, inputs `h-7 text-xs`
+
+### Integração em `Index.tsx`
+- Adicionar nova aba nos tabs: `{ id: "limites", label: "🎯 LIMITES" }`
+- Renderizar `<CategoryBudgets expenses={expenses} />` quando `activeTab === "limites"`
+- Também pode ser adicionado dentro da aba "financeiro" como seção extra (abaixo de BillsDueCards)
+
+### Persistência
+- Usa `usePersistedState` (localStorage) como todos os outros componentes
+- Se o usuário estiver logado, o `useUserData` hook sincroniza com Supabase automaticamente via a chave `finance-category-budgets`
+
+---
+
+## Escopo
+- 1 arquivo novo (`CategoryBudgets.tsx`)
+- 1 arquivo editado (`Index.tsx` — adicionar aba e renderizar componente)
+- Sem mudanças no banco de dados
 

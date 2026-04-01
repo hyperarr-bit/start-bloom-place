@@ -23,8 +23,8 @@ const categoryLabels: Record<string, string> = {
 };
 
 const COLORS = [
-  "bg-purple-500", "bg-pink-500", "bg-amber-500", "bg-emerald-500",
-  "bg-blue-500", "bg-red-500", "bg-indigo-500", "bg-teal-500",
+  "bg-purple-500", "bg-amber-500", "bg-emerald-500",
+  "bg-blue-500", "bg-red-500", "bg-indigo-500", "bg-teal-500", "bg-orange-500",
 ];
 
 interface CategoryData {
@@ -128,15 +128,11 @@ export const MonthComparison = () => {
   };
 
   return (
-    <div className="bg-card rounded-lg border border-border overflow-hidden animate-fade-in">
-      {/* Header */}
-      <div className="bg-accent/20 px-4 py-2.5 flex items-center gap-2 border-b border-border">
-        <ArrowLeftRight className="w-4 h-4 text-muted-foreground" />
-        <h3 className="text-xs font-bold tracking-wide uppercase">Comparação Mensal</h3>
-      </div>
+    <div className="bg-card rounded-lg border border-border p-4 animate-fade-in">
+      <h3 className="text-xs font-bold mb-3">🔄 COMPARAÇÃO MENSAL</h3>
 
       {/* Month selectors */}
-      <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-3">
         <Select value={monthA} onValueChange={setMonthA}>
           <SelectTrigger className="h-7 text-xs flex-1">
             <SelectValue />
@@ -165,7 +161,7 @@ export const MonthComparison = () => {
           Sem dados para comparar. Preencha pelo menos um mês.
         </p>
       ) : (
-        <div className="px-4 pb-4 space-y-3">
+        <div className="space-y-3">
           {/* Summary grid */}
           <div className="grid grid-cols-3 gap-2 text-center">
             {/* Receitas */}

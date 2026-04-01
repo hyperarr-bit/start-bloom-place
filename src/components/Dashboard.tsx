@@ -61,9 +61,15 @@ export const Dashboard = ({
   expenses,
   fixedExpenses,
   dueDays,
-  annualData,
   savingsRate,
 }: DashboardProps) => {
+  // Compute annual data from actual monthly records
+  const annualData = useMemo(() => {
+    return ALL_MONTHS.map((month) => {
+      const totals = getMonthTotals(month);
+      return { month, ...totals };
+    });
+  }, []);
   // Expense by category for pie chart (variable + fixed)
   const expensesByCategory = useMemo(() => {
     const grouped: Record<string, number> = {};

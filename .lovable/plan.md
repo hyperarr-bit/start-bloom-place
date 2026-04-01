@@ -1,23 +1,46 @@
 
 
-## Plano: Ativar cópia de receitas + adicionar mais opções úteis
+## Redesign da Retrospectiva de Mês — Alinhamento Visual
 
-### O que muda
+### Problemas identificados
 
-1. **Receitas** — transformar de item desabilitado para checkbox ativo (como custos fixos e vencimentos). Estado inicial `false` mas o usuário pode marcar.
+1. **Cores hardcoded** — O modal usa `emerald-500`, `red-500`, `amber-500` diretamente, enquanto o resto do app usa tokens semânticos (`card-receitas`, `card-despesas`, `success`, `destructive`, `accent`).
+2. **Emojis inconsistentes** — Mistura de emojis Unicode (📊✅🏆📋📑📝💰🚀🤝⚖️💪) com ícones Lucide, sem critério claro. O app usa emojis nas tabs mas Lucide icons nos cards.
+3. **Gradientes destoantes** — O modal usa gradientes coloridos (`from-amber-400/20`, `from-emerald-400/20`) que não existem em nenhum outro lugar do app. O app é flat com `bg-card`, `bg-muted`, borders sutis.
+4. **Tipografia inconsistente** — `text-[9px]`, `text-[10px]`, `text-[11px]` excessivos. O app usa `text-xs` e `text-sm` padrão.
+5. **Estilo do banner** — Gradiente `from-primary/5 to-primary/10` destoa dos cards do `FinancialSummary` que usam os tokens `card-receitas`, etc.
 
-2. **Parcelas/Dívidas (Installments)** — copiar parcelas em andamento faz sentido, pois dívidas continuam entre meses. As parcelas pagas não mudam, mas o registro das parcelas ativas deve seguir.
+### Plano de correção (1 arquivo: `MonthTurnover.tsx`)
 
-3. **Notas** — o usuário pode ter anotações financeiras que quer manter no novo mês (lembretes, observações).
+**Banner:**
+- Trocar gradiente por estilo flat `bg-card border-border` consistente com o app
+- Usar ícone Lucide `CalendarCheck` em vez de emoji `📊`
 
-### Alterações no arquivo `src/components/MonthTurnover.tsx`
+**Modal - Step Recap:**
+- Header: trocar gradiente colorido por `bg-muted/50 border-border` — limpo e neutro
+- Cards de Receita/Despesa: usar tokens do app (`bg-card-receitas`, `text-card-receitas-text`, `border-card-receitas-border` / `bg-card-despesas`, etc.)
+- Card de Saldo: usar `bg-card-investimentos` (positivo) ou `bg-card-dividas` (negativo) com os respectivos tokens
+- Stats extras (contas pagas, economia): manter `bg-muted/30` com ícones Lucide sem emojis
+- Mensagem motivacional: `bg-muted/50 border-border` em vez de gradientes coloridos
+- Remover emojis soltos no texto (📊, 🤝) — usar apenas ícones Lucide coerentes
+- Botões: manter estilo atual (já usa Button do shadcn)
 
-- Adicionar estados `copyIncomes` (default `false`), `copyInstallments` (default `true`), `copyNotes` (default `false`)
-- No wizard de cópia (step "copy"), substituir o bloco desabilitado de receitas por um checkbox funcional com descrição "Salário, freelance, etc. — valores podem variar"
-- Adicionar checkbox para "Copiar parcelas/dívidas" com descrição "Parcelas em andamento continuam no novo mês"
-- Adicionar checkbox para "Copiar notas" com descrição "Anotações e lembretes financeiros"
-- Atualizar `copyToMonth` para suportar `incomes`, `installments` e `notes`
-- Atualizar `handleCopy` para passar as novas opções
-- Atualizar a condição `disabled` do botão para considerar todas as opções
-- Contar itens de receitas, parcelas e notas do mês anterior para mostrar no wizard
+**Modal - Step Copy:**
+- Trocar emojis nos labels (✅📑📝💰) por ícones Lucide inline pequenos ou simplesmente remover
+- Manter checkboxes como estão (já usam shadcn)
+- Mensagem de sucesso: trocar `✅` por ícone `CheckCircle` Lucide
+
+**Modal - Step Badges:**
+- Cards de badge: trocar `bg-amber-500/10 border-amber-500/20` por `bg-accent/10 border-accent/20` (usa o accent rosa do app)
+- Trocar emoji 🏆 do header por ícone `Trophy` Lucide (já importado)
+
+**Emojis mantidos apenas onde fazem sentido semântico:**
+- Nos ícones de badge (`badge.icon`) — pois são badges/conquistas, emojis são o conteúdo
+- Remover todos os outros emojis decorativos
+
+**Tipografia:**
+- Padronizar para `text-xs` e `text-sm`, eliminar `text-[9px]`, `text-[10px]`, `text-[11px]`
+
+### Resultado
+Modal e banner visualmente integrados com o design system do app — cores semânticas, ícones Lucide consistentes, sem gradientes estranhos, tipografia padronizada.
 

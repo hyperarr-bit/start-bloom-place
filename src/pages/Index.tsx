@@ -25,6 +25,7 @@ import { Gamification } from "@/components/Gamification";
 import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
+import { CategoryBudgets } from "@/components/CategoryBudgets";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -106,6 +107,7 @@ const Index = () => {
     { id: "viagem", label: "✈️ VIAGEM" },
     { id: "simuladores", label: "🧮 SIMULADORES" },
     { id: "desafios", label: "🏆 DESAFIOS" },
+    { id: "limites", label: "🎯 LIMITES" },
     { id: "relatorios", label: "📋 RELATÓRIOS" },
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
   ];
@@ -261,6 +263,10 @@ const Index = () => {
             challenge52Weeks={challenge52Weeks}
             setChallenge52Weeks={setChallenge52Weeks}
           />
+        )}
+
+        {activeTab === "limites" && (
+          <CategoryBudgets expenses={expenses} />
         )}
 
         {activeTab === "relatorios" && (

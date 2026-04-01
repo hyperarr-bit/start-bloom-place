@@ -23,7 +23,7 @@ const REMINDER_DAYS_AHEAD = 3;
 const NOTIFICATION_COOLDOWN_KEY = "bill-notification-cooldown";
 
 export function useBillReminders() {
-  const { get } = useUserData();
+  const { get, loaded } = useUserData();
   const notifiedRef = useRef(false);
 
   const getBillsWithFilter = useCallback((maxDaysAhead?: number): UpcomingBill[] => {

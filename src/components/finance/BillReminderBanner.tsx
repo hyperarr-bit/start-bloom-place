@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, BellRing, AlertTriangle, ChevronDown, ChevronUp, Calendar, Clock, CalendarDays } from "lucide-react";
 import { useBillReminders, UpcomingBill } from "@/hooks/use-bill-reminders";
@@ -6,14 +6,11 @@ import { Button } from "@/components/ui/button";
 
 export const BillReminderBanner = () => {
   const { getAllMonthBills, requestNotificationPermission, notificationSupported, notificationPermission } = useBillReminders();
-  const [bills, setBills] = useState<UpcomingBill[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const [permAsked, setPermAsked] = useState(false);
 
-  useEffect(() => {
-    setBills(getAllMonthBills());
-  }, [getAllMonthBills]);
+  const bills = useMemo(() => getAllMonthBills(), [getAllMonthBills]);
 
   if (dismissed || bills.length === 0) return null;
 

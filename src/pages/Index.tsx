@@ -26,6 +26,7 @@ import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { BillReminderBanner } from "@/components/finance/BillReminderBanner";
+import { MonthlyHistory } from "@/components/finance/MonthlyHistory";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 

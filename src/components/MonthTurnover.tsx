@@ -617,7 +617,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   onClick={handleClose}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
-                  Vamos lá, {currentMonth}! 🚀
+                  Vamos lá, {currentMonth}!
                 </Button>
               </motion.div>
             )}

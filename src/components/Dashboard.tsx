@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
-import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, PieChart as PieChartIcon, LineChart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { getMonthTotals } from "@/components/finance/storage-keys";
 
@@ -46,7 +46,16 @@ interface DashboardProps {
   savingsRate: number;
 }
 
-const COLORS = ["#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#6366f1", "#14b8a6"];
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--muted-foreground) / 0.6)",
+  "hsl(var(--muted-foreground) / 0.4)",
+  "hsl(var(--muted-foreground) / 0.25)",
+];
 
 const categoryLabels: Record<string, string> = {
   vestuario: "Vestuário",
@@ -282,7 +291,10 @@ export const Dashboard = ({
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Expense Pie Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">📊 GASTOS POR CATEGORIA</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <PieChartIcon className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold uppercase tracking-wider">GASTOS POR CATEGORIA</h3>
+          </div>
           {expensesByCategory.length > 0 ? (
             <div className="flex items-center gap-4">
               <ResponsiveContainer width="50%" height={180}>
@@ -312,7 +324,10 @@ export const Dashboard = ({
 
         {/* Monthly Bar Chart */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">📈 RECEITAS VS DESPESAS</h3>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-muted-foreground" />
+            <h3 className="text-xs font-bold uppercase tracking-wider">RECEITAS VS DESPESAS</h3>
+          </div>
           {monthlyBarData.length > 0 ? (
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={monthlyBarData}>
@@ -332,7 +347,10 @@ export const Dashboard = ({
 
       {/* Patrimony Evolution */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3">💰 EVOLUÇÃO DO PATRIMÔNIO</h3>
+        <div className="flex items-center gap-2 mb-3">
+          <LineChart className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-xs font-bold uppercase tracking-wider">EVOLUÇÃO DO PATRIMÔNIO</h3>
+        </div>
         {patrimonyData.length > 0 ? (
           <ResponsiveContainer width="100%" height={150}>
             <AreaChart data={patrimonyData}>

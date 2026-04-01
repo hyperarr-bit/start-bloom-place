@@ -1,136 +1,198 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar, Trophy, Flame, Target } from "lucide-react";
-import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName } from "@/components/finance/storage-keys";
+import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, BASE_FINANCE_KEYS, getPrefixedKeys } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-
-const copyToMonth = (fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean }) => {
-  const fromKeys = getFinanceStorageKeys(fromMonth);
-  const toKeys = getFinanceStorageKeys(toMonth);
-
-  if (options.fixed) {
-    const fixed = localStorage.getItem(fromKeys.fixed);
-    if (fixed) {
-      const items = JSON.parse(fixed).map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
-      localStorage.setItem(toKeys.fixed, JSON.stringify(items));
-    }
-  }
-
-  if (options.bills) {
-    const dueDays = localStorage.getItem(fromKeys.dueDays);
-    if (dueDays) {
-      const days = JSON.parse(dueDays).map((d: any) => ({
-        ...d,
-        bills: d.bills.map((b: any) => ({ ...b, id: Date.now().toString() + Math.random(), paid: false })),
-      }));
-      localStorage.setItem(toKeys.dueDays, JSON.stringify(days));
-    }
-  }
-};
 
 interface MonthTurnoverProps {
   onOpenMonth?: (month: string) => void;
 }
 
-// Badge definitions
-const checkBadges = (prevMonth: string, prevBalance: number) => {
-  const badges: { icon: string; label: string; description: string }[] = [];
-
-  // "Mês Fechado" — has data for prev month
-  const prevData = getMonthTotals(prevMonth);
-  if (prevData.receitas > 0 || prevData.custosFixos > 0 || prevData.custosVariaveis > 0) {
-    badges.push({ icon: "📄", label: "Mês Fechado", description: `Registros completos em ${prevMonth}` });
-  }
-
-  // "3 Meses Seguidos" — check 3 consecutive months with positive balance
-  const prevIdx = months.indexOf(prevMonth);
-  let consecutivePositive = 0;
-  for (let i = 0; i < 3; i++) {
-    const idx = prevIdx - i < 0 ? prevIdx - i + 12 : prevIdx - i;
-    const data = getMonthTotals(months[idx]);
-    const bal = data.receitas - data.custosFixos - data.custosVariaveis;
-    if (bal > 0 && (data.receitas > 0 || data.custosFixos > 0)) {
-      consecutivePositive++;
-    } else break;
-  }
-  if (consecutivePositive >= 3) {
-    badges.push({ icon: "🔥", label: "3 Meses Seguidos", description: "3 meses consecutivos no positivo!" });
-  }
-
-  // "Constância" — check last 3 months have data
-  let consecutiveData = 0;
-  for (let i = 0; i < 3; i++) {
-    const idx = prevIdx - i < 0 ? prevIdx - i + 12 : prevIdx - i;
-    const data = getMonthTotals(months[idx]);
-    if (data.receitas > 0 || data.custosFixos > 0 || data.custosVariaveis > 0) {
-      consecutiveData++;
-    } else break;
-  }
-  if (consecutiveData >= 3) {
-    badges.push({ icon: "⭐", label: "Constância", description: "Registrou dados 3 meses seguidos" });
-  }
-
-  return badges;
-};
-
 export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
+  const { get, set: setData, loaded } = useUserData();
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
   const [showRecap, setShowRecap] = useState(false);
   const [step, setStep] = useState<"recap" | "copy" | "badges">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
   const [copyBills, setCopyBills] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [archived, setArchived] = useState(false);
 
   const currentMonth = getCurrentMonthName();
   const currentMonthIdx = months.indexOf(currentMonth);
   const prevMonthIdx = currentMonthIdx === 0 ? 11 : currentMonthIdx - 1;
   const prevMonth = months[prevMonthIdx];
 
-  const prevData = getMonthTotals(prevMonth);
+  // Getter that uses useUserData
+  const dataGetter = useCallback((key: string, fallback: any) => get(key, fallback), [get]);
+
+  // Archive: move base keys → prefixed keys for the previous month
+  const archivePreviousMonth = useCallback(() => {
+    const prefixed = getPrefixedKeys(prevMonth);
+    const baseKeys = BASE_FINANCE_KEYS;
+
+    // Copy each base key to the prefixed key for the previous month
+    const keyPairs: [string, string][] = [
+      [baseKeys.incomes, prefixed.incomes],
+      [baseKeys.expenses, prefixed.expenses],
+      [baseKeys.fixed, prefixed.fixed],
+      [baseKeys.dueDays, prefixed.dueDays],
+      [baseKeys.notes, prefixed.notes],
+      [baseKeys.installments, prefixed.installments],
+    ];
+
+    keyPairs.forEach(([fromKey, toKey]) => {
+      const data = get(fromKey, null);
+      if (data !== null && data !== undefined) {
+        // Only archive if the prefixed key doesn't already have data
+        const existing = get(toKey, null);
+        if (existing === null || existing === undefined || (Array.isArray(existing) && existing.length === 0)) {
+          setData(toKey, data);
+        }
+      }
+    });
+
+    // Clear base keys for the new month
+    Object.values(baseKeys).forEach((key) => {
+      setData(key, []);
+    });
+
+    setArchived(true);
+  }, [prevMonth, get, setData]);
+
+  // Check if base keys have data (= previous month's data before archiving)
+  const baseHasData = useCallback(() => {
+    const incomes = get(BASE_FINANCE_KEYS.incomes, []);
+    const expenses = get(BASE_FINANCE_KEYS.expenses, []);
+    const fixed = get(BASE_FINANCE_KEYS.fixed, []);
+    return (
+      (Array.isArray(incomes) && incomes.length > 0) ||
+      (Array.isArray(expenses) && expenses.length > 0) ||
+      (Array.isArray(fixed) && fixed.length > 0)
+    );
+  }, [get]);
+
+  // Read prev month totals (after archiving, read from prefixed keys)
+  const prevData = getMonthTotals(prevMonth, dataGetter);
   const prevHasData = prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0;
 
   const prevFixedCount = (() => {
-    try {
-      const keys = getFinanceStorageKeys(prevMonth);
-      const raw = localStorage.getItem(keys.fixed);
-      return raw ? JSON.parse(raw).length : 0;
-    } catch { return 0; }
+    const keys = getFinanceStorageKeys(prevMonth);
+    const raw = get(keys.fixed, []);
+    return Array.isArray(raw) ? raw.length : 0;
   })();
 
   const totalExpenses = prevData.custosFixos + prevData.custosVariaveis;
   const prevBalance = prevData.receitas - totalExpenses - prevData.dividas;
 
   const prevBillsInfo = (() => {
-    try {
-      const keys = getFinanceStorageKeys(prevMonth);
-      const raw = localStorage.getItem(keys.dueDays);
-      if (!raw) return { total: 0, paid: 0 };
-      const days = JSON.parse(raw);
-      const allBills = days.flatMap((d: any) => d.bills || []);
-      return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
-    } catch { return { total: 0, paid: 0 }; }
+    const keys = getFinanceStorageKeys(prevMonth);
+    const days = get(keys.dueDays, []);
+    if (!Array.isArray(days) || days.length === 0) return { total: 0, paid: 0 };
+    const allBills = days.flatMap((d: any) => d.bills || []);
+    return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
   })();
 
   const savingsRate = prevData.receitas > 0
     ? ((prevData.receitas - totalExpenses) / prevData.receitas) * 100
     : 0;
 
-  const badges = checkBadges(prevMonth, prevBalance);
+  // Badge check using getter
+  const badges = (() => {
+    const result: { icon: string; label: string; description: string }[] = [];
+    if (prevData.receitas > 0 || prevData.custosFixos > 0 || prevData.custosVariaveis > 0) {
+      result.push({ icon: "📄", label: "Mês Fechado", description: `Registros completos em ${prevMonth}` });
+    }
+    const prevIdx = months.indexOf(prevMonth);
+    let consecutivePositive = 0;
+    for (let i = 0; i < 3; i++) {
+      const idx = prevIdx - i < 0 ? prevIdx - i + 12 : prevIdx - i;
+      const data = getMonthTotals(months[idx], dataGetter);
+      const bal = data.receitas - data.custosFixos - data.custosVariaveis;
+      if (bal > 0 && (data.receitas > 0 || data.custosFixos > 0)) {
+        consecutivePositive++;
+      } else break;
+    }
+    if (consecutivePositive >= 3) {
+      result.push({ icon: "🔥", label: "3 Meses Seguidos", description: "3 meses consecutivos no positivo!" });
+    }
+    let consecutiveData = 0;
+    for (let i = 0; i < 3; i++) {
+      const idx = prevIdx - i < 0 ? prevIdx - i + 12 : prevIdx - i;
+      const data = getMonthTotals(months[idx], dataGetter);
+      if (data.receitas > 0 || data.custosFixos > 0 || data.custosVariaveis > 0) {
+        consecutiveData++;
+      } else break;
+    }
+    if (consecutiveData >= 3) {
+      result.push({ icon: "⭐", label: "Constância", description: "Registrou dados 3 meses seguidos" });
+    }
+    return result;
+  })();
 
+  // Month turnover detection
   useEffect(() => {
+    if (!loaded) return;
+
     const currentKey = `${currentMonth}-${new Date().getFullYear()}`;
-    if (lastSeenMonth && lastSeenMonth !== currentKey && prevHasData) {
-      setShowRecap(true);
-    }
-    if (!lastSeenMonth || lastSeenMonth !== currentKey) {
+
+    // If lastSeenMonth is empty, this is the first visit ever — just record and don't show modal
+    if (!lastSeenMonth) {
       setLastSeenMonth(currentKey);
+      return;
     }
-  }, []);
+
+    // If already seen this month, nothing to do
+    if (lastSeenMonth === currentKey) return;
+
+    // Month changed! Check if there's data to archive from base keys
+    const hasBaseData = baseHasData();
+
+    if (hasBaseData) {
+      // Archive base keys → previous month prefixed keys
+      archivePreviousMonth();
+    }
+
+    // Update last seen month
+    setLastSeenMonth(currentKey);
+
+    // Show recap if previous month has data (either already in prefixed keys or just archived)
+    // We use a small delay to let the archive writes propagate
+    setTimeout(() => {
+      setShowRecap(true);
+    }, 100);
+  }, [loaded, lastSeenMonth]);
+
+  // copyToMonth using useUserData
+  const copyToMonth = useCallback((fromMonth: string, toMonth: string, options: { fixed: boolean; bills: boolean }) => {
+    const fromKeys = getFinanceStorageKeys(fromMonth);
+    const toKeys = getFinanceStorageKeys(toMonth);
+
+    if (options.fixed) {
+      const fixed = get(fromKeys.fixed, []);
+      if (Array.isArray(fixed) && fixed.length > 0) {
+        const items = fixed.map((i: any) => ({ ...i, id: Date.now().toString() + Math.random() }));
+        setData(toKeys.fixed, items);
+      }
+    }
+
+    if (options.bills) {
+      const dueDays = get(fromKeys.dueDays, []);
+      if (Array.isArray(dueDays) && dueDays.length > 0) {
+        const days = dueDays.map((d: any) => ({
+          ...d,
+          bills: (d.bills || []).map((b: any) => ({ ...b, id: Date.now().toString() + Math.random(), paid: false })),
+        }));
+        setData(toKeys.dueDays, days);
+      }
+    }
+  }, [get, setData]);
 
   const getMessage = () => {
     if (prevBalance > 0 && savingsRate >= 30) {

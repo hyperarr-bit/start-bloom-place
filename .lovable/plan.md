@@ -1,74 +1,72 @@
 
 
-## Plano: 8 Melhorias para o CORE App
+# Análise da Identidade Visual — Módulo de Finanças
 
-### 1. PWA — App instalável no celular
-- Criar `public/manifest.json` com nome, ícones, cores e `display: standalone`
-- Criar `public/sw.js` (service worker básico com cache de assets)
-- Registrar service worker em `src/main.tsx`
-- Adicionar `<link rel="manifest">` e meta tags no `index.html`
-- Adicionar prompt "Instalar app" na Home quando disponível
+Analisei meticulosamente todos os componentes do módulo de finanças. Vou salvar as regras de design como memória do projeto para garantir consistência em tudo que for criado a partir de agora.
 
-### 2. Empty States — Telas vazias com ilustração e CTA
-- Criar componente reutilizável `src/components/EmptyState.tsx` com ícone, título, descrição e botão de ação
-- Aplicar em: `IncomeTable`, `ExpenseTable`, `FixedExpensesTable`, `FinancialGoals`, `InstallmentTracker`, `InvestmentsTracker`, `WishlistItems`
-- Cada empty state terá um ícone contextual e texto motivacional em português
+---
 
-### 3. Micro-interações e animações de feedback
-- Adicionar `framer-motion` animations ao adicionar/remover itens nas tabelas (layout animations)
-- Animação de confetti/pulse ao completar uma meta ou marcar conta como paga
-- Transições suaves nos cards do Dashboard ao carregar dados
-- Botões com `whileTap={{ scale: 0.95 }}` nos componentes principais
+## Padrões Identificados
 
-### 4. Recuperação de senha
-- Adicionar link "Esqueci minha senha" na página `Auth.tsx`
-- Criar página `src/pages/ResetPassword.tsx` com campo de email para envio do link
-- Criar página `src/pages/UpdatePassword.tsx` para definir nova senha (recebe token via URL)
-- Adicionar `resetPassword` no `use-auth.tsx` usando `supabase.auth.resetPasswordForEmail`
-- Adicionar rotas `/reset-password` e `/update-password` no `App.tsx`
+### Layout e Estrutura
+- **Container**: `max-w-7xl mx-auto px-4 py-5 space-y-5`
+- **Header fixo**: `border-b border-border bg-card sticky top-0 z-50`
+- **Título**: `text-base font-bold tracking-tight`, formato "CORE — MÓDULO"
+- **Tabs**: classe `notion-tab` (custom), texto `text-[11px]`, emojis apenas nas labels das tabs
+- **Grid responsivo**: `grid grid-cols-2 lg:grid-cols-4 gap-3`
 
-### 5. Dashboard com gráficos melhorados
-- Adicionar gráfico de evolução mensal (linha) no Dashboard usando `recharts` (já disponível via shadcn chart)
-- Gráfico de pizza para distribuição de despesas por categoria
-- Card de tendência mostrando se gastos estão subindo ou descendo vs mês anterior
-- Indicador visual de saúde financeira (gauge/termômetro)
+### Cards e Containers
+- **Card padrão**: `bg-card rounded-lg border border-border p-4`
+- **Animação de entrada**: `animate-fade-in` em todos os componentes
+- **Card com cor semântica**: usa tokens `bg-card-receitas`, `bg-card-despesas`, `bg-card-dividas`, `bg-card-investimentos` com `border-*-border` e `text-*-text`
 
-### 6. Gamificação aprimorada
-- Adicionar sistema de badges/conquistas no componente `Gamification.tsx`
-- Badges: "Primeira meta", "7 dias seguidos", "Investidor iniciante", "Sem dívidas"
-- Animação de desbloqueio com modal celebratório
-- Persistir badges no `usePersistedState`
+### Tabelas
+- **Container**: `bg-card rounded-lg overflow-hidden border border-border`
+- **Header colorido**: faixa com `bg-income py-2 px-4` + texto `font-bold text-sm tracking-wide`
+- **Cabeçalho da tabela**: `border-b border-border bg-muted/30`, texto `text-xs font-medium text-muted-foreground`
+- **Linha de input novo**: `bg-muted/20`, inputs transparentes `border-0 bg-transparent shadow-none px-0 focus-visible:ring-0`
+- **Rodapé**: `border-t border-border`, label "SUM" ou "TOTAL" + valor em `font-bold tabular-nums`
+- **Linhas**: `border-b border-border/50 hover:bg-muted/20 transition-colors`
+- **Badges de categoria**: `category-badge` (custom class: `px-2.5 py-0.5 rounded-full text-xs font-medium`)
 
-### 7. Sincronização offline melhorada
-- Implementar queue de operações offline em `src/hooks/use-offline-queue.ts`
-- Detectar estado online/offline com `navigator.onLine` e evento listeners
-- Mostrar banner "Modo offline" quando desconectado
-- Sincronizar dados pendentes quando voltar online
+### Tipografia
+- **Títulos de seção**: `text-xs font-bold`, UPPERCASE, com `tracking-wide` ou `tracking-widest`
+- **Labels**: `text-xs text-muted-foreground`
+- **Micro-texto**: `text-[10px] text-muted-foreground`
+- **Valores monetários**: `tabular-nums`, formatados com `toLocaleString("pt-BR")`
+- **Lucide icons**: `w-3.5 h-3.5` em ações, `w-4 h-4` em headers, `w-8 h-8` em stat cards (com opacidade `/30`)
 
-### 8. Dark mode refinado
-- Revisar variáveis CSS do dark mode em `index.css` para melhor contraste
-- Ajustar cards financeiros (receitas, despesas, dívidas, investimentos) no dark mode
-- Garantir que gráficos e badges respeitem o tema
-- Melhorar bordas e sombras no dark mode
+### Cores (nunca hex hardcoded nos componentes novos)
+- **Receitas/positivo**: `text-green-400` (dashboard) ou tokens `card-receitas`
+- **Despesas/negativo**: `text-red-400` ou tokens `card-despesas`
+- **Dívidas**: `text-orange-400` ou tokens `card-dividas`
+- **Investimentos**: `text-purple-400` ou tokens `card-investimentos`
+- **Alertas**: `bg-orange-500/10 border-orange-500/20` (warning), `bg-green-500/10` (success), `bg-blue-500/10` (info)
 
-### Detalhes técnicos
+### Interações
+- **Botão de ação**: ícone `Plus` em `text-muted-foreground hover:text-foreground`
+- **Botão de deletar**: `Trash2` em `text-muted-foreground hover:text-destructive`, aparece com `opacity-0 group-hover:opacity-100`
+- **Dialogs**: `max-w-md w-[92vw] p-0`, conteúdo com `p-6 space-y-5`, animação Framer Motion `opacity/y`
+- **Empty states**: texto centralizado `text-xs text-muted-foreground` + subtexto `text-[10px]`
 
-**Arquivos novos:**
-- `public/manifest.json`, `public/sw.js`
-- `src/components/EmptyState.tsx`
-- `src/pages/ResetPassword.tsx`, `src/pages/UpdatePassword.tsx`
-- `src/hooks/use-offline-queue.ts`
+### Componentes UI usados
+- `Button` (shadcn) com `variant="outline" size="sm" text-xs`
+- `Input` com `h-7 text-xs`
+- `Select` (shadcn) para dropdowns
+- `Checkbox` com `h-3.5 w-3.5 rounded-full`
+- `Progress` (shadcn) para barras
+- `Dialog/DialogContent` para modais
+- Recharts para gráficos (`PieChart`, `BarChart`, `AreaChart`)
 
-**Arquivos modificados:**
-- `index.html` — meta tags PWA
-- `src/main.tsx` — registro do service worker
-- `src/App.tsx` — novas rotas
-- `src/pages/Auth.tsx` — link "Esqueci minha senha"
-- `src/hooks/use-auth.tsx` — função resetPassword
-- `src/index.css` — refinamento dark mode
-- `src/components/Gamification.tsx` — sistema de badges
-- `src/components/Dashboard.tsx` — gráficos
-- Tabelas financeiras — empty states e micro-interações
+---
 
-**Dependências:** Nenhuma nova (recharts já está disponível via shadcn/chart, framer-motion já instalado)
+## Plano de Implementação
+
+Vou criar/atualizar um arquivo de memória detalhado com todas essas regras para que qualquer novo componente siga exatamente o mesmo padrão.
+
+### Arquivo a criar
+**`mem://design/finance-identity`** — Guia completo da identidade visual do módulo de finanças, incluindo todos os padrões de cards, tabelas, tipografia, cores, interações e componentes.
+
+### Arquivo a atualizar
+**`mem://index.md`** — Adicionar referência ao novo arquivo de memória.
 

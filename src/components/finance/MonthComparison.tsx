@@ -132,7 +132,7 @@ export const MonthComparison = () => {
       <h3 className="text-xs font-bold mb-3">🔄 COMPARAÇÃO MENSAL</h3>
 
       {/* Month selectors */}
-      <div className="px-4 pt-3 pb-2 flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-3">
         <Select value={monthA} onValueChange={setMonthA}>
           <SelectTrigger className="h-7 text-xs flex-1">
             <SelectValue />

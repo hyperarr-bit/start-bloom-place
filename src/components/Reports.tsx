@@ -226,7 +226,7 @@ export const Reports = ({
             <h2 className="text-lg font-bold">Relatório Financeiro</h2>
             <p className="text-sm text-muted-foreground capitalize">{currentMonth}</p>
           </div>
-          <Calendar className="w-8 h-8 text-muted-foreground" />
+          <span className="text-2xl">📅</span>
         </div>
 
         {/* Summary Cards */}

@@ -293,7 +293,7 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
             return (
               <div
                 key={item.id}
-                className={`bg-card rounded-xl border overflow-hidden transition-all hover:shadow-md ${
+                className={`bg-card rounded-lg border overflow-hidden transition-all hover:shadow-md ${
                   isComplete ? "border-emerald-500/40" : "border-border"
                 }`}
               >

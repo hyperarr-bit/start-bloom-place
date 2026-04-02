@@ -234,10 +234,7 @@ export const Simulators = () => {
 
         {/* Financial Independence */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
-            <Target className="w-4 h-4 text-purple-400" />
-            INDEPENDÊNCIA FINANCEIRA
-          </h3>
+          <h3 className="text-xs font-bold mb-4">🎯 INDEPENDÊNCIA FINANCEIRA</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Gastos mensais (R$)</label>

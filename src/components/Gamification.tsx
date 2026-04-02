@@ -173,10 +173,7 @@ export const Gamification = ({
       {/* 52 Week Challenge */}
       <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-bold flex items-center gap-2">
-            <Star className="w-4 h-4 text-yellow-400" />
-            DESAFIO DAS 52 SEMANAS
-          </h3>
+          <h3 className="text-xs font-bold">⭐ DESAFIO DAS 52 SEMANAS</h3>
           <span className="text-xs text-muted-foreground">
             R$ {challengeTotal} de R$ {fullChallengeTotal}
           </span>

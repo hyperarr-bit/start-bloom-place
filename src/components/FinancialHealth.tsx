@@ -312,10 +312,7 @@ export const FinancialHealth = ({
 
       {/* Tips */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h4 className="text-xs font-bold mb-3 flex items-center gap-2">
-          <Lightbulb className="w-4 h-4" />
-          DICAS PERSONALIZADAS
-        </h4>
+        <h4 className="text-xs font-bold mb-3">💡 DICAS PERSONALIZADAS</h4>
         <div className="space-y-2">
           {tips.map((tip, index) => (
             <div

@@ -88,8 +88,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
       {/* Header */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="bg-muted/40 px-4 py-2.5 flex items-center gap-2">
-          <Gauge className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className="text-xs font-bold tracking-wide uppercase">Limites por Categoria</span>
+          <span className="text-xs font-bold tracking-wide uppercase">🎯 LIMITES POR CATEGORIA</span>
         </div>
 
         {!hasBudgets && activeCats.length === 0 && !editing ? (

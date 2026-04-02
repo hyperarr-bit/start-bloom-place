@@ -207,11 +207,22 @@ export type TravelCostItem = {
   actual: number;
 };
 
+export type TravelPlace = {
+  id: string;
+  name: string;
+  category: "comida" | "turistico" | "compras" | "cafe" | "bar";
+  notes: string;
+  mapsLink: string;
+  status: "quero_ir" | "ja_fui" | "favorito";
+};
+
 export type TravelTrip = {
   id: string;
   destination: string;
   startDate: string;
   endDate: string;
+  photoUrl?: string;
+  places?: TravelPlace[];
   categories: Record<string, TravelCostItem[]>;
 };
 

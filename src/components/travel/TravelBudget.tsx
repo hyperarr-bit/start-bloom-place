@@ -1,23 +1,28 @@
 import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { TravelTrip, TravelCostItem, genId, formatCurrency } from "./types";
+import { TravelTrip, TravelCostItem, TravelPlace, genId, formatCurrency, PLACE_CATEGORIES, PLACE_STATUS } from "./types";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ExternalLink, ImagePlus } from "lucide-react";
 
 const CATEGORIES = [
-  { key: "passagens", emoji: "✈️", label: "PASSAGENS AÉREAS", headerColor: "bg-violet-300 dark:bg-violet-700", bodyColor: "bg-violet-50 dark:bg-violet-950/20", accentColor: "bg-violet-400" },
-  { key: "hotel", emoji: "🏨", label: "HOTEL", headerColor: "bg-teal-300 dark:bg-teal-700", bodyColor: "bg-teal-50 dark:bg-teal-950/20", accentColor: "bg-teal-400" },
-  { key: "passeios", emoji: "🎡", label: "PASSEIOS / TURISMO", headerColor: "bg-sky-200 dark:bg-sky-700", bodyColor: "bg-sky-50 dark:bg-sky-950/20", accentColor: "bg-sky-400" },
-  { key: "alimentacao", emoji: "🍲", label: "ALIMENTAÇÃO", headerColor: "bg-pink-300 dark:bg-pink-700", bodyColor: "bg-pink-50 dark:bg-pink-950/20", accentColor: "bg-pink-400" },
-  { key: "transporte", emoji: "🚕", label: "TRANSPORTE", headerColor: "bg-amber-200 dark:bg-amber-700", bodyColor: "bg-amber-50 dark:bg-amber-950/20", accentColor: "bg-amber-400" },
-  { key: "compras", emoji: "🛍️", label: "COMPRAS", headerColor: "bg-rose-300 dark:bg-rose-700", bodyColor: "bg-rose-50 dark:bg-rose-950/20", accentColor: "bg-rose-400" },
+  { key: "passagens", emoji: "✈️", label: "PASSAGENS AÉREAS", headerColor: "bg-violet-300 dark:bg-violet-700", bodyColor: "bg-violet-50 dark:bg-violet-950/20" },
+  { key: "hotel", emoji: "🏨", label: "HOTEL", headerColor: "bg-teal-300 dark:bg-teal-700", bodyColor: "bg-teal-50 dark:bg-teal-950/20" },
+  { key: "passeios", emoji: "🎡", label: "PASSEIOS / TURISMO", headerColor: "bg-sky-200 dark:bg-sky-700", bodyColor: "bg-sky-50 dark:bg-sky-950/20" },
+  { key: "alimentacao", emoji: "🍲", label: "ALIMENTAÇÃO", headerColor: "bg-pink-300 dark:bg-pink-700", bodyColor: "bg-pink-50 dark:bg-pink-950/20" },
+  { key: "transporte", emoji: "🚕", label: "TRANSPORTE", headerColor: "bg-amber-200 dark:bg-amber-700", bodyColor: "bg-amber-50 dark:bg-amber-950/20" },
+  { key: "compras", emoji: "🛍️", label: "COMPRAS", headerColor: "bg-rose-300 dark:bg-rose-700", bodyColor: "bg-rose-50 dark:bg-rose-950/20" },
 ];
+
+const PLACE_CAT_OPTIONS = Object.entries(PLACE_CATEGORIES) as [keyof typeof PLACE_CATEGORIES, { label: string; emoji: string }][];
+const PLACE_STATUS_OPTIONS = Object.entries(PLACE_STATUS) as [keyof typeof PLACE_STATUS, { label: string; emoji: string }][];
 
 const defaultTrip = (): TravelTrip => ({
   id: genId(),
   destination: "",
   startDate: "",
   endDate: "",
+  photoUrl: "",
+  places: [],
   categories: Object.fromEntries(CATEGORIES.map(c => [c.key, []])),
 });
 
@@ -32,6 +37,7 @@ export const TravelBudget = () => {
 
   const updateTrip = (patch: Partial<TravelTrip>) => setTrip(prev => ({ ...prev, ...patch }));
 
+  // === Cost items ===
   const updateItem = (catKey: string, itemId: string, patch: Partial<TravelCostItem>) => {
     setTrip(prev => ({
       ...prev,
@@ -64,6 +70,43 @@ export const TravelBudget = () => {
     }));
   };
 
+  // === Places ===
+  const places = trip.places || [];
+
+  const addPlace = () => {
+    setTrip(prev => ({
+      ...prev,
+      places: [...(prev.places || []), { id: genId(), name: "", category: "comida", notes: "", mapsLink: "", status: "quero_ir" }],
+    }));
+  };
+
+  const updatePlace = (placeId: string, patch: Partial<TravelPlace>) => {
+    setTrip(prev => ({
+      ...prev,
+      places: (prev.places || []).map(p => p.id === placeId ? { ...p, ...patch } : p),
+    }));
+  };
+
+  const removePlace = (placeId: string) => {
+    setTrip(prev => ({
+      ...prev,
+      places: (prev.places || []).filter(p => p.id !== placeId),
+    }));
+  };
+
+  const cycleStatus = (placeId: string) => {
+    const order: TravelPlace["status"][] = ["quero_ir", "ja_fui", "favorito"];
+    setTrip(prev => ({
+      ...prev,
+      places: (prev.places || []).map(p => {
+        if (p.id !== placeId) return p;
+        const idx = order.indexOf(p.status);
+        return { ...p, status: order[(idx + 1) % order.length] };
+      }),
+    }));
+  };
+
+  // === Totals ===
   const catTotals = useMemo(() => {
     return CATEGORIES.map(cat => {
       const items = trip.categories[cat.key] || [];
@@ -88,12 +131,26 @@ export const TravelBudget = () => {
           <span className="text-xs font-bold uppercase tracking-wider">📍 DESTINO</span>
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
+          {trip.photoUrl && (
+            <div className="rounded-lg overflow-hidden aspect-video">
+              <img src={trip.photoUrl} alt={trip.destination || "Destino"} className="w-full h-full object-cover" />
+            </div>
+          )}
           <Input
             placeholder="Nome do destino (ex: Nova York)"
             value={trip.destination}
             onChange={e => updateTrip({ destination: e.target.value })}
             className="h-8 rounded-lg text-xs bg-background/60"
           />
+          <div className="flex items-center gap-2">
+            <ImagePlus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <Input
+              placeholder="URL da imagem do destino"
+              value={trip.photoUrl || ""}
+              onChange={e => updateTrip({ photoUrl: e.target.value })}
+              className="h-8 rounded-lg text-xs bg-background/60"
+            />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[9px] text-muted-foreground font-medium uppercase">Data de Ida</label>
@@ -206,13 +263,91 @@ export const TravelBudget = () => {
         );
       })}
 
+      {/* Places card */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-emerald-300 dark:bg-emerald-700 px-3 py-2 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider">📍 LOCAIS PARA CONHECER</span>
+          <button
+            onClick={addPlace}
+            className="rounded-full w-5 h-5 flex items-center justify-center bg-background/40 hover:bg-background/70 transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="bg-emerald-50 dark:bg-emerald-950/20">
+          {places.length === 0 && (
+            <button
+              onClick={addPlace}
+              className="w-full py-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              + Adicionar local
+            </button>
+          )}
+          {places.map(place => (
+            <div key={place.id} className="px-3 py-2.5 border-b border-border/20 last:border-b-0 group">
+              <div className="flex items-start gap-2">
+                <div className="flex-1 space-y-1.5">
+                  <Input
+                    value={place.name}
+                    onChange={e => updatePlace(place.id, { name: e.target.value })}
+                    placeholder="Nome do local"
+                    className="h-7 rounded-md text-[11px] bg-background/50 border-0 px-2 font-medium"
+                  />
+                  <div className="flex gap-1.5 items-center flex-wrap">
+                    <select
+                      value={place.category}
+                      onChange={e => updatePlace(place.id, { category: e.target.value as TravelPlace["category"] })}
+                      className="h-6 rounded-md text-[10px] bg-background/50 border-0 px-1.5 appearance-none cursor-pointer"
+                    >
+                      {PLACE_CAT_OPTIONS.map(([key, val]) => (
+                        <option key={key} value={key}>{val.emoji} {val.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => cycleStatus(place.id)}
+                      className="h-6 rounded-md text-[10px] bg-background/50 px-2 hover:bg-background/80 transition-colors whitespace-nowrap"
+                    >
+                      {PLACE_STATUS[place.status].emoji} {PLACE_STATUS[place.status].label}
+                    </button>
+                  </div>
+                  <Input
+                    value={place.notes}
+                    onChange={e => updatePlace(place.id, { notes: e.target.value })}
+                    placeholder="Notas..."
+                    className="h-6 rounded-md text-[10px] bg-background/50 border-0 px-2 text-muted-foreground"
+                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={place.mapsLink}
+                      onChange={e => updatePlace(place.id, { mapsLink: e.target.value })}
+                      placeholder="Link Google Maps"
+                      className="h-6 rounded-md text-[10px] bg-background/50 border-0 px-2 flex-1"
+                    />
+                    {place.mapsLink && (
+                      <a href={place.mapsLink} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                        <ExternalLink className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => removePlace(place.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity mt-1"
+                >
+                  <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Grand total card */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-stone-400 dark:bg-stone-700 px-3 py-2">
           <span className="text-xs font-bold uppercase tracking-wider">💰 ORÇAMENTO TOTAL</span>
         </div>
         <div className="bg-stone-50 dark:bg-stone-950/20">
-          {/* Header row */}
           <div className="grid grid-cols-[1fr_90px_90px] gap-1 px-3 pt-2 mb-1">
             <span className="text-[8px] font-bold text-muted-foreground uppercase">Categoria</span>
             <span className="text-[8px] font-bold text-muted-foreground uppercase text-right">Estimado</span>

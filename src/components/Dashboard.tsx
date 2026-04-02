@@ -667,14 +667,19 @@ export const Dashboard = ({
         {(() => {
           const now = new Date();
           const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const dailyRate = totalIncome / daysInMonth;
+          const dailyFreeRate = freeBalance / daysInMonth;
           return (
-            <div className="text-[11px] text-muted-foreground mb-3 space-y-1">
+            <div className="text-[11px] text-muted-foreground mb-3 space-y-1.5">
               <p>
-                Sua receita total é <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>.
+                Receita: <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                {" − "}Fixos: <strong className="text-foreground">R$ {totalFixed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                {savingsAmount > 0 && <>{" − "}Reserva ({savingsRate}%): <strong className="text-foreground">R$ {savingsAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></>}
               </p>
               <p>
-                A linha azul tracejada mostra o quanto você <em>poderia</em> gastar por dia sem ultrapassar a receita. A linha vermelha mostra seus gastos reais acumulados.
+                = <strong className="text-foreground">R$ {freeBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> livres ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyFreeRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>
+              </p>
+              <p>
+                A linha azul considera suas contas fixas nos dias de vencimento + o valor livre diário. Se a vermelha ultrapassar, você está gastando acima do que sobra.
               </p>
             </div>
           );

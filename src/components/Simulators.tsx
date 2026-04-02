@@ -173,10 +173,7 @@ export const Simulators = () => {
 
         {/* Finance vs Cash */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-orange-400" />
-            FINANCIAR OU PAGAR À VISTA?
-          </h3>
+          <h3 className="text-xs font-bold mb-4">💳 FINANCIAR OU PAGAR À VISTA?</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Valor do bem (R$)</label>

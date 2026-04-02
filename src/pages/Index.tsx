@@ -188,6 +188,7 @@ const Index = () => {
               fixedExpenses={fixedExpenses}
               dueDays={dueDays}
               savingsRate={savingsRate}
+              onNavigateToFinanceiro={() => setActiveTab("financeiro")}
             />
             <MonthComparison />
           </>

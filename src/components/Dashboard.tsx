@@ -280,21 +280,29 @@ export const Dashboard = ({
 
   const categoryBarColors: Record<string, string> = {
     alimentacao: "bg-orange-400", restaurante: "bg-amber-400", mercado: "bg-lime-500",
-    transporte: "bg-blue-400", combustivel: "bg-indigo-400", lazer: "bg-purple-400",
-    entretenimento: "bg-violet-400", saude: "bg-green-400", farmacia: "bg-emerald-400",
-    vestuario: "bg-sky-400", beleza: "bg-rose-400", educacao: "bg-teal-400",
-    eletronicos: "bg-red-400", servicos: "bg-cyan-400", delivery: "bg-yellow-400",
-    presente: "bg-fuchsia-400", casa: "bg-stone-400", pets: "bg-slate-400",
-    filhos: "bg-blue-300", viagem: "bg-pink-400", outros: "bg-gray-400",
+    transporte: "bg-blue-400", combustivel: "bg-zinc-400", lazer: "bg-purple-400",
+    entretenimento: "bg-pink-400", saude: "bg-green-400", farmacia: "bg-red-400",
+    vestuario: "bg-fuchsia-400", beleza: "bg-rose-400", educacao: "bg-teal-400",
+    eletronicos: "bg-cyan-400", servicos: "bg-slate-400", delivery: "bg-yellow-400",
+    presente: "bg-violet-400", casa: "bg-stone-400", pets: "bg-emerald-400",
+    filhos: "bg-sky-400", viagem: "bg-indigo-400", outros: "bg-gray-400",
+    moradia: "bg-orange-400", contas_casa: "bg-yellow-400", condominio: "bg-amber-400",
+    seguro: "bg-sky-400", plano_saude: "bg-green-400", assinaturas: "bg-purple-400",
+    internet_telefone: "bg-blue-400", academia: "bg-lime-500", transporte_fixo: "bg-indigo-400",
+    fatura_cartao: "bg-rose-400", financiamento: "bg-red-400", pensao: "bg-stone-400",
   };
   const categoryTextColors: Record<string, string> = {
     alimentacao: "text-orange-400", restaurante: "text-amber-400", mercado: "text-lime-500",
-    transporte: "text-blue-400", combustivel: "text-indigo-400", lazer: "text-purple-400",
-    entretenimento: "text-violet-400", saude: "text-green-400", farmacia: "text-emerald-400",
-    vestuario: "text-sky-400", beleza: "text-rose-400", educacao: "text-teal-400",
-    eletronicos: "text-red-400", servicos: "text-cyan-400", delivery: "text-yellow-400",
-    presente: "text-fuchsia-400", casa: "text-stone-400", pets: "text-slate-400",
-    filhos: "text-blue-300", viagem: "text-pink-400", outros: "text-gray-400",
+    transporte: "text-blue-400", combustivel: "text-zinc-400", lazer: "text-purple-400",
+    entretenimento: "text-pink-400", saude: "text-green-400", farmacia: "text-red-400",
+    vestuario: "text-fuchsia-400", beleza: "text-rose-400", educacao: "text-teal-400",
+    eletronicos: "text-cyan-400", servicos: "text-slate-400", delivery: "text-yellow-400",
+    presente: "text-violet-400", casa: "text-stone-400", pets: "text-emerald-400",
+    filhos: "text-sky-400", viagem: "text-indigo-400", outros: "text-gray-400",
+    moradia: "text-orange-400", contas_casa: "text-yellow-400", condominio: "text-amber-400",
+    seguro: "text-sky-400", plano_saude: "text-green-400", assinaturas: "text-purple-400",
+    internet_telefone: "text-blue-400", academia: "text-lime-500", transporte_fixo: "text-indigo-400",
+    fatura_cartao: "text-rose-400", financiamento: "text-red-400", pensao: "text-stone-400",
   };
 
 

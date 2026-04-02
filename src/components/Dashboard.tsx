@@ -268,11 +268,27 @@ export const Dashboard = ({
 
   const balance = totalIncome - totalExpenses;
 
-  // Daily cash flow data
+  // Daily cash flow data — ideal considers fixed expenses, savings, and bill due dates
+  const totalFixed = useMemo(() => fixedExpenses.reduce((s, e) => s + e.value, 0), [fixedExpenses]);
+  const savingsAmount = useMemo(() => totalIncome * (savingsRate / 100), [totalIncome, savingsRate]);
+  const freeBalance = useMemo(() => Math.max(totalIncome - totalFixed - savingsAmount, 0), [totalIncome, totalFixed, savingsAmount]);
+
   const cashFlowData = useMemo(() => {
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dailyIdeal = totalIncome / daysInMonth;
+    const dailyFree = freeBalance / daysInMonth;
+
+    // Build fixed expense schedule by due day
+    const fixedByDay: Record<number, number> = {};
+    dueDays.forEach((dd) => {
+      dd.bills.forEach((bill) => {
+        const fe = fixedExpenses.find((f) => f.id === bill.id);
+        if (fe) {
+          fixedByDay[dd.day] = (fixedByDay[dd.day] || 0) + fe.value;
+        }
+      });
+    });
+
     const dailyTotals: Record<number, number> = {};
     expenses.forEach((e) => {
       if (!e.date) return;
@@ -282,14 +298,18 @@ export const Dashboard = ({
         dailyTotals[day] = (dailyTotals[day] || 0) + e.value;
       }
     });
+
     let accumulated = 0;
+    let idealAcc = 0;
     const data = [];
     for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
       accumulated += dailyTotals[day] || 0;
-      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(dailyIdeal * day) });
+      // Ideal = fixed bills on that day + daily free allowance
+      idealAcc += (fixedByDay[day] || 0) + dailyFree;
+      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(idealAcc) });
     }
     return data;
-  }, [expenses, totalIncome]);
+  }, [expenses, freeBalance, dueDays, fixedExpenses]);
 
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {

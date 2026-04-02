@@ -1,75 +1,115 @@
 
 
-# 4 Novos Gráficos no Dashboard
+# Redesign do TravelBudget — Estilo xTiles
 
-Adicionar ao final do Dashboard (após Fixos vs Variáveis), seguindo a identidade visual: `bg-card rounded-lg border border-border p-4`, título `emoji + UPPERCASE text-xs font-bold mb-3`, cores semânticas, `tabular-nums`.
-
----
-
-## 1. 💸 Fluxo de Caixa Diário
-
-**AreaChart** (Recharts) mostrando gastos acumulados dia a dia no mês atual.
-- Eixo X: dias (1–30)
-- Linha sólida: gastos reais acumulados (cor `#ef4444`)
-- Linha tracejada: ritmo ideal (receita total / dias do mês × dia) — cor `#3b82f6` com opacidade
-- Agrupa `expenses` por campo `date`, soma valores, acumula dia a dia
-- Gradiente de preenchimento sob a linha de gastos
-
-## 2. 🏆 TOP 5 MAIORES GASTOS
-
-**Barras horizontais CSS** (sem Recharts, igual ao card de Método de Pagamento).
-- Combina `expenses` + `fixedExpenses`, ordena por valor DESC, pega os 5 maiores
-- Cada barra: descrição truncada + valor `tabular-nums` + barra proporcional ao maior gasto
-- Cor: `bg-red-400`
-
-## 3. 📅 GASTOS POR DIA DA SEMANA
-
-**BarChart** (Recharts) com 7 barras (Seg–Dom).
-- Agrupa `expenses` pelo dia da semana extraído do campo `date`
-- Labels: Seg, Ter, Qua, Qui, Sex, Sáb, Dom
-- Cor única: `#8b5cf6`
-- Destaca visualmente o dia com maior gasto
-
-## 4. 💰 COMPOSIÇÃO DA RENDA + 📈 TENDÊNCIA
-
-Card dividido em **grid 2 colunas** (lg):
-
-**Coluna 1 — Composição da Renda**: PieChart (donut) com as fontes de receita.
-- Agrupa `incomes` por `description` (cada income tem descrição como "Salário", "Freelance")
-- Mesma paleta `COLORS` do pie de categorias
-- Legenda ao lado com valores
-
-**Coluna 2 — Tendência Mensal**: LineChart comparando ritmo de gastos do mês atual vs mês anterior.
-- Eixo X: dias (1–30)
-- Linha azul: mês atual (gastos acumulados por dia)
-- Linha cinza tracejada: mês anterior (dados do `getMonthTotals` dividido por 30, como estimativa linear)
-- Se não houver dados do mês anterior, mostra apenas mês atual
+Substituir o componente `TravelBudget.tsx` por um layout inspirado nas imagens de referência: cards por categoria com tabelas de Valor Estimado vs Valor Real, header colorido com emoji, e resumo total no final.
 
 ---
 
-## Dados necessários
+## Estrutura Visual (baseada nas imagens)
 
-- `incomes` — já passado ao Dashboard? **Não.** Precisa adicionar como nova prop.
-- `expenses.date` — já tem, para agrupar por dia/semana
-- `fixedExpenses` — já passado
+```text
+┌─────────────────────────────────┐
+│ 📍 DESTINO: Nova York           │
+│ Data de Ida: 22/12/2025         │
+│ Data de Volta: 05/01/2026       │
+│ Quantos dias: 14 noites         │
+└─────────────────────────────────┘
 
-## Arquivos editados
+┌─ PASSAGENS AÉREAS ──────────────┐
+│ ✈️  (header roxo/lilás)         │
+│ Descrição | Val.Estimado | Real │
+│ Ida       | 5000         | 6700 │
+│ Volta     |              |      │
+│ Valor Total: R$ X              │
+└─────────────────────────────────┘
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/components/Dashboard.tsx` | Adicionar prop `incomes`, 4 novos blocos com `useMemo` para cada dataset, JSX no final |
-| `src/pages/Index.tsx` | Passar `incomes={incomes}` ao `<Dashboard>` |
+┌─ HOTEL ─────────────────────────┐
+│ 🏨  (header teal/verde)         │
+│ ... mesma tabela ...            │
+└─────────────────────────────────┘
 
-## Layout final do Dashboard (de cima para baixo)
+... Passeios, Alimentação, Transporte, Compras ...
 
-1. Quick Stats (existente)
-2. Alertas Inteligentes (existente)
-3. Gastos por Categoria + Receitas vs Despesas (existente)
-4. Evolução do Patrimônio (existente)
-5. Progresso do Mês (existente)
-6. Últimas Transações + Gasto por Método (existente)
-7. Fixos vs Variáveis (existente)
-8. **Fluxo de Caixa Diário** (novo — largura total)
-9. **Grid 2 colunas: Top 5 Maiores Gastos + Gastos por Dia da Semana** (novo)
-10. **Grid 2 colunas: Composição da Renda + Tendência Mensal** (novo)
+┌─ ORÇAMENTO TOTAL ───────────────┐
+│ 💰 (header cinza/marrom)        │
+│ Passagens  | Est. | Real        │
+│ Hotel      | Est. | Real        │
+│ ...                             │
+│ TOTAL      | Est. | Real        │
+└─────────────────────────────────┘
+```
+
+---
+
+## Categorias (conforme imagens)
+
+| Categoria | Emoji | Cor Header | Cor Body |
+|-----------|-------|-----------|----------|
+| Passagens Aéreas | ✈️ | `bg-violet-300` | `bg-violet-50` |
+| Hotel | 🏨 | `bg-teal-300` | `bg-teal-50` |
+| Passeios/Turismo | 🎡 | `bg-sky-200` | `bg-sky-50` |
+| Alimentação | 🍲 | `bg-pink-300` | `bg-pink-50` |
+| Transporte | 🚕 | `bg-amber-200` | `bg-amber-50` |
+| Compras | 🛍️ | `bg-rose-300` | `bg-rose-50` |
+
+---
+
+## Dados / Estado
+
+Novo tipo de dados para suportar Valor Estimado + Valor Real por item:
+
+```typescript
+type TravelCostItem = {
+  id: string;
+  description: string;
+  estimated: number;
+  actual: number;
+};
+
+type TravelTrip = {
+  id: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  categories: Record<string, TravelCostItem[]>;
+};
+```
+
+Persistido com `usePersistedState("travel-budget-v2", ...)`.
+
+---
+
+## Funcionalidades por Card de Categoria
+
+- Header colorido com emoji centralizado + nome bold
+- Tabela com 3 colunas: Descrição, Valor Estimado, Valor Real
+- Inputs inline editáveis (tap para editar)
+- Botão "+" para adicionar nova linha
+- "Valor Total" no rodapé com barra lateral colorida (como na imagem)
+- Botão de deletar linha (hover/swipe)
+
+## Card de Destino (topo)
+
+- Inputs para: nome do destino, data ida, data volta
+- Cálculo automático de dias/noites
+- Sem fotos (não temos upload neste contexto)
+
+## Card Orçamento Total (final)
+
+- Header cinza/marrom escuro com emoji 💰
+- Tabela resumo: cada categoria como linha, com soma de Estimado e Real
+- Linha final TOTAL em bold
+- Cores: header `bg-stone-400 dark:bg-stone-700`, body `bg-stone-50 dark:bg-stone-950/20`
+
+---
+
+## Arquivos
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/travel/TravelBudget.tsx` | Reescrita completa |
+| `src/components/travel/types.ts` | Adicionar tipos `TravelCostItem` e `TravelTrip` |
+
+Nenhum outro arquivo muda. A aba "Budget" no `Viagens.tsx` já renderiza `<TravelBudget />`.
 

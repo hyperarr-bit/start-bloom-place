@@ -272,11 +272,30 @@ export const Dashboard = ({
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {
     const all = [
-      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
-      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value, category: e.category })),
+      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value, category: e.category })),
     ];
     return all.sort((a, b) => b.value - a.value).slice(0, 5);
   }, [expenses, fixedExpenses]);
+
+  const categoryBarColors: Record<string, string> = {
+    alimentacao: "bg-orange-400", restaurante: "bg-amber-400", mercado: "bg-lime-500",
+    transporte: "bg-blue-400", combustivel: "bg-indigo-400", lazer: "bg-purple-400",
+    entretenimento: "bg-violet-400", saude: "bg-green-400", farmacia: "bg-emerald-400",
+    vestuario: "bg-sky-400", beleza: "bg-rose-400", educacao: "bg-teal-400",
+    eletronicos: "bg-red-400", servicos: "bg-cyan-400", delivery: "bg-yellow-400",
+    presente: "bg-fuchsia-400", casa: "bg-stone-400", pets: "bg-slate-400",
+    filhos: "bg-blue-300", viagem: "bg-pink-400", outros: "bg-gray-400",
+  };
+  const categoryTextColors: Record<string, string> = {
+    alimentacao: "text-orange-400", restaurante: "text-amber-400", mercado: "text-lime-500",
+    transporte: "text-blue-400", combustivel: "text-indigo-400", lazer: "text-purple-400",
+    entretenimento: "text-violet-400", saude: "text-green-400", farmacia: "text-emerald-400",
+    vestuario: "text-sky-400", beleza: "text-rose-400", educacao: "text-teal-400",
+    eletronicos: "text-red-400", servicos: "text-cyan-400", delivery: "text-yellow-400",
+    presente: "text-fuchsia-400", casa: "text-stone-400", pets: "text-slate-400",
+    filhos: "text-blue-300", viagem: "text-pink-400", outros: "text-gray-400",
+  };
 
 
   // Budget bar color

@@ -286,7 +286,7 @@ export const FinancialHealth = ({
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Target className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm">🎯</span>
             <span className="text-[10px] text-muted-foreground">Metas</span>
           </div>
           <p className="text-lg font-bold">{goalsProgress.toFixed(0)}%</p>

@@ -1,60 +1,44 @@
 
 
-# Adicionar Locais para Conhecer + Imagem no Destino
+# Substituir Tendência Mensal por Card Estilo "Você gastou"
 
-Duas adições ao `TravelBudget.tsx`:
-
----
-
-## 1. Imagem no Card de Destino
-
-Adicionar campo de URL de imagem ao `TravelTrip` type e exibir no card de destino.
-
-- **`types.ts`**: Adicionar `photoUrl?: string` ao tipo `TravelTrip`
-- No card 📍 DESTINO, adicionar:
-  - Input para colar URL da imagem
-  - Se preenchido, exibir a imagem como banner no topo do card (rounded, aspect-video, object-cover)
-  - Mesmo estilo xTiles dos outros cards
-
-## 2. Seção Locais para Conhecer
-
-Adicionar um novo card xTiles **📍 LOCAIS PARA CONHECER** ao final do `TravelBudget` (antes do Orçamento Total), com a mesma identidade visual dos cards de categoria.
-
-- Header: `bg-emerald-300 dark:bg-emerald-700`, emoji 📍
-- Body: `bg-emerald-50 dark:bg-emerald-950/20`
-- Cada local tem: nome, categoria (dropdown: 🍕 Comida, 📸 Turístico, 🛍️ Compras, ☕ Café, 🍸 Bar), notas, link Google Maps
-- Botão "+" para adicionar
-- Cards compactos com nome, categoria badge, notas, link externo e botão deletar
-- Status toggle: 📌 Quero ir / ✅ Já fui / ❤️ Favorito
-
-### Dados
-
-Adicionar ao `TravelTrip`:
-```typescript
-photoUrl?: string;
-places?: TravelPlace[];
-```
-
-Novo tipo:
-```typescript
-type TravelPlace = {
-  id: string;
-  name: string;
-  category: "comida" | "turistico" | "compras" | "cafe" | "bar";
-  notes: string;
-  mapsLink: string;
-  status: "quero_ir" | "ja_fui" | "favorito";
-};
-```
+Substituir o card `📈 TENDÊNCIA MENSAL` (linhas 748-763 do Dashboard) por um card hero azul inspirado na imagem de referência.
 
 ---
 
-## Arquivos
+## Design
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/travel/types.ts` | Adicionar `TravelPlace`, `photoUrl` e `places` ao `TravelTrip` |
-| `src/components/travel/TravelBudget.tsx` | Adicionar imagem no destino + seção Locais para Conhecer |
+Card com fundo gradiente azul (`bg-gradient-to-br from-blue-600 to-blue-700`), ocupando largura total:
 
-Tudo integrado dentro do mesmo componente, sem criar arquivos novos. Reutiliza as constantes `PLACE_CATEGORIES` e `PLACE_STATUS` já existentes no `types.ts`.
+```text
+┌──────────────────────────────────────┐
+│  Você gastou                         │
+│  R$ X.XXX  a menos/mais este mês    │
+│  [↓ -XX%]  vs R$ X.XXX mês anterior │
+│                                      │
+│     ~~~ linha tracejada (gráfico) ~~~│
+│  ●                                   │
+│  ┌──────────────────────────────┐    │
+│  │ ✨ Defina um limite em       │    │
+│  │ Categorias e descubra...  →  │    │
+│  └──────────────────────────────┘    │
+└──────────────────────────────────────┘
+```
+
+## Lógica
+
+- Usa dados já existentes: `trendData` (gastos acumulados mês atual) e `prevMonthTotal` (total mês anterior)
+- Calcula diferença: `currentTotal - prevTotal`
+- Se gastou menos → texto "a menos este mês", badge verde com % negativa
+- Se gastou mais → texto "a mais este mês", badge vermelha com % positiva
+- Gráfico: SVG com path tracejado usando os pontos de `trendData` (campo `Atual`), ponto verde no início
+- CTA inferior: caixa `bg-white/10 backdrop-blur` com texto "Defina um limite em Categorias..." e link "Ir →" que navega para a aba de categorias
+
+## Alterações
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/Dashboard.tsx` | Substituir bloco do card Tendência Mensal (linhas 748-763) pelo novo card hero azul. Extrair `prevMonthTotal` para fora do `useMemo` do trendData para reutilizar. Adicionar SVG path tracejado inline. |
+
+Nenhum arquivo novo. A prop `onNavigate` já existe no Dashboard para navegação entre abas.
 

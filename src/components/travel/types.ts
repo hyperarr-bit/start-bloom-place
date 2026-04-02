@@ -199,6 +199,22 @@ export type TravelExpense = {
   date: string;
 };
 
+// ===== TRAVEL BUDGET V2 (xTiles style) =====
+export type TravelCostItem = {
+  id: string;
+  description: string;
+  estimated: number;
+  actual: number;
+};
+
+export type TravelTrip = {
+  id: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  categories: Record<string, TravelCostItem[]>;
+};
+
 // ===== WEATHER PREP (AI-created feature) =====
 export type WeatherPrep = {
   destination: string;

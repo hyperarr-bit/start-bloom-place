@@ -250,7 +250,7 @@ const Index = () => {
         )}
 
         {activeTab === "viagem" && (
-          <TravelPlanner trips={trips} setTrips={setTrips} />
+          <TravelBudget />
         )}
 
         {activeTab === "simuladores" && (

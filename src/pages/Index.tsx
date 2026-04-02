@@ -18,7 +18,7 @@ import { MonthlyBudget } from "@/components/MonthlyBudget";
 import { WishlistItems } from "@/components/WishlistItems";
 import { InvestmentsTracker } from "@/components/InvestmentsTracker";
 import { FinancialHealth } from "@/components/FinancialHealth";
-import { TravelPlanner } from "@/components/TravelPlanner";
+import { TravelBudget } from "@/components/travel/TravelBudget";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
 import { Gamification } from "@/components/Gamification";

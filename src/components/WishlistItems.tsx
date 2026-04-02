@@ -61,9 +61,9 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   };
 
   return (
-    <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-3">
-      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
-        🔗 IMPORTAR DE URL (AMAZON, MERCADO LIVRE...)
+    <div className="rounded-lg border-2 border-dashed border-pink-300 dark:border-pink-700 bg-pink-50/50 dark:bg-pink-950/20 p-3">
+      <p className="text-[10px] font-black uppercase tracking-wider text-pink-700 dark:text-pink-400 mb-2 flex items-center gap-1">
+        <Link className="w-3 h-3" /> IMPORTAR DE URL (AMAZON, MERCADO LIVRE...)
       </p>
       <div className="flex gap-1.5">
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="Cole o link do produto aqui..."
@@ -147,9 +147,12 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
   return (
     <div className="space-y-5">
       {/* Header Stats */}
-      <div className="bg-card rounded-lg border border-border p-4 space-y-3">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold">❤️ MEUS DESEJOS</h2>
+          <div className="flex items-center gap-2">
+            <Heart className="w-5 h-5 text-pink-400" />
+            <h2 className="font-bold text-sm">Meus Desejos</h2>
+          </div>
           <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? "item" : "itens"}</span>
         </div>
         
@@ -209,8 +212,8 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
 
       {/* Add Form */}
       {showForm && (
-        <div className="bg-card rounded-lg border border-border p-4 space-y-3">
-          <h3 className="text-xs font-bold uppercase tracking-wider">✨ NOVO DESEJO</h3>
+        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Novo Desejo</h3>
 
           {/* Import from URL */}
           <ImportFromUrl onImport={(data) => setNewItem(prev => ({
@@ -277,8 +280,8 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
 
       {/* Items Grid */}
       {sortedItems.length === 0 ? (
-        <div className="bg-card rounded-lg border border-border p-10 text-center">
-          <span className="text-4xl block mx-auto mb-3">❤️</span>
+        <div className="bg-card rounded-xl border border-border p-10 text-center">
+          <Heart className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
           <p className="text-sm text-muted-foreground">Nenhum desejo na lista ainda</p>
           <p className="text-xs text-muted-foreground/60 mt-1">Adicione algo que você quer conquistar!</p>
         </div>
@@ -293,7 +296,7 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
             return (
               <div
                 key={item.id}
-                className={`bg-card rounded-lg border overflow-hidden transition-all hover:shadow-md ${
+                className={`bg-card rounded-xl border overflow-hidden transition-all hover:shadow-md ${
                   isComplete ? "border-emerald-500/40" : "border-border"
                 }`}
               >

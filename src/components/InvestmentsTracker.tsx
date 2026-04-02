@@ -134,7 +134,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
       {/* Portfolio Distribution */}
       {Object.keys(byType).length > 0 && (
         <div className="bg-card rounded-lg border border-border p-3">
-          <h4 className="text-xs font-bold mb-3">📊 DISTRIBUIÇÃO DA CARTEIRA</h4>
+          <h4 className="text-xs font-bold mb-3">DISTRIBUIÇÃO DA CARTEIRA</h4>
           <div className="space-y-2">
             {Object.entries(byType).map(([type, data]) => {
               const percentage = (data.current / totalCurrentValue) * 100;
@@ -315,7 +315,10 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
 
       {/* Financial Independence Calculator */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h4 className="text-xs font-bold mb-3">💰 SIMULADOR DE INDEPENDÊNCIA FINANCEIRA</h4>
+        <h4 className="text-xs font-bold mb-3 flex items-center gap-2">
+          <Percent className="w-4 h-4" />
+          SIMULADOR DE INDEPENDÊNCIA FINANCEIRA
+        </h4>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Se continuar aportando</p>

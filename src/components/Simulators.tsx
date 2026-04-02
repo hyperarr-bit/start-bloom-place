@@ -75,7 +75,10 @@ export const Simulators = () => {
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Compound Interest */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4">📈 SIMULADOR DE JUROS COMPOSTOS</h3>
+          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-green-400" />
+            SIMULADOR DE JUROS COMPOSTOS
+          </h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Valor inicial (R$)</label>
@@ -132,7 +135,10 @@ export const Simulators = () => {
 
         {/* Time to Save */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4">⏱ QUANTO TEMPO PRA JUNTAR?</h3>
+          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-blue-400" />
+            QUANTO TEMPO PRA JUNTAR?
+          </h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Meta (R$)</label>
@@ -173,7 +179,10 @@ export const Simulators = () => {
 
         {/* Finance vs Cash */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4">💳 FINANCIAR OU PAGAR À VISTA?</h3>
+          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-orange-400" />
+            FINANCIAR OU PAGAR À VISTA?
+          </h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Valor do bem (R$)</label>
@@ -234,7 +243,10 @@ export const Simulators = () => {
 
         {/* Financial Independence */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4">🎯 INDEPENDÊNCIA FINANCEIRA</h3>
+          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
+            <Target className="w-4 h-4 text-purple-400" />
+            INDEPENDÊNCIA FINANCEIRA
+          </h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Gastos mensais (R$)</label>

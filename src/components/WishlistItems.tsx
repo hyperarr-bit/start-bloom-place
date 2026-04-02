@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -146,58 +146,66 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
 
   return (
     <div className="space-y-5">
-      {/* Header Stats */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-pink-400" />
-            <h2 className="font-bold text-sm">Meus Desejos</h2>
+      {/* Header Stats — 2x2 grid like reference */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-card rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Heart className="w-4 h-4 text-pink-400" />
+            <p className="text-[10px] text-muted-foreground">Total de Desejos</p>
           </div>
-          <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? "item" : "itens"}</span>
+          <p className="text-lg font-bold">R$ {totalWishlistValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
         </div>
-        
-        <div className="grid grid-cols-3 gap-3">
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Total</p>
-            <p className="text-sm font-bold">R$ {totalWishlistValue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</p>
+        <div className="bg-card rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <p className="text-[10px] text-muted-foreground">Já Guardado</p>
           </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Guardado</p>
-            <p className="text-sm font-bold text-emerald-400">R$ {totalSaved.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground mb-0.5">Falta</p>
-            <p className="text-sm font-bold text-orange-400">R$ {remainingToSave.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}</p>
-          </div>
+          <p className="text-lg font-bold text-emerald-400">R$ {totalSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
         </div>
-
-        {/* Overall progress */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-[10px] text-muted-foreground">
-            <span>Progresso geral</span>
-            <span>{overallProgress.toFixed(0)}%</span>
+        <div className="bg-card rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <ShoppingCart className="w-4 h-4 text-orange-400" />
+            <p className="text-[10px] text-muted-foreground">Falta Guardar</p>
           </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-pink-500 to-rose-400 transition-all duration-500"
-              style={{ width: `${overallProgress}%` }}
-            />
-          </div>
+          <p className="text-lg font-bold text-orange-400">R$ {remainingToSave.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
         </div>
-
-        {monthsToComplete > 0 && (
-          <p className="text-[10px] text-muted-foreground text-center">
-            ⏱ Estimativa: <span className="font-medium text-foreground">{monthsToComplete} meses</span> (30% do saldo livre)
+        <div className="bg-card rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Calendar className="w-4 h-4 text-blue-400" />
+            <p className="text-[10px] text-muted-foreground">Tempo Estimado</p>
+          </div>
+          <p className="text-lg font-bold text-blue-400">
+            {monthsToComplete > 0 ? `${monthsToComplete} meses` : "—"}
           </p>
-        )}
+          {monthsToComplete > 0 && (
+            <p className="text-[9px] text-muted-foreground">30% do saldo livre</p>
+          )}
+        </div>
       </div>
 
-      {/* Financial Alert */}
-      {!canAffordWithoutDebt && (
-        <div className="rounded-lg p-3 border bg-destructive/10 border-destructive/30">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-destructive" />
-            <p className="text-xs font-medium">Suas despesas superam sua renda. Foque em quitar dívidas primeiro.</p>
+      {/* Budget compatibility alert */}
+      {canAffordWithoutDebt ? (
+        <div className="rounded-xl p-3 border bg-emerald-500/10 border-emerald-500/30">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold">✅ Seus desejos estão compatíveis com seu orçamento!</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Saldo livre mensal: R$ {realAvailable.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} → R$ {savingsForWishlist.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês para desejos
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl p-3 border bg-destructive/10 border-destructive/30">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold">⚠️ Seus desejos não cabem no orçamento atual</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Suas despesas superam sua renda. Foque em quitar dívidas primeiro.
+              </p>
+            </div>
           </div>
         </div>
       )}

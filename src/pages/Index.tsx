@@ -27,6 +27,7 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
+import { SpendingBreakdown } from "@/components/finance/SpendingBreakdown";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -206,6 +207,11 @@ const Index = () => {
                   totalExpenses={totalExpenses}
                   totalDebts={totalDebts}
                   totalInvestments={totalInvestments}
+                />
+                <SpendingBreakdown
+                  totalIncome={totalIncome}
+                  totalFixed={fixedExpenses.reduce((s: number, e: any) => s + e.value, 0)}
+                  totalVariable={expenses.reduce((s: number, e: any) => s + e.value, 0)}
                 />
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">

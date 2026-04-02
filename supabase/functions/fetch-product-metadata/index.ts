@@ -161,6 +161,18 @@ Deno.serve(async (req) => {
           // "3,53" → decimal → "3.53"
           normalized = normalized.replace(',', '.');
         }
+      } else if (normalized.includes('.')) {
+        // Only dots — check if dot is thousands separator
+        // "3.533" → 3 digits after dot = thousands separator → "3533"
+        // "3.53" → 2 digits after dot = decimal → "3.53"
+        const parts = normalized.split('.');
+        if (parts.length === 2 && parts[1].length === 3) {
+          normalized = normalized.replace('.', '');
+        }
+        // Multiple dots like "1.234.567" → thousands separators
+        if (parts.length > 2) {
+          normalized = normalized.replace(/\./g, '');
+        }
       }
       priceNumber = parseFloat(normalized) || 0;
     }

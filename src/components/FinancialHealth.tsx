@@ -278,7 +278,7 @@ export const FinancialHealth = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <CreditCard className="w-4 h-4 text-purple-400" />
+            <span className="text-sm">💳</span>
             <span className="text-[10px] text-muted-foreground">Contas Pagas</span>
           </div>
           <p className="text-lg font-bold">{paidBills}/{allBills.length}</p>

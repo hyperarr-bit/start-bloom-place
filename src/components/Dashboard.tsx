@@ -267,6 +267,101 @@ export const Dashboard = ({
 
   const balance = totalIncome - totalExpenses;
 
+  // Daily cash flow data
+  const cashFlowData = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyIdeal = totalIncome / daysInMonth;
+    const dailyTotals: Record<number, number> = {};
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const d = new Date(e.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const day = d.getDate();
+        dailyTotals[day] = (dailyTotals[day] || 0) + e.value;
+      }
+    });
+    let accumulated = 0;
+    const data = [];
+    for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
+      accumulated += dailyTotals[day] || 0;
+      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(dailyIdeal * day) });
+    }
+    return data;
+  }, [expenses, totalIncome]);
+
+  // Top 5 largest expenses
+  const top5Expenses = useMemo(() => {
+    const all = [
+      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+    ];
+    return all.sort((a, b) => b.value - a.value).slice(0, 5);
+  }, [expenses, fixedExpenses]);
+
+  // Day of week data
+  const dayOfWeekData = useMemo(() => {
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const dow = new Date(e.date).getDay();
+      totals[dow] += e.value;
+    });
+    // Reorder to start on Monday
+    const ordered = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+    const reordered = [1, 2, 3, 4, 5, 6, 0];
+    return reordered.map((i, idx) => ({ day: ordered[idx], total: Math.round(totals[i]) }));
+  }, [expenses]);
+
+  // Income composition
+  const incomeComposition = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    incomes.forEach((inc) => {
+      const key = inc.description || "Outros";
+      grouped[key] = (grouped[key] || 0) + inc.value;
+    });
+    return Object.entries(grouped)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [incomes]);
+
+  // Trend data (current month vs previous month)
+  const trendData = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // Current month daily accumulation
+    const currentDaily: Record<number, number> = {};
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const d = new Date(e.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const day = d.getDate();
+        currentDaily[day] = (currentDaily[day] || 0) + e.value;
+      }
+    });
+
+    // Previous month estimate from getMonthTotals
+    const prevMonthIndex = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const prevMonthName = ALL_MONTHS[prevMonthIndex];
+    const prevTotals = getMonthTotals(prevMonthName);
+    const prevMonthTotal = prevTotals.custosFixos + prevTotals.custosVariaveis;
+    const prevDailyRate = prevMonthTotal / 30;
+
+    let currentAcc = 0;
+    const data = [];
+    for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
+      currentAcc += currentDaily[day] || 0;
+      data.push({
+        day,
+        Atual: Math.round(currentAcc),
+        Anterior: Math.round(prevDailyRate * day),
+      });
+    }
+    return data;
+  }, [expenses]);
+
   // Budget bar color
   const getBudgetColor = () => {
     const { timePercent, budgetPercent } = monthProgress;

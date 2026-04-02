@@ -132,10 +132,7 @@ export const Simulators = () => {
 
         {/* Time to Save */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-blue-400" />
-            QUANTO TEMPO PRA JUNTAR?
-          </h3>
+          <h3 className="text-xs font-bold mb-4">⏱ QUANTO TEMPO PRA JUNTAR?</h3>
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Meta (R$)</label>

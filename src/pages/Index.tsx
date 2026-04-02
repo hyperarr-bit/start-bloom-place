@@ -203,6 +203,15 @@ const Index = () => {
             ) : (
               <>
                 <MonthTurnover onOpenMonth={setOpenMonth} />
+                <SmartAlerts
+                  dueDays={dueDays}
+                  categoryBudgets={{}}
+                  expensesByCategory={expenses.reduce((acc: Record<string, number>, e: any) => {
+                    acc[e.category] = (acc[e.category] || 0) + e.value;
+                    return acc;
+                  }, {})}
+                  savingsRate={savingsRate}
+                />
                 <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}

@@ -268,6 +268,54 @@ export const Dashboard = ({
 
   const balance = totalIncome - totalExpenses;
 
+  // Forecast: predicted end-of-month balance
+  const forecast = useMemo(() => {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDays = daysInMonth - day;
+
+    // Total fixed costs (bills) still unpaid
+    const unpaidBills = dueDays.reduce((sum, d) => {
+      if (d.day > day) {
+        return sum + d.bills.filter(b => !b.paid).length * 0; // we don't have values, estimate from fixed
+      }
+      return sum;
+    }, 0);
+
+    const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
+    const dailyVariableRate = day > 0 ? totalExpenses / day : 0;
+    const projectedVariableSpend = dailyVariableRate * remainingDays;
+    const projectedTotal = totalExpenses + projectedVariableSpend;
+    const projectedBalance = totalIncome - projectedTotal;
+
+    return { projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day };
+  }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
+
+  // Daily budget: how much you can spend per day
+  const dailyBudget = useMemo(() => {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDays = daysInMonth - day;
+
+    const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
+    // Unpaid bills value estimate — count unpaid × avg bill
+    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+
+    // Available = income - already spent - remaining fixed costs
+    const alreadySpent = totalExpenses;
+    const stillOwed = fixedCostsTotal; // simplification: full fixed costs reserved
+    const available = totalIncome - alreadySpent;
+    const perDay = remainingDays > 0 ? available / remainingDays : 0;
+    const status: "good" | "warning" | "danger" = perDay > (totalIncome / daysInMonth) * 0.8
+      ? "good"
+      : perDay > 0
+      ? "warning"
+      : "danger";
+
+    return { available, perDay, remainingDays, status };
+  }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {

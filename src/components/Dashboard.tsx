@@ -644,9 +644,21 @@ export const Dashboard = ({
       {/* Daily Cash Flow */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">💸 FLUXO DE CAIXA DIÁRIO</h3>
-        <p className="text-[11px] text-muted-foreground mb-3">
-          Mostra seus gastos acumulados dia a dia (vermelho) vs o ritmo ideal (azul tracejado). Se a linha vermelha estiver abaixo, você está gastando menos do que o previsto.
-        </p>
+        {(() => {
+          const now = new Date();
+          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+          const dailyRate = totalIncome / daysInMonth;
+          return (
+            <div className="text-[11px] text-muted-foreground mb-3 space-y-1">
+              <p>
+                Sua receita total é <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>.
+              </p>
+              <p>
+                A linha azul tracejada mostra o quanto você <em>poderia</em> gastar por dia sem ultrapassar a receita. A linha vermelha mostra seus gastos reais acumulados.
+              </p>
+            </div>
+          );
+        })()}
         {cashFlowData.length > 0 ? (
           <>
             {/* Summary chips */}

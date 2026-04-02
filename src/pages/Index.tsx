@@ -208,6 +208,11 @@ const Index = () => {
                   totalDebts={totalDebts}
                   totalInvestments={totalInvestments}
                 />
+                <SpendingBreakdown
+                  totalIncome={totalIncome}
+                  totalFixed={fixedExpenses.reduce((s: number, e: any) => s + e.value, 0)}
+                  totalVariable={expenses.reduce((s: number, e: any) => s + e.value, 0)}
+                />
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <IncomeTable incomes={incomes} setIncomes={setIncomes} />

@@ -1,60 +1,97 @@
 
 
-# Adicionar Locais para Conhecer + Imagem no Destino
+# Unificar Identidade Visual em Todas as Abas do Módulo de Finanças
 
-Duas adições ao `TravelBudget.tsx`:
+## Análise das Inconsistências Encontradas
 
----
+Analisei cada aba e identifiquei dois padrões visuais coexistindo:
 
-## 1. Imagem no Card de Destino
+**Padrão A — Dashboard/Gráficos** (correto):
+- Card: `bg-card rounded-lg border border-border p-4`
+- Título: `emoji + TEXTO UPPERCASE text-xs font-bold mb-3`
+- Cores semânticas, `tabular-nums`, sem ícones Lucide nos títulos
 
-Adicionar campo de URL de imagem ao `TravelTrip` type e exibir no card de destino.
+**Padrão B — xTiles/Viagem** (correto para viagem):
+- Card: `rounded-xl border border-border overflow-hidden`
+- Header colorido: `bg-violet-300 dark:bg-violet-700 px-3 py-2`
+- Emoji no header, botão "+" integrado
 
-- **`types.ts`**: Adicionar `photoUrl?: string` ao tipo `TravelTrip`
-- No card 📍 DESTINO, adicionar:
-  - Input para colar URL da imagem
-  - Se preenchido, exibir a imagem como banner no topo do card (rounded, aspect-video, object-cover)
-  - Mesmo estilo xTiles dos outros cards
+**Inconsistências por aba:**
 
-## 2. Seção Locais para Conhecer
-
-Adicionar um novo card xTiles **📍 LOCAIS PARA CONHECER** ao final do `TravelBudget` (antes do Orçamento Total), com a mesma identidade visual dos cards de categoria.
-
-- Header: `bg-emerald-300 dark:bg-emerald-700`, emoji 📍
-- Body: `bg-emerald-50 dark:bg-emerald-950/20`
-- Cada local tem: nome, categoria (dropdown: 🍕 Comida, 📸 Turístico, 🛍️ Compras, ☕ Café, 🍸 Bar), notas, link Google Maps
-- Botão "+" para adicionar
-- Cards compactos com nome, categoria badge, notas, link externo e botão deletar
-- Status toggle: 📌 Quero ir / ✅ Já fui / ❤️ Favorito
-
-### Dados
-
-Adicionar ao `TravelTrip`:
-```typescript
-photoUrl?: string;
-places?: TravelPlace[];
-```
-
-Novo tipo:
-```typescript
-type TravelPlace = {
-  id: string;
-  name: string;
-  category: "comida" | "turistico" | "compras" | "cafe" | "bar";
-  notes: string;
-  mapsLink: string;
-  status: "quero_ir" | "ja_fui" | "favorito";
-};
-```
+| Aba | Problema |
+|-----|----------|
+| **Investimentos** | Usa Lucide icons nos títulos (`Wallet`, `PiggyBank`) em vez de emojis. `table-header-dark` no cabeçalho da tabela |
+| **Desejos** | Usa `Heart` Lucide no header. Import URL com `border-pink-300` hardcoded. `rounded-xl` diferente do padrão |
+| **Simuladores** | Títulos com Lucide (`TrendingUp`, `Clock`, `CreditCard`, `Target`). Sub-cards resultado com cores hardcoded (`bg-green-500/10 border border-green-500/20`) |
+| **Desafios** | Stats row usa Lucide (`Flame`, `Trophy`, `Gift`). Check-in com gradiente `from-orange-500/10 to-red-500/10` destoante |
+| **Limites** | Título usa Lucide `Gauge`. Sem header com emoji padrão |
+| **Relatórios** | Botões com Lucide (`FileText`, `Download`). Títulos com Lucide em vez de emoji |
+| **Saúde Financeira** | Score card com gradiente. Tips usam Lucide icons. Métricas com Lucide em vez de emojis |
 
 ---
 
-## Arquivos
+## Plano — Padronizar Tudo
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/travel/types.ts` | Adicionar `TravelPlace`, `photoUrl` e `places` ao `TravelTrip` |
-| `src/components/travel/TravelBudget.tsx` | Adicionar imagem no destino + seção Locais para Conhecer |
+### Regra unificada para títulos de card
+Trocar TODOS os ícones Lucide nos títulos de seção por emojis, mantendo o formato:
+```
+<h3 className="text-xs font-bold mb-3">📊 TÍTULO AQUI</h3>
+```
 
-Tudo integrado dentro do mesmo componente, sem criar arquivos novos. Reutiliza as constantes `PLACE_CATEGORIES` e `PLACE_STATUS` já existentes no `types.ts`.
+### Arquivo por arquivo
+
+#### 1. `InvestmentsTracker.tsx`
+- Summary cards: trocar `Wallet`, `PiggyBank`, `TrendingUp/Down`, `Calendar` por emojis equivalentes nos labels (não nos títulos — nos summary cards manter o padrão do Dashboard que usa Lucide como ícone decorativo grande de `/30`)
+- `DISTRIBUIÇÃO DA CARTEIRA` → `📊 DISTRIBUIÇÃO DA CARTEIRA`
+- `MEUS INVESTIMENTOS` header: manter `table-header-dark` (já é padrão das tabelas)
+
+#### 2. `WishlistItems.tsx`
+- Header `Heart` icon → emoji `❤️` no título "Meus Desejos"
+- Import URL: trocar `border-pink-300 dark:border-pink-700 bg-pink-50/50 dark:bg-pink-950/20` por tokens neutros `border-border bg-muted/30` ou `border-dashed border-muted-foreground/30`
+- `rounded-xl` → `rounded-lg` para consistência
+
+#### 3. `Simulators.tsx`
+- Cada simulador: trocar Lucide por emoji nos títulos:
+  - `<TrendingUp> JUROS COMPOSTOS` → `📈 JUROS COMPOSTOS`
+  - `<Clock> QUANTO TEMPO PRA JUNTAR?` → `⏱ QUANTO TEMPO PRA JUNTAR?`
+  - `<CreditCard> FINANCIAMENTO VS À VISTA` → `💳 FINANCIAMENTO VS À VISTA`
+  - `<Target> INDEPENDÊNCIA FINANCEIRA` → `🎯 INDEPENDÊNCIA FINANCEIRA`
+- Sub-cards de resultado: manter `bg-green-500/10` etc (são resultados contextuais, padrão similar aos alertas)
+
+#### 4. `Gamification.tsx`
+- Stats row: manter Lucide como ícone decorativo grande (mesmo padrão do Dashboard quick stats com `w-8 h-8`)
+- Check-in card: normalizar gradiente para `bg-card border border-border` com detalhe sutil
+- Seções de badges/52 semanas: adicionar emoji nos títulos de seção
+
+#### 5. `CategoryBudgets.tsx`
+- Remover `<Gauge>` do título → `🎯 LIMITES POR CATEGORIA`
+- Cards de categorias: já seguem bom padrão, manter
+
+#### 6. `Reports.tsx`
+- Títulos de seção: trocar Lucide por emojis
+  - `<FileText>` → `📄`
+  - `<Download>` → ícone mantido nos botões (Lucide OK para ações)
+  - Título do relatório: `📋 RELATÓRIO MENSAL`
+
+#### 7. `FinancialHealth.tsx`
+- Título score: manter gradiente (é elemento hero, diferenciado propositalmente)
+- Métricas individuais: trocar Lucide por emojis nos labels
+  - `Shield` → 🛡️, `Target` → 🎯, `CreditCard` → 💳, etc
+- Tips: manter Lucide nos alertas (padrão do Dashboard alerts)
+
+---
+
+## Arquivos Alterados
+
+| Arquivo | Tipo de Mudança |
+|---------|----------------|
+| `src/components/InvestmentsTracker.tsx` | Emojis nos títulos de seção |
+| `src/components/WishlistItems.tsx` | Emoji no header, normalizar border/radius |
+| `src/components/Simulators.tsx` | Emojis nos 4 títulos de simulador |
+| `src/components/Gamification.tsx` | Emojis nas seções, normalizar check-in card |
+| `src/components/CategoryBudgets.tsx` | Emoji no título |
+| `src/components/Reports.tsx` | Emojis nos títulos de seção |
+| `src/components/FinancialHealth.tsx` | Emojis nas métricas |
+
+Nenhuma mudança de lógica ou dados. Apenas ajustes visuais de consistência.
 

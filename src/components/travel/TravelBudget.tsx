@@ -132,8 +132,14 @@ export const TravelBudget = () => {
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
           {trip.photoUrl && (
-            <div className="rounded-lg overflow-hidden aspect-video">
+            <div className="rounded-lg overflow-hidden aspect-video relative group/photo">
               <img src={trip.photoUrl} alt={trip.destination || "Destino"} className="w-full h-full object-cover" />
+              <button
+                onClick={() => updateTrip({ photoUrl: "" })}
+                className="absolute top-1.5 right-1.5 rounded-full w-6 h-6 bg-black/50 text-white flex items-center justify-center opacity-0 group-hover/photo:opacity-100 transition-opacity"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
             </div>
           )}
           <Input
@@ -142,15 +148,25 @@ export const TravelBudget = () => {
             onChange={e => updateTrip({ destination: e.target.value })}
             className="h-8 rounded-lg text-xs bg-background/60"
           />
-          <div className="flex items-center gap-2">
-            <ImagePlus className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-            <Input
-              placeholder="URL da imagem do destino"
-              value={trip.photoUrl || ""}
-              onChange={e => updateTrip({ photoUrl: e.target.value })}
-              className="h-8 rounded-lg text-xs bg-background/60"
-            />
-          </div>
+          {!trip.photoUrl && (
+            <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-dashed border-border/60 bg-background/40 hover:bg-background/60 transition-colors px-3 py-2">
+              <ImagePlus className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground">Adicionar foto do destino</span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => updateTrip({ photoUrl: reader.result as string });
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[9px] text-muted-foreground font-medium uppercase">Data de Ida</label>

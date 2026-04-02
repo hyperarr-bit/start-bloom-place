@@ -293,10 +293,7 @@ export const Reports = ({
 
           {/* Expenses Table */}
           <div>
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-red-400" />
-              Despesas ({expenses.length})
-            </h3>
+            <h3 className="text-sm font-bold mb-2">📉 Despesas ({expenses.length})</h3>
             <div className="bg-muted/30 rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead>

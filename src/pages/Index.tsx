@@ -27,6 +27,8 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
+import { CreditCards } from "@/components/finance/CreditCards";
+import { SmartAlerts } from "@/components/finance/SmartAlerts";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 

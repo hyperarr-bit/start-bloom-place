@@ -205,10 +205,7 @@ export const FinancialHealth = ({
       {/* Score Card */}
       <div className={`bg-gradient-to-br ${getScoreBg()} rounded-lg border border-border p-5`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Target className="w-4 h-4" />
-            SCORE FINANCEIRO
-          </h3>
+          <h3 className="text-sm font-bold">🏆 SCORE FINANCEIRO</h3>
           <span className={`text-3xl font-bold ${getScoreColor()}`}>{score}/100</span>
         </div>
         <Progress value={score} className="h-3 mb-2" />

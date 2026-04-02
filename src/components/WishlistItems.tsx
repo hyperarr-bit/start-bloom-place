@@ -209,8 +209,8 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
 
       {/* Add Form */}
       {showForm && (
-        <div className="bg-card rounded-xl border border-border p-4 space-y-3">
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Novo Desejo</h3>
+        <div className="bg-card rounded-lg border border-border p-4 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider">✨ NOVO DESEJO</h3>
 
           {/* Import from URL */}
           <ImportFromUrl onImport={(data) => setNewItem(prev => ({

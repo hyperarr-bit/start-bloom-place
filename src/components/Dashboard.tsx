@@ -525,6 +525,33 @@ export const Dashboard = ({
         )}
       </div>
 
+      {/* Top 5 Maiores Gastos */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
+        {top5Expenses.length > 0 ? (
+          <div className="space-y-2.5">
+            {top5Expenses.map((item, i) => (
+              <div key={item.id} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs truncate flex-1 mr-2">{i + 1}. {item.description}</span>
+                  <span className="text-xs tabular-nums text-red-400 font-medium flex-shrink-0">
+                    R$ {item.value.toLocaleString("pt-BR")}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-red-400 rounded-full transition-all"
+                    style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
+        )}
+      </div>
+
       {/* Últimas Transações */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">🧾 ÚLTIMAS TRANSAÇÕES</h3>
@@ -553,33 +580,6 @@ export const Dashboard = ({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
-        )}
-      </div>
-
-      {/* Top 5 Maiores Gastos */}
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
-        {top5Expenses.length > 0 ? (
-          <div className="space-y-2.5">
-            {top5Expenses.map((item, i) => (
-              <div key={item.id} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs truncate flex-1 mr-2">{i + 1}. {item.description}</span>
-                  <span className="text-xs tabular-nums text-red-400 font-medium flex-shrink-0">
-                    R$ {item.value.toLocaleString("pt-BR")}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-red-400 rounded-full transition-all"
-                    style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
         )}
       </div>
     </div>

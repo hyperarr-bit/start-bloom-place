@@ -644,22 +644,50 @@ export const Dashboard = ({
       {/* Daily Cash Flow */}
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">💸 FLUXO DE CAIXA DIÁRIO</h3>
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Mostra seus gastos acumulados dia a dia (vermelho) vs o ritmo ideal (azul tracejado). Se a linha vermelha estiver abaixo, você está gastando menos do que o previsto.
+        </p>
         {cashFlowData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={cashFlowData}>
-              <defs>
-                <linearGradient id="colorCashFlow" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name === "Acumulado" ? "Gastos reais" : "Ritmo ideal"]} />
-              <Area type="monotone" dataKey="Acumulado" stroke="#ef4444" fill="url(#colorCashFlow)" strokeWidth={2} />
-              <Area type="monotone" dataKey="Ideal" stroke="#3b82f6" fill="none" strokeWidth={1.5} strokeDasharray="5 5" />
-            </AreaChart>
-          </ResponsiveContainer>
+          <>
+            {/* Summary chips */}
+            {(() => {
+              const lastEntry = cashFlowData[cashFlowData.length - 1];
+              const diff = lastEntry.Acumulado - lastEntry.Ideal;
+              const isUnder = diff <= 0;
+              return (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/10 text-red-400 tabular-nums">
+                    Gasto real: R$ {lastEntry.Acumulado.toLocaleString("pt-BR")}
+                  </span>
+                  <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 tabular-nums">
+                    Ritmo ideal: R$ {lastEntry.Ideal.toLocaleString("pt-BR")}
+                  </span>
+                  <span className={`text-[10px] px-2 py-1 rounded-full tabular-nums ${isUnder ? "bg-green-500/10 text-green-400" : "bg-orange-500/10 text-orange-400"}`}>
+                    {isUnder ? "✅ Dentro do ritmo" : `⚠️ R$ ${Math.abs(diff).toLocaleString("pt-BR")} acima`}
+                  </span>
+                </div>
+              );
+            })()}
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={cashFlowData}>
+                <defs>
+                  <linearGradient id="colorCashFlow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name === "Acumulado" ? "Gastos reais" : "Ritmo ideal"]} />
+                <Area type="monotone" dataKey="Acumulado" stroke="#ef4444" fill="url(#colorCashFlow)" strokeWidth={2} />
+                <Area type="monotone" dataKey="Ideal" stroke="#3b82f6" fill="none" strokeWidth={1.5} strokeDasharray="5 5" />
+              </AreaChart>
+            </ResponsiveContainer>
+            <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-400 rounded inline-block" /> Gastos reais (acumulados)</span>
+              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 rounded inline-block border-dashed" style={{ borderTopWidth: 1, height: 0, borderColor: '#3b82f6' }} /> Ritmo ideal (receita ÷ dias)</span>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">Sem despesas com data cadastradas</p>
         )}

@@ -75,10 +75,7 @@ export const Simulators = () => {
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Compound Interest */}
         <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-green-400" />
-            SIMULADOR DE JUROS COMPOSTOS
-          </h3>
+          <h3 className="text-xs font-bold mb-4">📈 SIMULADOR DE JUROS COMPOSTOS</h3>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[10px] text-muted-foreground">Valor inicial (R$)</label>

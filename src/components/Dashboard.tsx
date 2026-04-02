@@ -268,11 +268,27 @@ export const Dashboard = ({
 
   const balance = totalIncome - totalExpenses;
 
-  // Daily cash flow data
+  // Daily cash flow data — ideal considers fixed expenses, savings, and bill due dates
+  const totalFixed = useMemo(() => fixedExpenses.reduce((s, e) => s + e.value, 0), [fixedExpenses]);
+  const savingsAmount = useMemo(() => totalIncome * (savingsRate / 100), [totalIncome, savingsRate]);
+  const freeBalance = useMemo(() => Math.max(totalIncome - totalFixed - savingsAmount, 0), [totalIncome, totalFixed, savingsAmount]);
+
   const cashFlowData = useMemo(() => {
     const now = new Date();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dailyIdeal = totalIncome / daysInMonth;
+    const dailyFree = freeBalance / daysInMonth;
+
+    // Build fixed expense schedule by due day
+    const fixedByDay: Record<number, number> = {};
+    dueDays.forEach((dd) => {
+      dd.bills.forEach((bill) => {
+        const fe = fixedExpenses.find((f) => f.id === bill.id);
+        if (fe) {
+          fixedByDay[dd.day] = (fixedByDay[dd.day] || 0) + fe.value;
+        }
+      });
+    });
+
     const dailyTotals: Record<number, number> = {};
     expenses.forEach((e) => {
       if (!e.date) return;
@@ -282,14 +298,18 @@ export const Dashboard = ({
         dailyTotals[day] = (dailyTotals[day] || 0) + e.value;
       }
     });
+
     let accumulated = 0;
+    let idealAcc = 0;
     const data = [];
     for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
       accumulated += dailyTotals[day] || 0;
-      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(dailyIdeal * day) });
+      // Ideal = fixed bills on that day + daily free allowance
+      idealAcc += (fixedByDay[day] || 0) + dailyFree;
+      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(idealAcc) });
     }
     return data;
-  }, [expenses, totalIncome]);
+  }, [expenses, freeBalance, dueDays, fixedExpenses]);
 
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {
@@ -647,14 +667,19 @@ export const Dashboard = ({
         {(() => {
           const now = new Date();
           const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const dailyRate = totalIncome / daysInMonth;
+          const dailyFreeRate = freeBalance / daysInMonth;
           return (
-            <div className="text-[11px] text-muted-foreground mb-3 space-y-1">
+            <div className="text-[11px] text-muted-foreground mb-3 space-y-1.5">
               <p>
-                Sua receita total é <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>.
+                Receita: <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                {" − "}Fixos: <strong className="text-foreground">R$ {totalFixed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                {savingsAmount > 0 && <>{" − "}Reserva ({savingsRate}%): <strong className="text-foreground">R$ {savingsAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></>}
               </p>
               <p>
-                A linha azul tracejada mostra o quanto você <em>poderia</em> gastar por dia sem ultrapassar a receita. A linha vermelha mostra seus gastos reais acumulados.
+                = <strong className="text-foreground">R$ {freeBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> livres ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyFreeRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>
+              </p>
+              <p>
+                A linha azul considera suas contas fixas nos dias de vencimento + o valor livre diário. Se a vermelha ultrapassar, você está gastando acima do que sobra.
               </p>
             </div>
           );

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, LineChart, Line } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals } from "@/components/finance/storage-keys";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,13 @@ interface FixedExpense {
   cardName?: string;
 }
 
+interface Income {
+  id: string;
+  description: string;
+  value: number;
+  date?: string;
+}
+
 interface DashboardProps {
   totalIncome: number;
   totalExpenses: number;
@@ -37,6 +44,7 @@ interface DashboardProps {
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
   savingsRate: number;
+  incomes: Income[];
   onNavigate?: (tab: string) => void;
 }
 
@@ -114,6 +122,7 @@ export const Dashboard = ({
   fixedExpenses,
   dueDays,
   savingsRate,
+  incomes,
   onNavigate,
 }: DashboardProps) => {
   // Compute annual data from actual monthly records
@@ -257,6 +266,101 @@ export const Dashboard = ({
   }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts]);
 
   const balance = totalIncome - totalExpenses;
+
+  // Daily cash flow data
+  const cashFlowData = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyIdeal = totalIncome / daysInMonth;
+    const dailyTotals: Record<number, number> = {};
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const d = new Date(e.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const day = d.getDate();
+        dailyTotals[day] = (dailyTotals[day] || 0) + e.value;
+      }
+    });
+    let accumulated = 0;
+    const data = [];
+    for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
+      accumulated += dailyTotals[day] || 0;
+      data.push({ day, Acumulado: Math.round(accumulated), Ideal: Math.round(dailyIdeal * day) });
+    }
+    return data;
+  }, [expenses, totalIncome]);
+
+  // Top 5 largest expenses
+  const top5Expenses = useMemo(() => {
+    const all = [
+      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+    ];
+    return all.sort((a, b) => b.value - a.value).slice(0, 5);
+  }, [expenses, fixedExpenses]);
+
+  // Day of week data
+  const dayOfWeekData = useMemo(() => {
+    const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+    const totals = [0, 0, 0, 0, 0, 0, 0];
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const dow = new Date(e.date).getDay();
+      totals[dow] += e.value;
+    });
+    // Reorder to start on Monday
+    const ordered = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+    const reordered = [1, 2, 3, 4, 5, 6, 0];
+    return reordered.map((i, idx) => ({ day: ordered[idx], total: Math.round(totals[i]) }));
+  }, [expenses]);
+
+  // Income composition
+  const incomeComposition = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    incomes.forEach((inc) => {
+      const key = inc.description || "Outros";
+      grouped[key] = (grouped[key] || 0) + inc.value;
+    });
+    return Object.entries(grouped)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [incomes]);
+
+  // Trend data (current month vs previous month)
+  const trendData = useMemo(() => {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // Current month daily accumulation
+    const currentDaily: Record<number, number> = {};
+    expenses.forEach((e) => {
+      if (!e.date) return;
+      const d = new Date(e.date);
+      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const day = d.getDate();
+        currentDaily[day] = (currentDaily[day] || 0) + e.value;
+      }
+    });
+
+    // Previous month estimate from getMonthTotals
+    const prevMonthIndex = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const prevMonthName = ALL_MONTHS[prevMonthIndex];
+    const prevTotals = getMonthTotals(prevMonthName);
+    const prevMonthTotal = prevTotals.custosFixos + prevTotals.custosVariaveis;
+    const prevDailyRate = prevMonthTotal / 30;
+
+    let currentAcc = 0;
+    const data = [];
+    for (let day = 1; day <= Math.min(now.getDate(), daysInMonth); day++) {
+      currentAcc += currentDaily[day] || 0;
+      data.push({
+        day,
+        Atual: Math.round(currentAcc),
+        Anterior: Math.round(prevDailyRate * day),
+      });
+    }
+    return data;
+  }, [expenses]);
 
   // Budget bar color
   const getBudgetColor = () => {
@@ -534,6 +638,128 @@ export const Dashboard = ({
             <div className="h-full bg-blue-400 transition-all" style={{ width: `${Math.round((variableTotal / totalCosts) * 100)}%` }} />
           </div>
         )}
+      </div>
+
+      {/* Daily Cash Flow */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">💸 FLUXO DE CAIXA DIÁRIO</h3>
+        {cashFlowData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={cashFlowData}>
+              <defs>
+                <linearGradient id="colorCashFlow" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name === "Acumulado" ? "Gastos reais" : "Ritmo ideal"]} />
+              <Area type="monotone" dataKey="Acumulado" stroke="#ef4444" fill="url(#colorCashFlow)" strokeWidth={2} />
+              <Area type="monotone" dataKey="Ideal" stroke="#3b82f6" fill="none" strokeWidth={1.5} strokeDasharray="5 5" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-8">Sem despesas com data cadastradas</p>
+        )}
+      </div>
+
+      {/* Top 5 + Day of Week */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
+          {top5Expenses.length > 0 ? (
+            <div className="space-y-2.5">
+              {top5Expenses.map((item, i) => (
+                <div key={item.id} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs truncate flex-1 mr-2">{i + 1}. {item.description}</span>
+                    <span className="text-xs tabular-nums text-red-400 font-medium flex-shrink-0">
+                      R$ {item.value.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-red-400 rounded-full transition-all"
+                      style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
+          )}
+        </div>
+
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">📅 GASTOS POR DIA DA SEMANA</h3>
+          {dayOfWeekData.some((d) => d.total > 0) ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={dayOfWeekData}>
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
+                <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                  {dayOfWeekData.map((entry, index) => (
+                    <Cell key={index} fill={entry.total === Math.max(...dayOfWeekData.map(d => d.total)) && entry.total > 0 ? "#8b5cf6" : "#8b5cf680"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem despesas com data cadastradas</p>
+          )}
+        </div>
+      </div>
+
+      {/* Income Composition + Trend */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">💰 COMPOSIÇÃO DA RENDA</h3>
+          {incomeComposition.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="50%" height={180}>
+                <PieChart>
+                  <Pie data={incomeComposition} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2}>
+                    {incomeComposition.map((_, index) => (
+                      <Cell key={`inc-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-1">
+                {incomeComposition.map((src, i) => (
+                  <div key={src.name} className="flex items-center gap-2 text-xs">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                    <span className="flex-1 truncate">{src.name}</span>
+                    <span className="text-muted-foreground tabular-nums">R$ {src.value.toLocaleString("pt-BR")}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">Sem receitas cadastradas</p>
+          )}
+        </div>
+
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">📈 TENDÊNCIA MENSAL</h3>
+          {trendData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trendData}>
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name]} />
+                <Line type="monotone" dataKey="Atual" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Anterior" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8">Sem dados para comparar</p>
+          )}
+        </div>
       </div>
     </div>
   );

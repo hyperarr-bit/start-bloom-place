@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
-import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb } from "lucide-react";
+import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals } from "@/components/finance/storage-keys";
+import { Progress } from "@/components/ui/progress";
 
 const ALL_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -36,6 +37,7 @@ interface DashboardProps {
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
   savingsRate: number;
+  onNavigate?: (tab: string) => void;
 }
 
 const COLORS = ["#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#6366f1", "#14b8a6"];
@@ -76,6 +78,33 @@ const categoryLabels: Record<string, string> = {
   outros: "Outros",
 };
 
+const paymentMethodLabels: Record<string, string> = {
+  pix: "Pix",
+  credito: "Crédito",
+  debito: "Débito",
+  dinheiro: "Dinheiro",
+  boleto: "Boleto",
+  transferencia: "Transferência",
+};
+
+const paymentMethodColors: Record<string, string> = {
+  pix: "bg-green-400",
+  credito: "bg-purple-400",
+  debito: "bg-blue-400",
+  dinheiro: "bg-yellow-400",
+  boleto: "bg-orange-400",
+  transferencia: "bg-teal-400",
+};
+
+const paymentMethodIcons: Record<string, typeof CreditCard> = {
+  pix: Smartphone,
+  credito: CreditCard,
+  debito: Wallet,
+  dinheiro: Banknote,
+  boleto: Receipt,
+  transferencia: ArrowRight,
+};
+
 export const Dashboard = ({
   totalIncome,
   totalExpenses,
@@ -85,6 +114,7 @@ export const Dashboard = ({
   fixedExpenses,
   dueDays,
   savingsRate,
+  onNavigate,
 }: DashboardProps) => {
   // Compute annual data from actual monthly records
   const annualData = useMemo(() => {
@@ -93,7 +123,55 @@ export const Dashboard = ({
       return { month, ...totals };
     });
   }, []);
-  // Expense by category for pie chart (variable + fixed)
+
+  // Month progress data
+  const monthProgress = useMemo(() => {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const timePercent = Math.round((day / daysInMonth) * 100);
+    const budgetPercent = totalIncome > 0 ? Math.round((totalExpenses / totalIncome) * 100) : 0;
+    return { day, daysInMonth, timePercent, budgetPercent };
+  }, [totalIncome, totalExpenses]);
+
+  // Last 5 transactions
+  const lastTransactions = useMemo(() => {
+    const allTransactions = [
+      ...expenses.map((e) => ({ ...e, type: "variable" as const })),
+      ...fixedExpenses.map((e) => ({ ...e, date: new Date().toISOString().slice(0, 10), type: "fixed" as const })),
+    ];
+    return allTransactions
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 5);
+  }, [expenses, fixedExpenses]);
+
+  // Payment method breakdown
+  const paymentBreakdown = useMemo(() => {
+    const grouped: Record<string, number> = {};
+    expenses.forEach((e) => {
+      const method = (e as any).paymentMethod || "dinheiro";
+      grouped[method] = (grouped[method] || 0) + e.value;
+    });
+    fixedExpenses.forEach((e) => {
+      const method = e.paymentMethod || "boleto";
+      grouped[method] = (grouped[method] || 0) + e.value;
+    });
+    const total = Object.values(grouped).reduce((s, v) => s + v, 0);
+    return Object.entries(grouped)
+      .map(([method, value]) => ({
+        method,
+        value,
+        percent: total > 0 ? Math.round((value / total) * 100) : 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [expenses, fixedExpenses]);
+
+  // Fixed vs Variable totals
+  const fixedTotal = useMemo(() => fixedExpenses.reduce((s, e) => s + e.value, 0), [fixedExpenses]);
+  const variableTotal = useMemo(() => expenses.reduce((s, e) => s + e.value, 0), [expenses]);
+  const totalCosts = fixedTotal + variableTotal;
+
+  // Expense by category for pie chart
   const expensesByCategory = useMemo(() => {
     const grouped: Record<string, number> = {};
     expenses.forEach((e) => {
@@ -122,7 +200,7 @@ export const Dashboard = ({
       }));
   }, [annualData]);
 
-  // Patrimony evolution (cumulative savings)
+  // Patrimony evolution
   const patrimonyData = useMemo(() => {
     let accumulated = totalInvestments;
     return annualData
@@ -130,7 +208,7 @@ export const Dashboard = ({
       .slice(0, 6)
       .map((d) => {
         const saving = d.receitas - d.custosFixos - d.custosVariaveis - d.dividas;
-        accumulated += saving * 0.2; // Assume 20% saved
+        accumulated += saving * 0.2;
         return { month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) };
       });
   }, [annualData, totalInvestments]);
@@ -140,7 +218,6 @@ export const Dashboard = ({
     const list: { type: "warning" | "info" | "success"; icon: typeof AlertTriangle; text: string }[] = [];
     const today = new Date().getDate();
 
-    // Bills due soon
     dueDays.forEach((d) => {
       const unpaidBills = d.bills.filter((b) => !b.paid);
       const daysUntilDue = d.day >= today ? d.day - today : 30 - today + d.day;
@@ -153,7 +230,6 @@ export const Dashboard = ({
       }
     });
 
-    // Budget alert
     const budgetUsed = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
     const dayOfMonth = today;
     const expectedUsage = (dayOfMonth / 30) * 100;
@@ -165,40 +241,30 @@ export const Dashboard = ({
       });
     }
 
-    // Savings rate
     if (savingsRate >= 20) {
-      list.push({
-        type: "success",
-        icon: CheckCircle,
-        text: `Excelente! Você está poupando ${savingsRate.toFixed(1)}% da sua renda este mês.`,
-      });
+      list.push({ type: "success", icon: CheckCircle, text: `Excelente! Você está poupando ${savingsRate.toFixed(1)}% da sua renda este mês.` });
     } else if (savingsRate > 0) {
-      list.push({
-        type: "info",
-        icon: Lightbulb,
-        text: `Sua taxa de poupança é ${savingsRate.toFixed(1)}%. Tente chegar a 20%!`,
-      });
+      list.push({ type: "info", icon: Lightbulb, text: `Sua taxa de poupança é ${savingsRate.toFixed(1)}%. Tente chegar a 20%!` });
     } else {
-      list.push({
-        type: "warning",
-        icon: TrendingDown,
-        text: "Suas despesas estão maiores que sua renda. Revise seus gastos!",
-      });
+      list.push({ type: "warning", icon: TrendingDown, text: "Suas despesas estão maiores que sua renda. Revise seus gastos!" });
     }
 
-    // Debt alert
     if (totalDebts > totalIncome * 2) {
-      list.push({
-        type: "warning",
-        icon: AlertTriangle,
-        text: `Suas dívidas (R$ ${totalDebts.toLocaleString("pt-BR")}) são mais que o dobro da sua renda mensal.`,
-      });
+      list.push({ type: "warning", icon: AlertTriangle, text: `Suas dívidas (R$ ${totalDebts.toLocaleString("pt-BR")}) são mais que o dobro da sua renda mensal.` });
     }
 
     return list.slice(0, 4);
   }, [dueDays, totalIncome, totalExpenses, savingsRate, totalDebts]);
 
   const balance = totalIncome - totalExpenses;
+
+  // Budget bar color
+  const getBudgetColor = () => {
+    const { timePercent, budgetPercent } = monthProgress;
+    if (budgetPercent > timePercent + 15) return "bg-red-400";
+    if (budgetPercent > timePercent - 5) return "bg-orange-400";
+    return "bg-green-400";
+  };
 
   return (
     <div className="space-y-4">
@@ -244,6 +310,33 @@ export const Dashboard = ({
         </div>
       </div>
 
+      {/* NEW: Month Progress Bar */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          PROGRESSO DO MÊS
+        </h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Dia {monthProgress.day} de {monthProgress.daysInMonth} — {monthProgress.budgetPercent}% do orçamento usado
+        </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-muted-foreground w-16">Tempo</span>
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${monthProgress.timePercent}%` }} />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.timePercent}%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-muted-foreground w-16">Gastos</span>
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${getBudgetColor()}`} style={{ width: `${Math.min(monthProgress.budgetPercent, 100)}%` }} />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.budgetPercent}%</span>
+          </div>
+        </div>
+      </div>
+
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">
@@ -274,6 +367,125 @@ export const Dashboard = ({
           </div>
         </div>
       )}
+
+      {/* NEW: Last Transactions + Payment Method Grid */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Last Transactions */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
+            <Receipt className="w-4 h-4" />
+            ÚLTIMAS TRANSAÇÕES
+          </h3>
+          {lastTransactions.length > 0 ? (
+            <div className="space-y-2">
+              {lastTransactions.map((t) => (
+                <div key={t.id} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                  <span className="text-xs flex-1 truncate">{t.description}</span>
+                  <span className="text-xs tabular-nums text-red-400 font-medium">
+                    -R$ {t.value.toLocaleString("pt-BR")}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground w-12 text-right">
+                    {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
+                  </span>
+                </div>
+              ))}
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate("financeiro")}
+                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 transition-colors"
+                >
+                  Ver todas <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
+          )}
+        </div>
+
+        {/* Payment Method Breakdown */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            GASTO POR MÉTODO
+          </h3>
+          {paymentBreakdown.length > 0 ? (
+            <div className="space-y-2.5">
+              {paymentBreakdown.map((pm) => {
+                const Icon = paymentMethodIcons[pm.method] || Wallet;
+                return (
+                  <div key={pm.method} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
+                      </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${paymentMethodColors[pm.method] || "bg-gray-400"}`}
+                        style={{ width: `${pm.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
+          )}
+        </div>
+      </div>
+
+      {/* NEW: Fixed vs Variable Summary */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
+          <DollarSign className="w-4 h-4" />
+          CUSTOS FIXOS VS VARIÁVEIS
+        </h3>
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Lock className="w-3.5 h-3.5 text-orange-400" />
+              <span className="text-[10px] text-muted-foreground uppercase">Fixos</span>
+            </div>
+            <p className="text-lg font-bold tabular-nums text-orange-400">
+              R$ {fixedTotal.toLocaleString("pt-BR")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {totalCosts > 0 ? Math.round((fixedTotal / totalCosts) * 100) : 0}% do total
+            </p>
+          </div>
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-[10px] text-muted-foreground uppercase">Variáveis</span>
+            </div>
+            <p className="text-lg font-bold tabular-nums text-blue-400">
+              R$ {variableTotal.toLocaleString("pt-BR")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {totalCosts > 0 ? Math.round((variableTotal / totalCosts) * 100) : 0}% do total
+            </p>
+          </div>
+        </div>
+        {totalCosts > 0 && (
+          <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
+            <div
+              className="h-full bg-orange-400 transition-all"
+              style={{ width: `${Math.round((fixedTotal / totalCosts) * 100)}%` }}
+            />
+            <div
+              className="h-full bg-blue-400 transition-all"
+              style={{ width: `${Math.round((variableTotal / totalCosts) * 100)}%` }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Charts Grid */}
       <div className="grid lg:grid-cols-2 gap-4">

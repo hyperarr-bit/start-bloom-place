@@ -310,33 +310,6 @@ export const Dashboard = ({
         </div>
       </div>
 
-      {/* NEW: Month Progress Bar */}
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          PROGRESSO DO MÊS
-        </h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Dia {monthProgress.day} de {monthProgress.daysInMonth} — {monthProgress.budgetPercent}% do orçamento usado
-        </p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-muted-foreground w-16">Tempo</span>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-              <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${monthProgress.timePercent}%` }} />
-            </div>
-            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.timePercent}%</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-muted-foreground w-16">Gastos</span>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${getBudgetColor()}`} style={{ width: `${Math.min(monthProgress.budgetPercent, 100)}%` }} />
-            </div>
-            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.budgetPercent}%</span>
-          </div>
-        </div>
-      </div>
-
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">

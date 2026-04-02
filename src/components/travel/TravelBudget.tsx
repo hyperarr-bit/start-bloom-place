@@ -1,184 +1,237 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { TravelExpense, genId, formatCurrency } from "./types";
-import { Button } from "@/components/ui/button";
+import { TravelTrip, TravelCostItem, genId, formatCurrency } from "./types";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, DollarSign, TrendingUp } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 const CATEGORIES = [
-  { key: "hospedagem", emoji: "🏨", label: "Hospedagem", color: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20" },
-  { key: "transporte", emoji: "🚗", label: "Transporte", color: "bg-yellow-200 dark:bg-yellow-800/50", body: "bg-yellow-50 dark:bg-yellow-950/20" },
-  { key: "alimentação", emoji: "🍽️", label: "Alimentação", color: "bg-orange-200 dark:bg-orange-800/50", body: "bg-orange-50 dark:bg-orange-950/20" },
-  { key: "passeios", emoji: "🎯", label: "Passeios", color: "bg-green-200 dark:bg-green-800/50", body: "bg-green-50 dark:bg-green-950/20" },
-  { key: "compras", emoji: "🛍️", label: "Compras", color: "bg-pink-200 dark:bg-pink-800/50", body: "bg-pink-50 dark:bg-pink-950/20" },
-  { key: "outros", emoji: "📦", label: "Outros", color: "bg-gray-200 dark:bg-gray-800/50", body: "bg-gray-50 dark:bg-gray-950/20" },
+  { key: "passagens", emoji: "✈️", label: "PASSAGENS AÉREAS", headerColor: "bg-violet-300 dark:bg-violet-700", bodyColor: "bg-violet-50 dark:bg-violet-950/20", accentColor: "bg-violet-400" },
+  { key: "hotel", emoji: "🏨", label: "HOTEL", headerColor: "bg-teal-300 dark:bg-teal-700", bodyColor: "bg-teal-50 dark:bg-teal-950/20", accentColor: "bg-teal-400" },
+  { key: "passeios", emoji: "🎡", label: "PASSEIOS / TURISMO", headerColor: "bg-sky-200 dark:bg-sky-700", bodyColor: "bg-sky-50 dark:bg-sky-950/20", accentColor: "bg-sky-400" },
+  { key: "alimentacao", emoji: "🍲", label: "ALIMENTAÇÃO", headerColor: "bg-pink-300 dark:bg-pink-700", bodyColor: "bg-pink-50 dark:bg-pink-950/20", accentColor: "bg-pink-400" },
+  { key: "transporte", emoji: "🚕", label: "TRANSPORTE", headerColor: "bg-amber-200 dark:bg-amber-700", bodyColor: "bg-amber-50 dark:bg-amber-950/20", accentColor: "bg-amber-400" },
+  { key: "compras", emoji: "🛍️", label: "COMPRAS", headerColor: "bg-rose-300 dark:bg-rose-700", bodyColor: "bg-rose-50 dark:bg-rose-950/20", accentColor: "bg-rose-400" },
 ];
 
+const defaultTrip = (): TravelTrip => ({
+  id: genId(),
+  destination: "",
+  startDate: "",
+  endDate: "",
+  categories: Object.fromEntries(CATEGORIES.map(c => [c.key, []])),
+});
+
 export const TravelBudget = () => {
-  const [expenses, setExpenses] = usePersistedState<TravelExpense[]>("travel-expenses", []);
-  const [budget, setBudget] = usePersistedState("travel-budget-total", 5000);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<Partial<TravelExpense>>({ category: "hospedagem", currency: "BRL" });
-  const [tripFilter, setTripFilter] = useState("all");
+  const [trip, setTrip] = usePersistedState<TravelTrip>("travel-budget-v2", defaultTrip());
 
-  const trips = [...new Set(expenses.map(e => e.trip).filter(Boolean))];
-  const filtered = tripFilter === "all" ? expenses : expenses.filter(e => e.trip === tripFilter);
-  const totalSpent = filtered.reduce((s, e) => s + e.amount, 0);
-  const remaining = budget - totalSpent;
-  const percentage = Math.min((totalSpent / budget) * 100, 100);
+  const nightsCount = useMemo(() => {
+    if (!trip.startDate || !trip.endDate) return 0;
+    const diff = new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime();
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [trip.startDate, trip.endDate]);
 
-  const save = () => {
-    if (!form.description || !form.amount) return;
-    setExpenses(prev => [...prev, {
-      id: genId(), trip: form.trip || "", category: form.category || "outros",
-      description: form.description || "", amount: form.amount || 0,
-      currency: form.currency || "BRL", date: form.date || new Date().toISOString().slice(0, 10),
-    }]);
-    setForm({ category: "hospedagem", currency: "BRL" });
-    setShowForm(false);
+  const updateTrip = (patch: Partial<TravelTrip>) => setTrip(prev => ({ ...prev, ...patch }));
+
+  const updateItem = (catKey: string, itemId: string, patch: Partial<TravelCostItem>) => {
+    setTrip(prev => ({
+      ...prev,
+      categories: {
+        ...prev.categories,
+        [catKey]: (prev.categories[catKey] || []).map(item =>
+          item.id === itemId ? { ...item, ...patch } : item
+        ),
+      },
+    }));
   };
 
-  const dates = filtered.map(e => e.date).filter(Boolean);
-  const uniqueDays = new Set(dates).size;
-  const dailyAvg = uniqueDays > 0 ? totalSpent / uniqueDays : 0;
+  const addItem = (catKey: string) => {
+    setTrip(prev => ({
+      ...prev,
+      categories: {
+        ...prev.categories,
+        [catKey]: [...(prev.categories[catKey] || []), { id: genId(), description: "", estimated: 0, actual: 0 }],
+      },
+    }));
+  };
+
+  const removeItem = (catKey: string, itemId: string) => {
+    setTrip(prev => ({
+      ...prev,
+      categories: {
+        ...prev.categories,
+        [catKey]: (prev.categories[catKey] || []).filter(item => item.id !== itemId),
+      },
+    }));
+  };
+
+  const catTotals = useMemo(() => {
+    return CATEGORIES.map(cat => {
+      const items = trip.categories[cat.key] || [];
+      return {
+        key: cat.key,
+        label: cat.label,
+        emoji: cat.emoji,
+        estimated: items.reduce((s, i) => s + (i.estimated || 0), 0),
+        actual: items.reduce((s, i) => s + (i.actual || 0), 0),
+      };
+    });
+  }, [trip.categories]);
+
+  const grandEstimated = catTotals.reduce((s, c) => s + c.estimated, 0);
+  const grandActual = catTotals.reduce((s, c) => s + c.actual, 0);
 
   return (
-    <div className="space-y-4">
-      {/* Budget hero - Notion-style */}
+    <div className="space-y-3">
+      {/* Destination card */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-emerald-200 dark:bg-emerald-800/50 px-3 py-2 flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-wider">💰 ORÇAMENTO</span>
+        <div className="bg-blue-200 dark:bg-blue-800/60 px-3 py-2">
+          <span className="text-xs font-bold uppercase tracking-wider">📍 DESTINO</span>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
           <Input
-            type="number"
-            value={budget}
-            onChange={e => setBudget(Number(e.target.value))}
-            className="w-28 h-7 text-xs text-right rounded-lg bg-background/50"
+            placeholder="Nome do destino (ex: Nova York)"
+            value={trip.destination}
+            onChange={e => updateTrip({ destination: e.target.value })}
+            className="h-8 rounded-lg text-xs bg-background/60"
           />
-        </div>
-        <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4">
-          <div className="flex items-end justify-between mb-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-2xl font-black">{formatCurrency(totalSpent)}</p>
-              <p className="text-[10px] text-muted-foreground">gasto</p>
+              <label className="text-[9px] text-muted-foreground font-medium uppercase">Data de Ida</label>
+              <Input
+                type="date"
+                value={trip.startDate}
+                onChange={e => updateTrip({ startDate: e.target.value })}
+                className="h-8 rounded-lg text-xs bg-background/60"
+              />
             </div>
-            <div className="text-right">
-              <p className={`text-lg font-bold ${remaining < 0 ? "text-red-500" : "text-emerald-600 dark:text-emerald-400"}`}>
-                {formatCurrency(remaining)}
-              </p>
-              <p className="text-[10px] text-muted-foreground">restante</p>
+            <div>
+              <label className="text-[9px] text-muted-foreground font-medium uppercase">Data de Volta</label>
+              <Input
+                type="date"
+                value={trip.endDate}
+                onChange={e => updateTrip({ endDate: e.target.value })}
+                className="h-8 rounded-lg text-xs bg-background/60"
+              />
             </div>
           </div>
-          <Progress value={percentage} className="h-2 rounded-full" />
-          {remaining < 0 && <p className="text-[10px] text-red-500 font-bold mt-1">⚠️ Acima do orçamento!</p>}
+          {nightsCount > 0 && (
+            <p className="text-xs text-muted-foreground text-center font-medium">
+              🌙 {nightsCount} {nightsCount === 1 ? "noite" : "noites"}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Quick stats - Notion-style */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: "GASTOS", value: filtered.length.toString(), color: "bg-sky-200 dark:bg-sky-800/50", body: "bg-sky-50 dark:bg-sky-950/20" },
-          { label: "MÉDIA/DIA", value: formatCurrency(dailyAvg), color: "bg-orange-200 dark:bg-orange-800/50", body: "bg-orange-50 dark:bg-orange-950/20" },
-          { label: "USADO", value: `${percentage.toFixed(0)}%`, color: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20" },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl border border-border overflow-hidden">
-            <div className={`${s.color} px-2 py-1 text-center`}>
-              <span className="text-[8px] font-bold uppercase tracking-wider">{s.label}</span>
+      {/* Category cards */}
+      {CATEGORIES.map(cat => {
+        const items = trip.categories[cat.key] || [];
+        const totalEst = items.reduce((s, i) => s + (i.estimated || 0), 0);
+        const totalAct = items.reduce((s, i) => s + (i.actual || 0), 0);
+
+        return (
+          <div key={cat.key} className="rounded-xl border border-border overflow-hidden">
+            <div className={`${cat.headerColor} px-3 py-2 flex items-center justify-between`}>
+              <span className="text-xs font-bold uppercase tracking-wider">
+                {cat.emoji} {cat.label}
+              </span>
+              <button
+                onClick={() => addItem(cat.key)}
+                className="rounded-full w-5 h-5 flex items-center justify-center bg-background/40 hover:bg-background/70 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
             </div>
-            <div className={`${s.body} p-2 text-center`}>
-              <p className="text-xs font-bold">{s.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+            <div className={`${cat.bodyColor}`}>
+              {items.length > 0 && (
+                <div className="px-3 pt-2">
+                  <div className="grid grid-cols-[1fr_80px_80px_24px] gap-1 mb-1">
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase">Descrição</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase text-right">Estimado</span>
+                    <span className="text-[8px] font-bold text-muted-foreground uppercase text-right">Real</span>
+                    <span />
+                  </div>
+                  {items.map(item => (
+                    <div key={item.id} className="grid grid-cols-[1fr_80px_80px_24px] gap-1 items-center mb-1 group">
+                      <Input
+                        value={item.description}
+                        onChange={e => updateItem(cat.key, item.id, { description: e.target.value })}
+                        placeholder="Descrição"
+                        className="h-7 rounded-md text-[11px] bg-background/50 border-0 px-2"
+                      />
+                      <Input
+                        type="number"
+                        value={item.estimated || ""}
+                        onChange={e => updateItem(cat.key, item.id, { estimated: Number(e.target.value) })}
+                        placeholder="0"
+                        className="h-7 rounded-md text-[11px] bg-background/50 border-0 px-2 text-right tabular-nums"
+                      />
+                      <Input
+                        type="number"
+                        value={item.actual || ""}
+                        onChange={e => updateItem(cat.key, item.id, { actual: Number(e.target.value) })}
+                        placeholder="0"
+                        className="h-7 rounded-md text-[11px] bg-background/50 border-0 px-2 text-right tabular-nums"
+                      />
+                      <button
+                        onClick={() => removeItem(cat.key, item.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >
+                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-      {/* Category breakdown - Notion-style */}
-      <div className="grid grid-cols-3 gap-2">
-        {CATEGORIES.map(cat => {
-          const catTotal = filtered.filter(e => e.category === cat.key).reduce((s, e) => s + e.amount, 0);
-          if (catTotal === 0) return null;
-          const catPercent = totalSpent > 0 ? (catTotal / totalSpent) * 100 : 0;
-          return (
-            <div key={cat.key} className="rounded-xl border border-border overflow-hidden">
-              <div className={`${cat.color} px-2 py-1 text-center`}>
-                <span className="text-[9px] font-bold">{cat.emoji} {cat.label}</span>
-              </div>
-              <div className={`${cat.body} p-2 text-center`}>
-                <p className="text-xs font-bold">{formatCurrency(catTotal)}</p>
-                <p className="text-[8px] text-muted-foreground">{catPercent.toFixed(0)}%</p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              {items.length === 0 && (
+                <button
+                  onClick={() => addItem(cat.key)}
+                  className="w-full py-4 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  + Adicionar item
+                </button>
+              )}
 
-      {/* Trip filter */}
-      {trips.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-          <button onClick={() => setTripFilter("all")} className={`shrink-0 rounded-full px-3 py-1 text-[10px] border transition-all ${tripFilter === "all" ? "bg-foreground text-background" : "border-border"}`}>Todas</button>
-          {trips.map(t => (
-            <button key={t} onClick={() => setTripFilter(t)} className={`shrink-0 rounded-full px-3 py-1 text-[10px] border transition-all ${tripFilter === t ? "bg-foreground text-background" : "border-border"}`}>{t}</button>
-          ))}
-        </div>
-      )}
-
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Novo Gasto
-      </Button>
-
-      {showForm && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <Input placeholder="Viagem" value={form.trip || ""} onChange={e => setForm(p => ({ ...p, trip: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <Input placeholder="Descrição" value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <div className="grid grid-cols-3 gap-2">
-            <Input type="number" placeholder="Valor" value={form.amount || ""} onChange={e => setForm(p => ({ ...p, amount: Number(e.target.value) }))} className="h-9 rounded-xl text-xs" />
-            <Select value={form.category || "hospedagem"} onValueChange={v => setForm(p => ({ ...p, category: v }))}>
-              <SelectTrigger className="h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>{CATEGORIES.map(c => <SelectItem key={c.key} value={c.key}>{c.emoji} {c.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={save} className="flex-1 rounded-xl h-8 text-xs">Salvar</Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)} className="rounded-xl h-8 text-xs">Cancelar</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Expense list */}
-      <div className="space-y-1.5">
-        {filtered.sort((a, b) => b.date.localeCompare(a.date)).map(e => {
-          const cat = CATEGORIES.find(c => c.key === e.category);
-          return (
-            <div key={e.id} className="rounded-xl border border-border overflow-hidden group">
-              <div className="flex items-center justify-between px-3 py-2 bg-card">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{cat?.emoji}</span>
-                  <div>
-                    <p className="text-xs font-medium">{e.description}</p>
-                    <p className="text-[8px] text-muted-foreground">{e.date}{e.trip ? ` • ${e.trip}` : ""}</p>
+              {items.length > 0 && (
+                <div className="px-3 py-2 border-t border-border/30 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Valor Total</span>
+                  <div className="flex gap-4">
+                    <span className="text-xs font-bold tabular-nums">{formatCurrency(totalEst)}</span>
+                    <span className="text-xs font-bold tabular-nums">{formatCurrency(totalAct)}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold">{formatCurrency(e.amount)}</span>
-                  <button onClick={() => setExpenses(prev => prev.filter(x => x.id !== e.id))} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
 
-      {filtered.length === 0 && !showForm && (
-        <div className="text-center py-8">
-          <TrendingUp className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-          <p className="text-xs text-muted-foreground">Nenhum gasto registrado</p>
+      {/* Grand total card */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-stone-400 dark:bg-stone-700 px-3 py-2">
+          <span className="text-xs font-bold uppercase tracking-wider">💰 ORÇAMENTO TOTAL</span>
         </div>
-      )}
+        <div className="bg-stone-50 dark:bg-stone-950/20">
+          {/* Header row */}
+          <div className="grid grid-cols-[1fr_90px_90px] gap-1 px-3 pt-2 mb-1">
+            <span className="text-[8px] font-bold text-muted-foreground uppercase">Categoria</span>
+            <span className="text-[8px] font-bold text-muted-foreground uppercase text-right">Estimado</span>
+            <span className="text-[8px] font-bold text-muted-foreground uppercase text-right">Real</span>
+          </div>
+          {catTotals.map(ct => (
+            <div key={ct.key} className="grid grid-cols-[1fr_90px_90px] gap-1 px-3 py-1 items-center">
+              <span className="text-[11px] font-medium">{ct.emoji} {ct.label}</span>
+              <span className="text-[11px] tabular-nums text-right">{formatCurrency(ct.estimated)}</span>
+              <span className="text-[11px] tabular-nums text-right">{formatCurrency(ct.actual)}</span>
+            </div>
+          ))}
+          <div className="grid grid-cols-[1fr_90px_90px] gap-1 px-3 py-2 border-t border-border/40 items-center">
+            <span className="text-xs font-black uppercase">TOTAL</span>
+            <span className="text-xs font-black tabular-nums text-right">{formatCurrency(grandEstimated)}</span>
+            <span className="text-xs font-black tabular-nums text-right">{formatCurrency(grandActual)}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

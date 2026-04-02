@@ -1,52 +1,48 @@
 
 
-# Metas de Economia por Categoria
+# Melhorias no Dashboard e Meu Financeiro
 
-Criar um componente `CategoryBudgets` que permite definir limites de gasto por categoria e acompanhar o progresso com barras visuais.
-
----
-
-## Como funciona
-
-O usuário define um teto de gasto para cada categoria (Alimentação, Transporte, Lazer, etc.). O componente calcula automaticamente quanto já foi gasto no mês atual com base nos dados de `expenses` e exibe barras de progresso coloridas por categoria.
+Adicionar 3 funcionalidades escolhidas pelo usuário, seguindo a identidade visual existente.
 
 ---
 
-## Interface
+## 1. Barra de Progresso do Mês (Dashboard)
 
-- Header com faixa colorida (`bg-accent/20`) e título "LIMITES POR CATEGORIA" + ícone `Gauge` (Lucide)
-- Lista de categorias com:
-  - Badge colorido da categoria (reutilizando as cores já definidas em `ExpenseTable`)
-  - Barra de progresso: verde se < 75%, amarelo se 75-99%, vermelho se >= 100%
-  - Texto: "R$ gasto / R$ limite" em `tabular-nums text-xs`
-- Botão para adicionar/editar limite de cada categoria via input inline
-- Empty state: "Defina limites para controlar seus gastos por categoria"
+Card mostrando visualmente o progresso de gastos no mês:
+- Indicador: "Dia 15/30 — 45% do orçamento gasto"
+- Barra dupla: progresso do tempo (dias) vs progresso dos gastos
+- Alerta visual se gastos estão acima do esperado para o dia
+- Posição: logo após os 4 cards de stats rápidos no Dashboard
 
----
+## 2. Últimas Transações Rápidas (Dashboard)
 
-## Detalhes técnicos
+Card com as 5 últimas despesas (variáveis + fixas) ordenadas por data:
+- Cada linha: emoji da categoria, descrição, valor, data
+- Badge colorido do método de pagamento
+- Link "Ver todas →" que muda para aba financeiro
+- Posição: no grid de gráficos, ao lado do pie chart de categorias
 
-### Novo arquivo
-**`src/components/CategoryBudgets.tsx`**
-- Props: `expenses` (array de despesas do mês), categorias com cores do `ExpenseTable`
-- Estado persistido via `usePersistedState("finance-category-budgets", {})`
-- Formato: `Record<string, number>` (ex: `{ alimentacao: 500, transporte: 200 }`)
-- Calcula gasto por categoria com `expenses.filter(e => e.category === cat).reduce(...)`
-- Segue todos os padrões: `animate-fade-in`, `bg-card rounded-lg border border-border`, ícones `w-3.5 h-3.5`, inputs `h-7 text-xs`
+## 3. Gasto por Método de Pagamento (Dashboard)
 
-### Integração em `Index.tsx`
-- Adicionar nova aba nos tabs: `{ id: "limites", label: "🎯 LIMITES" }`
-- Renderizar `<CategoryBudgets expenses={expenses} />` quando `activeTab === "limites"`
-- Também pode ser adicionado dentro da aba "financeiro" como seção extra (abaixo de BillsDueCards)
-
-### Persistência
-- Usa `usePersistedState` (localStorage) como todos os outros componentes
-- Se o usuário estiver logado, o `useUserData` hook sincroniza com Supabase automaticamente via a chave `finance-category-budgets`
+Gráfico de barras horizontais ou donut mostrando distribuição por método:
+- Pix, Cartão de Crédito, Débito, Dinheiro, Boleto
+- Cada método com cor distinta e valor total
+- Dados vêm do campo `paymentMethod` das despesas variáveis e `fixedExpenses`
+- Posição: abaixo do gráfico Receitas vs Despesas
 
 ---
 
-## Escopo
-- 1 arquivo novo (`CategoryBudgets.tsx`)
-- 1 arquivo editado (`Index.tsx` — adicionar aba e renderizar componente)
-- Sem mudanças no banco de dados
+## Arquivos Alterados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/Dashboard.tsx` | Adicionar os 3 novos cards/seções com dados computados |
+| `src/pages/Index.tsx` | Passar `setActiveTab` como prop ao Dashboard para o link "Ver todas" |
+
+## Detalhes Técnicos
+
+- Todos os dados já existem nos props do Dashboard (`expenses`, `fixedExpenses`) — campo `paymentMethod` já está nas interfaces
+- Cores e espaçamento seguem o padrão: `bg-card rounded-lg border border-border p-4`, títulos `text-xs font-bold mb-3` com ícone Lucide
+- Gráficos via Recharts (já instalado)
+- Nenhuma mudança de banco de dados necessária
 

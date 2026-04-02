@@ -26,13 +26,13 @@ const categories = [
   { value: "assinaturas", label: "Assinaturas", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
   { value: "internet_telefone", label: "Internet/Telefone", color: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
   { value: "educacao", label: "Educação", color: "bg-teal-500/15 text-teal-700 dark:text-teal-300" },
-  { value: "academia", label: "Academia", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  { value: "academia", label: "Academia", color: "bg-lime-500/15 text-lime-700 dark:text-lime-300" },
   { value: "transporte_fixo", label: "Transporte Fixo", color: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300" },
   { value: "fatura_cartao", label: "Fatura Cartão", color: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
   { value: "financiamento", label: "Financiamento", color: "bg-red-500/15 text-red-700 dark:text-red-300" },
-  { value: "pensao", label: "Pensão", color: "bg-slate-500/15 text-slate-700 dark:text-slate-300" },
-  { value: "pets", label: "Pets", color: "bg-stone-500/15 text-stone-700 dark:text-stone-300" },
-  { value: "filhos", label: "Filhos", color: "bg-blue-400/15 text-blue-600 dark:text-blue-300" },
+  { value: "pensao", label: "Pensão", color: "bg-stone-500/15 text-stone-700 dark:text-stone-300" },
+  { value: "pets", label: "Pets", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
+  { value: "filhos", label: "Filhos", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
   { value: "outros", label: "Outros", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
 ];
 

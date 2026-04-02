@@ -526,31 +526,48 @@ export const Dashboard = ({
       </div>
 
       {/* Top 5 Maiores Gastos */}
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
-        {top5Expenses.length > 0 ? (
-          <div className="space-y-2.5">
-            {top5Expenses.map((item, i) => (
-              <div key={item.id} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs truncate flex-1 mr-2">{i + 1}. {item.description}</span>
-                  <span className="text-xs tabular-nums text-red-400 font-medium flex-shrink-0">
-                    R$ {item.value.toLocaleString("pt-BR")}
-                  </span>
-                </div>
-                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-red-400 rounded-full transition-all"
-                    style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
-                  />
-                </div>
+      {(() => {
+        const rankConfig = [
+          { emoji: "🥇", bar: "bg-amber-400", text: "text-amber-400" },
+          { emoji: "🥈", bar: "bg-slate-300", text: "text-slate-300" },
+          { emoji: "🥉", bar: "bg-orange-400", text: "text-orange-400" },
+          { emoji: "4", bar: "bg-blue-400", text: "text-blue-400" },
+          { emoji: "5", bar: "bg-purple-400", text: "text-purple-400" },
+        ];
+        return (
+          <div className="bg-card rounded-lg border border-border p-4">
+            <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
+            {top5Expenses.length > 0 ? (
+              <div className="space-y-2">
+                {top5Expenses.map((item, i) => {
+                  const cfg = rankConfig[i] || rankConfig[4];
+                  return (
+                    <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs truncate flex-1 mr-2">
+                          <span className="mr-1">{cfg.emoji}</span>
+                          {item.description}
+                        </span>
+                        <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${cfg.text}`}>
+                          R$ {item.value.toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${cfg.bar}`}
+                          style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
+            )}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
-        )}
-      </div>
+        );
+      })()}
 
       {/* Últimas Transações */}
       <div className="bg-card rounded-lg border border-border p-4">

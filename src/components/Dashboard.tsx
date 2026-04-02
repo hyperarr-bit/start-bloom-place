@@ -437,6 +437,81 @@ export const Dashboard = ({
         </div>
       )}
 
+      {/* Forecast + Daily Budget */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Previsão de Saldo */}
+        <div className={`rounded-lg border p-4 ${forecast.projectedBalance >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
+          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            PREVISÃO FIM DO MÊS
+          </h3>
+          <p className={`text-2xl font-bold tabular-nums ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
+            {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Baseado no seu ritmo de R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")}/dia × {forecast.remainingDays} dias restantes
+          </p>
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Receita total</span>
+              <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Já gasto (dia {forecast.day})</span>
+              <span className="text-red-400 tabular-nums">-R$ {totalExpenses.toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Projeção restante</span>
+              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.dailyVariableRate * forecast.remainingDays).toLocaleString("pt-BR")}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quanto Posso Gastar Hoje */}
+        <div className={`rounded-lg border p-4 ${
+          dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
+          dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
+          "bg-red-500/5 border-red-500/20"
+        }`}>
+          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+            <Wallet className="w-4 h-4" />
+            QUANTO POSSO GASTAR HOJE
+          </h3>
+          <p className={`text-2xl font-bold tabular-nums ${
+            dailyBudget.status === "good" ? "text-green-400" :
+            dailyBudget.status === "warning" ? "text-orange-400" :
+            "text-red-400"
+          }`}>
+            R$ {Math.max(0, Math.round(dailyBudget.perDay)).toLocaleString("pt-BR")}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {dailyBudget.remainingDays} dias restantes no mês
+          </p>
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Disponível total</span>
+              <span className="tabular-nums">R$ {Math.max(0, Math.round(dailyBudget.available)).toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
+              <span className="tabular-nums">= R$ {Math.max(0, Math.round(dailyBudget.perDay)).toLocaleString("pt-BR")}/dia</span>
+            </div>
+          </div>
+          {dailyBudget.status === "danger" && (
+            <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" />
+              Orçamento esgotado — evite gastos extras
+            </p>
+          )}
+          {dailyBudget.status === "warning" && (
+            <p className="text-[10px] text-orange-400 mt-2 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3" />
+              Atenção: ritmo de gastos acima do ideal
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Charts Grid */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Expense Pie Chart */}

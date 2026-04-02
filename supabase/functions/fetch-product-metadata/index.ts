@@ -149,9 +149,18 @@ Deno.serve(async (req) => {
       // Handle Brazilian format: 1.299,90 → 1299.90
       let normalized = price.replace(/\s/g, '');
       if (normalized.includes(',') && normalized.includes('.')) {
+        // "1.299,90" → "1299.90"
         normalized = normalized.replace(/\./g, '').replace(',', '.');
       } else if (normalized.includes(',')) {
-        normalized = normalized.replace(',', '.');
+        // Check if comma is thousands separator (3 digits after comma) vs decimal (1-2 digits)
+        const parts = normalized.split(',');
+        if (parts.length === 2 && parts[1].length === 3) {
+          // "3,533" → thousands separator → "3533"
+          normalized = normalized.replace(',', '');
+        } else {
+          // "3,53" → decimal → "3.53"
+          normalized = normalized.replace(',', '.');
+        }
       }
       priceNumber = parseFloat(normalized) || 0;
     }

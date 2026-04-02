@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Tag, Camera, Image } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { ReceiptViewer } from "@/components/finance/ReceiptViewer";
+import { toast } from "sonner";
 
 interface Expense {
   id: string;
@@ -11,6 +14,8 @@ interface Expense {
   date: string;
   paymentMethod: string;
   cardName?: string;
+  tags?: string[];
+  receiptUrl?: string;
 }
 
 interface ExpenseTableProps {
@@ -64,12 +69,31 @@ const cardOptions = [
   { value: "outro", label: "Outro", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
 ];
 
+const tagColors = [
+  "bg-blue-500/15 text-blue-600 dark:text-blue-300",
+  "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+  "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  "bg-pink-500/15 text-pink-600 dark:text-pink-300",
+  "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+  "bg-cyan-500/15 text-cyan-600 dark:text-cyan-300",
+];
+
+const getTagColor = (tag: string) => {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+  return tagColors[Math.abs(hash) % tagColors.length];
+};
+
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
 export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
   });
+  const [newTag, setNewTag] = useState("");
+  const [newTags, setNewTags] = useState<string[]>([]);
+  const [filterTag, setFilterTag] = useState("");
+  const [viewingReceipt, setViewingReceipt] = useState<string | null>(null);
 
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {
@@ -83,14 +107,48 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
           date: newExpense.date || new Date().toISOString().split("T")[0],
           paymentMethod: newExpense.paymentMethod || "pix",
           cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+          tags: newTags.length > 0 ? newTags : undefined,
         },
       ]);
       setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
+      setNewTags([]);
     }
   };
 
   const deleteExpense = (id: string) => {
     setExpenses(expenses.filter((e) => e.id !== id));
+  };
+
+  const handleAddTag = () => {
+    const tag = newTag.trim();
+    if (tag && !newTags.includes(tag)) {
+      setNewTags([...newTags, tag]);
+      setNewTag("");
+    }
+  };
+
+  const removeNewTag = (tag: string) => setNewTags(newTags.filter(t => t !== tag));
+
+  const handleReceiptUpload = async (expenseId: string, file: File) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Faça login para anexar comprovantes"); return; }
+
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${expenseId}.${ext}`;
+
+      const { error } = await supabase.storage.from("receipts").upload(path, file, { upsert: true });
+      if (error) { toast.error("Erro ao enviar comprovante"); return; }
+
+      const { data: urlData } = supabase.storage.from("receipts").getPublicUrl(path);
+
+      setExpenses(expenses.map(e =>
+        e.id === expenseId ? { ...e, receiptUrl: urlData.publicUrl } : e
+      ));
+      toast.success("Comprovante anexado!");
+    } catch {
+      toast.error("Erro ao enviar comprovante");
+    }
   };
 
   const getCategoryStyle = (v: string) => categories.find((c) => c.value === v)?.color || "bg-gray-100/80 text-gray-700";
@@ -99,16 +157,37 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const getCardLabel = (v: string) => cardOptions.find((c) => c.value === v)?.label || v;
   const getPaymentLabel = (v: string) => paymentMethods.find((p) => p.value === v)?.label || v;
 
-  const total = expenses.reduce((sum, e) => sum + e.value, 0);
+  // All unique tags
+  const allTags = [...new Set(expenses.flatMap(e => e.tags || []))];
+
+  const filteredExpenses = filterTag
+    ? expenses.filter(e => e.tags?.includes(filterTag))
+    : expenses;
+
+  const total = filteredExpenses.reduce((sum, e) => sum + e.value, 0);
 
   return (
-    <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in">
-        <div className="bg-income py-2 px-4">
+    <>
+      <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in">
+        <div className="bg-income py-2 px-4 flex items-center justify-between">
           <span className="font-bold text-sm text-income-foreground tracking-wide">CUSTOS VARIÁVEIS</span>
+          {allTags.length > 0 && (
+            <div className="flex items-center gap-1">
+              <Tag className="w-3 h-3 text-income-foreground/60" />
+              <select
+                value={filterTag}
+                onChange={e => setFilterTag(e.target.value)}
+                className="bg-transparent text-[10px] text-income-foreground border-0 outline-none cursor-pointer"
+              >
+                <option value="">Todas</option>
+                {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[650px]">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="border-b border-border bg-muted/30">
                 <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Descrição</th>
@@ -117,11 +196,11 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
                 <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Data</th>
                 <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Pagamento</th>
                 <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Cartão</th>
-                <th className="px-3 py-2 w-8"></th>
+                <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
             <tbody>
-              {expenses.length === 0 && (
+              {filteredExpenses.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-3 py-6 text-center">
                     <p className="text-xs text-muted-foreground">Nenhum gasto variável cadastrado</p>
@@ -129,9 +208,22 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
                   </td>
                 </tr>
               )}
-              {expenses.map((expense) => (
+              {filteredExpenses.map((expense) => (
                 <tr key={expense.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                  <td className="px-3 py-2">{expense.description}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex flex-col gap-0.5">
+                      <span>{expense.description}</span>
+                      {expense.tags && expense.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {expense.tags.map(tag => (
+                            <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded-full ${getTagColor(tag)}`}>
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-3 py-2 text-center">
                     <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
                       {getCategoryLabel(expense.category)}
@@ -154,15 +246,53 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
                     )}
                   </td>
                   <td className="px-3 py-2">
-                    <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {expense.receiptUrl ? (
+                        <button onClick={() => setViewingReceipt(expense.receiptUrl!)} className="text-green-500 hover:text-green-400 transition-colors">
+                          <Image className="w-3.5 h-3.5" />
+                        </button>
+                      ) : (
+                        <label className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                          <Camera className="w-3.5 h-3.5" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) handleReceiptUpload(expense.id, file);
+                            }}
+                          />
+                        </label>
+                      )}
+                      <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
               <tr className="bg-muted/20">
                 <td className="px-3 py-2">
-                  <Input placeholder="+ Novo gasto" value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })} className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0" />
+                  <div className="space-y-1">
+                    <Input placeholder="+ Novo gasto" value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })} className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0" />
+                    {/* Tags input */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {newTags.map(tag => (
+                        <span key={tag} className={`text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5 ${getTagColor(tag)}`}>
+                          {tag}
+                          <button onClick={() => removeNewTag(tag)} className="hover:opacity-70">×</button>
+                        </span>
+                      ))}
+                      <input
+                        value={newTag}
+                        onChange={e => setNewTag(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAddTag(); } }}
+                        placeholder="+ tag"
+                        className="bg-transparent text-[10px] text-muted-foreground outline-none w-12 placeholder:text-muted-foreground/50"
+                      />
+                    </div>
+                  </div>
                 </td>
                 <td className="px-3 py-2">
                   <Select value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })}>
@@ -201,7 +331,9 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
             </tbody>
             <tfoot>
               <tr className="border-t border-border">
-                <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={2}>TOTAL</td>
+                <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={2}>
+                  TOTAL {filterTag && <span className="text-[10px]">(tag: {filterTag})</span>}
+                </td>
                 <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={5}>
                   R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </td>
@@ -209,6 +341,11 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
             </tfoot>
           </table>
         </div>
-    </div>
+      </div>
+
+      {viewingReceipt && (
+        <ReceiptViewer url={viewingReceipt} onClose={() => setViewingReceipt(null)} />
+      )}
+    </>
   );
 };

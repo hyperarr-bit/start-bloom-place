@@ -253,10 +253,7 @@ export const Reports = ({
 
         {/* Expenses by Category */}
         <div className="mb-6">
-          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <PieChart className="w-4 h-4" />
-            Despesas por Categoria
-          </h3>
+          <h3 className="text-sm font-bold mb-3">🥧 Despesas por Categoria</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {Object.entries(expensesByCategory)
               .sort(([, a], [, b]) => b - a)

@@ -1,44 +1,42 @@
 
 
-# Substituir Tendência Mensal por Card Estilo "Você gastou"
+# Redesign do Card Top 5 Maiores Gastos
 
-Substituir o card `📈 TENDÊNCIA MENSAL` (linhas 748-763 do Dashboard) por um card hero azul inspirado na imagem de referência.
+Tornar o card visualmente mais interessante com cores variadas por posição (medalha), ícones de ranking e barras coloridas distintas.
 
 ---
 
 ## Design
 
-Card com fundo gradiente azul (`bg-gradient-to-br from-blue-600 to-blue-700`), ocupando largura total:
+Cada item terá uma cor diferente baseada na posição:
+- 1º: dourado (`amber-400`) com emoji 🥇
+- 2º: cinza claro (`slate-300`) com emoji 🥈
+- 3º: bronze (`orange-400`) com emoji 🥉
+- 4º e 5º: cores neutras (`blue-400`, `purple-400`)
+
+As barras de progresso acompanham a cor de cada posição. O valor fica com a mesma cor da barra ao invés de tudo vermelho.
+
+Cada item ganha um card sutil com `bg-secondary/30 rounded-lg px-3 py-2` para dar mais destaque e separação visual.
 
 ```text
-┌──────────────────────────────────────┐
-│  Você gastou                         │
-│  R$ X.XXX  a menos/mais este mês    │
-│  [↓ -XX%]  vs R$ X.XXX mês anterior │
-│                                      │
-│     ~~~ linha tracejada (gráfico) ~~~│
-│  ●                                   │
-│  ┌──────────────────────────────┐    │
-│  │ ✨ Defina um limite em       │    │
-│  │ Categorias e descubra...  →  │    │
-│  └──────────────────────────────┘    │
-└──────────────────────────────────────┘
+┌─────────────────────────────────┐
+│ 🏆 TOP 5 MAIORES GASTOS        │
+│                                 │
+│ ┌─ bg-secondary/30 ──────────┐ │
+│ │ 🥇 Aluguel     R$ 2.500   │ │
+│ │ ████████████████████ amber │ │
+│ └────────────────────────────┘ │
+│ ┌────────────────────────────┐ │
+│ │ 🥈 Mercado      R$ 1.800  │ │
+│ │ ██████████████ slate       │ │
+│ └────────────────────────────┘ │
+│ ...                            │
+└─────────────────────────────────┘
 ```
-
-## Lógica
-
-- Usa dados já existentes: `trendData` (gastos acumulados mês atual) e `prevMonthTotal` (total mês anterior)
-- Calcula diferença: `currentTotal - prevTotal`
-- Se gastou menos → texto "a menos este mês", badge verde com % negativa
-- Se gastou mais → texto "a mais este mês", badge vermelha com % positiva
-- Gráfico: SVG com path tracejado usando os pontos de `trendData` (campo `Atual`), ponto verde no início
-- CTA inferior: caixa `bg-white/10 backdrop-blur` com texto "Defina um limite em Categorias..." e link "Ir →" que navega para a aba de categorias
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/Dashboard.tsx` | Substituir bloco do card Tendência Mensal (linhas 748-763) pelo novo card hero azul. Extrair `prevMonthTotal` para fora do `useMemo` do trendData para reutilizar. Adicionar SVG path tracejado inline. |
-
-Nenhum arquivo novo. A prop `onNavigate` já existe no Dashboard para navegação entre abas.
+| `src/components/Dashboard.tsx` | Substituir bloco Top 5 (linhas 528-553) com novo design usando array de cores por posição, emojis de medalha, barras e valores coloridos individualmente |
 

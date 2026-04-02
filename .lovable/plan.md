@@ -1,57 +1,36 @@
 
 
-# 4 Novas Funcionalidades no Dashboard
+# Reformular Cards do Dashboard
 
-Adicionar 4 novos cards ao `Dashboard.tsx`, seguindo rigorosamente a identidade visual existente: `bg-card rounded-lg border border-border p-4`, títulos `text-xs font-bold` UPPERCASE, valores `tabular-nums`, cores semânticas (`green-400`, `red-400`, `purple-400`, `orange-400`).
+## Problema
+Os 4 cards novos (Progresso do Mês, Últimas Transações, Gasto por Método, Fixos vs Variáveis) estão:
+1. Na posição errada — devem ficar **por último**, após Evolução do Patrimônio
+2. Usando estilo dos Alertas Inteligentes (ícones Lucide nos títulos, sub-cards coloridos com `bg-orange-500/10`) em vez do estilo dos cards de gráficos
 
----
+## Identidade Visual Correta (cards de gráficos)
+- Título: **emoji + UPPERCASE** (`📊 GASTOS POR CATEGORIA`, `📈 RECEITAS VS DESPESAS`, `💰 EVOLUÇÃO DO PATRIMÔNIO`)
+- Container: `bg-card rounded-lg border border-border p-4`
+- Título: `text-xs font-bold mb-3`
+- Sem sub-cards coloridos internos — conteúdo direto e limpo
 
-## 1. Barra de Progresso do Mês (tempo vs gastos)
+## Alterações em `Dashboard.tsx`
 
-Duas barras horizontais lado a lado:
-- **Tempo do mês**: % dos dias passados (ex: dia 15 = 50%). Cor `blue-400`.
-- **Orçamento gasto**: % das despesas vs receitas. Cor `green-400` se abaixo do tempo, `orange-400` se próximo, `red-400` se acima.
-- Indicador textual: "Dia X de 30 — Y% do orçamento usado"
-- Usa `Progress` (shadcn) com cor dinâmica.
+### 1. Mover blocos
+Reordenar o JSX para:
+1. Quick Stats (já existe)
+2. Alertas Inteligentes (já existe)
+3. Charts Grid — Gastos por Categoria + Receitas vs Despesas (já existe)
+4. Evolução do Patrimônio (já existe)
+5. **Progresso do Mês** (movido)
+6. **Grid 2 colunas: Últimas Transações + Gasto por Método** (movido)
+7. **Custos Fixos vs Variáveis** (movido)
 
-## 2. Últimas Transações (5 mais recentes)
+### 2. Reformular títulos — trocar Lucide por emojis
+- `<Clock> PROGRESSO DO MÊS` → `⏳ PROGRESSO DO MÊS`
+- `<Receipt> ÚLTIMAS TRANSAÇÕES` → `🧾 ÚLTIMAS TRANSAÇÕES`
+- `<CreditCard> GASTO POR MÉTODO` → `💳 GASTO POR MÉTODO`
+- `<DollarSign> CUSTOS FIXOS VS VARIÁVEIS` → `⚖️ FIXOS VS VARIÁVEIS`
 
-- Lista das 5 despesas mais recentes (variáveis + fixas), ordenadas por data.
-- Cada linha: ícone colorido da categoria, descrição truncada, valor em `text-red-400`, data em `text-muted-foreground text-[10px]`.
-- Link "Ver todas →" no rodapé que muda `activeTab` para `"financeiro"`.
-- Requer passar `onNavigate` callback como nova prop no Dashboard.
-
-## 3. Gasto por Método de Pagamento
-
-- Barras horizontais com percentual. Agrupa `expenses` + `fixedExpenses` por `paymentMethod`.
-- Labels: Pix, Crédito, Débito, Dinheiro, Boleto.
-- Barra com `div` estilizado (cor única por método), percentual à direita.
-- Sem dependência de Recharts — barras CSS puras para consistência visual.
-
-## 4. Resumo Fixos vs Variáveis
-
-- Dois blocos lado a lado no estilo dos stat cards existentes.
-- **Custos Fixos**: soma de `fixedExpenses`, cor `orange-400`, ícone `Lock`.
-- **Custos Variáveis**: soma de `expenses`, cor `blue-400`, ícone `ShoppingCart`.
-- Barra de proporção visual (% fixo vs % variável) embaixo.
-
----
-
-## Arquivos Editados
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/Dashboard.tsx` | Adicionar os 4 novos blocos após os Alertas e antes dos Charts. Adicionar prop `onNavigate` para o link "Ver todas". Adicionar labels de métodos de pagamento. |
-| `src/pages/Index.tsx` | Passar `onNavigate={() => setActiveTab("financeiro")}` ao Dashboard. |
-
-## Layout no Dashboard
-
-Ordem dos blocos (de cima para baixo):
-1. Quick Stats (4 cards — já existe)
-2. **Barra de Progresso do Mês** (novo — largura total)
-3. Alertas Inteligentes (já existe)
-4. **Grid 2 colunas**: Últimas Transações | Gasto por Método de Pagamento (novos)
-5. **Resumo Fixos vs Variáveis** (novo — largura total)
-6. Charts Grid (já existe)
-7. Evolução do Patrimônio (já existe)
+### 3. Reformular Fixos vs Variáveis
+Remover os sub-cards coloridos (`bg-orange-500/10 border border-orange-500/20`) e usar layout limpo como os outros cards de gráficos — valores diretos sem bordas coloridas internas.
 

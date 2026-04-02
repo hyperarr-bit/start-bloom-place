@@ -745,22 +745,71 @@ export const Dashboard = ({
           )}
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">📈 TENDÊNCIA MENSAL</h3>
-          {trendData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={trendData}>
-                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name]} />
-                <Line type="monotone" dataKey="Atual" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Anterior" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="5 5" dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">Sem dados para comparar</p>
-          )}
-        </div>
+        {(() => {
+          const currentTotal = trendData.length > 0 ? trendData[trendData.length - 1].Atual : 0;
+          const now = new Date();
+          const prevMonthIndex = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+          const prevMonthName = ALL_MONTHS[prevMonthIndex];
+          const prevTotals = getMonthTotals(prevMonthName);
+          const prevTotal = prevTotals.custosFixos + prevTotals.custosVariaveis;
+          const diff = currentTotal - prevTotal;
+          const diffPercent = prevTotal > 0 ? Math.round((diff / prevTotal) * 100) : 0;
+          const spentLess = diff <= 0;
+
+          // SVG path from trendData
+          const maxVal = Math.max(...trendData.map(d => d.Atual), 1);
+          const svgW = 300;
+          const svgH = 60;
+          const points = trendData.map((d, i) => {
+            const x = trendData.length > 1 ? (i / (trendData.length - 1)) * svgW : svgW / 2;
+            const y = svgH - (d.Atual / maxVal) * (svgH - 8) - 4;
+            return `${x},${y}`;
+          });
+          const pathD = points.length > 0 ? `M${points.join(" L")}` : "";
+
+          return (
+            <div className="rounded-lg p-5 bg-gradient-to-br from-blue-600 to-blue-700 text-white relative overflow-hidden">
+              <p className="text-xs opacity-80 mb-1">Você gastou</p>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-2xl font-bold tabular-nums">
+                  R$ {Math.abs(diff).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-sm opacity-90">
+                  {spentLess ? "a menos este mês" : "a mais este mês"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs opacity-80 mb-4">
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${spentLess ? "bg-green-500/30 text-green-200" : "bg-red-500/30 text-red-200"}`}>
+                  {spentLess ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
+                  {spentLess ? "" : "+"}{diffPercent}%
+                </span>
+                <span>vs R$ {prevTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} mês anterior</span>
+              </div>
+
+              {trendData.length > 1 && (
+                <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-14 mb-3" preserveAspectRatio="none">
+                  <path d={pathD} fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeDasharray="6 4" />
+                  {points.length > 0 && (
+                    <circle cx={points[0].split(",")[0]} cy={points[0].split(",")[1]} r="4" fill="#4ade80" />
+                  )}
+                </svg>
+              )}
+
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate("categorias")}
+                  className="w-full bg-white/10 backdrop-blur-sm rounded-lg p-3 flex items-center justify-between text-left hover:bg-white/20 transition-colors"
+                >
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>✨</span>
+                    <span>Defina um limite em <strong>Categorias</strong> e descubra onde economizar</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 flex-shrink-0 opacity-70" />
+                </button>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -302,7 +302,7 @@ export const FinancialHealth = ({
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Plane className="w-4 h-4 text-blue-400" />
+            <span className="text-sm">✈️</span>
             <span className="text-[10px] text-muted-foreground">Viagens</span>
           </div>
           <p className="text-lg font-bold">{tripReadiness.toFixed(0)}%</p>

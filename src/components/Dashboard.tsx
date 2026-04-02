@@ -196,31 +196,32 @@ export const Dashboard = ({
       .sort((a, b) => b.value - a.value);
   }, [expenses, fixedExpenses]);
 
-  // Bar chart data for monthly comparison
+  // Bar chart data — only consecutive months up to current month
+  const currentMonthIdx = new Date().getMonth();
   const monthlyBarData = useMemo(() => {
     return annualData
+      .slice(0, currentMonthIdx + 1)
       .filter((d) => d.receitas > 0 || d.custosFixos > 0 || d.custosVariaveis > 0)
-      .slice(0, 6)
       .map((d) => ({
         month: d.month.substring(0, 3),
         Receitas: d.receitas,
         Despesas: d.custosFixos + d.custosVariaveis,
         Saldo: d.receitas - d.custosFixos - d.custosVariaveis - d.dividas,
       }));
-  }, [annualData]);
+  }, [annualData, currentMonthIdx]);
 
-  // Patrimony evolution
+  // Patrimony evolution — only consecutive months up to current month
   const patrimonyData = useMemo(() => {
     let accumulated = totalInvestments;
     return annualData
+      .slice(0, currentMonthIdx + 1)
       .filter((d) => d.receitas > 0)
-      .slice(0, 6)
       .map((d) => {
         const saving = d.receitas - d.custosFixos - d.custosVariaveis - d.dividas;
         accumulated += saving * 0.2;
         return { month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) };
       });
-  }, [annualData, totalInvestments]);
+  }, [annualData, totalInvestments, currentMonthIdx]);
 
   // Smart alerts
   const alerts = useMemo(() => {

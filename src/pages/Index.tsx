@@ -285,6 +285,10 @@ const Index = () => {
           <CategoryBudgets expenses={expenses} />
         )}
 
+        {activeTab === "cartoes" && (
+          <CreditCards expenses={expenses} />
+        )}
+
         {activeTab === "relatorios" && (
           <Reports
             incomes={incomes}

@@ -310,33 +310,6 @@ export const Dashboard = ({
         </div>
       </div>
 
-      {/* NEW: Month Progress Bar */}
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          PROGRESSO DO MÊS
-        </h3>
-        <p className="text-xs text-muted-foreground mb-3">
-          Dia {monthProgress.day} de {monthProgress.daysInMonth} — {monthProgress.budgetPercent}% do orçamento usado
-        </p>
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-muted-foreground w-16">Tempo</span>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-              <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${monthProgress.timePercent}%` }} />
-            </div>
-            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.timePercent}%</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] text-muted-foreground w-16">Gastos</span>
-            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-              <div className={`h-full rounded-full transition-all ${getBudgetColor()}`} style={{ width: `${Math.min(monthProgress.budgetPercent, 100)}%` }} />
-            </div>
-            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.budgetPercent}%</span>
-          </div>
-        </div>
-      </div>
-
       {/* Alerts */}
       {alerts.length > 0 && (
         <div className="bg-card rounded-lg border border-border p-4">
@@ -367,125 +340,6 @@ export const Dashboard = ({
           </div>
         </div>
       )}
-
-      {/* NEW: Last Transactions + Payment Method Grid */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Last Transactions */}
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
-            <Receipt className="w-4 h-4" />
-            ÚLTIMAS TRANSAÇÕES
-          </h3>
-          {lastTransactions.length > 0 ? (
-            <div className="space-y-2">
-              {lastTransactions.map((t) => (
-                <div key={t.id} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
-                  <span className="text-xs flex-1 truncate">{t.description}</span>
-                  <span className="text-xs tabular-nums text-red-400 font-medium">
-                    -R$ {t.value.toLocaleString("pt-BR")}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground w-12 text-right">
-                    {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
-                  </span>
-                </div>
-              ))}
-              {onNavigate && (
-                <button
-                  onClick={() => onNavigate("financeiro")}
-                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 transition-colors"
-                >
-                  Ver todas <ArrowRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
-          )}
-        </div>
-
-        {/* Payment Method Breakdown */}
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
-            <CreditCard className="w-4 h-4" />
-            GASTO POR MÉTODO
-          </h3>
-          {paymentBreakdown.length > 0 ? (
-            <div className="space-y-2.5">
-              {paymentBreakdown.map((pm) => {
-                const Icon = paymentMethodIcons[pm.method] || Wallet;
-                return (
-                  <div key={pm.method} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
-                      </div>
-                      <span className="text-[10px] tabular-nums text-muted-foreground">
-                        R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${paymentMethodColors[pm.method] || "bg-gray-400"}`}
-                        style={{ width: `${pm.percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
-          )}
-        </div>
-      </div>
-
-      {/* NEW: Fixed vs Variable Summary */}
-      <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3 flex items-center gap-2">
-          <DollarSign className="w-4 h-4" />
-          CUSTOS FIXOS VS VARIÁVEIS
-        </h3>
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Lock className="w-3.5 h-3.5 text-orange-400" />
-              <span className="text-[10px] text-muted-foreground uppercase">Fixos</span>
-            </div>
-            <p className="text-lg font-bold tabular-nums text-orange-400">
-              R$ {fixedTotal.toLocaleString("pt-BR")}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {totalCosts > 0 ? Math.round((fixedTotal / totalCosts) * 100) : 0}% do total
-            </p>
-          </div>
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <ShoppingCart className="w-3.5 h-3.5 text-blue-400" />
-              <span className="text-[10px] text-muted-foreground uppercase">Variáveis</span>
-            </div>
-            <p className="text-lg font-bold tabular-nums text-blue-400">
-              R$ {variableTotal.toLocaleString("pt-BR")}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {totalCosts > 0 ? Math.round((variableTotal / totalCosts) * 100) : 0}% do total
-            </p>
-          </div>
-        </div>
-        {totalCosts > 0 && (
-          <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
-            <div
-              className="h-full bg-orange-400 transition-all"
-              style={{ width: `${Math.round((fixedTotal / totalCosts) * 100)}%` }}
-            />
-            <div
-              className="h-full bg-blue-400 transition-all"
-              style={{ width: `${Math.round((variableTotal / totalCosts) * 100)}%` }}
-            />
-          </div>
-        )}
-      </div>
 
       {/* Charts Grid */}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -559,6 +413,126 @@ export const Dashboard = ({
           </ResponsiveContainer>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">Dados insuficientes</p>
+        )}
+      </div>
+
+      {/* Month Progress */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">⏳ PROGRESSO DO MÊS</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Dia {monthProgress.day} de {monthProgress.daysInMonth} — {monthProgress.budgetPercent}% do orçamento usado
+        </p>
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-muted-foreground w-16">Tempo</span>
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${monthProgress.timePercent}%` }} />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.timePercent}%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-muted-foreground w-16">Gastos</span>
+            <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all ${getBudgetColor()}`} style={{ width: `${Math.min(monthProgress.budgetPercent, 100)}%` }} />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-10 text-right">{monthProgress.budgetPercent}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Last Transactions + Payment Method */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">🧾 ÚLTIMAS TRANSAÇÕES</h3>
+          {lastTransactions.length > 0 ? (
+            <div className="space-y-2">
+              {lastTransactions.map((t) => (
+                <div key={t.id} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                  <span className="text-xs flex-1 truncate">{t.description}</span>
+                  <span className="text-xs tabular-nums text-red-400 font-medium">
+                    -R$ {t.value.toLocaleString("pt-BR")}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground w-12 text-right">
+                    {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
+                  </span>
+                </div>
+              ))}
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate("financeiro")}
+                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 transition-colors"
+                >
+                  Ver todas <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
+          )}
+        </div>
+
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-xs font-bold mb-3">💳 GASTO POR MÉTODO</h3>
+          {paymentBreakdown.length > 0 ? (
+            <div className="space-y-2.5">
+              {paymentBreakdown.map((pm) => {
+                const Icon = paymentMethodIcons[pm.method] || Wallet;
+                return (
+                  <div key={pm.method} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
+                      </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${paymentMethodColors[pm.method] || "bg-gray-400"}`}
+                        style={{ width: `${pm.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
+          )}
+        </div>
+      </div>
+
+      {/* Fixed vs Variable */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">⚖️ FIXOS VS VARIÁVEIS</h3>
+        <div className="grid grid-cols-2 gap-4 mb-3">
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Custos Fixos</p>
+            <p className="text-lg font-bold tabular-nums text-orange-400">
+              R$ {fixedTotal.toLocaleString("pt-BR")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {totalCosts > 0 ? Math.round((fixedTotal / totalCosts) * 100) : 0}% do total
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase mb-1">Custos Variáveis</p>
+            <p className="text-lg font-bold tabular-nums text-blue-400">
+              R$ {variableTotal.toLocaleString("pt-BR")}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              {totalCosts > 0 ? Math.round((variableTotal / totalCosts) * 100) : 0}% do total
+            </p>
+          </div>
+        </div>
+        {totalCosts > 0 && (
+          <div className="h-2 bg-secondary rounded-full overflow-hidden flex">
+            <div className="h-full bg-orange-400 transition-all" style={{ width: `${Math.round((fixedTotal / totalCosts) * 100)}%` }} />
+            <div className="h-full bg-blue-400 transition-all" style={{ width: `${Math.round((variableTotal / totalCosts) * 100)}%` }} />
+          </div>
         )}
       </div>
     </div>

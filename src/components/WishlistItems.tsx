@@ -372,6 +372,17 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
                     </div>
                   </div>
 
+                  {/* Estimated time */}
+                  {!isComplete && savingsForWishlist > 0 && remaining > 0 && (
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      ⏱ Estimativa: <span className="font-medium text-foreground">
+                        {Math.ceil(remaining / savingsForWishlist) === 1 
+                          ? "1 mês" 
+                          : `${Math.ceil(remaining / savingsForWishlist)} meses`}
+                      </span>
+                    </p>
+                  )}
+
                   {/* Add amount */}
                   {!isComplete && (
                     <div className="flex gap-1.5">

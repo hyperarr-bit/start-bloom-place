@@ -111,6 +111,7 @@ const Index = () => {
     { id: "simuladores", label: "🧮 SIMULADORES" },
     { id: "desafios", label: "🏆 DESAFIOS" },
     { id: "limites", label: "🎯 LIMITES" },
+    { id: "cartoes", label: "💳 CARTÕES" },
     { id: "relatorios", label: "📋 RELATÓRIOS" },
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
   ];

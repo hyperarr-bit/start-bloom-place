@@ -54,6 +54,7 @@ const Index = () => {
   const [notes, setNotes] = usePersistedState("finance-notes", [] as any[]);
 
   const [goals] = usePersistedState("finance-goals", [] as any[]);
+  const [categoryBudgetsData] = usePersistedState<Record<string, number>>("finance-category-budgets", {});
 
   const [installments, setInstallments] = usePersistedState("finance-installments", [] as any[]);
 

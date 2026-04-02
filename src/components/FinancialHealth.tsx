@@ -205,10 +205,7 @@ export const FinancialHealth = ({
       {/* Score Card */}
       <div className={`bg-gradient-to-br ${getScoreBg()} rounded-lg border border-border p-5`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold flex items-center gap-2">
-            <Target className="w-4 h-4" />
-            SCORE FINANCEIRO
-          </h3>
+          <h3 className="text-sm font-bold">🏆 SCORE FINANCEIRO</h3>
           <span className={`text-3xl font-bold ${getScoreColor()}`}>{score}/100</span>
         </div>
         <Progress value={score} className="h-3 mb-2" />
@@ -281,7 +278,7 @@ export const FinancialHealth = ({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <CreditCard className="w-4 h-4 text-purple-400" />
+            <span className="text-sm">💳</span>
             <span className="text-[10px] text-muted-foreground">Contas Pagas</span>
           </div>
           <p className="text-lg font-bold">{paidBills}/{allBills.length}</p>
@@ -289,7 +286,7 @@ export const FinancialHealth = ({
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Target className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm">🎯</span>
             <span className="text-[10px] text-muted-foreground">Metas</span>
           </div>
           <p className="text-lg font-bold">{goalsProgress.toFixed(0)}%</p>
@@ -297,7 +294,7 @@ export const FinancialHealth = ({
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Heart className="w-4 h-4 text-pink-400" />
+            <span className="text-sm">❤️</span>
             <span className="text-[10px] text-muted-foreground">Desejos</span>
           </div>
           <p className="text-lg font-bold">{wishlistDiscipline.toFixed(0)}%</p>
@@ -305,7 +302,7 @@ export const FinancialHealth = ({
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
-            <Plane className="w-4 h-4 text-blue-400" />
+            <span className="text-sm">✈️</span>
             <span className="text-[10px] text-muted-foreground">Viagens</span>
           </div>
           <p className="text-lg font-bold">{tripReadiness.toFixed(0)}%</p>
@@ -315,10 +312,7 @@ export const FinancialHealth = ({
 
       {/* Tips */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h4 className="text-xs font-bold mb-3 flex items-center gap-2">
-          <Lightbulb className="w-4 h-4" />
-          DICAS PERSONALIZADAS
-        </h4>
+        <h4 className="text-xs font-bold mb-3">💡 DICAS PERSONALIZADAS</h4>
         <div className="space-y-2">
           {tips.map((tip, index) => (
             <div

@@ -226,7 +226,7 @@ export const Reports = ({
             <h2 className="text-lg font-bold">Relatório Financeiro</h2>
             <p className="text-sm text-muted-foreground capitalize">{currentMonth}</p>
           </div>
-          <Calendar className="w-8 h-8 text-muted-foreground" />
+          <span className="text-2xl">📅</span>
         </div>
 
         {/* Summary Cards */}
@@ -253,10 +253,7 @@ export const Reports = ({
 
         {/* Expenses by Category */}
         <div className="mb-6">
-          <h3 className="text-sm font-bold mb-3 flex items-center gap-2">
-            <PieChart className="w-4 h-4" />
-            Despesas por Categoria
-          </h3>
+          <h3 className="text-sm font-bold mb-3">🥧 Despesas por Categoria</h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             {Object.entries(expensesByCategory)
               .sort(([, a], [, b]) => b - a)
@@ -273,10 +270,7 @@ export const Reports = ({
         <div className="grid lg:grid-cols-2 gap-4">
           {/* Incomes Table */}
           <div>
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-400" />
-              Receitas ({incomes.length})
-            </h3>
+            <h3 className="text-sm font-bold mb-2">📈 Receitas ({incomes.length})</h3>
             <div className="bg-muted/30 rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead>
@@ -299,10 +293,7 @@ export const Reports = ({
 
           {/* Expenses Table */}
           <div>
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-red-400" />
-              Despesas ({expenses.length})
-            </h3>
+            <h3 className="text-sm font-bold mb-2">📉 Despesas ({expenses.length})</h3>
             <div className="bg-muted/30 rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead>

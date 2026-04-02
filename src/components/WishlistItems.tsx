@@ -147,12 +147,9 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
   return (
     <div className="space-y-5">
       {/* Header Stats */}
-      <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+      <div className="bg-card rounded-lg border border-border p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-pink-400" />
-            <h2 className="font-bold text-sm">Meus Desejos</h2>
-          </div>
+          <h2 className="text-xs font-bold">❤️ MEUS DESEJOS</h2>
           <span className="text-xs text-muted-foreground">{items.length} {items.length === 1 ? "item" : "itens"}</span>
         </div>
         

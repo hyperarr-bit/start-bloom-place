@@ -61,9 +61,9 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   };
 
   return (
-    <div className="rounded-lg border-2 border-dashed border-pink-300 dark:border-pink-700 bg-pink-50/50 dark:bg-pink-950/20 p-3">
-      <p className="text-[10px] font-black uppercase tracking-wider text-pink-700 dark:text-pink-400 mb-2 flex items-center gap-1">
-        <Link className="w-3 h-3" /> IMPORTAR DE URL (AMAZON, MERCADO LIVRE...)
+    <div className="rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-3">
+      <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1">
+        🔗 IMPORTAR DE URL (AMAZON, MERCADO LIVRE...)
       </p>
       <div className="flex gap-1.5">
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="Cole o link do produto aqui..."

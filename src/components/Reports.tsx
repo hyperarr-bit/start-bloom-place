@@ -270,10 +270,7 @@ export const Reports = ({
         <div className="grid lg:grid-cols-2 gap-4">
           {/* Incomes Table */}
           <div>
-            <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-400" />
-              Receitas ({incomes.length})
-            </h3>
+            <h3 className="text-sm font-bold mb-2">📈 Receitas ({incomes.length})</h3>
             <div className="bg-muted/30 rounded-lg overflow-hidden">
               <table className="w-full text-xs">
                 <thead>

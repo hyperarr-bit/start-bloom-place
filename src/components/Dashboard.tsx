@@ -503,69 +503,37 @@ export const Dashboard = ({
         </div>
       </div>
 
-      {/* Last Transactions + Payment Method */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">🧾 ÚLTIMAS TRANSAÇÕES</h3>
-          {lastTransactions.length > 0 ? (
-            <div className="space-y-2">
-              {lastTransactions.map((t) => (
-                <div key={t.id} className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
-                  <span className="text-xs flex-1 truncate">{t.description}</span>
-                  <span className="text-xs tabular-nums text-red-400 font-medium">
-                    -R$ {t.value.toLocaleString("pt-BR")}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground w-12 text-right">
-                    {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
-                  </span>
-                </div>
-              ))}
-              {onNavigate && (
-                <button
-                  onClick={() => onNavigate("financeiro")}
-                  className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 transition-colors"
-                >
-                  Ver todas <ArrowRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
-          )}
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-xs font-bold mb-3">💳 GASTO POR MÉTODO</h3>
-          {paymentBreakdown.length > 0 ? (
-            <div className="space-y-2.5">
-              {paymentBreakdown.map((pm) => {
-                const Icon = paymentMethodIcons[pm.method] || Wallet;
-                return (
-                  <div key={pm.method} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
-                      </div>
-                      <span className="text-[10px] tabular-nums text-muted-foreground">
-                        R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
-                      </span>
+      {/* Payment Method */}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">💳 GASTO POR MÉTODO</h3>
+        {paymentBreakdown.length > 0 ? (
+          <div className="space-y-2.5">
+            {paymentBreakdown.map((pm) => {
+              const Icon = paymentMethodIcons[pm.method] || Wallet;
+              return (
+                <div key={pm.method} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
                     </div>
-                    <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${paymentMethodColors[pm.method] || "bg-gray-400"}`}
-                        style={{ width: `${pm.percent}%` }}
-                      />
-                    </div>
+                    <span className="text-[10px] tabular-nums text-muted-foreground">
+                      R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
-          )}
-        </div>
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${paymentMethodColors[pm.method] || "bg-gray-400"}`}
+                      style={{ width: `${pm.percent}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-6">Sem dados de pagamento</p>
+        )}
       </div>
 
       {/* Fixed vs Variable */}
@@ -599,72 +567,34 @@ export const Dashboard = ({
         )}
       </div>
 
-      {/* Daily Cash Flow */}
+      {/* Últimas Transações */}
       <div className="bg-card rounded-lg border border-border p-4">
-        <h3 className="text-xs font-bold mb-3">💸 FLUXO DE CAIXA DIÁRIO</h3>
-        {(() => {
-          const now = new Date();
-          const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-          const dailyFreeRate = freeBalance / daysInMonth;
-          return (
-            <div className="text-[11px] text-muted-foreground mb-3 space-y-1.5">
-              <p>
-                Receita: <strong className="text-foreground">R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                {" − "}Fixos: <strong className="text-foreground">R$ {totalFixed.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
-                {savingsAmount > 0 && <>{" − "}Reserva ({savingsRate}%): <strong className="text-foreground">R$ {savingsAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></>}
-              </p>
-              <p>
-                = <strong className="text-foreground">R$ {freeBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> livres ÷ {daysInMonth} dias = <strong className="text-foreground">R$ {dailyFreeRate.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/dia</strong>
-              </p>
-              <p>
-                A linha azul considera suas contas fixas nos dias de vencimento + o valor livre diário. Se a vermelha ultrapassar, você está gastando acima do que sobra.
-              </p>
-            </div>
-          );
-        })()}
-        {cashFlowData.length > 0 ? (
-          <>
-            {/* Summary chips */}
-            {(() => {
-              const lastEntry = cashFlowData[cashFlowData.length - 1];
-              const diff = lastEntry.Acumulado - lastEntry.Ideal;
-              const isUnder = diff <= 0;
-              return (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-red-500/10 text-red-400 tabular-nums">
-                    Gasto real: R$ {lastEntry.Acumulado.toLocaleString("pt-BR")}
-                  </span>
-                  <span className="text-[10px] px-2 py-1 rounded-full bg-blue-500/10 text-blue-400 tabular-nums">
-                    Ritmo ideal: R$ {lastEntry.Ideal.toLocaleString("pt-BR")}
-                  </span>
-                  <span className={`text-[10px] px-2 py-1 rounded-full tabular-nums ${isUnder ? "bg-green-500/10 text-green-400" : "bg-orange-500/10 text-orange-400"}`}>
-                    {isUnder ? "✅ Dentro do ritmo" : `⚠️ R$ ${Math.abs(diff).toLocaleString("pt-BR")} acima`}
-                  </span>
-                </div>
-              );
-            })()}
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={cashFlowData}>
-                <defs>
-                  <linearGradient id="colorCashFlow" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value: number, name: string) => [`R$ ${value.toLocaleString("pt-BR")}`, name === "Acumulado" ? "Gastos reais" : "Ritmo ideal"]} />
-                <Area type="monotone" dataKey="Acumulado" stroke="#ef4444" fill="url(#colorCashFlow)" strokeWidth={2} />
-                <Area type="monotone" dataKey="Ideal" stroke="#3b82f6" fill="none" strokeWidth={1.5} strokeDasharray="5 5" />
-              </AreaChart>
-            </ResponsiveContainer>
-            <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-red-400 rounded inline-block" /> Gastos reais (acumulados)</span>
-              <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-blue-400 rounded inline-block border-dashed" style={{ borderTopWidth: 1, height: 0, borderColor: '#3b82f6' }} /> Ritmo ideal (receita ÷ dias)</span>
-            </div>
-          </>
+        <h3 className="text-xs font-bold mb-3">🧾 ÚLTIMAS TRANSAÇÕES</h3>
+        {lastTransactions.length > 0 ? (
+          <div className="space-y-2">
+            {lastTransactions.map((t) => (
+              <div key={t.id} className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
+                <span className="text-xs flex-1 truncate">{t.description}</span>
+                <span className="text-xs tabular-nums text-red-400 font-medium">
+                  -R$ {t.value.toLocaleString("pt-BR")}
+                </span>
+                <span className="text-[10px] text-muted-foreground w-12 text-right">
+                  {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
+                </span>
+              </div>
+            ))}
+            {onNavigate && (
+              <button
+                onClick={() => onNavigate("financeiro")}
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 transition-colors"
+              >
+                Ver todas <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">Sem despesas com data cadastradas</p>
+          <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
         )}
       </div>
 

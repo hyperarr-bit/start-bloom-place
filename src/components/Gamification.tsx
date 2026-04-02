@@ -146,7 +146,7 @@ export const Gamification = ({
       </div>
 
       {/* Daily Check-in */}
-      <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/30 p-4">
+      <div className="bg-card rounded-lg border border-border p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center ${canCheckIn ? "bg-orange-500/20" : "bg-green-500/20"}`}>

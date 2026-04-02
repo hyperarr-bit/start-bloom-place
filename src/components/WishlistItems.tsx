@@ -277,8 +277,8 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
 
       {/* Items Grid */}
       {sortedItems.length === 0 ? (
-        <div className="bg-card rounded-xl border border-border p-10 text-center">
-          <Heart className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+        <div className="bg-card rounded-lg border border-border p-10 text-center">
+          <span className="text-4xl block mx-auto mb-3">❤️</span>
           <p className="text-sm text-muted-foreground">Nenhum desejo na lista ainda</p>
           <p className="text-xs text-muted-foreground/60 mt-1">Adicione algo que você quer conquistar!</p>
         </div>

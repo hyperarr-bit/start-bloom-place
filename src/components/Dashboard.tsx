@@ -28,6 +28,13 @@ interface FixedExpense {
   cardName?: string;
 }
 
+interface Income {
+  id: string;
+  description: string;
+  value: number;
+  date?: string;
+}
+
 interface DashboardProps {
   totalIncome: number;
   totalExpenses: number;
@@ -37,6 +44,7 @@ interface DashboardProps {
   fixedExpenses: FixedExpense[];
   dueDays: DueDay[];
   savingsRate: number;
+  incomes: Income[];
   onNavigate?: (tab: string) => void;
 }
 

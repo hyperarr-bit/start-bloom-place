@@ -1,52 +1,80 @@
 
 
-# Metas de Economia por Categoria
+# Implementação das 4 Funcionalidades de Finanças
 
-Criar um componente `CategoryBudgets` que permite definir limites de gasto por categoria e acompanhar o progresso com barras visuais.
-
----
-
-## Como funciona
-
-O usuário define um teto de gasto para cada categoria (Alimentação, Transporte, Lazer, etc.). O componente calcula automaticamente quanto já foi gasto no mês atual com base nos dados de `expenses` e exibe barras de progresso coloridas por categoria.
+Vou implementar todas na ordem: Controle de Cartões → Tags Personalizadas → Alertas Inteligentes → Scan de Comprovantes.
 
 ---
 
-## Interface
+## 1. 💳 Controle de Cartões
 
-- Header com faixa colorida (`bg-accent/20`) e título "LIMITES POR CATEGORIA" + ícone `Gauge` (Lucide)
-- Lista de categorias com:
-  - Badge colorido da categoria (reutilizando as cores já definidas em `ExpenseTable`)
-  - Barra de progresso: verde se < 75%, amarelo se 75-99%, vermelho se >= 100%
-  - Texto: "R$ gasto / R$ limite" em `tabular-nums text-xs`
-- Botão para adicionar/editar limite de cada categoria via input inline
-- Empty state: "Defina limites para controlar seus gastos por categoria"
+**Novo arquivo**: `src/components/finance/CreditCards.tsx`
 
----
+Nova aba "💳 CARTÕES" no módulo de finanças. O usuário cadastra cartões com:
+- Nome, bandeira (Visa, Mastercard, Elo, etc.), limite total, data de fechamento, melhor dia de compra
+- Fatura atual calculada automaticamente somando despesas do mês com `paymentMethod === "credito"` e `cardName` correspondente
+- Barra de progresso de uso do limite (verde < 50%, amarelo < 80%, vermelho ≥ 80%)
+- Cards visuais no padrão `bg-card rounded-lg border border-border p-4`
 
-## Detalhes técnicos
+**Persistência**: chave `finance-credit-cards` via `usePersistedState`
 
-### Novo arquivo
-**`src/components/CategoryBudgets.tsx`**
-- Props: `expenses` (array de despesas do mês), categorias com cores do `ExpenseTable`
-- Estado persistido via `usePersistedState("finance-category-budgets", {})`
-- Formato: `Record<string, number>` (ex: `{ alimentacao: 500, transporte: 200 }`)
-- Calcula gasto por categoria com `expenses.filter(e => e.category === cat).reduce(...)`
-- Segue todos os padrões: `animate-fade-in`, `bg-card rounded-lg border border-border`, ícones `w-3.5 h-3.5`, inputs `h-7 text-xs`
-
-### Integração em `Index.tsx`
-- Adicionar nova aba nos tabs: `{ id: "limites", label: "🎯 LIMITES" }`
-- Renderizar `<CategoryBudgets expenses={expenses} />` quando `activeTab === "limites"`
-- Também pode ser adicionado dentro da aba "financeiro" como seção extra (abaixo de BillsDueCards)
-
-### Persistência
-- Usa `usePersistedState` (localStorage) como todos os outros componentes
-- Se o usuário estiver logado, o `useUserData` hook sincroniza com Supabase automaticamente via a chave `finance-category-budgets`
+**Edição em Index.tsx**: adicionar aba e renderizar componente
 
 ---
 
-## Escopo
-- 1 arquivo novo (`CategoryBudgets.tsx`)
-- 1 arquivo editado (`Index.tsx` — adicionar aba e renderizar componente)
-- Sem mudanças no banco de dados
+## 2. 🏷️ Tags Personalizadas
+
+**Alterações em**: `ExpenseTable.tsx`, `FixedExpensesTable.tsx`
+
+- Adicionar campo `tags: string[]` na interface Expense
+- Input de tags no formulário (chips com X para remover, input livre)
+- Tags renderizadas como badges coloridos na tabela ao lado da categoria
+- Filtro por tag no topo da tabela (dropdown multi-select)
+- Tags salvas em localStorage como parte dos dados existentes (retrocompatível — despesas sem tags continuam funcionando)
+
+---
+
+## 3. 🔔 Alertas Inteligentes
+
+**Novo arquivo**: `src/components/finance/SmartAlerts.tsx`
+
+Componente de alertas que aparece no topo da aba "financeiro" (abaixo do summary):
+- **Contas a vencer**: verifica `dueDays` e alerta 3 dias antes do vencimento
+- **Limite ultrapassado**: verifica `CategoryBudgets` e alerta quando > 80%
+- **Meta atingida**: celebra quando meta de economia é alcançada
+
+Visual: cards compactos com ícones (Bell, AlertTriangle, CheckCircle), cores semânticas (warning, destructive, success), dismiss individual.
+
+**Persistência**: `finance-dismissed-alerts` para alertas descartados
+
+---
+
+## 4. 📸 Scan de Comprovantes
+
+**Novo bucket Supabase**: `receipts` (público para leitura)
+
+**Migration SQL**: criar bucket + RLS policies para upload autenticado
+
+**Alterações em**: `ExpenseTable.tsx`
+- Botão câmera/upload ao lado de cada despesa
+- Upload para Supabase Storage (`receipts/{user_id}/{expense_id}.jpg`)
+- Thumbnail clicável na tabela que abre modal com imagem completa
+- Campo `receiptUrl?: string` adicionado à interface Expense
+
+**Novo componente**: `src/components/finance/ReceiptViewer.tsx` — modal de visualização
+
+---
+
+## Arquivos Modificados/Criados
+
+| Arquivo | Ação |
+|---------|------|
+| `src/components/finance/CreditCards.tsx` | Criar |
+| `src/components/finance/SmartAlerts.tsx` | Criar |
+| `src/components/finance/ReceiptViewer.tsx` | Criar |
+| `src/components/ExpenseTable.tsx` | Editar (tags + receipts) |
+| `src/pages/Index.tsx` | Editar (nova aba + alertas + wiring) |
+| Migration SQL | Criar bucket `receipts` |
+
+Todos seguem a identidade visual mapeada: tokens de cor, `bg-card`, `rounded-lg`, `border-border`, `text-xs`, Lucide icons, inputs `h-7`.
 

@@ -606,8 +606,14 @@ export const Dashboard = ({
         {top5Expenses.length > 0 ? (
           <div className="space-y-2">
             {top5Expenses.map((item, i) => {
-              const barColor = categoryBarColors[item.category] || "bg-gray-400";
-              const textColor = categoryTextColors[item.category] || "text-gray-400";
+              const redShades = [
+                { bar: "bg-red-600", text: "text-red-600" },
+                { bar: "bg-red-500", text: "text-red-500" },
+                { bar: "bg-red-400", text: "text-red-400" },
+                { bar: "bg-red-300", text: "text-red-300" },
+                { bar: "bg-red-200", text: "text-red-200" },
+              ];
+              const shade = redShades[i] || redShades[4];
               return (
                 <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -615,13 +621,13 @@ export const Dashboard = ({
                       <span className="font-bold mr-1.5">{i + 1}.</span>
                       {item.description}
                     </span>
-                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${textColor}`}>
+                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${shade.text}`}>
                       R$ {item.value.toLocaleString("pt-BR")}
                     </span>
                   </div>
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${barColor}`}
+                      className={`h-full rounded-full transition-all ${shade.bar}`}
                       style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
                     />
                   </div>

@@ -272,11 +272,30 @@ export const Dashboard = ({
   // Top 5 largest expenses
   const top5Expenses = useMemo(() => {
     const all = [
-      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
-      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value })),
+      ...expenses.map((e) => ({ id: e.id, description: e.description, value: e.value, category: e.category })),
+      ...fixedExpenses.map((e) => ({ id: e.id, description: e.description, value: e.value, category: e.category })),
     ];
     return all.sort((a, b) => b.value - a.value).slice(0, 5);
   }, [expenses, fixedExpenses]);
+
+  const categoryBarColors: Record<string, string> = {
+    alimentacao: "bg-orange-400", restaurante: "bg-amber-400", mercado: "bg-lime-500",
+    transporte: "bg-blue-400", combustivel: "bg-indigo-400", lazer: "bg-purple-400",
+    entretenimento: "bg-violet-400", saude: "bg-green-400", farmacia: "bg-emerald-400",
+    vestuario: "bg-sky-400", beleza: "bg-rose-400", educacao: "bg-teal-400",
+    eletronicos: "bg-red-400", servicos: "bg-cyan-400", delivery: "bg-yellow-400",
+    presente: "bg-fuchsia-400", casa: "bg-stone-400", pets: "bg-slate-400",
+    filhos: "bg-blue-300", viagem: "bg-pink-400", outros: "bg-gray-400",
+  };
+  const categoryTextColors: Record<string, string> = {
+    alimentacao: "text-orange-400", restaurante: "text-amber-400", mercado: "text-lime-500",
+    transporte: "text-blue-400", combustivel: "text-indigo-400", lazer: "text-purple-400",
+    entretenimento: "text-violet-400", saude: "text-green-400", farmacia: "text-emerald-400",
+    vestuario: "text-sky-400", beleza: "text-rose-400", educacao: "text-teal-400",
+    eletronicos: "text-red-400", servicos: "text-cyan-400", delivery: "text-yellow-400",
+    presente: "text-fuchsia-400", casa: "text-stone-400", pets: "text-slate-400",
+    filhos: "text-blue-300", viagem: "text-pink-400", outros: "text-gray-400",
+  };
 
 
   // Budget bar color
@@ -526,48 +545,38 @@ export const Dashboard = ({
       </div>
 
       {/* Top 5 Maiores Gastos */}
-      {(() => {
-        const rankConfig = [
-          { emoji: "🥇", bar: "bg-amber-400", text: "text-amber-400" },
-          { emoji: "🥈", bar: "bg-slate-300", text: "text-slate-300" },
-          { emoji: "🥉", bar: "bg-orange-400", text: "text-orange-400" },
-          { emoji: "4", bar: "bg-blue-400", text: "text-blue-400" },
-          { emoji: "5", bar: "bg-purple-400", text: "text-purple-400" },
-        ];
-        return (
-          <div className="bg-card rounded-lg border border-border p-4">
-            <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
-            {top5Expenses.length > 0 ? (
-              <div className="space-y-2">
-                {top5Expenses.map((item, i) => {
-                  const cfg = rankConfig[i] || rankConfig[4];
-                  return (
-                    <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs truncate flex-1 mr-2">
-                          <span className="mr-1">{cfg.emoji}</span>
-                          {item.description}
-                        </span>
-                        <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${cfg.text}`}>
-                          R$ {item.value.toLocaleString("pt-BR")}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${cfg.bar}`}
-                          style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
-            )}
+      <div className="bg-card rounded-lg border border-border p-4">
+        <h3 className="text-xs font-bold mb-3">🏆 TOP 5 MAIORES GASTOS</h3>
+        {top5Expenses.length > 0 ? (
+          <div className="space-y-2">
+            {top5Expenses.map((item, i) => {
+              const barColor = categoryBarColors[item.category] || "bg-gray-400";
+              const textColor = categoryTextColors[item.category] || "text-gray-400";
+              return (
+                <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs truncate flex-1 mr-2">
+                      <span className="font-bold mr-1.5">{i + 1}.</span>
+                      {item.description}
+                    </span>
+                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${textColor}`}>
+                      R$ {item.value.toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${barColor}`}
+                      style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })()}
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-6">Sem despesas cadastradas</p>
+        )}
+      </div>
 
       {/* Últimas Transações */}
       <div className="bg-card rounded-lg border border-border p-4">

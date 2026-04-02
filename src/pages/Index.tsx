@@ -27,8 +27,6 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
-import { CreditCards } from "@/components/finance/CreditCards";
-import { SmartAlerts } from "@/components/finance/SmartAlerts";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -54,7 +52,6 @@ const Index = () => {
   const [notes, setNotes] = usePersistedState("finance-notes", [] as any[]);
 
   const [goals] = usePersistedState("finance-goals", [] as any[]);
-  const [categoryBudgetsData] = usePersistedState<Record<string, number>>("finance-category-budgets", {});
 
   const [installments, setInstallments] = usePersistedState("finance-installments", [] as any[]);
 
@@ -112,7 +109,6 @@ const Index = () => {
     { id: "simuladores", label: "🧮 SIMULADORES" },
     { id: "desafios", label: "🏆 DESAFIOS" },
     { id: "limites", label: "🎯 LIMITES" },
-    { id: "cartoes", label: "💳 CARTÕES" },
     { id: "relatorios", label: "📋 RELATÓRIOS" },
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
   ];
@@ -204,15 +200,6 @@ const Index = () => {
             ) : (
               <>
                 <MonthTurnover onOpenMonth={setOpenMonth} />
-                <SmartAlerts
-                  dueDays={dueDays}
-                  categoryBudgets={categoryBudgetsData}
-                  expensesByCategory={expenses.reduce((acc: Record<string, number>, e: any) => {
-                    acc[e.category] = (acc[e.category] || 0) + e.value;
-                    return acc;
-                  }, {})}
-                  savingsRate={savingsRate}
-                />
                 <FinancialSummary
                   totalIncome={totalIncome}
                   totalExpenses={totalExpenses}
@@ -284,10 +271,6 @@ const Index = () => {
 
         {activeTab === "limites" && (
           <CategoryBudgets expenses={expenses} />
-        )}
-
-        {activeTab === "cartoes" && (
-          <CreditCards expenses={expenses} />
         )}
 
         {activeTab === "relatorios" && (

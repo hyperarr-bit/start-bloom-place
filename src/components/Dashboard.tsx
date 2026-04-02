@@ -122,6 +122,7 @@ export const Dashboard = ({
   fixedExpenses,
   dueDays,
   savingsRate,
+  incomes,
   onNavigate,
 }: DashboardProps) => {
   // Compute annual data from actual monthly records

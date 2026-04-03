@@ -723,31 +723,6 @@ export const Dashboard = ({
               </span>
             </div>
           </div>
-          {/* Progress bar: consumed vs projected vs remaining */}
-          {totalIncome > 0 && (() => {
-            const fixedPct = Math.min((forecast.fixedCostsTotal / totalIncome) * 100, 100);
-            const variablePct = Math.min((forecast.variableSpent / totalIncome) * 100, 100 - fixedPct);
-            const projectedPct = Math.min((forecast.projectedVariableRemaining / totalIncome) * 100, 100 - fixedPct - variablePct);
-            return (
-              <div className="mt-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[9px] text-muted-foreground">0%</span>
-                  <div className="flex-1 h-3 rounded-full bg-muted/30 overflow-hidden flex">
-                    <div className="h-full bg-red-400/80 transition-all" style={{ width: `${fixedPct}%` }} />
-                    <div className="h-full bg-orange-400/80 transition-all" style={{ width: `${variablePct}%` }} />
-                    <div className="h-full bg-yellow-400/40 transition-all border-r border-dashed border-yellow-400/60" style={{ width: `${projectedPct}%` }} />
-                  </div>
-                  <span className="text-[9px] text-muted-foreground">100%</span>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-muted-foreground">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400/80" />Fixos</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-orange-400/80" />Variável gasto</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-yellow-400/40" />Projeção</span>
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-muted/30" />Livre</span>
-                </div>
-              </div>
-            );
-          })()}
         </div>
 
         {/* Quanto Posso Gastar Hoje */}

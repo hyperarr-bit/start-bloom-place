@@ -757,15 +757,11 @@ export const Dashboard = ({
           <div className="mt-3 space-y-1">
             <div className="flex justify-between text-[10px]">
               <span className="text-muted-foreground">Saldo atual</span>
-              <span className="tabular-nums">R$ {Math.round(totalIncome - dailyBudget.alreadySpent).toLocaleString("pt-BR")}</span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Custos fixos reservados</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+              <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR")}</span>
             </div>
             {dailyBudget.unpaidBillsEstimate > 0 && (
               <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes</span>
+                <span className="text-muted-foreground">Contas pendentes (reserva)</span>
                 <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
               </div>
             )}

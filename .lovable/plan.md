@@ -1,23 +1,44 @@
 
 
-# Notificação de Desejos Baseada na Previsão de Fim do Mês
+# Corrigir Score de Saúde Financeira
 
-## Problema
-A notificação de compatibilidade dos desejos usa um cálculo simples (`receita - despesas - parcelas`), enquanto o Dashboard tem um card "Previsão Fim do Mês" mais inteligente que considera: gastos fixos já registrados, projeção de gastos variáveis baseada no ritmo diário, e contas pendentes não pagas.
+## Problemas encontrados
+
+### 1. `totalExpenses` NÃO inclui despesas fixas
+Na linha 81 do `Index.tsx`, `totalExpenses` soma apenas `expenses` (variáveis). As `fixedExpenses` são completamente ignoradas. Isso faz:
+- **Taxa de poupança** parecer muito maior do que é (ex: se ganha 5000, gasta 1000 variável e 3000 fixo → mostra 80% de poupança quando deveria ser 20%)
+- **Saldo real mensal** e **projeção anual** ficam inflados
+- **Reserva de emergência meta** (`totalExpenses * 6`) fica baixa demais
+
+### 2. `investmentRate` usa valor total da carteira vs renda anual
+Linha 92: `(totalInvestments / (totalIncome * 12)) * 100` — compara patrimônio acumulado com renda. Deveria comparar **aportes mensais** vs renda mensal para medir disciplina de investimento.
+
+### 3. Score dá 10 pontos de graça (base)
+Linha 134: `score += 10` — infla o score sem motivo. Um usuário sem dados já começa em ~25 (10 base + 15 contas em dia default).
+
+### 4. Parcelas não entram no cálculo de despesas totais
+O `monthlyInstallments` é calculado em Index.tsx mas NÃO é passado nem somado no `totalExpenses` que vai para o FinancialHealth.
 
 ## Solução
-Passar `fixedExpenses` e `dueDays` como props para `WishlistItems` e replicar a lógica do forecast do Dashboard para calcular o saldo projetado real. A notificação vai mostrar o saldo projetado de fim de mês em vez do saldo livre simples.
 
-### Nova lógica da notificação:
-- **Saldo projetado** = receita − gastos já feitos − contas pendentes − projeção de gastos restantes (mesmo cálculo do Dashboard)
-- **Compatível**: se saldo projetado > 0 → "Seus desejos cabem! Saldo projetado: R$ X → R$ Y/mês para desejos (30%)"
-- **Incompatível**: se saldo projetado ≤ 0 → "Previsão aponta saldo negativo de R$ X no fim do mês"
-- **Tempo estimado** também usa o saldo projetado × 30% em vez do saldo livre simples
+### `src/pages/Index.tsx`
+- Criar `totalAllExpenses = totalExpenses + totalFixedExpenses + monthlyInstallments` e passar como prop ou passar `fixedExpenses` e `monthlyInstallments` separados
+- Passar `fixedExpenses` como prop para o FinancialHealth
+
+### `src/components/FinancialHealth.tsx`
+- Receber `fixedExpenses` e `monthlyInstallments` como props
+- Recalcular `totalRealExpenses = totalExpenses + fixedExpensesTotal + monthlyInstallments`
+- **Savings rate**: usar `(totalIncome - totalRealExpenses) / totalIncome`
+- **Investment rate**: usar `monthlyContributions / totalIncome * 100` (aportes mensais vs renda mensal)
+- **Reserva de emergência meta**: usar `totalRealExpenses * 6`
+- **Saldo real mensal**: `totalIncome - totalRealExpenses`
+- **Remover base de 10 pontos** — redistribuir: Poupança 20pts, Contas 15pts, Emergência 15pts, Investimentos 15pts, Metas 10pts, Dívidas -15pts, Parcelas 5pts, Desejos 5pts, Diversificação 5pts, Aportes 5pts
+- Ajustar as dicas para refletir os valores reais
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/WishlistItems.tsx` | Adicionar props `fixedExpenses` e `dueDays`; calcular forecast igual ao Dashboard (projeção diária + contas pendentes); atualizar texto da notificação para mostrar "Previsão fim do mês: R$ X" e usar saldo projetado para cálculo de tempo estimado e compatibilidade |
-| `src/pages/Index.tsx` | Passar `fixedExpenses` e `dueDays` como props ao `WishlistItems` |
+| `src/pages/Index.tsx` | Calcular `totalFixedExpenses`, passar junto com `monthlyInstallments` como props ao FinancialHealth |
+| `src/components/FinancialHealth.tsx` | Receber novas props; usar despesa real total no score; corrigir investmentRate para usar aportes; remover base 10; recalibrar pesos |
 

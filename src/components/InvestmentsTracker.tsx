@@ -246,9 +246,9 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
               />
               <Input
                 type="number"
-                placeholder="Retorno esperado (% a.a.)"
-                value={newInvestment.expectedReturn ?? ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: parseFloat(e.target.value) || 0 })}
+                placeholder="Rentabilidade esperada (% a.a.)"
+                value={newInvestment.expectedReturn !== undefined && newInvestment.expectedReturn !== 10 ? newInvestment.expectedReturn : ""}
+                onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
                 className="h-8 text-xs"
               />
               <Input
@@ -337,8 +337,8 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     />
                     <Input
                       type="number"
-                      placeholder="% a.a."
-                      className="h-6 text-[10px] w-16"
+                      placeholder="Rent. esperada (% a.a.)"
+                      className="h-6 text-[10px] w-24"
                       defaultValue={inv.expectedReturn ?? 10}
                       onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
                     />

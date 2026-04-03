@@ -11,6 +11,7 @@ interface Investment {
   investedAmount: number;
   currentValue: number;
   monthlyContribution: number;
+  expectedReturn: number; // % anual esperada (ex: 12.5)
   startDate: string;
   broker?: string;
 }
@@ -28,11 +29,22 @@ const typeLabels: Record<string, { label: string; color: string; icon: string }>
   outros: { label: "Outros", color: "bg-gray-500/20 text-gray-400 border-gray-500/30", icon: "💼" },
 };
 
+// Juros compostos: FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
+const futureValue = (pv: number, pmt: number, rateAnnual: number, years: number) => {
+  if (rateAnnual === 0) return pv + pmt * years * 12;
+  const monthlyRate = rateAnnual / 100 / 12;
+  const months = years * 12;
+  const fvPrincipal = pv * Math.pow(1 + monthlyRate, months);
+  const fvContributions = pmt * ((Math.pow(1 + monthlyRate, months) - 1) / monthlyRate);
+  return fvPrincipal + fvContributions;
+};
+
 export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsTrackerProps) => {
   const [showForm, setShowForm] = useState(false);
   const [newInvestment, setNewInvestment] = useState<Partial<Investment>>({
     type: "renda_fixa",
     monthlyContribution: 0,
+    expectedReturn: 10,
   });
 
   const addInvestment = () => {
@@ -44,11 +56,12 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
       investedAmount: newInvestment.investedAmount,
       currentValue: newInvestment.currentValue || newInvestment.investedAmount,
       monthlyContribution: newInvestment.monthlyContribution || 0,
+      expectedReturn: newInvestment.expectedReturn ?? 10,
       startDate: newInvestment.startDate || new Date().toISOString().split("T")[0],
       broker: newInvestment.broker,
     };
     setInvestments([...investments, investment]);
-    setNewInvestment({ type: "renda_fixa", monthlyContribution: 0 });
+    setNewInvestment({ type: "renda_fixa", monthlyContribution: 0, expectedReturn: 10 });
     setShowForm(false);
   };
 
@@ -58,6 +71,10 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
 
   const updateCurrentValue = (id: string, value: number) => {
     setInvestments(investments.map((i) => (i.id === id ? { ...i, currentValue: value } : i)));
+  };
+
+  const updateExpectedReturn = (id: string, value: number) => {
+    setInvestments(investments.map((i) => (i.id === id ? { ...i, expectedReturn: value } : i)));
   };
 
   const addContribution = (id: string, amount: number) => {
@@ -75,6 +92,23 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
   const totalReturn = totalCurrentValue - totalInvested;
   const returnPercentage = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
   const monthlyContributions = investments.reduce((sum, i) => sum + i.monthlyContribution, 0);
+
+  // Projeções com juros compostos reais por investimento
+  const projection5y = investments.reduce((sum, inv) => {
+    const rate = inv.expectedReturn ?? 10;
+    return sum + futureValue(inv.currentValue, inv.monthlyContribution, rate, 5);
+  }, 0);
+
+  const projection10y = investments.reduce((sum, inv) => {
+    const rate = inv.expectedReturn ?? 10;
+    return sum + futureValue(inv.currentValue, inv.monthlyContribution, rate, 10);
+  }, 0);
+
+  // Média ponderada da taxa para renda passiva
+  const weightedRate = totalCurrentValue > 0
+    ? investments.reduce((sum, inv) => sum + (inv.expectedReturn ?? 10) * inv.currentValue, 0) / totalCurrentValue
+    : 6;
+  const passiveIncome = (totalCurrentValue * (weightedRate / 100)) / 12;
 
   // Group by type
   const byType = investments.reduce((acc, inv) => {
@@ -162,7 +196,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
 
       {/* Investments List */}
       <div className="bg-card rounded-lg border border-border">
-        <div className="table-header-dark flex items-center justify-between">
+        <div className="table-header-dark flex items-center justify-between px-4">
           <span className="text-xs font-bold">MEUS INVESTIMENTOS</span>
           <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setShowForm(!showForm)}>
             <Plus className="w-3 h-3 mr-1" /> Adicionar
@@ -202,12 +236,19 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 className="h-8 text-xs"
               />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
               <Input
                 type="number"
                 placeholder="Aporte mensal"
                 value={newInvestment.monthlyContribution || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, monthlyContribution: parseFloat(e.target.value) || 0 })}
+                className="h-8 text-xs"
+              />
+              <Input
+                type="number"
+                placeholder="Retorno esperado (% a.a.)"
+                value={newInvestment.expectedReturn ?? ""}
+                onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: parseFloat(e.target.value) || 0 })}
                 className="h-8 text-xs"
               />
               <Input
@@ -240,15 +281,18 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
           ) : (
             investments.map((inv) => {
               const returnVal = inv.currentValue - inv.investedAmount;
-              const returnPct = (returnVal / inv.investedAmount) * 100;
+              const returnPct = inv.investedAmount > 0 ? (returnVal / inv.investedAmount) * 100 : 0;
               const typeInfo = typeLabels[inv.type] || typeLabels.outros;
               return (
                 <div key={inv.id} className="p-3 hover:bg-muted/30 transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${typeInfo.color}`}>
                           {typeInfo.icon} {typeInfo.label}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/50 text-accent-foreground border border-border">
+                          {(inv.expectedReturn ?? 10).toFixed(1)}% a.a.
                         </span>
                         {inv.broker && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
@@ -257,7 +301,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         )}
                       </div>
                       <p className="text-sm font-medium">{inv.name}</p>
-                      <div className="flex items-center gap-4 mt-1 text-xs">
+                      <div className="flex items-center gap-4 mt-1 text-xs flex-wrap">
                         <span className="text-muted-foreground">
                           Investido: R$ {(inv.investedAmount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </span>
@@ -266,7 +310,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         </span>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-sm font-bold">
                         R$ {inv.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </p>
@@ -277,7 +321,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive shrink-0"
                       onClick={() => deleteInvestment(inv.id)}
                     >
                       <Trash2 className="w-3 h-3" />
@@ -290,6 +334,13 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       className="h-6 text-[10px] flex-1"
                       onBlur={(e) => updateCurrentValue(inv.id, parseFloat(e.target.value) || inv.currentValue)}
                       defaultValue={inv.currentValue}
+                    />
+                    <Input
+                      type="number"
+                      placeholder="% a.a."
+                      className="h-6 text-[10px] w-16"
+                      defaultValue={inv.expectedReturn ?? 10}
+                      onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
                     />
                     <Input
                       type="number"
@@ -323,25 +374,26 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Se continuar aportando</p>
             <p className="text-sm font-bold">R$ {monthlyContributions.toLocaleString("pt-BR")}/mês</p>
+            <p className="text-[10px] text-muted-foreground">Taxa média: {weightedRate.toFixed(1)}% a.a.</p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 5 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {(totalCurrentValue + monthlyContributions * 60 * 1.08).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              R$ {projection5y.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 10 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {(totalCurrentValue + monthlyContributions * 120 * 1.15).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              R$ {projection10y.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Renda passiva potencial</p>
             <p className="text-sm font-bold text-purple-400">
-              R$ {((totalCurrentValue * 0.06) / 12).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}/mês
+              R$ {passiveIncome.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}/mês
             </p>
-            <p className="text-[10px] text-muted-foreground">(6% a.a.)</p>
+            <p className="text-[10px] text-muted-foreground">({weightedRate.toFixed(1)}% a.a.)</p>
           </div>
         </div>
       </div>

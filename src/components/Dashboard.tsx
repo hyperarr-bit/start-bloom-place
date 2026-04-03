@@ -125,13 +125,15 @@ export const Dashboard = ({
   incomes,
   onNavigate,
 }: DashboardProps) => {
-  // Compute annual data from actual monthly records
+  const currentYear = getCurrentYear();
+
+  // Compute annual data from actual monthly records (current year only)
   const annualData = useMemo(() => {
     return ALL_MONTHS.map((month) => {
-      const totals = getMonthTotals(month);
+      const totals = getMonthTotals(month, currentYear);
       return { month, ...totals };
     });
-  }, []);
+  }, [currentYear]);
 
   // Month progress data
   const monthProgress = useMemo(() => {

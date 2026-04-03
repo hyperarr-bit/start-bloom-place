@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";

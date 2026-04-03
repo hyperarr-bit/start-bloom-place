@@ -240,7 +240,7 @@ export const FinancialHealth = ({
           <p className={`text-lg font-bold ${realMonthlyBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
             {realMonthlyBalance >= 0 ? "+" : ""}R$ {realMonthlyBalance.toLocaleString("pt-BR")}
           </p>
-          <p className="text-[10px] text-muted-foreground">Inclui parcelas</p>
+          <p className="text-[10px] text-muted-foreground">Inclui fixas + parcelas</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Projeção Anual</p>

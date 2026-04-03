@@ -64,7 +64,7 @@ const Saude = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-lg">≡</span>
-          <h1 className="text-base font-bold tracking-tight">CORE — SAÚDE</h1>
+          <h1 className="text-base font-bold tracking-tight"><h1 className="text-base font-bold tracking-tight">SAÚDE</h1></h1>
           <span className="ml-auto text-xs text-muted-foreground capitalize">{currentMonth}</span>
           <ThemeToggle />
           <button

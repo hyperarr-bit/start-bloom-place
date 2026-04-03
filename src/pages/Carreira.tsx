@@ -446,7 +446,7 @@ const Carreira = () => {
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-slate-600" /> MINHA CARREIRA
+              <Briefcase className="w-5 h-5 text-slate-600" /> CARREIRA
             </h1>
             <p className="text-[11px] text-muted-foreground">Vagas, portfolio, networking e skills</p>
           </div>

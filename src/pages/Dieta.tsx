@@ -151,7 +151,7 @@ const Dieta = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Apple className="w-5 h-5 text-green-600" /> MINHA DIETA</h1>
+            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Apple className="w-5 h-5 text-green-600" /> DIETA</h1></h1>
             <p className="text-xs text-muted-foreground">Cardápio, calorias, jejum e receitas</p>
           </div>
           <div className="flex items-center gap-2">

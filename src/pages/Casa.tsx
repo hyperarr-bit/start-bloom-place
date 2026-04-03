@@ -53,7 +53,7 @@ const Casa = () => {
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Home className="w-5 h-5 text-cyan-600" /> MINHA CASA
+              <Home className="w-5 h-5 text-cyan-600" /> CASA
             </h1>
             <p className="text-[11px] text-muted-foreground">Limpeza, despensa, cardápio e manutenção</p>
           </div>

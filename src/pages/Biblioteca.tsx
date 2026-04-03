@@ -300,7 +300,7 @@ const Biblioteca = () => {
       <div className="px-4 pt-6 pb-2 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
         <div>
-          <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-600" /> MINHA BIBLIOTECA</h1>
+          <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-600" /> BIBLIOTECA</h1></h1>
           <p className="text-xs text-muted-foreground">Sua estante digital inteligente</p>
         </div>
       </div>

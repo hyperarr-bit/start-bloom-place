@@ -21,7 +21,7 @@ const Beleza = () => {
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-pink-600" /> MINHA BELEZA
+              <Sparkles className="w-5 h-5 text-pink-600" /> BELEZA
             </h1>
             <p className="text-[11px] text-muted-foreground">Seu ritual de beleza inteligente</p>
           </div>

@@ -39,7 +39,7 @@ const Viagens = () => {
           </Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Plane className="w-5 h-5 text-teal-600" /> MINHAS VIAGENS
+              <Plane className="w-5 h-5 text-teal-600" /> VIAGENS
             </h1>
             <p className="text-[11px] text-muted-foreground">Planeje, viva e eternize suas viagens</p>
           </div>

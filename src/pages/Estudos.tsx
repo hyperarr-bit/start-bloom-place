@@ -139,7 +139,7 @@ const Estudos = () => {
           </Button>
           <div>
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-indigo-600" /> MEUS ESTUDOS
+              <GraduationCap className="w-5 h-5 text-indigo-600" /> ESTUDOS
             </h1>
             <p className="text-[11px] text-muted-foreground">Cursos, grade, provas, tarefas e caderno</p>
           </div>

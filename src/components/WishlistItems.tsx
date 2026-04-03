@@ -136,10 +136,27 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
   const remainingToSave = totalWishlistValue - totalSaved;
   const overallProgress = totalWishlistValue > 0 ? (totalSaved / totalWishlistValue) * 100 : 0;
   
-  const realAvailable = Math.max(0, monthlyBudget - totalExpenses - monthlyInstallments);
-  const savingsForWishlist = realAvailable * 0.3;
+  // Forecast logic (same as Dashboard)
+  const forecast = (() => {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDays = daysInMonth - day;
+    const fixedCostsRecorded = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || 0), 0);
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
+    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
+    const projectedVariableRemaining = dailyVariableRate * remainingDays;
+    const unpaidBillsCount = dueDays.reduce((sum: number, d: any) => sum + d.bills.filter((b: any) => !b.paid).length, 0);
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+    const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
+    return { projectedBalance, remainingDays };
+  })();
+
+  const projectedAvailable = Math.max(0, forecast.projectedBalance);
+  const savingsForWishlist = projectedAvailable * 0.3;
   const monthsToComplete = savingsForWishlist > 0 ? Math.ceil(remainingToSave / savingsForWishlist) : 0;
-  const canAffordWithoutDebt = realAvailable > 0;
+  const canAffordWithoutDebt = forecast.projectedBalance > 0;
 
   const sortedItems = [...items].sort((a, b) => {
     const priorityOrder = { alta: 0, media: 1, baixa: 2 };

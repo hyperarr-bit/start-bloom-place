@@ -275,21 +275,27 @@ export const Dashboard = ({
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = daysInMonth - day;
 
-    // Total fixed costs (bills) still unpaid
-    const unpaidBills = dueDays.reduce((sum, d) => {
-      if (d.day > day) {
-        return sum + d.bills.filter(b => !b.paid).length * 0; // we don't have values, estimate from fixed
-      }
-      return sum;
-    }, 0);
-
+    // Fixed costs: reserved integrally (rent, subscriptions, etc.)
     const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
-    const dailyVariableRate = day > 0 ? totalExpenses / day : 0;
-    const projectedVariableSpend = dailyVariableRate * remainingDays;
-    const projectedTotal = totalExpenses + projectedVariableSpend;
+
+    // Unpaid bills still pending (estimate value from avg fixed cost)
+    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsTotal / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+
+    // Variable expenses = totalExpenses minus fixed costs (fixed are already accounted separately)
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsTotal);
+    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
+    const projectedVariableRemaining = dailyVariableRate * remainingDays;
+
+    // Projected total = fixed (full) + unpaid bills + variable already spent + variable projected
+    const projectedTotal = fixedCostsTotal + unpaidBillsEstimate + variableSpent + projectedVariableRemaining;
     const projectedBalance = totalIncome - projectedTotal;
 
-    return { projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day };
+    return {
+      projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day,
+      fixedCostsTotal, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
+    };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Daily budget: how much you can spend per day (accounting for fixed costs & unpaid bills)

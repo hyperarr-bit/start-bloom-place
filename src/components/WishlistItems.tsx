@@ -24,6 +24,8 @@ interface WishlistItemsProps {
   totalExpenses: number;
   totalDebts: number;
   monthlyInstallments: number;
+  fixedExpenses?: any[];
+  dueDays?: any[];
 }
 
 const priorityConfig = {
@@ -76,7 +78,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   );
 };
 
-export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments }: WishlistItemsProps) => {
+export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [] }: WishlistItemsProps) => {
   const [showForm, setShowForm] = useState(false);
   const [newItem, setNewItem] = useState<Partial<WishlistItem>>({
     priority: "media",
@@ -134,10 +136,27 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
   const remainingToSave = totalWishlistValue - totalSaved;
   const overallProgress = totalWishlistValue > 0 ? (totalSaved / totalWishlistValue) * 100 : 0;
   
-  const realAvailable = Math.max(0, monthlyBudget - totalExpenses - monthlyInstallments);
-  const savingsForWishlist = realAvailable * 0.3;
+  // Forecast logic (same as Dashboard)
+  const forecast = (() => {
+    const now = new Date();
+    const day = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const remainingDays = daysInMonth - day;
+    const fixedCostsRecorded = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || 0), 0);
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
+    const dailyVariableRate = day > 0 ? variableSpent / day : 0;
+    const projectedVariableRemaining = dailyVariableRate * remainingDays;
+    const unpaidBillsCount = dueDays.reduce((sum: number, d: any) => sum + d.bills.filter((b: any) => !b.paid).length, 0);
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+    const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
+    return { projectedBalance, remainingDays };
+  })();
+
+  const projectedAvailable = Math.max(0, forecast.projectedBalance);
+  const savingsForWishlist = projectedAvailable * 0.3;
   const monthsToComplete = savingsForWishlist > 0 ? Math.ceil(remainingToSave / savingsForWishlist) : 0;
-  const canAffordWithoutDebt = realAvailable > 0;
+  const canAffordWithoutDebt = forecast.projectedBalance > 0;
 
   const sortedItems = [...items].sort((a, b) => {
     const priorityOrder = { alta: 0, media: 1, baixa: 2 };
@@ -189,9 +208,9 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold">✅ Seus desejos estão compatíveis com seu orçamento!</p>
+              <p className="text-xs font-semibold">✅ Seus desejos cabem no orçamento!</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Saldo livre mensal: R$ {realAvailable.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} → R$ {savingsForWishlist.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês para desejos
+                Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR")}/mês para desejos (30%)
               </p>
             </div>
           </div>
@@ -201,9 +220,9 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold">⚠️ Seus desejos não cabem no orçamento atual</p>
+              <p className="text-xs font-semibold">⚠️ Previsão aponta saldo negativo no fim do mês</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Suas despesas superam sua renda. Foque em quitar dívidas primeiro.
+                Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}. Foque em reduzir gastos primeiro.
               </p>
             </div>
           </div>

@@ -696,30 +696,45 @@ export const Dashboard = ({
           <p className="text-[10px] text-muted-foreground mt-1">
             Custos fixos reservados integralmente. Projeção baseada no ritmo de gastos variáveis.
           </p>
-          <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Receita total</span>
-              <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+          <div className="mt-3 space-y-2">
+            <div className="text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Receita total</span>
+                <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">Soma de todos os ganhos registrados no mês</p>
             </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Já gasto (fixos + variáveis)</span>
-              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR")}</span>
+            <div className="text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Já gasto (fixos + variáveis)</span>
+                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR")}</span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">Tudo que já saiu da conta: contas pagas, compras, etc.</p>
             </div>
             {forecast.unpaidBillsEstimate > 0 && (
-              <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes (estimativa)</span>
-                <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+              <div className="text-[10px]">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Contas pendentes (estimativa)</span>
+                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/60">Contas nos vencimentos que ainda não foram marcadas como pagas</p>
               </div>
             )}
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
-              <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+            <div className="text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
+                <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">Estimativa do que você ainda vai gastar baseado no seu ritmo atual</p>
             </div>
-            <div className="flex justify-between text-[10px] border-t border-border pt-1 mt-1">
-              <span className="text-muted-foreground font-medium">Saldo projetado</span>
-              <span className={`tabular-nums font-bold ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
-              </span>
+            <div className="text-[10px] border-t border-border pt-1 mt-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground font-medium">Saldo projetado</span>
+                <span className={`tabular-nums font-bold ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+                </span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">O que deve sobrar (ou faltar) no fim do mês</p>
             </div>
           </div>
         </div>
@@ -754,27 +769,39 @@ export const Dashboard = ({
           <p className="text-[10px] text-muted-foreground mt-1">
             {dailyBudget.remainingDays} dias restantes no mês
           </p>
-          <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Saldo atual</span>
-              <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR")}</span>
+          <div className="mt-3 space-y-2">
+            <div className="text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Saldo atual</span>
+                <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR")}</span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">Receita menos tudo que já foi gasto até agora</p>
             </div>
             {dailyBudget.unpaidBillsEstimate > 0 && (
-              <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes (reserva)</span>
-                <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+              <div className="text-[10px]">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Contas pendentes (reserva)</span>
+                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/60">Valor reservado para contas que ainda vão vencer este mês</p>
               </div>
             )}
-            <div className="flex justify-between text-[10px] border-t border-border pt-1 mt-1">
-              <span className="text-muted-foreground font-medium">Disponível livre</span>
-              <span className={`tabular-nums font-medium ${dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400"}`}>
-                R$ {Math.round(Math.max(0, dailyBudget.availableReal)).toLocaleString("pt-BR")}
-              </span>
+            <div className="text-[10px] border-t border-border pt-1 mt-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground font-medium">Disponível livre</span>
+                <span className={`tabular-nums font-medium ${dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                  R$ {Math.round(Math.max(0, dailyBudget.availableReal)).toLocaleString("pt-BR")}
+                </span>
+              </div>
+              <p className="text-[9px] text-muted-foreground/60">O que sobra depois de reservar para contas futuras</p>
             </div>
             {!dailyBudget.cantSpend && (
-              <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
-                <span className="tabular-nums">= R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}/dia</span>
+              <div className="text-[10px]">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
+                  <span className="tabular-nums">= R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}/dia</span>
+                </div>
+                <p className="text-[9px] text-muted-foreground/60">Disponível livre dividido pelos dias que faltam no mês</p>
               </div>
             )}
           </div>

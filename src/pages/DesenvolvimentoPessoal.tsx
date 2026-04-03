@@ -212,7 +212,7 @@ const DesenvolvimentoPessoal = () => {
         <ModuleTip
           moduleId="desenvolvimento"
           tips={[
-            "Preencha a Roda da Vida para visualizar áreas que precisam de atenção",
+            "Defina suas metas de vida, bucket list e quadro de visão na aba Metas",
             "Escreva 3 coisas pelas quais é grato no diário de gratidão",
             "Defina seus valores e forças pessoais na aba 🧠 Sobre Mim",
             "Crie afirmações positivas e leia-as diariamente"

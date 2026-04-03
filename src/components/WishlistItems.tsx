@@ -78,7 +78,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   );
 };
 
-export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments }: WishlistItemsProps) => {
+export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [] }: WishlistItemsProps) => {
   const [showForm, setShowForm] = useState(false);
   const [newItem, setNewItem] = useState<Partial<WishlistItem>>({
     priority: "media",

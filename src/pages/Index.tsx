@@ -243,6 +243,8 @@ const Index = () => {
             totalExpenses={totalExpenses}
             totalDebts={totalDebts}
             monthlyInstallments={monthlyInstallments}
+            fixedExpenses={fixedExpenses}
+            dueDays={dueDays}
           />
         )}
 

@@ -208,9 +208,9 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold">✅ Seus desejos estão compatíveis com seu orçamento!</p>
+              <p className="text-xs font-semibold">✅ Seus desejos cabem no orçamento!</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Saldo livre mensal: R$ {realAvailable.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} → R$ {savingsForWishlist.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}/mês para desejos
+                Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR")}/mês para desejos (30%)
               </p>
             </div>
           </div>
@@ -220,9 +220,9 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-xs font-semibold">⚠️ Seus desejos não cabem no orçamento atual</p>
+              <p className="text-xs font-semibold">⚠️ Previsão aponta saldo negativo no fim do mês</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Suas despesas superam sua renda. Foque em quitar dívidas primeiro.
+                Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}. Foque em reduzir gastos primeiro.
               </p>
             </div>
           </div>

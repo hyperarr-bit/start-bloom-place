@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Star, Settings, Eye, EyeOff
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Star, Settings, Eye, EyeOff, LogOut
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
+import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 
 const modules = [
@@ -25,6 +26,7 @@ const modules = [
 
 export const ModuleDrawer = () => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
 
@@ -104,6 +106,14 @@ export const ModuleDrawer = () => {
           +{hiddenCount} oculto{hiddenCount > 1 ? "s" : ""} · Editar
         </button>
       )}
+
+      <button
+        onClick={signOut}
+        className="w-full flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border text-xs text-destructive hover:text-destructive/80 transition-colors"
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        Sair da conta
+      </button>
     </div>
   );
 };

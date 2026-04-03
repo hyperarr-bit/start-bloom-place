@@ -150,7 +150,7 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
     const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
-    return { projectedBalance, remainingDays };
+    return { projectedBalance, remainingDays, totalExpenses, unpaidBillsEstimate, projectedVariableRemaining, fixedCostsRecorded, variableSpent, unpaidBillsCount };
   })();
 
   const projectedAvailable = Math.max(0, forecast.projectedBalance);
@@ -207,11 +207,36 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
         <div className="rounded-xl p-3 border bg-emerald-500/10 border-emerald-500/30">
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
-            <div>
+            <div className="w-full">
               <p className="text-xs font-semibold">✅ Seus desejos cabem no orçamento!</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR")}/mês para desejos (30%)
               </p>
+              <div className="mt-2 pt-2 border-t border-emerald-500/20 space-y-1">
+                <p className="text-[10px] text-muted-foreground font-medium">Como chegamos nesse valor:</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+                  <span className="text-muted-foreground">Receita</span>
+                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground">Gastos atuais</span>
+                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR")}</span>
+                  {forecast.unpaidBillsCount > 0 && (
+                    <>
+                      <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                    </>
+                  )}
+                  {forecast.projectedVariableRemaining > 0 && (
+                    <>
+                      <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
+                  <span className={`text-right font-semibold border-t border-border pt-0.5 mt-0.5 ${forecast.projectedBalance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -219,11 +244,36 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
         <div className="rounded-xl p-3 border bg-destructive/10 border-destructive/30">
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 text-destructive mt-0.5 flex-shrink-0" />
-            <div>
+            <div className="w-full">
               <p className="text-xs font-semibold">⚠️ Previsão aponta saldo negativo no fim do mês</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
                 Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}. Foque em reduzir gastos primeiro.
               </p>
+              <div className="mt-2 pt-2 border-t border-destructive/20 space-y-1">
+                <p className="text-[10px] text-muted-foreground font-medium">Detalhamento:</p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+                  <span className="text-muted-foreground">Receita</span>
+                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR")}</span>
+                  <span className="text-muted-foreground">Gastos atuais</span>
+                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR")}</span>
+                  {forecast.unpaidBillsCount > 0 && (
+                    <>
+                      <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                    </>
+                  )}
+                  {forecast.projectedVariableRemaining > 0 && (
+                    <>
+                      <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
+                  <span className="text-right font-semibold border-t border-border pt-0.5 mt-0.5 text-red-400">
+                    -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

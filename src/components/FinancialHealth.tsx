@@ -256,12 +256,12 @@ export const FinancialHealth = ({
         <h4 className="text-xs font-bold mb-3">📊 COMPOSIÇÃO DO SCORE</h4>
         <div className="space-y-2">
           {[
-            { label: "Poupança mensal", value: Math.min(savingsRate * 0.6, 15), max: 15, icon: "💰" },
+            { label: "Poupança mensal", value: Math.min(Math.max(savingsRate, 0) * 1.0, 20), max: 20, icon: "💰" },
             { label: "Contas em dia", value: Math.min(billsPaymentRate * 0.15, 15), max: 15, icon: "📋" },
             { label: "Reserva de emergência", value: Math.min(emergencyProgress * 0.15, 15), max: 15, icon: "🛡️" },
-            { label: "Volume de investimentos", value: Math.min(investmentRate * 0.3, 10), max: 10, icon: "📈" },
+            { label: "Aportes mensais", value: Math.min(investmentRate * 1.0, 15), max: 15, icon: "📈" },
             { label: "Progresso das metas", value: Math.min(goalsProgress * 0.1, 10), max: 10, icon: "🎯" },
-            { label: "Controle de dívidas", value: Math.max(0, 15 - Math.min(debtToIncome * 0.4, 15)), max: 15, icon: "💳" },
+            { label: "Controle de dívidas", value: Math.max(0, 15 - Math.min(debtToIncome * 0.5, 15)), max: 15, icon: "💳" },
             { label: "Quitação de parcelas", value: Math.min(installmentProgress * 0.05, 5), max: 5, icon: "📆" },
             { label: "Disciplina (desejos)", value: Math.min(wishlistDiscipline * 0.05, 5), max: 5, icon: "❤️" },
             { label: "Diversificação", value: Math.min(diversificationScore * 0.05, 5), max: 5, icon: "🔀" },

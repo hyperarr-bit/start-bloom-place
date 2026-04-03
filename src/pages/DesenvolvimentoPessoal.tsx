@@ -365,33 +365,8 @@ const DesenvolvimentoPessoal = () => {
           </TabsContent>
 
           {/* ========== RODA DA VIDA ========== */}
-          <TabsContent value="roda" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Compass className="w-4 h-4" /> RODA DA VIDA</h3>
-              <p className="text-xs text-muted-foreground mb-4">Avalie de 0 a 10 sua satisfação em cada área:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {lifeAreas.map(area => {
-                  const Icon = area.icon; const score = wheelScores[area.id];
-                  return (
-                    <div key={area.id} className="bg-muted/30 rounded-lg p-3 border border-border">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Icon className={`w-4 h-4 ${area.color}`} /><span className="text-xs font-bold">{area.name}</span>
-                        <span className="ml-auto text-lg font-bold">{score}</span>
-                      </div>
-                      <input type="range" min={0} max={10} value={score}
-                        onChange={e => setWheelScores({ ...wheelScores, [area.id]: Number(e.target.value) })}
-                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary" />
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-3 border border-purple-500/20">
-                <p className="text-xs font-bold">📈 Média: {(Object.values(wheelScores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}/10</p>
-              </div>
-            </div>
-          </TabsContent>
 
-          {/* ========== DIÁRIO / JOURNALING ========== */}
+
           <TabsContent value="diario" className="space-y-4">
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/30 p-4">
               <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><PenTool className="w-4 h-4 text-indigo-500" /> DIÁRIO DE REFLEXÃO — {new Date().toLocaleDateString("pt-BR")}</h3>

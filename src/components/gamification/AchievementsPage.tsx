@@ -34,7 +34,8 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
   const workoutLog = get<any[]>("saude-workout-log", []);
 
   // Habits / streak
-  const streak = get<number>("core-hub-streak", 0);
+  const streakRaw = get<any>("core-hub-streak", 0);
+  const streak = typeof streakRaw === "object" && streakRaw !== null ? (streakRaw.count || 0) : (Number(streakRaw) || 0);
   const habits = get<any[]>("core-rotina-habits", []);
   const allHabitsDone = habits.length > 0 && habits.every((h: any) => h.done);
 
@@ -88,7 +89,8 @@ export const AchievementsPage = () => {
   const lastCheckIn = get<string>("gamification-lastCheckIn", "");
   const checkedInToday = lastCheckIn === today;
 
-  const streak = get<number>("core-hub-streak", 0);
+  const streakRaw = get<any>("core-hub-streak", 0);
+  const streak = typeof streakRaw === "object" && streakRaw !== null ? (streakRaw.count || 0) : (Number(streakRaw) || 0);
 
   const badges = useMemo(() => buildBadges(get), [get]);
 
@@ -115,7 +117,7 @@ export const AchievementsPage = () => {
     const newStreak = lastCheckIn === yesterdayStr ? streak + 1 : 1;
 
     set("gamification-lastCheckIn", today);
-    set("core-hub-streak", newStreak);
+    set("core-hub-streak", { count: newStreak, lastDate: today });
   };
 
   // Next badges to unlock

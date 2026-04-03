@@ -279,6 +279,8 @@ const Index = () => {
           <FinancialHealth
             totalIncome={totalIncome}
             totalExpenses={totalExpenses}
+            totalFixedExpenses={totalFixedExpenses}
+            monthlyInstallments={monthlyInstallments}
             totalDebts={totalDebts}
             totalInvestments={totalInvestments}
             emergencyFund={emergencyFund}

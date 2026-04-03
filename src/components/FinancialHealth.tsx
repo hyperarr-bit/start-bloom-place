@@ -59,6 +59,8 @@ interface Investment {
 interface FinancialHealthProps {
   totalIncome: number;
   totalExpenses: number;
+  totalFixedExpenses: number;
+  monthlyInstallments: number;
   totalDebts: number;
   totalInvestments: number;
   emergencyFund: number;
@@ -74,6 +76,8 @@ interface FinancialHealthProps {
 export const FinancialHealth = ({
   totalIncome,
   totalExpenses,
+  totalFixedExpenses,
+  monthlyInstallments,
   totalDebts,
   totalInvestments,
   emergencyFund,
@@ -85,11 +89,14 @@ export const FinancialHealth = ({
   trips,
   investments,
 }: FinancialHealthProps) => {
-  // === METRICS ===
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+  // === METRICS (usando despesa real total) ===
+  const totalRealExpenses = totalExpenses + totalFixedExpenses + monthlyInstallments;
+  const savingsRate = totalIncome > 0 ? ((totalIncome - totalRealExpenses) / totalIncome) * 100 : 0;
   const debtToIncome = totalIncome > 0 ? (totalDebts / (totalIncome * 12)) * 100 : 0;
-  const emergencyProgress = emergencyFundGoal > 0 ? (emergencyFund / emergencyFundGoal) * 100 : 0;
-  const investmentRate = totalIncome > 0 ? (totalInvestments / (totalIncome * 12)) * 100 : 0;
+  const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * 6 : emergencyFundGoal;
+  const emergencyProgress = realEmergencyGoal > 0 ? (emergencyFund / realEmergencyGoal) * 100 : 0;
+  const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
+  const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
   // Bills payment rate
   const allBills = dueDays.flatMap(d => d.bills);

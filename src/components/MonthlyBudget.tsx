@@ -1,5 +1,5 @@
 import { FileText, ChevronRight } from "lucide-react";
-import { getFinanceStorageKeys, isCurrentMonth } from "@/components/finance/storage-keys";
+import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
 
 interface MonthBudget {
   month: string;

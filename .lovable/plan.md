@@ -1,37 +1,24 @@
 
 
-# Ajustes no Módulo de Investimentos
+# Corrigir campo de Rentabilidade nos Investimentos
 
-## 2 mudanças:
+## Problema
+O campo "Retorno esperado (% a.a.)" no formulário de criação mostra o valor default (10) em vez de ficar vazio com placeholder explicativo. O mesmo ocorre no campo inline de edição — mostra só o número sem contexto.
 
-### 1. Texto "MEUS INVESTIMENTOS" cortado no header
-O header preto do card (linha 165-169) usa `table-header-dark` mas o texto e botão ficam apertados no mobile (430px). Adicionar `px-4` ao header para dar padding lateral, igual ao fix feito no BillsDueCards.
+## Solução
 
-### 2. Campo de taxa de retorno anual (%) por investimento
-Atualmente o simulador usa taxas fixas hardcoded (8%, 15%, 6%). Cada investimento precisa ter um campo `expectedReturn` (% anual esperada) para que:
-- O cálculo de projeção 5/10 anos use juros compostos reais por investimento
-- A rentabilidade projetada reflita a taxa informada pelo usuário
-- O simulador de independência financeira use a média ponderada das taxas
+### Formulário de criação (linha 247-252)
+- Mudar `value={newInvestment.expectedReturn ?? ""}` para não mostrar o default
+- Usar placeholder descritivo: `"Rentabilidade esperada (% a.a.)"`
+- Só preencher o value quando o usuário digitar; manter o default 10 apenas no submit se ficar vazio
 
-#### Interface atualizada
-```typescript
-interface Investment {
-  // ... campos existentes
-  expectedReturn: number; // % anual esperada (ex: 12.5)
-}
-```
+### Campo inline de edição (linha 338-344)
+- Mudar placeholder de `"% a.a."` para `"Rent. esperada (% a.a.)"`
+- Manter `defaultValue` com o valor real do investimento (correto)
+- Aumentar largura do campo de `w-16` para `w-24` para caber o placeholder
 
-#### Formulário
-Adicionar campo "Rentabilidade esperada (%)" no form de criação e na linha de cada investimento (editável).
-
-#### Simulador corrigido
-- **5 anos**: `Σ (valorAtual_i × (1 + taxa_i/100)^5) + Σ (aporteMensal_i × ((1+taxa_i/12/100)^60 - 1) / (taxa_i/12/100))`
-- **10 anos**: mesma fórmula com 120 meses
-- **Renda passiva**: usa média ponderada das taxas pelo valor atual
-
-## Alterações
-
+## Arquivo alterado
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/InvestmentsTracker.tsx` | Adicionar `px-4` no header; campo `expectedReturn` na interface e form; usar juros compostos reais no simulador; campo editável de % em cada investimento |
+| `src/components/InvestmentsTracker.tsx` | Ajustar value/placeholder do campo expectedReturn no form e no inline edit |
 

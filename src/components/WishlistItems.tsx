@@ -24,6 +24,8 @@ interface WishlistItemsProps {
   totalExpenses: number;
   totalDebts: number;
   monthlyInstallments: number;
+  fixedExpenses?: any[];
+  dueDays?: any[];
 }
 
 const priorityConfig = {

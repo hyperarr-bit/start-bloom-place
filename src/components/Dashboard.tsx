@@ -292,29 +292,36 @@ export const Dashboard = ({
     return { projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
-  // Daily budget: how much you can spend per day
+  // Daily budget: how much you can spend per day (accounting for fixed costs & unpaid bills)
   const dailyBudget = useMemo(() => {
     const now = new Date();
     const day = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = daysInMonth - day;
 
+    // Reserve full fixed costs (rent, subscriptions, etc.)
     const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
-    // Unpaid bills value estimate — count unpaid × avg bill
+
+    // Unpaid bills still pending
     const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    // Estimate unpaid bill values: avg fixed cost per bill
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsTotal / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
 
-    // Available = income - already spent - remaining fixed costs
+    // Available = income - already spent - fixed costs reserved - unpaid bills reserved
     const alreadySpent = totalExpenses;
-    const stillOwed = fixedCostsTotal; // simplification: full fixed costs reserved
-    const available = totalIncome - alreadySpent;
-    const perDay = remainingDays > 0 ? available / remainingDays : 0;
-    const status: "good" | "warning" | "danger" = perDay > (totalIncome / daysInMonth) * 0.8
+    const reserved = fixedCostsTotal + unpaidBillsEstimate;
+    const availableReal = totalIncome - alreadySpent - reserved;
+    const perDay = remainingDays > 0 ? availableReal / remainingDays : availableReal;
+    const cantSpend = availableReal <= 0;
+    const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsTotal) / daysInMonth : 0;
+    const status: "good" | "warning" | "danger" = cantSpend
+      ? "danger"
+      : perDay > idealPerDay * 0.8
       ? "good"
-      : perDay > 0
-      ? "warning"
-      : "danger";
+      : "warning";
 
-    return { available, perDay, remainingDays, status };
+    return { availableReal, reserved, fixedCostsTotal, unpaidBillsEstimate, perDay, remainingDays, status, cantSpend, alreadySpent };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Top 5 largest expenses

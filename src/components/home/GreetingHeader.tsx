@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { LogOut, Sun, Moon, CloudSun, Sunset, Pencil } from "lucide-react";
+import { LogOut, Sun, Moon, CloudSun, Sunset, Pencil, Trophy } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
@@ -83,6 +84,7 @@ const getContextualMessage = (data: LifeHubData): string => {
 
 export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
   const { signOut, user } = useAuth();
+  const navigate = useNavigate();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
 
@@ -120,6 +122,14 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <motion.button
+            onClick={() => navigate("/conquistas")}
+            className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-yellow-500/10 hover:text-yellow-500 transition-colors"
+            whileTap={{ scale: 0.9 }}
+            aria-label="Conquistas"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+          </motion.button>
           <ThemeToggle showPalette />
           <motion.button
             onClick={signOut}

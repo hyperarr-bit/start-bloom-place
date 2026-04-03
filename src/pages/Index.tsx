@@ -21,7 +21,7 @@ import { FinancialHealth } from "@/components/FinancialHealth";
 import { TravelBudget } from "@/components/travel/TravelBudget";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
-import { Gamification } from "@/components/Gamification";
+
 import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
@@ -75,9 +75,6 @@ const Index = () => {
 
   const [trips, setTrips] = usePersistedState("finance-trips", [] as any[]);
 
-  // Gamification state
-  const [streakDays, setStreakDays] = usePersistedState("finance-streak", 0);
-  const [challenge52Weeks, setChallenge52Weeks] = usePersistedState<number[]>("finance-52weeks", []);
 
   // Computed values
   const totalIncome = incomes.reduce((sum: number, i: any) => sum + i.value, 0);
@@ -107,7 +104,7 @@ const Index = () => {
     { id: "itens", label: "❤️ DESEJOS" },
     { id: "viagem", label: "✈️ VIAGEM" },
     { id: "simuladores", label: "🧮 SIMULADORES" },
-    { id: "desafios", label: "🏆 DESAFIOS" },
+    
     { id: "limites", label: "🎯 LIMITES" },
     { id: "relatorios", label: "📋 RELATÓRIOS" },
     { id: "saude", label: "💚 SAÚDE FINANCEIRA" },
@@ -257,19 +254,6 @@ const Index = () => {
           <Simulators />
         )}
 
-        {activeTab === "desafios" && (
-          <Gamification
-            savingsRate={savingsRate}
-            billsPaidRate={billsPaidRate}
-            goalsProgress={goalsProgress}
-            totalInvestments={totalInvestments}
-            totalDebts={totalDebts}
-            streakDays={streakDays}
-            setStreakDays={setStreakDays}
-            challenge52Weeks={challenge52Weeks}
-            setChallenge52Weeks={setChallenge52Weeks}
-          />
-        )}
 
         {activeTab === "limites" && (
           <CategoryBudgets expenses={expenses} />

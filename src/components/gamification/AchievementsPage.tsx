@@ -116,7 +116,7 @@ export const AchievementsPage = () => {
     const newStreak = lastCheckIn === yesterdayStr ? streak + 1 : 1;
 
     set("gamification-lastCheckIn", today);
-    set("core-hub-streak", newStreak);
+    set("core-hub-streak", { count: newStreak, lastDate: today });
   };
 
   // Next badges to unlock

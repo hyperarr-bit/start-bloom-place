@@ -193,7 +193,7 @@ const DesenvolvimentoPessoal = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" /> DEV. PESSOAL
+              <Sparkles className="w-5 h-5 text-purple-600" /> DESENVOLVIMENTO PESSOAL
             </h1>
             <p className="text-xs text-muted-foreground">Conheça-se, evolua, conquiste</p>
           </div>

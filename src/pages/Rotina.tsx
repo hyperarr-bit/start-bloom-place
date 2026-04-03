@@ -1016,7 +1016,7 @@ const Rotina = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-lg">≡</span>
-          <h1 className="text-base font-bold tracking-tight">CORE — ROTINA</h1>
+          <h1 className="text-base font-bold tracking-tight"><h1 className="text-base font-bold tracking-tight">ROTINA</h1></h1>
         </div>
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

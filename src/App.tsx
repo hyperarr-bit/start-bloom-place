@@ -28,6 +28,7 @@ import Viagens from "./pages/Viagens";
 import Carreira from "./pages/Carreira";
 import Treino from "./pages/Treino";
 import Dieta from "./pages/Dieta";
+import Hiperfoco from "./pages/Hiperfoco";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,6 +55,7 @@ const AnimatedRoutes = () => {
         <Route path="/carreira" element={<ProtectedRoute><PageTransition><><TrialBanner /><Carreira /></></PageTransition></ProtectedRoute>} />
         <Route path="/treino" element={<ProtectedRoute><PageTransition><><TrialBanner /><Treino /></></PageTransition></ProtectedRoute>} />
         <Route path="/dieta" element={<ProtectedRoute><PageTransition><><TrialBanner /><Dieta /></></PageTransition></ProtectedRoute>} />
+        <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><><TrialBanner /><Hiperfoco /></></PageTransition></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Star, Settings, Eye, EyeOff
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Star, Settings, Eye, EyeOff
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useState } from "react";
@@ -20,6 +20,7 @@ const modules = [
   { id: "beleza", path: "/beleza", Icon: Droplets, label: "Beleza", color: "bg-pink-400/20 text-pink-600" },
   { id: "viagens", path: "/viagens", Icon: Plane, label: "Viagens", color: "bg-teal-400/20 text-teal-600" },
   { id: "carreira", path: "/carreira", Icon: Briefcase, label: "Carreira", color: "bg-slate-400/20 text-slate-600" },
+  { id: "hiperfoco", path: "/hiperfoco", Icon: Brain, label: "Hiperfoco", color: "bg-violet-400/20 text-violet-600" },
 ];
 
 export const ModuleDrawer = () => {

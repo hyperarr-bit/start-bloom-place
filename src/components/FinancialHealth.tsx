@@ -59,6 +59,8 @@ interface Investment {
 interface FinancialHealthProps {
   totalIncome: number;
   totalExpenses: number;
+  totalFixedExpenses: number;
+  monthlyInstallments: number;
   totalDebts: number;
   totalInvestments: number;
   emergencyFund: number;
@@ -74,6 +76,8 @@ interface FinancialHealthProps {
 export const FinancialHealth = ({
   totalIncome,
   totalExpenses,
+  totalFixedExpenses,
+  monthlyInstallments,
   totalDebts,
   totalInvestments,
   emergencyFund,
@@ -85,11 +89,14 @@ export const FinancialHealth = ({
   trips,
   investments,
 }: FinancialHealthProps) => {
-  // === METRICS ===
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+  // === METRICS (usando despesa real total) ===
+  const totalRealExpenses = totalExpenses + totalFixedExpenses + monthlyInstallments;
+  const savingsRate = totalIncome > 0 ? ((totalIncome - totalRealExpenses) / totalIncome) * 100 : 0;
   const debtToIncome = totalIncome > 0 ? (totalDebts / (totalIncome * 12)) * 100 : 0;
-  const emergencyProgress = emergencyFundGoal > 0 ? (emergencyFund / emergencyFundGoal) * 100 : 0;
-  const investmentRate = totalIncome > 0 ? (totalInvestments / (totalIncome * 12)) * 100 : 0;
+  const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * 6 : emergencyFundGoal;
+  const emergencyProgress = realEmergencyGoal > 0 ? (emergencyFund / realEmergencyGoal) * 100 : 0;
+  const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
+  const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
   // Bills payment rate
   const allBills = dueDays.flatMap(d => d.bills);
@@ -116,22 +123,20 @@ export const FinancialHealth = ({
   const diversificationScore = Math.min(investmentTypes * 25, 100);
 
   // Monthly contributions consistency
-  const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
   const contributionRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
-  // === SCORE CALCULATION (0-100) ===
+  // === SCORE CALCULATION (0-100) — sem base inflada ===
   let score = 0;
-  score += Math.min(savingsRate * 0.6, 15);           // Savings: up to 15pts
-  score -= Math.min(debtToIncome * 0.4, 15);           // Debt penalty: up to -15pts
-  score += Math.min(emergencyProgress * 0.15, 15);     // Emergency fund: up to 15pts
-  score += Math.min(investmentRate * 0.3, 10);          // Investment volume: up to 10pts
-  score += Math.min(billsPaymentRate * 0.15, 15);       // Bills on time: up to 15pts
-  score += Math.min(goalsProgress * 0.1, 10);           // Goals progress: up to 10pts
-  score += Math.min(installmentProgress * 0.05, 5);     // Installment payoff: up to 5pts
-  score += Math.min(wishlistDiscipline * 0.05, 5);      // Wishlist saving: up to 5pts
-  score += Math.min(diversificationScore * 0.05, 5);    // Diversification: up to 5pts
-  score += Math.min(contributionRate * 0.5, 5);         // Monthly contributions: up to 5pts
-  score += 10; // Base
+  score += Math.min(Math.max(savingsRate, 0) * 1.0, 20);  // Poupança: até 20pts
+  score -= Math.min(debtToIncome * 0.5, 15);                // Dívidas: até -15pts
+  score += Math.min(emergencyProgress * 0.15, 15);          // Reserva: até 15pts
+  score += Math.min(investmentRate * 1.0, 15);               // Aportes mensais: até 15pts
+  score += Math.min(billsPaymentRate * 0.15, 15);            // Contas em dia: até 15pts
+  score += Math.min(goalsProgress * 0.1, 10);                // Metas: até 10pts
+  score += Math.min(installmentProgress * 0.05, 5);          // Parcelas: até 5pts
+  score += Math.min(wishlistDiscipline * 0.05, 5);           // Desejos: até 5pts
+  score += Math.min(diversificationScore * 0.05, 5);         // Diversificação: até 5pts
+  score += Math.min(contributionRate * 0.5, 5);              // Aportes regulares: até 5pts
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   const getScoreColor = () => {
@@ -171,7 +176,7 @@ export const FinancialHealth = ({
   }
 
   if (emergencyProgress < 100) {
-    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas.`, type: "info" });
+    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${realEmergencyGoal.toLocaleString("pt-BR")}).`, type: "info" });
   } else {
     tips.push({ icon: CheckCircle, text: "Reserva de emergência completa! 🎉", type: "success" });
   }
@@ -190,10 +195,9 @@ export const FinancialHealth = ({
     tips.push({ icon: Heart, text: `Seus desejos somam R$ ${wishlistTotal.toLocaleString("pt-BR")} — ${(wishlistTotal / totalIncome).toFixed(1)}x sua renda. Priorize os mais importantes.`, type: "warning" });
   }
 
-  const monthlyBalance = totalIncome - totalExpenses;
+  const monthlyBalance = totalIncome - totalRealExpenses;
   const yearlyProjection = monthlyBalance * 12;
-  const monthlyInstallmentCost = installments.reduce((s, i) => i.paidInstallments < i.totalInstallments ? s + i.installmentValue : s, 0);
-  const realMonthlyBalance = monthlyBalance - monthlyInstallmentCost;
+  const realMonthlyBalance = monthlyBalance;
 
   // Trip readiness
   const tripReadiness = trips.length > 0
@@ -236,7 +240,7 @@ export const FinancialHealth = ({
           <p className={`text-lg font-bold ${realMonthlyBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
             {realMonthlyBalance >= 0 ? "+" : ""}R$ {realMonthlyBalance.toLocaleString("pt-BR")}
           </p>
-          <p className="text-[10px] text-muted-foreground">Inclui parcelas</p>
+          <p className="text-[10px] text-muted-foreground">Inclui fixas + parcelas</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Projeção Anual</p>
@@ -252,12 +256,12 @@ export const FinancialHealth = ({
         <h4 className="text-xs font-bold mb-3">📊 COMPOSIÇÃO DO SCORE</h4>
         <div className="space-y-2">
           {[
-            { label: "Poupança mensal", value: Math.min(savingsRate * 0.6, 15), max: 15, icon: "💰" },
+            { label: "Poupança mensal", value: Math.min(Math.max(savingsRate, 0) * 1.0, 20), max: 20, icon: "💰" },
             { label: "Contas em dia", value: Math.min(billsPaymentRate * 0.15, 15), max: 15, icon: "📋" },
             { label: "Reserva de emergência", value: Math.min(emergencyProgress * 0.15, 15), max: 15, icon: "🛡️" },
-            { label: "Volume de investimentos", value: Math.min(investmentRate * 0.3, 10), max: 10, icon: "📈" },
+            { label: "Aportes mensais", value: Math.min(investmentRate * 1.0, 15), max: 15, icon: "📈" },
             { label: "Progresso das metas", value: Math.min(goalsProgress * 0.1, 10), max: 10, icon: "🎯" },
-            { label: "Controle de dívidas", value: Math.max(0, 15 - Math.min(debtToIncome * 0.4, 15)), max: 15, icon: "💳" },
+            { label: "Controle de dívidas", value: Math.max(0, 15 - Math.min(debtToIncome * 0.5, 15)), max: 15, icon: "💳" },
             { label: "Quitação de parcelas", value: Math.min(installmentProgress * 0.05, 5), max: 5, icon: "📆" },
             { label: "Disciplina (desejos)", value: Math.min(wishlistDiscipline * 0.05, 5), max: 5, icon: "❤️" },
             { label: "Diversificação", value: Math.min(diversificationScore * 0.05, 5), max: 5, icon: "🔀" },
@@ -359,7 +363,7 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {emergencyFund.toLocaleString("pt-BR")} de R$ {emergencyFundGoal.toLocaleString("pt-BR")} ({emergencyProgress.toFixed(0)}%)
+            R$ {emergencyFund.toLocaleString("pt-BR")} de R$ {realEmergencyGoal.toLocaleString("pt-BR")} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">

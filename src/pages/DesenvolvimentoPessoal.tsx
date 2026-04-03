@@ -212,7 +212,7 @@ const DesenvolvimentoPessoal = () => {
         <ModuleTip
           moduleId="desenvolvimento"
           tips={[
-            "Preencha a Roda da Vida para visualizar áreas que precisam de atenção",
+            "Defina suas metas de vida, bucket list e quadro de visão na aba Metas",
             "Escreva 3 coisas pelas quais é grato no diário de gratidão",
             "Defina seus valores e forças pessoais na aba 🧠 Sobre Mim",
             "Crie afirmações positivas e leia-as diariamente"
@@ -221,11 +221,10 @@ const DesenvolvimentoPessoal = () => {
         <Tabs defaultValue="sobre" className="w-full">
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             {[
-              { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" }, { v: "roda", l: "RODA DA VIDA" },
-              { v: "diario", l: "DIÁRIO" }, { v: "humor", l: "HUMOR" }, { v: "respiracao", l: "RESPIRAÇÃO" },
-              { v: "leituras", l: "LEITURAS" }, { v: "cursos", l: "CURSOS" }, { v: "bucket", l: "BUCKET LIST" },
-              { v: "visao", l: "VISÃO" }, { v: "gratidao", l: "GRATIDÃO" }, { v: "carta", l: "CARTA" },
-              { v: "desafios", l: "30 DIAS" }, { v: "scorecard", l: "SCORECARD" },
+              { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" },
+              { v: "diario", l: "DIÁRIO" }, { v: "humor", l: "HUMOR & SCORE" }, { v: "respiracao", l: "RESPIRAÇÃO" },
+              { v: "gratidao", l: "GRATIDÃO" }, { v: "carta", l: "CARTA" },
+              { v: "desafios", l: "30 DIAS" },
             ].map(t => (
               <TabsTrigger key={t.v} value={t.v} className="text-xs px-3 py-1.5">{t.l}</TabsTrigger>
             ))}
@@ -284,7 +283,7 @@ const DesenvolvimentoPessoal = () => {
             </div>
           </TabsContent>
 
-          {/* ========== METAS ========== */}
+          {/* ========== METAS (com Bucket List e Visão) ========== */}
           <TabsContent value="metas" className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Target className="w-4 h-4" /> METAS DE VIDA</h3>
@@ -312,36 +311,62 @@ const DesenvolvimentoPessoal = () => {
                 {lifeGoals.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione suas metas de vida ✨</p>}
               </div>
             </div>
-          </TabsContent>
 
-          {/* ========== RODA DA VIDA ========== */}
-          <TabsContent value="roda" className="space-y-4">
+            {/* Bucket List dentro de Metas */}
             <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Compass className="w-4 h-4" /> RODA DA VIDA</h3>
-              <p className="text-xs text-muted-foreground mb-4">Avalie de 0 a 10 sua satisfação em cada área:</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {lifeAreas.map(area => {
-                  const Icon = area.icon; const score = wheelScores[area.id];
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-400" /> BUCKET LIST</h3>
+              <div className="flex gap-2 mb-3">
+                <Input value={newBucket} onChange={e => setNewBucket(e.target.value)} placeholder="Ex: Conhecer a Aurora Boreal" className="text-xs h-8 flex-1"
+                  onKeyDown={e => { if (e.key === "Enter" && newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}} />
+                <Button size="sm" className="h-8" onClick={() => { if (newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}}><Plus className="w-3 h-3" /></Button>
+              </div>
+              {bucketList.map((item, i) => (
+                <div key={item.id} className={`flex items-center gap-3 rounded-lg p-3 border mb-1 ${item.done ? "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30" : "bg-muted/30 border-border"}`}>
+                  <button onClick={() => { const u = [...bucketList]; u[i] = { ...item, done: !item.done }; setBucketList(u); }}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${item.done ? "bg-green-500 border-green-500" : "border-muted-foreground/30"}`}>
+                    {item.done && <Check className="w-3 h-3 text-white" />}
+                  </button>
+                  <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+                  <button onClick={() => setBucketList(bucketList.filter(x => x.id !== item.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
+                </div>
+              ))}
+              {bucketList.length > 0 && <p className="text-xs text-muted-foreground mt-2">✅ {bucketList.filter(b => b.done).length}/{bucketList.length} realizados</p>}
+              {bucketList.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">O que você quer fazer na vida? 🌍</p>}
+            </div>
+
+            {/* Visão dentro de Metas */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Eye className="w-4 h-4" /> QUADRO DE VISÃO</h3>
+              <div className="flex gap-2 mb-3">
+                <select value={newVisionCategory} onChange={e => setNewVisionCategory(e.target.value)} className="text-xs bg-background border border-border rounded px-2 py-1 h-8">
+                  {lifeAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <Input value={newVisionText} onChange={e => setNewVisionText(e.target.value)} placeholder="Ex: Morar na praia" className="text-xs h-8 flex-1" />
+                <Button size="sm" className="h-8" onClick={() => { if (newVisionText.trim()) { setVisionItems([...visionItems, { id: Date.now().toString(), category: newVisionCategory, text: newVisionText.trim() }]); setNewVisionText(""); }}}><Plus className="w-3 h-3" /></Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lifeAreas.filter(a => visionItems.some(v => v.category === a.id)).map(area => {
+                  const Icon = area.icon;
                   return (
                     <div key={area.id} className="bg-muted/30 rounded-lg p-3 border border-border">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Icon className={`w-4 h-4 ${area.color}`} /><span className="text-xs font-bold">{area.name}</span>
-                        <span className="ml-auto text-lg font-bold">{score}</span>
-                      </div>
-                      <input type="range" min={0} max={10} value={score}
-                        onChange={e => setWheelScores({ ...wheelScores, [area.id]: Number(e.target.value) })}
-                        className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-primary" />
+                      <h4 className="text-xs font-bold flex items-center gap-2 mb-2"><Icon className={`w-3 h-3 ${area.color}`} />{area.name}</h4>
+                      {visionItems.filter(v => v.category === area.id).map(item => (
+                        <div key={item.id} className="flex items-center justify-between text-xs mb-1">
+                          <span>✨ {item.text}</span>
+                          <button onClick={() => setVisionItems(visionItems.filter(v => v.id !== item.id))}><X className="w-3 h-3 text-muted-foreground" /></button>
+                        </div>
+                      ))}
                     </div>
                   );
                 })}
               </div>
-              <div className="mt-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg p-3 border border-purple-500/20">
-                <p className="text-xs font-bold">📈 Média: {(Object.values(wheelScores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}/10</p>
-              </div>
+              {visionItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione seus sonhos 🎯</p>}
             </div>
           </TabsContent>
 
-          {/* ========== DIÁRIO / JOURNALING ========== */}
+          {/* ========== RODA DA VIDA ========== */}
+
+
           <TabsContent value="diario" className="space-y-4">
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/30 p-4">
               <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><PenTool className="w-4 h-4 text-indigo-500" /> DIÁRIO DE REFLEXÃO — {new Date().toLocaleDateString("pt-BR")}</h3>
@@ -400,9 +425,47 @@ const DesenvolvimentoPessoal = () => {
                 })}
               </div>
             </div>
-          </TabsContent>
 
-          {/* ========== BREATHING ========== */}
+            {/* Scorecard Semanal dentro de Humor */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4" /> SCORECARD SEMANAL — {currentWeek}</h3>
+              <p className="text-xs text-muted-foreground mb-4">Dê uma nota de 1 a 10 para cada área nesta semana:</p>
+              <div className="space-y-3">
+                {lifeAreas.map(area => {
+                  const Icon = area.icon; const score = thisWeekScores[area.id] || 5;
+                  return (
+                    <div key={area.id} className="flex items-center gap-3">
+                      <Icon className={`w-4 h-4 ${area.color}`} />
+                      <span className="text-xs font-medium w-28">{area.name}</span>
+                      <input type="range" min={1} max={10} value={score}
+                        onChange={e => {
+                          const updated = { ...thisWeekScores, [area.id]: Number(e.target.value) };
+                          setWeeklyScores({ ...weeklyScores, [currentWeek]: updated });
+                        }} className="flex-1 h-2 accent-primary" />
+                      <span className="text-xs font-bold w-8 text-right">{score}/10</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-500/20">
+                <p className="text-xs font-bold">📊 Média da semana: {(Object.values(thisWeekScores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}/10</p>
+              </div>
+            </div>
+            {Object.keys(weeklyScores).length > 1 && (
+              <div className="bg-card rounded-xl border border-border p-4">
+                <h3 className="text-xs font-bold mb-3">📈 EVOLUÇÃO SEMANAL</h3>
+                <div className="space-y-2">
+                  {Object.entries(weeklyScores).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 8).map(([week, scores]) => (
+                    <div key={week} className="flex items-center gap-3">
+                      <span className="text-xs font-medium w-20">{week}</span>
+                      <Progress value={(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length) * 10} className="h-2 flex-1" />
+                      <span className="text-xs font-bold">{(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
           <TabsContent value="respiracao" className="space-y-4">
             <div className="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10 rounded-xl border border-teal-200 dark:border-teal-500/30 p-6 text-center">
               <h3 className="text-xs font-bold mb-4 flex items-center justify-center gap-2"><Wind className="w-4 h-4 text-teal-500" /> RESPIRAÇÃO 4-7-8</h3>
@@ -427,131 +490,7 @@ const DesenvolvimentoPessoal = () => {
             </div>
           </TabsContent>
 
-          {/* ========== LEITURAS ========== */}
-          <TabsContent value="leituras" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BookOpen className="w-4 h-4" /> MEUS LIVROS</h3>
-              <div className="flex gap-2 mb-3">
-                <Input value={newBookTitle} onChange={e => setNewBookTitle(e.target.value)} placeholder="Título" className="text-xs h-8 flex-1" />
-                <Input value={newBookAuthor} onChange={e => setNewBookAuthor(e.target.value)} placeholder="Autor" className="text-xs h-8 w-32" />
-                <Button size="sm" className="h-8" onClick={() => {
-                  if (newBookTitle.trim()) { setBooks([...books, { id: Date.now().toString(), title: newBookTitle.trim(), author: newBookAuthor.trim(), status: "lendo", rating: 0, notes: "" }]); setNewBookTitle(""); setNewBookAuthor(""); }
-                }}><Plus className="w-3 h-3" /></Button>
-              </div>
-              {books.map((book, i) => (
-                <div key={book.id} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <div><p className="text-sm font-bold">{book.title}</p><p className="text-xs text-muted-foreground">{book.author}</p></div>
-                    <div className="flex items-center gap-2">
-                      <select value={book.status} onChange={e => { const u = [...books]; u[i] = { ...book, status: e.target.value }; setBooks(u); }} className="text-xs bg-background border border-border rounded px-2 py-1">
-                        <option value="quero-ler">Quero ler</option><option value="lendo">Lendo</option><option value="lido">Lido</option>
-                      </select>
-                      <button onClick={() => setBooks(books.filter(b => b.id !== book.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 mb-2">
-                    {[1,2,3,4,5].map(s => (
-                      <button key={s} onClick={() => { const u = [...books]; u[i] = { ...book, rating: s }; setBooks(u); }}>
-                        <Star className={`w-4 h-4 ${s <= book.rating ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground/30"}`} />
-                      </button>
-                    ))}
-                  </div>
-                  <Textarea value={book.notes} onChange={e => { const u = [...books]; u[i] = { ...book, notes: e.target.value }; setBooks(u); }} placeholder="Anotações..." className="text-xs min-h-[50px]" />
-                </div>
-              ))}
-              {books.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione livros 📚</p>}
-            </div>
-          </TabsContent>
 
-          {/* ========== CURSOS/PODCASTS ========== */}
-          <TabsContent value="cursos" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Headphones className="w-4 h-4" /> CURSOS E PODCASTS</h3>
-              <div className="flex gap-2 mb-3">
-                <Input value={newCourseTitle} onChange={e => setNewCourseTitle(e.target.value)} placeholder="Nome do curso/podcast" className="text-xs h-8 flex-1" />
-                <Button size="sm" className="h-8" onClick={() => {
-                  if (newCourseTitle.trim()) { setCourses([...courses, { id: Date.now().toString(), title: newCourseTitle.trim(), platform: "", status: "em-andamento", progress: 0, notes: "" }]); setNewCourseTitle(""); }
-                }}><Plus className="w-3 h-3" /></Button>
-              </div>
-              {courses.map((c, i) => (
-                <div key={c.id} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-bold">{c.title}</p>
-                    <div className="flex items-center gap-2">
-                      <select value={c.status} onChange={e => { const u = [...courses]; u[i] = { ...c, status: e.target.value }; setCourses(u); }} className="text-xs bg-background border border-border rounded px-2 py-1">
-                        <option value="quero-fazer">Quero fazer</option><option value="em-andamento">Em andamento</option><option value="concluido">Concluído</option>
-                      </select>
-                      <button onClick={() => setCourses(courses.filter(x => x.id !== c.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs text-muted-foreground">Progresso:</span>
-                    <input type="range" min={0} max={100} value={c.progress} onChange={e => { const u = [...courses]; u[i] = { ...c, progress: Number(e.target.value) }; setCourses(u); }} className="flex-1 h-2 accent-primary" />
-                    <span className="text-xs font-bold">{c.progress}%</span>
-                  </div>
-                  <Textarea value={c.notes} onChange={e => { const u = [...courses]; u[i] = { ...c, notes: e.target.value }; setCourses(u); }} placeholder="Anotações..." className="text-xs min-h-[40px]" />
-                </div>
-              ))}
-              {courses.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione cursos ou podcasts 🎧</p>}
-            </div>
-          </TabsContent>
-
-          {/* ========== BUCKET LIST ========== */}
-          <TabsContent value="bucket" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-400" /> BUCKET LIST</h3>
-              <div className="flex gap-2 mb-3">
-                <Input value={newBucket} onChange={e => setNewBucket(e.target.value)} placeholder="Ex: Conhecer a Aurora Boreal" className="text-xs h-8 flex-1"
-                  onKeyDown={e => { if (e.key === "Enter" && newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}} />
-                <Button size="sm" className="h-8" onClick={() => { if (newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}}><Plus className="w-3 h-3" /></Button>
-              </div>
-              {bucketList.map((item, i) => (
-                <div key={item.id} className={`flex items-center gap-3 rounded-lg p-3 border mb-1 ${item.done ? "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30" : "bg-muted/30 border-border"}`}>
-                  <button onClick={() => { const u = [...bucketList]; u[i] = { ...item, done: !item.done }; setBucketList(u); }}
-                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${item.done ? "bg-green-500 border-green-500" : "border-muted-foreground/30"}`}>
-                    {item.done && <Check className="w-3 h-3 text-white" />}
-                  </button>
-                  <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
-                  <button onClick={() => setBucketList(bucketList.filter(x => x.id !== item.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
-                </div>
-              ))}
-              {bucketList.length > 0 && <p className="text-xs text-muted-foreground mt-2">✅ {bucketList.filter(b => b.done).length}/{bucketList.length} realizados</p>}
-              {bucketList.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">O que você quer fazer na vida? 🌍</p>}
-            </div>
-          </TabsContent>
-
-          {/* ========== VISÃO ========== */}
-          <TabsContent value="visao" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Eye className="w-4 h-4" /> QUADRO DE VISÃO</h3>
-              <div className="flex gap-2 mb-3">
-                <select value={newVisionCategory} onChange={e => setNewVisionCategory(e.target.value)} className="text-xs bg-background border border-border rounded px-2 py-1 h-8">
-                  {lifeAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-                <Input value={newVisionText} onChange={e => setNewVisionText(e.target.value)} placeholder="Ex: Morar na praia" className="text-xs h-8 flex-1" />
-                <Button size="sm" className="h-8" onClick={() => { if (newVisionText.trim()) { setVisionItems([...visionItems, { id: Date.now().toString(), category: newVisionCategory, text: newVisionText.trim() }]); setNewVisionText(""); }}}><Plus className="w-3 h-3" /></Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {lifeAreas.filter(a => visionItems.some(v => v.category === a.id)).map(area => {
-                  const Icon = area.icon;
-                  return (
-                    <div key={area.id} className="bg-muted/30 rounded-lg p-3 border border-border">
-                      <h4 className="text-xs font-bold flex items-center gap-2 mb-2"><Icon className={`w-3 h-3 ${area.color}`} />{area.name}</h4>
-                      {visionItems.filter(v => v.category === area.id).map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-xs mb-1">
-                          <span>✨ {item.text}</span>
-                          <button onClick={() => setVisionItems(visionItems.filter(v => v.id !== item.id))}><X className="w-3 h-3 text-muted-foreground" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-              {visionItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione seus sonhos 🎯</p>}
-            </div>
-          </TabsContent>
-
-          {/* ========== GRATIDÃO ========== */}
           <TabsContent value="gratidao" className="space-y-4">
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-amber-500" /> GRATIDÃO — {new Date().toLocaleDateString("pt-BR")}</h3>
@@ -649,47 +588,8 @@ const DesenvolvimentoPessoal = () => {
             </div>
           </TabsContent>
 
-          {/* ========== SCORECARD SEMANAL ========== */}
-          <TabsContent value="scorecard" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4" /> SCORECARD SEMANAL — {currentWeek}</h3>
-              <p className="text-xs text-muted-foreground mb-4">Dê uma nota de 1 a 10 para cada área nesta semana:</p>
-              <div className="space-y-3">
-                {lifeAreas.map(area => {
-                  const Icon = area.icon; const score = thisWeekScores[area.id] || 5;
-                  return (
-                    <div key={area.id} className="flex items-center gap-3">
-                      <Icon className={`w-4 h-4 ${area.color}`} />
-                      <span className="text-xs font-medium w-28">{area.name}</span>
-                      <input type="range" min={1} max={10} value={score}
-                        onChange={e => {
-                          const updated = { ...thisWeekScores, [area.id]: Number(e.target.value) };
-                          setWeeklyScores({ ...weeklyScores, [currentWeek]: updated });
-                        }} className="flex-1 h-2 accent-primary" />
-                      <span className="text-xs font-bold w-8 text-right">{score}/10</span>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-500/20">
-                <p className="text-xs font-bold">📊 Média da semana: {(Object.values(thisWeekScores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}/10</p>
-              </div>
-            </div>
-            {Object.keys(weeklyScores).length > 1 && (
-              <div className="bg-card rounded-xl border border-border p-4">
-                <h3 className="text-xs font-bold mb-3">📈 EVOLUÇÃO SEMANAL</h3>
-                <div className="space-y-2">
-                  {Object.entries(weeklyScores).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 8).map(([week, scores]) => (
-                    <div key={week} className="flex items-center gap-3">
-                      <span className="text-xs font-medium w-20">{week}</span>
-                      <Progress value={(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length) * 10} className="h-2 flex-1" />
-                      <span className="text-xs font-bold">{(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
+
+
         </Tabs>
       </main>
     </div>

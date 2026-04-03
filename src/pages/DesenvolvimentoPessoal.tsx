@@ -425,9 +425,47 @@ const DesenvolvimentoPessoal = () => {
                 })}
               </div>
             </div>
-          </TabsContent>
 
-          {/* ========== BREATHING ========== */}
+            {/* Scorecard Semanal dentro de Humor */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4" /> SCORECARD SEMANAL — {currentWeek}</h3>
+              <p className="text-xs text-muted-foreground mb-4">Dê uma nota de 1 a 10 para cada área nesta semana:</p>
+              <div className="space-y-3">
+                {lifeAreas.map(area => {
+                  const Icon = area.icon; const score = thisWeekScores[area.id] || 5;
+                  return (
+                    <div key={area.id} className="flex items-center gap-3">
+                      <Icon className={`w-4 h-4 ${area.color}`} />
+                      <span className="text-xs font-medium w-28">{area.name}</span>
+                      <input type="range" min={1} max={10} value={score}
+                        onChange={e => {
+                          const updated = { ...thisWeekScores, [area.id]: Number(e.target.value) };
+                          setWeeklyScores({ ...weeklyScores, [currentWeek]: updated });
+                        }} className="flex-1 h-2 accent-primary" />
+                      <span className="text-xs font-bold w-8 text-right">{score}/10</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg p-3 border border-blue-500/20">
+                <p className="text-xs font-bold">📊 Média da semana: {(Object.values(thisWeekScores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}/10</p>
+              </div>
+            </div>
+            {Object.keys(weeklyScores).length > 1 && (
+              <div className="bg-card rounded-xl border border-border p-4">
+                <h3 className="text-xs font-bold mb-3">📈 EVOLUÇÃO SEMANAL</h3>
+                <div className="space-y-2">
+                  {Object.entries(weeklyScores).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 8).map(([week, scores]) => (
+                    <div key={week} className="flex items-center gap-3">
+                      <span className="text-xs font-medium w-20">{week}</span>
+                      <Progress value={(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length) * 10} className="h-2 flex-1" />
+                      <span className="text-xs font-bold">{(Object.values(scores).reduce((a, b) => a + b, 0) / lifeAreas.length).toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </TabsContent>
           <TabsContent value="respiracao" className="space-y-4">
             <div className="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10 rounded-xl border border-teal-200 dark:border-teal-500/30 p-6 text-center">
               <h3 className="text-xs font-bold mb-4 flex items-center justify-center gap-2"><Wind className="w-4 h-4 text-teal-500" /> RESPIRAÇÃO 4-7-8</h3>

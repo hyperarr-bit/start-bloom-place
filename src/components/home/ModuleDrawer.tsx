@@ -106,6 +106,14 @@ export const ModuleDrawer = () => {
           +{hiddenCount} oculto{hiddenCount > 1 ? "s" : ""} · Editar
         </button>
       )}
+
+      <button
+        onClick={signOut}
+        className="w-full flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border text-xs text-destructive hover:text-destructive/80 transition-colors"
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        Sair da conta
+      </button>
     </div>
   );
 };

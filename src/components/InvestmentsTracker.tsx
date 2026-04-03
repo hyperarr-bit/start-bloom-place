@@ -239,7 +239,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
               <Input
                 type="number"
-                placeholder="Aporte mensal"
+                placeholder="Aporte mensal (R$)"
                 value={newInvestment.monthlyContribution || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, monthlyContribution: parseFloat(e.target.value) || 0 })}
                 className="h-8 text-xs"
@@ -251,13 +251,19 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
                 className="h-8 text-xs"
               />
-              <Input
-                type="date"
-                placeholder="Data início"
-                value={newInvestment.startDate || ""}
-                onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                className="h-8 text-xs"
-              />
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={newInvestment.startDate || ""}
+                  onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
+                  className={`h-8 text-xs w-full ${!newInvestment.startDate ? "text-muted-foreground" : ""}`}
+                />
+                {!newInvestment.startDate && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                    Data início
+                  </span>
+                )}
+              </div>
               <Input
                 placeholder="Corretora (opcional)"
                 value={newInvestment.broker || ""}

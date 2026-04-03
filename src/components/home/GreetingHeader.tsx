@@ -84,7 +84,8 @@ const getContextualMessage = (data: LifeHubData): string => {
 };
 
 export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
+  const { set: setUserData } = useUserData();
   const navigate = useNavigate();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
@@ -93,8 +94,7 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
   const displayName = data.userName || user?.email?.split("@")[0] || "";
 
   const handleNameSave = (name: string) => {
-    // Will be persisted via useUserData in the parent
-    try { localStorage.setItem("core-user-name", name); } catch {}
+    setUserData("core-user-name", name);
     onNameChange?.(name);
   };
 

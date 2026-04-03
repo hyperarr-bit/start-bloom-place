@@ -292,29 +292,36 @@ export const Dashboard = ({
     return { projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
-  // Daily budget: how much you can spend per day
+  // Daily budget: how much you can spend per day (accounting for fixed costs & unpaid bills)
   const dailyBudget = useMemo(() => {
     const now = new Date();
     const day = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = daysInMonth - day;
 
+    // Reserve full fixed costs (rent, subscriptions, etc.)
     const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
-    // Unpaid bills value estimate — count unpaid × avg bill
+
+    // Unpaid bills still pending
     const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    // Estimate unpaid bill values: avg fixed cost per bill
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsTotal / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
 
-    // Available = income - already spent - remaining fixed costs
+    // Available = income - already spent - fixed costs reserved - unpaid bills reserved
     const alreadySpent = totalExpenses;
-    const stillOwed = fixedCostsTotal; // simplification: full fixed costs reserved
-    const available = totalIncome - alreadySpent;
-    const perDay = remainingDays > 0 ? available / remainingDays : 0;
-    const status: "good" | "warning" | "danger" = perDay > (totalIncome / daysInMonth) * 0.8
+    const reserved = fixedCostsTotal + unpaidBillsEstimate;
+    const availableReal = totalIncome - alreadySpent - reserved;
+    const perDay = remainingDays > 0 ? availableReal / remainingDays : availableReal;
+    const cantSpend = availableReal <= 0;
+    const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsTotal) / daysInMonth : 0;
+    const status: "good" | "warning" | "danger" = cantSpend
+      ? "danger"
+      : perDay > idealPerDay * 0.8
       ? "good"
-      : perDay > 0
-      ? "warning"
-      : "danger";
+      : "warning";
 
-    return { available, perDay, remainingDays, status };
+    return { availableReal, reserved, fixedCostsTotal, unpaidBillsEstimate, perDay, remainingDays, status, cantSpend, alreadySpent };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Top 5 largest expenses
@@ -437,80 +444,6 @@ export const Dashboard = ({
         </div>
       )}
 
-      {/* Forecast + Daily Budget */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Previsão de Saldo */}
-        <div className={`rounded-lg border p-4 ${forecast.projectedBalance >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
-          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
-            <TrendingUp className="w-4 h-4" />
-            PREVISÃO FIM DO MÊS
-          </h3>
-          <p className={`text-2xl font-bold tabular-nums ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Baseado no seu ritmo de R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")}/dia × {forecast.remainingDays} dias restantes
-          </p>
-          <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Receita total</span>
-              <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Já gasto (dia {forecast.day})</span>
-              <span className="text-red-400 tabular-nums">-R$ {totalExpenses.toLocaleString("pt-BR")}</span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Projeção restante</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.dailyVariableRate * forecast.remainingDays).toLocaleString("pt-BR")}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quanto Posso Gastar Hoje */}
-        <div className={`rounded-lg border p-4 ${
-          dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
-          dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
-          "bg-red-500/5 border-red-500/20"
-        }`}>
-          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
-            <Wallet className="w-4 h-4" />
-            QUANTO POSSO GASTAR HOJE
-          </h3>
-          <p className={`text-2xl font-bold tabular-nums ${
-            dailyBudget.status === "good" ? "text-green-400" :
-            dailyBudget.status === "warning" ? "text-orange-400" :
-            "text-red-400"
-          }`}>
-            R$ {Math.max(0, Math.round(dailyBudget.perDay)).toLocaleString("pt-BR")}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            {dailyBudget.remainingDays} dias restantes no mês
-          </p>
-          <div className="mt-3 space-y-1">
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Disponível total</span>
-              <span className="tabular-nums">R$ {Math.max(0, Math.round(dailyBudget.available)).toLocaleString("pt-BR")}</span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
-              <span className="tabular-nums">= R$ {Math.max(0, Math.round(dailyBudget.perDay)).toLocaleString("pt-BR")}/dia</span>
-            </div>
-          </div>
-          {dailyBudget.status === "danger" && (
-            <p className="text-[10px] text-red-400 mt-2 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" />
-              Orçamento esgotado — evite gastos extras
-            </p>
-          )}
-          {dailyBudget.status === "warning" && (
-            <p className="text-[10px] text-orange-400 mt-2 flex items-center gap-1">
-              <Lightbulb className="w-3 h-3" />
-              Atenção: ritmo de gastos acima do ideal
-            </p>
-          )}
-        </div>
-      </div>
 
       {/* Charts Grid */}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -681,14 +614,8 @@ export const Dashboard = ({
         {top5Expenses.length > 0 ? (
           <div className="space-y-2">
             {top5Expenses.map((item, i) => {
-              const redShades = [
-                { bar: "bg-red-600", text: "text-red-600" },
-                { bar: "bg-red-500", text: "text-red-500" },
-                { bar: "bg-red-400", text: "text-red-400" },
-                { bar: "bg-red-300", text: "text-red-300" },
-                { bar: "bg-red-200", text: "text-red-200" },
-              ];
-              const shade = redShades[i] || redShades[4];
+              const barColor = categoryBarColors[item.category] || "bg-gray-400";
+              const textColor = categoryTextColors[item.category] || "text-gray-400";
               return (
                 <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -696,13 +623,13 @@ export const Dashboard = ({
                       <span className="font-bold mr-1.5">{i + 1}.</span>
                       {item.description}
                     </span>
-                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${shade.text}`}>
+                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${textColor}`}>
                       R$ {item.value.toLocaleString("pt-BR")}
                     </span>
                   </div>
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${shade.bar}`}
+                      className={`h-full rounded-full transition-all ${barColor}`}
                       style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
                     />
                   </div>
@@ -744,6 +671,103 @@ export const Dashboard = ({
         ) : (
           <p className="text-sm text-muted-foreground text-center py-6">Sem transações registradas</p>
         )}
+      </div>
+
+      {/* Forecast + Daily Budget */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Previsão de Saldo */}
+        <div className={`rounded-lg border p-4 ${forecast.projectedBalance >= 0 ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
+          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            PREVISÃO FIM DO MÊS
+          </h3>
+          <p className={`text-2xl font-bold tabular-nums ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
+            {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Baseado no seu ritmo de R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")}/dia × {forecast.remainingDays} dias restantes
+          </p>
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Receita total</span>
+              <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Já gasto (dia {forecast.day})</span>
+              <span className="text-red-400 tabular-nums">-R$ {totalExpenses.toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Projeção restante</span>
+              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.dailyVariableRate * forecast.remainingDays).toLocaleString("pt-BR")}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quanto Posso Gastar Hoje */}
+        <div className={`rounded-lg border p-4 ${
+          dailyBudget.status === "good" ? "bg-green-500/5 border-green-500/20" :
+          dailyBudget.status === "warning" ? "bg-orange-500/5 border-orange-500/20" :
+          "bg-red-500/5 border-red-500/20"
+        }`}>
+          <h3 className="text-xs font-bold mb-2 flex items-center gap-2">
+            <Wallet className="w-4 h-4" />
+            QUANTO POSSO GASTAR HOJE
+          </h3>
+          {dailyBudget.cantSpend ? (
+            <>
+              <p className="text-2xl font-bold tabular-nums text-red-400">R$ 0</p>
+              <p className="text-[10px] text-red-400 mt-2 flex items-start gap-1">
+                <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                <span>Você não pode gastar — suas contas futuras consomem todo o saldo restante. Guarde o que puder.</span>
+              </p>
+            </>
+          ) : (
+            <p className={`text-2xl font-bold tabular-nums ${
+              dailyBudget.status === "good" ? "text-green-400" :
+              dailyBudget.status === "warning" ? "text-orange-400" :
+              "text-red-400"
+            }`}>
+              R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}
+            </p>
+          )}
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {dailyBudget.remainingDays} dias restantes no mês
+          </p>
+          <div className="mt-3 space-y-1">
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Saldo atual</span>
+              <span className="tabular-nums">R$ {Math.round(totalIncome - dailyBudget.alreadySpent).toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Custos fixos reservados</span>
+              <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+            </div>
+            {dailyBudget.unpaidBillsEstimate > 0 && (
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Contas pendentes</span>
+                <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-[10px] border-t border-border pt-1 mt-1">
+              <span className="text-muted-foreground font-medium">Disponível livre</span>
+              <span className={`tabular-nums font-medium ${dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400"}`}>
+                R$ {Math.round(Math.max(0, dailyBudget.availableReal)).toLocaleString("pt-BR")}
+              </span>
+            </div>
+            {!dailyBudget.cantSpend && (
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
+                <span className="tabular-nums">= R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}/dia</span>
+              </div>
+            )}
+          </div>
+          {!dailyBudget.cantSpend && dailyBudget.status === "warning" && (
+            <p className="text-[10px] text-orange-400 mt-2 flex items-center gap-1">
+              <Lightbulb className="w-3 h-3" />
+              Atenção: ritmo de gastos acima do ideal
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

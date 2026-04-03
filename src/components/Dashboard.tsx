@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
-import { getMonthTotals } from "@/components/finance/storage-keys";
+import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
 import { Progress } from "@/components/ui/progress";
 
 const ALL_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -125,13 +125,15 @@ export const Dashboard = ({
   incomes,
   onNavigate,
 }: DashboardProps) => {
-  // Compute annual data from actual monthly records
+  const currentYear = getCurrentYear();
+
+  // Compute annual data from actual monthly records (current year only)
   const annualData = useMemo(() => {
     return ALL_MONTHS.map((month) => {
-      const totals = getMonthTotals(month);
+      const totals = getMonthTotals(month, currentYear);
       return { month, ...totals };
     });
-  }, []);
+  }, [currentYear]);
 
   // Month progress data
   const monthProgress = useMemo(() => {
@@ -210,17 +212,20 @@ export const Dashboard = ({
       }));
   }, [annualData, currentMonthIdx]);
 
-  // Patrimony evolution — only consecutive months up to current month
+  // Patrimony evolution — real accumulated balance across months
+  // Patrimônio = investments base + sum of monthly balances (receitas - fixos - variáveis)
   const patrimonyData = useMemo(() => {
     let accumulated = totalInvestments;
-    return annualData
-      .slice(0, currentMonthIdx + 1)
-      .filter((d) => d.receitas > 0)
-      .map((d) => {
-        const saving = d.receitas - d.custosFixos - d.custosVariaveis - d.dividas;
-        accumulated += saving * 0.2;
-        return { month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) };
-      });
+    const result: { month: string; Patrimônio: number }[] = [];
+    for (let i = 0; i <= currentMonthIdx; i++) {
+      const d = annualData[i];
+      const hasData = d.receitas > 0 || d.custosFixos > 0 || d.custosVariaveis > 0;
+      if (!hasData && result.length === 0) continue; // skip leading empty months
+      const monthBalance = d.receitas - d.custosFixos - d.custosVariaveis;
+      accumulated += monthBalance;
+      result.push({ month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) });
+    }
+    return result;
   }, [annualData, totalInvestments, currentMonthIdx]);
 
   // Smart alerts

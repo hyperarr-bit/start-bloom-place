@@ -1,5 +1,5 @@
 import { FileText, ChevronRight } from "lucide-react";
-import { getFinanceStorageKeys, isCurrentMonth } from "@/components/finance/storage-keys";
+import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
 
 interface MonthBudget {
   month: string;
@@ -16,7 +16,7 @@ interface MonthlyBudgetProps {
 const currentMonthIndex = new Date().getMonth();
 
 const hasMonthData = (month: string) => {
-  const keys = getFinanceStorageKeys(month);
+  const keys = getFinanceStorageKeys(month, getCurrentYear());
   try {
     const incomes = JSON.parse(localStorage.getItem(keys.incomes) || "[]");
     const expenses = JSON.parse(localStorage.getItem(keys.expenses) || "[]");

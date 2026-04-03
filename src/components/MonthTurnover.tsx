@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar } from "lucide-react";
-import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey } from "@/components/finance/storage-keys";
+import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getCurrentYear } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -60,10 +60,13 @@ const copyToMonth = (fromMonth: string, toMonth: string, options: {
   }
 
   if (options.categoryBudgets) {
-    const fromKey = `finance-month-${getMonthKey(fromMonth)}-category-budgets`;
+    const year = getCurrentYear();
+    const fromKey = isCurrentMonthCheck(fromMonth)
+      ? "finance-category-budgets"
+      : `finance-${year}-${getMonthKey(fromMonth)}-category-budgets`;
     const toKey = isCurrentMonthCheck(toMonth)
       ? "finance-category-budgets"
-      : `finance-month-${getMonthKey(toMonth)}-category-budgets`;
+      : `finance-${year}-${getMonthKey(toMonth)}-category-budgets`;
     const baseBudgets = readLocalKey("finance-category-budgets");
     const monthBudgets = readLocalKey(fromKey);
     const data = monthBudgets || baseBudgets;
@@ -120,7 +123,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
 
   const hasCategoryBudgets = (() => {
     const base = readLocalKey("finance-category-budgets");
-    const monthKey = `finance-month-${getMonthKey(prevMonth)}-category-budgets`;
+    const year = getCurrentYear();
+    const monthKey = `finance-${year}-${getMonthKey(prevMonth)}-category-budgets`;
     const month = readLocalKey(monthKey);
     const data = month || base;
     return data && Object.keys(data).length > 0;

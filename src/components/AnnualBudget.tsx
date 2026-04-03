@@ -1,14 +1,16 @@
 import { useMemo } from "react";
-import { getMonthTotals, getCurrentMonthName } from "@/components/finance/storage-keys";
+import { getMonthTotals, getCurrentMonthName, getCurrentYear } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
+// TODO: adicionar seletor de ano para visualizar anos anteriores
 export const AnnualBudget = () => {
   const currentMonth = getCurrentMonthName();
+  const currentYear = getCurrentYear();
 
   const computedData = useMemo(() => {
     return months.map((month) => {
-      const totals = getMonthTotals(month);
+      const totals = getMonthTotals(month, currentYear);
       return {
         month,
         ...totals,
@@ -16,7 +18,7 @@ export const AnnualBudget = () => {
         hasData: totals.receitas + totals.custosFixos + totals.custosVariaveis + totals.dividas > 0,
       };
     });
-  }, [currentMonth]);
+  }, [currentMonth, currentYear]);
 
   const sumCol = (field: "receitas" | "custosFixos" | "custosVariaveis" | "dividas") =>
     computedData.reduce((s, d) => s + d[field], 0);

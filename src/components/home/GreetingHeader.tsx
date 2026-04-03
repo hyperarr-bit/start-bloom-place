@@ -84,6 +84,7 @@ const getContextualMessage = (data: LifeHubData): string => {
 
 export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
   const { signOut, user } = useAuth();
+  const navigate = useNavigate();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
 

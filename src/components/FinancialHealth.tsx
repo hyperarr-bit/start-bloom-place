@@ -363,7 +363,7 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {emergencyFund.toLocaleString("pt-BR")} de R$ {emergencyFundGoal.toLocaleString("pt-BR")} ({emergencyProgress.toFixed(0)}%)
+            R$ {emergencyFund.toLocaleString("pt-BR")} de R$ {realEmergencyGoal.toLocaleString("pt-BR")} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">

@@ -75,9 +75,6 @@ const Index = () => {
 
   const [trips, setTrips] = usePersistedState("finance-trips", [] as any[]);
 
-  // Gamification state
-  const [streakDays, setStreakDays] = usePersistedState("finance-streak", 0);
-  const [challenge52Weeks, setChallenge52Weeks] = usePersistedState<number[]>("finance-52weeks", []);
 
   // Computed values
   const totalIncome = incomes.reduce((sum: number, i: any) => sum + i.value, 0);

@@ -60,10 +60,13 @@ const copyToMonth = (fromMonth: string, toMonth: string, options: {
   }
 
   if (options.categoryBudgets) {
-    const fromKey = `finance-month-${getMonthKey(fromMonth)}-category-budgets`;
+    const year = getCurrentYear();
+    const fromKey = isCurrentMonthCheck(fromMonth)
+      ? "finance-category-budgets"
+      : `finance-${year}-${getMonthKey(fromMonth)}-category-budgets`;
     const toKey = isCurrentMonthCheck(toMonth)
       ? "finance-category-budgets"
-      : `finance-month-${getMonthKey(toMonth)}-category-budgets`;
+      : `finance-${year}-${getMonthKey(toMonth)}-category-budgets`;
     const baseBudgets = readLocalKey("finance-category-budgets");
     const monthBudgets = readLocalKey(fromKey);
     const data = monthBudgets || baseBudgets;

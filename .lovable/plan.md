@@ -1,24 +1,18 @@
 
 
-# Corrigir campo de Rentabilidade nos Investimentos
+# Corrigir Campo de Data no WishlistItems
 
 ## Problema
-O campo "Retorno esperado (% a.a.)" no formulário de criação mostra o valor default (10) em vez de ficar vazio com placeholder explicativo. O mesmo ocorre no campo inline de edição — mostra só o número sem contexto.
+O campo de data no formulário de desejos (`WishlistItems.tsx`) mostra um input `type="date"` sem placeholder visível — igual ao problema que já foi corrigido nos investimentos.
 
 ## Solução
+Padronizar o campo de data do WishlistItems com o mesmo estilo usado no InvestmentsTracker: input `type="date"` com `h-8 text-xs` e dimensões proporcionais aos outros campos do grid.
 
-### Formulário de criação (linha 247-252)
-- Mudar `value={newInvestment.expectedReturn ?? ""}` para não mostrar o default
-- Usar placeholder descritivo: `"Rentabilidade esperada (% a.a.)"`
-- Só preencher o value quando o usuário digitar; manter o default 10 apenas no submit se ficar vazio
+O campo de data em `type="date"` no mobile já mostra o seletor nativo do sistema, então o placeholder não aparece nativamente. Manter consistente com investimentos — sem wrapper extra, apenas garantir que o tamanho (`h-8 text-xs`) esteja correto e proporcional.
 
-### Campo inline de edição (linha 338-344)
-- Mudar placeholder de `"% a.a."` para `"Rent. esperada (% a.a.)"`
-- Manter `defaultValue` com o valor real do investimento (correto)
-- Aumentar largura do campo de `w-16` para `w-24` para caber o placeholder
+## Alteração
 
-## Arquivo alterado
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/InvestmentsTracker.tsx` | Ajustar value/placeholder do campo expectedReturn no form e no inline edit |
+| `src/components/WishlistItems.tsx` | Garantir que o input de data (linha 274) tenha o mesmo padrão visual do InvestmentsTracker — `h-8 text-xs` sem wrappers extras, proporcional aos demais campos |
 

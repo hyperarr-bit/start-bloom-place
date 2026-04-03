@@ -251,15 +251,19 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
                 className="h-8 text-xs"
               />
-              <Input
-                type="text"
-                placeholder="Data início (dd/mm/aaaa)"
-                value={newInvestment.startDate || ""}
-                onFocus={(e) => { e.currentTarget.type = "date"; }}
-                onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
-                onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                className="h-8 text-xs"
-              />
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={newInvestment.startDate || ""}
+                  onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
+                  className="h-8 text-xs"
+                />
+                {!newInvestment.startDate && (
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                    Data início
+                  </span>
+                )}
+              </div>
               <Input
                 placeholder="Corretora (opcional)"
                 value={newInvestment.broker || ""}

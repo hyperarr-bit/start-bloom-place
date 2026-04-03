@@ -123,22 +123,20 @@ export const FinancialHealth = ({
   const diversificationScore = Math.min(investmentTypes * 25, 100);
 
   // Monthly contributions consistency
-  const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
   const contributionRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
-  // === SCORE CALCULATION (0-100) ===
+  // === SCORE CALCULATION (0-100) — sem base inflada ===
   let score = 0;
-  score += Math.min(savingsRate * 0.6, 15);           // Savings: up to 15pts
-  score -= Math.min(debtToIncome * 0.4, 15);           // Debt penalty: up to -15pts
-  score += Math.min(emergencyProgress * 0.15, 15);     // Emergency fund: up to 15pts
-  score += Math.min(investmentRate * 0.3, 10);          // Investment volume: up to 10pts
-  score += Math.min(billsPaymentRate * 0.15, 15);       // Bills on time: up to 15pts
-  score += Math.min(goalsProgress * 0.1, 10);           // Goals progress: up to 10pts
-  score += Math.min(installmentProgress * 0.05, 5);     // Installment payoff: up to 5pts
-  score += Math.min(wishlistDiscipline * 0.05, 5);      // Wishlist saving: up to 5pts
-  score += Math.min(diversificationScore * 0.05, 5);    // Diversification: up to 5pts
-  score += Math.min(contributionRate * 0.5, 5);         // Monthly contributions: up to 5pts
-  score += 10; // Base
+  score += Math.min(Math.max(savingsRate, 0) * 1.0, 20);  // Poupança: até 20pts
+  score -= Math.min(debtToIncome * 0.5, 15);                // Dívidas: até -15pts
+  score += Math.min(emergencyProgress * 0.15, 15);          // Reserva: até 15pts
+  score += Math.min(investmentRate * 1.0, 15);               // Aportes mensais: até 15pts
+  score += Math.min(billsPaymentRate * 0.15, 15);            // Contas em dia: até 15pts
+  score += Math.min(goalsProgress * 0.1, 10);                // Metas: até 10pts
+  score += Math.min(installmentProgress * 0.05, 5);          // Parcelas: até 5pts
+  score += Math.min(wishlistDiscipline * 0.05, 5);           // Desejos: até 5pts
+  score += Math.min(diversificationScore * 0.05, 5);         // Diversificação: até 5pts
+  score += Math.min(contributionRate * 0.5, 5);              // Aportes regulares: até 5pts
   score = Math.max(0, Math.min(100, Math.round(score)));
 
   const getScoreColor = () => {

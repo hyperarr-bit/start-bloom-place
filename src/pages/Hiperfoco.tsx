@@ -2,7 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Brain } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThoughtCapture } from "@/components/hiperfoco/ThoughtCapture";
+import { ThoughtSearch } from "@/components/hiperfoco/ThoughtSearch";
 import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
+import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
+import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 
 const Hiperfoco = () => {
   const navigate = useNavigate();
@@ -22,16 +25,28 @@ const Hiperfoco = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="captura" className="w-full">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="captura" className="text-xs">🧠 CAPTURA</TabsTrigger>
-            <TabsTrigger value="metas" className="text-xs">🎯 METAS</TabsTrigger>
+        <Tabs defaultValue="dia" className="w-full">
+          <TabsList className="w-full grid grid-cols-5">
+            <TabsTrigger value="dia" className="text-[10px]">DIA</TabsTrigger>
+            <TabsTrigger value="busca" className="text-[10px]">BUSCA</TabsTrigger>
+            <TabsTrigger value="metas" className="text-[10px]">METAS</TabsTrigger>
+            <TabsTrigger value="estrategia" className="text-[10px]">ESTRATÉGIA</TabsTrigger>
+            <TabsTrigger value="timeline" className="text-[10px]">TIMELINE</TabsTrigger>
           </TabsList>
-          <TabsContent value="captura">
+          <TabsContent value="dia">
             <ThoughtCapture />
+          </TabsContent>
+          <TabsContent value="busca">
+            <ThoughtSearch />
           </TabsContent>
           <TabsContent value="metas">
             <GoalsPanel />
+          </TabsContent>
+          <TabsContent value="estrategia">
+            <StrategyPanel />
+          </TabsContent>
+          <TabsContent value="timeline">
+            <TimelinePanel />
           </TabsContent>
         </Tabs>
       </div>

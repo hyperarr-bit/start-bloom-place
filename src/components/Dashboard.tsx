@@ -623,13 +623,13 @@ export const Dashboard = ({
                       <span className="font-bold mr-1.5">{i + 1}.</span>
                       {item.description}
                     </span>
-                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${shade.text}`}>
+                    <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${textColor}`}>
                       R$ {item.value.toLocaleString("pt-BR")}
                     </span>
                   </div>
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${shade.bar}`}
+                      className={`h-full rounded-full transition-all ${barColor}`}
                       style={{ width: `${top5Expenses[0] ? Math.round((item.value / top5Expenses[0].value) * 100) : 0}%` }}
                     />
                   </div>

@@ -57,6 +57,7 @@ const AnimatedRoutes = () => {
         <Route path="/treino" element={<ProtectedRoute><PageTransition><><TrialBanner /><Treino /></></PageTransition></ProtectedRoute>} />
         <Route path="/dieta" element={<ProtectedRoute><PageTransition><><TrialBanner /><Dieta /></></PageTransition></ProtectedRoute>} />
         <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><><TrialBanner /><Hiperfoco /></></PageTransition></ProtectedRoute>} />
+        <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><Conquistas /></></PageTransition></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>

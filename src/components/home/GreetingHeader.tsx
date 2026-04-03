@@ -122,6 +122,14 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <motion.button
+            onClick={() => navigate("/conquistas")}
+            className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-yellow-500/10 hover:text-yellow-500 transition-colors"
+            whileTap={{ scale: 0.9 }}
+            aria-label="Conquistas"
+          >
+            <Trophy className="w-3.5 h-3.5" />
+          </motion.button>
           <ThemeToggle showPalette />
           <motion.button
             onClick={signOut}

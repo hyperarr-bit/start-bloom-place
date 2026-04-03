@@ -254,19 +254,6 @@ const Index = () => {
           <Simulators />
         )}
 
-        {activeTab === "desafios" && (
-          <Gamification
-            savingsRate={savingsRate}
-            billsPaidRate={billsPaidRate}
-            goalsProgress={goalsProgress}
-            totalInvestments={totalInvestments}
-            totalDebts={totalDebts}
-            streakDays={streakDays}
-            setStreakDays={setStreakDays}
-            challenge52Weeks={challenge52Weeks}
-            setChallenge52Weeks={setChallenge52Weeks}
-          />
-        )}
 
         {activeTab === "limites" && (
           <CategoryBudgets expenses={expenses} />

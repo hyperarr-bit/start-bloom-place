@@ -35,6 +35,7 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
   const [newBills, setNewBills] = useState<Record<number, string>>({});
   const [editingDay, setEditingDay] = useState<number | null>(null);
   const [editDayValue, setEditDayValue] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const addBill = (day: number) => {
     const name = newBills[day];
@@ -86,11 +87,19 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
 
   return (
     <div className="animate-fade-in">
-      <div className="table-header-dark rounded-t-lg flex items-center justify-between">
+      <div className="table-header-dark rounded-t-lg flex items-center justify-between px-4">
         <span>VENCIMENTOS DAS CONTAS</span>
-        <div className="flex gap-1">
-          <button onClick={addNewDueDay} className="hover:opacity-80 transition-opacity" title="Adicionar dia">
-            <Plus className="w-4 h-4" />
+        <div className="flex gap-2 items-center">
+          {editing && (
+            <button onClick={addNewDueDay} className="hover:opacity-80 transition-opacity" title="Adicionar dia">
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => { setEditing(!editing); setEditingDay(null); }}
+            className="text-xs font-medium hover:opacity-80 transition-opacity"
+          >
+            {editing ? "Concluído" : "Editar"}
           </button>
         </div>
       </div>
@@ -100,7 +109,7 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
           return (
             <div key={dueDay.day} className={`rounded-lg border overflow-hidden ${style.card}`}>
               <div className={`${style.header} px-3 py-2 flex items-center justify-between`}>
-                {editingDay === dueDay.day ? (
+                {editing && editingDay === dueDay.day ? (
                   <div className="flex items-center gap-1">
                     <span className="font-bold text-sm">Dia</span>
                     <Input
@@ -117,15 +126,17 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
                       <Check className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                ) : (
+                ) : editing ? (
                   <button onClick={() => startEditDay(dueDay.day)} className="flex items-center gap-1 hover:opacity-80">
                     <span className="font-bold text-sm">Dia {dueDay.day}</span>
                     <Pencil className="w-3 h-3 opacity-60" />
                   </button>
+                ) : (
+                  <span className="font-bold text-sm">Dia {dueDay.day}</span>
                 )}
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs opacity-75">{dueDay.bills.filter(b => b.paid).length}/{dueDay.bills.length}</span>
-                  {dueDays.length > 1 && (
+                  {editing && dueDays.length > 1 && (
                     <button onClick={() => removeDueDay(dueDay.day)} className="hover:opacity-80" title="Remover dia">
                       <Minus className="w-3 h-3 opacity-60" />
                     </button>
@@ -137,21 +148,25 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
                   <div key={bill.id} className="flex items-center gap-2 group">
                     <Checkbox checked={bill.paid} onCheckedChange={() => toggleBill(dueDay.day, bill.id)} className="h-3.5 w-3.5 rounded-full" />
                     <span className={`flex-1 text-xs ${bill.paid ? "line-through text-muted-foreground" : ""}`}>{bill.name}</span>
-                    <button onClick={() => removeBill(dueDay.day, bill.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
-                      <X className="w-3 h-3" />
-                    </button>
+                    {editing && (
+                      <button onClick={() => removeBill(dueDay.day, bill.id)} className="text-muted-foreground hover:text-destructive transition-opacity">
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 ))}
-                <div className="flex items-center gap-1 pt-1">
-                  <Checkbox disabled className="h-3.5 w-3.5 rounded-full opacity-30" />
-                  <Input
-                    placeholder="Adicionar conta..."
-                    value={newBills[dueDay.day] || ""}
-                    onChange={(e) => setNewBills({ ...newBills, [dueDay.day]: e.target.value })}
-                    onKeyDown={(e) => e.key === "Enter" && addBill(dueDay.day)}
-                    className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-muted-foreground"
-                  />
-                </div>
+                {editing && (
+                  <div className="flex items-center gap-1 pt-1">
+                    <Checkbox disabled className="h-3.5 w-3.5 rounded-full opacity-30" />
+                    <Input
+                      placeholder="Adicionar conta..."
+                      value={newBills[dueDay.day] || ""}
+                      onChange={(e) => setNewBills({ ...newBills, [dueDay.day]: e.target.value })}
+                      onKeyDown={(e) => e.key === "Enter" && addBill(dueDay.day)}
+                      className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-muted-foreground"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );

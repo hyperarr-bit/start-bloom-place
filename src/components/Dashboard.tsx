@@ -691,7 +691,7 @@ export const Dashboard = ({
             {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Baseado no seu ritmo de R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")}/dia × {forecast.remainingDays} dias restantes
+            Custos fixos reservados integralmente. Projeção baseada no ritmo de gastos variáveis.
           </p>
           <div className="mt-3 space-y-1">
             <div className="flex justify-between text-[10px]">
@@ -699,12 +699,28 @@ export const Dashboard = ({
               <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
             </div>
             <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Já gasto (dia {forecast.day})</span>
-              <span className="text-red-400 tabular-nums">-R$ {totalExpenses.toLocaleString("pt-BR")}</span>
+              <span className="text-muted-foreground">Custos fixos reservados</span>
+              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+            </div>
+            {forecast.unpaidBillsEstimate > 0 && (
+              <div className="flex justify-between text-[10px]">
+                <span className="text-muted-foreground">Contas pendentes</span>
+                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">Já gasto variável (dia {forecast.day})</span>
+              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.variableSpent).toLocaleString("pt-BR")}</span>
             </div>
             <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Projeção restante</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.dailyVariableRate * forecast.remainingDays).toLocaleString("pt-BR")}</span>
+              <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
+              <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+            </div>
+            <div className="flex justify-between text-[10px] border-t border-border pt-1 mt-1">
+              <span className="text-muted-foreground font-medium">Saldo projetado</span>
+              <span className={`tabular-nums font-bold ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
+                {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+              </span>
             </div>
           </div>
         </div>

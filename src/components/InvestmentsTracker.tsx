@@ -337,8 +337,8 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     />
                     <Input
                       type="number"
-                      placeholder="% a.a."
-                      className="h-6 text-[10px] w-16"
+                      placeholder="Rent. esperada (% a.a.)"
+                      className="h-6 text-[10px] w-24"
                       defaultValue={inv.expectedReturn ?? 10}
                       onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
                     />

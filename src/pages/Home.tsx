@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
@@ -63,6 +63,24 @@ const HomePage = () => {
   const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
+
+  // Auto check-in on app open
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const lastCheckIn = get<string>("gamification-lastCheckIn", "");
+    if (lastCheckIn === today) return;
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+    const streakRaw = get<any>("core-hub-streak", 0);
+    const currentStreak = typeof streakRaw === "object" && streakRaw !== null ? (streakRaw.count || 0) : (Number(streakRaw) || 0);
+    const newStreak = lastCheckIn === yesterdayStr ? currentStreak + 1 : 1;
+
+    setData("gamification-lastCheckIn", today);
+    setData("core-hub-streak", { count: newStreak, lastDate: today });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

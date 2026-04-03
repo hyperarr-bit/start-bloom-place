@@ -82,7 +82,7 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
 
 export const AchievementsPage = () => {
   const navigate = useNavigate();
-  const { get, set } = useUserData();
+  const { get } = useUserData();
   const [justUnlocked, setJustUnlocked] = useState<Badge | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -94,33 +94,31 @@ export const AchievementsPage = () => {
 
   const badges = useMemo(() => buildBadges(get), [get]);
 
-  // Calculate XP
   const totalXP = useMemo(() => {
     return badges.filter(b => b.unlocked).reduce((sum, b) => sum + b.xp, 0);
   }, [badges]);
 
-  // Fix master badge based on XP
   const finalBadges = useMemo(() => {
     return badges.map(b => b.id === "master" ? { ...b, unlocked: totalXP >= 2000 } : b);
   }, [badges, totalXP]);
 
   const unlockedCount = finalBadges.filter(b => b.unlocked).length;
 
-  const handleCheckIn = () => {
-    if (checkedInToday) return;
+  // Category progress
+  const categories = useMemo(() => {
+    const cats = [
+      { id: "finance", label: "Finanças", icon: "💰" },
+      { id: "health", label: "Saúde", icon: "❤️" },
+      { id: "habits", label: "Hábitos", icon: "🔥" },
+      { id: "general", label: "Geral", icon: "⭐" },
+    ];
+    return cats.map(cat => {
+      const catBadges = finalBadges.filter(b => b.category === cat.id);
+      const unlocked = catBadges.filter(b => b.unlocked).length;
+      return { ...cat, total: catBadges.length, unlocked };
+    });
+  }, [finalBadges]);
 
-    // Check if yesterday was checked in to maintain streak
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    const newStreak = lastCheckIn === yesterdayStr ? streak + 1 : 1;
-
-    set("gamification-lastCheckIn", today);
-    set("core-hub-streak", { count: newStreak, lastDate: today });
-  };
-
-  // Next badges to unlock
   const nextBadges = finalBadges.filter(b => !b.unlocked).slice(0, 3);
 
   return (
@@ -138,10 +136,8 @@ export const AchievementsPage = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
-        {/* Level Progress */}
         <LevelProgress xp={totalXP} />
 
-        {/* Stats Row */}
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-card rounded-lg border border-border p-3 text-center">
             <Flame className="w-4 h-4 mx-auto mb-1 text-orange-400" />
@@ -160,40 +156,57 @@ export const AchievementsPage = () => {
           </div>
         </div>
 
-        {/* Daily Check-in */}
-        <motion.div
-          className="bg-card rounded-lg border border-border p-4"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-bold flex items-center gap-2">
-                <CheckCircle2 className={`w-4 h-4 ${checkedInToday ? "text-green-400" : "text-muted-foreground"}`} />
-                Check-in Diário
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {checkedInToday ? "Feito hoje! Volte amanhã ✨" : "Marque presença e mantenha seu streak"}
-              </p>
-            </div>
-            <button
-              onClick={handleCheckIn}
-              disabled={checkedInToday}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                checkedInToday
-                  ? "bg-green-500/20 text-green-400 cursor-default"
-                  : "bg-primary text-primary-foreground hover:opacity-90 active:scale-95"
-              }`}
-            >
-              {checkedInToday ? "✓ Feito" : "Check-in"}
-            </button>
+        {/* Auto check-in status */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className={`w-4 h-4 ${checkedInToday ? "text-green-400" : "text-muted-foreground"}`} />
+            <p className="text-sm font-bold">Check-in Diário</p>
+            <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+              checkedInToday
+                ? "bg-green-500/20 text-green-400"
+                : "bg-muted text-muted-foreground"
+            }`}>
+              {checkedInToday ? "✓ Feito" : "Pendente"}
+            </span>
           </div>
-        </motion.div>
+          <p className="text-[10px] text-muted-foreground mt-1 ml-6">
+            {checkedInToday ? "Presença registrada automaticamente ao abrir o app ✨" : "Abra o app pela Home para registrar"}
+          </p>
+        </div>
 
-        {/* Badges Grid */}
+        {/* Category Progress */}
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h4 className="text-xs font-bold mb-3 flex items-center gap-2">
+            <Award className="w-3.5 h-3.5 text-primary" />
+            Progresso por Categoria
+          </h4>
+          <div className="space-y-3">
+            {categories.map(cat => (
+              <div key={cat.id}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium flex items-center gap-1.5">
+                    <span>{cat.icon}</span>
+                    {cat.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-bold">
+                    {cat.unlocked}/{cat.total}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <motion.div
+                    className="h-full rounded-full bg-primary"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${cat.total > 0 ? (cat.unlocked / cat.total) * 100 : 0}%` }}
+                    transition={{ duration: 0.8, ease: "easeOut" }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <BadgesGrid badges={finalBadges} />
 
-        {/* Next to unlock */}
         {nextBadges.length > 0 && (
           <div className="bg-card rounded-lg border border-border p-4">
             <h4 className="text-xs font-bold mb-3 flex items-center gap-2">

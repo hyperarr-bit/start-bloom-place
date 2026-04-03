@@ -702,19 +702,15 @@ export const Dashboard = ({
               <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
             </div>
             <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Custos fixos reservados</span>
-              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+              <span className="text-muted-foreground">Já gasto (fixos + variáveis)</span>
+              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR")}</span>
             </div>
             {forecast.unpaidBillsEstimate > 0 && (
               <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes</span>
-                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                <span className="text-muted-foreground">Contas pendentes (estimativa)</span>
+                <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
               </div>
             )}
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Já gasto variável (dia {forecast.day})</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.variableSpent).toLocaleString("pt-BR")}</span>
-            </div>
             <div className="flex justify-between text-[10px]">
               <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
               <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>

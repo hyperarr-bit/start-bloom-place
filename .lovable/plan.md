@@ -1,43 +1,29 @@
 
 
-# Previsão Fim do Mês — Cálculo Mais Inteligente
+# Ajustes no Card de Vencimentos das Contas
 
-## Problema
-Atualmente a previsão usa `totalExpenses / dia_atual` como taxa diária, o que é impreciso — se o aluguel cai no dia 5, parece que o usuário gasta R$3.000/dia nos primeiros dias. Precisa separar custos fixos (previsíveis) de variáveis (ritmo real).
+## 2 mudanças:
 
-## Nova Lógica
+### 1. Padding no header preto
+O texto "VENCIMENTOS DAS CONTAS" e o botão "+" estão colados nas bordas. Adicionar `px-4` ao header para dar respiro.
 
-```text
-Receita total
-- Custos fixos (integral, sempre reservados)
-- Contas pendentes (dueDays não pagas, estimativa)
-- Gastos variáveis já feitos
-- Projeção variável restante (taxa_variável × dias_restantes)
-= Saldo projetado
-```
+### 2. Modo edição toggle
+Atualmente o ícone de lápis e o input "Adicionar conta..." ficam sempre visíveis. O ideal é ter uma visualização limpa por padrão, e um botão "Editar" que ativa o modo de edição.
 
-Detalhes:
-- **Taxa variável** = `totalExpenses_variáveis / dia_atual` (só despesas da tabela de variáveis, sem fixas)
-- **Custos fixos** = soma integral das `fixedExpenses` (reservados, não projetados por dia)
-- **Contas pendentes** = bills não pagas nos `dueDays`, estimadas pelo valor médio das fixas
-- **Projeção restante** = só a parte variável × dias restantes
+**Modo visualização (padrão):**
+- Header do card mostra apenas "Dia X" e o contador (sem lápis, sem botão remover)
+- Lista de contas mostra apenas checkbox + nome (sem X de remover)
+- Input "Adicionar conta..." oculto
+- Botão "+" no header preto oculto
 
-## Breakdown Exibido no Card
-
-| Linha | Cor |
-|-------|-----|
-| Receita total | verde |
-| Custos fixos reservados | vermelho |
-| Contas pendentes | vermelho |
-| Já gasto (variável, dia X) | laranja |
-| Projeção variável restante | amarelo |
-| **Saldo projetado** | verde/vermelho |
-
-Mensagem explicativa: "Custos fixos reservados integralmente. Projeção baseada no ritmo de gastos variáveis."
+**Modo edição (ao clicar no botão):**
+- Botão "Editar" no header preto vira "Concluído"
+- Lápis aparece nos dias, X aparece nas contas, input de adicionar aparece
+- Botão "+" e "−" nos cards ficam visíveis
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/Dashboard.tsx` | Refazer `forecast` useMemo separando fixas de variáveis; atualizar breakdown no card com linhas detalhadas |
+| `src/components/BillsDueCards.tsx` | Adicionar estado `editing` (boolean). Condicionar exibição de lápis, X, input adicionar, +, − ao modo edição. Adicionar `px-4` ao header. Botão Editar/Concluído no header preto. |
 

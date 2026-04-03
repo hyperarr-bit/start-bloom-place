@@ -252,8 +252,11 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 className="h-8 text-xs"
               />
               <Input
-                type="date"
+                type="text"
+                placeholder="Data início (dd/mm/aaaa)"
                 value={newInvestment.startDate || ""}
+                onFocus={(e) => { e.currentTarget.type = "date"; }}
+                onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
                 onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
                 className="h-8 text-xs"
               />

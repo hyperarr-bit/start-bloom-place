@@ -271,7 +271,15 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
             <select value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} className="h-8 text-xs rounded-md border border-input bg-background px-2">
               {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
-            <Input type="date" placeholder="Data alvo" value={newItem.targetDate || ""} onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })} className="h-8 text-xs" />
+            <Input
+              type="text"
+              placeholder="Data alvo (dd/mm/aaaa)"
+              value={newItem.targetDate || ""}
+              onFocus={(e) => { e.currentTarget.type = "date"; }}
+              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
+              onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
+              className="h-8 text-xs"
+            />
             <Input type="number" placeholder="Já guardei (R$)" value={newItem.savedAmount || ""} onChange={(e) => setNewItem({ ...newItem, savedAmount: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
           </div>
 

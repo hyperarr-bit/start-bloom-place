@@ -21,7 +21,7 @@ import { FinancialHealth } from "@/components/FinancialHealth";
 import { TravelBudget } from "@/components/travel/TravelBudget";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
-import { Gamification } from "@/components/Gamification";
+
 import { Reports } from "@/components/Reports";
 import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";

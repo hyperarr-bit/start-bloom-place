@@ -269,65 +269,68 @@ export const Dashboard = ({
   const balance = totalIncome - totalExpenses;
 
   // Forecast: predicted end-of-month balance
+  // Logic: totalExpenses already includes fixedExpenses that are recorded.
+  // We only need to project future variable spending + unpaid bills NOT yet in totalExpenses.
   const forecast = useMemo(() => {
     const now = new Date();
     const day = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = daysInMonth - day;
 
-    // Fixed costs: reserved integrally (rent, subscriptions, etc.)
-    const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
+    // Fixed costs already recorded (these are already inside totalExpenses)
+    const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
-    // Unpaid bills still pending (estimate value from avg fixed cost)
-    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
-    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsTotal / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
-
-    // Variable expenses = totalExpenses minus fixed costs (fixed are already accounted separately)
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsTotal);
+    // Variable expenses = totalExpenses minus the fixed costs already recorded
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
     const dailyVariableRate = day > 0 ? variableSpent / day : 0;
     const projectedVariableRemaining = dailyVariableRate * remainingDays;
 
-    // Projected total = fixed (full) + unpaid bills + variable already spent + variable projected
-    const projectedTotal = fixedCostsTotal + unpaidBillsEstimate + variableSpent + projectedVariableRemaining;
-    const projectedBalance = totalIncome - projectedTotal;
+    // Unpaid bills: these are future obligations NOT yet in totalExpenses
+    // Count unpaid bills and estimate their value from avg fixed cost
+    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
+    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+
+    // Projected balance = income - what's already spent - future bills - future variable
+    const projectedBalance = totalIncome - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
 
     return {
-      projectedBalance, projectedTotal, dailyVariableRate, remainingDays, daysInMonth, day,
-      fixedCostsTotal, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
+      projectedBalance, dailyVariableRate, remainingDays, daysInMonth, day,
+      fixedCostsRecorded, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
+      totalAlreadySpent: totalExpenses,
     };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
-  // Daily budget: how much you can spend per day (accounting for fixed costs & unpaid bills)
+  // Daily budget: how much you can spend per day
+  // Logic: saldo atual = income - totalExpenses (already spent, includes fixed recorded)
+  // Only reserve future unpaid bills (NOT fixed costs already recorded/spent)
   const dailyBudget = useMemo(() => {
     const now = new Date();
     const day = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const remainingDays = daysInMonth - day;
 
-    // Reserve full fixed costs (rent, subscriptions, etc.)
-    const fixedCostsTotal = fixedExpenses.reduce((s, e) => s + e.value, 0);
+    const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
-    // Unpaid bills still pending
+    // Unpaid bills: future obligations not yet recorded
     const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
-    // Estimate unpaid bill values: avg fixed cost per bill
-    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsTotal / fixedExpenses.length : 0;
+    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
 
-    // Available = income - already spent - fixed costs reserved - unpaid bills reserved
-    const alreadySpent = totalExpenses;
-    const reserved = fixedCostsTotal + unpaidBillsEstimate;
-    const availableReal = totalIncome - alreadySpent - reserved;
+    // Saldo atual = income - everything already spent
+    const currentBalance = totalIncome - totalExpenses;
+    // Available = saldo atual - future unpaid bills only (no double-counting fixed costs)
+    const availableReal = currentBalance - unpaidBillsEstimate;
     const perDay = remainingDays > 0 ? availableReal / remainingDays : availableReal;
     const cantSpend = availableReal <= 0;
-    const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsTotal) / daysInMonth : 0;
+    const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
     const status: "good" | "warning" | "danger" = cantSpend
       ? "danger"
       : perDay > idealPerDay * 0.8
       ? "good"
       : "warning";
 
-    return { availableReal, reserved, fixedCostsTotal, unpaidBillsEstimate, perDay, remainingDays, status, cantSpend, alreadySpent };
+    return { availableReal, unpaidBillsEstimate, perDay, remainingDays, status, cantSpend, currentBalance, fixedCostsRecorded };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Top 5 largest expenses
@@ -699,19 +702,15 @@ export const Dashboard = ({
               <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
             </div>
             <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Custos fixos reservados</span>
-              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+              <span className="text-muted-foreground">Já gasto (fixos + variáveis)</span>
+              <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR")}</span>
             </div>
             {forecast.unpaidBillsEstimate > 0 && (
               <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes</span>
-                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                <span className="text-muted-foreground">Contas pendentes (estimativa)</span>
+                <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
               </div>
             )}
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Já gasto variável (dia {forecast.day})</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.variableSpent).toLocaleString("pt-BR")}</span>
-            </div>
             <div className="flex justify-between text-[10px]">
               <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
               <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
@@ -758,15 +757,11 @@ export const Dashboard = ({
           <div className="mt-3 space-y-1">
             <div className="flex justify-between text-[10px]">
               <span className="text-muted-foreground">Saldo atual</span>
-              <span className="tabular-nums">R$ {Math.round(totalIncome - dailyBudget.alreadySpent).toLocaleString("pt-BR")}</span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span className="text-muted-foreground">Custos fixos reservados</span>
-              <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.fixedCostsTotal).toLocaleString("pt-BR")}</span>
+              <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR")}</span>
             </div>
             {dailyBudget.unpaidBillsEstimate > 0 && (
               <div className="flex justify-between text-[10px]">
-                <span className="text-muted-foreground">Contas pendentes</span>
+                <span className="text-muted-foreground">Contas pendentes (reserva)</span>
                 <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
               </div>
             )}

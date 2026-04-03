@@ -212,17 +212,20 @@ export const Dashboard = ({
       }));
   }, [annualData, currentMonthIdx]);
 
-  // Patrimony evolution — only consecutive months up to current month
+  // Patrimony evolution — real accumulated balance across months
+  // Patrimônio = investments base + sum of monthly balances (receitas - fixos - variáveis)
   const patrimonyData = useMemo(() => {
     let accumulated = totalInvestments;
-    return annualData
-      .slice(0, currentMonthIdx + 1)
-      .filter((d) => d.receitas > 0)
-      .map((d) => {
-        const saving = d.receitas - d.custosFixos - d.custosVariaveis - d.dividas;
-        accumulated += saving * 0.2;
-        return { month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) };
-      });
+    const result: { month: string; Patrimônio: number }[] = [];
+    for (let i = 0; i <= currentMonthIdx; i++) {
+      const d = annualData[i];
+      const hasData = d.receitas > 0 || d.custosFixos > 0 || d.custosVariaveis > 0;
+      if (!hasData && result.length === 0) continue; // skip leading empty months
+      const monthBalance = d.receitas - d.custosFixos - d.custosVariaveis;
+      accumulated += monthBalance;
+      result.push({ month: d.month.substring(0, 3), Patrimônio: Math.round(accumulated) });
+    }
+    return result;
   }, [annualData, totalInvestments, currentMonthIdx]);
 
   // Smart alerts

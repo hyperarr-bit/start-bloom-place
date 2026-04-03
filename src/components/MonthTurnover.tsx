@@ -123,7 +123,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
 
   const hasCategoryBudgets = (() => {
     const base = readLocalKey("finance-category-budgets");
-    const monthKey = `finance-month-${getMonthKey(prevMonth)}-category-budgets`;
+    const year = getCurrentYear();
+    const monthKey = `finance-${year}-${getMonthKey(prevMonth)}-category-budgets`;
     const month = readLocalKey(monthKey);
     const data = month || base;
     return data && Object.keys(data).length > 0;

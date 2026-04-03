@@ -195,10 +195,9 @@ export const FinancialHealth = ({
     tips.push({ icon: Heart, text: `Seus desejos somam R$ ${wishlistTotal.toLocaleString("pt-BR")} — ${(wishlistTotal / totalIncome).toFixed(1)}x sua renda. Priorize os mais importantes.`, type: "warning" });
   }
 
-  const monthlyBalance = totalIncome - totalExpenses;
+  const monthlyBalance = totalIncome - totalRealExpenses;
   const yearlyProjection = monthlyBalance * 12;
-  const monthlyInstallmentCost = installments.reduce((s, i) => i.paidInstallments < i.totalInstallments ? s + i.installmentValue : s, 0);
-  const realMonthlyBalance = monthlyBalance - monthlyInstallmentCost;
+  const realMonthlyBalance = monthlyBalance;
 
   // Trip readiness
   const tripReadiness = trips.length > 0

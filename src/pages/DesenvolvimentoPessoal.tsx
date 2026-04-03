@@ -283,7 +283,7 @@ const DesenvolvimentoPessoal = () => {
             </div>
           </TabsContent>
 
-          {/* ========== METAS ========== */}
+          {/* ========== METAS (com Bucket List e Visão) ========== */}
           <TabsContent value="metas" className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Target className="w-4 h-4" /> METAS DE VIDA</h3>
@@ -310,6 +310,57 @@ const DesenvolvimentoPessoal = () => {
                 ))}
                 {lifeGoals.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione suas metas de vida ✨</p>}
               </div>
+            </div>
+
+            {/* Bucket List dentro de Metas */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-400" /> BUCKET LIST</h3>
+              <div className="flex gap-2 mb-3">
+                <Input value={newBucket} onChange={e => setNewBucket(e.target.value)} placeholder="Ex: Conhecer a Aurora Boreal" className="text-xs h-8 flex-1"
+                  onKeyDown={e => { if (e.key === "Enter" && newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}} />
+                <Button size="sm" className="h-8" onClick={() => { if (newBucket.trim()) { setBucketList([...bucketList, { id: Date.now().toString(), text: newBucket.trim(), done: false }]); setNewBucket(""); }}}><Plus className="w-3 h-3" /></Button>
+              </div>
+              {bucketList.map((item, i) => (
+                <div key={item.id} className={`flex items-center gap-3 rounded-lg p-3 border mb-1 ${item.done ? "bg-green-50 dark:bg-green-500/10 border-green-200 dark:border-green-500/30" : "bg-muted/30 border-border"}`}>
+                  <button onClick={() => { const u = [...bucketList]; u[i] = { ...item, done: !item.done }; setBucketList(u); }}
+                    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${item.done ? "bg-green-500 border-green-500" : "border-muted-foreground/30"}`}>
+                    {item.done && <Check className="w-3 h-3 text-white" />}
+                  </button>
+                  <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+                  <button onClick={() => setBucketList(bucketList.filter(x => x.id !== item.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
+                </div>
+              ))}
+              {bucketList.length > 0 && <p className="text-xs text-muted-foreground mt-2">✅ {bucketList.filter(b => b.done).length}/{bucketList.length} realizados</p>}
+              {bucketList.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">O que você quer fazer na vida? 🌍</p>}
+            </div>
+
+            {/* Visão dentro de Metas */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Eye className="w-4 h-4" /> QUADRO DE VISÃO</h3>
+              <div className="flex gap-2 mb-3">
+                <select value={newVisionCategory} onChange={e => setNewVisionCategory(e.target.value)} className="text-xs bg-background border border-border rounded px-2 py-1 h-8">
+                  {lifeAreas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+                <Input value={newVisionText} onChange={e => setNewVisionText(e.target.value)} placeholder="Ex: Morar na praia" className="text-xs h-8 flex-1" />
+                <Button size="sm" className="h-8" onClick={() => { if (newVisionText.trim()) { setVisionItems([...visionItems, { id: Date.now().toString(), category: newVisionCategory, text: newVisionText.trim() }]); setNewVisionText(""); }}}><Plus className="w-3 h-3" /></Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {lifeAreas.filter(a => visionItems.some(v => v.category === a.id)).map(area => {
+                  const Icon = area.icon;
+                  return (
+                    <div key={area.id} className="bg-muted/30 rounded-lg p-3 border border-border">
+                      <h4 className="text-xs font-bold flex items-center gap-2 mb-2"><Icon className={`w-3 h-3 ${area.color}`} />{area.name}</h4>
+                      {visionItems.filter(v => v.category === area.id).map(item => (
+                        <div key={item.id} className="flex items-center justify-between text-xs mb-1">
+                          <span>✨ {item.text}</span>
+                          <button onClick={() => setVisionItems(visionItems.filter(v => v.id !== item.id))}><X className="w-3 h-3 text-muted-foreground" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })}
+              </div>
+              {visionItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Adicione seus sonhos 🎯</p>}
             </div>
           </TabsContent>
 

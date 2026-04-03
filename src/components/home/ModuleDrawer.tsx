@@ -2,9 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Star, Settings, Eye, EyeOff
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Star, Settings, Eye, EyeOff, LogOut
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
+import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 
 const modules = [

@@ -88,7 +88,8 @@ export const AchievementsPage = () => {
   const lastCheckIn = get<string>("gamification-lastCheckIn", "");
   const checkedInToday = lastCheckIn === today;
 
-  const streak = get<number>("core-hub-streak", 0);
+  const streakRaw = get<any>("core-hub-streak", 0);
+  const streak = typeof streakRaw === "object" && streakRaw !== null ? (streakRaw.count || 0) : (Number(streakRaw) || 0);
 
   const badges = useMemo(() => buildBadges(get), [get]);
 

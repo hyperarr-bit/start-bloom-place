@@ -176,7 +176,7 @@ export const FinancialHealth = ({
   }
 
   if (emergencyProgress < 100) {
-    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas.`, type: "info" });
+    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${realEmergencyGoal.toLocaleString("pt-BR")}).`, type: "info" });
   } else {
     tips.push({ icon: CheckCircle, text: "Reserva de emergência completa! 🎉", type: "success" });
   }

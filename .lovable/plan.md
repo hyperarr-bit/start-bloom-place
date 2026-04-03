@@ -1,39 +1,23 @@
 
 
-# Correções: Score Ring, Nome, Check-in Automático + Fix Runtime Error
+# Notificação de Desejos Baseada na Previsão de Fim do Mês
 
-## 4 Problemas
+## Problema
+A notificação de compatibilidade dos desejos usa um cálculo simples (`receita - despesas - parcelas`), enquanto o Dashboard tem um card "Previsão Fim do Mês" mais inteligente que considera: gastos fixos já registrados, projeção de gastos variáveis baseada no ritmo diário, e contas pendentes não pagas.
 
-### 1. Runtime Error: `LogOut` not found in GreetingHeader
-O erro aponta para `GreetingHeader.tsx:230` mas o arquivo tem 145 linhas — provável cache stale. Porém, precisa garantir que não há referência residual. O arquivo atual está limpo, mas o `ModuleDrawer.tsx` importa `LogOut` e precisa verificar se está correto.
+## Solução
+Passar `fixedExpenses` e `dueDays` como props para `WishlistItems` e replicar a lógica do forecast do Dashboard para calcular o saldo projetado real. A notificação vai mostrar o saldo projetado de fim de mês em vez do saldo livre simples.
 
-### 2. Cor do Score Ring não muda com tema/paleta
-O `DayScoreRing` usa `hsl(var(--success))`, `hsl(var(--warning))`, `hsl(var(--accent))`. Esses tokens mudam entre light/dark, mas as palettes em `use-theme.tsx` NÃO incluem overrides para `--success` e `--warning`. Quando o usuário muda de paleta (ex: Midnight, Rose), as cores success/warning ficam sempre verde/âmbar em vez de se adaptar.
-
-**Solução**: Adicionar `--success` e `--warning` nos overrides de cada palette em `use-theme.tsx`, com tons que combinem com cada tema (ex: no Rose, warning fica rosado; no Forest, success fica mais verde vibrante).
-
-### 3. Nome não salva
-O `GreetingHeader.handleNameSave` só escreve no `localStorage` diretamente — NÃO chama `useUserData.set()`. E o `Home.tsx handleNameChange` apenas incrementa um counter para re-render, sem persistir o nome.
-
-**Solução**: Passar `useUserData.set` para o `GreetingHeader` (ou dar acesso ao hook lá dentro) e chamar `set("core-user-name", name)` no `handleNameSave`.
-
-### 4. Check-in automático ao abrir o app
-O check-in hoje exige clicar um botão na página de Conquistas. O usuário quer que abrir o app já conte como check-in.
-
-**Solução**: Mover a lógica de check-in para o `Home.tsx` (ou `useLifeHubData`) — ao montar a Home, verificar se `gamification-lastCheckIn !== today` e, se sim, registrar automaticamente. Remover o botão manual da `AchievementsPage` e substituir por um indicador de status ("Check-in feito hoje ✓").
-
----
+### Nova lógica da notificação:
+- **Saldo projetado** = receita − gastos já feitos − contas pendentes − projeção de gastos restantes (mesmo cálculo do Dashboard)
+- **Compatível**: se saldo projetado > 0 → "Seus desejos cabem! Saldo projetado: R$ X → R$ Y/mês para desejos (30%)"
+- **Incompatível**: se saldo projetado ≤ 0 → "Previsão aponta saldo negativo de R$ X no fim do mês"
+- **Tempo estimado** também usa o saldo projetado × 30% em vez do saldo livre simples
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/hooks/use-theme.tsx` | Adicionar `--success` e `--warning` em cada palette (light+dark) para que as cores do ring acompanhem o tema |
-| `src/components/home/GreetingHeader.tsx` | Usar `useUserData().set` para persistir o nome em vez de só localStorage |
-| `src/pages/Home.tsx` | Adicionar lógica de auto check-in ao montar (verificar lastCheckIn, atualizar streak) |
-| `src/components/gamification/AchievementsPage.tsx` | Remover botão de check-in manual, trocar por indicador de status; remover lógica de handleCheckIn (movida para Home) |
-| `src/components/home/ModuleDrawer.tsx` | Verificar import de `LogOut` está correto (já está, mas confirmar que não há conflito) |
-
-## Adição útil (obrigatória)
-Adicionar na `AchievementsPage` um **resumo de progresso por categoria** — mini barras mostrando quantos badges de cada categoria (Finanças, Saúde, Hábitos, Geral) foram desbloqueados, dando ao usuário uma visão clara de onde está mais forte e onde precisa melhorar.
+| `src/components/WishlistItems.tsx` | Adicionar props `fixedExpenses` e `dueDays`; calcular forecast igual ao Dashboard (projeção diária + contas pendentes); atualizar texto da notificação para mostrar "Previsão fim do mês: R$ X" e usar saldo projetado para cálculo de tempo estimado e compatibilidade |
+| `src/pages/Index.tsx` | Passar `fixedExpenses` e `dueDays` como props ao `WishlistItems` |
 

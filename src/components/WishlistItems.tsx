@@ -150,7 +150,7 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
     const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
-    return { projectedBalance, remainingDays };
+    return { projectedBalance, remainingDays, totalExpenses, unpaidBillsEstimate, projectedVariableRemaining, fixedCostsRecorded, variableSpent, unpaidBillsCount };
   })();
 
   const projectedAvailable = Math.max(0, forecast.projectedBalance);

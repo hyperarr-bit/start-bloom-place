@@ -221,11 +221,10 @@ const DesenvolvimentoPessoal = () => {
         <Tabs defaultValue="sobre" className="w-full">
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             {[
-              { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" }, { v: "roda", l: "RODA DA VIDA" },
-              { v: "diario", l: "DIÁRIO" }, { v: "humor", l: "HUMOR" }, { v: "respiracao", l: "RESPIRAÇÃO" },
-              { v: "leituras", l: "LEITURAS" }, { v: "cursos", l: "CURSOS" }, { v: "bucket", l: "BUCKET LIST" },
-              { v: "visao", l: "VISÃO" }, { v: "gratidao", l: "GRATIDÃO" }, { v: "carta", l: "CARTA" },
-              { v: "desafios", l: "30 DIAS" }, { v: "scorecard", l: "SCORECARD" },
+              { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" },
+              { v: "diario", l: "DIÁRIO" }, { v: "humor", l: "HUMOR & SCORE" }, { v: "respiracao", l: "RESPIRAÇÃO" },
+              { v: "gratidao", l: "GRATIDÃO" }, { v: "carta", l: "CARTA" },
+              { v: "desafios", l: "30 DIAS" },
             ].map(t => (
               <TabsTrigger key={t.v} value={t.v} className="text-xs px-3 py-1.5">{t.l}</TabsTrigger>
             ))}

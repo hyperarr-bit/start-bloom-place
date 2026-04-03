@@ -28,6 +28,7 @@ import Viagens from "./pages/Viagens";
 import Carreira from "./pages/Carreira";
 import Treino from "./pages/Treino";
 import Dieta from "./pages/Dieta";
+import Hiperfoco from "./pages/Hiperfoco";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

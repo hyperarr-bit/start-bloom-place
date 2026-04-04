@@ -2,11 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock, Droplets,
+  ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
   ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
   ArrowUp, ArrowDown, Copy
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -71,11 +75,7 @@ const Dieta = () => {
   const [newMealCarb, setNewMealCarb] = useState("");
   const [newMealFat, setNewMealFat] = useState("");
 
-  // WATER
-  const [waterGoal] = usePersistedState("saude-water-goal", 8);
-  const [waterToday, setWaterToday] = usePersistedState("saude-water-today", 0);
-  const [waterDate, setWaterDate] = usePersistedState("saude-water-date", "");
-
+  // WATER - removed (available in Saúde module)
   // FASTING
   const [fastingGoal, setFastingGoal] = usePersistedState("saude-fast-goal", 16);
   const [fastingStart, setFastingStart] = usePersistedState<string | null>("saude-fast-start", null);
@@ -119,7 +119,7 @@ const Dieta = () => {
     return count;
   })();
 
-  useEffect(() => { if (waterDate !== today) { setWaterToday(0); setWaterDate(today); } }, [today]);
+  
 
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }
@@ -158,10 +158,6 @@ const Dieta = () => {
             <p className="text-xs text-muted-foreground">Cardápio, calorias, jejum e receitas</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-full border border-blue-300">
-              <Droplets className="w-3 h-3 text-blue-500" />
-              <span className="text-[10px] font-bold text-blue-700">{waterToday}/{waterGoal}</span>
-            </div>
             {dietStreak > 0 && (
               <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300">
                 <Flame className="w-3 h-3 text-green-600" />
@@ -178,15 +174,13 @@ const Dieta = () => {
           tips={[
             "Configure suas refeições clicando em ⚙️ no cardápio (adicione ou remova refeições)",
             "No cardápio semanal, clique em cada refeição para adicionar o que vai comer",
-            "Na aba 🔥 CALORIAS, registre o que comeu e acompanhe macros",
-            "Use a aba 💧 ÁGUA para contar seus copos diários"
+            "Na aba 🔥 CALORIAS, registre o que comeu e acompanhe macros"
           ]}
         />
         <Tabs defaultValue="cardapio" className="w-full">
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="calorias" className="text-xs px-3 py-1.5">🔥 CALORIAS</TabsTrigger>
-            <TabsTrigger value="agua" className="text-xs px-3 py-1.5">💧 ÁGUA</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
             <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
             <TabsTrigger value="mercado" className="text-xs px-3 py-1.5">🛒 MERCADO</TabsTrigger>
@@ -287,20 +281,33 @@ const Dieta = () => {
                     </div>
                     <span className="flex-1 text-center">{day}</span>
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => {
-                          setMealPlan(prev => {
-                            const updated = { ...prev };
-                            delete updated[day];
-                            return updated;
-                          });
-                        }}
-                        className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
-                        title="Limpar cardápio deste dia"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="text-[9px] font-normal">Limpar</span>
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
+                            title="Limpar cardápio deste dia"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-normal">Limpar</span>
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Limpar cardápio de {day}?</AlertDialogTitle>
+                            <AlertDialogDescription>Todas as refeições deste dia serão removidas.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                              setMealPlan(prev => {
+                                const updated = { ...prev };
+                                delete updated[day];
+                                return updated;
+                              });
+                            }}>Limpar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
 
@@ -482,24 +489,8 @@ const Dieta = () => {
             )}
           </TabsContent>
 
-          {/* ========== ÁGUA ========== */}
-          <TabsContent value="agua" className="space-y-4">
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-500/10 dark:to-cyan-500/10 rounded-xl border border-blue-200 p-6 text-center">
-              <Droplets className="w-12 h-12 mx-auto text-blue-500 mb-3" />
-              <h3 className="text-sm font-bold mb-4">Hidratação de Hoje</h3>
-              <div className="flex justify-center gap-2 flex-wrap mb-4">
-                {Array.from({ length: waterGoal }, (_, i) => (
-                  <button key={i} onClick={() => setWaterToday(i < waterToday ? i : i + 1)}
-                    className={`w-10 h-12 rounded-lg border-2 transition-all ${i < waterToday ? "bg-blue-400 border-blue-500 text-white scale-105" : "border-blue-200 text-blue-300 hover:border-blue-400"}`}>
-                    <Droplets className="w-5 h-5 mx-auto" />
-                  </button>
-                ))}
-              </div>
-              <p className="text-3xl font-bold text-blue-600 mb-1">{waterToday}/{waterGoal}</p>
-              <Progress value={(waterToday / waterGoal) * 100} className="h-3 max-w-xs mx-auto" />
-              <p className="text-xs text-muted-foreground mt-2">{waterToday >= waterGoal ? "🎉 Meta atingida!" : `Faltam ${waterGoal - waterToday} copos`}</p>
-            </div>
-          </TabsContent>
+
+
 
           {/* ========== JEJUM ========== */}
           <TabsContent value="jejum" className="space-y-4">

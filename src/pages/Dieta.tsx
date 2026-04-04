@@ -199,12 +199,28 @@ const Dieta = () => {
             </div>
 
             {showMealConfig && (
-              <div className="bg-muted/30 rounded-xl border border-border p-3 space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground">CONFIGURAR REFEIÇÕES</p>
-                <div className="flex flex-wrap gap-1.5">
+              <div className="bg-muted/30 rounded-xl border border-border p-3 space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground">CONFIGURAR REFEIÇÕES (arraste a ordem)</p>
+                <div className="space-y-1.5">
                   {meals.map((meal, i) => (
-                    <div key={meal} className="flex items-center gap-1 bg-card rounded-lg border border-border px-2 py-1">
-                      <span className="text-xs">{mealEmojis[meal] || "🍽️"} {meal}</span>
+                    <div key={meal} className="flex items-center gap-1.5 bg-card rounded-lg border border-border px-2 py-1.5">
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          disabled={i === 0}
+                          onClick={() => setMeals(prev => { const n = [...prev]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; return n; })}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20"
+                        >
+                          <ArrowUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          disabled={i === meals.length - 1}
+                          onClick={() => setMeals(prev => { const n = [...prev]; [n[i], n[i + 1]] = [n[i + 1], n[i]]; return n; })}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-20"
+                        >
+                          <ArrowDown className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-xs flex-1">{mealEmojis[meal] || "🍽️"} {meal}</span>
                       {meals.length > 2 && (
                         <button onClick={() => setMeals(prev => prev.filter(m => m !== meal))} className="text-muted-foreground hover:text-destructive">
                           <X className="w-3 h-3" />
@@ -213,18 +229,39 @@ const Dieta = () => {
                     </div>
                   ))}
                 </div>
+                {/* Quick add from presets */}
                 <div className="flex gap-1.5">
-                  <Select value={newMealNameConfig} onValueChange={v => {
-                    if (!meals.includes(v)) { setMeals(prev => [...prev, v]); }
-                    setNewMealNameConfig("");
+                  <Select value="" onValueChange={v => {
+                    if (v && !meals.includes(v)) { setMeals(prev => [...prev, v]); }
                   }}>
-                    <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="+ Adicionar refeição" /></SelectTrigger>
+                    <SelectTrigger className="h-7 text-xs flex-1"><SelectValue placeholder="Sugestões rápidas..." /></SelectTrigger>
                     <SelectContent>
                       {availableMeals.filter(m => !meals.includes(m)).map(m => (
                         <SelectItem key={m} value={m}>{defaultMealEmojis[m]} {m}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                {/* Custom name */}
+                <div className="flex gap-1.5">
+                  <Input
+                    value={newMealNameConfig}
+                    onChange={e => setNewMealNameConfig(e.target.value)}
+                    placeholder="Nome personalizado (ex: Pré-Treino Leve)"
+                    className="text-xs h-7 flex-1"
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && newMealNameConfig.trim() && !meals.includes(newMealNameConfig.trim())) {
+                        setMeals(prev => [...prev, newMealNameConfig.trim()]);
+                        setNewMealNameConfig("");
+                      }
+                    }}
+                  />
+                  <Button size="sm" className="h-7 px-2" onClick={() => {
+                    if (newMealNameConfig.trim() && !meals.includes(newMealNameConfig.trim())) {
+                      setMeals(prev => [...prev, newMealNameConfig.trim()]);
+                      setNewMealNameConfig("");
+                    }
+                  }}><Plus className="w-3 h-3" /></Button>
                 </div>
               </div>
             )}

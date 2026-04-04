@@ -44,8 +44,25 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
   const books = get<any[]>("lib-books", []);
   const booksRead = books.filter((b: any) => b.status === "read" || b.finished).length;
 
-  // Module visits (count keys that exist)
-  const moduleKeys = ["finance-incomes", "core-rotina-habits", "core-saude-water", "lib-books", "beleza-routines", "casa-rooms"];
+  // Relationships
+  const relPeople = get<any[]>("rel-people", []);
+  const relMoments = get<any[]>("rel-moments", []);
+
+  // Pet
+  const petList = get<any[]>("pet-list", []);
+  const petHealth = get<any[]>("pet-health", []);
+
+  // Detox
+  const detoxHabits = get<any[]>("detox-habits", []);
+  const bestDetoxStreak = detoxHabits.reduce((max: number, h: any) => {
+    const lastRelapse = h.relapses?.length > 0 ? h.relapses[h.relapses.length - 1] : null;
+    const from = lastRelapse || h.startDate || new Date().toISOString().split("T")[0];
+    const streak = Math.floor((Date.now() - new Date(from).getTime()) / 86400000);
+    return Math.max(max, Math.max(h.record || 0, streak));
+  }, 0);
+
+  // Module visits
+  const moduleKeys = ["finance-incomes", "core-rotina-habits", "core-saude-water", "lib-books", "beleza-routines", "casa-rooms", "rel-people", "pet-list", "detox-habits"];
   const modulesUsed = moduleKeys.filter(k => {
     const v = get<any>(k, null);
     return v !== null && (Array.isArray(v) ? v.length > 0 : true);

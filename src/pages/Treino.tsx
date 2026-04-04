@@ -569,17 +569,18 @@ const Treino = () => {
             "Acompanhe sua progressão de carga na aba 📈 PROGRESSÃO"
           ]}
         />
-        <Tabs defaultValue="treino" className="w-full">
+        <Tabs defaultValue="hoje" className="w-full">
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
-            <TabsTrigger value="treino" className="text-xs px-3 py-1.5">🏋️ TREINO</TabsTrigger>
+            <TabsTrigger value="hoje" className="text-xs px-3 py-1.5">🏋️ HOJE</TabsTrigger>
+            <TabsTrigger value="semana" className="text-xs px-3 py-1.5">📅 SEMANA</TabsTrigger>
+            <TabsTrigger value="config" className="text-xs px-3 py-1.5">⚙️ CONFIG</TabsTrigger>
             <TabsTrigger value="progressao" className="text-xs px-3 py-1.5">📈 PROGRESSÃO</TabsTrigger>
             <TabsTrigger value="records" className="text-xs px-3 py-1.5">🏆 RECORDES</TabsTrigger>
-            <TabsTrigger value="stats" className="text-xs px-3 py-1.5">📊 ESTATÍSTICAS</TabsTrigger>
-            <TabsTrigger value="history" className="text-xs px-3 py-1.5">📅 HISTÓRICO</TabsTrigger>
+            <TabsTrigger value="stats" className="text-xs px-3 py-1.5">📊 STATS</TabsTrigger>
           </TabsList>
 
-          {/* ========== TREINO ========== */}
-          <TabsContent value="treino" className="space-y-3">
+          {/* ========== HOJE ========== */}
+          <TabsContent value="hoje" className="space-y-3">
             {/* Compact stats bar */}
             <div className="flex items-center gap-2 flex-wrap text-xs bg-muted/30 rounded-lg px-3 py-2 border border-border">
               <span className="flex items-center gap-1 text-muted-foreground">
@@ -664,93 +665,91 @@ const Treino = () => {
               )}
             </AnimatePresence>
 
-            {/* Config accordion — collapsed by default */}
-            <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
-              <CollapsibleTrigger asChild>
-                <button className="w-full flex items-center justify-between bg-card rounded-xl border border-border px-4 py-2.5 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs font-bold">Configurar Semana</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-muted-foreground">{splitSummary}</span>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${configOpen ? "rotate-180" : ""}`} />
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <div className="bg-card rounded-b-xl border border-t-0 border-border p-4 space-y-3">
-                  {/* Templates */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground">Templates rápidos:</span>
-                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowTemplates(!showTemplates)}>
-                      <Copy className="w-3 h-3 mr-1" /> {showTemplates ? "Fechar" : "Ver Templates"}
-                    </Button>
-                  </div>
-                  
-                  <AnimatePresence>
-                    {showTemplates && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                        <div className="grid grid-cols-2 gap-2 pb-2">
-                          {templates.map(t => (
-                            <button key={t.name} onClick={() => applyTemplate(t)}
-                              className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
-                              <p className="text-sm font-bold">{t.emoji} {t.name}</p>
-                              <p className="text-[10px] text-muted-foreground mt-1">
-                                {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
-                              </p>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+            {/* Workout card — protagonist */}
+            <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
+          </TabsContent>
 
-                  {/* Day chips */}
-                  <div className="flex gap-1.5 flex-wrap">
-                    {weekDays.map(day => (
-                      <button key={day} onClick={() => toggleDay(day)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer hover:scale-105 ${
-                          activeDays.includes(day) ? `${dayColors[day]} text-white border-transparent` : "bg-muted/30 text-muted-foreground border-border"
-                        } ${day === todayDayName ? "ring-2 ring-primary ring-offset-1" : ""}`}>
-                        {day.slice(0, 3)}
-                        {activeDays.includes(day) && <Check className="w-3 h-3 inline ml-1" />}
-                      </button>
-                    ))}
-                  </div>
+          {/* ========== SEMANA ========== */}
+          <TabsContent value="semana" className="space-y-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{weekDays.map(day => renderWorkoutDay(day))}</div>
+          </TabsContent>
 
-                  {/* Muscle groups per day */}
-                  <div className="space-y-3">
-                    <p className="text-[10px] text-muted-foreground">Selecione grupos musculares por dia:</p>
-                    {activeDays.sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)).map(day => (
-                      <div key={day} className="space-y-1">
-                        <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
-                        <div className="flex flex-wrap gap-1 ml-1">
-                          {muscleGroups.map(m => {
-                            const isSelected = workoutPlan[day]?.muscles.includes(m);
-                            return (
-                              <button key={m} onClick={() => toggleMuscleForDay(day, m)}
-                                className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                                  isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground"
-                                }`}>
-                                {muscleGroupIcons[m] || "💪"} {m}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+          {/* ========== CONFIG ========== */}
+          <TabsContent value="config" className="space-y-4">
+            <div className="bg-card rounded-xl border border-border p-4 space-y-4">
+              {/* Templates */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold flex items-center gap-2"><Copy className="w-4 h-4 text-muted-foreground" /> TEMPLATES</h3>
+                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowTemplates(!showTemplates)}>
+                    {showTemplates ? "Fechar" : "Ver Templates"}
+                  </Button>
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                <AnimatePresence>
+                  {showTemplates && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                      <div className="grid grid-cols-2 gap-2 pb-2">
+                        {templates.map(t => (
+                          <button key={t.name} onClick={() => applyTemplate(t)}
+                            className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+                            <p className="text-sm font-bold">{t.emoji} {t.name}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-            {/* Workout cards — protagonist */}
-            {viewMode === "today" ? (
-              <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{weekDays.map(day => renderWorkoutDay(day))}</div>
-            )}
+              {/* Day chips */}
+              <div>
+                <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /> DIAS ATIVOS</h3>
+                <div className="flex gap-1.5 flex-wrap">
+                  {weekDays.map(day => (
+                    <button key={day} onClick={() => toggleDay(day)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer hover:scale-105 ${
+                        activeDays.includes(day) ? `${dayColors[day]} text-white border-transparent` : "bg-muted/30 text-muted-foreground border-border"
+                      } ${day === todayDayName ? "ring-2 ring-primary ring-offset-1" : ""}`}>
+                      {day.slice(0, 3)}
+                      {activeDays.includes(day) && <Check className="w-3 h-3 inline ml-1" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Muscle groups per day */}
+              <div>
+                <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-muted-foreground" /> GRUPOS MUSCULARES POR DIA</h3>
+                <div className="space-y-3">
+                  {activeDays.sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)).map(day => (
+                    <div key={day} className="space-y-1">
+                      <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
+                      <div className="flex flex-wrap gap-1 ml-1">
+                        {muscleGroups.map(m => {
+                          const isSelected = workoutPlan[day]?.muscles.includes(m);
+                          return (
+                            <button key={m} onClick={() => toggleMuscleForDay(day, m)}
+                              className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                                isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground"
+                              }`}>
+                              {muscleGroupIcons[m] || "💪"} {m}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Split summary */}
+              <div className="bg-muted/30 rounded-lg px-3 py-2 text-xs text-muted-foreground">
+                <span className="font-bold text-foreground">Resumo:</span> {splitSummary}
+              </div>
+            </div>
           </TabsContent>
 
           {/* ========== PROGRESSÃO ========== */}
@@ -954,10 +953,8 @@ const Treino = () => {
               </div>
               <p className="text-[10px] text-muted-foreground">Últimos 60 dias — verde = treinou</p>
             </div>
-          </TabsContent>
 
-          {/* ========== HISTÓRICO ========== */}
-          <TabsContent value="history" className="space-y-4">
+            {/* History merged into stats */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" /> HISTÓRICO DE EXERCÍCIOS</h3>
               {exerciseHistory.length === 0 ? (
@@ -981,23 +978,19 @@ const Treino = () => {
         </Tabs>
       </main>
 
-      {/* ===== BOTTOM ACTION BAR — sticky ===== */}
+      {/* ===== BOTTOM ACTION BAR — simplified ===== */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border">
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {!sessionStart ? (
               <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1 h-8 text-xs" onClick={() => setSessionStart(new Date().toISOString())}>
-                <Play className="w-3 h-3" /> Iniciar
+                <Play className="w-3 h-3" /> Iniciar Sessão
               </Button>
             ) : (
               <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => logWorkoutToday()}>
                 <Check className="w-3 h-3" /> Finalizar
               </Button>
             )}
-            <div className="flex gap-0.5 bg-muted/50 rounded-md p-0.5">
-              <button onClick={() => setViewMode("today")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "today" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Hoje</button>
-              <button onClick={() => setViewMode("grid")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Semana</button>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">

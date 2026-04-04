@@ -174,8 +174,7 @@ const Dieta = () => {
           tips={[
             "Configure suas refeições clicando em ⚙️ no cardápio (adicione ou remova refeições)",
             "No cardápio semanal, clique em cada refeição para adicionar o que vai comer",
-            "Na aba 🔥 CALORIAS, registre o que comeu e acompanhe macros",
-            "Use a aba 💧 ÁGUA para contar seus copos diários"
+            "Na aba 🔥 CALORIAS, registre o que comeu e acompanhe macros"
           ]}
         />
         <Tabs defaultValue="cardapio" className="w-full">

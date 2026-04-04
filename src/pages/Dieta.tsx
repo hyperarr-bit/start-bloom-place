@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock, Droplets,
   TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
-  ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3
+  ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
+  ArrowUp, ArrowDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

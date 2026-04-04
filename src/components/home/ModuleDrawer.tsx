@@ -21,7 +21,10 @@ const modules = [
   { id: "beleza", path: "/beleza", Icon: Droplets, label: "Beleza", color: "bg-pink-400/20 text-pink-600" },
   { id: "viagens", path: "/viagens", Icon: Plane, label: "Viagens", color: "bg-teal-400/20 text-teal-600" },
   { id: "carreira", path: "/carreira", Icon: Briefcase, label: "Carreira", color: "bg-slate-400/20 text-slate-600" },
-  { id: "hiperfoco", path: "/hiperfoco", Icon: Brain, label: "Hiperfoco", color: "bg-violet-400/20 text-violet-600" },
+  { id: "hiperfoco", path: "/hiperfoco", Icon: Brain, label: "Mente", color: "bg-violet-400/20 text-violet-600" },
+  { id: "relacionamentos", path: "/relacionamentos", Icon: Users, label: "Relações", color: "bg-rose-400/20 text-rose-600" },
+  { id: "pet", path: "/pet", Icon: PawPrint, label: "Pet", color: "bg-amber-400/20 text-amber-500" },
+  { id: "detox", path: "/detox", Icon: Leaf, label: "Detox", color: "bg-lime-400/20 text-lime-600" },
 ];
 
 export const ModuleDrawer = () => {

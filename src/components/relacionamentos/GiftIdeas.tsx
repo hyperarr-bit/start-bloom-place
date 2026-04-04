@@ -8,6 +8,7 @@ interface GiftItem {
   id: string;
   person: string;
   idea: string;
+  link: string;
   status: "idea" | "bought" | "delivered";
 }
 

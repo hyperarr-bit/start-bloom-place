@@ -282,20 +282,33 @@ const Dieta = () => {
                     </div>
                     <span className="flex-1 text-center">{day}</span>
                     <div className="flex gap-1">
-                      <button
-                        onClick={() => {
-                          setMealPlan(prev => {
-                            const updated = { ...prev };
-                            delete updated[day];
-                            return updated;
-                          });
-                        }}
-                        className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
-                        title="Limpar cardápio deste dia"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="text-[9px] font-normal">Limpar</span>
-                      </button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
+                            title="Limpar cardápio deste dia"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="text-[9px] font-normal">Limpar</span>
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Limpar cardápio de {day}?</AlertDialogTitle>
+                            <AlertDialogDescription>Todas as refeições deste dia serão removidas.</AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => {
+                              setMealPlan(prev => {
+                                const updated = { ...prev };
+                                delete updated[day];
+                                return updated;
+                              });
+                            }}>Limpar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
 

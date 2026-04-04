@@ -75,11 +75,7 @@ const Dieta = () => {
   const [newMealCarb, setNewMealCarb] = useState("");
   const [newMealFat, setNewMealFat] = useState("");
 
-  // WATER
-  const [waterGoal] = usePersistedState("saude-water-goal", 8);
-  const [waterToday, setWaterToday] = usePersistedState("saude-water-today", 0);
-  const [waterDate, setWaterDate] = usePersistedState("saude-water-date", "");
-
+  // WATER - removed (available in Saúde module)
   // FASTING
   const [fastingGoal, setFastingGoal] = usePersistedState("saude-fast-goal", 16);
   const [fastingStart, setFastingStart] = usePersistedState<string | null>("saude-fast-start", null);

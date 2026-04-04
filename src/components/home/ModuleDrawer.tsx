@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff, LogOut
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff, LogOut, BarChart3
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useAuth } from "@/hooks/use-auth";

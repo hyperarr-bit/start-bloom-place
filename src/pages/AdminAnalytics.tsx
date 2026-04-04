@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BarChart3, Clock, Users, TrendingUp, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
-
-const ADMIN_ID = "2c896992-6849-4ca6-9a66-5c2414bb9424";
 
 const MODULE_LABELS: Record<string, string> = {
   financas: "Finanças",

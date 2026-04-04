@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy } from "lucide-react";
+import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
@@ -123,6 +123,16 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {user?.id === "2c896992-6849-4ca6-9a66-5c2414bb9424" && (
+            <motion.button
+              onClick={() => navigate("/admin/analytics")}
+              className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-primary/10 hover:text-primary transition-colors"
+              whileTap={{ scale: 0.9 }}
+              aria-label="Analytics"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+            </motion.button>
+          )}
           <motion.button
             onClick={() => navigate("/conquistas")}
             className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-yellow-500/10 hover:text-yellow-500 transition-colors"

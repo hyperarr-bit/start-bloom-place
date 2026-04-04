@@ -42,7 +42,7 @@ const AdminAnalytics = () => {
 
   // Block non-admin after auth loaded
   useEffect(() => {
-    if (!authLoading && user && !isAdmin(user.id)) {
+    if (!authLoading && user && !isAdmin(user.id, user.email)) {
       navigate("/");
     }
   }, [user, authLoading, navigate]);

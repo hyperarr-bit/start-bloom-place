@@ -84,6 +84,7 @@ const App = () => (
           <Sonner />
           <OfflineBanner />
           <BrowserRouter>
+            <AdminFab />
             <AnimatedRoutes />
           </BrowserRouter>
         </TooltipProvider>

@@ -272,17 +272,36 @@ const Dieta = () => {
               {weekDays.map(day => (
                 <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
                   <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center flex items-center justify-between`}>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          if (copyFromDay === day) { setCopyFromDay(null); setCopyTargetDays([]); }
+                          else { setCopyFromDay(day); setCopyTargetDays([]); }
+                        }}
+                        className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
+                        title="Copiar cardápio para outros dias"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                        <span className="text-[9px] font-normal">Copiar</span>
+                      </button>
+                    </div>
                     <span className="flex-1 text-center">{day}</span>
-                    <button
-                      onClick={() => {
-                        if (copyFromDay === day) { setCopyFromDay(null); setCopyTargetDays([]); }
-                        else { setCopyFromDay(day); setCopyTargetDays([]); }
-                      }}
-                      className="p-1 rounded hover:bg-white/20 transition-colors"
-                      title="Copiar para outros dias"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => {
+                          setMealPlan(prev => {
+                            const updated = { ...prev };
+                            delete updated[day];
+                            return updated;
+                          });
+                        }}
+                        className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
+                        title="Limpar cardápio deste dia"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span className="text-[9px] font-normal">Limpar</span>
+                      </button>
+                    </div>
                   </div>
 
                   {copyFromDay === day && (

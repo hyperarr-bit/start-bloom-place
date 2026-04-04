@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy } from "lucide-react";
+import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";

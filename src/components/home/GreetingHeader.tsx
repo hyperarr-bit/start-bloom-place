@@ -4,6 +4,7 @@ import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy, BarChart3 } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { useUserData } from "@/hooks/use-user-data";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";
@@ -123,7 +124,7 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {user?.id === "2c896992-6849-4ca6-9a66-5c2414bb9424" && (
+          {isAdmin(user?.id) && (
             <motion.button
               onClick={() => navigate("/admin/analytics")}
               className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-primary/10 hover:text-primary transition-colors"

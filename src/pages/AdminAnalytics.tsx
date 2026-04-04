@@ -3,9 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BarChart3, Clock, Users, TrendingUp, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip } from "recharts";
-
-const ADMIN_ID = "2c896992-6849-4ca6-9a66-5c2414bb9424";
 
 const MODULE_LABELS: Record<string, string> = {
   financas: "Finanças",
@@ -36,20 +35,20 @@ interface AnalyticsRow {
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<AnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("30d");
 
-  // Block non-admin
+  // Block non-admin after auth loaded
   useEffect(() => {
-    if (user && user.id !== ADMIN_ID) {
+    if (!authLoading && user && !isAdmin(user.id)) {
       navigate("/");
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user || user.id !== ADMIN_ID) return;
+    if (authLoading || !user || !isAdmin(user.id)) return;
     const load = async () => {
       setLoading(true);
       let query = (supabase as any)
@@ -115,7 +114,8 @@ const AdminAnalytics = () => {
     return `${(s / 3600).toFixed(1)}h`;
   };
 
-  if (!user || user.id !== ADMIN_ID) return null;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground text-sm">Carregando...</div></div>;
+  if (!user || !isAdmin(user.id)) return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">

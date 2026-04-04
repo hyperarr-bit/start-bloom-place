@@ -35,20 +35,20 @@ interface AnalyticsRow {
 
 const AdminAnalytics = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [data, setData] = useState<AnalyticsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("30d");
 
-  // Block non-admin
+  // Block non-admin after auth loaded
   useEffect(() => {
-    if (user && user.id !== ADMIN_ID) {
+    if (!authLoading && user && !isAdmin(user.id)) {
       navigate("/");
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (!user || user.id !== ADMIN_ID) return;
+    if (authLoading || !user || !isAdmin(user.id)) return;
     const load = async () => {
       setLoading(true);
       let query = (supabase as any)

@@ -477,24 +477,8 @@ const Dieta = () => {
             )}
           </TabsContent>
 
-          {/* ========== ÁGUA ========== */}
-          <TabsContent value="agua" className="space-y-4">
-            <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-500/10 dark:to-cyan-500/10 rounded-xl border border-blue-200 p-6 text-center">
-              <Droplets className="w-12 h-12 mx-auto text-blue-500 mb-3" />
-              <h3 className="text-sm font-bold mb-4">Hidratação de Hoje</h3>
-              <div className="flex justify-center gap-2 flex-wrap mb-4">
-                {Array.from({ length: waterGoal }, (_, i) => (
-                  <button key={i} onClick={() => setWaterToday(i < waterToday ? i : i + 1)}
-                    className={`w-10 h-12 rounded-lg border-2 transition-all ${i < waterToday ? "bg-blue-400 border-blue-500 text-white scale-105" : "border-blue-200 text-blue-300 hover:border-blue-400"}`}>
-                    <Droplets className="w-5 h-5 mx-auto" />
-                  </button>
-                ))}
-              </div>
-              <p className="text-3xl font-bold text-blue-600 mb-1">{waterToday}/{waterGoal}</p>
-              <Progress value={(waterToday / waterGoal) * 100} className="h-3 max-w-xs mx-auto" />
-              <p className="text-xs text-muted-foreground mt-2">{waterToday >= waterGoal ? "🎉 Meta atingida!" : `Faltam ${waterGoal - waterToday} copos`}</p>
-            </div>
-          </TabsContent>
+
+
 
           {/* ========== JEJUM ========== */}
           <TabsContent value="jejum" className="space-y-4">

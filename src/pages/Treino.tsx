@@ -591,7 +591,7 @@ const Treino = () => {
           ]}
         />
         <Tabs defaultValue="hoje" className="w-full">
-          <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-nowrap" ref={(el) => { if (el) el.scrollLeft = 0; }}>
+          <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-nowrap" ref={(el) => { if (el) requestAnimationFrame(() => { el.scrollLeft = 0; }); }}>
             <TabsTrigger value="hoje" className="text-xs px-2.5 py-1.5 flex-shrink-0">🏋️ HOJE</TabsTrigger>
             <TabsTrigger value="semana" className="text-xs px-2.5 py-1.5 flex-shrink-0">📅 SEMANA</TabsTrigger>
             <TabsTrigger value="config" className="text-xs px-2.5 py-1.5 flex-shrink-0">⚙️ CONFIG</TabsTrigger>

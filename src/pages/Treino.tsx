@@ -953,10 +953,8 @@ const Treino = () => {
               </div>
               <p className="text-[10px] text-muted-foreground">Últimos 60 dias — verde = treinou</p>
             </div>
-          </TabsContent>
 
-          {/* ========== HISTÓRICO ========== */}
-          <TabsContent value="history" className="space-y-4">
+            {/* History merged into stats */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Calendar className="w-4 h-4" /> HISTÓRICO DE EXERCÍCIOS</h3>
               {exerciseHistory.length === 0 ? (
@@ -980,23 +978,19 @@ const Treino = () => {
         </Tabs>
       </main>
 
-      {/* ===== BOTTOM ACTION BAR — sticky ===== */}
+      {/* ===== BOTTOM ACTION BAR — simplified ===== */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border">
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {!sessionStart ? (
               <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1 h-8 text-xs" onClick={() => setSessionStart(new Date().toISOString())}>
-                <Play className="w-3 h-3" /> Iniciar
+                <Play className="w-3 h-3" /> Iniciar Sessão
               </Button>
             ) : (
               <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => logWorkoutToday()}>
                 <Check className="w-3 h-3" /> Finalizar
               </Button>
             )}
-            <div className="flex gap-0.5 bg-muted/50 rounded-md p-0.5">
-              <button onClick={() => setViewMode("today")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "today" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Hoje</button>
-              <button onClick={() => setViewMode("grid")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Semana</button>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">

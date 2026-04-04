@@ -6,6 +6,7 @@ import { PetList } from "@/components/pet/PetList";
 import { PetHealth } from "@/components/pet/PetHealth";
 import { PetRoutine } from "@/components/pet/PetRoutine";
 import { PetExpenses } from "@/components/pet/PetExpenses";
+import { PetDiary } from "@/components/pet/PetDiary";
 
 const Pet = () => {
   const navigate = useNavigate();
@@ -40,16 +41,18 @@ const Pet = () => {
           transition={{ duration: 0.3, delay: 0.15 }}
         >
           <Tabs defaultValue="pets" className="w-full">
-            <TabsList className="w-full grid grid-cols-4">
+            <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="pets" className="text-[10px]">🐾 PETS</TabsTrigger>
               <TabsTrigger value="saude" className="text-[10px]">💉 SAÚDE</TabsTrigger>
               <TabsTrigger value="rotina" className="text-[10px]">📋 ROTINA</TabsTrigger>
               <TabsTrigger value="gastos" className="text-[10px]">💸 GASTOS</TabsTrigger>
+              <TabsTrigger value="diario" className="text-[10px]">📸 DIÁRIO</TabsTrigger>
             </TabsList>
             <TabsContent value="pets"><PetList /></TabsContent>
             <TabsContent value="saude"><PetHealth /></TabsContent>
             <TabsContent value="rotina"><PetRoutine /></TabsContent>
             <TabsContent value="gastos"><PetExpenses /></TabsContent>
+            <TabsContent value="diario"><PetDiary /></TabsContent>
           </Tabs>
         </motion.div>
       </div>

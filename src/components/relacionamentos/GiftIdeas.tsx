@@ -8,6 +8,7 @@ interface GiftItem {
   id: string;
   person: string;
   idea: string;
+  link: string;
   status: "idea" | "bought" | "delivered";
 }
 
@@ -24,12 +25,13 @@ export const GiftIdeas = () => {
   const [showForm, setShowForm] = useState(false);
   const [person, setPerson] = useState("");
   const [idea, setIdea] = useState("");
+  const [link, setLink] = useState("");
 
   const addGift = () => {
     if (!idea.trim()) return;
-    const updated = [...gifts, { id: Date.now().toString(), person: person.trim(), idea: idea.trim(), status: "idea" as const }];
+    const updated = [...gifts, { id: Date.now().toString(), person: person.trim(), idea: idea.trim(), link: link.trim(), status: "idea" as const }];
     set("rel-gifts", updated);
-    setIdea(""); setPerson("");
+    setIdea(""); setPerson(""); setLink("");
     setShowForm(false);
   };
 
@@ -78,6 +80,7 @@ export const GiftIdeas = () => {
               {people.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
             <Input placeholder="Ideia de presente" value={idea} onChange={e => setIdea(e.target.value)} className="h-8 text-sm" />
+            <Input placeholder="Onde comprar / link (opcional)" value={link} onChange={e => setLink(e.target.value)} className="h-8 text-sm" />
             <motion.button whileTap={{ scale: 0.95 }} onClick={addGift} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
           </motion.div>
         )}
@@ -120,7 +123,10 @@ export const GiftIdeas = () => {
                     >
                       <span>{st.icon}</span> {st.label}
                     </motion.button>
-                    <span className={`text-xs flex-1 ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-xs ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                      {g.link && <a href={g.link.startsWith("http") ? g.link : `https://${g.link}`} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary truncate hover:underline">{g.link}</a>}
+                    </div>
                     <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeGift(g.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 className="w-3 h-3" />
                     </motion.button>

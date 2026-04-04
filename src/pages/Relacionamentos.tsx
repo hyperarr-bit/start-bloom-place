@@ -3,8 +3,10 @@ import { ArrowLeft, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeoplePanel } from "@/components/relacionamentos/PeoplePanel";
+import { DateCalendar } from "@/components/relacionamentos/DateCalendar";
 import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
+import { EventLog } from "@/components/relacionamentos/EventLog";
 
 const Relacionamentos = () => {
   const navigate = useNavigate();
@@ -39,14 +41,18 @@ const Relacionamentos = () => {
           transition={{ duration: 0.3, delay: 0.15 }}
         >
           <Tabs defaultValue="pessoas" className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
+            <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="pessoas" className="text-[10px]">💜 PESSOAS</TabsTrigger>
+              <TabsTrigger value="agenda" className="text-[10px]">📅 AGENDA</TabsTrigger>
               <TabsTrigger value="momentos" className="text-[10px]">✨ MOMENTOS</TabsTrigger>
               <TabsTrigger value="presentes" className="text-[10px]">🎁 PRESENTES</TabsTrigger>
+              <TabsTrigger value="eventos" className="text-[10px]">📋 EVENTOS</TabsTrigger>
             </TabsList>
             <TabsContent value="pessoas"><PeoplePanel /></TabsContent>
+            <TabsContent value="agenda"><DateCalendar /></TabsContent>
             <TabsContent value="momentos"><MomentsTimeline /></TabsContent>
             <TabsContent value="presentes"><GiftIdeas /></TabsContent>
+            <TabsContent value="eventos"><EventLog /></TabsContent>
           </Tabs>
         </motion.div>
       </div>

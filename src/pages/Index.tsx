@@ -2,10 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useAuth } from "@/hooks/use-auth";
-import { isAdmin } from "@/lib/admin";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
@@ -35,7 +33,6 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [openMonth, setOpenMonth] = useState<string | null>(null);
 
@@ -126,11 +123,6 @@ const Index = () => {
           <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
-            {isAdmin(user?.id, user?.email) && (
-              <button onClick={() => navigate("/admin/analytics")} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Analytics">
-                <BarChart3 className="w-4 h-4 text-primary" />
-              </button>
-            )}
             <ThemeToggle />
           </div>
         </div>

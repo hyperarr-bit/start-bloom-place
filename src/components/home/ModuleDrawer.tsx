@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { useState } from "react";
 
 const modules = [

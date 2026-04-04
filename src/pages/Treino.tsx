@@ -16,7 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { motion, AnimatePresence } from "framer-motion";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const dayColors: Record<string, string> = {
@@ -71,7 +73,6 @@ const defaultWorkoutPlan: WorkoutPlan = {
   DOMINGO: { muscles: [], exercises: [] },
 };
 
-// Templates
 const templates: { name: string; emoji: string; plan: Record<string, string[]> }[] = [
   {
     name: "Push / Pull / Legs",
@@ -127,7 +128,6 @@ const templates: { name: string; emoji: string; plan: Record<string, string[]> }
   },
 ];
 
-// Migrate old format (muscle: string → muscles: string[])
 function migratePlan(plan: any): WorkoutPlan {
   const result: WorkoutPlan = {};
   for (const day of weekDays) {
@@ -151,7 +151,6 @@ function migratePlan(plan: any): WorkoutPlan {
   return result;
 }
 
-// Epley 1RM formula
 function estimate1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return 0;
   if (reps === 1) return weight;
@@ -185,7 +184,11 @@ const Treino = () => {
   const [restCountdown, setRestCountdown] = useState(0);
   const [restRunning, setRestRunning] = useState(false);
   const [soundEnabled, setSoundEnabled] = usePersistedState("treino-sound", true);
+  const [showRestTimer, setShowRestTimer] = useState(false);
   const restRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Config accordion
+  const [configOpen, setConfigOpen] = useState(false);
 
   // Session timer
   const [sessionStart, setSessionStart] = usePersistedState<string | null>("treino-session-start", null);
@@ -233,7 +236,6 @@ const Treino = () => {
     setShowTemplates(false);
   };
 
-  // Streak
   const streak = (() => {
     if (workoutLog.length === 0) return 0;
     const sorted = [...workoutLog].sort((a, b) => b.localeCompare(a));
@@ -252,7 +254,6 @@ const Treino = () => {
     total + day.exercises.reduce((s, ex) => s + (Number(ex.sets) || 0), 0), 0
   );
 
-  // Weekly volume comparison
   const thisWeekVolume = useMemo(() => {
     const now = new Date();
     const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
@@ -279,13 +280,11 @@ const Treino = () => {
 
   const volumeDiff = lastWeekVolume > 0 ? Math.round(((thisWeekVolume - lastWeekVolume) / lastWeekVolume) * 100) : 0;
 
-  // Unique exercises for progression chart
   const uniqueExercises = useMemo(() => {
     const set = new Set(exerciseHistory.map(h => h.exercise));
     return Array.from(set).sort();
   }, [exerciseHistory]);
 
-  // Progression data for selected exercise
   const progressionData = useMemo(() => {
     if (!selectedExercise) return [];
     return exerciseHistory
@@ -299,7 +298,7 @@ const Treino = () => {
       .slice(-20);
   }, [exerciseHistory, selectedExercise]);
 
-  // Rest timer logic
+  // Rest timer logic — auto-show when running
   useEffect(() => {
     if (restRunning && restCountdown > 0) {
       restRef.current = setTimeout(() => setRestCountdown(prev => prev - 1), 1000);
@@ -311,6 +310,11 @@ const Treino = () => {
     }
     return () => { if (restRef.current) clearTimeout(restRef.current); };
   }, [restRunning, restCountdown, soundEnabled]);
+
+  // Auto-show timer when running
+  useEffect(() => {
+    if (restRunning) setShowRestTimer(true);
+  }, [restRunning]);
 
   // Session timer
   useEffect(() => {
@@ -343,6 +347,8 @@ const Treino = () => {
 
   const todayWorkout = workoutPlan[todayDayName];
   const todayProgress = todayWorkout ? todayWorkout.exercises.filter(e => e.done).length / Math.max(todayWorkout.exercises.length, 1) * 100 : 0;
+  const todayDoneCount = todayWorkout?.exercises.filter(e => e.done).length || 0;
+  const todayTotalCount = todayWorkout?.exercises.length || 0;
 
   const muscleDistribution = weekDays.map(day => ({
     day: day.slice(0, 3),
@@ -351,7 +357,6 @@ const Treino = () => {
     volume: workoutPlan[day]?.exercises.reduce((s, ex) => s + (Number(ex.sets) || 0) * (Number(ex.reps) || 0), 0) || 0
   }));
 
-  // Badges
   const badges = [
     { name: "Primeiro Treino", desc: "Registrou o primeiro treino", unlocked: workoutLog.length >= 1, icon: "🎯" },
     { name: "Sequência 7", desc: "7 dias seguidos", unlocked: streak >= 7, icon: "🔥" },
@@ -363,6 +368,17 @@ const Treino = () => {
     { name: "Dedicação", desc: "Treinou 200+ dias", unlocked: workoutLog.length >= 200, icon: "👑" },
   ];
 
+  // Split summary for config accordion
+  const splitSummary = useMemo(() => {
+    const activeMuscles = activeDays.map(d => {
+      const m = workoutPlan[d]?.muscles || [];
+      return m.length > 0 ? m.join("/") : null;
+    }).filter(Boolean);
+    const uniqueSplits = [...new Set(activeMuscles)];
+    if (uniqueSplits.length === 0) return `${activeDays.length} dias · Sem split definido`;
+    return `${activeDays.length} dias · ${uniqueSplits.slice(0, 3).join(", ")}${uniqueSplits.length > 3 ? "…" : ""}`;
+  }, [activeDays, workoutPlan]);
+
   const renderWorkoutDay = (day: string) => {
     const workout = workoutPlan[day];
     const isActive = activeDays.includes(day);
@@ -372,17 +388,17 @@ const Treino = () => {
     const muscleEmoji = workout.muscles.length > 0 ? (muscleGroupIcons[workout.muscles[0]] || "💪") : "😴";
 
     if (!isActive && workout.exercises.length === 0) return (
-      <div key={day} className="bg-card rounded-xl border border-border overflow-hidden opacity-50">
+      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden opacity-50">
         <div className={`${dayColors[day]} text-white p-3 font-bold text-sm flex items-center justify-between`}>
           <span>{day}</span>
           <span className="text-lg">😴</span>
         </div>
         <div className="p-4 text-center"><p className="text-xs text-muted-foreground">Dia de descanso</p></div>
-      </div>
+      </motion.div>
     );
 
     if (workout.exercises.length === 0) return (
-      <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
+      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden">
         <div className={`${dayColors[day]} text-white p-3 font-bold text-sm flex items-center justify-between`}>
           <span>{day} {day === todayDayName ? "⬅️ HOJE" : ""}</span>
           <span className="text-xs opacity-80">{muscleLabel || "Configurar"}</span>
@@ -405,11 +421,11 @@ const Treino = () => {
             }}><Plus className="w-3 h-3" /></Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     );
 
     return (
-      <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
+      <motion.div key={day} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl border border-border overflow-hidden">
         <div className={`${dayColors[day]} text-white p-3`}>
           <div className="flex items-center justify-between">
             <div>
@@ -472,7 +488,6 @@ const Treino = () => {
                   {ex.done && <Check className="w-3 h-3 text-white" />}
                 </button>
               </div>
-              {/* Observation field */}
               {showObsFor === `${day}-${i}` && (
                 <div className="ml-5 mr-7 mb-2">
                   <Input value={ex.obs} onChange={e => {
@@ -514,18 +529,18 @@ const Treino = () => {
               placeholder="📝 Notas da sessão (sono, energia, dores...)" className="text-[10px] h-6 bg-muted/20 border-none" />
           </div>
         </div>
-      </div>
+      </motion.div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-24">
+      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Dumbbell className="w-5 h-5 text-blue-600" /> TREINO</h1></h1>
-            <p className="text-xs text-muted-foreground">Planilha, recordes e progresso</p>
+            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Dumbbell className="w-5 h-5 text-blue-600" /> TREINO</h1>
           </div>
           <div className="flex items-center gap-2">
             {sessionStart && (
@@ -564,184 +579,173 @@ const Treino = () => {
           </TabsList>
 
           {/* ========== TREINO ========== */}
-          <TabsContent value="treino" className="space-y-4">
-            {/* Stats row */}
-            <div className="grid grid-cols-4 gap-2">
-              <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-3 text-center border border-blue-200 dark:border-blue-500/30">
-                <Dumbbell className="w-5 h-5 mx-auto text-blue-500 mb-1" />
-                <p className="text-lg font-bold">{todayWorkout?.exercises.length || 0}</p>
-                <p className="text-[9px] text-muted-foreground">Exercícios</p>
-              </div>
-              <div className="bg-green-50 dark:bg-green-500/10 rounded-xl p-3 text-center border border-green-200 dark:border-green-500/30">
-                <Check className="w-5 h-5 mx-auto text-green-500 mb-1" />
-                <p className="text-lg font-bold">{todayWorkout?.exercises.filter(e => e.done).length || 0}</p>
-                <p className="text-[9px] text-muted-foreground">Feitos</p>
-              </div>
-              <div className="bg-purple-50 dark:bg-purple-500/10 rounded-xl p-3 text-center border border-purple-200 dark:border-purple-500/30">
-                <BarChart3 className="w-5 h-5 mx-auto text-purple-500 mb-1" />
-                <p className="text-lg font-bold">{totalWeeklySets}</p>
-                <p className="text-[9px] text-muted-foreground">Séries/sem</p>
-              </div>
-              <div className="bg-orange-50 dark:bg-orange-500/10 rounded-xl p-3 text-center border border-orange-200 dark:border-orange-500/30">
-                <Flame className="w-5 h-5 mx-auto text-orange-500 mb-1" />
-                <p className="text-lg font-bold">{workoutLog.length}</p>
-                <p className="text-[9px] text-muted-foreground">Total treinos</p>
-              </div>
+          <TabsContent value="treino" className="space-y-3">
+            {/* Compact stats bar */}
+            <div className="flex items-center gap-2 flex-wrap text-xs bg-muted/30 rounded-lg px-3 py-2 border border-border">
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Dumbbell className="w-3.5 h-3.5 text-blue-500" />
+                <span className="font-bold text-foreground">{todayTotalCount}</span> exercícios
+              </span>
+              <span className="text-border">·</span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Check className="w-3.5 h-3.5 text-green-500" />
+                <span className="font-bold text-foreground">{todayDoneCount}</span> feitos
+              </span>
+              <span className="text-border">·</span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <BarChart3 className="w-3.5 h-3.5 text-purple-500" />
+                <span className="font-bold text-foreground">{totalWeeklySets}</span> séries/sem
+              </span>
+              <span className="text-border">·</span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Flame className="w-3.5 h-3.5 text-orange-500" />
+                <span className="font-bold text-foreground">{workoutLog.length}</span> treinos
+              </span>
+              {volumeDiff !== 0 && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className={`flex items-center gap-0.5 font-bold ${volumeDiff > 0 ? "text-green-600" : "text-red-500"}`}>
+                    {volumeDiff > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    {Math.abs(volumeDiff)}% vol
+                  </span>
+                </>
+              )}
             </div>
 
-            {/* Weekly comparison */}
-            <div className="bg-card rounded-xl border border-border p-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                <span className="text-xs font-bold">VOLUME SEMANAL</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Esta semana</p>
-                  <p className="text-sm font-bold">{(thisWeekVolume / 1000).toFixed(1)}k</p>
-                </div>
-                <div className={`flex items-center gap-0.5 px-2 py-1 rounded-full text-[10px] font-bold ${
-                  volumeDiff > 0 ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400" :
-                  volumeDiff < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400" :
-                  "bg-muted text-muted-foreground"
-                }`}>
-                  {volumeDiff > 0 ? <ArrowUpRight className="w-3 h-3" /> : volumeDiff < 0 ? <ArrowDownRight className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
-                  {Math.abs(volumeDiff)}%
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Semana passada</p>
-                  <p className="text-sm font-bold text-muted-foreground">{(lastWeekVolume / 1000).toFixed(1)}k</p>
-                </div>
-              </div>
-            </div>
+            {/* Rest timer — collapsible, auto-shows when running */}
+            <AnimatePresence>
+              {(showRestTimer || restRunning) && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-500/20 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-xs font-bold flex items-center gap-2"><Timer className="w-3.5 h-3.5 text-blue-500" /> DESCANSO</h3>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setSoundEnabled(!soundEnabled)} className="text-muted-foreground p-1">
+                          {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                        </button>
+                        {!restRunning && (
+                          <button onClick={() => setShowRestTimer(false)} className="text-muted-foreground p-1">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        {[30, 45, 60, 90, 120].map(t => (
+                          <button key={t} onClick={() => { setRestTime(t); setRestCountdown(t); }}
+                            className={`px-2 py-1 rounded-md text-[10px] font-medium border transition-all ${restTime === t && !restRunning ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300"}`}>{t}s</button>
+                        ))}
+                      </div>
+                      <div className="relative w-12 h-12 flex-shrink-0">
+                        <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
+                          <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
+                          <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--primary))" strokeWidth="4"
+                            strokeDasharray={`${((restCountdown || restTime) / restTime) * 176} 176`} strokeLinecap="round" />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold font-mono">{restCountdown > 0 ? restCountdown : restTime}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {!restRunning ? (
+                          <Button size="sm" className="h-7 text-xs" onClick={() => { setRestCountdown(restCountdown || restTime); setRestRunning(true); }}><Play className="w-3 h-3 mr-1" /> Go</Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setRestRunning(false)}><Pause className="w-3 h-3" /></Button>
+                        )}
+                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setRestRunning(false); setRestCountdown(restTime); }}><RotateCcw className="w-3 h-3" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Rest Timer */}
-            <div className="bg-gradient-to-r from-blue-500/10 to-indigo-500/10 rounded-xl border border-blue-500/20 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-bold flex items-center gap-2"><Timer className="w-4 h-4 text-blue-500" /> TIMER DE DESCANSO</h3>
-                <button onClick={() => setSoundEnabled(!soundEnabled)} className="text-muted-foreground">
-                  {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {/* Config accordion — collapsed by default */}
+            <Collapsible open={configOpen} onOpenChange={setConfigOpen}>
+              <CollapsibleTrigger asChild>
+                <button className="w-full flex items-center justify-between bg-card rounded-xl border border-border px-4 py-2.5 hover:bg-muted/30 transition-colors">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs font-bold">Configurar Semana</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">{splitSummary}</span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${configOpen ? "rotate-180" : ""}`} />
+                  </div>
                 </button>
-              </div>
-              <div className="flex items-center gap-3">
-                {[30, 45, 60, 90, 120].map(t => (
-                  <button key={t} onClick={() => { setRestTime(t); setRestCountdown(t); }}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all ${restTime === t && !restRunning ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300"}`}>{t}s</button>
-                ))}
-              </div>
-              <div className="flex items-center gap-3 mt-3">
-                <div className="relative w-16 h-16">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 64 64">
-                    <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--muted))" strokeWidth="4" />
-                    <circle cx="32" cy="32" r="28" fill="none" stroke="hsl(var(--primary))" strokeWidth="4"
-                      strokeDasharray={`${((restCountdown || restTime) / restTime) * 176} 176`} strokeLinecap="round" />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-sm font-bold font-mono">{restCountdown > 0 ? restCountdown : restTime}</span>
-                </div>
-                {!restRunning ? (
-                  <Button size="sm" onClick={() => { setRestCountdown(restCountdown || restTime); setRestRunning(true); }}><Play className="w-3 h-3 mr-1" /> Iniciar</Button>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setRestRunning(false)}><Pause className="w-3 h-3 mr-1" /> Pausar</Button>
-                )}
-                <Button size="sm" variant="ghost" onClick={() => { setRestRunning(false); setRestCountdown(restTime); }}><RotateCcw className="w-3 h-3" /></Button>
-              </div>
-            </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="bg-card rounded-b-xl border border-t-0 border-border p-4 space-y-3">
+                  {/* Templates */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-muted-foreground">Templates rápidos:</span>
+                    <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowTemplates(!showTemplates)}>
+                      <Copy className="w-3 h-3 mr-1" /> {showTemplates ? "Fechar" : "Ver Templates"}
+                    </Button>
+                  </div>
+                  
+                  <AnimatePresence>
+                    {showTemplates && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                        <div className="grid grid-cols-2 gap-2 pb-2">
+                          {templates.map(t => (
+                            <button key={t.name} onClick={() => applyTemplate(t)}
+                              className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+                              <p className="text-sm font-bold">{t.emoji} {t.name}</p>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-            {/* Day config + Templates */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold flex items-center gap-2"><Settings className="w-4 h-4" /> DIAS DE TREINO</h3>
-                <div className="flex gap-1">
-                  <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => setShowTemplates(!showTemplates)}>
-                    <Copy className="w-3 h-3 mr-1" /> Templates
-                  </Button>
-                  <Button size="sm" variant={showDayConfig ? "default" : "outline"} className="text-xs h-7" onClick={() => setShowDayConfig(!showDayConfig)}>
-                    <Settings className="w-3 h-3 mr-1" /> {showDayConfig ? "Fechar" : "Configurar"}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Templates */}
-              {showTemplates && (
-                <div className="mb-4 space-y-2">
-                  <p className="text-[10px] text-muted-foreground mb-2">Escolha um template para configurar sua semana automaticamente:</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {templates.map(t => (
-                      <button key={t.name} onClick={() => applyTemplate(t)}
-                        className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
-                        <p className="text-sm font-bold">{t.emoji} {t.name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
-                        </p>
+                  {/* Day chips */}
+                  <div className="flex gap-1.5 flex-wrap">
+                    {weekDays.map(day => (
+                      <button key={day} onClick={() => toggleDay(day)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all cursor-pointer hover:scale-105 ${
+                          activeDays.includes(day) ? `${dayColors[day]} text-white border-transparent` : "bg-muted/30 text-muted-foreground border-border"
+                        } ${day === todayDayName ? "ring-2 ring-primary ring-offset-1" : ""}`}>
+                        {day.slice(0, 3)}
+                        {activeDays.includes(day) && <Check className="w-3 h-3 inline ml-1" />}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
 
-              <div className="flex gap-1.5 flex-wrap">
-                {weekDays.map(day => (
-                  <button key={day} onClick={() => showDayConfig && toggleDay(day)}
-                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
-                      activeDays.includes(day) ? `${dayColors[day]} text-white border-transparent` : "bg-muted/30 text-muted-foreground border-border"
-                    } ${showDayConfig ? "cursor-pointer hover:scale-105" : "cursor-default"} ${day === todayDayName ? "ring-2 ring-primary ring-offset-1" : ""}`}>
-                    {day.slice(0, 3)}
-                    {showDayConfig && activeDays.includes(day) && <Check className="w-3 h-3 inline ml-1" />}
-                  </button>
-                ))}
-              </div>
-
-              {showDayConfig && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-[10px] text-muted-foreground">Selecione múltiplos grupos musculares para cada dia:</p>
-                  {activeDays.sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)).map(day => (
-                    <div key={day} className="space-y-1">
-                      <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
-                      <div className="flex flex-wrap gap-1 ml-1">
-                        {muscleGroups.map(m => {
-                          const isSelected = workoutPlan[day]?.muscles.includes(m);
-                          return (
-                            <button key={m} onClick={() => toggleMuscleForDay(day, m)}
-                              className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                                isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground"
-                              }`}>
-                              {muscleGroupIcons[m] || "💪"} {m}
-                            </button>
-                          );
-                        })}
+                  {/* Muscle groups per day */}
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-muted-foreground">Selecione grupos musculares por dia:</p>
+                    {activeDays.sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)).map(day => (
+                      <div key={day} className="space-y-1">
+                        <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
+                        <div className="flex flex-wrap gap-1 ml-1">
+                          {muscleGroups.map(m => {
+                            const isSelected = workoutPlan[day]?.muscles.includes(m);
+                            return (
+                              <button key={m} onClick={() => toggleMuscleForDay(day, m)}
+                                className={`px-2 py-1 rounded text-[10px] border transition-all ${
+                                  isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground"
+                                }`}>
+                                {muscleGroupIcons[m] || "💪"} {m}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Session controls */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {!sessionStart ? (
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1" onClick={() => setSessionStart(new Date().toISOString())}>
-                    <Play className="w-3 h-3" /> Iniciar Sessão
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => logWorkoutToday()}>
-                    <Check className="w-3 h-3" /> Finalizar Treino
-                  </Button>
-                )}
-                <Button size="sm" variant={viewMode === "today" ? "default" : "outline"} onClick={() => setViewMode("today")} className="text-xs">Hoje</Button>
-                <Button size="sm" variant={viewMode === "grid" ? "default" : "outline"} onClick={() => setViewMode("grid")} className="text-xs">Semana</Button>
-              </div>
-              {todayProgress > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="w-20 h-2 bg-muted rounded-full">
-                    <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${todayProgress}%` }} />
+                    ))}
                   </div>
-                  <span className="text-[10px] font-bold text-green-600">{Math.round(todayProgress)}%</span>
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
 
-            {/* Workout grid */}
+            {/* Workout cards — protagonist */}
             {viewMode === "today" ? (
               <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
             ) : (
@@ -751,7 +755,6 @@ const Treino = () => {
 
           {/* ========== PROGRESSÃO ========== */}
           <TabsContent value="progressao" className="space-y-4">
-            {/* Progression Chart */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> PROGRESSÃO DE CARGA</h3>
               <p className="text-[10px] text-muted-foreground mb-3">Selecione um exercício para ver a evolução da carga ao longo do tempo</p>
@@ -778,7 +781,6 @@ const Treino = () => {
               )}
             </div>
 
-            {/* Volume Progression */}
             {selectedExercise && progressionData.length > 1 && (
               <div className="bg-card rounded-xl border border-border p-4">
                 <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /> VOLUME TOTAL ({selectedExercise})</h3>
@@ -794,7 +796,6 @@ const Treino = () => {
               </div>
             )}
 
-            {/* 1RM Calculator */}
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
               <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-amber-500" /> CALCULADORA DE 1RM (Epley)</h3>
               <p className="text-[10px] text-muted-foreground mb-3">Estime sua repetição máxima com base no peso e reps realizadas</p>
@@ -860,7 +861,6 @@ const Treino = () => {
               </div>
             </div>
 
-            {/* Badges */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Award className="w-4 h-4 text-purple-500" /> CONQUISTAS ({badges.filter(b => b.unlocked).length}/{badges.length})</h3>
               <div className="grid grid-cols-2 gap-2">
@@ -878,6 +878,29 @@ const Treino = () => {
 
           {/* ========== ESTATÍSTICAS ========== */}
           <TabsContent value="stats" className="space-y-4">
+            {/* Volume semanal comparison — moved here */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-blue-500" /> VOLUME SEMANAL</h3>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] text-muted-foreground">Esta semana</p>
+                  <p className="text-xl font-black">{(thisWeekVolume / 1000).toFixed(1)}k <span className="text-xs font-normal text-muted-foreground">kg</span></p>
+                </div>
+                <div className={`flex items-center gap-0.5 px-3 py-1.5 rounded-full text-xs font-bold ${
+                  volumeDiff > 0 ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400" :
+                  volumeDiff < 0 ? "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400" :
+                  "bg-muted text-muted-foreground"
+                }`}>
+                  {volumeDiff > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : volumeDiff < 0 ? <ArrowDownRight className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+                  {Math.abs(volumeDiff)}%
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground">Semana passada</p>
+                  <p className="text-xl font-black text-muted-foreground">{(lastWeekVolume / 1000).toFixed(1)}k</p>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /> DISTRIBUIÇÃO SEMANAL</h3>
               <div className="space-y-2">
@@ -895,7 +918,6 @@ const Treino = () => {
               </div>
             </div>
 
-            {/* Volume Chart */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> VOLUME DE TREINO (últimos 14 dias)</h3>
               <div className="flex items-end gap-1 h-24">
@@ -917,7 +939,6 @@ const Treino = () => {
               </div>
             </div>
 
-            {/* Heatmap */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-500" /> HEATMAP — {streak} dias de sequência 🔥</h3>
               <div className="flex flex-wrap gap-1 mb-3">
@@ -959,6 +980,49 @@ const Treino = () => {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* ===== BOTTOM ACTION BAR — sticky ===== */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border">
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {!sessionStart ? (
+              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1 h-8 text-xs" onClick={() => setSessionStart(new Date().toISOString())}>
+                <Play className="w-3 h-3" /> Iniciar
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => logWorkoutToday()}>
+                <Check className="w-3 h-3" /> Finalizar
+              </Button>
+            )}
+            <div className="flex gap-0.5 bg-muted/50 rounded-md p-0.5">
+              <button onClick={() => setViewMode("today")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "today" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Hoje</button>
+              <button onClick={() => setViewMode("grid")} className={`px-2 py-1 rounded text-[10px] font-bold transition-all ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>Semana</button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowRestTimer(!showRestTimer)}
+              className={`p-1.5 rounded-md border transition-all ${restRunning ? "border-blue-400 bg-blue-500/10 text-blue-500 animate-pulse" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              <Timer className="w-4 h-4" />
+            </button>
+            {todayProgress > 0 && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-green-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${todayProgress}%` }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold text-green-600">{Math.round(todayProgress)}%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

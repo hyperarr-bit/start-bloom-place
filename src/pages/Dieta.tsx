@@ -2,11 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock, Droplets,
+  ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
   ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
   ArrowUp, ArrowDown, Copy
 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

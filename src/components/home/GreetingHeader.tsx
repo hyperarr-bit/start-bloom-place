@@ -4,6 +4,7 @@ import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy, BarChart3 } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
+import { isAdmin } from "@/lib/admin";
 import { useUserData } from "@/hooks/use-user-data";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";

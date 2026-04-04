@@ -181,7 +181,7 @@ const Dieta = () => {
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="calorias" className="text-xs px-3 py-1.5">🔥 CALORIAS</TabsTrigger>
-            <TabsTrigger value="agua" className="text-xs px-3 py-1.5">💧 ÁGUA</TabsTrigger>
+            <TabsTrigger value="calorias" className="text-xs px-3 py-1.5">🔥 CALORIAS</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
             <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
             <TabsTrigger value="mercado" className="text-xs px-3 py-1.5">🛒 MERCADO</TabsTrigger>

@@ -111,7 +111,7 @@ export const ModuleDrawer = () => {
         </button>
       )}
 
-      {isAdmin(user?.id) && (
+      {isAdmin(user?.id, user?.email) && (
         <button
           onClick={() => navigate("/admin/analytics")}
           className="w-full flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border text-xs text-primary hover:text-primary/80 transition-colors"

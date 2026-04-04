@@ -5,7 +5,7 @@ import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock, Droplets,
   TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
   ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, Copy
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +46,8 @@ const Dieta = () => {
   const [meals, setMeals] = usePersistedState<string[]>("dieta-meals-config", defaultMeals);
   const [showMealConfig, setShowMealConfig] = useState(false);
   const [newMealNameConfig, setNewMealNameConfig] = useState("");
+  const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
+  const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
 
   const mealEmojis = defaultMealEmojis;
   const mealColors = defaultMealColors;
@@ -269,7 +271,66 @@ const Dieta = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {weekDays.map(day => (
                 <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
-                  <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center`}>{day}</div>
+                  <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center flex items-center justify-between`}>
+                    <span className="flex-1 text-center">{day}</span>
+                    <button
+                      onClick={() => {
+                        if (copyFromDay === day) { setCopyFromDay(null); setCopyTargetDays([]); }
+                        else { setCopyFromDay(day); setCopyTargetDays([]); }
+                      }}
+                      className="p-1 rounded hover:bg-white/20 transition-colors"
+                      title="Copiar para outros dias"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {copyFromDay === day && (
+                    <div className="p-2 bg-muted/50 border-b border-border space-y-2">
+                      <p className="text-[10px] font-bold text-muted-foreground">Copiar para:</p>
+                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                        <Checkbox
+                          checked={copyTargetDays.length === weekDays.length - 1}
+                          onCheckedChange={(checked) => {
+                            setCopyTargetDays(checked ? weekDays.filter(d => d !== day) : []);
+                          }}
+                        />
+                        Todos
+                      </label>
+                      <div className="grid grid-cols-2 gap-1">
+                        {weekDays.filter(d => d !== day).map(d => (
+                          <label key={d} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                            <Checkbox
+                              checked={copyTargetDays.includes(d)}
+                              onCheckedChange={(checked) => {
+                                setCopyTargetDays(prev => checked ? [...prev, d] : prev.filter(x => x !== d));
+                              }}
+                            />
+                            {d}
+                          </label>
+                        ))}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="w-full h-7 text-xs"
+                        disabled={copyTargetDays.length === 0}
+                        onClick={() => {
+                          setMealPlan(prev => {
+                            const updated = { ...prev };
+                            copyTargetDays.forEach(targetDay => {
+                              updated[targetDay] = { ...(prev[day] || {}) };
+                            });
+                            return updated;
+                          });
+                          setCopyFromDay(null);
+                          setCopyTargetDays([]);
+                        }}
+                      >
+                        Copiar ({copyTargetDays.length})
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="p-3 space-y-3">
                     {meals.map(meal => {
                       const key = `${day}-${meal}`; const isEditing = editingMeal === key;

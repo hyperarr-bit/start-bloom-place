@@ -33,6 +33,7 @@ import Relacionamentos from "./pages/Relacionamentos";
 import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
+import AdminAnalytics from "./pages/AdminAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

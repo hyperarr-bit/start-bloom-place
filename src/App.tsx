@@ -60,6 +60,9 @@ const AnimatedRoutes = () => {
         <Route path="/treino" element={<ProtectedRoute><PageTransition><><TrialBanner /><Treino /></></PageTransition></ProtectedRoute>} />
         <Route path="/dieta" element={<ProtectedRoute><PageTransition><><TrialBanner /><Dieta /></></PageTransition></ProtectedRoute>} />
         <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><><TrialBanner /><Hiperfoco /></></PageTransition></ProtectedRoute>} />
+        <Route path="/relacionamentos" element={<ProtectedRoute><PageTransition><><TrialBanner /><Relacionamentos /></></PageTransition></ProtectedRoute>} />
+        <Route path="/pet" element={<ProtectedRoute><PageTransition><><TrialBanner /><PetPage /></></PageTransition></ProtectedRoute>} />
+        <Route path="/detox" element={<ProtectedRoute><PageTransition><><TrialBanner /><Detox /></></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><Conquistas /></></PageTransition></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -29,6 +29,9 @@ import Carreira from "./pages/Carreira";
 import Treino from "./pages/Treino";
 import Dieta from "./pages/Dieta";
 import Hiperfoco from "./pages/Hiperfoco";
+import Relacionamentos from "./pages/Relacionamentos";
+import PetPage from "./pages/Pet";
+import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
 import NotFound from "./pages/NotFound";
 
@@ -57,6 +60,9 @@ const AnimatedRoutes = () => {
         <Route path="/treino" element={<ProtectedRoute><PageTransition><><TrialBanner /><Treino /></></PageTransition></ProtectedRoute>} />
         <Route path="/dieta" element={<ProtectedRoute><PageTransition><><TrialBanner /><Dieta /></></PageTransition></ProtectedRoute>} />
         <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><><TrialBanner /><Hiperfoco /></></PageTransition></ProtectedRoute>} />
+        <Route path="/relacionamentos" element={<ProtectedRoute><PageTransition><><TrialBanner /><Relacionamentos /></></PageTransition></ProtectedRoute>} />
+        <Route path="/pet" element={<ProtectedRoute><PageTransition><><TrialBanner /><PetPage /></></PageTransition></ProtectedRoute>} />
+        <Route path="/detox" element={<ProtectedRoute><PageTransition><><TrialBanner /><Detox /></></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><Conquistas /></></PageTransition></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

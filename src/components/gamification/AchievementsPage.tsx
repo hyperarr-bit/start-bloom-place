@@ -44,8 +44,25 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
   const books = get<any[]>("lib-books", []);
   const booksRead = books.filter((b: any) => b.status === "read" || b.finished).length;
 
-  // Module visits (count keys that exist)
-  const moduleKeys = ["finance-incomes", "core-rotina-habits", "core-saude-water", "lib-books", "beleza-routines", "casa-rooms"];
+  // Relationships
+  const relPeople = get<any[]>("rel-people", []);
+  const relMoments = get<any[]>("rel-moments", []);
+
+  // Pet
+  const petList = get<any[]>("pet-list", []);
+  const petHealth = get<any[]>("pet-health", []);
+
+  // Detox
+  const detoxHabits = get<any[]>("detox-habits", []);
+  const bestDetoxStreak = detoxHabits.reduce((max: number, h: any) => {
+    const lastRelapse = h.relapses?.length > 0 ? h.relapses[h.relapses.length - 1] : null;
+    const from = lastRelapse || h.startDate || new Date().toISOString().split("T")[0];
+    const streak = Math.floor((Date.now() - new Date(from).getTime()) / 86400000);
+    return Math.max(max, Math.max(h.record || 0, streak));
+  }, 0);
+
+  // Module visits
+  const moduleKeys = ["finance-incomes", "core-rotina-habits", "core-saude-water", "lib-books", "beleza-routines", "casa-rooms", "rel-people", "pet-list", "detox-habits"];
   const modulesUsed = moduleKeys.filter(k => {
     const v = get<any>(k, null);
     return v !== null && (Array.isArray(v) ? v.length > 0 : true);
@@ -76,7 +93,20 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
     { id: "first-checkin", name: "Primeiro Check-in", description: "Faça seu primeiro check-in", icon: "👋", category: "general", unlocked: checkInDone || streak > 0, color: "yellow", xp: XP_PER_BADGE },
     { id: "explorer", name: "Explorador", description: "Use 3+ módulos diferentes", icon: "🧭", category: "general", unlocked: modulesUsed >= 3, color: "yellow", xp: XP_PER_BADGE },
     { id: "reader", name: "Leitor", description: "Termine 1 livro", icon: "📚", category: "general", unlocked: booksRead >= 1, color: "yellow", xp: XP_PER_BADGE },
-    { id: "master", name: "Mestre", description: "Atinja nível Diamante", icon: "👑", category: "general", unlocked: false, color: "yellow", xp: 200 }, // computed after XP calc
+
+    // Relationships
+    { id: "rel-people-5", name: "Círculo Íntimo", description: "Cadastre 5+ pessoas", icon: "👥", category: "general", unlocked: relPeople.length >= 5, color: "rose", xp: XP_PER_BADGE },
+    { id: "rel-moments-10", name: "Memórias", description: "Registre 10+ momentos", icon: "💕", category: "general", unlocked: relMoments.length >= 10, color: "rose", xp: XP_PER_BADGE },
+
+    // Pet
+    { id: "pet-registered", name: "Pai/Mãe de Pet", description: "Cadastre seu primeiro pet", icon: "🐾", category: "general", unlocked: petList.length > 0, color: "amber", xp: XP_PER_BADGE },
+    { id: "pet-vaccinated", name: "Pet Vacinado", description: "Registre uma vacina", icon: "💉", category: "general", unlocked: petHealth.length > 0, color: "amber", xp: XP_PER_BADGE },
+
+    // Detox
+    { id: "detox-7", name: "7 Dias Puro", description: "7 dias sem recaída", icon: "🌿", category: "general", unlocked: bestDetoxStreak >= 7, color: "lime", xp: XP_PER_BADGE },
+    { id: "detox-30", name: "30 Dias Puro", description: "30 dias sem recaída", icon: "🛡️", category: "general", unlocked: bestDetoxStreak >= 30, color: "lime", xp: 100 },
+
+    { id: "master", name: "Mestre", description: "Atinja nível Diamante", icon: "👑", category: "general", unlocked: false, color: "yellow", xp: 200 },
   ];
 }
 

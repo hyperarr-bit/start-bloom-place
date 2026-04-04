@@ -46,6 +46,8 @@ const Dieta = () => {
   const [meals, setMeals] = usePersistedState<string[]>("dieta-meals-config", defaultMeals);
   const [showMealConfig, setShowMealConfig] = useState(false);
   const [newMealNameConfig, setNewMealNameConfig] = useState("");
+  const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
+  const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
 
   const mealEmojis = defaultMealEmojis;
   const mealColors = defaultMealColors;

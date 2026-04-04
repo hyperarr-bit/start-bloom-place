@@ -119,7 +119,7 @@ const Dieta = () => {
     return count;
   })();
 
-  useEffect(() => { if (waterDate !== today) { setWaterToday(0); setWaterDate(today); } }, [today]);
+  
 
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }

@@ -1,42 +1,46 @@
 
 
-# Reorganizar Treino em abas claras e separadas
+# Plano: Reorganizar Treino — Stats em aba separada, Timer dentro do treino, Semana mais clara
 
-## Problema atual
-O módulo já tem 5 abas, mas a aba "TREINO" ainda acumula tudo: barra de stats, timer de descanso, accordion de configuração, e os cards de treino. O usuário abre e vê muita coisa junta.
+## Problema confirmado
+A screenshot mostra a versão antiga (4 cards coloridos + Volume Semanal). As mudanças anteriores não estão renderizando. Vou reescrever o arquivo completo para garantir que a nova versão substitua a antiga.
 
-## Solução: separar em 6 abas focadas
+## Mudanças
+
+### 1. Aba 🏋️ HOJE — só o treino do dia
+- Remove stats bar e timer do topo
+- Mostra apenas o card do treino de hoje (protagonista)
+- O timer de descanso aparece **inline dentro do card** quando o usuário clica "Iniciar Sessão" ou marca um exercício como feito
+- Sem ruído visual — o usuário entra e vê direto o que vai treinar
+
+### 2. Nova aba 📊 RESUMO — stats + volume
+- Move os 4 stat cards (Exercícios, Feitos, Séries/sem, Total treinos) para esta aba
+- Move o card de Volume Semanal (esta semana vs semana passada) para aqui
+- Adiciona distribuição muscular e heatmap de treinos
+
+### 3. Aba 📅 SEMANA — mais óbvia
+- Adicionar um mini texto explicativo no topo: "Visão geral da sua semana de treino"
+- Mostrar mini resumo de cada dia com ícone de status (✅ completo, 🟡 parcial, ⚪ pendente, 😴 descanso)
+- Cards dos 7 dias com visual mais diferenciado entre dia ativo e descanso
+
+### 4. Timer de descanso — dentro do fluxo
+- Remove o timer como bloco separado na aba HOJE
+- Quando o usuário marca um exercício como feito, o timer aparece como mini-bar entre os exercícios
+- Quando clica "Iniciar Sessão", a bottom bar mostra o cronômetro da sessão + botão timer
+
+### 5. Tabs finais
 
 ```text
-🏋️ HOJE  |  📅 SEMANA  |  ⚙️ CONFIG  |  📈 PROGRESSÃO  |  🏆 RECORDES  |  📊 STATS
+🏋️ HOJE  |  📅 SEMANA  |  ⚙️ CONFIG  |  📊 RESUMO  |  📈 PROGRESSÃO  |  🏆 RECORDES
 ```
 
-### Aba 🏋️ HOJE (padrão)
-- Apenas o card do treino de hoje (protagonista)
-- Barra de stats compacta no topo (exercícios, feitos, streak)
-- Timer de descanso inline (aparece quando marca exercício)
-- Zero configuração visível
+(Junta stats + history na aba RESUMO em vez de ter STATS separado)
 
-### Aba 📅 SEMANA
-- Grid com todos os dias da semana (o que já existe no viewMode "grid")
-- Visão geral da semana inteira
-
-### Aba ⚙️ CONFIG
-- Seleção de dias ativos (chips)
-- Templates (Push/Pull/Legs, ABC, etc.)
-- Grupos musculares por dia
-- Tudo que hoje fica no accordion "Configurar Semana"
-
-### Abas existentes mantidas
-- 📈 PROGRESSÃO — gráfico de carga + calculadora 1RM
-- 🏆 RECORDES — PRs + conquistas
-- 📊 STATS — histórico, volume semanal, distribuição muscular (juntar stats + history)
-
-## Alterações
+## Alterações técnicas
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Treino.tsx` | (1) Substituir tab "treino" por duas: "hoje" e "semana". (2) Criar tab "config" com o conteúdo do Collapsible (dias, templates, músculos). (3) Remover accordion Collapsible e toggle viewMode (hoje/semana) — agora são abas separadas. (4) Juntar "stats" e "history" numa aba só. (5) Mover barra de stats compacta para dentro da aba "hoje" apenas. (6) Remover botões Hoje/Semana da bottom bar (virou aba). (7) Simplificar bottom bar: só "Iniciar/Finalizar Sessão" + timer shortcut. |
+| `src/pages/Treino.tsx` | Reescrever completo: (1) Remover stats bar e timer da aba HOJE — só card do dia. (2) Criar aba RESUMO com os 4 stat cards + volume semanal + distribuição + heatmap. (3) Melhorar aba SEMANA com texto explicativo e status visual por dia. (4) Timer de descanso aparece inline quando marca exercício. (5) Bottom bar simplificada: Iniciar/Finalizar + timer da sessão. (6) Reduzir de 6 para 6 abas (STATS vira RESUMO, mais completo). |
 
-Nenhum arquivo novo. Nenhuma informação removida — tudo reorganizado em abas dedicadas.
+Arquivo único. Reescrita completa para garantir que a versão nova substitua a antiga.
 

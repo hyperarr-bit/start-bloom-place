@@ -1,27 +1,21 @@
 
 
-# Plano: Refeições customizáveis com reordenação e nomes livres
+# Plano: Copiar cardápio de um dia para outros dias
 
-## Problema atual
-1. O usuário só pode escolher refeições de uma lista fixa (`availableMeals`). Não pode criar nomes personalizados (ex: "Lanche da Tarde", "Pré-Treino Leve").
-2. Não pode reordenar as refeições — se adicionar "Pré-Treino", ele vai pro final da lista em vez de ficar entre Almoço e Lanche.
+## O que muda
+Cada card de dia no cardápio semanal ganha um botão "Copiar para..." que abre um mini-painel com checkboxes dos outros 6 dias + opção "Todos". Ao confirmar, as refeições daquele dia são copiadas para os dias selecionados.
 
-## Solução
-
-### 1. Refeições com nomes livres
-- Adicionar um campo `Input` no painel de config para o usuário digitar qualquer nome de refeição
-- Manter o `Select` com sugestões pré-definidas como atalho, mas permitir texto livre também
-- Emoji padrão 🍽️ para refeições customizadas
-
-### 2. Reordenação por drag (setas)
-- Adicionar botões ↑/↓ em cada refeição no painel de config para mover a ordem
-- A ordem do array `meals` define a ordem de exibição no cardápio semanal
-
-### 3. Alterações técnicas
+## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Dieta.tsx` | (1) No painel `showMealConfig`: adicionar Input de texto livre + botão "Adicionar" para criar refeição com nome customizado. (2) Manter Select como sugestões rápidas. (3) Adicionar botões ↑↓ em cada chip de refeição para reordenar. (4) Usar `ArrowUp`/`ArrowDown` icons do Lucide. |
+| `src/pages/Dieta.tsx` | (1) Adicionar estado `copyFromDay` (string ou null) e `copyTargetDays` (string[]). (2) No header de cada card de dia (linha ~272), adicionar botão `Copy` do Lucide. (3) Quando clicado, abre um popover/mini-painel inline com checkboxes para cada dia (exceto o próprio) + checkbox "Todos". (4) Botão "Copiar" que executa `setMealPlan` copiando `mealPlan[sourceDay]` para cada dia selecionado. (5) Importar `Copy` do Lucide. |
 
-Nenhum arquivo novo. Apenas edição do painel de configuração de refeições que já existe.
+## Fluxo do usuário
+1. Preenche o cardápio de Segunda
+2. Clica no ícone 📋 no card de Segunda
+3. Aparece lista com checkboxes: ☐ Terça, ☐ Quarta... ☐ Todos
+4. Marca "Todos" ou seleciona dias específicos
+5. Clica "Copiar" → refeições de Segunda são copiadas para os dias marcados
+6. Painel fecha automaticamente
 

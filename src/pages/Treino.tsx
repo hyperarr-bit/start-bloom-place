@@ -139,9 +139,9 @@ function migratePlan(plan: any): WorkoutPlan {
         : [];
     const exercises = (d.exercises || []).map((ex: any) => ({
       name: ex.name || "",
-      sets: ex.sets || "3",
-      reps: ex.reps || "12",
-      carga: ex.carga || "—",
+      sets: ex.sets || "",
+      reps: ex.reps || "",
+      carga: ex.carga || "",
       done: ex.done || false,
       obs: ex.obs || "",
     }));

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift, Check } from "lucide-react";
+import { Plus, Trash2, Gift } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 
@@ -10,10 +11,10 @@ interface GiftItem {
   status: "idea" | "bought" | "delivered";
 }
 
-const statusLabels: Record<string, { label: string; color: string }> = {
-  idea: { label: "Ideia", color: "bg-muted text-muted-foreground" },
-  bought: { label: "Comprado", color: "bg-amber-500/20 text-amber-400" },
-  delivered: { label: "Entregue", color: "bg-green-500/20 text-green-400" },
+const statusLabels: Record<string, { label: string; color: string; icon: string }> = {
+  idea: { label: "Ideia", color: "bg-muted text-muted-foreground", icon: "💡" },
+  bought: { label: "Comprado", color: "bg-amber-500/20 text-amber-400", icon: "🛒" },
+  delivered: { label: "Entregue", color: "bg-green-500/20 text-green-400", icon: "✅" },
 };
 
 export const GiftIdeas = () => {
@@ -59,50 +60,76 @@ export const GiftIdeas = () => {
     <div className="space-y-3 mt-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">{gifts.length} ideia{gifts.length !== 1 ? "s" : ""}</p>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
+        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
           <Plus className="w-3.5 h-3.5" /> Adicionar
-        </button>
+        </motion.button>
       </div>
 
-      {showForm && (
-        <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-          <Input placeholder="Para quem?" value={person} onChange={e => setPerson(e.target.value)} className="h-8 text-sm" list="people-gift-list" />
-          <datalist id="people-gift-list">
-            {people.map((p: any) => <option key={p.id} value={p.name} />)}
-          </datalist>
-          <Input placeholder="Ideia de presente" value={idea} onChange={e => setIdea(e.target.value)} className="h-8 text-sm" />
-          <button onClick={addGift} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</button>
-        </div>
-      )}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-card rounded-xl border border-border p-3 space-y-2 overflow-hidden"
+          >
+            <Input placeholder="Para quem?" value={person} onChange={e => setPerson(e.target.value)} className="h-8 text-sm" list="people-gift-list" />
+            <datalist id="people-gift-list">
+              {people.map((p: any) => <option key={p.id} value={p.name} />)}
+            </datalist>
+            <Input placeholder="Ideia de presente" value={idea} onChange={e => setIdea(e.target.value)} className="h-8 text-sm" />
+            <motion.button whileTap={{ scale: 0.95 }} onClick={addGift} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {Object.keys(grouped).length === 0 && !showForm && (
-        <div className="text-center py-8 text-muted-foreground text-sm">
-          Anote ideias de presentes para pessoas especiais 🎁
-        </div>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 text-muted-foreground text-sm">
+          <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-3xl mb-2">🎁</motion.div>
+          Anote ideias de presentes para pessoas especiais
+        </motion.div>
       )}
 
-      {Object.entries(grouped).map(([name, items]) => (
-        <div key={name}>
+      {Object.entries(grouped).map(([name, items], gi) => (
+        <motion.div
+          key={name}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: gi * 0.08 }}
+        >
           <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
             <Gift className="w-3 h-3" /> {name}
           </p>
           <div className="space-y-1.5">
-            {items.map(g => {
-              const st = statusLabels[g.status];
-              return (
-                <div key={g.id} className="bg-card rounded-lg border border-border p-2.5 flex items-center gap-2">
-                  <button onClick={() => cycleStatus(g.id)} className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${st.color}`}>
-                    {st.label}
-                  </button>
-                  <span className={`text-xs flex-1 ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
-                  <button onClick={() => removeGift(g.id)} className="text-muted-foreground hover:text-destructive">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
+            <AnimatePresence mode="popLayout">
+              {items.map(g => {
+                const st = statusLabels[g.status];
+                return (
+                  <motion.div
+                    key={g.id}
+                    layout
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="bg-card rounded-lg border border-border p-2.5 flex items-center gap-2 hover:shadow-sm transition-shadow"
+                  >
+                    <motion.button
+                      whileTap={{ scale: 0.85 }}
+                      onClick={() => cycleStatus(g.id)}
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${st.color} flex items-center gap-1`}
+                    >
+                      <span>{st.icon}</span> {st.label}
+                    </motion.button>
+                    <span className={`text-xs flex-1 ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                    <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeGift(g.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-3 h-3" />
+                    </motion.button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );

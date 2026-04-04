@@ -1,24 +1,27 @@
 
 
-# Plano: Exercícios sem valores padrão + Progressão funcional
+# Plano: Refeições customizáveis com reordenação e nomes livres
 
-## Problema 1: "3 de 12 automático"
-Quando o usuário adiciona um exercício, os campos já vêm preenchidos com `sets: "3", reps: "12", carga: "—"`. O usuário quer adicionar os valores manualmente.
+## Problema atual
+1. O usuário só pode escolher refeições de uma lista fixa (`availableMeals`). Não pode criar nomes personalizados (ex: "Lanche da Tarde", "Pré-Treino Leve").
+2. Não pode reordenar as refeições — se adicionar "Pré-Treino", ele vai pro final da lista em vez de ficar entre Almoço e Lanche.
 
-**Solução**: Mudar o default para campos vazios (`sets: "", reps: "", carga: ""`). Mostrar placeholder "0" nos inputs para indicar onde digitar.
+## Solução
 
-Linhas afetadas: ~396, ~519 (dois locais onde exercícios são criados com `{ name: ..., sets: "3", reps: "12", carga: "—", ... }`).
+### 1. Refeições com nomes livres
+- Adicionar um campo `Input` no painel de config para o usuário digitar qualquer nome de refeição
+- Manter o `Select` com sugestões pré-definidas como atalho, mas permitir texto livre também
+- Emoji padrão 🍽️ para refeições customizadas
 
-## Problema 2: Progressão — Select não mostra exercícios
-O dropdown de exercícios na aba PROGRESSÃO usa `uniqueExercises`, que vem de `exerciseHistory`. Se o usuário nunca finalizou uma sessão, o histórico está vazio e o Select não tem opções.
+### 2. Reordenação por drag (setas)
+- Adicionar botões ↑/↓ em cada refeição no painel de config para mover a ordem
+- A ordem do array `meals` define a ordem de exibição no cardápio semanal
 
-**Solução**: Além do `exerciseHistory`, também incluir os exercícios do plano atual (todos os dias) no Select. Assim o usuário vê os exercícios que já cadastrou, mesmo sem histórico.
-
-Linha ~276: expandir `uniqueExercises` para incluir exercícios do `workoutPlan` atual.
-
-## Alterações
+### 3. Alterações técnicas
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Treino.tsx` | (1) Trocar default de novos exercícios de `sets:"3", reps:"12", carga:"—"` para `sets:"", reps:"", carga:""` nos dois pontos de criação. (2) Expandir `uniqueExercises` para incluir exercícios do plano atual além do histórico. (3) Adicionar placeholders nos inputs de sets/reps/carga ("S", "R", "kg"). |
+| `src/pages/Dieta.tsx` | (1) No painel `showMealConfig`: adicionar Input de texto livre + botão "Adicionar" para criar refeição com nome customizado. (2) Manter Select como sugestões rápidas. (3) Adicionar botões ↑↓ em cada chip de refeição para reordenar. (4) Usar `ArrowUp`/`ArrowDown` icons do Lucide. |
+
+Nenhum arquivo novo. Apenas edição do painel de configuração de refeições que já existe.
 

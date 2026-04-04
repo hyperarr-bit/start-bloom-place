@@ -12,7 +12,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialBanner } from "@/components/TrialBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
-import { AdminFab } from "@/components/AdminFab";
+
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import Planos from "./pages/Planos";

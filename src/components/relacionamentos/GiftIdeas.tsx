@@ -25,12 +25,13 @@ export const GiftIdeas = () => {
   const [showForm, setShowForm] = useState(false);
   const [person, setPerson] = useState("");
   const [idea, setIdea] = useState("");
+  const [link, setLink] = useState("");
 
   const addGift = () => {
     if (!idea.trim()) return;
-    const updated = [...gifts, { id: Date.now().toString(), person: person.trim(), idea: idea.trim(), status: "idea" as const }];
+    const updated = [...gifts, { id: Date.now().toString(), person: person.trim(), idea: idea.trim(), link: link.trim(), status: "idea" as const }];
     set("rel-gifts", updated);
-    setIdea(""); setPerson("");
+    setIdea(""); setPerson(""); setLink("");
     setShowForm(false);
   };
 

@@ -114,7 +114,8 @@ const AdminAnalytics = () => {
     return `${(s / 3600).toFixed(1)}h`;
   };
 
-  if (!user || user.id !== ADMIN_ID) return null;
+  if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground text-sm">Carregando...</div></div>;
+  if (!user || !isAdmin(user.id)) return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">

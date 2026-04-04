@@ -123,7 +123,10 @@ export const GiftIdeas = () => {
                     >
                       <span>{st.icon}</span> {st.label}
                     </motion.button>
-                    <span className={`text-xs flex-1 ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-xs ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                      {g.link && <a href={g.link.startsWith("http") ? g.link : `https://${g.link}`} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary truncate hover:underline">{g.link}</a>}
+                    </div>
                     <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeGift(g.id)} className="text-muted-foreground hover:text-destructive transition-colors">
                       <Trash2 className="w-3 h-3" />
                     </motion.button>

@@ -124,7 +124,7 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {isAdmin(user?.id) && (
+          {isAdmin(user?.id, user?.email) && (
             <motion.button
               onClick={() => navigate("/admin/analytics")}
               className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-primary/10 hover:text-primary transition-colors"

@@ -123,10 +123,10 @@ const Index = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-lg">≡</span>
-          <h1 className="text-base font-bold tracking-tight"><h1 className="text-base font-bold tracking-tight">FINANÇAS</h1></h1>
+          <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
-            {isAdmin(user?.id) && (
+            {isAdmin(user?.id, user?.email) && (
               <button onClick={() => navigate("/admin/analytics")} className="p-1.5 rounded-lg hover:bg-muted transition-colors" aria-label="Analytics">
                 <BarChart3 className="w-4 h-4 text-primary" />
               </button>

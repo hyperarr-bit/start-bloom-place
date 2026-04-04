@@ -439,21 +439,21 @@ const Treino = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Input value={ex.sets} onChange={e => {
+                  <Input value={ex.sets} placeholder="S" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], sets: e.target.value }; return u;
                     });
                   }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
                   <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.reps} onChange={e => {
+                  <Input value={ex.reps} placeholder="R" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], reps: e.target.value }; return u;
                     });
                   }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
                   <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.carga} onChange={e => {
+                  <Input value={ex.carga} placeholder="kg" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], carga: e.target.value }; return u;

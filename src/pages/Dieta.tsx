@@ -158,10 +158,6 @@ const Dieta = () => {
             <p className="text-xs text-muted-foreground">Cardápio, calorias, jejum e receitas</p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-full border border-blue-300">
-              <Droplets className="w-3 h-3 text-blue-500" />
-              <span className="text-[10px] font-bold text-blue-700">{waterToday}/{waterGoal}</span>
-            </div>
             {dietStreak > 0 && (
               <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300">
                 <Flame className="w-3 h-3 text-green-600" />

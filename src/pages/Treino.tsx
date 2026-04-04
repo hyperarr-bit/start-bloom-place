@@ -139,9 +139,9 @@ function migratePlan(plan: any): WorkoutPlan {
         : [];
     const exercises = (d.exercises || []).map((ex: any) => ({
       name: ex.name || "",
-      sets: ex.sets || "3",
-      reps: ex.reps || "12",
-      carga: ex.carga || "—",
+      sets: ex.sets || "",
+      reps: ex.reps || "",
+      carga: ex.carga || "",
       done: ex.done || false,
       obs: ex.obs || "",
     }));
@@ -275,8 +275,11 @@ const Treino = () => {
 
   const uniqueExercises = useMemo(() => {
     const set = new Set(exerciseHistory.map(h => h.exercise));
+    Object.values(workoutPlan).forEach(day => {
+      (day.exercises || []).forEach((ex: any) => { if (ex.name) set.add(ex.name); });
+    });
     return Array.from(set).sort();
-  }, [exerciseHistory]);
+  }, [exerciseHistory, workoutPlan]);
 
   const progressionData = useMemo(() => {
     if (!selectedExercise) return [];
@@ -393,7 +396,7 @@ const Treino = () => {
               if (newExName.trim()) {
                 setWorkoutPlan(prev => ({
                   ...prev,
-                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "3", reps: "12", carga: "—", done: false, obs: "" }] }
+                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] }
                 }));
                 setNewExName("");
               }
@@ -436,21 +439,21 @@ const Treino = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Input value={ex.sets} onChange={e => {
+                  <Input value={ex.sets} placeholder="S" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], sets: e.target.value }; return u;
                     });
                   }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
                   <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.reps} onChange={e => {
+                  <Input value={ex.reps} placeholder="R" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], reps: e.target.value }; return u;
                     });
                   }} className="text-xs h-6 w-8 text-center border-none bg-transparent p-0" />
                   <span className="text-muted-foreground text-xs">×</span>
-                  <Input value={ex.carga} onChange={e => {
+                  <Input value={ex.carga} placeholder="kg" onChange={e => {
                     setWorkoutPlan(prev => {
                       const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                       u[day].exercises[i] = { ...u[day].exercises[i], carga: e.target.value }; return u;
@@ -516,7 +519,7 @@ const Treino = () => {
               if (newExName.trim()) {
                 setWorkoutPlan(prev => ({
                   ...prev,
-                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "3", reps: "12", carga: "—", done: false, obs: "" }] }
+                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] }
                 }));
                 setNewExName("");
               }

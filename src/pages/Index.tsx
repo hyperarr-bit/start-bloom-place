@@ -33,7 +33,6 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [openMonth, setOpenMonth] = useState<string | null>(null);
 

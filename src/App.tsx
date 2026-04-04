@@ -29,6 +29,9 @@ import Carreira from "./pages/Carreira";
 import Treino from "./pages/Treino";
 import Dieta from "./pages/Dieta";
 import Hiperfoco from "./pages/Hiperfoco";
+import Relacionamentos from "./pages/Relacionamentos";
+import PetPage from "./pages/Pet";
+import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
 import NotFound from "./pages/NotFound";
 

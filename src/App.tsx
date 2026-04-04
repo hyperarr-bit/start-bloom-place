@@ -65,6 +65,7 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute><PageTransition><><TrialBanner /><PetPage /></></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute><PageTransition><><TrialBanner /><Detox /></></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><Conquistas /></></PageTransition></ProtectedRoute>} />
+        <Route path="/admin/analytics" element={<ProtectedRoute><PageTransition><AdminAnalytics /></PageTransition></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>

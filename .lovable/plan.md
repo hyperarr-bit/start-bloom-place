@@ -1,44 +1,96 @@
 
 
-# Corrigir Score de Saúde Financeira
+# Plano: Renomear Hiperfoco → Mente + 3 Novos Módulos (Relacionamentos, Pet, Detox)
 
-## Problemas encontrados
+## Resumo
+Renomear o módulo "Hiperfoco" para "Mente", criar 3 novos módulos para fechar o grid 4×4 (16 módulos) na Home.
 
-### 1. `totalExpenses` NÃO inclui despesas fixas
-Na linha 81 do `Index.tsx`, `totalExpenses` soma apenas `expenses` (variáveis). As `fixedExpenses` são completamente ignoradas. Isso faz:
-- **Taxa de poupança** parecer muito maior do que é (ex: se ganha 5000, gasta 1000 variável e 3000 fixo → mostra 80% de poupança quando deveria ser 20%)
-- **Saldo real mensal** e **projeção anual** ficam inflados
-- **Reserva de emergência meta** (`totalExpenses * 6`) fica baixa demais
+---
 
-### 2. `investmentRate` usa valor total da carteira vs renda anual
-Linha 92: `(totalInvestments / (totalIncome * 12)) * 100` — compara patrimônio acumulado com renda. Deveria comparar **aportes mensais** vs renda mensal para medir disciplina de investimento.
-
-### 3. Score dá 10 pontos de graça (base)
-Linha 134: `score += 10` — infla o score sem motivo. Um usuário sem dados já começa em ~25 (10 base + 15 contas em dia default).
-
-### 4. Parcelas não entram no cálculo de despesas totais
-O `monthlyInstallments` é calculado em Index.tsx mas NÃO é passado nem somado no `totalExpenses` que vai para o FinancialHealth.
-
-## Solução
-
-### `src/pages/Index.tsx`
-- Criar `totalAllExpenses = totalExpenses + totalFixedExpenses + monthlyInstallments` e passar como prop ou passar `fixedExpenses` e `monthlyInstallments` separados
-- Passar `fixedExpenses` como prop para o FinancialHealth
-
-### `src/components/FinancialHealth.tsx`
-- Receber `fixedExpenses` e `monthlyInstallments` como props
-- Recalcular `totalRealExpenses = totalExpenses + fixedExpensesTotal + monthlyInstallments`
-- **Savings rate**: usar `(totalIncome - totalRealExpenses) / totalIncome`
-- **Investment rate**: usar `monthlyContributions / totalIncome * 100` (aportes mensais vs renda mensal)
-- **Reserva de emergência meta**: usar `totalRealExpenses * 6`
-- **Saldo real mensal**: `totalIncome - totalRealExpenses`
-- **Remover base de 10 pontos** — redistribuir: Poupança 20pts, Contas 15pts, Emergência 15pts, Investimentos 15pts, Metas 10pts, Dívidas -15pts, Parcelas 5pts, Desejos 5pts, Diversificação 5pts, Aportes 5pts
-- Ajustar as dicas para refletir os valores reais
-
-## Alterações
+## 1. Renomear Hiperfoco → Mente
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Index.tsx` | Calcular `totalFixedExpenses`, passar junto com `monthlyInstallments` como props ao FinancialHealth |
-| `src/components/FinancialHealth.tsx` | Receber novas props; usar despesa real total no score; corrigir investmentRate para usar aportes; remover base 10; recalibrar pesos |
+| `src/pages/Hiperfoco.tsx` | Trocar título "HIPERFOCO" → "MENTE", ícone `Brain` permanece |
+| `src/components/home/ModuleDrawer.tsx` | `label: "Mente"` no módulo hiperfoco |
+| `src/App.tsx` | Rota `/hiperfoco` permanece (não quebra links) |
+
+---
+
+## 2. Módulo Relacionamentos (`/relacionamentos`)
+
+**Ícone**: `Users` · **Cor**: `bg-rose-400/20 text-rose-600`
+
+**Abas**:
+- **Pessoas** — Cadastro de pessoas importantes (nome, relação, aniversário, notas). Card com countdown pro próximo aniversário.
+- **Momentos** — Registro de encontros/momentos especiais (data, com quem, descrição). Timeline visual.
+- **Presentes** — Lista de ideias de presentes por pessoa, com status (ideia/comprado/entregue).
+
+**Dados**: `useUserData` com chaves `rel-people`, `rel-moments`, `rel-gifts`.
+
+---
+
+## 3. Módulo Pet (`/pet`)
+
+**Ícone**: `PawPrint` (Lucide) · **Cor**: `bg-amber-400/20 text-amber-500`
+
+**Abas**:
+- **Meus Pets** — Cadastro (nome, espécie, raça, peso, nascimento, foto placeholder). Card por pet.
+- **Saúde** — Vacinas (nome, data, próxima dose), vermífugo, consultas. Alerta de vacina próxima.
+- **Rotina** — Checklist diário (comida, água, passeio, banho) com toggle por dia.
+- **Gastos** — Registro de gastos com pet (ração, vet, brinquedos) com total mensal.
+
+**Dados**: `useUserData` com chaves `pet-list`, `pet-health`, `pet-routine`, `pet-expenses`.
+
+---
+
+## 4. Módulo Detox — Dias Puros (`/detox`)
+
+**Ícone**: `Leaf` ou `ShieldCheck` · **Cor**: `bg-lime-400/20 text-lime-600`
+
+**Conceito**: Rastrear "dias limpos" de hábitos que o usuário quer parar ou controlar (redes sociais, álcool, cigarro, junk food, etc). Foco em streaks e recaídas.
+
+**Abas**:
+- **Rastreador** — Lista de hábitos a evitar (configurável). Cada um mostra streak atual (dias sem), recorde, e botão "Recaí" que reseta o contador. Grid visual tipo GitHub contributions mostrando dias puros vs recaídas no mês.
+- **Diário** — Registro de como se sentiu no dia (gatilhos, dificuldade 1-5, nota livre). Ajuda a identificar padrões.
+- **Conquistas** — Marcos automáticos: 1 dia, 3 dias, 7 dias, 14 dias, 30 dias, 60, 90, 180, 365. Badge desbloqueado a cada marco com frase motivacional.
+- **Estatísticas** — Taxa de sucesso (%), maior streak, total de dias puros, gráfico mensal de evolução.
+
+**Dados**: `useUserData` com chaves `detox-habits`, `detox-log`, `detox-diary`.
+
+---
+
+## 5. Registro nos sistemas globais
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/App.tsx` | Adicionar 3 rotas protegidas: `/relacionamentos`, `/pet`, `/detox` |
+| `src/components/home/ModuleDrawer.tsx` | Adicionar 3 módulos ao array `modules` (total: 16) |
+| `src/components/gamification/AchievementsPage.tsx` | Adicionar badges para os novos módulos (ex: "7 dias puro", "Pet vacinado", "10 momentos registrados") |
+
+---
+
+## Arquivos a criar
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| `src/pages/Relacionamentos.tsx` | Página com 3 abas |
+| `src/components/relacionamentos/PeoplePanel.tsx` | CRUD de pessoas + countdown aniversário |
+| `src/components/relacionamentos/MomentsTimeline.tsx` | Timeline de momentos |
+| `src/components/relacionamentos/GiftIdeas.tsx` | Lista de presentes por pessoa |
+| `src/pages/Pet.tsx` | Página com 4 abas |
+| `src/components/pet/PetList.tsx` | Cadastro de pets |
+| `src/components/pet/PetHealth.tsx` | Vacinas e consultas |
+| `src/components/pet/PetRoutine.tsx` | Checklist diário |
+| `src/components/pet/PetExpenses.tsx` | Gastos com pet |
+| `src/pages/Detox.tsx` | Página com 4 abas |
+| `src/components/detox/DetoxTracker.tsx` | Streaks + grid de dias puros |
+| `src/components/detox/DetoxDiary.tsx` | Diário de gatilhos |
+| `src/components/detox/DetoxAchievements.tsx` | Marcos e badges |
+| `src/components/detox/DetoxStats.tsx` | Estatísticas e gráficos |
+
+---
+
+## Padrão visual
+Todos seguem o padrão existente: header sticky com seta voltar + ícone + título, `Tabs` com `TabsList` horizontal scrollável, cards com `bg-card border border-border rounded-xl`, dados via `useUserData`.
 

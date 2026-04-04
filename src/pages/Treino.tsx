@@ -396,7 +396,7 @@ const Treino = () => {
               if (newExName.trim()) {
                 setWorkoutPlan(prev => ({
                   ...prev,
-                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "3", reps: "12", carga: "—", done: false, obs: "" }] }
+                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] }
                 }));
                 setNewExName("");
               }

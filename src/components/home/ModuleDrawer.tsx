@@ -29,7 +29,7 @@ const modules = [
 
 export const ModuleDrawer = () => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
 

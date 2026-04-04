@@ -80,6 +80,7 @@ export const GiftIdeas = () => {
               {people.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
             <Input placeholder="Ideia de presente" value={idea} onChange={e => setIdea(e.target.value)} className="h-8 text-sm" />
+            <Input placeholder="Onde comprar / link (opcional)" value={link} onChange={e => setLink(e.target.value)} className="h-8 text-sm" />
             <motion.button whileTap={{ scale: 0.95 }} onClick={addGift} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
           </motion.div>
         )}

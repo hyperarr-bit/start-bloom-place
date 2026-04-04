@@ -275,8 +275,11 @@ const Treino = () => {
 
   const uniqueExercises = useMemo(() => {
     const set = new Set(exerciseHistory.map(h => h.exercise));
+    Object.values(workoutPlan).forEach(day => {
+      (day.exercises || []).forEach((ex: any) => { if (ex.name) set.add(ex.name); });
+    });
     return Array.from(set).sort();
-  }, [exerciseHistory]);
+  }, [exerciseHistory, workoutPlan]);
 
   const progressionData = useMemo(() => {
     if (!selectedExercise) return [];

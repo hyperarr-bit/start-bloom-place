@@ -1,96 +1,79 @@
 
+# Plano — Fazer o Analytics aparecer de forma confiável e só para sua conta
 
-# Plano: Renomear Hiperfoco → Mente + 3 Novos Módulos (Relacionamentos, Pet, Detox)
+## Diagnóstico frio
+O problema principal não é o banco nem o ID da sua conta.
 
-## Resumo
-Renomear o módulo "Hiperfoco" para "Mente", criar 3 novos módulos para fechar o grid 4×4 (16 módulos) na Home.
+Pelos arquivos atuais:
+- o botão de analytics do header existe só em `src/components/home/GreetingHeader.tsx`
+- o link “Painel Analytics” existe só em `src/components/home/ModuleDrawer.tsx`
+- o `ModuleDrawer` só é renderizado em `src/pages/Home.tsx`
+- você está na rota `/index` (Finanças), não na Home
 
----
+Ou seja: na tela onde você está, nenhum dos dois pontos de acesso é renderizado.
 
-## 1. Renomear Hiperfoco → Mente
+Além disso, vale endurecer a checagem de admin para não depender de comparação solta repetida em vários arquivos.
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/pages/Hiperfoco.tsx` | Trocar título "HIPERFOCO" → "MENTE", ícone `Brain` permanece |
-| `src/components/home/ModuleDrawer.tsx` | `label: "Mente"` no módulo hiperfoco |
-| `src/App.tsx` | Rota `/hiperfoco` permanece (não quebra links) |
+## O que vou corrigir
+### 1. Centralizar a regra de admin
+Criar uma constante/função única de verificação do admin:
+- `ADMIN_ID = "2c896992-6849-4ca6-9a66-5c2414bb9424"`
+- usar essa regra em todos os lugares que exibem analytics
 
----
+Isso evita divergência e reduz risco de “num arquivo aparece, no outro não”.
 
-## 2. Módulo Relacionamentos (`/relacionamentos`)
+### 2. Fazer o acesso aparecer fora da Home
+Adicionar acesso ao analytics em locais realmente visíveis:
+- manter no `GreetingHeader`
+- manter no `ModuleDrawer`
+- adicionar também no header das páginas de módulo, começando por `src/pages/Index.tsx` (Finanças)
 
-**Ícone**: `Users` · **Cor**: `bg-rose-400/20 text-rose-600`
+Assim você consegue abrir o analytics mesmo estando dentro de um módulo.
 
-**Abas**:
-- **Pessoas** — Cadastro de pessoas importantes (nome, relação, aniversário, notas). Card com countdown pro próximo aniversário.
-- **Momentos** — Registro de encontros/momentos especiais (data, com quem, descrição). Timeline visual.
-- **Presentes** — Lista de ideias de presentes por pessoa, com status (ideia/comprado/entregue).
+### 3. Blindar contra timing de auth
+Hoje o `ProtectedRoute` espera `loading`, mas os botões usam `user?.id` direto.
 
-**Dados**: `useUserData` com chaves `rel-people`, `rel-moments`, `rel-gifts`.
+Vou ajustar a renderização admin-only para respeitar o estado de auth carregando:
+- enquanto auth estiver carregando, não decidir cedo demais
+- depois que carregar, mostrar o acesso se o usuário for o admin
 
----
+Isso evita sumiço por inicialização de sessão.
 
-## 3. Módulo Pet (`/pet`)
+### 4. Proteger a página de analytics do jeito certo
+Em `src/pages/AdminAnalytics.tsx`:
+- manter bloqueio para não-admin
+- usar a mesma regra centralizada
+- exibir estado de carregamento antes da decisão final
+- só consultar dados quando auth estiver pronta e o usuário for admin
 
-**Ícone**: `PawPrint` (Lucide) · **Cor**: `bg-amber-400/20 text-amber-500`
+## Arquivos a ajustar
+- `src/hooks/use-auth.tsx`  
+  Expor e usar claramente o estado de carregamento na lógica admin-only.
+- `src/components/home/GreetingHeader.tsx`  
+  Trocar comparação hardcoded por regra centralizada.
+- `src/components/home/ModuleDrawer.tsx`  
+  Trocar comparação hardcoded por regra centralizada.
+- `src/pages/Index.tsx`  
+  Adicionar botão admin-only no header de Finanças.
+- `src/pages/AdminAnalytics.tsx`  
+  Ajustar gating + loading para não haver falso negativo.
+- opcionalmente criar algo como `src/lib/admin.ts` ou `src/hooks/use-is-admin.ts`  
+  para centralizar a checagem.
 
-**Abas**:
-- **Meus Pets** — Cadastro (nome, espécie, raça, peso, nascimento, foto placeholder). Card por pet.
-- **Saúde** — Vacinas (nome, data, próxima dose), vermífugo, consultas. Alerta de vacina próxima.
-- **Rotina** — Checklist diário (comida, água, passeio, banho) com toggle por dia.
-- **Gastos** — Registro de gastos com pet (ração, vet, brinquedos) com total mensal.
+## Resultado esperado
+Depois disso:
+- o analytics continuará invisível para qualquer outro usuário
+- ele aparecerá para sua conta na Home
+- ele também aparecerá dentro de Finanças
+- a página `/admin/analytics` ficará consistente com a checagem visual
 
-**Dados**: `useUserData` com chaves `pet-list`, `pet-health`, `pet-routine`, `pet-expenses`.
+## Validação que vou fazer na implementação
+1. Entrar logado com sua conta.
+2. Confirmar botão de analytics na Home.
+3. Confirmar acesso “Painel Analytics” no drawer.
+4. Confirmar botão de analytics no header de Finanças.
+5. Abrir `/admin/analytics` e validar carregamento dos dados.
+6. Confirmar que outro usuário não vê nenhum desses acessos.
 
----
-
-## 4. Módulo Detox — Dias Puros (`/detox`)
-
-**Ícone**: `Leaf` ou `ShieldCheck` · **Cor**: `bg-lime-400/20 text-lime-600`
-
-**Conceito**: Rastrear "dias limpos" de hábitos que o usuário quer parar ou controlar (redes sociais, álcool, cigarro, junk food, etc). Foco em streaks e recaídas.
-
-**Abas**:
-- **Rastreador** — Lista de hábitos a evitar (configurável). Cada um mostra streak atual (dias sem), recorde, e botão "Recaí" que reseta o contador. Grid visual tipo GitHub contributions mostrando dias puros vs recaídas no mês.
-- **Diário** — Registro de como se sentiu no dia (gatilhos, dificuldade 1-5, nota livre). Ajuda a identificar padrões.
-- **Conquistas** — Marcos automáticos: 1 dia, 3 dias, 7 dias, 14 dias, 30 dias, 60, 90, 180, 365. Badge desbloqueado a cada marco com frase motivacional.
-- **Estatísticas** — Taxa de sucesso (%), maior streak, total de dias puros, gráfico mensal de evolução.
-
-**Dados**: `useUserData` com chaves `detox-habits`, `detox-log`, `detox-diary`.
-
----
-
-## 5. Registro nos sistemas globais
-
-| Arquivo | Mudança |
-|---------|---------|
-| `src/App.tsx` | Adicionar 3 rotas protegidas: `/relacionamentos`, `/pet`, `/detox` |
-| `src/components/home/ModuleDrawer.tsx` | Adicionar 3 módulos ao array `modules` (total: 16) |
-| `src/components/gamification/AchievementsPage.tsx` | Adicionar badges para os novos módulos (ex: "7 dias puro", "Pet vacinado", "10 momentos registrados") |
-
----
-
-## Arquivos a criar
-
-| Arquivo | Conteúdo |
-|---------|----------|
-| `src/pages/Relacionamentos.tsx` | Página com 3 abas |
-| `src/components/relacionamentos/PeoplePanel.tsx` | CRUD de pessoas + countdown aniversário |
-| `src/components/relacionamentos/MomentsTimeline.tsx` | Timeline de momentos |
-| `src/components/relacionamentos/GiftIdeas.tsx` | Lista de presentes por pessoa |
-| `src/pages/Pet.tsx` | Página com 4 abas |
-| `src/components/pet/PetList.tsx` | Cadastro de pets |
-| `src/components/pet/PetHealth.tsx` | Vacinas e consultas |
-| `src/components/pet/PetRoutine.tsx` | Checklist diário |
-| `src/components/pet/PetExpenses.tsx` | Gastos com pet |
-| `src/pages/Detox.tsx` | Página com 4 abas |
-| `src/components/detox/DetoxTracker.tsx` | Streaks + grid de dias puros |
-| `src/components/detox/DetoxDiary.tsx` | Diário de gatilhos |
-| `src/components/detox/DetoxAchievements.tsx` | Marcos e badges |
-| `src/components/detox/DetoxStats.tsx` | Estatísticas e gráficos |
-
----
-
-## Padrão visual
-Todos seguem o padrão existente: header sticky com seta voltar + ícone + título, `Tabs` com `TabsList` horizontal scrollável, cards com `bg-card border border-border rounded-xl`, dados via `useUserData`.
-
+## Detalhe técnico importante
+Os logs e requests já indicam que sua sessão está autenticada com o ID correto. Então eu estou seguro de que o problema não é “sua conta não é reconhecida”; é principalmente um problema de onde o acesso foi renderizado e de como a checagem está espalhada.

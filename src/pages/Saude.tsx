@@ -67,7 +67,7 @@ const Saude = () => {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
             <HydrationTracker />
             <PharmacyChecklist />
-            <FastingTimer />
+            <BMICalculator />
             <SleepCard />
             <SOSCard />
           </motion.div>

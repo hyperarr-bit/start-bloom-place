@@ -1,29 +1,55 @@
 
 
-# Plano: Horários até 0:00 + Diário/Revisão persistentes por data
+# Plano: Redesign do módulo Saúde — Limpar AGORA + Remover FERRAMENTAS
 
-## Mudanças
+## Problemas identificados
 
-### 1. Rotina semanal — horários até 0:00
-**Linha 19-22**: Expandir o array `hours` para incluir todos os horários até meia-noite:
+**Aba AGORA** (poluída):
+- 4 cards de resumo redundantes (hidratação, suplementos, sono, score) — info repetida nos trackers logo abaixo
+- "Ações Rápidas" com 3 botões que não fazem nada útil (Postura/Dor não funciona, Humor/Sono só muda de aba)
+- Calculadora IMC — já foi movida pra cá mas ocupa espaço desnecessariamente
+- Health Score — métrica artificial que não agrega valor real
+- Resultado: scroll enorme com muita coisa visual e pouca ação
+
+**Aba FERRAMENTAS** (inútil):
+- Dívida de Sono — duplicado do card na aba AGORA
+- Inventário & Compras — lista de compras genérica que não pertence ao módulo saúde
+- Ficha SOS — único item realmente útil, mas escondido atrás de uma aba que ninguém abre
+
+## Nova estrutura
+
 ```text
-ANTES: "6:00" ... "19:00", "19:30"
-DEPOIS: "6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "0:00"
+ANTES:  ⚡ AGORA | ⚖️ EVOLUÇÃO | 🏥 LOG MÉDICO | 🛠️ FERRAMENTAS
+DEPOIS: 💊 HOJE   | ⚖️ EVOLUÇÃO | 🏥 LOG MÉDICO
 ```
 
-### 2. Diário — salvar por data e navegar entre dias passados
-Atualmente o `DailyJournal` só mostra "hoje" (`getDateKey()`). Depois que o dia passa, o usuário não consegue ver o que escreveu.
+### Aba HOJE (ex-AGORA, limpa)
+Só o que é ação diária real:
+1. **HydrationTracker** — rastrear água (já tem design bom)
+2. **PharmacyChecklist** — vitaminas/remédios (já tem design bom)
+3. **FastingTimer** — jejum intermitente (já tem design bom)
+4. **Registro de Sono** — input simples de horas dormidas (puxar o `SleepInput` que já existe)
+5. **Ficha SOS** — mover do FERRAMENTAS para o final da aba HOJE (emergência sempre acessível)
 
-**Solução**: Adicionar navegação por data no Diário (botões ← →  e exibição da data). Os dados já estão salvos por chave de data no `journal-entries`, só falta a navegação para acessar dias anteriores. O campo continua editável para dias passados.
+**Removidos:**
+- 4 cards de resumo redundantes
+- Ações Rápidas (botões inúteis)
+- Calculadora IMC (mover para Evolução, onde faz mais sentido junto com medidas corporais)
+- Health Score
+- Dívida de sono (card separado)
+- Lista de compras de suplementos
 
-### 3. Revisão — salvar por semana e navegar entre semanas passadas
-Atualmente o `WeeklyReview` só mostra a semana atual (`getWeekKey()`). Semana passada some.
+### Aba EVOLUÇÃO
+- Manter `BodyEvolution` como está (design aprovado)
+- Adicionar calculadora IMC aqui (faz sentido junto com peso/medidas)
 
-**Solução**: Adicionar navegação por semana (botões ← →) no componente `WeeklyReview`. Os dados já estão salvos por chave de semana no `weekly-reviews`, só falta a UI de navegação.
+### Aba LOG MÉDICO
+- Manter `MedicalLog` como está (design aprovado)
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Rotina.tsx` | (1) Expandir `hours` até "0:00". (2) No `DailyJournal`: adicionar estado `selectedDate` com navegação ← → entre dias, mostrando a data formatada. (3) No `WeeklyReview`: adicionar estado `weekOffset` com navegação ← → entre semanas, mostrando o intervalo de datas da semana. |
+| `src/pages/Saude.tsx` | (1) Remover tab "tools" do array `tabs`. (2) Renomear "agora" → "hoje". (3) Na aba HOJE: remover os 4 summary cards, remover QuickActionCard, remover BMI calculator, remover Health Score. Manter apenas: HydrationTracker + PharmacyChecklist + FastingTimer + card simples de sono + SOS card (movido de ToolsEmergency). (4) Na aba EVOLUÇÃO: adicionar calculadora IMC. (5) Remover imports/estados órfãos (score, bmiHeight/bmiWeight do nível raiz, QuickActionCard). (6) Mover SOS inline (sem precisar do ToolsEmergency inteiro). |
+| `src/components/saude/ToolsEmergency.tsx` | Pode ser deletado ou mantido — o SOS card será extraído inline no Saude.tsx. |
 

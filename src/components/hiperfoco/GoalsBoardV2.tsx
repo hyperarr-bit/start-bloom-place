@@ -185,9 +185,9 @@ export const GoalsBoardV2 = () => {
 
   // Section header component
   const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
-    <div className="bg-muted/50 rounded-t-xl px-5 py-4 flex items-center justify-between">
-      <h3 className="text-sm font-bold tracking-wide">{title}</h3>
-      <span className="text-2xl">{emoji}</span>
+    <div className="bg-muted/60 rounded-t-xl px-5 py-5 flex items-center justify-between">
+      <h3 className="text-xs font-extrabold tracking-widest uppercase text-muted-foreground">{title}</h3>
+      <span className="text-3xl">{emoji}</span>
     </div>
   );
 

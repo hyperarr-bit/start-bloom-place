@@ -442,7 +442,7 @@ export const GoalsBoardV2 = () => {
 
       {/* PROBLEMAS E SOLUÇÕES */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" />
+        <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" color="hsl(0 75% 82% / 0.4)" />
         <div className="p-4 space-y-3">
           {goal.problems.map((ps, i) => (
             <div key={ps.id} className="space-y-1 pb-3 border-b border-border/50 last:border-0">

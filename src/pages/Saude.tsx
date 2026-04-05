@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";

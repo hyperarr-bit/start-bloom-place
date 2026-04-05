@@ -264,10 +264,14 @@ export const GoalsBoardV2 = () => {
   };
 
   const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
-    <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
-      <h3 className="text-lg font-black tracking-tight text-foreground">{title}</h3>
-      <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
-    </div>
+    <>
+      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+        <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
+      </div>
+      <div className="px-5 pt-4 pb-2">
+        <h3 className="text-lg font-black tracking-tight text-foreground">{title}</h3>
+      </div>
+    </>
   );
 
   const DetailTaskInput = ({ groupId }: { groupId: string }) => {

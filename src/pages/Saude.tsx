@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Zap, Scale, Stethoscope, Wrench, AlertTriangle, Droplets, Pill, Moon, Activity, Timer, Smile, Plus } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -12,60 +11,22 @@ import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import { FastingTimer } from "@/components/saude/FastingTimer";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
-import { ToolsEmergency } from "@/components/saude/ToolsEmergency";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 const tabs = [
-  { id: "agora", label: "AGORA", icon: "⚡" },
+  { id: "hoje", label: "HOJE", icon: "💊" },
   { id: "evolucao", label: "EVOLUÇÃO", icon: "⚖️" },
   { id: "log", label: "LOG MÉDICO", icon: "🏥" },
-  { id: "tools", label: "FERRAMENTAS", icon: "🛠️" },
 ];
 
 const Saude = () => {
   const navigate = useNavigate();
-  const today = todayStr();
-  const [activeTab, setActiveTab] = useState("agora");
-
-  // BMI
-  const [bmiHeight, setBmiHeight] = usePersistedState("saude-bmi-height", "");
-  const [bmiWeight, setBmiWeight] = usePersistedState("saude-bmi-weight", "");
-  const bmi = bmiHeight && bmiWeight ? (Number(bmiWeight) / Math.pow(Number(bmiHeight) / 100, 2)).toFixed(1) : null;
-  const bmiCategory = bmi ? (Number(bmi) < 18.5 ? "Abaixo" : Number(bmi) < 25 ? "Normal ✅" : Number(bmi) < 30 ? "Sobrepeso" : "Obesidade") : "";
-  const bmiColor = bmi ? (Number(bmi) < 18.5 ? "text-blue-500" : Number(bmi) < 25 ? "text-green-500" : Number(bmi) < 30 ? "text-yellow-500" : "text-red-500") : "";
-
-  // Compute health score from all signals
-  const [waterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
-  const [waterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
-  const [sleepLog] = usePersistedState<Record<string, number>>("core-saude-sleep", {});
-  const [sleepGoal] = usePersistedState<number>("core-saude-sleep-goal", 8);
-  const [supplements] = usePersistedState<{ id: string; name: string; stock: number }[]>("core-saude-supplements", []);
-  const [supplementLog] = usePersistedState<Record<string, string[]>>("core-saude-supplement-log", {});
-
-  const waterToday = waterLog[today] || 0;
-  const waterPct = waterGoal > 0 ? (waterToday / waterGoal) * 100 : 0;
-  const mlCurrent = waterToday * 250;
-  const mlGoal = waterGoal * 250;
-  const sleepToday = sleepLog[today] || 0;
-  const sleepOk = sleepToday >= sleepGoal - 1;
-  const takenToday = supplementLog[today] || [];
-  const medsCount = takenToday.length;
-  const medsTotal = supplements.length;
-  const debtHours = Math.max(0, sleepGoal - sleepToday);
-
-  // Score: water 30%, sleep 30%, meds 40%
-  let score = 0;
-  score += Math.min(30, (waterPct / 100) * 30);
-  score += sleepOk ? 30 : sleepToday > 0 ? (sleepToday / sleepGoal) * 30 : 0;
-  score += medsTotal > 0 ? (medsCount / medsTotal) * 40 : 40;
-  score = Math.round(Math.min(100, score));
-
+  const [activeTab, setActiveTab] = useState("hoje");
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header — Notion style */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
@@ -75,20 +36,7 @@ const Saude = () => {
           <h1 className="text-base font-bold tracking-tight">SAÚDE</h1>
           <span className="ml-auto text-xs text-muted-foreground capitalize">{currentMonth}</span>
           <ThemeToggle />
-          <button
-            onClick={() => {
-              setActiveTab("tools");
-              setTimeout(() => {
-                const el = document.getElementById("saude-sos-section");
-                if (el) el.scrollIntoView({ behavior: "smooth" });
-              }, 100);
-            }}
-            className="w-8 h-8 rounded-lg bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center transition-colors"
-          >
-            <AlertTriangle className="w-4 h-4 text-destructive" />
-          </button>
         </div>
-        {/* Tabs row */}
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
@@ -104,7 +52,6 @@ const Saude = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        {/* Tips card */}
         <ModuleTip
           moduleId="saude"
           tips={[
@@ -115,106 +62,26 @@ const Saude = () => {
           ]}
         />
 
-        {/* === AGORA TAB === */}
-        {activeTab === "agora" && (
+        {activeTab === "hoje" && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* Hydration Card */}
-              <div className="rounded-xl p-4 border bg-[hsl(var(--saude-blue)/0.12)] border-[hsl(var(--saude-blue)/0.25)]">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--saude-blue))]">Hidratação</p>
-                  <Droplets className="w-5 h-5 text-[hsl(var(--saude-blue)/0.5)]" />
-                </div>
-                <p className="text-sm text-[hsl(var(--saude-blue))]">{(mlCurrent / 1000).toFixed(1)}L / {(mlGoal / 1000).toFixed(1)}L</p>
-              </div>
-
-              {/* Supplements Card */}
-              <div className="rounded-xl p-4 border bg-[hsl(var(--saude-green)/0.12)] border-[hsl(var(--saude-green)/0.25)]">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-bold uppercase tracking-wider text-[hsl(var(--saude-green))]">Suplementos</p>
-                  <Pill className="w-5 h-5 text-[hsl(var(--saude-green)/0.5)]" />
-                </div>
-                <p className="text-sm text-[hsl(var(--saude-green))]">{medsCount}/{medsTotal} tomados</p>
-              </div>
-
-              {/* Sleep Debt Card */}
-              <div className={`rounded-xl p-4 border ${debtHours > 0 ? "bg-[hsl(var(--saude-red)/0.12)] border-[hsl(var(--saude-red)/0.25)]" : "bg-[hsl(var(--saude-green)/0.12)] border-[hsl(var(--saude-green)/0.25)]"}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <p className={`text-xs font-bold uppercase tracking-wider ${debtHours > 0 ? "text-[hsl(var(--saude-red))]" : "text-[hsl(var(--saude-green))]"}`}>Dívida de Sono</p>
-                  <Moon className={`w-5 h-5 ${debtHours > 0 ? "text-[hsl(var(--saude-red)/0.5)]" : "text-[hsl(var(--saude-green)/0.5)]"}`} />
-                </div>
-                <p className={`text-sm ${debtHours > 0 ? "text-[hsl(var(--saude-red))]" : "text-[hsl(var(--saude-green))]"}`}>
-                  {debtHours > 0 ? `-${debtHours} Horas` : "OK ✓"}
-                </p>
-              </div>
-
-              {/* Health Score Card */}
-              <div className="rounded-xl p-4 border bg-muted border-border">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Score de Hoje</p>
-                  <Activity className="w-5 h-5 text-muted-foreground/50" />
-                </div>
-                <p className="text-sm font-bold text-foreground">Health Score: {score}%</p>
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Ações Rápidas</h2>
-              <div className="grid grid-cols-3 gap-2">
-                <QuickActionCard icon="⏱️" label="Iniciar Jejum" onClick={() => setActiveTab("agora")} />
-                <QuickActionCard icon="🧍" label="Postura/Dor" onClick={() => {}} />
-                <QuickActionCard icon="🥱" label="Humor/Sono" onClick={() => setActiveTab("tools")} />
-              </div>
-            </div>
-
-            {/* Trackers */}
             <HydrationTracker />
             <PharmacyChecklist />
             <FastingTimer />
-
-            {/* BMI Calculator */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-teal-500" /> CALCULADORA IMC</h3>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-1">
-                  <Input type="number" value={bmiHeight} onChange={e => setBmiHeight(e.target.value)} placeholder="Altura" className="text-xs h-8 w-20" />
-                  <span className="text-xs text-muted-foreground">cm</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Input type="number" value={bmiWeight} onChange={e => setBmiWeight(e.target.value)} placeholder="Peso" className="text-xs h-8 w-20" />
-                  <span className="text-xs text-muted-foreground">kg</span>
-                </div>
-              </div>
-              {bmi && (
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="text-2xl font-bold">{bmi}</span>
-                  <span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span>
-                </div>
-              )}
-            </div>
+            <SleepCard />
+            <SOSCard />
           </motion.div>
         )}
 
-        {/* === EVOLUÇÃO TAB === */}
         {activeTab === "evolucao" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
             <BodyEvolution />
+            <BMICalculator />
           </motion.div>
         )}
 
-        {/* === LOG MÉDICO TAB === */}
         {activeTab === "log" && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
             <MedicalLog />
-          </motion.div>
-        )}
-
-        {/* === FERRAMENTAS TAB === */}
-        {activeTab === "tools" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} id="saude-sos-section">
-            <ToolsEmergency />
           </motion.div>
         )}
       </main>
@@ -222,14 +89,134 @@ const Saude = () => {
   );
 };
 
-const QuickActionCard = ({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) => (
-  <button
-    onClick={onClick}
-    className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
-  >
-    <span className="text-lg">{icon}</span>
-    <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
-  </button>
-);
+/* ---------- Sleep Card ---------- */
+const SleepCard = () => {
+  const today = todayStr();
+  const [sleepLog, setSleepLog] = usePersistedState<Record<string, number>>("core-saude-sleep", {});
+  const [sleepGoal] = usePersistedState<number>("core-saude-sleep-goal", 8);
+  const [val, setVal] = useState(String(sleepLog[today] || ""));
+
+  const sleepToday = sleepLog[today] || 0;
+  const debtHours = Math.max(0, sleepGoal - sleepToday);
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Moon className="w-4 h-4 text-[hsl(var(--saude-blue))]" />
+        <span className="text-xs font-bold uppercase tracking-wider">Sono</span>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">Horas dormidas:</span>
+          <Input
+            type="number"
+            step="0.5"
+            min="0"
+            max="24"
+            placeholder="Horas"
+            value={val}
+            onChange={e => {
+              setVal(e.target.value);
+              const n = parseFloat(e.target.value);
+              if (!isNaN(n) && n >= 0 && n <= 24) {
+                setSleepLog(prev => ({ ...prev, [today]: n }));
+              }
+            }}
+            className="text-xs h-8 w-20"
+          />
+        </div>
+        <div className={`text-xs font-bold ${debtHours > 0 ? "text-[hsl(var(--saude-red))]" : "text-[hsl(var(--saude-green))]"}`}>
+          {sleepToday > 0 ? (debtHours > 0 ? `Faltam ${debtHours}h para a meta` : "Meta atingida ✓") : ""}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ---------- SOS Card ---------- */
+const SOSCard = () => {
+  const [sosInfo, setSosInfo] = usePersistedState<{ bloodType: string; allergies: string; emergencyContact: string; emergencyPhone: string }>("core-saude-sos", {
+    bloodType: "", allergies: "", emergencyContact: "", emergencyPhone: "",
+  });
+  const [showSOS, setShowSOS] = useState(false);
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-border" id="saude-sos-section">
+      <button
+        onClick={() => setShowSOS(!showSOS)}
+        className="w-full p-4 bg-destructive/10 hover:bg-destructive/15 transition-colors flex items-center justify-center gap-3"
+      >
+        <AlertTriangle className="w-5 h-5 text-destructive" />
+        <span className="text-sm font-black text-destructive uppercase tracking-wider">Ficha SOS - Emergência</span>
+      </button>
+
+      {showSOS && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          className="bg-destructive/5 p-4 space-y-3"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1 mb-1">
+                <Droplet className="w-3 h-3" /> Tipo Sanguíneo
+              </label>
+              <Input value={sosInfo.bloodType} onChange={e => setSosInfo(prev => ({ ...prev, bloodType: e.target.value }))} placeholder="A+, O-, AB+..." className="text-xs h-9" />
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1 mb-1">
+                <Phone className="w-3 h-3" /> Contato Emergência
+              </label>
+              <Input value={sosInfo.emergencyPhone} onChange={e => setSosInfo(prev => ({ ...prev, emergencyPhone: e.target.value }))} placeholder="(11) 99999-9999" className="text-xs h-9" />
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1 mb-1">
+              <Heart className="w-3 h-3" /> Nome do contato
+            </label>
+            <Input value={sosInfo.emergencyContact} onChange={e => setSosInfo(prev => ({ ...prev, emergencyContact: e.target.value }))} placeholder="Mãe, Pai, Esposa..." className="text-xs h-9" />
+          </div>
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1 mb-1">
+              <AlertTriangle className="w-3 h-3" /> Alergias a Medicamentos
+            </label>
+            <Input value={sosInfo.allergies} onChange={e => setSosInfo(prev => ({ ...prev, allergies: e.target.value }))} placeholder="Dipirona, Penicilina..." className="text-xs h-9" />
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+};
+
+/* ---------- BMI Calculator ---------- */
+const BMICalculator = () => {
+  const [bmiHeight, setBmiHeight] = usePersistedState("saude-bmi-height", "");
+  const [bmiWeight, setBmiWeight] = usePersistedState("saude-bmi-weight", "");
+  const bmi = bmiHeight && bmiWeight ? (Number(bmiWeight) / Math.pow(Number(bmiHeight) / 100, 2)).toFixed(1) : null;
+  const bmiCategory = bmi ? (Number(bmi) < 18.5 ? "Abaixo" : Number(bmi) < 25 ? "Normal ✅" : Number(bmi) < 30 ? "Sobrepeso" : "Obesidade") : "";
+  const bmiColor = bmi ? (Number(bmi) < 18.5 ? "text-[hsl(var(--saude-blue))]" : Number(bmi) < 25 ? "text-[hsl(var(--saude-green))]" : Number(bmi) < 30 ? "text-[hsl(var(--saude-yellow))]" : "text-[hsl(var(--saude-red))]") : "";
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4">
+      <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-[hsl(var(--saude-blue))]" /> CALCULADORA IMC</h3>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="flex items-center gap-1">
+          <Input type="number" value={bmiHeight} onChange={e => setBmiHeight(e.target.value)} placeholder="Altura" className="text-xs h-8 w-20" />
+          <span className="text-xs text-muted-foreground">cm</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Input type="number" value={bmiWeight} onChange={e => setBmiWeight(e.target.value)} placeholder="Peso" className="text-xs h-8 w-20" />
+          <span className="text-xs text-muted-foreground">kg</span>
+        </div>
+      </div>
+      {bmi && (
+        <div className="flex items-center gap-3 mt-2">
+          <span className="text-2xl font-bold">{bmi}</span>
+          <span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default Saude;

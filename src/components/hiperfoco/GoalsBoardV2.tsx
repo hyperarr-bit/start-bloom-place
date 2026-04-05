@@ -256,15 +256,8 @@ export const GoalsBoardV2 = () => {
   }
 
   /* ─── DETAIL VIEW (existing goal editor) ─── */
-  const goal = goals.find(g => g.id === selectedGoalId) || goals[0];
   if (!goal) return null;
 
-  const updateGoal = (updated: GoalV2) => setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
-  const heroRef = useRef<HTMLInputElement>(null);
-  const galleryRef = useRef<HTMLInputElement>(null);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [newGroupLabel, setNewGroupLabel] = useState("");
-  const [newLinkUrl, setNewLinkUrl] = useState("");
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "hero" | "gallery") => {
     const file = e.target.files?.[0]; if (!file) return;

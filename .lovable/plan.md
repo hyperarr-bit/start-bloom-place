@@ -1,62 +1,32 @@
 
 
-# Plano: Redesign da aba METAS — Estilo xtiles.app (Vida em Ordem)
+# Plano: Metas pré-montadas como planilha (template pronto)
 
-## Design de referência (screenshots analisados)
+## Problema
+Atualmente quando o usuário cria uma meta, ela vem **vazia**. O conceito do app é ser uma planilha pronta — o usuário só preenche. As imagens de referência mostram metas já com toda a estrutura montada: grupos de ação, campos de visão, seções de problemas/soluções, tudo pronto pra preencher.
 
-Cada meta é uma **página vertical scrollável** com seções em cards grandes:
-- **Imagem hero** no topo (foto de referência da meta)
-- **PLANO DE AÇÃO** — card com header cinza/marrom + emoji 🚀, tarefas agrupadas por "etapas" (labels rosa/pink), checkboxes circulares, input inline "Adicionar uma tarefa..."
-- **LINKS DE REFERÊNCIA** — card com header cinza + emoji 🔗, grid de imagens + URLs
-- **VISÃO** — card com header cinza + emoji 🎯, campos: Meta, Objetivo, Tempo para bater a meta
-- **PROBLEMAS E SOLUÇÕES** — card com header cinza + emoji 😅, pares problema (label rosa) + solução (texto)
+## Solução
+Quando o usuário cria uma nova meta, ela já vem **pré-preenchida com template completo**, exatamente como nas fotos:
 
-Dropdown no topo para trocar entre metas ("Casamento →").
+### Template padrão de cada meta criada:
+1. **Imagem hero** — placeholder com texto "Toque para adicionar imagem de capa"
+2. **PLANO DE AÇÃO** — já vem com 2 grupos de exemplo:
+   - "Definir as bases:" com tarefas placeholder (ex: "Data: Escolher uma data ideal", "Orçamento: Determinar valor disponível", "Pesquisa: Buscar referências")
+   - "Estruturar o plano:" com tarefas (ex: "Listar prioridades", "Definir etapas principais", "Criar cronograma")
+3. **LINKS DE REFERÊNCIA** — seção vazia mas já visível com botões prontos
+4. **VISÃO** — campos já com labels claros e placeholders descritivos
+5. **PROBLEMAS E SOLUÇÕES** — já vem com 1 par vazio pronto pra preencher
 
-## Nova estrutura de dados
+### Estilo visual mais fiel às fotos:
+- Cards com **headers maiores** (py-5, bg com gradiente sutil)
+- Emoji **maior** (text-3xl) no header
+- Título do header em **uppercase tracking-wider**
+- Tasks com visual mais clean, espaçamento maior
+- Labels rosa com **border-l-4** mais grosso e bg mais marcante
 
-```typescript
-interface GoalV2 {
-  id: string;
-  title: string;
-  heroImage?: string; // base64 ou URL
-  // PLANO DE AÇÃO
-  actionGroups: { id: string; label: string; tasks: { id: string; text: string; done: boolean }[] }[];
-  // LINKS DE REFERÊNCIA  
-  referenceLinks: { id: string; url: string; title?: string }[];
-  referenceImages: string[]; // base64
-  // VISÃO
-  vision: { meta: string; objetivo: string; tempo: string };
-  // PROBLEMAS E SOLUÇÕES
-  problems: { id: string; problem: string; solution: string }[];
-}
-```
-
-## Layout dos cards (cada seção)
-
-```text
-┌─────────────────────────────┐
-│  ░░░░░ header cinza ░░░░░  │ ← bg-muted/60, ~60px alto
-│                        🚀  │ ← emoji grande no canto direito
-│  PLANO DE AÇÃO              │ ← título bold grande
-│                             │
-│  ┃ Definir as bases:        │ ← label rosa (bg-pink-100, border-l-4 pink)
-│  ☑ Data: Escolher uma...   │ ← checkbox circular + texto
-│  ☑ Orçamento: Determinar   │
-│  ○ Reservar espaço          │
-│  ○ Adicionar uma tarefa...  │ ← input placeholder inline
-│                             │
-│  ┃ Estruturar o evento:     │ ← outro grupo
-│  ○ Fotografia/filmagem     │
-└─────────────────────────────┘
-```
-
-## Alterações
+## Alteração
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/DesenvolvimentoPessoal.tsx` | (1) Substituir toda a `TabsContent value="metas"` pelo novo componente `<GoalsBoardV2 />`. (2) Remover estados antigos: `lifeGoals`, `newGoalText`, `newGoalDeadline`, `bucketList`, `newBucket`, `visionItems`, `newVisionText`, `newVisionCategory`. |
-| `src/components/hiperfoco/GoalsBoardV2.tsx` | **Novo arquivo**. Componente completo com: (1) Dropdown de seleção de meta no topo + botão "Nova Meta". (2) Quando meta selecionada, scroll vertical com seções-card: Hero Image (upload via input file, convertido a base64), PLANO DE AÇÃO (grupos de tarefas com labels rosa, checkboxes circulares, input inline para adicionar tarefa), LINKS DE REFERÊNCIA (grid de imagens uploadadas + campo para adicionar URLs), VISÃO (3 campos: meta, objetivo, prazo), PROBLEMAS E SOLUÇÕES (pares com label rosa + texto). (3) Cada seção com header cinza (bg-muted/50) ~60px com emoji grande no canto. (4) Persistência via `usePersistedState("goals-board-v2")`. (5) Upload de imagens via `<input type="file" accept="image/*">` convertendo para base64 (hero + galeria de referência). |
-
-Migração: dados antigos (`dp-life-goals`, `dp-bucket-list`, `dp-vision`) não são apagados, apenas deixam de ser usados. O novo formato é `goals-board-v2`.
+| `src/components/hiperfoco/GoalsBoardV2.tsx` | (1) Alterar `emptyGoal()` para retornar template pré-preenchido com 2 grupos de tarefas, 1 par problema/solução vazio, e campos de visão com placeholder text. (2) Ajustar visual dos headers de seção (maior, emoji maior, uppercase). (3) Garantir que todas as seções aparecem sempre (não condicional), como uma planilha pronta. |
 

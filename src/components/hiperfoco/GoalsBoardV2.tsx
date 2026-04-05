@@ -192,7 +192,7 @@ export const GoalsBoardV2 = () => {
 
         {/* MURAL DOS SONHOS */}
         <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+           <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden" style={{ minHeight: 72, background: "hsl(270 40% 75% / 0.35)" }}>
             <span className="text-4xl absolute right-4 bottom-2 opacity-80">✨</span>
           </div>
           <div className="px-5 py-4 space-y-3">
@@ -263,9 +263,9 @@ export const GoalsBoardV2 = () => {
     setGoals(filtered); setView("home");
   };
 
-  const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
+  const SectionHeader = ({ emoji, title, color }: { emoji: string; title: string; color: string }) => (
     <>
-      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: color }}>
         <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
       </div>
       <div className="px-5 pt-4 pb-2">
@@ -345,7 +345,7 @@ export const GoalsBoardV2 = () => {
 
       {/* PLANO DE AÇÃO */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🚀" title="PLANO DE AÇÃO" />
+        <SectionHeader emoji="🚀" title="PLANO DE AÇÃO" color="hsl(213 80% 80% / 0.45)" />
         <div className="p-4 space-y-4">
           {goal.actionGroups.map(group => {
             const doneCount = group.tasks.filter(t => t.done).length;
@@ -381,7 +381,7 @@ export const GoalsBoardV2 = () => {
 
       {/* LINKS DE REFERÊNCIA */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🔗" title="LINKS DE REFERÊNCIA" />
+        <SectionHeader emoji="🔗" title="LINKS DE REFERÊNCIA" color="hsl(152 60% 75% / 0.4)" />
         <div className="p-4 space-y-3">
           {goal.referenceImages.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
@@ -421,7 +421,7 @@ export const GoalsBoardV2 = () => {
 
       {/* VISÃO */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🎯" title="VISÃO" />
+        <SectionHeader emoji="🎯" title="VISÃO" color="hsl(45 90% 78% / 0.45)" />
         <div className="p-4 space-y-0">
           {[
             { label: "Meta:", field: "meta" as const, ph: "O que quero alcançar?" },
@@ -442,7 +442,7 @@ export const GoalsBoardV2 = () => {
 
       {/* PROBLEMAS E SOLUÇÕES */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" />
+        <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" color="hsl(0 75% 82% / 0.4)" />
         <div className="p-4 space-y-3">
           {goal.problems.map((ps, i) => (
             <div key={ps.id} className="space-y-1 pb-3 border-b border-border/50 last:border-0">

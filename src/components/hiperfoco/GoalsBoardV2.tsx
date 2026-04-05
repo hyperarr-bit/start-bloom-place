@@ -381,7 +381,7 @@ export const GoalsBoardV2 = () => {
 
       {/* LINKS DE REFERÊNCIA */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🔗" title="LINKS DE REFERÊNCIA" />
+        <SectionHeader emoji="🔗" title="LINKS DE REFERÊNCIA" color="hsl(152 60% 75% / 0.4)" />
         <div className="p-4 space-y-3">
           {goal.referenceImages.length > 0 && (
             <div className="grid grid-cols-3 gap-2">

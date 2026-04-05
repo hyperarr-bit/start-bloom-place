@@ -9,7 +9,6 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
-import { FastingTimer } from "@/components/saude/FastingTimer";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
 

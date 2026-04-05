@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane, Compass, Map, Package, Users, MapPin, DollarSign, BookOpen, Shield, ArrowRightLeft, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

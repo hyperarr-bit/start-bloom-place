@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

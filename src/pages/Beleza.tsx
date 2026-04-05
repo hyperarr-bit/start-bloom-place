@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Sparkles, FlaskConical, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";

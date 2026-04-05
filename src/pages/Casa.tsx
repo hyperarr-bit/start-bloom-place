@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, Home, Droplets, ShoppingCart, UtensilsCrossed, Wrench, Leaf, Users, ShieldCheck, Settings, DoorOpen, Apple, SprayCan } from "lucide-react";
 import { Button } from "@/components/ui/button";

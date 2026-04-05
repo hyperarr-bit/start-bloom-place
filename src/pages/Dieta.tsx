@@ -5,7 +5,7 @@ import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
   ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
-  ArrowUp, ArrowDown, Copy
+  ArrowUp, ArrowDown, Copy, Search
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,

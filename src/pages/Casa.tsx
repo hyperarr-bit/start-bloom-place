@@ -33,6 +33,7 @@ const tabs = [
 
 const Casa = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const [cleaningTasks] = usePersistedState<{id: string; lastDone: string; frequencyDays: number}[]>("casa-cleaning", []);
   const [pantryItems] = usePersistedState<{id: string; status: string}[]>("casa-pantry", []);
   const [plants] = usePersistedState<{id: string}[]>("casa-plants", []);

@@ -156,7 +156,7 @@ const Estudos = () => {
           "Use o caderno para anotar resumos e dúvidas das aulas",
         ]} />
 
-        <Tabs defaultValue="estudos" className="w-full">
+        <Tabs defaultValue="estudos" className="w-full" onValueChange={v => reportTab?.(v)}>
           <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
             <TabsList className="inline-flex w-auto min-w-full">
               {TABS.map(t => (

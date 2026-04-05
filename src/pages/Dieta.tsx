@@ -209,7 +209,7 @@ const Dieta = () => {
             "Use o 📊 DIÁRIO para registrar o que você comeu de verdade e compare com o plano"
           ]}
         />
-        <Tabs defaultValue="cardapio" className="w-full">
+        <Tabs defaultValue="cardapio" className="w-full" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>

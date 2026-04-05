@@ -497,7 +497,7 @@ const Carreira = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="jobs">
+        <Tabs defaultValue="jobs" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="jobs" className="text-[10px] gap-0.5"><Briefcase className="w-3 h-3" />Vagas</TabsTrigger>
             <TabsTrigger value="portfolio" className="text-[10px] gap-0.5"><Award className="w-3 h-3" />Portfolio</TabsTrigger>

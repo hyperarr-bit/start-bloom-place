@@ -213,7 +213,7 @@ const DesenvolvimentoPessoal = () => {
             "Crie afirmações positivas e leia-as diariamente"
           ]}
         />
-        <Tabs defaultValue="sobre" className="w-full">
+        <Tabs defaultValue="sobre" className="w-full" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             {[
               { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" },

@@ -762,7 +762,7 @@ const DailyJournal = () => {
           <span className="text-xs font-bold text-muted-foreground">💡 O QUE APRENDI HOJE</span>
           <Textarea
             placeholder="Algo novo que aprendi..."
-            value={todayEntry.learned}
+            value={entry.learned}
             onChange={e => updateField("learned", e.target.value)}
             className="text-xs min-h-[50px] mt-2"
           />

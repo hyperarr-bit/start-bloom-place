@@ -1001,11 +1001,10 @@ const Rotina = () => {
 
   const tabs = [
     { id: "semana", label: "MINHA SEMANA", icon: "📅" },
-    { id: "foco", label: "FOCO", icon: "🧠" },
-    
     { id: "mes", label: "MEU MÊS", icon: "📆" },
     { id: "diario", label: "DIÁRIO", icon: "📝" },
     { id: "revisao", label: "REVISÃO", icon: "⭐" },
+    { id: "foco", label: "FOCO", icon: "🧠" },
   ];
 
   return (

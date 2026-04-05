@@ -1,3 +1,4 @@
+// v2 - analytics completo com drill-down por abas
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BarChart3, Clock, Users, TrendingUp, Trophy, Activity, Calendar, ArrowLeftCircle, Zap } from "lucide-react";

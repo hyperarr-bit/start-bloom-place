@@ -1,57 +1,37 @@
 
 
-# Plano: Analytics completo + drill-down por abas de cada módulo
+# Plano: Garantir que o Analytics novo funcione (problema de cache)
 
-## Problema
-O analytics atual mostra apenas dados básicos (usuários, sessões, tempo por módulo). Falta:
-1. Métricas mais úteis (retenção, usuários ativos por dia, horários de pico, sessão média)
-2. Drill-down: clicar num módulo e ver quais **abas** dentro dele são mais usadas
+## Diagnóstico
 
-## Solução
+O codigo do AdminAnalytics.tsx **ja esta completo** com todas as features:
+- Cards: usuarios, sessoes, tempo total, sessao media
+- Card "Hoje": sessoes e usuarios do dia + retencao
+- Grafico de atividade diaria (LineChart)
+- Grafico de horarios de pico (BarChart)
+- Ranking de modulos **clicavel** -> drill-down mostrando:
+  - Ranking de abas (tab_id) com sessoes, tempo e usuarios
+  - Lista de usuarios do modulo
 
-### Parte 1: Tracking de abas (DB + hook)
+O tracking de `tab_id` tambem ja esta implementado em todos os 16 modulos. Cada modulo reporta sua aba ativa via `useSetTrackedTab` ou `useTabReporter`.
 
-**Nova coluna `tab_id`** na tabela `module_analytics` (nullable, para não quebrar dados existentes):
-```sql
-ALTER TABLE module_analytics ADD COLUMN tab_id text;
-```
+A coluna `tab_id` ja foi adicionada na tabela `module_analytics`.
 
-**Atualizar `useModuleTracker`** para aceitar `tabId` opcional:
-```typescript
-useModuleTracker("financas", activeTab) // "dashboard", "investimentos", etc.
-```
-Quando `tabId` muda, faz flush do anterior e inicia novo tracking.
+## Problema real
 
-**Atualizar cada página de módulo** para passar o `activeTab` atual ao tracker. Exemplo no Index.tsx (Finanças):
-- Trocar `<TrackedModule moduleId="financas">` por usar `useModuleTracker` direto dentro do componente, passando `activeTab`.
+O browser esta servindo o bundle JS antigo (cache). As network requests mostram a query antiga sem `tab_id`.
 
-### Parte 2: Analytics mais completo
+## Solucao
 
-Adicionar ao painel:
+Forcando uma mudanca minima no arquivo para invalidar o cache do build:
 
-1. **Card "Sessão média"** — tempo médio por sessão (totalSeconds / totalSessions)
-2. **Card "Hoje"** — sessões e usuários apenas de hoje
-3. **Gráfico de atividade diária** — LineChart mostrando sessões por dia nos últimos 7/30 dias
-4. **Horários de pico** — gráfico de barras com sessões por hora do dia (0h-23h)
-5. **Retenção simplificada** — quantos usuários voltaram em mais de 1 dia distinto no período
-
-### Parte 3: Drill-down por módulo
-
-No ranking, cada módulo vira **clicável**. Ao clicar:
-- Abre uma view de detalhe (estado `selectedModule`) mostrando:
-  - Tempo total e sessões naquele módulo
-  - **Ranking de abas** (tab_id): quais abas dentro do módulo são mais usadas, com sessões e tempo
-  - Lista de usuários que usaram (user_id truncado) com tempo total de cada um
-  - Botão voltar para a lista geral
-
-## Alterações
-
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
-| **Migration SQL** | Adicionar coluna `tab_id text` à tabela `module_analytics` |
-| `src/hooks/use-module-tracker.ts` | Aceitar `tabId?` como segundo param. Fazer flush e re-iniciar tracking quando tabId muda. Incluir `tab_id` no insert. |
-| `src/components/TrackedModule.tsx` | Adicionar prop `tabId?` e passar ao hook. |
-| `src/pages/Index.tsx` | Usar `useModuleTracker("financas", activeTab)` diretamente (remover TrackedModule wrapper no App.tsx para este módulo, ou passar tabId via context). |
-| Demais páginas de módulo (Rotina, Saude, Casa, etc.) | Adicionar `useModuleTracker(moduleId, activeTab)` passando a aba ativa. |
-| `src/pages/AdminAnalytics.tsx` | (1) Adicionar cards: sessão média, atividade hoje. (2) Gráfico LineChart de atividade diária. (3) Gráfico de horários de pico. (4) Card de retenção. (5) Ranking clicável → view de detalhe com ranking de `tab_id` por módulo. (6) Selecionar `tab_id` na query. |
+| `src/pages/AdminAnalytics.tsx` | Adicionar um comentario de versao no topo (`// v2 - analytics completo`) para forcar rebuild e invalidacao de cache. |
+
+Isso vai gerar um novo hash no bundle, forcando o browser a baixar a versao nova.
+
+## Nota
+
+Se mesmo apos o rebuild o browser continuar com cache, voce precisa fazer **Ctrl+Shift+R** (hard refresh) ou abrir em aba anonima.
 

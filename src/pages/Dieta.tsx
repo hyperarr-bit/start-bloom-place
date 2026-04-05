@@ -67,6 +67,9 @@ const Dieta = () => {
 
   // CALORIAS & MACROS
   const [calorieGoal, setCalorieGoal] = usePersistedState("saude-cal-goal", 2000);
+  const [protGoal, setProtGoal] = usePersistedState("saude-prot-goal", 0);
+  const [carbGoal, setCarbGoal] = usePersistedState("saude-carb-goal", 0);
+  const [fatGoal, setFatGoal] = usePersistedState("saude-fat-goal", 0);
   const [dailyMeals, setDailyMeals] = usePersistedState<Record<string, {name: string; cal: number; prot: number; carb: number; fat: number}[]>>("saude-daily-meals", {});
   const todayMeals = dailyMeals[today] || [];
   const [newMealName, setNewMealName] = useState("");
@@ -74,6 +77,15 @@ const Dieta = () => {
   const [newMealProt, setNewMealProt] = useState("");
   const [newMealCarb, setNewMealCarb] = useState("");
   const [newMealFat, setNewMealFat] = useState("");
+  const [foodSearch, setFoodSearch] = useState("");
+  const [showFoodSearch, setShowFoodSearch] = useState(false);
+
+  // Auto-calc macro goals from calorie goal (30% prot, 40% carb, 30% fat)
+  const autoCalcMacros = (kcal: number) => {
+    setProtGoal(Math.round((kcal * 0.3) / 4));
+    setCarbGoal(Math.round((kcal * 0.4) / 4));
+    setFatGoal(Math.round((kcal * 0.3) / 9));
+  };
 
   // WATER - removed (available in Saúde module)
   // FASTING

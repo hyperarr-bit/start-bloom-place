@@ -77,13 +77,16 @@ const Dieta = () => {
   const [checkedIngredients, setCheckedIngredients] = usePersistedState<Record<string, string[]>>("dieta-recipe-checked", {});
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
 
-  // DIÁRIO
+  // DIÁRIO v2
   const [diaryDate, setDiaryDate] = useState(today);
-  const [diaryEntries, setDiaryEntries] = usePersistedState<Record<string, {id: string; text: string; time: string}[]>>("dieta-diary", {});
-  const [newDiaryEntry, setNewDiaryEntry] = useState("");
-  const [diaryFollowed, setDiaryFollowed] = usePersistedState<Record<string, boolean>>("dieta-diary-followed", {});
+  const [diaryData, setDiaryData] = usePersistedState<Record<string, { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }>>("dieta-diary-v2", {});
 
-  const todayEntries = diaryEntries[diaryDate] || [];
+  // LISTA INTELIGENTE
+  const [smartList, setSmartList] = usePersistedState<{ id: string; text: string; done: boolean }[]>("dieta-smart-list", []);
+  const [newSmartItem, setNewSmartItem] = useState("");
+
+  // Casa grocery sync
+  const [casaGrocery, setCasaGrocery] = usePersistedState<any[]>("casa-grocery-categories", []);
 
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }

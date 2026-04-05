@@ -44,11 +44,30 @@ const emptyGoal = (title: string): GoalV2 => ({
   id: Date.now().toString(),
   title,
   heroImage: undefined,
-  actionGroups: [],
+  actionGroups: [
+    {
+      id: Date.now().toString() + "-g1",
+      label: "Definir as bases:",
+      tasks: [
+        { id: Date.now().toString() + "-t1", text: "Data: Escolher uma data ideal", done: false },
+        { id: Date.now().toString() + "-t2", text: "Orçamento: Determinar valor disponível", done: false },
+        { id: Date.now().toString() + "-t3", text: "Pesquisa: Buscar referências e inspirações", done: false },
+      ],
+    },
+    {
+      id: Date.now().toString() + "-g2",
+      label: "Estruturar o plano:",
+      tasks: [
+        { id: Date.now().toString() + "-t4", text: "Listar prioridades", done: false },
+        { id: Date.now().toString() + "-t5", text: "Definir etapas principais", done: false },
+        { id: Date.now().toString() + "-t6", text: "Criar cronograma", done: false },
+      ],
+    },
+  ],
   referenceLinks: [],
   referenceImages: [],
   vision: { meta: "", objetivo: "", tempo: "" },
-  problems: [],
+  problems: [{ id: Date.now().toString() + "-p1", problem: "", solution: "" }],
 });
 
 export const GoalsBoardV2 = () => {
@@ -166,9 +185,9 @@ export const GoalsBoardV2 = () => {
 
   // Section header component
   const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
-    <div className="bg-muted/50 rounded-t-xl px-5 py-4 flex items-center justify-between">
-      <h3 className="text-sm font-bold tracking-wide">{title}</h3>
-      <span className="text-2xl">{emoji}</span>
+    <div className="bg-muted/60 rounded-t-xl px-5 py-5 flex items-center justify-between">
+      <h3 className="text-xs font-extrabold tracking-widest uppercase text-muted-foreground">{title}</h3>
+      <span className="text-3xl">{emoji}</span>
     </div>
   );
 

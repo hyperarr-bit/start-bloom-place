@@ -3,7 +3,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 
 /* ─── Types ─── */
 interface TaskItem { id: string; text: string; done: boolean }

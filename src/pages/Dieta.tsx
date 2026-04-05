@@ -736,27 +736,49 @@ const Dieta = () => {
 
           {/* ========== RECEITAS ========== */}
           <TabsContent value="receitas" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold flex items-center gap-2"><ChefHat className="w-4 h-4" /> MINHAS RECEITAS SAUDÁVEIS</h3>
-                <Button size="sm" onClick={() => setShowRecipeForm(true)}><Plus className="w-3 h-3 mr-1" /> Nova</Button>
-              </div>
+            {/* Category filter chips */}
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {["Todas", "Café", "Almoço", "Janta", "Lanche", "Doce Fit", "Fitness", "Salgado", "Shake", "Receita Rápida"].map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setRecipeFilter(cat)}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold whitespace-nowrap border transition-colors ${
+                    recipeFilter === cat
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
 
-              {showRecipeForm && (
-                <div className="bg-muted/30 rounded-lg p-3 border border-border mb-3 space-y-2">
-                  <Input value={recipeForm.name} onChange={e => setRecipeForm(p => ({...p, name: e.target.value}))} placeholder="Nome da receita" className="text-xs h-8" />
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold flex items-center gap-2"><ChefHat className="w-4 h-4" /> MINHAS RECEITAS</h3>
+              <Button size="sm" onClick={() => setShowRecipeForm(true)}><Plus className="w-3 h-3 mr-1" /> Nova</Button>
+            </div>
+
+            {showRecipeForm && (() => {
+              const catColors: Record<string, string> = {
+                "Café": "border-l-amber-400", "Almoço": "border-l-green-400", "Janta": "border-l-blue-400",
+                "Lanche": "border-l-orange-400", "Doce Fit": "border-l-pink-400", "Fitness": "border-l-purple-400",
+                "Salgado": "border-l-red-400", "Shake": "border-l-cyan-400", "Receita Rápida": "border-l-emerald-400", "Sobremesa": "border-l-pink-400",
+              };
+              return (
+                <div className={`bg-muted/30 rounded-lg p-3 border border-border border-l-4 ${catColors[recipeForm.category] || "border-l-primary"} mb-3 space-y-2`}>
+                  <Input value={recipeForm.name} onChange={e => setRecipeForm(p => ({...p, name: e.target.value}))} placeholder="Nome da receita" className="text-xs h-8 font-bold" />
                   <div className="grid grid-cols-3 gap-2">
                     <Select value={recipeForm.category} onValueChange={v => setRecipeForm(p => ({...p, category: v}))}>
                       <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {["Café", "Almoço", "Lanche", "Janta", "Sobremesa", "Shake"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {["Café", "Almoço", "Janta", "Lanche", "Doce Fit", "Fitness", "Salgado", "Shake", "Receita Rápida"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Input value={recipeForm.prepTime} onChange={e => setRecipeForm(p => ({...p, prepTime: e.target.value}))} placeholder="Tempo (ex: 20min)" className="text-xs h-8" />
-                    <Input value={recipeForm.servings} onChange={e => setRecipeForm(p => ({...p, servings: e.target.value}))} placeholder="Porções" className="text-xs h-8" />
+                    <Input value={recipeForm.prepTime} onChange={e => setRecipeForm(p => ({...p, prepTime: e.target.value}))} placeholder="⏱ Tempo (20min)" className="text-xs h-8" />
+                    <Input value={recipeForm.servings} onChange={e => setRecipeForm(p => ({...p, servings: e.target.value}))} placeholder="🍽 Porções" className="text-xs h-8" />
                   </div>
-                  <Textarea value={recipeForm.ingredients} onChange={e => setRecipeForm(p => ({...p, ingredients: e.target.value}))} placeholder="Ingredientes (um por linha)..." className="text-xs min-h-[60px]" />
-                  <Textarea value={recipeForm.instructions} onChange={e => setRecipeForm(p => ({...p, instructions: e.target.value}))} placeholder="Modo de preparo..." className="text-xs min-h-[60px]" />
+                  <Textarea value={recipeForm.ingredients} onChange={e => setRecipeForm(p => ({...p, ingredients: e.target.value}))} placeholder={"1 banana madura\n2 ovos\n3 col sopa de aveia\n1 scoop whey"} className="text-xs min-h-[80px]" />
+                  <Textarea value={recipeForm.instructions} onChange={e => setRecipeForm(p => ({...p, instructions: e.target.value}))} placeholder={"Bata tudo no liquidificador\nDespeje na frigideira\nCozinhe 3min de cada lado"} className="text-xs min-h-[80px]" />
                   <div className="flex gap-2">
                     <Button size="sm" className="flex-1" onClick={() => {
                       if (recipeForm.name.trim()) {
@@ -764,33 +786,145 @@ const Dieta = () => {
                         setRecipeForm({ name: "", ingredients: "", instructions: "", category: "Almoço", prepTime: "", servings: "", favorite: false });
                         setShowRecipeForm(false);
                       }
-                    }}>Salvar</Button>
+                    }}>Salvar Receita</Button>
                     <Button size="sm" variant="outline" onClick={() => setShowRecipeForm(false)}>Cancelar</Button>
                   </div>
                 </div>
-              )}
+              );
+            })()}
 
-              {recipes.map(r => (
-                <div key={r.id} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold">{r.name}</span>
-                      <Badge variant="outline" className="text-[9px]">{r.category}</Badge>
-                      {r.prepTime && <span className="text-[10px] text-muted-foreground">⏱ {r.prepTime}</span>}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setRecipes(prev => prev.map(x => x.id === r.id ? {...x, favorite: !x.favorite} : x))}>
-                        <Heart className={`w-3.5 h-3.5 ${r.favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
-                      </button>
-                      <button onClick={() => setRecipes(prev => prev.filter(x => x.id !== r.id))}><Trash2 className="w-3 h-3 text-muted-foreground" /></button>
-                    </div>
-                  </div>
-                  {r.ingredients && <p className="text-[10px] text-muted-foreground whitespace-pre-line mb-1">{r.ingredients}</p>}
-                  {r.instructions && <p className="text-[10px] whitespace-pre-line">{r.instructions}</p>}
+            {/* Recipe cards */}
+            {(() => {
+              const catColors: Record<string, { bg: string; border: string; darkBg: string; text: string }> = {
+                "Café": { bg: "bg-amber-50", border: "border-l-amber-400", darkBg: "dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400" },
+                "Almoço": { bg: "bg-green-50", border: "border-l-green-400", darkBg: "dark:bg-green-950/30", text: "text-green-700 dark:text-green-400" },
+                "Janta": { bg: "bg-blue-50", border: "border-l-blue-400", darkBg: "dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400" },
+                "Lanche": { bg: "bg-orange-50", border: "border-l-orange-400", darkBg: "dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400" },
+                "Doce Fit": { bg: "bg-pink-50", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
+                "Fitness": { bg: "bg-purple-50", border: "border-l-purple-400", darkBg: "dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400" },
+                "Salgado": { bg: "bg-red-50", border: "border-l-red-400", darkBg: "dark:bg-red-950/30", text: "text-red-700 dark:text-red-400" },
+                "Shake": { bg: "bg-cyan-50", border: "border-l-cyan-400", darkBg: "dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400" },
+                "Receita Rápida": { bg: "bg-emerald-50", border: "border-l-emerald-400", darkBg: "dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400" },
+                "Sobremesa": { bg: "bg-pink-50", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
+              };
+              const defaultColor = { bg: "bg-muted/30", border: "border-l-primary", darkBg: "", text: "text-primary" };
+
+              const filtered = recipes.filter(r => recipeFilter === "Todas" || r.category === recipeFilter);
+              const favorites = filtered.filter(r => r.favorite);
+              const others = filtered.filter(r => !r.favorite);
+              const sorted = [...favorites, ...others];
+
+              if (sorted.length === 0) return (
+                <div className="text-center py-12">
+                  <ChefHat className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-xs text-muted-foreground">
+                    {recipeFilter !== "Todas" ? `Nenhuma receita em "${recipeFilter}"` : "Salve suas receitas favoritas aqui 🥗"}
+                  </p>
                 </div>
-              ))}
-              {recipes.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Salve suas receitas favoritas aqui 🥗</p>}
-            </div>
+              );
+
+              return (
+                <div className="space-y-3">
+                  {sorted.map(r => {
+                    const colors = catColors[r.category] || defaultColor;
+                    const isExpanded = expandedRecipe === r.id;
+                    const ingredients = r.ingredients ? r.ingredients.split("\n").filter(l => l.trim()) : [];
+                    const steps = r.instructions ? r.instructions.split("\n").filter(l => l.trim()) : [];
+                    const checked = checkedIngredients[r.id] || [];
+
+                    return (
+                      <div key={r.id} className={`rounded-xl border border-border border-l-4 ${colors.border} ${colors.bg} ${colors.darkBg} overflow-hidden transition-all`}>
+                        {/* Header */}
+                        <div className="p-3 cursor-pointer" onClick={() => setExpandedRecipe(isExpanded ? null : r.id)}>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="text-sm font-bold leading-tight">{r.name}</h4>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className={`text-[10px] font-bold ${colors.text}`}>{r.category}</span>
+                                {r.prepTime && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                    <Clock className="w-3 h-3" /> {r.prepTime}
+                                  </span>
+                                )}
+                                {r.servings && (
+                                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                                    <Utensils className="w-3 h-3" /> {r.servings} porções
+                                  </span>
+                                )}
+                                {ingredients.length > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {checked.length}/{ingredients.length} ✓
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 ml-2">
+                              <button onClick={e => { e.stopPropagation(); setRecipes(prev => prev.map(x => x.id === r.id ? {...x, favorite: !x.favorite} : x)); }}>
+                                <Heart className={`w-4 h-4 ${r.favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); setRecipes(prev => prev.filter(x => x.id !== r.id)); }}>
+                                <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded content */}
+                        {isExpanded && (
+                          <div className="border-t border-border/50 p-3 space-y-3">
+                            {/* Ingredients with checkboxes */}
+                            {ingredients.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-muted-foreground mb-1.5">📝 INGREDIENTES</p>
+                                <div className="space-y-1">
+                                  {ingredients.map((ing, i) => {
+                                    const isChecked = checked.includes(ing);
+                                    return (
+                                      <label key={i} className="flex items-center gap-2 cursor-pointer group">
+                                        <Checkbox
+                                          checked={isChecked}
+                                          onCheckedChange={() => {
+                                            setCheckedIngredients(prev => {
+                                              const current = prev[r.id] || [];
+                                              return {
+                                                ...prev,
+                                                [r.id]: isChecked ? current.filter(x => x !== ing) : [...current, ing]
+                                              };
+                                            });
+                                          }}
+                                        />
+                                        <span className={`text-xs ${isChecked ? "line-through text-muted-foreground" : ""}`}>{ing}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Numbered steps */}
+                            {steps.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-muted-foreground mb-1.5">👩‍🍳 MODO DE PREPARO</p>
+                                <ol className="space-y-1.5">
+                                  {steps.map((step, i) => (
+                                    <li key={i} className="flex gap-2 text-xs">
+                                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${colors.bg} ${colors.text} border`}>
+                                        {i + 1}
+                                      </span>
+                                      <span className="pt-0.5">{step}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </TabsContent>
 
           {/* ========== LISTA DE MERCADO ========== */}

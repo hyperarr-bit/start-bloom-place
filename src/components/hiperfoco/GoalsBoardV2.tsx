@@ -192,7 +192,7 @@ export const GoalsBoardV2 = () => {
 
         {/* MURAL DOS SONHOS */}
         <div className="rounded-xl border border-border overflow-hidden bg-card">
-          <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+           <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden" style={{ minHeight: 72, background: "hsl(270 40% 75% / 0.35)" }}>
             <span className="text-4xl absolute right-4 bottom-2 opacity-80">✨</span>
           </div>
           <div className="px-5 py-4 space-y-3">

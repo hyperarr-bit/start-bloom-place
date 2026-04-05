@@ -166,6 +166,7 @@ const Dieta = () => {
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
             <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
+            <TabsTrigger value="lista" className="text-xs px-3 py-1.5">🛒 LISTA</TabsTrigger>
             <TabsTrigger value="diario" className="text-xs px-3 py-1.5">📊 DIÁRIO</TabsTrigger>
           </TabsList>
 

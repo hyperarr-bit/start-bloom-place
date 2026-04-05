@@ -1,38 +1,49 @@
 
 
-# Plano: Tornar a aba Calorias mais útil
+# Plano: Receitas estilo cards visuais (inspirado nas referências)
 
 ## Problema atual
-A aba é basicamente um formulário manual com 5 campos para digitar. Ninguém vai preencher kcal/P/C/G na mão pra cada refeição. Falta praticidade.
+A aba Receitas é uma lista simples com texto corrido — nome, badge de categoria, ingredientes e modo de preparo tudo espremido num bloco cinza. Sem visual atrativo, sem organização por categorias, sem destaque.
 
-## Melhorias
+## Inspiração (screenshots)
+Os cards de referência têm: header colorido por categoria, título bold grande, lista de ingredientes com checkboxes, modo de preparo numerado, e visual de "ficha de receita".
 
-### 1. Banco de alimentos rápidos
-- Lista de ~50 alimentos comuns brasileiros com calorias/macros pré-preenchidos (arroz, feijão, frango, ovo, banana, pão, etc.)
-- Campo de busca: usuário digita "frango" e aparece "Frango grelhado 100g — 165kcal, 31P, 0C, 3.6G"
-- Clicou, adicionou. Sem precisar digitar números
+## Nova estrutura
 
-### 2. Metas de macros (não só calorias)
-- Além da meta de kcal, adicionar metas de proteína, carbo e gordura
-- Barras de progresso individuais para cada macro
-- Sugestão automática: baseado na meta calórica, calcular split padrão (ex: 30% prot, 40% carb, 30% gordura)
+### 1. Cards de receita estilo ficha
+- Header colorido por categoria (cores diferentes: amarelo para café, rosa para doce, verde para salada, etc.)
+- Título grande e bold
+- Ingredientes com checkboxes (para riscar enquanto cozinha)
+- Modo de preparo com passos numerados
+- Badges de tempo e porções
+- Botão favoritar e deletar
 
-### 3. Resumo visual melhor
-- Trocar os 4 cards estáticos por um anel/donut mostrando distribuição de macros
-- Card de "Restante do dia": "Faltam 800kcal, 45g prot"
-- Indicador de cor: verde (dentro da meta), amarelo (perto), vermelho (passou)
+### 2. Filtro por categoria
+- Chips horizontais no topo: Todas | Café | Almoço | Janta | Lanche | Doce | Fitness
+- Filtro rápido visual
 
-### 4. Integração com o Cardápio
-- Botão "Importar do Cardápio de Hoje": puxa o que o usuário planejou no cardápio semanal como base, aí ele só ajusta as quantidades
-- Evita ter que digitar tudo duas vezes
+### 3. Formulário melhorado
+- Mesmo formulário, mas com preview da cor da categoria selecionada
+- Placeholder mais descritivo nos campos de ingredientes ("1 banana madura\n2 ovos\n3 col aveia...")
 
-### 5. Mover IMC para a aba Saúde (módulo Saúde)
-- A calculadora de IMC não tem a ver com o dia-a-dia de calorias, faz mais sentido no módulo Saúde junto com evolução corporal
+### 4. Cores por categoria
+
+```text
+Café da Manhã  → bg-amber-100/border-l-amber-400
+Almoço         → bg-green-100/border-l-green-400
+Janta          → bg-blue-100/border-l-blue-400
+Lanche         → bg-orange-100/border-l-orange-400
+Doce Fit       → bg-pink-100/border-l-pink-400
+Fitness        → bg-purple-100/border-l-purple-400
+Salgado        → bg-red-100/border-l-red-400
+```
+(Em dark mode: versões escuras com opacidade, ex: `dark:bg-amber-950/30`)
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Dieta.tsx` | (1) Criar array `FOOD_DATABASE` com ~50 alimentos brasileiros comuns + macros. (2) Adicionar campo de busca com autocomplete que filtra o banco. (3) Adicionar metas de macros (`protGoal`, `carbGoal`, `fatGoal`) com cálculo automático a partir da meta calórica. (4) Substituir os 4 cards por donut de macros + card "Restante". (5) Adicionar botão "Importar do Cardápio" que puxa refeições do dia atual do `mealPlan`. (6) Remover seção IMC da aba. |
-| `src/pages/Saude.tsx` | Adicionar calculadora IMC (mesmo código, movido pra cá) como card na tela principal. |
+| `src/pages/Dieta.tsx` | (1) Adicionar mapa de cores por categoria (`categoryColors`). (2) Adicionar filtro por categoria com chips horizontais. (3) Redesenhar cards de receita: header colorido, título grande, ingredientes com checkboxes (split por `\n`), modo de preparo com `ol` numerado. (4) Adicionar mais opções de categoria no form: "Doce Fit", "Salgado", "Fitness", "Receita Rápida". (5) Estado `checkedIngredients` por receita para riscar ingredientes. (6) Melhorar placeholders do formulário. |
+
+Nenhum arquivo novo.
 

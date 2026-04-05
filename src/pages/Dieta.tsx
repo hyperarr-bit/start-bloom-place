@@ -146,6 +146,9 @@ const Dieta = () => {
   const [newRecipeName, setNewRecipeName] = useState("");
   const [showRecipeForm, setShowRecipeForm] = useState(false);
   const [recipeForm, setRecipeForm] = useState({ name: "", ingredients: "", instructions: "", category: "Almoço", prepTime: "", servings: "", favorite: false });
+  const [recipeFilter, setRecipeFilter] = useState("Todas");
+  const [checkedIngredients, setCheckedIngredients] = usePersistedState<Record<string, string[]>>("dieta-recipe-checked", {});
+  const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
 
   // GROCERY LIST
   const [groceryItems, setGroceryItems] = usePersistedState<{id: string; name: string; category: string; checked: boolean}[]>("dieta-grocery", []);

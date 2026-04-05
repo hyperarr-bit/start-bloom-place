@@ -44,11 +44,30 @@ const emptyGoal = (title: string): GoalV2 => ({
   id: Date.now().toString(),
   title,
   heroImage: undefined,
-  actionGroups: [],
+  actionGroups: [
+    {
+      id: Date.now().toString() + "-g1",
+      label: "Definir as bases:",
+      tasks: [
+        { id: Date.now().toString() + "-t1", text: "Data: Escolher uma data ideal", done: false },
+        { id: Date.now().toString() + "-t2", text: "Orçamento: Determinar valor disponível", done: false },
+        { id: Date.now().toString() + "-t3", text: "Pesquisa: Buscar referências e inspirações", done: false },
+      ],
+    },
+    {
+      id: Date.now().toString() + "-g2",
+      label: "Estruturar o plano:",
+      tasks: [
+        { id: Date.now().toString() + "-t4", text: "Listar prioridades", done: false },
+        { id: Date.now().toString() + "-t5", text: "Definir etapas principais", done: false },
+        { id: Date.now().toString() + "-t6", text: "Criar cronograma", done: false },
+      ],
+    },
+  ],
   referenceLinks: [],
   referenceImages: [],
   vision: { meta: "", objetivo: "", tempo: "" },
-  problems: [],
+  problems: [{ id: Date.now().toString() + "-p1", problem: "", solution: "" }],
 });
 
 export const GoalsBoardV2 = () => {

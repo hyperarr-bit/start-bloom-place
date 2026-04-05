@@ -173,6 +173,27 @@ const Saude = () => {
             <HydrationTracker />
             <PharmacyChecklist />
             <FastingTimer />
+
+            {/* BMI Calculator */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-teal-500" /> CALCULADORA IMC</h3>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-1">
+                  <Input type="number" value={bmiHeight} onChange={e => setBmiHeight(e.target.value)} placeholder="Altura" className="text-xs h-8 w-20" />
+                  <span className="text-xs text-muted-foreground">cm</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Input type="number" value={bmiWeight} onChange={e => setBmiWeight(e.target.value)} placeholder="Peso" className="text-xs h-8 w-20" />
+                  <span className="text-xs text-muted-foreground">kg</span>
+                </div>
+              </div>
+              {bmi && (
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-2xl font-bold">{bmi}</span>
+                  <span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
 

@@ -439,27 +439,178 @@ const Dieta = () => {
 
           {/* ========== CALORIAS ========== */}
           <TabsContent value="calorias" className="space-y-4">
+            {/* Macro Donut + Remaining */}
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Utensils className="w-4 h-4" /> CALORIAS E MACROS — {new Date().toLocaleDateString("pt-BR")}</h3>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs">Meta diária:</span>
-                <Input type="number" value={calorieGoal} onChange={e => setCalorieGoal(Number(e.target.value))} className="text-xs h-8 w-24" />
+              
+              {/* Goals config */}
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="text-xs">Meta:</span>
+                <Input type="number" value={calorieGoal} onChange={e => {
+                  const v = Number(e.target.value);
+                  setCalorieGoal(v);
+                  if (protGoal === 0 && carbGoal === 0 && fatGoal === 0) autoCalcMacros(v);
+                }} className="text-xs h-8 w-20" />
                 <span className="text-xs text-muted-foreground">kcal</span>
+                {protGoal === 0 && carbGoal === 0 && fatGoal === 0 && (
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => autoCalcMacros(calorieGoal)}>
+                    Calcular macros
+                  </Button>
+                )}
               </div>
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                <div className="bg-orange-50 dark:bg-orange-500/10 rounded-lg p-2 text-center border border-orange-200">
-                  <p className="text-lg font-bold">{totalCal}</p><p className="text-[10px] text-muted-foreground">kcal</p>
-                  <Progress value={Math.min((totalCal / calorieGoal) * 100, 100)} className="h-1 mt-1" />
+
+              {/* Macro goals (editable) */}
+              {(protGoal > 0 || carbGoal > 0 || fatGoal > 0) && (
+                <div className="flex gap-2 mb-4 text-[10px]">
+                  <div className="flex items-center gap-1">
+                    <span className="text-destructive font-bold">P:</span>
+                    <Input type="number" value={protGoal} onChange={e => setProtGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
+                    <span className="text-muted-foreground">g</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-primary font-bold">C:</span>
+                    <Input type="number" value={carbGoal} onChange={e => setCarbGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
+                    <span className="text-muted-foreground">g</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-yellow-600 font-bold">G:</span>
+                    <Input type="number" value={fatGoal} onChange={e => setFatGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
+                    <span className="text-muted-foreground">g</span>
+                  </div>
                 </div>
-                <div className="bg-red-50 dark:bg-red-500/10 rounded-lg p-2 text-center border border-red-200">
-                  <p className="text-lg font-bold">{totalProt}g</p><p className="text-[10px] text-muted-foreground">Proteína</p>
+              )}
+
+              {/* Visual: Donut + Remaining card */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* SVG Donut */}
+                <div className="flex items-center justify-center">
+                  {(() => {
+                    const total = totalProt * 4 + totalCarb * 4 + totalFat * 9;
+                    const protPct = total > 0 ? (totalProt * 4 / total) * 100 : 33;
+                    const carbPct = total > 0 ? (totalCarb * 4 / total) * 100 : 33;
+                    const fatPct = total > 0 ? (totalFat * 9 / total) * 100 : 34;
+                    const r = 40; const c = 2 * Math.PI * r;
+                    const protLen = (protPct / 100) * c;
+                    const carbLen = (carbPct / 100) * c;
+                    const fatLen = (fatPct / 100) * c;
+                    return (
+                      <div className="relative w-28 h-28">
+                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(var(--destructive))" strokeWidth="8"
+                            strokeDasharray={`${protLen} ${c - protLen}`} strokeDashoffset="0" />
+                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(var(--primary))" strokeWidth="8"
+                            strokeDasharray={`${carbLen} ${c - carbLen}`} strokeDashoffset={`${-protLen}`} />
+                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(45 93% 47%)" strokeWidth="8"
+                            strokeDasharray={`${fatLen} ${c - fatLen}`} strokeDashoffset={`${-(protLen + carbLen)}`} />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-lg font-bold">{totalCal}</span>
+                          <span className="text-[9px] text-muted-foreground">kcal</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
-                <div className="bg-blue-50 dark:bg-blue-500/10 rounded-lg p-2 text-center border border-blue-200">
-                  <p className="text-lg font-bold">{totalCarb}g</p><p className="text-[10px] text-muted-foreground">Carbo</p>
+
+                {/* Remaining card */}
+                <div className="space-y-2">
+                  {(() => {
+                    const calRemain = calorieGoal - totalCal;
+                    const calColor = calRemain > 0 ? "text-green-600" : "text-destructive";
+                    return (
+                      <div className={`rounded-lg p-3 border ${calRemain > 0 ? "bg-green-50 dark:bg-green-500/10 border-green-200" : "bg-red-50 dark:bg-red-500/10 border-red-200"}`}>
+                        <p className="text-[10px] text-muted-foreground font-bold">RESTANTE</p>
+                        <p className={`text-xl font-bold ${calColor}`}>{calRemain > 0 ? calRemain : 0} kcal</p>
+                        {calRemain < 0 && <p className="text-[10px] text-destructive font-bold">+{Math.abs(calRemain)} acima!</p>}
+                      </div>
+                    );
+                  })()}
+                  <div className="grid grid-cols-3 gap-1 text-[9px]">
+                    <div className="text-center"><span className="text-destructive font-bold">{totalProt}g</span><br/>Prot</div>
+                    <div className="text-center"><span className="text-primary font-bold">{totalCarb}g</span><br/>Carb</div>
+                    <div className="text-center"><span className="text-yellow-600 font-bold">{totalFat}g</span><br/>Gord</div>
+                  </div>
                 </div>
-                <div className="bg-yellow-50 dark:bg-yellow-500/10 rounded-lg p-2 text-center border border-yellow-200">
-                  <p className="text-lg font-bold">{totalFat}g</p><p className="text-[10px] text-muted-foreground">Gordura</p>
+              </div>
+
+              {/* Macro progress bars */}
+              {(protGoal > 0 || carbGoal > 0 || fatGoal > 0) && (
+                <div className="space-y-1.5 mb-4">
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-8 text-destructive font-bold">Prot</span>
+                    <Progress value={protGoal > 0 ? Math.min((totalProt / protGoal) * 100, 100) : 0} className="h-2 flex-1" />
+                    <span className="text-muted-foreground w-16 text-right">{totalProt}/{protGoal}g</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-8 text-primary font-bold">Carb</span>
+                    <Progress value={carbGoal > 0 ? Math.min((totalCarb / carbGoal) * 100, 100) : 0} className="h-2 flex-1" />
+                    <span className="text-muted-foreground w-16 text-right">{totalCarb}/{carbGoal}g</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px]">
+                    <span className="w-8 text-yellow-600 font-bold">Gord</span>
+                    <Progress value={fatGoal > 0 ? Math.min((totalFat / fatGoal) * 100, 100) : 0} className="h-2 flex-1" />
+                    <span className="text-muted-foreground w-16 text-right">{totalFat}/{fatGoal}g</span>
+                  </div>
                 </div>
+              )}
+
+              {/* Import from menu */}
+              {(() => {
+                const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+                const todayMenu = mealPlan[todayDayName];
+                const hasMenu = todayMenu && Object.values(todayMenu).some(v => v && v.trim());
+                if (!hasMenu) return null;
+                return (
+                  <Button size="sm" variant="outline" className="w-full mb-3 text-xs h-8" onClick={() => {
+                    const items = Object.entries(todayMenu)
+                      .filter(([, v]) => v && v.trim())
+                      .map(([meal, desc]) => ({
+                        name: `${meal}: ${desc}`,
+                        cal: 0, prot: 0, carb: 0, fat: 0
+                      }));
+                    setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, ...items] });
+                  }}>
+                    <Calendar className="w-3 h-3 mr-1" /> Importar do Cardápio de Hoje ({todayDayName})
+                  </Button>
+                );
+              })()}
+
+              {/* Food search / autocomplete */}
+              <div className="mb-3">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    value={foodSearch}
+                    onChange={e => { setFoodSearch(e.target.value); setShowFoodSearch(true); }}
+                    onFocus={() => setShowFoodSearch(true)}
+                    placeholder="Buscar alimento (ex: frango, arroz, ovo...)"
+                    className="text-xs h-8 pl-8"
+                  />
+                </div>
+                {showFoodSearch && foodSearch.trim().length > 0 && (
+                  <div className="bg-card border border-border rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
+                    {FOOD_DATABASE.filter(f => f.name.toLowerCase().includes(foodSearch.toLowerCase())).map((food, i) => (
+                      <button
+                        key={i}
+                        className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b border-border last:border-0 transition-colors"
+                        onClick={() => {
+                          setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, { name: `${food.name} (${food.portion})`, cal: food.cal, prot: food.prot, carb: food.carb, fat: food.fat }] });
+                          setFoodSearch("");
+                          setShowFoodSearch(false);
+                        }}
+                      >
+                        <span className="text-xs font-medium">{food.name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1">({food.portion})</span>
+                        <div className="text-[9px] text-muted-foreground">
+                          {food.cal}kcal · {food.prot}P · {food.carb}C · {food.fat}G
+                        </div>
+                      </button>
+                    ))}
+                    {FOOD_DATABASE.filter(f => f.name.toLowerCase().includes(foodSearch.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-3">Nenhum alimento encontrado</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Quick add from favorites */}
@@ -469,7 +620,7 @@ const Dieta = () => {
                   <div className="flex gap-1 flex-wrap">
                     {favoriteMeals.map(f => (
                       <button key={f.id} onClick={() => setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, f] })}
-                        className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[10px] hover:bg-amber-100 transition-colors">
+                        className="px-2 py-1 rounded-lg bg-muted/50 border border-border text-[10px] hover:bg-muted transition-colors">
                         {f.name} ({f.cal}kcal)
                       </button>
                     ))}
@@ -477,8 +628,10 @@ const Dieta = () => {
                 </div>
               )}
 
-              <div className="flex gap-1 mb-2">
-                <Input value={newMealName} onChange={e => setNewMealName(e.target.value)} placeholder="Refeição" className="text-xs h-8 flex-1" />
+              {/* Manual add */}
+              <p className="text-[10px] font-bold text-muted-foreground mb-1">ADICIONAR MANUAL:</p>
+              <div className="flex gap-1 mb-2 flex-wrap">
+                <Input value={newMealName} onChange={e => setNewMealName(e.target.value)} placeholder="Refeição" className="text-xs h-8 flex-1 min-w-[100px]" />
                 <Input type="number" value={newMealCal} onChange={e => setNewMealCal(e.target.value)} placeholder="kcal" className="text-xs h-8 w-16" />
                 <Input type="number" value={newMealProt} onChange={e => setNewMealProt(e.target.value)} placeholder="P" className="text-xs h-8 w-12" />
                 <Input type="number" value={newMealCarb} onChange={e => setNewMealCarb(e.target.value)} placeholder="C" className="text-xs h-8 w-12" />
@@ -491,11 +644,17 @@ const Dieta = () => {
                   }
                 }}><Plus className="w-3 h-3" /></Button>
               </div>
+
+              {/* Today's meals list */}
+              {todayMeals.length > 0 && <p className="text-[10px] font-bold text-muted-foreground mt-3 mb-1">REFEIÇÕES DE HOJE:</p>}
               {todayMeals.map((m, i) => (
                 <div key={i} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-1.5 text-xs mb-1 border border-border">
-                  <span className="font-medium">{m.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span>{m.cal}kcal</span><span className="text-red-500">{m.prot}P</span><span className="text-blue-500">{m.carb}C</span><span className="text-yellow-600">{m.fat}G</span>
+                  <span className="font-medium flex-1 truncate">{m.name}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span>{m.cal}kcal</span>
+                    <span className="text-destructive">{m.prot}P</span>
+                    <span className="text-primary">{m.carb}C</span>
+                    <span className="text-yellow-600">{m.fat}G</span>
                     <button onClick={() => {
                       if (!favoriteMeals.find(f => f.name === m.name)) setFavoriteMeals([...favoriteMeals, { id: Date.now().toString(), ...m }]);
                     }}><Star className="w-3 h-3 text-amber-400" /></button>
@@ -503,16 +662,6 @@ const Dieta = () => {
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* BMI */}
-            <div className="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10 rounded-xl border border-teal-200 p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-teal-500" /> CALCULADORA IMC</h3>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex items-center gap-1"><Input type="number" value={bmiHeight} onChange={e => setBmiHeight(e.target.value)} placeholder="Altura" className="text-xs h-8 w-20" /><span className="text-xs text-muted-foreground">cm</span></div>
-                <div className="flex items-center gap-1"><Input type="number" value={bmiWeight} onChange={e => setBmiWeight(e.target.value)} placeholder="Peso" className="text-xs h-8 w-20" /><span className="text-xs text-muted-foreground">kg</span></div>
-              </div>
-              {bmi && <div className="flex items-center gap-3 mt-2"><span className="text-2xl font-bold">{bmi}</span><span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span></div>}
             </div>
 
             {/* Calorie History */}
@@ -529,7 +678,7 @@ const Dieta = () => {
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
                         {cal > 0 && <span className="text-[7px] font-bold">{cal}</span>}
-                        <div className={`w-full rounded-t transition-all ${overGoal ? "bg-red-400" : cal > 0 ? "bg-green-400" : "bg-muted/30"}`}
+                        <div className={`w-full rounded-t transition-all ${overGoal ? "bg-destructive" : cal > 0 ? "bg-green-400" : "bg-muted/30"}`}
                           style={{ height: `${Math.max(pct * 0.6, 4)}%` }} />
                         <span className="text-[7px] text-muted-foreground">{d.getDate()}</span>
                       </div>
@@ -538,7 +687,7 @@ const Dieta = () => {
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
                   <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-green-400" /> Dentro da meta</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-red-400" /> Acima da meta</span>
+                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-destructive" /> Acima da meta</span>
                 </div>
               </div>
             )}

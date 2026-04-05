@@ -52,10 +52,10 @@ const PERIODS: { key: keyof TimelineData; label: string; color: string }[] = [
 /* ─── Shared components ─── */
 const CircleCheck = ({ checked, onToggle }: { checked: boolean; onToggle: () => void }) => (
   <button onClick={onToggle}
-    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+    className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all ${
       checked ? "bg-[hsl(217,91%,60%)] border-[hsl(217,91%,60%)]" : "border-muted-foreground/30 hover:border-[hsl(217,91%,60%)]"
     }`}>
-    {checked && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>}
+    {checked && <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>}
   </button>
 );
 

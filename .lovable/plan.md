@@ -1,32 +1,36 @@
 
 
-# Plano: Metas pré-montadas como planilha (template pronto)
+# Plano: Metas como planilha pré-montada (1:1 com as fotos)
 
 ## Problema
-Atualmente quando o usuário cria uma meta, ela vem **vazia**. O conceito do app é ser uma planilha pronta — o usuário só preenche. As imagens de referência mostram metas já com toda a estrutura montada: grupos de ação, campos de visão, seções de problemas/soluções, tudo pronto pra preencher.
+Atualmente o componente começa vazio com botão "Criar primeira meta". O conceito é planilha: o usuário abre e já está tudo lá, vazio, pronto pra preencher.
 
-## Solução
-Quando o usuário cria uma nova meta, ela já vem **pré-preenchida com template completo**, exatamente como nas fotos:
+## Mudanças no GoalsBoardV2.tsx
 
-### Template padrão de cada meta criada:
-1. **Imagem hero** — placeholder com texto "Toque para adicionar imagem de capa"
-2. **PLANO DE AÇÃO** — já vem com 2 grupos de exemplo:
-   - "Definir as bases:" com tarefas placeholder (ex: "Data: Escolher uma data ideal", "Orçamento: Determinar valor disponível", "Pesquisa: Buscar referências")
-   - "Estruturar o plano:" com tarefas (ex: "Listar prioridades", "Definir etapas principais", "Criar cronograma")
-3. **LINKS DE REFERÊNCIA** — seção vazia mas já visível com botões prontos
-4. **VISÃO** — campos já com labels claros e placeholders descritivos
-5. **PROBLEMAS E SOLUÇÕES** — já vem com 1 par vazio pronto pra preencher
+### 1. Remover empty state
+Eliminar o bloco `if (goals.length === 0)` que mostra "Nenhuma meta criada ainda". Em vez disso, inicializar o `usePersistedState` com **uma meta vazia já criada** (título "Minha Meta", tudo em branco).
 
-### Estilo visual mais fiel às fotos:
-- Cards com **headers maiores** (py-5, bg com gradiente sutil)
-- Emoji **maior** (text-3xl) no header
-- Título do header em **uppercase tracking-wider**
-- Tasks com visual mais clean, espaçamento maior
-- Labels rosa com **border-l-4** mais grosso e bg mais marcante
+### 2. Template vazio (não pré-preenchido)
+O `emptyGoal()` volta a ter tudo VAZIO — sem tarefas de exemplo, sem texto placeholder nas tasks. Apenas a ESTRUTURA está lá:
+- 2 grupos de ação vazios (labels "Definir as bases:" e "Estruturar o plano:") com 0 tarefas, só o input "Adicionar uma tarefa..."
+- Visão com 3 campos vazios
+- 1 par problema/solução vazio
+- Hero image placeholder
+
+### 3. Visual 1:1 com as fotos
+- **Header dos cards**: bg cinza/marrom (`bg-[#8B7D6B]/30` dark, `bg-[#C4B5A4]/40` light) — não cinza genérico. Altura ~80px. Emoji grande (text-4xl) no canto direito inferior do header.
+- **Título da seção**: Texto preto bold grande (`text-lg font-black`) abaixo do header colorido, dentro do body do card.
+- **Labels rosa**: `bg-pink-100 dark:bg-pink-500/15` com `border-l-4 border-pink-400`, texto bold.
+- **Checkboxes**: Circulares. Checked = azul preenchido com checkmark branco (como nas fotos, não verde). Unchecked = borda cinza fina.
+- **Visão**: Campos inline tipo "**Meta:** texto editável" e "**Objetivo:** texto editável" e "**Tempo para bater a meta:** texto editável" — sem labels separados, tudo numa mesma área com separador `<hr>` embaixo.
+- **Links de referência**: Grid de imagens 3 colunas no topo, depois cards de link com thumbnail + URL.
+
+### 4. Título editável no topo
+Em vez de `<select>`, mostrar o título da meta como texto grande editável ("Casamento →") com dropdown chevron ao lado para trocar entre metas.
 
 ## Alteração
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/hiperfoco/GoalsBoardV2.tsx` | (1) Alterar `emptyGoal()` para retornar template pré-preenchido com 2 grupos de tarefas, 1 par problema/solução vazio, e campos de visão com placeholder text. (2) Ajustar visual dos headers de seção (maior, emoji maior, uppercase). (3) Garantir que todas as seções aparecem sempre (não condicional), como uma planilha pronta. |
+| `src/components/hiperfoco/GoalsBoardV2.tsx` | (1) Inicializar com 1 meta vazia por default. (2) `emptyGoal()` retorna estrutura vazia (grupos sem tarefas, visão em branco, 1 problema vazio). (3) Remover empty state. (4) Visual dos headers: bg marrom/bege, emoji 4xl no canto direito, título grande no body. (5) Checkboxes azuis (não verdes). (6) Visão como campos inline ("**Meta:** editable", "**Objetivo:** editable", "**Tempo:** editable") com hr. (7) Título editável no topo tipo "Casamento → ∨". |
 

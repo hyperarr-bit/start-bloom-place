@@ -28,6 +28,13 @@ const Saude = () => {
   const today = todayStr();
   const [activeTab, setActiveTab] = useState("agora");
 
+  // BMI
+  const [bmiHeight, setBmiHeight] = usePersistedState("saude-bmi-height", "");
+  const [bmiWeight, setBmiWeight] = usePersistedState("saude-bmi-weight", "");
+  const bmi = bmiHeight && bmiWeight ? (Number(bmiWeight) / Math.pow(Number(bmiHeight) / 100, 2)).toFixed(1) : null;
+  const bmiCategory = bmi ? (Number(bmi) < 18.5 ? "Abaixo" : Number(bmi) < 25 ? "Normal ✅" : Number(bmi) < 30 ? "Sobrepeso" : "Obesidade") : "";
+  const bmiColor = bmi ? (Number(bmi) < 18.5 ? "text-blue-500" : Number(bmi) < 25 ? "text-green-500" : Number(bmi) < 30 ? "text-yellow-500" : "text-red-500") : "";
+
   // Compute health score from all signals
   const [waterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
   const [waterGoal] = usePersistedState<number>("core-saude-water-goal", 8);

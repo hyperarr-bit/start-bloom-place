@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Zap, Scale, Stethoscope, Wrench, AlertTriangle, Droplets, Pill, Moon, Activity, Timer, Smile, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ModuleTip } from "@/components/ModuleTip";

@@ -886,13 +886,26 @@ const FocusZones = () => {
 
 // ============= WEEKLY REVIEW =============
 const WeeklyReview = () => {
-  const getWeekKey = () => {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const getWeekKeyForOffset = (offset: number) => {
     const d = new Date();
+    d.setDate(d.getDate() + offset * 7);
     const start = new Date(d);
     start.setDate(d.getDate() - d.getDay());
     return getDateKey(start);
   };
-  const weekKey = getWeekKey();
+  const getWeekRange = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset * 7);
+    const start = new Date(d);
+    start.setDate(d.getDate() - d.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = (dt: Date) => dt.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+    return `${fmt(start)} — ${fmt(end)}`;
+  };
+  const isCurrentWeek = weekOffset === 0;
+  const weekKey = getWeekKeyForOffset(weekOffset);
   const [reviews, setReviews] = usePersistedState<Record<string, { wins: string; improve: string; focus: string; rating: number }>>("weekly-reviews", {});
   const review = reviews[weekKey] || { wins: "", improve: "", focus: "", rating: 0 };
 
@@ -902,9 +915,18 @@ const WeeklyReview = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center gap-2">
-        <Star className="w-4 h-4 text-white" />
-        <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Star className="w-4 h-4 text-white" />
+          <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-xs text-white font-medium min-w-[120px] text-center">
+            {isCurrentWeek ? "Esta semana" : getWeekRange(weekOffset)}
+          </span>
+          <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))} disabled={isCurrentWeek} className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-2">

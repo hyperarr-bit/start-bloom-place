@@ -24,6 +24,7 @@ const tabs = [
 const Saude = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
+  useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (

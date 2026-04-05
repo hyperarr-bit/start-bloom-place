@@ -962,6 +962,7 @@ const WeeklyReview = () => {
 const Rotina = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  useSetTrackedTab(activeTab);
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);

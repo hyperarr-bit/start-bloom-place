@@ -103,6 +103,7 @@ const Biblioteca = () => {
   const [books, setBooks] = usePersistedState<Book[]>("lib-books", []);
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
   const [tab, setTab] = useState("lendo");
+  useSetTrackedTab(tab);
 
   // ── Form State ──
   const [showForm, setShowForm] = useState(false);

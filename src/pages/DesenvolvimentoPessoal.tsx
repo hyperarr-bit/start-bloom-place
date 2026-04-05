@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 
 
 const defaultAffirmations: string[] = [];

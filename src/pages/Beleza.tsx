@@ -44,7 +44,7 @@ const Beleza = () => {
         <DailyMirror />
 
         {/* Tabs */}
-        <Tabs defaultValue="routine">
+        <Tabs defaultValue="routine" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="routine" className="text-xs gap-1">
               <Sparkles className="w-3.5 h-3.5" /> Rotina

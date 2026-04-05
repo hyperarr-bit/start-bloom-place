@@ -40,7 +40,7 @@ const Detox = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
         >
-          <Tabs defaultValue="rastreador" className="w-full">
+          <Tabs defaultValue="rastreador" className="w-full" onValueChange={v => reportTab?.(v)}>
             <TabsList className="w-full grid grid-cols-4">
               <TabsTrigger value="rastreador" className="text-[10px]">🌿 RASTREADOR</TabsTrigger>
               <TabsTrigger value="diario" className="text-[10px]">📓 DIÁRIO</TabsTrigger>

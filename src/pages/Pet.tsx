@@ -41,7 +41,7 @@ const Pet = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
         >
-          <Tabs defaultValue="pets" className="w-full">
+          <Tabs defaultValue="pets" className="w-full" onValueChange={v => reportTab?.(v)}>
             <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="pets" className="text-[10px]">🐾 PETS</TabsTrigger>
               <TabsTrigger value="saude" className="text-[10px]">💉 SAÚDE</TabsTrigger>

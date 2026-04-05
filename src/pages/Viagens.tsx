@@ -59,7 +59,7 @@ const Viagens = () => {
           ]}
         />
 
-        <Tabs defaultValue="destinos">
+        <Tabs defaultValue="destinos" onValueChange={v => reportTab?.(v)}>
           <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
             <TabsList className="inline-flex w-auto min-w-full">
               {TABS.map(tab => (

@@ -41,7 +41,7 @@ const Relacionamentos = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
         >
-          <Tabs defaultValue="pessoas" className="w-full">
+          <Tabs defaultValue="pessoas" className="w-full" onValueChange={v => reportTab?.(v)}>
             <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="pessoas" className="text-[10px]">💜 PESSOAS</TabsTrigger>
               <TabsTrigger value="agenda" className="text-[10px]">📅 AGENDA</TabsTrigger>

@@ -1,36 +1,73 @@
 
 
-# Plano: Metas como planilha pré-montada (1:1 com as fotos)
+# Plano: Página inicial METAS — cópia 1:1 do xtiles.app
 
-## Problema
-Atualmente o componente começa vazio com botão "Criar primeira meta". O conceito é planilha: o usuário abre e já está tudo lá, vazio, pronto pra preencher.
+## O que as fotos mostram (página inicial)
 
-## Mudanças no GoalsBoardV2.tsx
+A página inicial de METAS é uma scroll vertical com cards fixos nesta ordem:
 
-### 1. Remover empty state
-Eliminar o bloco `if (goals.length === 0)` que mostra "Nenhuma meta criada ainda". Em vez disso, inicializar o `usePersistedState` com **uma meta vazia já criada** (título "Minha Meta", tudo em branco).
+1. **"MINHAS METAS ∨"** — título com dropdown no topo
+2. **Card PLANO DE AÇÃO PARA CADA META** — header marrom/bege com 🎯 centralizado, body bege claro listando metas como links ("Casamento →", "Nova meta →") com ícone de documento à direita
+3. **Card de frase motivacional** — fundo cinza/marrom, texto cursivo branco centralizado "Eu crio a minha realidade."
+4. **Card 6 MESES** — header amarelo (#FDE68A), emoji relógio ⏱ centralizado no header, título "6 MESES" bold grande, checkboxes circulares azuis com itens, área de imagem abaixo
+5. **Card 1 ANO** — header lilás (#C4B5FD), mesmo layout
+6. **Card 3 ANOS** — header verde (#86EFAC), mesmo layout
+7. **Card 5 ANOS** — header laranja (#FDBA74), mesmo layout
+8. **MURAL DOS SONHOS** — seção no final
 
-### 2. Template vazio (não pré-preenchido)
-O `emptyGoal()` volta a ter tudo VAZIO — sem tarefas de exemplo, sem texto placeholder nas tasks. Apenas a ESTRUTURA está lá:
-- 2 grupos de ação vazios (labels "Definir as bases:" e "Estruturar o plano:") com 0 tarefas, só o input "Adicionar uma tarefa..."
-- Visão com 3 campos vazios
-- 1 par problema/solução vazio
-- Hero image placeholder
+Cada card de tempo (6M, 1A, 3A, 5A) tem:
+- Header colorido ~80px com emoji relógio centralizado
+- Título bold centralizado abaixo do header
+- Lista de checkboxes circulares (azul = done, cinza = undone)
+- Input inline para adicionar item
+- Área para upload de imagem inspiracional full-width
 
-### 3. Visual 1:1 com as fotos
-- **Header dos cards**: bg cinza/marrom (`bg-[#8B7D6B]/30` dark, `bg-[#C4B5A4]/40` light) — não cinza genérico. Altura ~80px. Emoji grande (text-4xl) no canto direito inferior do header.
-- **Título da seção**: Texto preto bold grande (`text-lg font-black`) abaixo do header colorido, dentro do body do card.
-- **Labels rosa**: `bg-pink-100 dark:bg-pink-500/15` com `border-l-4 border-pink-400`, texto bold.
-- **Checkboxes**: Circulares. Checked = azul preenchido com checkmark branco (como nas fotos, não verde). Unchecked = borda cinza fina.
-- **Visão**: Campos inline tipo "**Meta:** texto editável" e "**Objetivo:** texto editável" e "**Tempo para bater a meta:** texto editável" — sem labels separados, tudo numa mesma área com separador `<hr>` embaixo.
-- **Links de referência**: Grid de imagens 3 colunas no topo, depois cards de link com thumbnail + URL.
+Ao clicar num item do "PLANO DE AÇÃO" (ex: "Casamento →"), abre a view detalhada (o GoalsBoardV2 atual).
 
-### 4. Título editável no topo
-Em vez de `<select>`, mostrar o título da meta como texto grande editável ("Casamento →") com dropdown chevron ao lado para trocar entre metas.
+## Estrutura técnica
+
+O GoalsBoardV2 será dividido em duas views:
+- **View "home"** (default) — a página inicial das fotos
+- **View "detail"** — a view atual (plano de ação, visão, problemas de uma meta específica)
+
+### Dados novos (persistidos)
+
+```typescript
+interface TimelineGoals {
+  "6meses": { items: { id: string; text: string; done: boolean }[]; image?: string };
+  "1ano": { items: ...; image?: string };
+  "3anos": { items: ...; image?: string };
+  "5anos": { items: ...; image?: string };
+}
+quote: string; // frase motivacional editável
+dreamBoard: string[]; // imagens do mural dos sonhos
+```
+
+### Layout dos cards de tempo (1:1)
+
+```text
+┌─────────────────────────────┐
+│  ██████ AMARELO ██████████  │ ← header colorido ~80px
+│          ⏱                  │ ← emoji relógio centralizado
+├─────────────────────────────┤
+│        6 MESES              │ ← título bold centralizado
+│                             │
+│  ✅ Viajar pra Bariloche    │ ← checkbox azul + texto
+│  ✅ Começar no Crossfit     │
+│  ○  Perder 5kg              │
+│  ○  Adicionar...            │ ← input placeholder
+│                             │
+│  ┌─────────────────────┐    │
+│  │                     │    │
+│  │   IMAGEM UPLOAD     │    │ ← foto inspiracional
+│  │                     │    │
+│  └─────────────────────┘    │
+└─────────────────────────────┘
+```
 
 ## Alteração
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/hiperfoco/GoalsBoardV2.tsx` | (1) Inicializar com 1 meta vazia por default. (2) `emptyGoal()` retorna estrutura vazia (grupos sem tarefas, visão em branco, 1 problema vazio). (3) Remover empty state. (4) Visual dos headers: bg marrom/bege, emoji 4xl no canto direito, título grande no body. (5) Checkboxes azuis (não verdes). (6) Visão como campos inline ("**Meta:** editable", "**Objetivo:** editable", "**Tempo:** editable") com hr. (7) Título editável no topo tipo "Casamento → ∨". |
+| `src/components/hiperfoco/GoalsBoardV2.tsx` | Reescrever completamente. (1) Estado `view`: "home" ou "detail". (2) View "home": título "MINHAS METAS ∨", card PLANO DE AÇÃO com lista de metas como links (→), card de frase motivacional editável (bg cinza/marrom, texto branco cursivo), 4 cards de timeline (6M/1A/3A/5A) cada um com header colorido, emoji relógio centralizado, título bold, checkboxes circulares azuis, input inline, upload de imagem. Seção MURAL DOS SONHOS com grid de imagens. (3) View "detail": o conteúdo atual (plano de ação, visão, problemas) acessado ao clicar numa meta. (4) Persistência: `usePersistedState("goals-timeline")` para os 4 períodos + quote + mural. Goals individuais continuam em `goals-board-v2`. |
 

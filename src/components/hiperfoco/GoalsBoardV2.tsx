@@ -464,3 +464,48 @@ const TimelineInput = ({ onAdd }: { onAdd: (text: string) => void }) => {
     </div>
   );
 };
+
+/* Timeline card — extracted to avoid hooks in loops */
+const TimelineCard = ({ periodKey, label, color, period, onToggle, onRemove, onAdd, onImageChange, onImageRemove }: {
+  periodKey: string; label: string; color: string; period: { items: { id: string; text: string; done: boolean }[]; image?: string };
+  onToggle: (id: string) => void; onRemove: (id: string) => void; onAdd: (text: string) => void;
+  onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void; onImageRemove: () => void;
+}) => {
+  const imgRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="rounded-xl border border-border overflow-hidden bg-card">
+      <div className="flex items-center justify-center" style={{ background: color, minHeight: 72 }}>
+        <span className="text-4xl">⏱</span>
+      </div>
+      <div className="px-5 py-4 space-y-3">
+        <h3 className="text-lg font-black tracking-tight text-center">{label}</h3>
+        {period.items.map(item => (
+          <div key={item.id} className="flex items-center gap-3 group/item">
+            <CircleCheck checked={item.done} onToggle={() => onToggle(item.id)} />
+            <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+            <button onClick={() => onRemove(item.id)} className="opacity-0 group-hover/item:opacity-100 text-muted-foreground/40 hover:text-destructive">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        <TimelineInput onAdd={onAdd} />
+        {period.image ? (
+          <div className="relative group/img rounded-lg overflow-hidden">
+            <img src={period.image} alt="" className="w-full h-40 object-cover rounded-lg" />
+            <button onClick={onImageRemove}
+              className="absolute top-2 right-2 bg-black/60 rounded-full p-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
+              <X className="w-3 h-3 text-white" />
+            </button>
+          </div>
+        ) : (
+          <button onClick={() => imgRef.current?.click()}
+            className="w-full h-28 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground/50 hover:border-muted-foreground/40 transition-colors">
+            <ImagePlus className="w-5 h-5" />
+            <span className="text-[10px]">Adicionar imagem</span>
+          </button>
+        )}
+        <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+      </div>
+    </div>
+  );
+};

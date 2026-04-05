@@ -76,9 +76,7 @@ const DesenvolvimentoPessoal = () => {
     Object.fromEntries(lifeAreas.map(a => [a.id, 5]))
   );
 
-  // BUCKET LIST
-  const [bucketList, setBucketList] = usePersistedState<{id: string; text: string; done: boolean}[]>("dp-bucket", []);
-  const [newBucket, setNewBucket] = useState("");
+  // BUCKET LIST — movido para GoalsBoardV2
 
   // GRATIDÃO
   const [gratitudeEntries, setGratitudeEntries] = usePersistedState<Record<string, string[]>>("dp-gratitude", {});

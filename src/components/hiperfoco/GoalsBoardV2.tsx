@@ -345,7 +345,7 @@ export const GoalsBoardV2 = () => {
 
       {/* PLANO DE AÇÃO */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🚀" title="PLANO DE AÇÃO" />
+        <SectionHeader emoji="🚀" title="PLANO DE AÇÃO" color="hsl(213 80% 80% / 0.45)" />
         <div className="p-4 space-y-4">
           {goal.actionGroups.map(group => {
             const doneCount = group.tasks.filter(t => t.done).length;

@@ -1,0 +1,1 @@
+ALTER TABLE public.module_analytics ADD COLUMN tab_id text;

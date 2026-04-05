@@ -751,7 +751,7 @@ const DailyJournal = () => {
               <Input
                 key={i}
                 placeholder={`Gratidão ${i + 1}...`}
-                value={todayEntry.gratitude[i] || ""}
+                value={entry.gratitude[i] || ""}
                 onChange={e => updateGratitude(i, e.target.value)}
                 className="h-8 text-xs"
               />

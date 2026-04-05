@@ -18,11 +18,12 @@ const defaultHabits: string[] = [];
 
 const hours = [
   "6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "19:30"
+  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
+  "20:00", "21:00", "22:00", "23:00", "0:00"
 ];
 
 const defaultSchedule: Record<string, Record<string, string>> = Object.fromEntries(
-  ["6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "19:30"].map(h => [
+  ["6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "0:00"].map(h => [
     h, { Segunda: "", Terça: "", Quarta: "", Quinta: "", Sexta: "", Sábado: "", Domingo: "" }
   ])
 );
@@ -703,25 +704,44 @@ const MonthlyPlanning = () => {
 
 // ============= DAILY JOURNAL =============
 const DailyJournal = () => {
-  const today = getDateKey();
+  const [dayOffset, setDayOffset] = useState(0);
+  const getDateForOffset = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+  const selectedDate = getDateForOffset(dayOffset);
+  const selectedKey = getDateKey(selectedDate);
+  const isToday = dayOffset === 0;
   const [entries, setEntries] = usePersistedState<Record<string, { gratitude: string[]; learned: string; tomorrow: string }>>("journal-entries", {});
-  const todayEntry = entries[today] || { gratitude: ["", "", ""], learned: "", tomorrow: "" };
+  const entry = entries[selectedKey] || { gratitude: ["", "", ""], learned: "", tomorrow: "" };
 
   const updateGratitude = (index: number, value: string) => {
-    const newGratitude = [...todayEntry.gratitude];
+    const newGratitude = [...entry.gratitude];
     newGratitude[index] = value;
-    setEntries(prev => ({ ...prev, [today]: { ...todayEntry, gratitude: newGratitude } }));
+    setEntries(prev => ({ ...prev, [selectedKey]: { ...entry, gratitude: newGratitude } }));
   };
 
   const updateField = (field: "learned" | "tomorrow", value: string) => {
-    setEntries(prev => ({ ...prev, [today]: { ...todayEntry, [field]: value } }));
+    setEntries(prev => ({ ...prev, [selectedKey]: { ...entry, [field]: value } }));
   };
+
+  const formatDate = (d: Date) => d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-3 flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-white" />
-        <span className="font-bold text-sm text-white">DIÁRIO DO DIA</span>
+      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-white" />
+          <span className="font-bold text-sm text-white">DIÁRIO DO DIA</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setDayOffset(prev => prev - 1)} className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-xs text-white font-medium min-w-[90px] text-center">
+            {isToday ? "Hoje" : formatDate(selectedDate)}
+          </span>
+          <button onClick={() => setDayOffset(prev => Math.min(prev + 1, 0))} disabled={isToday} className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="p-4 space-y-4">
         <div>
@@ -731,7 +751,7 @@ const DailyJournal = () => {
               <Input
                 key={i}
                 placeholder={`Gratidão ${i + 1}...`}
-                value={todayEntry.gratitude[i] || ""}
+                value={entry.gratitude[i] || ""}
                 onChange={e => updateGratitude(i, e.target.value)}
                 className="h-8 text-xs"
               />
@@ -742,7 +762,7 @@ const DailyJournal = () => {
           <span className="text-xs font-bold text-muted-foreground">💡 O QUE APRENDI HOJE</span>
           <Textarea
             placeholder="Algo novo que aprendi..."
-            value={todayEntry.learned}
+            value={entry.learned}
             onChange={e => updateField("learned", e.target.value)}
             className="text-xs min-h-[50px] mt-2"
           />
@@ -751,7 +771,7 @@ const DailyJournal = () => {
           <span className="text-xs font-bold text-muted-foreground">🎯 PRIORIDADE PRA AMANHÃ</span>
           <Input
             placeholder="Qual a coisa mais importante pra amanhã?"
-            value={todayEntry.tomorrow}
+            value={entry.tomorrow}
             onChange={e => updateField("tomorrow", e.target.value)}
             className="h-8 text-xs mt-2"
           />
@@ -866,13 +886,26 @@ const FocusZones = () => {
 
 // ============= WEEKLY REVIEW =============
 const WeeklyReview = () => {
-  const getWeekKey = () => {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const getWeekKeyForOffset = (offset: number) => {
     const d = new Date();
+    d.setDate(d.getDate() + offset * 7);
     const start = new Date(d);
     start.setDate(d.getDate() - d.getDay());
     return getDateKey(start);
   };
-  const weekKey = getWeekKey();
+  const getWeekRange = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset * 7);
+    const start = new Date(d);
+    start.setDate(d.getDate() - d.getDay());
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const fmt = (dt: Date) => dt.toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+    return `${fmt(start)} — ${fmt(end)}`;
+  };
+  const isCurrentWeek = weekOffset === 0;
+  const weekKey = getWeekKeyForOffset(weekOffset);
   const [reviews, setReviews] = usePersistedState<Record<string, { wins: string; improve: string; focus: string; rating: number }>>("weekly-reviews", {});
   const review = reviews[weekKey] || { wins: "", improve: "", focus: "", rating: 0 };
 
@@ -882,9 +915,18 @@ const WeeklyReview = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center gap-2">
-        <Star className="w-4 h-4 text-white" />
-        <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Star className="w-4 h-4 text-white" />
+          <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-xs text-white font-medium min-w-[120px] text-center">
+            {isCurrentWeek ? "Esta semana" : getWeekRange(weekOffset)}
+          </span>
+          <button onClick={() => setWeekOffset(prev => Math.min(prev + 1, 0))} disabled={isCurrentWeek} className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-2">

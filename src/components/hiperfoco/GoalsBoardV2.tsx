@@ -69,7 +69,16 @@ export const GoalsBoardV2 = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNewGoal, setShowNewGoal] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [newGroupLabel, setNewGroupLabel] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
   const dreamRef = useRef<HTMLInputElement>(null);
+  const heroRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  const goal = goals.find(g => g.id === selectedGoalId) || goals[0];
+
+  const updateGoal = (updated: GoalV2) => setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
 
   const openGoal = (id: string) => { setSelectedGoalId(id); setView("detail"); };
 

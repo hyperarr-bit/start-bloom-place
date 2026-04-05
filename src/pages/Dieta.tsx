@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
-  ArrowUp, ArrowDown, Copy, Search, BookOpen
+  ArrowUp, ArrowDown, Copy, Search, BookOpen,
+  ShoppingCart, Send, UtensilsCrossed
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,

@@ -704,25 +704,44 @@ const MonthlyPlanning = () => {
 
 // ============= DAILY JOURNAL =============
 const DailyJournal = () => {
-  const today = getDateKey();
+  const [dayOffset, setDayOffset] = useState(0);
+  const getDateForOffset = (offset: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d;
+  };
+  const selectedDate = getDateForOffset(dayOffset);
+  const selectedKey = getDateKey(selectedDate);
+  const isToday = dayOffset === 0;
   const [entries, setEntries] = usePersistedState<Record<string, { gratitude: string[]; learned: string; tomorrow: string }>>("journal-entries", {});
-  const todayEntry = entries[today] || { gratitude: ["", "", ""], learned: "", tomorrow: "" };
+  const entry = entries[selectedKey] || { gratitude: ["", "", ""], learned: "", tomorrow: "" };
 
   const updateGratitude = (index: number, value: string) => {
-    const newGratitude = [...todayEntry.gratitude];
+    const newGratitude = [...entry.gratitude];
     newGratitude[index] = value;
-    setEntries(prev => ({ ...prev, [today]: { ...todayEntry, gratitude: newGratitude } }));
+    setEntries(prev => ({ ...prev, [selectedKey]: { ...entry, gratitude: newGratitude } }));
   };
 
   const updateField = (field: "learned" | "tomorrow", value: string) => {
-    setEntries(prev => ({ ...prev, [today]: { ...todayEntry, [field]: value } }));
+    setEntries(prev => ({ ...prev, [selectedKey]: { ...entry, [field]: value } }));
   };
+
+  const formatDate = (d: Date) => d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-3 flex items-center gap-2">
-        <BookOpen className="w-4 h-4 text-white" />
-        <span className="font-bold text-sm text-white">DIÁRIO DO DIA</span>
+      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-white" />
+          <span className="font-bold text-sm text-white">DIÁRIO DO DIA</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setDayOffset(prev => prev - 1)} className="p-1 rounded hover:bg-white/20 text-white"><ChevronLeft className="w-4 h-4" /></button>
+          <span className="text-xs text-white font-medium min-w-[90px] text-center">
+            {isToday ? "Hoje" : formatDate(selectedDate)}
+          </span>
+          <button onClick={() => setDayOffset(prev => Math.min(prev + 1, 0))} disabled={isToday} className="p-1 rounded hover:bg-white/20 text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+        </div>
       </div>
       <div className="p-4 space-y-4">
         <div>

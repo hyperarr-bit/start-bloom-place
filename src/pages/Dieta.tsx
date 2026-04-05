@@ -102,17 +102,19 @@ const Dieta = () => {
   const formatTime = (secs: number) => { const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60; return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`; };
 
   // Diary helpers
-  const addDiaryEntry = () => {
-    if (!newDiaryEntry.trim()) return;
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-    const entry = { id: Date.now().toString(), text: newDiaryEntry.trim(), time };
-    setDiaryEntries(prev => ({ ...prev, [diaryDate]: [...(prev[diaryDate] || []), entry] }));
-    setNewDiaryEntry("");
+  const getDiaryDayName = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dayIndex = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    return weekDays[dayIndex];
   };
 
-  const removeDiaryEntry = (id: string) => {
-    setDiaryEntries(prev => ({ ...prev, [diaryDate]: (prev[diaryDate] || []).filter(e => e.id !== id) }));
+  const getDayDiary = (dateStr: string) => diaryData[dateStr] || { meals: {}, extraFood: { had: false, description: "" } };
+
+  const updateDayDiary = (dateStr: string, updater: (prev: { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }) => typeof prev extends never ? never : any) => {
+    setDiaryData(prev => ({
+      ...prev,
+      [dateStr]: updater(prev[dateStr] || { meals: {}, extraFood: { had: false, description: "" } })
+    }));
   };
 
   const navigateDiaryDate = (offset: number) => {
@@ -129,19 +131,60 @@ const Dieta = () => {
     return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
   };
 
-  // Check how many days have diary entries (streak)
-  const diaryStreak = (() => {
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      const dateStr = d.toISOString().split("T")[0];
-      const entries = diaryEntries[dateStr];
-      if (entries && entries.length > 0) { count++; d.setDate(d.getDate() - 1); }
-      else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
-      else break;
+  // Smart list: generate from meal plan
+  const generateFromMealPlan = () => {
+    const items: string[] = [];
+    weekDays.forEach(day => {
+      const dayMeals = mealPlan[day];
+      if (!dayMeals) return;
+      Object.values(dayMeals).forEach(desc => {
+        if (desc && desc.trim()) {
+          desc.split(/[,\n+]/).forEach(item => {
+            const clean = item.trim().toLowerCase();
+            if (clean && !items.includes(clean)) items.push(clean);
+          });
+        }
+      });
+    });
+    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
+    if (newItems.length > 0) {
+      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
     }
-    return count;
-  })();
+  };
+
+  const generateFromRecipes = () => {
+    const items: string[] = [];
+    recipes.filter(r => r.favorite).forEach(r => {
+      if (r.ingredients) {
+        r.ingredients.split("\n").forEach(line => {
+          const clean = line.trim().toLowerCase();
+          if (clean && !items.includes(clean)) items.push(clean);
+        });
+      }
+    });
+    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
+    if (newItems.length > 0) {
+      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
+    }
+  };
+
+  const sendToCasa = () => {
+    const pendingItems = smartList.filter(i => !i.done);
+    if (pendingItems.length === 0) return;
+    setCasaGrocery((prev: any[]) => {
+      const updated = [...prev];
+      // Find or create "Dieta" category
+      let dietaCat = updated.find(c => c.name === "Dieta");
+      if (!dietaCat) {
+        dietaCat = { id: "dieta-auto", name: "Dieta", emoji: "🥗", color: "bg-green-500", items: [] };
+        updated.push(dietaCat);
+      }
+      const existingTexts = dietaCat.items.map((i: any) => i.text.toLowerCase());
+      const newItems = pendingItems.filter(i => !existingTexts.includes(i.text.toLowerCase()));
+      dietaCat.items = [...dietaCat.items, ...newItems.map(i => ({ id: Date.now().toString() + Math.random(), text: i.text, done: false }))];
+      return updated.map(c => c.id === dietaCat!.id ? dietaCat! : c);
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">

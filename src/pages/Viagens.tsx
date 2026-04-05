@@ -30,6 +30,7 @@ const TABS = [
 
 const Viagens = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background pb-20">

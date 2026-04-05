@@ -11,6 +11,7 @@ import { PetDiary } from "@/components/pet/PetDiary";
 
 const Pet = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background text-foreground">

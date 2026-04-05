@@ -11,6 +11,7 @@ import { EventLog } from "@/components/relacionamentos/EventLog";
 
 const Relacionamentos = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background text-foreground">

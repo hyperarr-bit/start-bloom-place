@@ -421,7 +421,7 @@ export const GoalsBoardV2 = () => {
 
       {/* VISÃO */}
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        <SectionHeader emoji="🎯" title="VISÃO" />
+        <SectionHeader emoji="🎯" title="VISÃO" color="hsl(45 90% 78% / 0.45)" />
         <div className="p-4 space-y-0">
           {[
             { label: "Meta:", field: "meta" as const, ph: "O que quero alcançar?" },

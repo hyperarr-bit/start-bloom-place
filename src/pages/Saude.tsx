@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Zap, Scale, Stethoscope, Wrench, AlertTriangle, Droplets, Pill, Moon, Activity, Timer, Smile, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -26,6 +27,13 @@ const Saude = () => {
   const navigate = useNavigate();
   const today = todayStr();
   const [activeTab, setActiveTab] = useState("agora");
+
+  // BMI
+  const [bmiHeight, setBmiHeight] = usePersistedState("saude-bmi-height", "");
+  const [bmiWeight, setBmiWeight] = usePersistedState("saude-bmi-weight", "");
+  const bmi = bmiHeight && bmiWeight ? (Number(bmiWeight) / Math.pow(Number(bmiHeight) / 100, 2)).toFixed(1) : null;
+  const bmiCategory = bmi ? (Number(bmi) < 18.5 ? "Abaixo" : Number(bmi) < 25 ? "Normal ✅" : Number(bmi) < 30 ? "Sobrepeso" : "Obesidade") : "";
+  const bmiColor = bmi ? (Number(bmi) < 18.5 ? "text-blue-500" : Number(bmi) < 25 ? "text-green-500" : Number(bmi) < 30 ? "text-yellow-500" : "text-red-500") : "";
 
   // Compute health score from all signals
   const [waterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
@@ -64,7 +72,7 @@ const Saude = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-lg">≡</span>
-          <h1 className="text-base font-bold tracking-tight"><h1 className="text-base font-bold tracking-tight">SAÚDE</h1></h1>
+          <h1 className="text-base font-bold tracking-tight">SAÚDE</h1>
           <span className="ml-auto text-xs text-muted-foreground capitalize">{currentMonth}</span>
           <ThemeToggle />
           <button
@@ -165,6 +173,27 @@ const Saude = () => {
             <HydrationTracker />
             <PharmacyChecklist />
             <FastingTimer />
+
+            {/* BMI Calculator */}
+            <div className="bg-card rounded-xl border border-border p-4">
+              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Activity className="w-4 h-4 text-teal-500" /> CALCULADORA IMC</h3>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-1">
+                  <Input type="number" value={bmiHeight} onChange={e => setBmiHeight(e.target.value)} placeholder="Altura" className="text-xs h-8 w-20" />
+                  <span className="text-xs text-muted-foreground">cm</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Input type="number" value={bmiWeight} onChange={e => setBmiWeight(e.target.value)} placeholder="Peso" className="text-xs h-8 w-20" />
+                  <span className="text-xs text-muted-foreground">kg</span>
+                </div>
+              </div>
+              {bmi && (
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-2xl font-bold">{bmi}</span>
+                  <span className={`text-sm font-bold ${bmiColor}`}>{bmiCategory}</span>
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
 

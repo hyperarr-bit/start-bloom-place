@@ -771,7 +771,7 @@ const DailyJournal = () => {
           <span className="text-xs font-bold text-muted-foreground">🎯 PRIORIDADE PRA AMANHÃ</span>
           <Input
             placeholder="Qual a coisa mais importante pra amanhã?"
-            value={todayEntry.tomorrow}
+            value={entry.tomorrow}
             onChange={e => updateField("tomorrow", e.target.value)}
             className="h-8 text-xs mt-2"
           />

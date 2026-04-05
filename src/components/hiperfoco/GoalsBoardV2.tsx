@@ -445,21 +445,22 @@ export const GoalsBoardV2 = () => {
         <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" />
         <div className="p-4 space-y-3">
           {goal.problems.map((ps, i) => (
-            <div key={ps.id} className="space-y-2 pb-3 border-b border-border/50 last:border-0">
+            <div key={ps.id} className="space-y-1 pb-3 border-b border-border/50 last:border-0">
               <div className="flex items-start gap-2">
-                <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-3 py-2 flex-1">
+                <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-4 py-2.5 flex-1">
                   <input value={ps.problem} onChange={e => {
                     const updated = [...goal.problems]; updated[i] = { ...ps, problem: e.target.value };
                     updateGoal({ ...goal, problems: updated });
                   }} placeholder="Descreva o problema..."
-                    className="bg-transparent text-xs font-bold text-pink-700 dark:text-pink-300 outline-none w-full placeholder:text-pink-300" />
+                    className="bg-transparent text-sm font-bold text-pink-700 dark:text-pink-300 outline-none w-full placeholder:text-pink-300" />
                 </div>
                 <button onClick={() => updateGoal({ ...goal, problems: goal.problems.filter(p => p.id !== ps.id) })}><Trash2 className="w-3 h-3 text-muted-foreground/40" /></button>
               </div>
-              <Textarea value={ps.solution} onChange={e => {
+              <input value={ps.solution} onChange={e => {
                 const updated = [...goal.problems]; updated[i] = { ...ps, solution: e.target.value };
                 updateGoal({ ...goal, problems: updated });
-              }} placeholder="Como resolver?" className="text-xs min-h-[50px] ml-4" />
+              }} placeholder="Como resolver?"
+                className="bg-transparent text-sm outline-none w-full pl-4 py-1 placeholder:text-muted-foreground/40" />
             </div>
           ))}
           <Button size="sm" variant="outline" className="w-full text-xs" onClick={addProblem}>

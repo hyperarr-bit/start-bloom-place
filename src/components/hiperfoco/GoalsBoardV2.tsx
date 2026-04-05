@@ -426,9 +426,9 @@ export const GoalsBoardV2 = () => {
           {[
             { label: "Meta:", field: "meta" as const, ph: "O que quero alcançar?" },
             { label: "Objetivo:", field: "objetivo" as const, ph: "Por que isso é importante?" },
-            { label: "Tempo:", field: "tempo" as const, ph: "Ex: 1 ano, 6 meses..." },
+            { label: "Tempo para bater a meta:", field: "tempo" as const, ph: "Ex: 1 ano, 6 meses..." },
           ].map(({ label, field, ph }, i) => (
-            <div key={field} className={`py-3 ${i < 2 ? "border-b border-border/50" : ""}`}>
+            <div key={field} className="py-3 border-b border-border/50">
               <div className="flex items-start gap-2">
                 <span className="text-sm font-bold text-foreground whitespace-nowrap mt-0.5">{label}</span>
                 <input value={goal.vision[field]} onChange={e => updateGoal({ ...goal, vision: { ...goal.vision, [field]: e.target.value } })}
@@ -436,6 +436,7 @@ export const GoalsBoardV2 = () => {
               </div>
             </div>
           ))}
+          <div className="py-4" />
         </div>
       </div>
 

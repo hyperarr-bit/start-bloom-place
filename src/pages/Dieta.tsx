@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
-  ArrowUp, ArrowDown, Copy, Search, BookOpen
+  ArrowUp, ArrowDown, Copy, Search, BookOpen,
+  ShoppingCart, Send, UtensilsCrossed
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -76,13 +77,16 @@ const Dieta = () => {
   const [checkedIngredients, setCheckedIngredients] = usePersistedState<Record<string, string[]>>("dieta-recipe-checked", {});
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
 
-  // DIÁRIO
+  // DIÁRIO v2
   const [diaryDate, setDiaryDate] = useState(today);
-  const [diaryEntries, setDiaryEntries] = usePersistedState<Record<string, {id: string; text: string; time: string}[]>>("dieta-diary", {});
-  const [newDiaryEntry, setNewDiaryEntry] = useState("");
-  const [diaryFollowed, setDiaryFollowed] = usePersistedState<Record<string, boolean>>("dieta-diary-followed", {});
+  const [diaryData, setDiaryData] = usePersistedState<Record<string, { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }>>("dieta-diary-v2", {});
 
-  const todayEntries = diaryEntries[diaryDate] || [];
+  // LISTA INTELIGENTE
+  const [smartList, setSmartList] = usePersistedState<{ id: string; text: string; done: boolean }[]>("dieta-smart-list", []);
+  const [newSmartItem, setNewSmartItem] = useState("");
+
+  // Casa grocery sync
+  const [casaGrocery, setCasaGrocery] = usePersistedState<any[]>("casa-grocery-categories", []);
 
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }
@@ -98,17 +102,19 @@ const Dieta = () => {
   const formatTime = (secs: number) => { const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60; return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`; };
 
   // Diary helpers
-  const addDiaryEntry = () => {
-    if (!newDiaryEntry.trim()) return;
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
-    const entry = { id: Date.now().toString(), text: newDiaryEntry.trim(), time };
-    setDiaryEntries(prev => ({ ...prev, [diaryDate]: [...(prev[diaryDate] || []), entry] }));
-    setNewDiaryEntry("");
+  const getDiaryDayName = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const dayIndex = d.getDay() === 0 ? 6 : d.getDay() - 1;
+    return weekDays[dayIndex];
   };
 
-  const removeDiaryEntry = (id: string) => {
-    setDiaryEntries(prev => ({ ...prev, [diaryDate]: (prev[diaryDate] || []).filter(e => e.id !== id) }));
+  const getDayDiary = (dateStr: string) => diaryData[dateStr] || { meals: {}, extraFood: { had: false, description: "" } };
+
+  const updateDayDiary = (dateStr: string, updater: (prev: { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }) => typeof prev extends never ? never : any) => {
+    setDiaryData(prev => ({
+      ...prev,
+      [dateStr]: updater(prev[dateStr] || { meals: {}, extraFood: { had: false, description: "" } })
+    }));
   };
 
   const navigateDiaryDate = (offset: number) => {
@@ -125,19 +131,60 @@ const Dieta = () => {
     return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
   };
 
-  // Check how many days have diary entries (streak)
-  const diaryStreak = (() => {
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      const dateStr = d.toISOString().split("T")[0];
-      const entries = diaryEntries[dateStr];
-      if (entries && entries.length > 0) { count++; d.setDate(d.getDate() - 1); }
-      else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
-      else break;
+  // Smart list: generate from meal plan
+  const generateFromMealPlan = () => {
+    const items: string[] = [];
+    weekDays.forEach(day => {
+      const dayMeals = mealPlan[day];
+      if (!dayMeals) return;
+      Object.values(dayMeals).forEach(desc => {
+        if (desc && desc.trim()) {
+          desc.split(/[,\n+]/).forEach(item => {
+            const clean = item.trim().toLowerCase();
+            if (clean && !items.includes(clean)) items.push(clean);
+          });
+        }
+      });
+    });
+    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
+    if (newItems.length > 0) {
+      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
     }
-    return count;
-  })();
+  };
+
+  const generateFromRecipes = () => {
+    const items: string[] = [];
+    recipes.filter(r => r.favorite).forEach(r => {
+      if (r.ingredients) {
+        r.ingredients.split("\n").forEach(line => {
+          const clean = line.trim().toLowerCase();
+          if (clean && !items.includes(clean)) items.push(clean);
+        });
+      }
+    });
+    const newItems = items.filter(item => !smartList.some(s => s.text.toLowerCase() === item));
+    if (newItems.length > 0) {
+      setSmartList(prev => [...prev, ...newItems.map(text => ({ id: Date.now().toString() + Math.random(), text, done: false }))]);
+    }
+  };
+
+  const sendToCasa = () => {
+    const pendingItems = smartList.filter(i => !i.done);
+    if (pendingItems.length === 0) return;
+    setCasaGrocery((prev: any[]) => {
+      const updated = [...prev];
+      // Find or create "Dieta" category
+      let dietaCat = updated.find(c => c.name === "Dieta");
+      if (!dietaCat) {
+        dietaCat = { id: "dieta-auto", name: "Dieta", emoji: "🥗", color: "bg-green-500", items: [] };
+        updated.push(dietaCat);
+      }
+      const existingTexts = dietaCat.items.map((i: any) => i.text.toLowerCase());
+      const newItems = pendingItems.filter(i => !existingTexts.includes(i.text.toLowerCase()));
+      dietaCat.items = [...dietaCat.items, ...newItems.map(i => ({ id: Date.now().toString() + Math.random(), text: i.text, done: false }))];
+      return updated.map(c => c.id === dietaCat!.id ? dietaCat! : c);
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -165,6 +212,7 @@ const Dieta = () => {
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
             <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
+            <TabsTrigger value="lista" className="text-xs px-3 py-1.5">🛒 LISTA</TabsTrigger>
             <TabsTrigger value="diario" className="text-xs px-3 py-1.5">📊 DIÁRIO</TabsTrigger>
           </TabsList>
 
@@ -592,7 +640,107 @@ const Dieta = () => {
             })()}
           </TabsContent>
 
-          {/* ========== DIÁRIO ========== */}
+          {/* ========== LISTA INTELIGENTE ========== */}
+          <TabsContent value="lista" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> LISTA INTELIGENTE</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  {smartList.length > 0 ? `${smartList.filter(i => !i.done).length} itens pendentes` : "Gere a lista a partir do cardápio"}
+                </p>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={generateFromMealPlan}>
+                <Calendar className="w-3 h-3" /> Gerar do Cardápio
+              </Button>
+              <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={generateFromRecipes}>
+                <Heart className="w-3 h-3" /> Gerar das Favoritas
+              </Button>
+            </div>
+
+            {/* Manual add */}
+            <div className="flex gap-2">
+              <Input
+                value={newSmartItem}
+                onChange={e => setNewSmartItem(e.target.value)}
+                placeholder="Adicionar item manualmente..."
+                className="text-xs h-9 flex-1"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newSmartItem.trim()) {
+                    setSmartList(prev => [...prev, { id: Date.now().toString(), text: newSmartItem.trim(), done: false }]);
+                    setNewSmartItem("");
+                  }
+                }}
+              />
+              <Button size="sm" className="h-9" onClick={() => {
+                if (newSmartItem.trim()) {
+                  setSmartList(prev => [...prev, { id: Date.now().toString(), text: newSmartItem.trim(), done: false }]);
+                  setNewSmartItem("");
+                }
+              }}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Items list */}
+            {smartList.length > 0 ? (
+              <div className="bg-card rounded-xl border border-border p-3 space-y-1.5">
+                {smartList.filter(i => !i.done).map(item => (
+                  <div key={item.id} className="flex items-center gap-2 py-1 group">
+                    <Checkbox
+                      checked={false}
+                      onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: true } : i))}
+                    />
+                    <span className="text-xs flex-1 capitalize">{item.text}</span>
+                    <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
+                      <X className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
+                ))}
+                {smartList.some(i => i.done) && (
+                  <>
+                    <div className="border-t border-border my-2" />
+                    <p className="text-[10px] font-bold text-muted-foreground">COMPRADOS</p>
+                    {smartList.filter(i => i.done).map(item => (
+                      <div key={item.id} className="flex items-center gap-2 py-1 group">
+                        <Checkbox
+                          checked={true}
+                          onCheckedChange={() => setSmartList(prev => prev.map(i => i.id === item.id ? { ...i, done: false } : i))}
+                        />
+                        <span className="text-xs flex-1 capitalize line-through text-muted-foreground">{item.text}</span>
+                        <button onClick={() => setSmartList(prev => prev.filter(i => i.id !== item.id))} className="opacity-0 group-hover:opacity-100">
+                          <X className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <ShoppingCart className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                <p className="text-xs text-muted-foreground">Lista vazia</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Use os botões acima para gerar automaticamente</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="text-xs h-9 flex-1 gap-1" onClick={sendToCasa} disabled={smartList.filter(i => !i.done).length === 0}>
+                <Send className="w-3 h-3" /> Enviar para Casa (Mercado)
+              </Button>
+              {smartList.length > 0 && (
+                <Button variant="outline" size="sm" className="text-xs h-9 gap-1" onClick={() => setSmartList(prev => prev.filter(i => !i.done))}>
+                  <Trash2 className="w-3 h-3" /> Limpar ✓
+                </Button>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ========== DIÁRIO v2 ========== */}
           <TabsContent value="diario" className="space-y-4">
             {/* Date navigation */}
             <div className="flex items-center justify-between bg-card rounded-xl border border-border p-3">
@@ -610,111 +758,140 @@ const Dieta = () => {
               </Button>
             </div>
 
-            {/* Follow toggle + stats */}
-            <div className="flex items-center justify-between bg-card rounded-xl border border-border p-3">
-              <div className="flex items-center gap-3">
-                <div>
-                  <p className="text-xs font-bold">Seguiu o cardápio?</p>
-                  <p className="text-[10px] text-muted-foreground">Compare plano vs realidade</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{diaryFollowed[diaryDate] ? "✅ Sim" : "❌ Não"}</span>
-                <Switch
-                  checked={diaryFollowed[diaryDate] || false}
-                  onCheckedChange={(checked) => setDiaryFollowed(prev => ({ ...prev, [diaryDate]: checked }))}
-                />
-              </div>
-            </div>
+            {/* Meal checklist from plan */}
+            {(() => {
+              const dayName = getDiaryDayName(diaryDate);
+              const dayMeals = mealPlan[dayName];
+              const diary = getDayDiary(diaryDate);
+              const plannedMeals = dayMeals ? Object.entries(dayMeals).filter(([, v]) => v && v.trim()) : [];
+              const allFollowed = plannedMeals.length > 0 && plannedMeals.every(([meal]) => diary.meals[meal]?.followed);
 
-            {/* Adherence streak */}
-            <div className="bg-card rounded-xl border border-border p-3">
-              <p className="text-[10px] font-bold text-muted-foreground mb-2">ADERÊNCIA — ÚLTIMOS 7 DIAS</p>
-              <div className="flex gap-1.5">
-                {Array.from({ length: 7 }, (_, i) => {
-                  const d = new Date(); d.setDate(d.getDate() - (6 - i));
-                  const dateStr = d.toISOString().split("T")[0];
-                  const followed = diaryFollowed[dateStr];
-                  const hasEntries = (diaryEntries[dateStr] || []).length > 0;
-                  return (
-                    <div key={i} className="flex-1 text-center">
-                      <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm border ${
-                        followed ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600" :
-                        hasEntries ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600" :
-                        "bg-muted/30 border-border text-muted-foreground"
-                      }`}>
-                        {followed ? "✅" : hasEntries ? "❌" : "—"}
+              return (
+                <>
+                  {plannedMeals.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-muted-foreground">REFEIÇÕES PLANEJADAS ({dayName})</p>
+                        {allFollowed && <Badge className="text-[10px] bg-green-500/10 text-green-600 border-green-300">100% ✅</Badge>}
                       </div>
-                      <p className="text-[9px] text-muted-foreground mt-0.5">
-                        {d.toLocaleDateString("pt-BR", { weekday: "narrow" })}
-                      </p>
+                      {plannedMeals.map(([meal, desc]) => {
+                        const mealDiary = diary.meals[meal] || { followed: false, note: "" };
+                        return (
+                          <div key={meal} className={`bg-card rounded-xl border p-3 space-y-2 ${mealDiary.followed ? "border-green-300 dark:border-green-500/30" : "border-border"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="text-xs font-bold">{mealEmojis[meal] || "🍽️"} {meal}</p>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
+                              </div>
+                              <div className="flex gap-1.5">
+                                <button
+                                  onClick={() => updateDayDiary(diaryDate, prev => ({
+                                    ...prev,
+                                    meals: { ...prev.meals, [meal]: { ...mealDiary, followed: true, note: "" } }
+                                  }))}
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
+                                    mealDiary.followed
+                                      ? "bg-green-100 dark:bg-green-500/20 border-green-400 text-green-600"
+                                      : "bg-muted/30 border-border text-muted-foreground hover:border-green-300"
+                                  }`}
+                                >✅</button>
+                                <button
+                                  onClick={() => updateDayDiary(diaryDate, prev => ({
+                                    ...prev,
+                                    meals: { ...prev.meals, [meal]: { ...mealDiary, followed: false } }
+                                  }))}
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
+                                    !mealDiary.followed && diary.meals[meal]
+                                      ? "bg-red-100 dark:bg-red-500/20 border-red-400 text-red-600"
+                                      : "bg-muted/30 border-border text-muted-foreground hover:border-red-300"
+                                  }`}
+                                >❌</button>
+                              </div>
+                            </div>
+                            {!mealDiary.followed && diary.meals[meal] && (
+                              <Input
+                                value={mealDiary.note}
+                                onChange={e => updateDayDiary(diaryDate, prev => ({
+                                  ...prev,
+                                  meals: { ...prev.meals, [meal]: { ...mealDiary, note: e.target.value } }
+                                }))}
+                                placeholder="Por que não comeu?"
+                                className="text-xs h-8"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  ) : (
+                    <div className="bg-muted/30 rounded-xl border border-border p-4 text-center">
+                      <UtensilsCrossed className="w-6 h-6 mx-auto text-muted-foreground/40 mb-2" />
+                      <p className="text-xs text-muted-foreground">Nenhuma refeição planejada para {dayName}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Adicione refeições na aba Cardápio</p>
+                    </div>
+                  )}
 
-            {/* Add entry */}
-            <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-              <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
-                <BookOpen className="w-3 h-3" /> O QUE VOCÊ COMEU?
-              </p>
-              <div className="flex gap-2">
-                <Input
-                  value={newDiaryEntry}
-                  onChange={e => setNewDiaryEntry(e.target.value)}
-                  placeholder="Ex: 2 ovos + café com leite"
-                  className="text-xs h-9 flex-1"
-                  onKeyDown={e => { if (e.key === "Enter") addDiaryEntry(); }}
-                />
-                <Button size="sm" className="h-9" onClick={addDiaryEntry} disabled={!newDiaryEntry.trim()}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Today's planned menu hint */}
-              {(() => {
-                const todayDayName = weekDays[new Date(diaryDate).getDay() === 0 ? 6 : new Date(diaryDate).getDay() - 1];
-                const todayMenu = mealPlan[todayDayName];
-                const hasMenu = todayMenu && Object.values(todayMenu).some(v => v && v.trim());
-                if (!hasMenu) return null;
-                return (
-                  <div className="bg-muted/30 rounded-lg p-2 border border-border">
-                    <p className="text-[10px] font-bold text-muted-foreground mb-1">📋 CARDÁPIO PLANEJADO ({todayDayName}):</p>
-                    {Object.entries(todayMenu).filter(([, v]) => v && v.trim()).map(([meal, desc]) => (
-                      <p key={meal} className="text-[10px] text-muted-foreground">
-                        <span className="font-medium">{meal}:</span> {desc}
-                      </p>
-                    ))}
+                  {/* Extra food section */}
+                  <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold">Comeu algo fora da dieta?</p>
+                        <p className="text-[10px] text-muted-foreground">Registre qualquer "furo" sem culpa 😊</p>
+                      </div>
+                      <Switch
+                        checked={diary.extraFood.had}
+                        onCheckedChange={checked => updateDayDiary(diaryDate, prev => ({
+                          ...prev,
+                          extraFood: { ...prev.extraFood, had: checked, description: checked ? prev.extraFood.description : "" }
+                        }))}
+                      />
+                    </div>
+                    {diary.extraFood.had && (
+                      <Input
+                        value={diary.extraFood.description}
+                        onChange={e => updateDayDiary(diaryDate, prev => ({
+                          ...prev,
+                          extraFood: { ...prev.extraFood, description: e.target.value }
+                        }))}
+                        placeholder="O que comeu? (ex: bolo na festa)"
+                        className="text-xs h-8"
+                      />
+                    )}
                   </div>
-                );
-              })()}
-            </div>
 
-            {/* Entries list */}
-            {todayEntries.length > 0 ? (
-              <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold text-muted-foreground">REGISTROS DO DIA</p>
-                  <Badge variant="secondary" className="text-[10px]">{todayEntries.length} itens</Badge>
-                </div>
-                {todayEntries.map(entry => (
-                  <div key={entry.id} className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2 border border-border group">
-                    <span className="text-[10px] text-muted-foreground font-mono shrink-0">{entry.time}</span>
-                    <span className="text-xs flex-1">{entry.text}</span>
-                    <button onClick={() => removeDiaryEntry(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-                    </button>
+                  {/* 7-day adherence */}
+                  <div className="bg-card rounded-xl border border-border p-3">
+                    <p className="text-[10px] font-bold text-muted-foreground mb-2">ADERÊNCIA — ÚLTIMOS 7 DIAS</p>
+                    <div className="flex gap-1.5">
+                      {Array.from({ length: 7 }, (_, i) => {
+                        const d = new Date(); d.setDate(d.getDate() - (6 - i));
+                        const dateStr = d.toISOString().split("T")[0];
+                        const dayDiary = getDayDiary(dateStr);
+                        const dayNameCheck = getDiaryDayName(dateStr);
+                        const dayMealsCheck = mealPlan[dayNameCheck];
+                        const planned = dayMealsCheck ? Object.entries(dayMealsCheck).filter(([, v]) => v && v.trim()) : [];
+                        const allGood = planned.length > 0 && planned.every(([m]) => dayDiary.meals[m]?.followed);
+                        const anyMarked = planned.some(([m]) => dayDiary.meals[m]);
+                        return (
+                          <div key={i} className="flex-1 text-center">
+                            <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm border ${
+                              allGood ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600" :
+                              anyMarked ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600" :
+                              "bg-muted/30 border-border text-muted-foreground"
+                            }`}>
+                              {allGood ? "✅" : anyMarked ? "❌" : "—"}
+                            </div>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">
+                              {d.toLocaleDateString("pt-BR", { weekday: "narrow" })}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <BookOpen className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground">Nenhum registro para este dia</p>
-                <p className="text-[10px] text-muted-foreground mt-1">Adicione o que você comeu acima ☝️</p>
-              </div>
-            )}
+                </>
+              );
+            })()}
           </TabsContent>
         </Tabs>
       </main>

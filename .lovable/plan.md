@@ -1,55 +1,29 @@
 
 
-# Plano: Lista Inteligente + Diário baseado no Cardápio
+# Plano: Horários até 0:00 + Diário/Revisão persistentes por data
 
-## 1. Aba 🛒 LISTA INTELIGENTE
+## Mudanças
 
-Nova aba no módulo Dieta que gera lista de compras automaticamente a partir do cardápio semanal e das receitas, e sincroniza com o módulo Casa (GroceryList).
-
-**Como funciona:**
-- Botão "Gerar lista da semana" — varre `mealPlan` e extrai todos os itens preenchidos nos 7 dias
-- Botão "Gerar das receitas favoritas" — puxa ingredientes das receitas marcadas como favoritas
-- Os itens gerados aparecem numa lista com checkboxes para marcar como comprado
-- Botão "Enviar para Mercado (Casa)" — copia os itens para o estado `casa-grocery-categories` que o `GroceryList.tsx` do módulo Casa usa, assim aparece lá automaticamente
-- O usuário pode adicionar itens manuais também
-- Badge mostrando quantos itens faltam comprar
-
-**Compartilhamento com Casa:**
-- A lista inteligente lê e escreve no mesmo key `casa-grocery-categories` do `usePersistedState` que o `GroceryList.tsx` usa
-- Isso garante que quando o usuário vai no módulo Casa > Mercado, os itens já estão lá
-
-## 2. Aba 📊 DIÁRIO — Redesign
-
-Trocar o formato atual (input de texto livre) por um formato baseado no cardápio planejado.
-
-**Nova estrutura:**
-- Puxa automaticamente as refeições do dia (do `mealPlan` baseado no dia da semana)
-- Cada refeição aparece como um card com:
-  - Nome da refeição + o que estava planejado
-  - Botão ✅ (comeu) ou ❌ (não comeu)
-  - Se ❌: campo de texto aparece para "Por que não comeu?"
-- Seção extra no final: **"Comeu algo fora da dieta?"**
-  - Toggle Sim/Não
-  - Se Sim: campo de texto para descrever (ex: "comi um bolo na festa")
-- Manter o streak de aderência dos 7 dias
-- Manter a navegação por data
-
-**Dados:**
-- Novo formato de estado: `dieta-diary-v2` com estrutura por data:
+### 1. Rotina semanal — horários até 0:00
+**Linha 19-22**: Expandir o array `hours` para incluir todos os horários até meia-noite:
 ```text
-{
-  "2026-04-05": {
-    meals: { "Café da Manhã": { followed: true, note: "" }, ... },
-    extraFood: { had: false, description: "" }
-  }
-}
+ANTES: "6:00" ... "19:00", "19:30"
+DEPOIS: "6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "0:00"
 ```
+
+### 2. Diário — salvar por data e navegar entre dias passados
+Atualmente o `DailyJournal` só mostra "hoje" (`getDateKey()`). Depois que o dia passa, o usuário não consegue ver o que escreveu.
+
+**Solução**: Adicionar navegação por data no Diário (botões ← →  e exibição da data). Os dados já estão salvos por chave de data no `journal-entries`, só falta a navegação para acessar dias anteriores. O campo continua editável para dias passados.
+
+### 3. Revisão — salvar por semana e navegar entre semanas passadas
+Atualmente o `WeeklyReview` só mostra a semana atual (`getWeekKey()`). Semana passada some.
+
+**Solução**: Adicionar navegação por semana (botões ← →) no componente `WeeklyReview`. Os dados já estão salvos por chave de semana no `weekly-reviews`, só falta a UI de navegação.
 
 ## Alterações
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/pages/Dieta.tsx` | (1) Adicionar aba 🛒 LISTA com geração automática a partir do cardápio e receitas, checkboxes, e botão "Enviar para Casa". (2) Redesenhar aba DIÁRIO: puxar refeições do cardápio, mostrar ✅/❌ por refeição, campo de observação quando ❌, seção "comeu fora da dieta". (3) Substituir estados antigos do diário (`diaryEntries`, `newDiaryEntry`) por novo formato `dieta-diary-v2`. (4) Adicionar import de ícones necessários (`ShoppingCart`, `Send`). |
-
-Resultado: 5 abas — 🍽️ CARDÁPIO | ⏱️ JEJUM | 👩‍🍳 RECEITAS | 🛒 LISTA | 📊 DIÁRIO
+| `src/pages/Rotina.tsx` | (1) Expandir `hours` até "0:00". (2) No `DailyJournal`: adicionar estado `selectedDate` com navegação ← → entre dias, mostrando a data formatada. (3) No `WeeklyReview`: adicionar estado `weekOffset` com navegação ← → entre semanas, mostrando o intervalo de datas da semana. |
 

@@ -179,50 +179,16 @@ export const GoalsBoardV2 = () => {
         </div>
 
         {/* TIMELINE CARDS */}
-        {PERIODS.map(({ key, label, color }) => {
-          const period = timeline[key];
-          const imgRef = useRef<HTMLInputElement>(null);
-          return (
-            <div key={key} className="rounded-xl border border-border overflow-hidden bg-card">
-              {/* Colored header */}
-              <div className="flex items-center justify-center" style={{ background: color, minHeight: 72 }}>
-                <span className="text-4xl">⏱</span>
-              </div>
-              <div className="px-5 py-4 space-y-3">
-                <h3 className="text-lg font-black tracking-tight text-center">{label}</h3>
-                {/* Items */}
-                {period.items.map(item => (
-                  <div key={item.id} className="flex items-center gap-3 group/item">
-                    <CircleCheck checked={item.done} onToggle={() => toggleTimelineItem(key, item.id)} />
-                    <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
-                    <button onClick={() => removeTimelineItem(key, item.id)} className="opacity-0 group-hover/item:opacity-100 text-muted-foreground/40 hover:text-destructive">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {/* Inline add */}
-                <TimelineInput onAdd={(text) => addTimelineItem(key, text)} />
-                {/* Image */}
-                {period.image ? (
-                  <div className="relative group/img rounded-lg overflow-hidden">
-                    <img src={period.image} alt="" className="w-full h-40 object-cover rounded-lg" />
-                    <button onClick={() => setTimeline(prev => ({ ...prev, [key]: { ...prev[key], image: undefined } }))}
-                      className="absolute top-2 right-2 bg-black/60 rounded-full p-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => imgRef.current?.click()}
-                    className="w-full h-28 rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground/50 hover:border-muted-foreground/40 transition-colors">
-                    <ImagePlus className="w-5 h-5" />
-                    <span className="text-[10px]">Adicionar imagem</span>
-                  </button>
-                )}
-                <input ref={imgRef} type="file" accept="image/*" className="hidden" onChange={e => handleTimelineImage(key, e)} />
-              </div>
-            </div>
-          );
-        })}
+        {PERIODS.map(({ key, label, color }) => (
+          <TimelineCard key={key} periodKey={key} label={label} color={color}
+            period={timeline[key]}
+            onToggle={(id) => toggleTimelineItem(key, id)}
+            onRemove={(id) => removeTimelineItem(key, id)}
+            onAdd={(text) => addTimelineItem(key, text)}
+            onImageChange={(e) => handleTimelineImage(key, e)}
+            onImageRemove={() => setTimeline(prev => ({ ...prev, [key]: { ...prev[key], image: undefined } }))}
+          />
+        ))}
 
         {/* MURAL DOS SONHOS */}
         <div className="rounded-xl border border-border overflow-hidden bg-card">

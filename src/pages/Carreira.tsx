@@ -429,6 +429,7 @@ const InterviewPrep = () => {
 // ============= MAIN =============
 const Carreira = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const [jobs] = usePersistedState<JobApp[]>("career-jobs", DEFAULT_JOBS);
   const [skills] = usePersistedState<Skill[]>("career-skills", DEFAULT_SKILLS);
   const [contacts] = usePersistedState<Contact[]>("career-contacts", DEFAULT_CONTACTS);

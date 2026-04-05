@@ -68,6 +68,7 @@ const TABS = [
 
 const Estudos = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   // CURSOS
   const [cursosAndamento, setCursosAndamento] = usePersistedState<Course[]>("estudos-cursos-andamento", []);

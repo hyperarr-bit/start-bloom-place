@@ -49,6 +49,7 @@ const moodOptions = [
 
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);

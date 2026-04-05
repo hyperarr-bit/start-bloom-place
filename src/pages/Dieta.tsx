@@ -44,6 +44,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 
 const Dieta = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
 
   // Configurable meals

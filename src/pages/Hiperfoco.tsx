@@ -11,6 +11,7 @@ import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 
 const Hiperfoco = () => {
+  const navigate = useNavigate();
   const reportTab = useTabReporter();
 
   return (

@@ -13,6 +13,8 @@ export const useSetTrackedTab = (tabId: string) => {
   }, [tabId, report]);
 };
 
+export const useTabReporter = () => useContext(TabTrackContext);
+
 export const useModuleTracker = (moduleId: string) => {
   const { user } = useAuth();
   const enteredAt = useRef<Date>(new Date());

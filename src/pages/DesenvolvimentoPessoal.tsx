@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -48,6 +49,7 @@ const moodOptions = [
 
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);
@@ -211,7 +213,7 @@ const DesenvolvimentoPessoal = () => {
             "Crie afirmações positivas e leia-as diariamente"
           ]}
         />
-        <Tabs defaultValue="sobre" className="w-full">
+        <Tabs defaultValue="sobre" className="w-full" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             {[
               { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" },

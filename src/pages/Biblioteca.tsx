@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash } from "lucide-react";
@@ -102,6 +103,7 @@ const Biblioteca = () => {
   const [books, setBooks] = usePersistedState<Book[]>("lib-books", []);
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
   const [tab, setTab] = useState("lendo");
+  useSetTrackedTab(tab);
 
   // ── Form State ──
   const [showForm, setShowForm] = useState(false);

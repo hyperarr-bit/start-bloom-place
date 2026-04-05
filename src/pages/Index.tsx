@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -34,6 +35,7 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 const Index = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
+  useSetTrackedTab(activeTab);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
 
   const [incomes, setIncomes] = usePersistedState("finance-incomes", [] as any[]);

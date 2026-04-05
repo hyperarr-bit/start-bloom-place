@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Sparkles, FlaskConical, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +11,7 @@ import { ModuleTip } from "@/components/ModuleTip";
 
 const Beleza = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -43,7 +45,7 @@ const Beleza = () => {
         <DailyMirror />
 
         {/* Tabs */}
-        <Tabs defaultValue="routine">
+        <Tabs defaultValue="routine" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="routine" className="text-xs gap-1">
               <Sparkles className="w-3.5 h-3.5" /> Rotina

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, Home, Droplets, ShoppingCart, UtensilsCrossed, Wrench, Leaf, Users, ShieldCheck, Settings, DoorOpen, Apple, SprayCan } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ const tabs = [
 
 const Casa = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const [cleaningTasks] = usePersistedState<{id: string; lastDone: string; frequencyDays: number}[]>("casa-cleaning", []);
   const [pantryItems] = usePersistedState<{id: string; status: string}[]>("casa-pantry", []);
   const [plants] = usePersistedState<{id: string}[]>("casa-plants", []);
@@ -103,7 +105,7 @@ const Casa = () => {
           </div>
         </div>
 
-          <Tabs defaultValue="comodos" className="w-full">
+          <Tabs defaultValue="comodos" className="w-full" onValueChange={v => reportTab?.(v)}>
           <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
             <TabsList className="inline-flex w-auto min-w-full">
               {tabs.map(t => (

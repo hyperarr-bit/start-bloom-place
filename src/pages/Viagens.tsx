@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane, Compass, Map, Package, Users, MapPin, DollarSign, BookOpen, Shield, ArrowRightLeft, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,6 +30,7 @@ const TABS = [
 
 const Viagens = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -58,7 +60,7 @@ const Viagens = () => {
           ]}
         />
 
-        <Tabs defaultValue="destinos">
+        <Tabs defaultValue="destinos" onValueChange={v => reportTab?.(v)}>
           <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
             <TabsList className="inline-flex w-auto min-w-full">
               {TABS.map(tab => (

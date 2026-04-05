@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, PawPrint } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +11,7 @@ import { PetDiary } from "@/components/pet/PetDiary";
 
 const Pet = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -40,7 +42,7 @@ const Pet = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
         >
-          <Tabs defaultValue="pets" className="w-full">
+          <Tabs defaultValue="pets" className="w-full" onValueChange={v => reportTab?.(v)}>
             <TabsList className="w-full grid grid-cols-5">
               <TabsTrigger value="pets" className="text-[10px]">🐾 PETS</TabsTrigger>
               <TabsTrigger value="saude" className="text-[10px]">💉 SAÚDE</TabsTrigger>

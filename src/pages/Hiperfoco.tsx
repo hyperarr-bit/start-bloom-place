@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Brain } from "lucide-react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +12,7 @@ import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 
 const Hiperfoco = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -41,7 +43,7 @@ const Hiperfoco = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
         >
-          <Tabs defaultValue="dia" className="w-full">
+          <Tabs defaultValue="dia" className="w-full" onValueChange={v => reportTab?.(v)}>
             <TabsList className="w-full grid grid-cols-6">
               <TabsTrigger value="dia" className="text-[10px]">DIA</TabsTrigger>
               <TabsTrigger value="busca" className="text-[10px]">BUSCA</TabsTrigger>

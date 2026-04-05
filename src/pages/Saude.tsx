@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
@@ -23,6 +24,7 @@ const tabs = [
 const Saude = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
+  useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   return (

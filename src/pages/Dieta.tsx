@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
@@ -43,6 +44,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 
 const Dieta = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
 
   // Configurable meals
@@ -207,7 +209,7 @@ const Dieta = () => {
             "Use o 📊 DIÁRIO para registrar o que você comeu de verdade e compare com o plano"
           ]}
         />
-        <Tabs defaultValue="cardapio" className="w-full">
+        <Tabs defaultValue="cardapio" className="w-full" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>

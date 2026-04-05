@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -428,6 +429,7 @@ const InterviewPrep = () => {
 // ============= MAIN =============
 const Carreira = () => {
   const navigate = useNavigate();
+  const reportTab = useTabReporter();
   const [jobs] = usePersistedState<JobApp[]>("career-jobs", DEFAULT_JOBS);
   const [skills] = usePersistedState<Skill[]>("career-skills", DEFAULT_SKILLS);
   const [contacts] = usePersistedState<Contact[]>("career-contacts", DEFAULT_CONTACTS);
@@ -495,7 +497,7 @@ const Carreira = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="jobs">
+        <Tabs defaultValue="jobs" onValueChange={v => reportTab?.(v)}>
           <TabsList className="w-full grid grid-cols-5">
             <TabsTrigger value="jobs" className="text-[10px] gap-0.5"><Briefcase className="w-3 h-3" />Vagas</TabsTrigger>
             <TabsTrigger value="portfolio" className="text-[10px] gap-0.5"><Award className="w-3 h-3" />Portfolio</TabsTrigger>

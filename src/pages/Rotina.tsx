@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -961,6 +962,7 @@ const WeeklyReview = () => {
 const Rotina = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  useSetTrackedTab(activeTab);
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);

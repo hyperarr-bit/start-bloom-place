@@ -88,10 +88,7 @@ const DesenvolvimentoPessoal = () => {
   const [newBookTitle, setNewBookTitle] = useState("");
   const [newBookAuthor, setNewBookAuthor] = useState("");
 
-  // VISÃO
-  const [visionItems, setVisionItems] = usePersistedState<{id: string; category: string; text: string}[]>("dp-vision", []);
-  const [newVisionText, setNewVisionText] = useState("");
-  const [newVisionCategory, setNewVisionCategory] = useState("carreira");
+  // VISÃO — movido para GoalsBoardV2
 
   // === NEW: JOURNALING ===
   const [journalEntries, setJournalEntries] = usePersistedState<Record<string, { text: string; prompt: string }>> ("dp-journal", {});

@@ -3,7 +3,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+
 
 /* ─── Types ─── */
 interface TaskItem { id: string; text: string; done: boolean }
@@ -52,10 +52,10 @@ const PERIODS: { key: keyof TimelineData; label: string; color: string }[] = [
 /* ─── Shared components ─── */
 const CircleCheck = ({ checked, onToggle }: { checked: boolean; onToggle: () => void }) => (
   <button onClick={onToggle}
-    className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+    className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 transition-all ${
       checked ? "bg-[hsl(217,91%,60%)] border-[hsl(217,91%,60%)]" : "border-muted-foreground/30 hover:border-[hsl(217,91%,60%)]"
     }`}>
-    {checked && <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>}
+    {checked && <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M5 13l4 4L19 7" /></svg>}
   </button>
 );
 
@@ -264,10 +264,14 @@ export const GoalsBoardV2 = () => {
   };
 
   const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
-    <div className="relative px-5 py-6 flex items-end justify-between overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
-      <h3 className="text-lg font-black tracking-tight text-foreground">{title}</h3>
-      <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
-    </div>
+    <>
+      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+        <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
+      </div>
+      <div className="px-5 pt-4 pb-2">
+        <h3 className="text-lg font-black tracking-tight text-foreground">{title}</h3>
+      </div>
+    </>
   );
 
   const DetailTaskInput = ({ groupId }: { groupId: string }) => {
@@ -285,26 +289,41 @@ export const GoalsBoardV2 = () => {
 
   return (
     <div className="space-y-4">
-      {/* Back + title */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setView("home")} className="p-2 rounded-xl hover:bg-muted transition-colors active:scale-95">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1">
+      {/* Back */}
+      <button onClick={() => setView("home")} className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-xs">
+        <ChevronLeft className="w-4 h-4" /> voltar
+      </button>
+
+      {/* Title with dropdown */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {editingTitle ? (
             <input value={goal.title} onChange={e => updateGoal({ ...goal, title: e.target.value })}
               onBlur={() => setEditingTitle(false)} onKeyDown={e => e.key === "Enter" && setEditingTitle(false)}
               autoFocus className="w-full bg-transparent text-xl font-black tracking-tight outline-none border-b-2 border-primary pb-1" />
           ) : (
-            <button onClick={() => setEditingTitle(true)} className="text-xl font-black tracking-tight truncate">{goal.title}</button>
+            <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center gap-2 text-xl font-black tracking-tight truncate">
+              {goal.title} <span className="text-muted-foreground">→</span> <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
           )}
         </div>
         {goals.length > 1 && (
-          <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10 text-muted-foreground" onClick={deleteGoal}>
+          <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground" onClick={deleteGoal}>
             <Trash2 className="w-4 h-4" />
           </Button>
         )}
       </div>
+      {/* Goal switcher dropdown */}
+      {showDropdown && (
+        <div className="rounded-xl border border-border bg-card p-2 space-y-1">
+          {goals.map(g => (
+            <button key={g.id} onClick={() => { setSelectedGoalId(g.id); setShowDropdown(false); }}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${g.id === goal.id ? "bg-muted font-bold" : "hover:bg-muted/50"}`}>
+              {g.title}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* HERO IMAGE */}
       <div className="relative w-full rounded-xl overflow-hidden bg-muted/30 border border-border cursor-pointer group"
@@ -333,10 +352,10 @@ export const GoalsBoardV2 = () => {
             const total = group.tasks.length;
             return (
               <div key={group.id} className="space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-3 py-2 flex-1">
-                    <span className="text-xs font-bold text-pink-700 dark:text-pink-300">{group.label}</span>
-                    {total > 0 && <span className="text-[10px] text-pink-500 dark:text-pink-400 ml-2">{doneCount}/{total}</span>}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-4 py-2.5 flex-1">
+                    <span className="text-sm font-bold text-pink-700 dark:text-pink-300">{group.label}</span>
+                    {total > 0 && <span className="text-xs text-pink-500 dark:text-pink-400 ml-2">{doneCount}/{total}</span>}
                   </div>
                   <button onClick={() => removeGroup(group.id)} className="text-muted-foreground/40 hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
                 </div>
@@ -407,9 +426,9 @@ export const GoalsBoardV2 = () => {
           {[
             { label: "Meta:", field: "meta" as const, ph: "O que quero alcançar?" },
             { label: "Objetivo:", field: "objetivo" as const, ph: "Por que isso é importante?" },
-            { label: "Tempo:", field: "tempo" as const, ph: "Ex: 1 ano, 6 meses..." },
+            { label: "Tempo para bater a meta:", field: "tempo" as const, ph: "Ex: 1 ano, 6 meses..." },
           ].map(({ label, field, ph }, i) => (
-            <div key={field} className={`py-3 ${i < 2 ? "border-b border-border/50" : ""}`}>
+            <div key={field} className="py-3 border-b border-border/50">
               <div className="flex items-start gap-2">
                 <span className="text-sm font-bold text-foreground whitespace-nowrap mt-0.5">{label}</span>
                 <input value={goal.vision[field]} onChange={e => updateGoal({ ...goal, vision: { ...goal.vision, [field]: e.target.value } })}
@@ -417,6 +436,7 @@ export const GoalsBoardV2 = () => {
               </div>
             </div>
           ))}
+          <div className="py-4" />
         </div>
       </div>
 
@@ -425,21 +445,22 @@ export const GoalsBoardV2 = () => {
         <SectionHeader emoji="😅" title="PROBLEMAS E SOLUÇÕES" />
         <div className="p-4 space-y-3">
           {goal.problems.map((ps, i) => (
-            <div key={ps.id} className="space-y-2 pb-3 border-b border-border/50 last:border-0">
+            <div key={ps.id} className="space-y-1 pb-3 border-b border-border/50 last:border-0">
               <div className="flex items-start gap-2">
-                <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-3 py-2 flex-1">
+                <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-4 py-2.5 flex-1">
                   <input value={ps.problem} onChange={e => {
                     const updated = [...goal.problems]; updated[i] = { ...ps, problem: e.target.value };
                     updateGoal({ ...goal, problems: updated });
                   }} placeholder="Descreva o problema..."
-                    className="bg-transparent text-xs font-bold text-pink-700 dark:text-pink-300 outline-none w-full placeholder:text-pink-300" />
+                    className="bg-transparent text-sm font-bold text-pink-700 dark:text-pink-300 outline-none w-full placeholder:text-pink-300" />
                 </div>
                 <button onClick={() => updateGoal({ ...goal, problems: goal.problems.filter(p => p.id !== ps.id) })}><Trash2 className="w-3 h-3 text-muted-foreground/40" /></button>
               </div>
-              <Textarea value={ps.solution} onChange={e => {
+              <input value={ps.solution} onChange={e => {
                 const updated = [...goal.problems]; updated[i] = { ...ps, solution: e.target.value };
                 updateGoal({ ...goal, problems: updated });
-              }} placeholder="Como resolver?" className="text-xs min-h-[50px] ml-4" />
+              }} placeholder="Como resolver?"
+                className="bg-transparent text-sm outline-none w-full pl-4 py-1 placeholder:text-muted-foreground/40" />
             </div>
           ))}
           <Button size="sm" variant="outline" className="w-full text-xs" onClick={addProblem}>

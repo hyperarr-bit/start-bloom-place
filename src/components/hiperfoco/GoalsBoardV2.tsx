@@ -352,10 +352,10 @@ export const GoalsBoardV2 = () => {
             const total = group.tasks.length;
             return (
               <div key={group.id} className="space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-3 py-2 flex-1">
-                    <span className="text-xs font-bold text-pink-700 dark:text-pink-300">{group.label}</span>
-                    {total > 0 && <span className="text-[10px] text-pink-500 dark:text-pink-400 ml-2">{doneCount}/{total}</span>}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="border-l-4 border-pink-400 bg-pink-50 dark:bg-pink-500/10 rounded-r-md px-4 py-2.5 flex-1">
+                    <span className="text-sm font-bold text-pink-700 dark:text-pink-300">{group.label}</span>
+                    {total > 0 && <span className="text-xs text-pink-500 dark:text-pink-400 ml-2">{doneCount}/{total}</span>}
                   </div>
                   <button onClick={() => removeGroup(group.id)} className="text-muted-foreground/40 hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
                 </div>

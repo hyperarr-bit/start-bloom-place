@@ -289,26 +289,41 @@ export const GoalsBoardV2 = () => {
 
   return (
     <div className="space-y-4">
-      {/* Back + title */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setView("home")} className="p-2 rounded-xl hover:bg-muted transition-colors active:scale-95">
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <div className="flex-1">
+      {/* Back */}
+      <button onClick={() => setView("home")} className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-xs">
+        <ChevronLeft className="w-4 h-4" /> voltar
+      </button>
+
+      {/* Title with dropdown */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           {editingTitle ? (
             <input value={goal.title} onChange={e => updateGoal({ ...goal, title: e.target.value })}
               onBlur={() => setEditingTitle(false)} onKeyDown={e => e.key === "Enter" && setEditingTitle(false)}
               autoFocus className="w-full bg-transparent text-xl font-black tracking-tight outline-none border-b-2 border-primary pb-1" />
           ) : (
-            <button onClick={() => setEditingTitle(true)} className="text-xl font-black tracking-tight truncate">{goal.title}</button>
+            <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center gap-2 text-xl font-black tracking-tight truncate">
+              {goal.title} <span className="text-muted-foreground">→</span> <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
           )}
         </div>
         {goals.length > 1 && (
-          <Button size="icon" variant="ghost" className="shrink-0 h-10 w-10 text-muted-foreground" onClick={deleteGoal}>
+          <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground" onClick={deleteGoal}>
             <Trash2 className="w-4 h-4" />
           </Button>
         )}
       </div>
+      {/* Goal switcher dropdown */}
+      {showDropdown && (
+        <div className="rounded-xl border border-border bg-card p-2 space-y-1">
+          {goals.map(g => (
+            <button key={g.id} onClick={() => { setSelectedGoalId(g.id); setShowDropdown(false); }}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${g.id === goal.id ? "bg-muted font-bold" : "hover:bg-muted/50"}`}>
+              {g.title}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* HERO IMAGE */}
       <div className="relative w-full rounded-xl overflow-hidden bg-muted/30 border border-border cursor-pointer group"

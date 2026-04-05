@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
-  TrendingUp, Target, Zap, Activity, Flame, Apple, ShoppingCart,
-  ChefHat, Calendar, Star, BookOpen, Heart, Settings, Edit3,
-  ArrowUp, ArrowDown, Copy, Search
+  Apple, ChefHat, Calendar, Heart, Settings,
+  ArrowUp, ArrowDown, Copy, Search, BookOpen
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -15,60 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
-
-
-const FOOD_DATABASE: { name: string; cal: number; prot: number; carb: number; fat: number; portion: string }[] = [
-  { name: "Arroz branco", cal: 130, prot: 2.7, carb: 28, fat: 0.3, portion: "100g" },
-  { name: "Feijão carioca", cal: 76, prot: 4.8, carb: 13.6, fat: 0.5, portion: "100g" },
-  { name: "Frango grelhado", cal: 165, prot: 31, carb: 0, fat: 3.6, portion: "100g" },
-  { name: "Ovo cozido", cal: 155, prot: 13, carb: 1.1, fat: 11, portion: "100g (2 un)" },
-  { name: "Banana", cal: 89, prot: 1.1, carb: 23, fat: 0.3, portion: "1 un (100g)" },
-  { name: "Pão francês", cal: 150, prot: 4, carb: 30, fat: 1.5, portion: "1 un (50g)" },
-  { name: "Batata doce", cal: 86, prot: 1.6, carb: 20, fat: 0.1, portion: "100g" },
-  { name: "Carne bovina (patinho)", cal: 219, prot: 35, carb: 0, fat: 7.3, portion: "100g" },
-  { name: "Leite integral", cal: 60, prot: 3.2, carb: 4.7, fat: 3.3, portion: "200ml" },
-  { name: "Queijo minas", cal: 264, prot: 17, carb: 3, fat: 20, portion: "100g" },
-  { name: "Iogurte natural", cal: 61, prot: 3.5, carb: 4.7, fat: 3.3, portion: "170g" },
-  { name: "Aveia em flocos", cal: 389, prot: 17, carb: 66, fat: 7, portion: "100g" },
-  { name: "Maçã", cal: 52, prot: 0.3, carb: 14, fat: 0.2, portion: "1 un (130g)" },
-  { name: "Whey Protein", cal: 120, prot: 24, carb: 3, fat: 1.5, portion: "1 scoop (30g)" },
-  { name: "Amendoim torrado", cal: 567, prot: 26, carb: 16, fat: 49, portion: "100g" },
-  { name: "Pasta de amendoim", cal: 588, prot: 25, carb: 20, fat: 50, portion: "100g" },
-  { name: "Azeite de oliva", cal: 108, prot: 0, carb: 0, fat: 12, portion: "1 col sopa" },
-  { name: "Brócolis cozido", cal: 35, prot: 2.4, carb: 7, fat: 0.4, portion: "100g" },
-  { name: "Tomate", cal: 18, prot: 0.9, carb: 3.9, fat: 0.2, portion: "1 un (100g)" },
-  { name: "Alface", cal: 15, prot: 1.4, carb: 2.9, fat: 0.2, portion: "100g" },
-  { name: "Mandioca cozida", cal: 125, prot: 0.6, carb: 30, fat: 0.2, portion: "100g" },
-  { name: "Macarrão cozido", cal: 131, prot: 5, carb: 25, fat: 1.1, portion: "100g" },
-  { name: "Salmão grelhado", cal: 208, prot: 20, carb: 0, fat: 13, portion: "100g" },
-  { name: "Atum em lata", cal: 116, prot: 26, carb: 0, fat: 0.8, portion: "100g" },
-  { name: "Abacate", cal: 160, prot: 2, carb: 9, fat: 15, portion: "100g" },
-  { name: "Granola", cal: 471, prot: 10, carb: 64, fat: 20, portion: "100g" },
-  { name: "Tapioca", cal: 68, prot: 0, carb: 17, fat: 0, portion: "1 un (20g)" },
-  { name: "Cuscuz", cal: 112, prot: 3, carb: 23, fat: 0.6, portion: "100g" },
-  { name: "Mamão", cal: 40, prot: 0.5, carb: 10, fat: 0.1, portion: "100g" },
-  { name: "Laranja", cal: 47, prot: 0.9, carb: 12, fat: 0.1, portion: "1 un (130g)" },
-  { name: "Café com leite", cal: 45, prot: 2, carb: 5, fat: 1.5, portion: "200ml" },
-  { name: "Pão integral", cal: 247, prot: 13, carb: 41, fat: 3.4, portion: "2 fatias" },
-  { name: "Peito de peru", cal: 110, prot: 18, carb: 3, fat: 2.5, portion: "100g" },
-  { name: "Requeijão", cal: 257, prot: 7, carb: 3, fat: 24, portion: "100g" },
-  { name: "Pipoca (sem óleo)", cal: 31, prot: 1, carb: 6, fat: 0.4, portion: "1 xícara" },
-  { name: "Melancia", cal: 30, prot: 0.6, carb: 8, fat: 0.2, portion: "100g" },
-  { name: "Morango", cal: 32, prot: 0.7, carb: 8, fat: 0.3, portion: "100g" },
-  { name: "Açaí (puro)", cal: 58, prot: 0.8, carb: 6, fat: 3.9, portion: "100g" },
-  { name: "Castanha do Pará", cal: 656, prot: 14, carb: 12, fat: 66, portion: "100g" },
-  { name: "Frango desfiado", cal: 165, prot: 31, carb: 0, fat: 3.6, portion: "100g" },
-  { name: "Carne moída", cal: 250, prot: 26, carb: 0, fat: 15, portion: "100g" },
-  { name: "Salada verde mista", cal: 20, prot: 1.5, carb: 3, fat: 0.3, portion: "100g" },
-  { name: "Sopa de legumes", cal: 45, prot: 2, carb: 8, fat: 0.5, portion: "250ml" },
-  { name: "Wrap integral", cal: 130, prot: 4, carb: 22, fat: 3, portion: "1 un" },
-  { name: "Cottage", cal: 98, prot: 11, carb: 3.4, fat: 4.3, portion: "100g" },
-];
+import { Switch } from "@/components/ui/switch";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const dayColors: Record<string, string> = {
@@ -113,29 +63,6 @@ const Dieta = () => {
   const [editingMeal, setEditingMeal] = useState<string | null>(null);
   const [editMealValue, setEditMealValue] = useState("");
 
-  // CALORIAS & MACROS
-  const [calorieGoal, setCalorieGoal] = usePersistedState("saude-cal-goal", 2000);
-  const [protGoal, setProtGoal] = usePersistedState("saude-prot-goal", 0);
-  const [carbGoal, setCarbGoal] = usePersistedState("saude-carb-goal", 0);
-  const [fatGoal, setFatGoal] = usePersistedState("saude-fat-goal", 0);
-  const [dailyMeals, setDailyMeals] = usePersistedState<Record<string, {name: string; cal: number; prot: number; carb: number; fat: number}[]>>("saude-daily-meals", {});
-  const todayMeals = dailyMeals[today] || [];
-  const [newMealName, setNewMealName] = useState("");
-  const [newMealCal, setNewMealCal] = useState("");
-  const [newMealProt, setNewMealProt] = useState("");
-  const [newMealCarb, setNewMealCarb] = useState("");
-  const [newMealFat, setNewMealFat] = useState("");
-  const [foodSearch, setFoodSearch] = useState("");
-  const [showFoodSearch, setShowFoodSearch] = useState(false);
-
-  // Auto-calc macro goals from calorie goal (30% prot, 40% carb, 30% fat)
-  const autoCalcMacros = (kcal: number) => {
-    setProtGoal(Math.round((kcal * 0.3) / 4));
-    setCarbGoal(Math.round((kcal * 0.4) / 4));
-    setFatGoal(Math.round((kcal * 0.3) / 9));
-  };
-
-  // WATER - removed (available in Saúde module)
   // FASTING
   const [fastingGoal, setFastingGoal] = usePersistedState("saude-fast-goal", 16);
   const [fastingStart, setFastingStart] = usePersistedState<string | null>("saude-fast-start", null);
@@ -143,41 +70,19 @@ const Dieta = () => {
 
   // RECIPES
   const [recipes, setRecipes] = usePersistedState<{id: string; name: string; ingredients: string; instructions: string; category: string; favorite: boolean; prepTime: string; servings: string}[]>("dieta-recipes-v2", []);
-  const [newRecipeName, setNewRecipeName] = useState("");
   const [showRecipeForm, setShowRecipeForm] = useState(false);
   const [recipeForm, setRecipeForm] = useState({ name: "", ingredients: "", instructions: "", category: "Almoço", prepTime: "", servings: "", favorite: false });
   const [recipeFilter, setRecipeFilter] = useState("Todas");
   const [checkedIngredients, setCheckedIngredients] = usePersistedState<Record<string, string[]>>("dieta-recipe-checked", {});
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
 
-  // GROCERY LIST
-  const [groceryItems, setGroceryItems] = usePersistedState<{id: string; name: string; category: string; checked: boolean}[]>("dieta-grocery", []);
-  const [newGroceryItem, setNewGroceryItem] = useState("");
-  const [groceryCategory, setGroceryCategory] = useState("Proteínas");
+  // DIÁRIO
+  const [diaryDate, setDiaryDate] = useState(today);
+  const [diaryEntries, setDiaryEntries] = usePersistedState<Record<string, {id: string; text: string; time: string}[]>>("dieta-diary", {});
+  const [newDiaryEntry, setNewDiaryEntry] = useState("");
+  const [diaryFollowed, setDiaryFollowed] = usePersistedState<Record<string, boolean>>("dieta-diary-followed", {});
 
-  // MEAL FAVORITES
-  const [favoriteMeals, setFavoriteMeals] = usePersistedState<{id: string; name: string; cal: number; prot: number; carb: number; fat: number}[]>("dieta-favorites", []);
-
-  // BMI removed — now in Saúde module
-
-  // Calorie history
-  const [calorieLog, setCalorieLog] = usePersistedState<Record<string, number>>("dieta-cal-log", {});
-
-  // Streak
-  const dietStreak = (() => {
-    let count = 0;
-    const d = new Date();
-    for (let i = 0; i < 60; i++) {
-      const dateStr = d.toISOString().split("T")[0];
-      const meals = dailyMeals[dateStr];
-      if (meals && meals.length > 0) { count++; d.setDate(d.getDate() - 1); }
-      else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
-      else break;
-    }
-    return count;
-  })();
-
-  
+  const todayEntries = diaryEntries[diaryDate] || [];
 
   useEffect(() => {
     if (!fastingStart) { setFastingElapsed(0); return; }
@@ -187,24 +92,52 @@ const Dieta = () => {
     return () => clearInterval(interval);
   }, [fastingStart]);
 
-  // Log calories for history
-  useEffect(() => {
-    const totalCal = todayMeals.reduce((s, m) => s + m.cal, 0);
-    if (totalCal > 0) setCalorieLog(prev => ({ ...prev, [today]: totalCal }));
-  }, [todayMeals]);
-
   const startEditMeal = (day: string, meal: string) => { setEditingMeal(`${day}-${meal}`); setEditMealValue(mealPlan[day]?.[meal] || ""); };
   const saveMeal = (day: string, meal: string) => { setMealPlan({ ...mealPlan, [day]: { ...mealPlan[day], [meal]: editMealValue } }); setEditingMeal(null); };
 
   const formatTime = (secs: number) => { const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60; return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`; };
 
-  const totalCal = todayMeals.reduce((s, m) => s + m.cal, 0);
-  const totalProt = todayMeals.reduce((s, m) => s + m.prot, 0);
-  const totalCarb = todayMeals.reduce((s, m) => s + m.carb, 0);
-  const totalFat = todayMeals.reduce((s, m) => s + m.fat, 0);
+  // Diary helpers
+  const addDiaryEntry = () => {
+    if (!newDiaryEntry.trim()) return;
+    const now = new Date();
+    const time = `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+    const entry = { id: Date.now().toString(), text: newDiaryEntry.trim(), time };
+    setDiaryEntries(prev => ({ ...prev, [diaryDate]: [...(prev[diaryDate] || []), entry] }));
+    setNewDiaryEntry("");
+  };
 
-  const groceryCategories = ["Proteínas", "Frutas", "Verduras", "Grãos", "Laticínios", "Temperos", "Outros"];
-  const groceryEmoji: Record<string, string> = { "Proteínas": "🥩", "Frutas": "🍎", "Verduras": "🥬", "Grãos": "🌾", "Laticínios": "🥛", "Temperos": "🧂", "Outros": "🛒" };
+  const removeDiaryEntry = (id: string) => {
+    setDiaryEntries(prev => ({ ...prev, [diaryDate]: (prev[diaryDate] || []).filter(e => e.id !== id) }));
+  };
+
+  const navigateDiaryDate = (offset: number) => {
+    const d = new Date(diaryDate);
+    d.setDate(d.getDate() + offset);
+    setDiaryDate(d.toISOString().split("T")[0]);
+  };
+
+  const formatDateLabel = (dateStr: string) => {
+    if (dateStr === today) return "Hoje";
+    const d = new Date(dateStr);
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    if (dateStr === yesterday.toISOString().split("T")[0]) return "Ontem";
+    return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  // Check how many days have diary entries (streak)
+  const diaryStreak = (() => {
+    let count = 0;
+    const d = new Date();
+    for (let i = 0; i < 60; i++) {
+      const dateStr = d.toISOString().split("T")[0];
+      const entries = diaryEntries[dateStr];
+      if (entries && entries.length > 0) { count++; d.setDate(d.getDate() - 1); }
+      else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
+      else break;
+    }
+    return count;
+  })();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -212,16 +145,8 @@ const Dieta = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Apple className="w-5 h-5 text-green-600" /> DIETA</h1></h1>
-            <p className="text-xs text-muted-foreground">Cardápio, calorias, jejum e receitas</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {dietStreak > 0 && (
-              <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300">
-                <Flame className="w-3 h-3 text-green-600" />
-                <span className="text-[10px] font-bold text-green-700">{dietStreak}d</span>
-              </div>
-            )}
+            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Apple className="w-5 h-5 text-green-600" /> DIETA</h1>
+            <p className="text-xs text-muted-foreground">Cardápio, jejum, receitas e diário</p>
           </div>
         </div>
       </header>
@@ -232,16 +157,15 @@ const Dieta = () => {
           tips={[
             "Configure suas refeições clicando em ⚙️ no cardápio (adicione ou remova refeições)",
             "No cardápio semanal, clique em cada refeição para adicionar o que vai comer",
-            "Na aba 🔥 CALORIAS, registre o que comeu e acompanhe macros"
+            "Use o 📊 DIÁRIO para registrar o que você comeu de verdade e compare com o plano"
           ]}
         />
         <Tabs defaultValue="cardapio" className="w-full">
           <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
             <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
-            <TabsTrigger value="calorias" className="text-xs px-3 py-1.5">🔥 CALORIAS</TabsTrigger>
             <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
             <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
-            <TabsTrigger value="mercado" className="text-xs px-3 py-1.5">🛒 MERCADO</TabsTrigger>
+            <TabsTrigger value="diario" className="text-xs px-3 py-1.5">📊 DIÁRIO</TabsTrigger>
           </TabsList>
 
           <TabsContent value="cardapio" className="space-y-3">
@@ -439,265 +363,6 @@ const Dieta = () => {
               ))}
             </div>
           </TabsContent>
-
-          {/* ========== CALORIAS ========== */}
-          <TabsContent value="calorias" className="space-y-4">
-            {/* Macro Donut + Remaining */}
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Utensils className="w-4 h-4" /> CALORIAS E MACROS — {new Date().toLocaleDateString("pt-BR")}</h3>
-              
-              {/* Goals config */}
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                <span className="text-xs">Meta:</span>
-                <Input type="number" value={calorieGoal} onChange={e => {
-                  const v = Number(e.target.value);
-                  setCalorieGoal(v);
-                  if (protGoal === 0 && carbGoal === 0 && fatGoal === 0) autoCalcMacros(v);
-                }} className="text-xs h-8 w-20" />
-                <span className="text-xs text-muted-foreground">kcal</span>
-                {protGoal === 0 && carbGoal === 0 && fatGoal === 0 && (
-                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => autoCalcMacros(calorieGoal)}>
-                    Calcular macros
-                  </Button>
-                )}
-              </div>
-
-              {/* Macro goals (editable) */}
-              {(protGoal > 0 || carbGoal > 0 || fatGoal > 0) && (
-                <div className="flex gap-2 mb-4 text-[10px]">
-                  <div className="flex items-center gap-1">
-                    <span className="text-destructive font-bold">P:</span>
-                    <Input type="number" value={protGoal} onChange={e => setProtGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
-                    <span className="text-muted-foreground">g</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-primary font-bold">C:</span>
-                    <Input type="number" value={carbGoal} onChange={e => setCarbGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
-                    <span className="text-muted-foreground">g</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-yellow-600 font-bold">G:</span>
-                    <Input type="number" value={fatGoal} onChange={e => setFatGoal(Number(e.target.value))} className="h-6 w-14 text-[10px] px-1" />
-                    <span className="text-muted-foreground">g</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Visual: Donut + Remaining card */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {/* SVG Donut */}
-                <div className="flex items-center justify-center">
-                  {(() => {
-                    const total = totalProt * 4 + totalCarb * 4 + totalFat * 9;
-                    const protPct = total > 0 ? (totalProt * 4 / total) * 100 : 33;
-                    const carbPct = total > 0 ? (totalCarb * 4 / total) * 100 : 33;
-                    const fatPct = total > 0 ? (totalFat * 9 / total) * 100 : 34;
-                    const r = 40; const c = 2 * Math.PI * r;
-                    const protLen = (protPct / 100) * c;
-                    const carbLen = (carbPct / 100) * c;
-                    const fatLen = (fatPct / 100) * c;
-                    return (
-                      <div className="relative w-28 h-28">
-                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(var(--destructive))" strokeWidth="8"
-                            strokeDasharray={`${protLen} ${c - protLen}`} strokeDashoffset="0" />
-                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(var(--primary))" strokeWidth="8"
-                            strokeDasharray={`${carbLen} ${c - carbLen}`} strokeDashoffset={`${-protLen}`} />
-                          <circle cx="50" cy="50" r={r} fill="none" stroke="hsl(45 93% 47%)" strokeWidth="8"
-                            strokeDasharray={`${fatLen} ${c - fatLen}`} strokeDashoffset={`${-(protLen + carbLen)}`} />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-lg font-bold">{totalCal}</span>
-                          <span className="text-[9px] text-muted-foreground">kcal</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Remaining card */}
-                <div className="space-y-2">
-                  {(() => {
-                    const calRemain = calorieGoal - totalCal;
-                    const calColor = calRemain > 0 ? "text-green-600" : "text-destructive";
-                    return (
-                      <div className={`rounded-lg p-3 border ${calRemain > 0 ? "bg-green-50 dark:bg-green-500/10 border-green-200" : "bg-red-50 dark:bg-red-500/10 border-red-200"}`}>
-                        <p className="text-[10px] text-muted-foreground font-bold">RESTANTE</p>
-                        <p className={`text-xl font-bold ${calColor}`}>{calRemain > 0 ? calRemain : 0} kcal</p>
-                        {calRemain < 0 && <p className="text-[10px] text-destructive font-bold">+{Math.abs(calRemain)} acima!</p>}
-                      </div>
-                    );
-                  })()}
-                  <div className="grid grid-cols-3 gap-1 text-[9px]">
-                    <div className="text-center"><span className="text-destructive font-bold">{totalProt}g</span><br/>Prot</div>
-                    <div className="text-center"><span className="text-primary font-bold">{totalCarb}g</span><br/>Carb</div>
-                    <div className="text-center"><span className="text-yellow-600 font-bold">{totalFat}g</span><br/>Gord</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Macro progress bars */}
-              {(protGoal > 0 || carbGoal > 0 || fatGoal > 0) && (
-                <div className="space-y-1.5 mb-4">
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="w-8 text-destructive font-bold">Prot</span>
-                    <Progress value={protGoal > 0 ? Math.min((totalProt / protGoal) * 100, 100) : 0} className="h-2 flex-1" />
-                    <span className="text-muted-foreground w-16 text-right">{totalProt}/{protGoal}g</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="w-8 text-primary font-bold">Carb</span>
-                    <Progress value={carbGoal > 0 ? Math.min((totalCarb / carbGoal) * 100, 100) : 0} className="h-2 flex-1" />
-                    <span className="text-muted-foreground w-16 text-right">{totalCarb}/{carbGoal}g</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="w-8 text-yellow-600 font-bold">Gord</span>
-                    <Progress value={fatGoal > 0 ? Math.min((totalFat / fatGoal) * 100, 100) : 0} className="h-2 flex-1" />
-                    <span className="text-muted-foreground w-16 text-right">{totalFat}/{fatGoal}g</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Import from menu */}
-              {(() => {
-                const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
-                const todayMenu = mealPlan[todayDayName];
-                const hasMenu = todayMenu && Object.values(todayMenu).some(v => v && v.trim());
-                if (!hasMenu) return null;
-                return (
-                  <Button size="sm" variant="outline" className="w-full mb-3 text-xs h-8" onClick={() => {
-                    const items = Object.entries(todayMenu)
-                      .filter(([, v]) => v && v.trim())
-                      .map(([meal, desc]) => ({
-                        name: `${meal}: ${desc}`,
-                        cal: 0, prot: 0, carb: 0, fat: 0
-                      }));
-                    setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, ...items] });
-                  }}>
-                    <Calendar className="w-3 h-3 mr-1" /> Importar do Cardápio de Hoje ({todayDayName})
-                  </Button>
-                );
-              })()}
-
-              {/* Food search / autocomplete */}
-              <div className="mb-3">
-                <div className="relative">
-                  <Search className="absolute left-2 top-2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    value={foodSearch}
-                    onChange={e => { setFoodSearch(e.target.value); setShowFoodSearch(true); }}
-                    onFocus={() => setShowFoodSearch(true)}
-                    placeholder="Buscar alimento (ex: frango, arroz, ovo...)"
-                    className="text-xs h-8 pl-8"
-                  />
-                </div>
-                {showFoodSearch && foodSearch.trim().length > 0 && (
-                  <div className="bg-card border border-border rounded-lg mt-1 max-h-48 overflow-y-auto shadow-lg">
-                    {FOOD_DATABASE.filter(f => f.name.toLowerCase().includes(foodSearch.toLowerCase())).map((food, i) => (
-                      <button
-                        key={i}
-                        className="w-full text-left px-3 py-2 hover:bg-muted/50 border-b border-border last:border-0 transition-colors"
-                        onClick={() => {
-                          setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, { name: `${food.name} (${food.portion})`, cal: food.cal, prot: food.prot, carb: food.carb, fat: food.fat }] });
-                          setFoodSearch("");
-                          setShowFoodSearch(false);
-                        }}
-                      >
-                        <span className="text-xs font-medium">{food.name}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1">({food.portion})</span>
-                        <div className="text-[9px] text-muted-foreground">
-                          {food.cal}kcal · {food.prot}P · {food.carb}C · {food.fat}G
-                        </div>
-                      </button>
-                    ))}
-                    {FOOD_DATABASE.filter(f => f.name.toLowerCase().includes(foodSearch.toLowerCase())).length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-3">Nenhum alimento encontrado</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Quick add from favorites */}
-              {favoriteMeals.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[10px] font-bold text-muted-foreground mb-1">⭐ FAVORITOS — clique para adicionar:</p>
-                  <div className="flex gap-1 flex-wrap">
-                    {favoriteMeals.map(f => (
-                      <button key={f.id} onClick={() => setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, f] })}
-                        className="px-2 py-1 rounded-lg bg-muted/50 border border-border text-[10px] hover:bg-muted transition-colors">
-                        {f.name} ({f.cal}kcal)
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Manual add */}
-              <p className="text-[10px] font-bold text-muted-foreground mb-1">ADICIONAR MANUAL:</p>
-              <div className="flex gap-1 mb-2 flex-wrap">
-                <Input value={newMealName} onChange={e => setNewMealName(e.target.value)} placeholder="Refeição" className="text-xs h-8 flex-1 min-w-[100px]" />
-                <Input type="number" value={newMealCal} onChange={e => setNewMealCal(e.target.value)} placeholder="kcal" className="text-xs h-8 w-16" />
-                <Input type="number" value={newMealProt} onChange={e => setNewMealProt(e.target.value)} placeholder="P" className="text-xs h-8 w-12" />
-                <Input type="number" value={newMealCarb} onChange={e => setNewMealCarb(e.target.value)} placeholder="C" className="text-xs h-8 w-12" />
-                <Input type="number" value={newMealFat} onChange={e => setNewMealFat(e.target.value)} placeholder="G" className="text-xs h-8 w-12" />
-                <Button size="sm" className="h-8" onClick={() => {
-                  if (newMealName.trim()) {
-                    const meal = { name: newMealName.trim(), cal: Number(newMealCal) || 0, prot: Number(newMealProt) || 0, carb: Number(newMealCarb) || 0, fat: Number(newMealFat) || 0 };
-                    setDailyMeals({ ...dailyMeals, [today]: [...todayMeals, meal] });
-                    setNewMealName(""); setNewMealCal(""); setNewMealProt(""); setNewMealCarb(""); setNewMealFat("");
-                  }
-                }}><Plus className="w-3 h-3" /></Button>
-              </div>
-
-              {/* Today's meals list */}
-              {todayMeals.length > 0 && <p className="text-[10px] font-bold text-muted-foreground mt-3 mb-1">REFEIÇÕES DE HOJE:</p>}
-              {todayMeals.map((m, i) => (
-                <div key={i} className="flex items-center justify-between bg-muted/30 rounded-md px-3 py-1.5 text-xs mb-1 border border-border">
-                  <span className="font-medium flex-1 truncate">{m.name}</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span>{m.cal}kcal</span>
-                    <span className="text-destructive">{m.prot}P</span>
-                    <span className="text-primary">{m.carb}C</span>
-                    <span className="text-yellow-600">{m.fat}G</span>
-                    <button onClick={() => {
-                      if (!favoriteMeals.find(f => f.name === m.name)) setFavoriteMeals([...favoriteMeals, { id: Date.now().toString(), ...m }]);
-                    }}><Star className="w-3 h-3 text-amber-400" /></button>
-                    <button onClick={() => setDailyMeals({ ...dailyMeals, [today]: todayMeals.filter((_, j) => j !== i) })}><X className="w-3 h-3 text-muted-foreground" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Calorie History */}
-            {Object.keys(calorieLog).length > 1 && (
-              <div className="bg-card rounded-xl border border-border p-4">
-                <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> HISTÓRICO DE CALORIAS</h3>
-                <div className="flex items-end gap-1 h-24">
-                  {Array.from({ length: 14 }, (_, i) => {
-                    const d = new Date(); d.setDate(d.getDate() - (13 - i));
-                    const dateStr = d.toISOString().split("T")[0];
-                    const cal = calorieLog[dateStr] || 0;
-                    const pct = cal > 0 ? Math.min((cal / calorieGoal) * 100, 150) : 0;
-                    const overGoal = cal > calorieGoal;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                        {cal > 0 && <span className="text-[7px] font-bold">{cal}</span>}
-                        <div className={`w-full rounded-t transition-all ${overGoal ? "bg-destructive" : cal > 0 ? "bg-green-400" : "bg-muted/30"}`}
-                          style={{ height: `${Math.max(pct * 0.6, 4)}%` }} />
-                        <span className="text-[7px] text-muted-foreground">{d.getDate()}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground">
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-green-400" /> Dentro da meta</span>
-                  <span className="flex items-center gap-1"><div className="w-2 h-2 rounded bg-destructive" /> Acima da meta</span>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-
-
 
           {/* ========== JEJUM ========== */}
           <TabsContent value="jejum" className="space-y-4">
@@ -927,62 +592,129 @@ const Dieta = () => {
             })()}
           </TabsContent>
 
-          {/* ========== LISTA DE MERCADO ========== */}
-          <TabsContent value="mercado" className="space-y-4">
-            <div className="bg-card rounded-xl border border-border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> LISTA DE MERCADO</h3>
-                <Badge variant="secondary" className="text-[10px]">{groceryItems.filter(i => i.checked).length}/{groceryItems.length} ✓</Badge>
+          {/* ========== DIÁRIO ========== */}
+          <TabsContent value="diario" className="space-y-4">
+            {/* Date navigation */}
+            <div className="flex items-center justify-between bg-card rounded-xl border border-border p-3">
+              <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigateDiaryDate(-1)}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="text-center">
+                <p className="text-sm font-bold">{formatDateLabel(diaryDate)}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {new Date(diaryDate).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
               </div>
-              {groceryItems.length > 0 && (
-                <Progress value={(groceryItems.filter(i => i.checked).length / groceryItems.length) * 100} className="h-1.5 mb-3" />
-              )}
-              <div className="flex gap-2 mb-3">
-                <Input value={newGroceryItem} onChange={e => setNewGroceryItem(e.target.value)} placeholder="Adicionar item..."
-                  className="text-xs h-8 flex-1" onKeyDown={e => {
-                    if (e.key === "Enter" && newGroceryItem.trim()) {
-                      setGroceryItems(prev => [...prev, { id: Date.now().toString(), name: newGroceryItem.trim(), category: groceryCategory, checked: false }]);
-                      setNewGroceryItem("");
-                    }
-                  }} />
-                <Select value={groceryCategory} onValueChange={setGroceryCategory}>
-                  <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{groceryCategories.map(c => <SelectItem key={c} value={c}>{groceryEmoji[c]} {c}</SelectItem>)}</SelectContent>
-                </Select>
-                <Button size="sm" className="h-8" onClick={() => {
-                  if (newGroceryItem.trim()) {
-                    setGroceryItems(prev => [...prev, { id: Date.now().toString(), name: newGroceryItem.trim(), category: groceryCategory, checked: false }]);
-                    setNewGroceryItem("");
-                  }
-                }}><Plus className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigateDiaryDate(1)} disabled={diaryDate >= today}>
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </Button>
+            </div>
+
+            {/* Follow toggle + stats */}
+            <div className="flex items-center justify-between bg-card rounded-xl border border-border p-3">
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-xs font-bold">Seguiu o cardápio?</p>
+                  <p className="text-[10px] text-muted-foreground">Compare plano vs realidade</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{diaryFollowed[diaryDate] ? "✅ Sim" : "❌ Não"}</span>
+                <Switch
+                  checked={diaryFollowed[diaryDate] || false}
+                  onCheckedChange={(checked) => setDiaryFollowed(prev => ({ ...prev, [diaryDate]: checked }))}
+                />
+              </div>
+            </div>
+
+            {/* Adherence streak */}
+            <div className="bg-card rounded-xl border border-border p-3">
+              <p className="text-[10px] font-bold text-muted-foreground mb-2">ADERÊNCIA — ÚLTIMOS 7 DIAS</p>
+              <div className="flex gap-1.5">
+                {Array.from({ length: 7 }, (_, i) => {
+                  const d = new Date(); d.setDate(d.getDate() - (6 - i));
+                  const dateStr = d.toISOString().split("T")[0];
+                  const followed = diaryFollowed[dateStr];
+                  const hasEntries = (diaryEntries[dateStr] || []).length > 0;
+                  return (
+                    <div key={i} className="flex-1 text-center">
+                      <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm border ${
+                        followed ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600" :
+                        hasEntries ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600" :
+                        "bg-muted/30 border-border text-muted-foreground"
+                      }`}>
+                        {followed ? "✅" : hasEntries ? "❌" : "—"}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        {d.toLocaleDateString("pt-BR", { weekday: "narrow" })}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Add entry */}
+            <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+              <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                <BookOpen className="w-3 h-3" /> O QUE VOCÊ COMEU?
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={newDiaryEntry}
+                  onChange={e => setNewDiaryEntry(e.target.value)}
+                  placeholder="Ex: 2 ovos + café com leite"
+                  className="text-xs h-9 flex-1"
+                  onKeyDown={e => { if (e.key === "Enter") addDiaryEntry(); }}
+                />
+                <Button size="sm" className="h-9" onClick={addDiaryEntry} disabled={!newDiaryEntry.trim()}>
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
 
-              {groceryCategories.map(cat => {
-                const items = groceryItems.filter(i => i.category === cat);
-                if (items.length === 0) return null;
+              {/* Today's planned menu hint */}
+              {(() => {
+                const todayDayName = weekDays[new Date(diaryDate).getDay() === 0 ? 6 : new Date(diaryDate).getDay() - 1];
+                const todayMenu = mealPlan[todayDayName];
+                const hasMenu = todayMenu && Object.values(todayMenu).some(v => v && v.trim());
+                if (!hasMenu) return null;
                 return (
-                  <div key={cat} className="mb-3">
-                    <p className="text-[10px] font-bold text-muted-foreground mb-1">{groceryEmoji[cat]} {cat}</p>
-                    {items.map(item => (
-                      <div key={item.id} className="flex items-center gap-2 py-1 group">
-                        <Checkbox checked={item.checked} onCheckedChange={() => setGroceryItems(prev => prev.map(i => i.id === item.id ? {...i, checked: !i.checked} : i))} />
-                        <span className={`text-xs flex-1 ${item.checked ? "line-through text-muted-foreground" : ""}`}>{item.name}</span>
-                        <button className="opacity-0 group-hover:opacity-100" onClick={() => setGroceryItems(prev => prev.filter(i => i.id !== item.id))}>
-                          <Trash2 className="w-3 h-3 text-muted-foreground" />
-                        </button>
-                      </div>
+                  <div className="bg-muted/30 rounded-lg p-2 border border-border">
+                    <p className="text-[10px] font-bold text-muted-foreground mb-1">📋 CARDÁPIO PLANEJADO ({todayDayName}):</p>
+                    {Object.entries(todayMenu).filter(([, v]) => v && v.trim()).map(([meal, desc]) => (
+                      <p key={meal} className="text-[10px] text-muted-foreground">
+                        <span className="font-medium">{meal}:</span> {desc}
+                      </p>
                     ))}
                   </div>
                 );
-              })}
-
-              {groceryItems.length > 0 && (
-                <Button size="sm" variant="outline" className="w-full mt-2 text-xs" onClick={() => setGroceryItems(prev => prev.filter(i => !i.checked))}>
-                  Limpar comprados ✓
-                </Button>
-              )}
-              {groceryItems.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Lista vazia. Adicione seus itens! 🛒</p>}
+              })()}
             </div>
+
+            {/* Entries list */}
+            {todayEntries.length > 0 ? (
+              <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-bold text-muted-foreground">REGISTROS DO DIA</p>
+                  <Badge variant="secondary" className="text-[10px]">{todayEntries.length} itens</Badge>
+                </div>
+                {todayEntries.map(entry => (
+                  <div key={entry.id} className="flex items-center gap-2 bg-muted/30 rounded-lg px-3 py-2 border border-border group">
+                    <span className="text-[10px] text-muted-foreground font-mono shrink-0">{entry.time}</span>
+                    <span className="text-xs flex-1">{entry.text}</span>
+                    <button onClick={() => removeDiaryEntry(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <BookOpen className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                <p className="text-xs text-muted-foreground">Nenhum registro para este dia</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Adicione o que você comeu acima ☝️</p>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>

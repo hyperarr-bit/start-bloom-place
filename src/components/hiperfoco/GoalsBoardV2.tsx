@@ -263,9 +263,9 @@ export const GoalsBoardV2 = () => {
     setGoals(filtered); setView("home");
   };
 
-  const SectionHeader = ({ emoji, title }: { emoji: string; title: string }) => (
+  const SectionHeader = ({ emoji, title, color }: { emoji: string; title: string; color: string }) => (
     <>
-      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: "hsl(30 20% 78% / 0.35)" }}>
+      <div className="relative overflow-hidden rounded-t-xl" style={{ minHeight: 72, background: color }}>
         <span className="text-4xl opacity-80 absolute right-4 bottom-2">{emoji}</span>
       </div>
       <div className="px-5 pt-4 pb-2">

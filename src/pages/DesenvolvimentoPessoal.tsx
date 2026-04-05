@@ -69,10 +69,7 @@ const DesenvolvimentoPessoal = () => {
   const [cantControl, setCantControl] = usePersistedState<string[]>("dp-cant-control", []);
   const [newCantControl, setNewCantControl] = useState("");
 
-  // METAS
-  const [lifeGoals, setLifeGoals] = usePersistedState<{id: string; text: string; deadline: string; done: boolean}[]>("dp-life-goals", []);
-  const [newGoalText, setNewGoalText] = useState("");
-  const [newGoalDeadline, setNewGoalDeadline] = useState("");
+  // METAS — agora no GoalsBoardV2
 
   // RODA DA VIDA
   const [wheelScores, setWheelScores] = usePersistedState<Record<string, number>>("dp-wheel",

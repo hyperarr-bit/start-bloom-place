@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useSetTrackedTab } from "@/hooks/use-module-tracker";
+import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";

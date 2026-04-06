@@ -30,10 +30,7 @@ const statusConfig: Record<string, { label: string; emoji: string; color: string
   desistiu: { label: "Desistiu", emoji: "🚪", color: "bg-muted text-muted-foreground border-border" },
 };
 
-const DEFAULT_JOBS: JobApp[] = [
-  { id: "ex-1", company: "Tech Corp", role: "Dev Frontend", link: "", status: "aplicado", date: new Date().toISOString().slice(0, 10), salary: "R$ 8.000 - 12.000", notes: "Vaga remota, React + TypeScript", favorite: false },
-  { id: "ex-2", company: "StartupXYZ", role: "Fullstack Engineer", link: "", status: "entrevista", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), salary: "R$ 10.000 - 15.000", notes: "Entrevista técnica na próxima semana", favorite: true },
-];
+const DEFAULT_JOBS: JobApp[] = [];
 
 const DEFAULT_PORTFOLIO: PortfolioItem[] = [
   { id: "ex-p1", title: "Landing Page E-commerce", description: "Redesign completo com React e Tailwind", link: "", category: "projeto", date: new Date().toISOString().slice(0, 10), highlight: true },

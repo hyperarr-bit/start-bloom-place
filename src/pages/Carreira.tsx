@@ -32,9 +32,7 @@ const statusConfig: Record<string, { label: string; emoji: string; color: string
 
 const DEFAULT_JOBS: JobApp[] = [];
 
-const DEFAULT_PORTFOLIO: PortfolioItem[] = [
-  { id: "ex-p1", title: "Landing Page E-commerce", description: "Redesign completo com React e Tailwind", link: "", category: "projeto", date: new Date().toISOString().slice(0, 10), highlight: true },
-];
+const DEFAULT_PORTFOLIO: PortfolioItem[] = [];
 
 const DEFAULT_CONTACTS: Contact[] = [
   { id: "ex-c1", name: "Maria Silva", company: "Tech Corp", role: "Head of Engineering", linkedin: "", email: "", phone: "", notes: "Conheci no meetup de React", lastContact: new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10), category: "profissional" },

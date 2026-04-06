@@ -108,6 +108,13 @@ const JobTracker = () => {
 
       {/* Jobs table — Notion-style */}
       <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-indigo-200 dark:bg-indigo-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📋 CANDIDATURAS</span>
+          <button onClick={() => { setShowForm(true); setEditId(null); setForm({ status: "aplicado", favorite: false }); }}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+          </button>
+        </div>
         <div className="bg-indigo-100 dark:bg-indigo-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
           <span className="col-span-3">Empresa</span>
           <span className="col-span-3">Cargo</span>
@@ -116,6 +123,11 @@ const JobTracker = () => {
           <span className="col-span-2 text-right">Ações</span>
         </div>
         <div className="divide-y divide-border bg-card">
+          {filtered.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhuma candidatura ainda</p>
+            </div>
+          )}
           {filtered.sort((a, b) => b.date.localeCompare(a.date)).map(job => (
             <div key={job.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
               <div className="col-span-3 min-w-0">

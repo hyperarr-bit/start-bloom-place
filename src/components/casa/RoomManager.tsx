@@ -40,14 +40,7 @@ const BODY_COLORS: Record<string, string> = {
   "bg-cyan-200 dark:bg-cyan-900/40": "bg-cyan-50 dark:bg-cyan-950/20",
 };
 
-const defaultRooms: Room[] = [
-  { id: "1", name: "QUARTO CASAL", color: "bg-yellow-200 dark:bg-yellow-900/40", tasks: [] },
-  { id: "2", name: "SALA DE ESTAR", color: "bg-orange-200 dark:bg-orange-900/40", tasks: [] },
-  { id: "3", name: "COZINHA", color: "bg-green-200 dark:bg-green-900/40", tasks: [] },
-  { id: "4", name: "BANHEIROS", color: "bg-cyan-200 dark:bg-cyan-900/40", tasks: [] },
-  { id: "5", name: "LAVANDERIA", color: "bg-pink-200 dark:bg-pink-900/40", tasks: [] },
-  { id: "6", name: "ÁREA EXTERNA", color: "bg-gray-200 dark:bg-gray-700/40", tasks: [] },
-];
+const defaultRooms: Room[] = [];
 
 const RoomManager = () => {
   const [rooms, setRooms] = usePersistedState<Room[]>("casa-rooms", defaultRooms);

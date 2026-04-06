@@ -172,29 +172,8 @@ export const statusEmoji: Record<string, string> = {
   acabou: "🔴",
 };
 
-export const defaultCleaningTasks: CleaningTask[] = [
-  { id: "1", name: "Lavar banheiro", room: "Banheiro", emoji: "🚿", frequencyDays: 7, lastDone: "" },
-  { id: "2", name: "Aspirar/varrer sala", room: "Sala", emoji: "🧹", frequencyDays: 3, lastDone: "" },
-  { id: "3", name: "Trocar lençol", room: "Quarto", emoji: "🛏️", frequencyDays: 7, lastDone: "" },
-  { id: "4", name: "Limpar cozinha", room: "Cozinha", emoji: "🍳", frequencyDays: 2, lastDone: "" },
-  { id: "5", name: "Lavar roupa", room: "Área", emoji: "👕", frequencyDays: 3, lastDone: "" },
-  { id: "6", name: "Tirar o lixo", room: "Geral", emoji: "🗑️", frequencyDays: 2, lastDone: "" },
-];
+export const defaultCleaningTasks: CleaningTask[] = [];
 
-export const defaultEmergencyItems: EmergencyItem[] = [
-  { id: "1", name: "Velas", checked: false, lastChecked: "" },
-  { id: "2", name: "Pilhas AA/AAA", checked: false, lastChecked: "" },
-  { id: "3", name: "Lanterna", checked: false, lastChecked: "" },
-  { id: "4", name: "Kit Primeiros Socorros", checked: false, lastChecked: "" },
-  { id: "5", name: "Água mineral (reserva)", checked: false, lastChecked: "" },
-  { id: "6", name: "Fósforos/Isqueiro", checked: false, lastChecked: "" },
-];
+export const defaultEmergencyItems: EmergencyItem[] = [];
 
-export const defaultTravelChecklist = [
-  { id: "1", text: "Desligar gás", checked: false },
-  { id: "2", text: "Tirar lixo da pia", checked: false },
-  { id: "3", text: "Desligar eletrônicos da tomada", checked: false },
-  { id: "4", text: "Trancar janelas", checked: false },
-  { id: "5", text: "Conferir torneiras", checked: false },
-  { id: "6", text: "Pedir para alguém regar plantas", checked: false },
-];
+export const defaultTravelChecklist: { id: string; text: string; checked: boolean }[] = [];

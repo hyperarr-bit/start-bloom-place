@@ -25,24 +25,9 @@ interface Reminder {
 }
 
 const DEFAULT_SECTIONS: CleaningSection[] = [
-  { id: "1", name: "LIMPEZA DIÁRIA", color: "bg-yellow-200 dark:bg-yellow-800/50", items: [
-    { id: "d1", text: "Arrumar as camas", done: false },
-    { id: "d2", text: "Retirar os lixos", done: false },
-    { id: "d3", text: "Lavar a louça", done: false },
-    { id: "d4", text: "Limpar bancadas da cozinha", done: false },
-  ]},
-  { id: "2", name: "LIMPEZA SEMANAL", color: "bg-purple-200 dark:bg-purple-800/50", items: [
-    { id: "s1", text: "Trocar roupa de cama", done: false },
-    { id: "s2", text: "Limpar o chão da casa", done: false },
-    { id: "s3", text: "Tirar o pó", done: false },
-    { id: "s4", text: "Lavar roupas", done: false },
-  ]},
-  { id: "3", name: "LIMPEZA MENSAL", color: "bg-green-200 dark:bg-green-800/50", items: [
-    { id: "m1", text: "Limpar vidros e janelas", done: false },
-    { id: "m2", text: "Lavar cortinas ou limpar persianas", done: false },
-    { id: "m3", text: "Limpar armários por dentro", done: false },
-    { id: "m4", text: "Limpar eletrodomésticos por dentro", done: false },
-  ]},
+  { id: "1", name: "LIMPEZA DIÁRIA", color: "bg-yellow-200 dark:bg-yellow-800/50", items: [] },
+  { id: "2", name: "LIMPEZA SEMANAL", color: "bg-purple-200 dark:bg-purple-800/50", items: [] },
+  { id: "3", name: "LIMPEZA MENSAL", color: "bg-green-200 dark:bg-green-800/50", items: [] },
 ];
 
 const BODY_COLORS: Record<string, string> = {

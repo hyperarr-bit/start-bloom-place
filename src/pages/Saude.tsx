@@ -33,7 +33,7 @@ const Saude = () => {
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-lg">≡</span>
+          <span className="text-red-600 text-lg">❤️</span>
           <h1 className="text-base font-bold tracking-tight">SAÚDE</h1>
           <span className="ml-auto text-xs text-muted-foreground capitalize">{currentMonth}</span>
           <ThemeToggle />

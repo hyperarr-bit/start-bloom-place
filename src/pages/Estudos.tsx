@@ -491,10 +491,9 @@ const Estudos = () => {
                 </div>
               );
             })}
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ CADERNO ══════════ */}
-          <TabsContent value="caderno" className="space-y-4 mt-4">
+          {activeTab === "caderno" && <div className="space-y-4">
             <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={addNotebook}>
               <Plus className="w-3 h-3 mr-1" /> Nova Anotação
             </Button>

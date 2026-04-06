@@ -304,7 +304,7 @@ export const BodyEvolution = () => {
                         setSentimentNote(e.target.value);
                         setSentimentLog(prev => ({ ...prev, [today]: { ...prev[today], note: e.target.value } }));
                       }}
-                      placeholder="I feel lighter."
+                      placeholder="Escreva como você está se sentindo..."
                       className="text-sm min-h-[80px] border-0 bg-transparent resize-none focus-visible:ring-0 p-0 text-muted-foreground placeholder:text-muted-foreground/50"
                     />
                   )}

@@ -137,7 +137,7 @@ export const PharmacyChecklist = () => {
         </div>
       ) : (
         <div className="p-6 text-center">
-          <p className="text-sm text-muted-foreground">Nenhum suplemento cadastrado</p>
+          <p className="text-sm text-muted-foreground">Nenhum suplemento e remédio cadastrado</p>
         </div>
       )}
 

@@ -365,8 +365,7 @@ const SkillsTracker = () => {
 
 // ============= INTERVIEW PREP =============
 const InterviewPrep = () => {
-  const [questions, setQuestions] = usePersistedState<{id: string; question: string; answer: string; category: string; practiced: boolean}[]>("career-interview-prep", [
-  ] as { id: string; question: string; answer: string; category: string; practiced: boolean }[]);
+  const [questions, setQuestions] = usePersistedState<{id: string; question: string; answer: string; category: string; practiced: boolean}[]>("career-interview-prep", []);
   const [newQuestion, setNewQuestion] = useState("");
   const practiced = questions.filter(q => q.practiced).length;
   const pct = Math.round((practiced / Math.max(questions.length, 1)) * 100);

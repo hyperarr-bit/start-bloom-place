@@ -66,17 +66,17 @@ const getExamColor = (name: string) => {
 };
 
 export const MedicalLog = () => {
-  const { user } = useAuth();
   const [appointments, setAppointments] = usePersistedState<Appointment[]>("core-saude-appointments", []);
-  const [exams, setExams] = usePersistedState<ExamFile[]>("core-saude-exams", []);
+  const [exams, setExams] = usePersistedState<Exam[]>("core-saude-exams-v2", []);
   const [biomarkers, setBiomarkers] = usePersistedState<Biomarker[]>("core-saude-biomarkers", []);
   const [showApptForm, setShowApptForm] = useState(false);
+  const [showExamForm, setShowExamForm] = useState(false);
   const [showBioForm, setShowBioForm] = useState(false);
   const [expandedAppt, setExpandedAppt] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const examFileRef = useRef<HTMLInputElement>(null);
+  const [expandedExam, setExpandedExam] = useState<string | null>(null);
 
   const [newAppt, setNewAppt] = useState<Omit<Appointment, "id">>({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "" });
+  const [newExam, setNewExam] = useState<Omit<Exam, "id" | "done">>({ name: "", date: "", time: "", location: "", notes: "" });
   const [newBio, setNewBio] = useState({ name: "", unit: "ng/dL", refMin: "", refMax: "" });
 
   const addAppointment = () => {
@@ -86,20 +86,15 @@ export const MedicalLog = () => {
     setShowApptForm(false);
   };
 
-  const uploadExam = async (file: File) => {
-    if (!user) return;
-    setUploading(true);
-    try {
-      const ext = file.name.split(".").pop();
-      const path = `${user.id}/exams/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("skin-photos").upload(path, file);
-      if (error) throw error;
-      const { data: urlData } = supabase.storage.from("skin-photos").getPublicUrl(path);
-      setExams(prev => [...prev, { id: Date.now().toString(), name: file.name, date: new Date().toISOString().slice(0, 10), type: ext?.toUpperCase() || "FILE", url: urlData.publicUrl }]);
-    } catch (e) {
-      console.error("Upload failed", e);
-    }
-    setUploading(false);
+  const addExam = () => {
+    if (!newExam.name.trim()) return;
+    setExams(prev => [...prev, { ...newExam, id: Date.now().toString(), done: false }]);
+    setNewExam({ name: "", date: "", time: "", location: "", notes: "" });
+    setShowExamForm(false);
+  };
+
+  const toggleExamDone = (id: string) => {
+    setExams(prev => prev.map(e => e.id === id ? { ...e, done: !e.done } : e));
   };
 
   const addBiomarker = () => {

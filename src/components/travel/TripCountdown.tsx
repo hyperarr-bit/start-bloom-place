@@ -96,6 +96,14 @@ export const TripCountdown = () => {
           )}
         </div>
       </div>
-    </div>
+
+      {showForm && (
+        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+          <Input placeholder="Nome da viagem" value={form.tripName} onChange={e => setForm(p => ({ ...p, tripName: e.target.value }))} className="h-8 rounded-lg text-xs" />
+          <Input type="date" value={form.departureDate} onChange={e => setForm(p => ({ ...p, departureDate: e.target.value }))} className="h-8 rounded-lg text-xs" />
+          <Input placeholder="URL da foto (opcional)" value={form.photoUrl} onChange={e => setForm(p => ({ ...p, photoUrl: e.target.value }))} className="h-8 rounded-lg text-xs" />
+          <Button onClick={add} className="w-full rounded-lg h-7 text-xs">Criar</Button>
+        </div>
+      )}
   );
 };

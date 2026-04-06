@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { EmergencyItem, defaultEmergencyItems, defaultTravelChecklist, daysSince } from "./types";
 
 const SafetyChecks = () => {
-  const [travelChecklist, setTravelChecklist] = usePersistedState("casa-travel-checklist", defaultTravelChecklist);
-  const [emergencyStock, setEmergencyStock] = usePersistedState<EmergencyItem[]>("casa-emergency-stock", defaultEmergencyItems);
+  const [travelChecklist, setTravelChecklist] = usePersistedState("casa-travel-checklist", [] as typeof defaultTravelChecklist);
+  const [emergencyStock, setEmergencyStock] = usePersistedState<EmergencyItem[]>("casa-emergency-stock", []);
   const [section, setSection] = useState<"travel" | "emergency">("travel");
   const [newTravelItem, setNewTravelItem] = useState("");
   const [newEmergItem, setNewEmergItem] = useState("");

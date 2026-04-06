@@ -414,6 +414,13 @@ const InterviewPrep = () => {
       </div>
 
       <div className="space-y-2">
+        {questions.length === 0 && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="bg-card px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhuma pergunta ainda</p>
+            </div>
+          </div>
+        )}
         {questions.map((q, i) => (
           <div key={q.id} className={`rounded-xl border overflow-hidden ${q.practiced ? "border-green-200 dark:border-green-800/30" : "border-border"}`}>
             <div className={`px-3 py-2 flex items-start gap-2 ${q.practiced ? "bg-green-50 dark:bg-green-950/20" : "bg-card"}`}>

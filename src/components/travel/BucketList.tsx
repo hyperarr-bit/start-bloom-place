@@ -114,6 +114,11 @@ export const BucketList = () => {
           <span className="col-span-2 text-right">Nota</span>
         </div>
         <div className="divide-y divide-border bg-card">
+          {filtered.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhum destino ainda</p>
+            </div>
+          )}
           {filtered.map(d => {
             const pCfg = priorityConfig[d.priority];
             return (

@@ -98,62 +98,67 @@ export const PlacesBoard = () => {
         </div>
       )}
 
-      {/* Places - Notion-style cards */}
-      <div className="space-y-2">
-        {filtered.map(place => {
-          const cat = PLACE_CATEGORIES[place.category];
-          const status = PLACE_STATUS[place.status];
-          const colors = CAT_COLORS[place.category] || { header: "bg-teal-200 dark:bg-teal-800/50", body: "bg-teal-50 dark:bg-teal-950/20" };
-          return (
-            <div key={place.id} className="rounded-xl border border-border overflow-hidden group hover:shadow-md transition-all">
-              <div className={`${colors.header} px-3 py-1.5 flex items-center justify-between`}>
-                <span className="text-[10px] font-bold uppercase tracking-wider">{cat.emoji} {cat.label}</span>
-                <Badge variant="secondary" className="text-[8px] px-1.5 h-4 bg-background/50">{status.emoji} {status.label}</Badge>
-              </div>
-              <div className={`${colors.body} p-3`}>
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-semibold">{place.name}</h4>
-                    {place.city && <p className="text-[9px] text-muted-foreground mt-0.5"><MapPin className="w-2.5 h-2.5 inline" /> {place.city}</p>}
-                    {place.notes && <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">{place.notes}</p>}
-                  </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <button onClick={() => toggleFavorite(place.id)}>
-                      <Heart className={`w-3.5 h-3.5 ${place.status === "favorito" ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
-                    </button>
-                    {place.mapsLink && (
-                      <a href={place.mapsLink} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                      </a>
-                    )}
-                    <button onClick={() => remove(place.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                    </button>
-                  </div>
-                </div>
-                {/* Quick status change */}
-                <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
-                  {(Object.entries(PLACE_STATUS) as [Place["status"], typeof PLACE_STATUS["quero_ir"]][]).map(([key, s]) => (
-                    <button key={key} onClick={() => updateStatus(place.id, key)}
-                      className={`rounded-md px-2 py-0.5 text-[8px] border transition-all ${
-                        place.status === key ? "bg-foreground/10 border-foreground/20 font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
-                      }`}>
-                      {s.emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filtered.length === 0 && !showForm && (
-        <div className="text-center py-10">
-          <MapPin className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-          <p className="text-xs text-muted-foreground">Salve lugares que quer conhecer!</p>
+      {/* Places card — always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📍 LUGARES SALVOS</span>
+          <button onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+          </button>
         </div>
-      )}
+        <div className="bg-teal-50 dark:bg-teal-950/20">
+          {filtered.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhum lugar salvo ainda</p>
+            </div>
+          )}
+          <div className="divide-y divide-border">
+            {filtered.map(place => {
+              const cat = PLACE_CATEGORIES[place.category];
+              const status = PLACE_STATUS[place.status];
+              return (
+                <div key={place.id} className="p-3 hover:bg-background/30 transition-colors group">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs">{cat.emoji}</span>
+                        <h4 className="text-xs font-semibold">{place.name}</h4>
+                        <Badge variant="secondary" className="text-[8px] px-1.5 h-4">{status.emoji} {status.label}</Badge>
+                      </div>
+                      {place.city && <p className="text-[9px] text-muted-foreground mt-0.5"><MapPin className="w-2.5 h-2.5 inline" /> {place.city}</p>}
+                      {place.notes && <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">{place.notes}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button onClick={() => toggleFavorite(place.id)}>
+                        <Heart className={`w-3.5 h-3.5 ${place.status === "favorito" ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                      </button>
+                      {place.mapsLink && (
+                        <a href={place.mapsLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                        </a>
+                      )}
+                      <button onClick={() => remove(place.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
+                    {(Object.entries(PLACE_STATUS) as [Place["status"], typeof PLACE_STATUS["quero_ir"]][]).map(([key, s]) => (
+                      <button key={key} onClick={() => updateStatus(place.id, key)}
+                        className={`rounded-md px-2 py-0.5 text-[8px] border transition-all ${
+                          place.status === key ? "bg-foreground/10 border-foreground/20 font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                        }`}>
+                        {s.emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

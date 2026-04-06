@@ -468,37 +468,6 @@ const Carreira = () => {
           ]}
         />
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: "TOTAL", value: jobs.length, emoji: "📊", headerColor: "bg-indigo-200 dark:bg-indigo-800/50", bodyColor: "bg-indigo-50 dark:bg-indigo-950/20" },
-            { label: "ATIVAS", value: activeJobs, emoji: "🎯", headerColor: "bg-purple-200 dark:bg-purple-800/50", bodyColor: "bg-purple-50 dark:bg-purple-950/20" },
-            { label: "ENTREVISTAS", value: interviews, emoji: "🎤", headerColor: "bg-amber-200 dark:bg-amber-800/50", bodyColor: "bg-amber-50 dark:bg-amber-950/20" },
-            { label: "OFERTAS", value: offers, emoji: "🎉", headerColor: "bg-green-200 dark:bg-green-800/50", bodyColor: "bg-green-50 dark:bg-green-950/20" },
-          ].map(s => (
-            <div key={s.label} className="rounded-xl border border-border overflow-hidden">
-              <div className={`${s.headerColor} px-2 py-1 text-center`}>
-                <span className="text-[8px] font-bold uppercase tracking-wider">{s.emoji} {s.label}</span>
-              </div>
-              <div className={`${s.bodyColor} p-2 text-center`}>
-                <p className="text-xl font-black">{s.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="bg-gray-200 dark:bg-gray-800/50 px-3 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider">📋 RESUMO</span>
-          </div>
-          <div className="bg-gray-50 dark:bg-gray-950/20 px-4 py-2 flex items-center gap-4 text-[11px]">
-            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> {skills.length} skills</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3 text-indigo-500" /> {contacts.length} contatos</span>
-            <span className="flex items-center gap-1"><Trophy className="w-3 h-3 text-purple-500" /> {portfolio.length} conquistas</span>
-          </div>
-        </div>
-
         {activeTab === "jobs" && <JobTracker />}
         {activeTab === "portfolio" && <Portfolio />}
         {activeTab === "network" && <Networking />}

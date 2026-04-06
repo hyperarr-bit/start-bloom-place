@@ -18,23 +18,7 @@ const TYPE_CONFIG = {
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const dayAfter = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
 
-const DEFAULT_DAYS: ItineraryDay[] = [
-  {
-    id: "ex-d1", tripId: "Viagem Exemplo", dayNumber: 1, date: tomorrow,
-    items: [
-      { id: "ex-i1", time: "06:00", title: "Voo GRU → LIS", location: "Aeroporto de Guarulhos", mapsLink: "", estimatedCost: 2500, type: "voo", done: false, pinned: true },
-      { id: "ex-i2", time: "14:00", title: "Check-in Hotel", location: "Hotel Lisboa Centro", mapsLink: "", estimatedCost: 350, type: "hotel", done: false, pinned: false },
-      { id: "ex-i3", time: "19:00", title: "Jantar Típico", location: "Restaurante Alfama", mapsLink: "", estimatedCost: 80, type: "restaurante", done: false, pinned: false },
-    ],
-  },
-  {
-    id: "ex-d2", tripId: "Viagem Exemplo", dayNumber: 2, date: dayAfter,
-    items: [
-      { id: "ex-i4", time: "09:00", title: "Torre de Belém", location: "Belém, Lisboa", mapsLink: "", estimatedCost: 10, type: "atividade", done: false, pinned: false },
-      { id: "ex-i5", time: "12:30", title: "Pastéis de Belém", location: "Antiga Confeitaria", mapsLink: "", estimatedCost: 15, type: "restaurante", done: false, pinned: false },
-    ],
-  },
-];
+const DEFAULT_DAYS: ItineraryDay[] = [];
 
 export const DailyTimeline = () => {
   const [days, setDays] = usePersistedState<ItineraryDay[]>("travel-timeline-v2", DEFAULT_DAYS);

@@ -5,12 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MaintenanceTask, Warranty, RoomMeasure, monthsSince, daysSince } from "./types";
 
-const defaultMaintenance: MaintenanceTask[] = [
-  { id: "1", task: "Trocar filtro de água", frequencyMonths: 6, lastDone: "", icon: "💧" },
-  { id: "2", task: "Limpar filtro do ar-condicionado", frequencyMonths: 3, lastDone: "", icon: "❄️" },
-  { id: "3", task: "Virar o colchão", frequencyMonths: 6, lastDone: "", icon: "🛏️" },
-  { id: "4", task: "Limpar máquina de lavar", frequencyMonths: 3, lastDone: "", icon: "🫧" },
-];
+const defaultMaintenance: MaintenanceTask[] = [];
 
 const MaintenanceLog = () => {
   const [tasks, setTasks] = usePersistedState<MaintenanceTask[]>("casa-maint-tasks", defaultMaintenance);

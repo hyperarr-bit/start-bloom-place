@@ -11,12 +11,7 @@ const dayColors: Record<string, string> = {
   Quinta: "border-l-yellow-500", Sexta: "border-l-pink-500", Sábado: "border-l-purple-500", Domingo: "border-l-violet-500"
 };
 
-const defaultRecipes: Recipe[] = [
-  { id: "1", name: "Arroz e Feijão", emoji: "🍚", ingredients: ["Arroz", "Feijão", "Alho", "Cebola"] },
-  { id: "2", name: "Macarrão", emoji: "🍝", ingredients: ["Macarrão", "Molho de tomate"] },
-  { id: "3", name: "Frango Grelhado", emoji: "🍗", ingredients: ["Peito de frango", "Temperos"] },
-  { id: "4", name: "Salada", emoji: "🥗", ingredients: ["Alface", "Tomate", "Pepino"] },
-];
+const defaultRecipes: Recipe[] = [];
 
 const MealPlanner = () => {
   const [recipes, setRecipes] = usePersistedState<Recipe[]>("casa-recipes", defaultRecipes);

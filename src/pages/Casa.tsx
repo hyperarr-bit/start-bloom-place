@@ -45,6 +45,7 @@ const Casa = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <span className="text-lg">≡</span>
+          <span className="text-cyan-600 text-lg">🏠</span>
           <h1 className="text-base font-bold tracking-tight">CASA</h1>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

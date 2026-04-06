@@ -98,8 +98,12 @@ export const BucketList = () => {
 
       {/* Destinations table — Notion-style */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2">
+        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">🗺️ BUCKET LIST</span>
+          <button onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+          </button>
         </div>
         <div className="bg-teal-100 dark:bg-teal-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
           <span className="col-span-1">✓</span>

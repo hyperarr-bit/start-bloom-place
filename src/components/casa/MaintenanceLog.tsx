@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MaintenanceTask, Warranty, RoomMeasure, monthsSince, daysSince } from "./types";
 
-const defaultMaintenance: MaintenanceTask[] = [];
+const defaultMaintenance: MaintenanceTask[] = [
+  { id: "1", task: "Trocar filtro de água", frequencyMonths: 6, lastDone: "", icon: "💧" },
+  { id: "2", task: "Limpar filtro do ar-condicionado", frequencyMonths: 3, lastDone: "", icon: "❄️" },
+  { id: "3", task: "Virar o colchão", frequencyMonths: 6, lastDone: "", icon: "🛏️" },
+  { id: "4", task: "Limpar máquina de lavar", frequencyMonths: 3, lastDone: "", icon: "🫧" },
+];
 
 const MaintenanceLog = () => {
   const [tasks, setTasks] = usePersistedState<MaintenanceTask[]>("casa-maint-tasks", defaultMaintenance);
@@ -68,13 +73,6 @@ const MaintenanceLog = () => {
 
       {section === "maint" && (
         <div className="space-y-2">
-          {tasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <span className="text-4xl mb-3">🔧</span>
-              <h4 className="text-sm font-semibold mb-1">Nenhuma manutenção cadastrada</h4>
-              <p className="text-xs text-muted-foreground max-w-[240px]">Cadastre tarefas como trocar filtro de água, limpar ar-condicionado e nunca esqueça</p>
-            </div>
-          )}
           {tasks.map(t => {
             const months = monthsSince(t.lastDone);
             const overdue = months >= t.frequencyMonths;

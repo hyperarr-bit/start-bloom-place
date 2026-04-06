@@ -1,46 +1,50 @@
 
 
-# Plano: Cards vazios no Casa + ícones coloridos nos headers
+# Plano: Aplicar estilo notion-tab em todos os módulos
 
-## Problema 1: Cards no Casa vêm pré-preenchidos
-Vários componentes do módulo Casa inicializam com dados default ao invés de começar vazios com instruções:
-- **RoomManager**: 6 cômodos pré-cadastrados (Quarto Casal, Sala, Cozinha...)
-- **GroceryList**: 9 categorias pré-cadastradas (HortiFrutti, Açougue...)
-- **CleaningRoutine**: 3 seções com tarefas pré-preenchidas
-- **MealPlanner**: 4 receitas default
-- **MaintenanceLog**: 4 tarefas de manutenção default
+## Situação atual
+12 módulos ainda usam o `<Tabs>/<TabsList>/<TabsTrigger>` antigo do Shadcn. Saúde, Rotina e Casa já usam o estilo notion-tab com header sticky + abas no header.
 
-## Solução 1: Inicializar vazio + empty state com instruções
-Mudar o `usePersistedState` de cada componente para inicializar com `[]` e mostrar um empty state com instrução do que adicionar (ex: "Adicione seu primeiro cômodo", "Crie categorias para sua lista de mercado").
+## Padrão alvo (igual Rotina/Casa)
+```text
+┌─────────────────────────────────┐
+│ ←  ≡  TÍTULO                   │
+│ 🔥Tab1  📋Tab2  ⚙️Tab3 ...    │  ← scroll horizontal, notion-tab
+└─────────────────────────────────┘
+<main>
+  {activeTab === "tab1" && <Component1 />}
+</main>
+```
 
-## Problema 2: Headers sem ícone ou com `≡` genérico
-4 módulos usam `≡` ao invés do ícone Lucide com a cor da home:
-- **Casa** → `≡` (deveria: `Home` cyan)
-- **Finanças** → `≡` (deveria: `DollarSign` amber)
-- **Saúde** → `≡` (deveria: `Heart` red)
-- **Rotina** → `≡` + h1 duplicado (deveria: `CalendarCheck` emerald)
+- Header sticky com `border-b border-border bg-card sticky top-0 z-50`
+- Abas como `<button>` com classe `notion-tab` / `notion-tab-active`
+- `useState` para controlar aba ativa + `reportTab?.()` no onChange
+- Conteúdo renderizado com `{activeTab === "x" && <Comp />}`
+- Remove imports de `Tabs, TabsContent, TabsList, TabsTrigger`
+- Remove `motion.div` wrappers desnecessários do header (simplifica para o padrão Notion)
 
-Outros módulos já têm ícone mas sem a cor certa da home (ex: Estudos usa `text-indigo-600` mas na home é `text-indigo-600` — ok). Preciso alinhar as cores com o `ModuleDrawer`.
+## Módulos a alterar (12 arquivos)
 
-## Cores da Home (referência)
-| Módulo | Ícone | Cor |
-|--------|-------|-----|
-| Finanças | DollarSign | text-amber-600 |
-| Casa | Home | text-cyan-600 |
-| Saúde | Heart | text-red-600 |
-| Rotina | CalendarCheck | text-emerald-600 |
+| # | Arquivo | Título | Abas (emoji + label) |
+|---|---------|--------|---------------------|
+| 1 | `Hiperfoco.tsx` | MENTE | DIA, BUSCA, METAS, ESTRATÉGIA, TIMELINE, 🌙 SONHOS |
+| 2 | `Relacionamentos.tsx` | RELAÇÕES | 💜 PESSOAS, 📅 AGENDA, ✨ MOMENTOS, 🎁 PRESENTES, 📋 EVENTOS |
+| 3 | `Detox.tsx` | DETOX | 🌿 RASTREADOR, 📓 DIÁRIO, 🏆 CONQUISTAS, 📊 STATS |
+| 4 | `Pet.tsx` | PET | 🐾 PETS, 💉 SAÚDE, 📋 ROTINA, 💸 GASTOS, 📸 DIÁRIO |
+| 5 | `Viagens.tsx` | VIAGENS | 🧭 Destinos, 🗺️ Roteiro, 🎒 Mala, 💰 Budget, 👥 Rachar, 📍 Lugares, 📖 Diário, 🔄 Câmbio, 🛡️ SOS, ⏱️ Timer |
+| 6 | `Beleza.tsx` | BELEZA | ✨ Rotina, 🧪 Bancada, 📷 Diário |
+| 7 | `Dieta.tsx` | DIETA | 🍽️ CARDÁPIO, ⏱️ JEJUM, 👩‍🍳 RECEITAS, 🛒 LISTA, 📊 DIÁRIO |
+| 8 | `Treino.tsx` | TREINO | 🏋️ HOJE, 📅 SEMANA, ⚙️ CONFIG, 📊 RESUMO, 📈 PROGRESSÃO, 🏆 RECORDES |
+| 9 | `Estudos.tsx` | ESTUDOS | 📝 Estudos, 🎓 Grade, ✅ Tarefas, 📓 Caderno, 🍅 Pomodoro |
+| 10 | `Carreira.tsx` | CARREIRA | 💼 Vagas, 🏆 Portfolio, 👥 Rede, ⚡ Skills, 📖 Prep |
+| 11 | `DesenvolvimentoPessoal.tsx` | DESENV. PESSOAL | SOBRE MIM, METAS, DIÁRIO, HUMOR & SCORE, RESPIRAÇÃO, GRATIDÃO, CARTA, 30 DIAS |
+| 12 | `Biblioteca.tsx` | BIBLIOTECA | (mantém tabs existentes com notion-tab) |
 
-## Alterações
-
-| Arquivo | Mudança |
-|---------|---------|
-| `src/pages/Casa.tsx` | Trocar `≡` por `<Home className="w-5 h-5 text-cyan-600" />` |
-| `src/pages/Index.tsx` | Trocar `≡` por `<DollarSign className="w-5 h-5 text-amber-600" />` |
-| `src/pages/Saude.tsx` | Trocar `≡` por `<Heart className="w-5 h-5 text-red-600" />` |
-| `src/pages/Rotina.tsx` | Trocar `≡` por `<CalendarCheck className="w-5 h-5 text-emerald-600" />` + corrigir h1 duplicado |
-| `src/components/casa/RoomManager.tsx` | `defaultRooms = []`, adicionar empty state "Adicione seu primeiro cômodo" |
-| `src/components/casa/GroceryList.tsx` | `DEFAULT_CATEGORIES = []`, adicionar empty state "Crie categorias para organizar suas compras" |
-| `src/components/casa/CleaningRoutine.tsx` | `DEFAULT_SECTIONS = []`, adicionar empty state "Monte sua rotina de limpeza" |
-| `src/components/casa/MealPlanner.tsx` | `defaultRecipes = []`, adicionar empty state "Cadastre suas receitas favoritas" |
-| `src/components/casa/MaintenanceLog.tsx` | `defaultMaintenance = []`, adicionar empty state "Cadastre tarefas de manutenção da casa" |
+## Mudança em cada arquivo (mesmo padrão)
+1. Remover import de `Tabs, TabsContent, TabsList, TabsTrigger`
+2. Adicionar `useState` para `activeTab` (default = primeira aba)
+3. Header: sticky com título + barra de abas notion-tab com scroll horizontal
+4. Conteúdo: `{activeTab === "x" && <Component />}` em vez de `TabsContent`
+5. Manter `reportTab?.(tabId)` no handler de troca de aba
+6. Remover `motion.div` wrappers do header onde existirem (Hiperfoco, Relacionamentos, Detox, Pet)
 

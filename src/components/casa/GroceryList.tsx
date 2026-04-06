@@ -19,7 +19,17 @@ interface GroceryCategory {
   items: GroceryItem[];
 }
 
-const DEFAULT_CATEGORIES: GroceryCategory[] = [];
+const DEFAULT_CATEGORIES: GroceryCategory[] = [
+  { id: "1", name: "HortiFrutti", emoji: "🥬", color: "bg-green-500", items: [] },
+  { id: "2", name: "Açougue e Peixaria", emoji: "🥩", color: "bg-red-500", items: [] },
+  { id: "3", name: "Laticínios e Frios", emoji: "🧀", color: "bg-blue-600", items: [] },
+  { id: "4", name: "Mercearia", emoji: "🏪", color: "bg-purple-500", items: [] },
+  { id: "5", name: "Padaria", emoji: "🥖", color: "bg-orange-500", items: [] },
+  { id: "6", name: "Congelados", emoji: "🍦", color: "bg-yellow-600", items: [] },
+  { id: "7", name: "Limpeza", emoji: "🧹", color: "bg-cyan-500", items: [] },
+  { id: "8", name: "Higiene Pessoal", emoji: "🛁", color: "bg-pink-500", items: [] },
+  { id: "9", name: "Bebidas", emoji: "🥤", color: "bg-indigo-600", items: [] },
+];
 
 const EXTRA_COLORS = [
   { label: "Verde", value: "bg-green-500" },
@@ -140,15 +150,6 @@ const GroceryList = () => {
             <Button size="sm" className="h-8 flex-1" onClick={addCategory}>Adicionar</Button>
             <Button size="sm" variant="outline" className="h-8" onClick={() => setShowAddCat(false)}>Cancelar</Button>
           </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {categories.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <span className="text-4xl mb-3">🍎</span>
-          <h4 className="text-sm font-semibold mb-1">Nenhuma categoria criada</h4>
-          <p className="text-xs text-muted-foreground max-w-[240px]">Crie categorias como HortiFrutti, Açougue, Limpeza para organizar suas compras</p>
         </div>
       )}
 

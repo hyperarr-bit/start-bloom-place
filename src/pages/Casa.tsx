@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";
 import MaintenanceLog from "@/components/casa/MaintenanceLog";
@@ -44,7 +44,7 @@ const Casa = () => {
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <Home className="w-5 h-5 text-cyan-600" />
+          <span className="text-lg">≡</span>
           <h1 className="text-base font-bold tracking-tight">CASA</h1>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

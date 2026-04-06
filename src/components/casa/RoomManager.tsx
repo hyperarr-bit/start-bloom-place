@@ -40,7 +40,14 @@ const BODY_COLORS: Record<string, string> = {
   "bg-cyan-200 dark:bg-cyan-900/40": "bg-cyan-50 dark:bg-cyan-950/20",
 };
 
-const defaultRooms: Room[] = [];
+const defaultRooms: Room[] = [
+  { id: "1", name: "QUARTO CASAL", color: "bg-yellow-200 dark:bg-yellow-900/40", tasks: [] },
+  { id: "2", name: "SALA DE ESTAR", color: "bg-orange-200 dark:bg-orange-900/40", tasks: [] },
+  { id: "3", name: "COZINHA", color: "bg-green-200 dark:bg-green-900/40", tasks: [] },
+  { id: "4", name: "BANHEIROS", color: "bg-cyan-200 dark:bg-cyan-900/40", tasks: [] },
+  { id: "5", name: "LAVANDERIA", color: "bg-pink-200 dark:bg-pink-900/40", tasks: [] },
+  { id: "6", name: "ÁREA EXTERNA", color: "bg-gray-200 dark:bg-gray-700/40", tasks: [] },
+];
 
 const RoomManager = () => {
   const [rooms, setRooms] = usePersistedState<Room[]>("casa-rooms", defaultRooms);
@@ -129,15 +136,6 @@ const RoomManager = () => {
             <Button size="sm" className="h-8 flex-1" onClick={addRoom}>Adicionar</Button>
             <Button size="sm" variant="outline" className="h-8" onClick={() => setShowAdd(false)}>Cancelar</Button>
           </div>
-        </div>
-      )}
-
-      {/* Empty State */}
-      {rooms.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <span className="text-4xl mb-3">🚪</span>
-          <h4 className="text-sm font-semibold mb-1">Nenhum cômodo cadastrado</h4>
-          <p className="text-xs text-muted-foreground max-w-[240px]">Adicione seus cômodos e organize tarefas de cada ambiente da casa</p>
         </div>
       )}
 

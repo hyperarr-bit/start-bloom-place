@@ -132,19 +132,37 @@ const Estudos = () => {
     }, ...notebooks]);
   };
 
+  const [activeTab, setActiveTab] = useState("estudos");
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
+          <GraduationCap className="w-5 h-5 text-indigo-600" />
           <div>
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-indigo-600" /> ESTUDOS
-            </h1>
+            <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
             <p className="text-[11px] text-muted-foreground">Cursos, grade, provas, tarefas e caderno</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {TABS.map((tab) => (
+            <button
+              key={tab.v}
+              onClick={() => handleTabChange(tab.v)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.v ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.l}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -156,19 +174,7 @@ const Estudos = () => {
           "Use o caderno para anotar resumos e dúvidas das aulas",
         ]} />
 
-        <Tabs defaultValue="estudos" className="w-full" onValueChange={v => reportTab?.(v)}>
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full">
-              {TABS.map(t => (
-                <TabsTrigger key={t.v} value={t.v} className="text-[10px] gap-1 px-2.5">
-                  <span>{t.icon}</span> {t.l}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          {/* ══════════ ESTUDOS ══════════ */}
-          <TabsContent value="estudos" className="space-y-4 mt-4">
+        {activeTab === "estudos" && <div className="space-y-4">
 
             {/* Cursos em Andamento */}
             <div className="rounded-xl border border-border overflow-hidden">

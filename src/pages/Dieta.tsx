@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -44,6 +43,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 
 const Dieta = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("cardapio");
   const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
 
@@ -190,13 +190,32 @@ const Dieta = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Apple className="w-5 h-5 text-green-600" /> DIETA</h1>
-            <p className="text-xs text-muted-foreground">Cardápio, jejum, receitas e diário</p>
+          <Apple className="w-5 h-5 text-green-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">DIETA</h1>
+            <p className="text-[11px] text-muted-foreground">Cardápio, jejum, receitas e diário</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {[
+            { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
+            { id: "jejum", label: "JEJUM", icon: "⏱️" },
+            { id: "receitas", label: "RECEITAS", icon: "👩‍🍳" },
+            { id: "lista", label: "LISTA", icon: "🛒" },
+            { id: "diario", label: "DIÁRIO", icon: "📊" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -209,16 +228,7 @@ const Dieta = () => {
             "Use o 📊 DIÁRIO para registrar o que você comeu de verdade e compare com o plano"
           ]}
         />
-        <Tabs defaultValue="cardapio" className="w-full" onValueChange={v => reportTab?.(v)}>
-          <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
-            <TabsTrigger value="cardapio" className="text-xs px-3 py-1.5">🍽️ CARDÁPIO</TabsTrigger>
-            <TabsTrigger value="jejum" className="text-xs px-3 py-1.5">⏱️ JEJUM</TabsTrigger>
-            <TabsTrigger value="receitas" className="text-xs px-3 py-1.5">👩‍🍳 RECEITAS</TabsTrigger>
-            <TabsTrigger value="lista" className="text-xs px-3 py-1.5">🛒 LISTA</TabsTrigger>
-            <TabsTrigger value="diario" className="text-xs px-3 py-1.5">📊 DIÁRIO</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="cardapio" className="space-y-3">
+          {activeTab === "cardapio" && <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">Cardápio semanal — clique para editar:</p>
               <Button size="sm" variant={showMealConfig ? "default" : "outline"} className="text-xs h-7" onClick={() => setShowMealConfig(!showMealConfig)}>
@@ -412,10 +422,10 @@ const Dieta = () => {
                 </div>
               ))}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== JEJUM ========== */}
-          <TabsContent value="jejum" className="space-y-4">
+          {activeTab === "jejum" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 rounded-xl border border-orange-200 p-4 text-center">
               <h3 className="text-xs font-bold mb-3 flex items-center justify-center gap-2"><Clock className="w-4 h-4 text-orange-500" /> JEJUM INTERMITENTE</h3>
               <div className="flex justify-center gap-2 mb-4">
@@ -447,10 +457,10 @@ const Dieta = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== RECEITAS ========== */}
-          <TabsContent value="receitas" className="space-y-4">
+          {activeTab === "receitas" && <div className="space-y-4">
             {/* Category filter chips */}
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               {["Todas", "Café", "Almoço", "Janta", "Lanche", "Doce Fit", "Fitness", "Salgado", "Shake", "Receita Rápida"].map(cat => (
@@ -640,10 +650,10 @@ const Dieta = () => {
                 </div>
               );
             })()}
-          </TabsContent>
+          </div>}
 
           {/* ========== LISTA INTELIGENTE ========== */}
-          <TabsContent value="lista" className="space-y-4">
+          {activeTab === "lista" && <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold flex items-center gap-2"><ShoppingCart className="w-4 h-4" /> LISTA INTELIGENTE</h3>
@@ -740,10 +750,10 @@ const Dieta = () => {
                 </Button>
               )}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== DIÁRIO v2 ========== */}
-          <TabsContent value="diario" className="space-y-4">
+          {activeTab === "diario" && <div className="space-y-4">
             {/* Date navigation */}
             <div className="flex items-center justify-between bg-card rounded-xl border border-border p-3">
               <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigateDiaryDate(-1)}>
@@ -894,8 +904,8 @@ const Dieta = () => {
                 </>
               );
             })()}
-          </TabsContent>
-        </Tabs>
+          </div>}
+        
       </main>
     </div>
   );

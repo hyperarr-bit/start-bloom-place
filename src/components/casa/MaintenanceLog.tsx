@@ -1,26 +1,19 @@
 import { useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, X, Trash2, AlertTriangle, Ruler, Shield } from "lucide-react";
+import { Plus, X, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MaintenanceTask, Warranty, RoomMeasure, monthsSince, daysSince } from "./types";
-
-const defaultMaintenance: MaintenanceTask[] = [];
+import { MaintenanceTask, Warranty, RoomMeasure, monthsSince } from "./types";
 
 const MaintenanceLog = () => {
-  const [tasks, setTasks] = usePersistedState<MaintenanceTask[]>("casa-maint-tasks", defaultMaintenance);
+  const [tasks, setTasks] = usePersistedState<MaintenanceTask[]>("casa-maint-tasks", []);
   const [warranties, setWarranties] = usePersistedState<Warranty[]>("casa-warranties", []);
   const [measures, setMeasures] = usePersistedState<RoomMeasure[]>("casa-measures", []);
   const [newTask, setNewTask] = useState("");
   const [newFreq, setNewFreq] = useState("6");
-  const [section, setSection] = useState<"maint" | "warranty" | "measures">("maint");
-
-  // Warranty form
   const [wProduct, setWProduct] = useState("");
   const [wDate, setWDate] = useState("");
   const [wMonths, setWMonths] = useState("12");
-
-  // Measure form
   const [mRoom, setMRoom] = useState("");
   const [mLabel, setMLabel] = useState("");
   const [mValue, setMValue] = useState("");
@@ -56,117 +49,102 @@ const MaintenanceLog = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1">
-        {[
-          { k: "maint" as const, l: "🔧 Manutenção" },
-          { k: "warranty" as const, l: "🛡️ Garantias" },
-          { k: "measures" as const, l: "📐 Medidas" },
-        ].map(s => (
-          <Button key={s.k} variant={section === s.k ? "default" : "outline"} size="sm" className="text-xs flex-1 h-8" onClick={() => setSection(s.k)}>{s.l}</Button>
-        ))}
-      </div>
-
-      {section === "maint" && (
-        <div className="space-y-2">
+      {/* MANUTENÇÃO */}
+      <div className="rounded-xl overflow-hidden border border-border">
+        <div className="bg-amber-200 dark:bg-amber-900/60 px-3 py-2">
+          <h4 className="text-xs font-bold text-foreground">🔧 MANUTENÇÃO</h4>
+        </div>
+        <div className="bg-amber-50 dark:bg-amber-950/30 p-2 space-y-1.5">
           {tasks.map(t => {
             const months = monthsSince(t.lastDone);
             const overdue = months >= t.frequencyMonths;
             return (
-              <div key={t.id} className={`bg-card rounded-xl border p-3 group ${overdue ? "border-red-500/50 bg-red-500/5" : "border-border"}`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{t.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold">{t.task}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      A cada {t.frequencyMonths} meses • {t.lastDone ? `Último: ${new Date(t.lastDone).toLocaleDateString("pt-BR")}` : "Nunca feito"}
-                    </p>
-                  </div>
-                  {overdue && <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />}
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => markTaskDone(t.id)}>✅ Feito</Button>
-                  <button onClick={() => setTasks(prev => prev.filter(x => x.id !== t.id))} className="opacity-0 group-hover:opacity-100">
-                    <X className="w-3 h-3 text-muted-foreground" />
-                  </button>
+              <div key={t.id} className={`flex items-center gap-2 p-2 rounded-lg group ${overdue ? "bg-red-500/10 border border-red-500/30" : "bg-background/50 border border-border"}`}>
+                <span className="text-sm">{t.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold">{t.task}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    A cada {t.frequencyMonths}m • {t.lastDone ? `Último: ${new Date(t.lastDone).toLocaleDateString("pt-BR")}` : "Nunca feito"}
+                  </p>
                 </div>
+                {overdue && <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => markTaskDone(t.id)}>✅ Feito</Button>
+                <button onClick={() => setTasks(prev => prev.filter(x => x.id !== t.id))} className="opacity-0 group-hover:opacity-100">
+                  <X className="w-3 h-3 text-muted-foreground" />
+                </button>
               </div>
             );
           })}
-          <div className="flex gap-2">
-            <Input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Nova manutenção..." className="text-xs h-8 flex-1" onKeyDown={e => e.key === "Enter" && addTask()} />
-            <Input type="number" value={newFreq} onChange={e => setNewFreq(e.target.value)} className="text-xs h-8 w-14" placeholder="Meses" />
-            <Button size="sm" className="h-8" onClick={addTask}><Plus className="w-3 h-3" /></Button>
+          {tasks.length === 0 && <p className="text-[11px] text-muted-foreground italic py-2 text-center">Nenhuma manutenção ainda</p>}
+          <div className="flex gap-2 pt-1">
+            <Input value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Nova manutenção..." className="text-xs h-7 flex-1 bg-background/70" onKeyDown={e => e.key === "Enter" && addTask()} />
+            <Input type="number" value={newFreq} onChange={e => setNewFreq(e.target.value)} className="text-xs h-7 w-14 bg-background/70" placeholder="Meses" />
+            <Button size="sm" className="h-7 px-2" onClick={addTask}><Plus className="w-3 h-3" /></Button>
           </div>
         </div>
-      )}
+      </div>
 
-      {section === "warranty" && (
-        <div className="space-y-2">
-          {warranties.filter(w => warrantyDaysLeft(w) <= 60 && warrantyDaysLeft(w) > 0).length > 0 && (
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2 text-xs text-center">
-              ⚠️ Garantias expirando em breve!
-            </div>
-          )}
+      {/* GARANTIAS */}
+      <div className="rounded-xl overflow-hidden border border-border">
+        <div className="bg-teal-200 dark:bg-teal-900/60 px-3 py-2">
+          <h4 className="text-xs font-bold text-foreground">🛡️ GARANTIAS</h4>
+        </div>
+        <div className="bg-teal-50 dark:bg-teal-950/30 p-2 space-y-1.5">
           {warranties.map(w => {
             const daysLeft = warrantyDaysLeft(w);
             return (
-              <div key={w.id} className={`bg-card rounded-xl border p-3 group ${daysLeft <= 30 ? "border-red-500/50" : daysLeft <= 60 ? "border-yellow-500/50" : "border-border"}`}>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-primary shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-bold">{w.product}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {daysLeft > 0 ? `${daysLeft} dias restantes` : "Garantia expirada"} • {w.warrantyMonths} meses
-                    </p>
-                  </div>
-                  <button onClick={() => setWarranties(prev => prev.filter(x => x.id !== w.id))} className="opacity-0 group-hover:opacity-100">
-                    <Trash2 className="w-3 h-3 text-muted-foreground" />
-                  </button>
+              <div key={w.id} className={`flex items-center gap-2 p-2 rounded-lg group border ${daysLeft <= 30 ? "border-red-500/30 bg-red-500/5" : daysLeft <= 60 ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-background/50"}`}>
+                <div className="flex-1">
+                  <p className="text-xs font-bold">{w.product}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {daysLeft > 0 ? `${daysLeft} dias restantes` : "Expirada"} • {w.warrantyMonths} meses
+                  </p>
                 </div>
+                <button onClick={() => setWarranties(prev => prev.filter(x => x.id !== w.id))} className="opacity-0 group-hover:opacity-100">
+                  <Trash2 className="w-3 h-3 text-muted-foreground" />
+                </button>
               </div>
             );
           })}
-          <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-            <p className="text-xs font-bold">Adicionar garantia</p>
-            <div className="grid grid-cols-3 gap-2">
-              <Input value={wProduct} onChange={e => setWProduct(e.target.value)} placeholder="Produto" className="text-xs h-7 col-span-3" />
-              <Input type="date" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 col-span-2" />
-              <Input type="number" value={wMonths} onChange={e => setWMonths(e.target.value)} placeholder="Meses" className="text-xs h-7" />
-            </div>
-            <Button size="sm" className="h-7 w-full text-xs" onClick={addWarranty}>Salvar</Button>
+          {warranties.length === 0 && <p className="text-[11px] text-muted-foreground italic py-2 text-center">Nenhuma garantia ainda</p>}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <Input value={wProduct} onChange={e => setWProduct(e.target.value)} placeholder="Produto" className="text-xs h-7 col-span-3 bg-background/70" />
+            <Input type="date" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 col-span-2 bg-background/70" />
+            <Input type="number" value={wMonths} onChange={e => setWMonths(e.target.value)} placeholder="Meses" className="text-xs h-7 bg-background/70" />
           </div>
+          <Button size="sm" className="h-7 w-full text-xs mt-1" onClick={addWarranty}>Salvar garantia</Button>
         </div>
-      )}
+      </div>
 
-      {section === "measures" && (
-        <div className="space-y-2">
-          {measures.length > 0 && (
-            <div className="bg-card rounded-xl border border-border p-3">
-              {Object.entries(measures.reduce((acc, m) => { (acc[m.room] = acc[m.room] || []).push(m); return acc; }, {} as Record<string, RoomMeasure[]>)).map(([room, items]) => (
-                <div key={room} className="mb-3 last:mb-0">
-                  <h4 className="text-xs font-bold mb-1">📐 {room}</h4>
-                  {items.map(m => (
-                    <div key={m.id} className="flex items-center gap-2 text-xs py-0.5 group">
-                      <span className="text-muted-foreground">{m.label}:</span>
-                      <span className="font-mono font-bold">{m.value}</span>
-                      <button onClick={() => setMeasures(prev => prev.filter(x => x.id !== m.id))} className="opacity-0 group-hover:opacity-100 ml-auto">
-                        <X className="w-2.5 h-2.5 text-muted-foreground" />
-                      </button>
-                    </div>
-                  ))}
+      {/* MEDIDAS */}
+      <div className="rounded-xl overflow-hidden border border-border">
+        <div className="bg-slate-200 dark:bg-slate-800/60 px-3 py-2">
+          <h4 className="text-xs font-bold text-foreground">📐 MEDIDAS</h4>
+        </div>
+        <div className="bg-slate-50 dark:bg-slate-950/30 p-2 space-y-1.5">
+          {Object.entries(measures.reduce((acc, m) => { (acc[m.room] = acc[m.room] || []).push(m); return acc; }, {} as Record<string, RoomMeasure[]>)).map(([room, items]) => (
+            <div key={room} className="bg-background/50 rounded-lg p-2 border border-border">
+              <h5 className="text-[10px] font-bold mb-1">📐 {room}</h5>
+              {items.map(m => (
+                <div key={m.id} className="flex items-center gap-2 text-xs py-0.5 group">
+                  <span className="text-muted-foreground">{m.label}:</span>
+                  <span className="font-mono font-bold">{m.value}</span>
+                  <button onClick={() => setMeasures(prev => prev.filter(x => x.id !== m.id))} className="opacity-0 group-hover:opacity-100 ml-auto">
+                    <X className="w-2.5 h-2.5 text-muted-foreground" />
+                  </button>
                 </div>
               ))}
             </div>
-          )}
-          <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-            <p className="text-xs font-bold">Nova medida</p>
-            <div className="grid grid-cols-3 gap-2">
-              <Input value={mRoom} onChange={e => setMRoom(e.target.value)} placeholder="Cômodo" className="text-xs h-7" />
-              <Input value={mLabel} onChange={e => setMLabel(e.target.value)} placeholder="O quê" className="text-xs h-7" />
-              <Input value={mValue} onChange={e => setMValue(e.target.value)} placeholder="Ex: 2.5m" className="text-xs h-7" />
-            </div>
-            <Button size="sm" className="h-7 w-full text-xs" onClick={addMeasure}>Salvar</Button>
+          ))}
+          {measures.length === 0 && <p className="text-[11px] text-muted-foreground italic py-2 text-center">Nenhuma medida ainda</p>}
+          <div className="grid grid-cols-3 gap-2 pt-1">
+            <Input value={mRoom} onChange={e => setMRoom(e.target.value)} placeholder="Cômodo" className="text-xs h-7 bg-background/70" />
+            <Input value={mLabel} onChange={e => setMLabel(e.target.value)} placeholder="O quê" className="text-xs h-7 bg-background/70" />
+            <Input value={mValue} onChange={e => setMValue(e.target.value)} placeholder="Ex: 2.5m" className="text-xs h-7 bg-background/70" />
           </div>
+          <Button size="sm" className="h-7 w-full text-xs mt-1" onClick={addMeasure}>Salvar medida</Button>
         </div>
-      )}
+      </div>
     </div>
   );
 };

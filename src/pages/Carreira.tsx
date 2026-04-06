@@ -439,19 +439,45 @@ const Carreira = () => {
   const interviews = jobs.filter(j => j.status === "entrevista").length;
   const offers = jobs.filter(j => j.status === "oferta").length;
 
+  const [activeTab, setActiveTab] = useState("jobs");
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
+
+  const careerTabs = [
+    { id: "jobs", label: "Vagas", icon: "💼" },
+    { id: "portfolio", label: "Portfolio", icon: "🏆" },
+    { id: "network", label: "Rede", icon: "👥" },
+    { id: "skills", label: "Skills", icon: "⚡" },
+    { id: "interview", label: "Prep", icon: "📖" },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-slate-600" /> CARREIRA
-            </h1>
+          <Briefcase className="w-5 h-5 text-slate-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">CARREIRA</h1>
             <p className="text-[11px] text-muted-foreground">Vagas, portfolio, networking e skills</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {careerTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -466,7 +492,7 @@ const Carreira = () => {
           ]}
         />
 
-        {/* Stat Cards — Notion-style */}
+        {/* Stat Cards */}
         <div className="grid grid-cols-4 gap-2">
           {[
             { label: "TOTAL", value: jobs.length, emoji: "📊", headerColor: "bg-indigo-200 dark:bg-indigo-800/50", bodyColor: "bg-indigo-50 dark:bg-indigo-950/20" },
@@ -497,20 +523,11 @@ const Carreira = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="jobs" onValueChange={v => reportTab?.(v)}>
-          <TabsList className="w-full grid grid-cols-5">
-            <TabsTrigger value="jobs" className="text-[10px] gap-0.5"><Briefcase className="w-3 h-3" />Vagas</TabsTrigger>
-            <TabsTrigger value="portfolio" className="text-[10px] gap-0.5"><Award className="w-3 h-3" />Portfolio</TabsTrigger>
-            <TabsTrigger value="network" className="text-[10px] gap-0.5"><Users className="w-3 h-3" />Rede</TabsTrigger>
-            <TabsTrigger value="skills" className="text-[10px] gap-0.5"><Zap className="w-3 h-3" />Skills</TabsTrigger>
-            <TabsTrigger value="interview" className="text-[10px] gap-0.5"><BookOpen className="w-3 h-3" />Prep</TabsTrigger>
-          </TabsList>
-          <TabsContent value="jobs"><JobTracker /></TabsContent>
-          <TabsContent value="portfolio"><Portfolio /></TabsContent>
-          <TabsContent value="network"><Networking /></TabsContent>
-          <TabsContent value="skills"><SkillsTracker /></TabsContent>
-          <TabsContent value="interview"><InterviewPrep /></TabsContent>
-        </Tabs>
+        {activeTab === "jobs" && <JobTracker />}
+        {activeTab === "portfolio" && <Portfolio />}
+        {activeTab === "network" && <Networking />}
+        {activeTab === "skills" && <SkillsTracker />}
+        {activeTab === "interview" && <InterviewPrep />}
       </main>
     </div>
   );

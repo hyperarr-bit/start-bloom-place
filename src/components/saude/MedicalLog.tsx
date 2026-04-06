@@ -235,41 +235,81 @@ export const MedicalLog = () => {
         })()}
       </div>
 
-      {/* ── EXAMES TABLE ── */}
+      {/* ── MARCAR EXAME ── */}
       <div className="rounded-2xl border border-border overflow-hidden bg-card">
-        <div className="bg-teal-200 dark:bg-teal-900/40 px-5 py-4 flex items-center justify-between">
+        <div className="bg-rose-200 dark:bg-rose-900/40 px-5 py-4 flex items-center justify-between">
           <h3 className="text-base font-black uppercase tracking-wide text-foreground">Exames</h3>
           <span className="text-3xl">🩸</span>
         </div>
-        <input ref={examFileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={e => { if (e.target.files?.[0]) uploadExam(e.target.files[0]); }} />
+        <div className="p-4">
+          <button
+            onClick={() => setShowExamForm(!showExamForm)}
+            className="w-full py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" /> {showExamForm ? "Cancelar" : "Novo Exame"}
+          </button>
+
+          <AnimatePresence>
+            {showExamForm && (
+              <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden mt-3">
+                <div className="grid gap-2 p-3 rounded-xl bg-muted">
+                  <Input value={newExam.name} onChange={e => setNewExam({ ...newExam, name: e.target.value })} placeholder="Nome do exame (ex: Hemograma)" className="text-xs h-9" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input type="date" value={newExam.date} onChange={e => setNewExam({ ...newExam, date: e.target.value })} className="text-xs h-9" />
+                    <Input type="time" value={newExam.time} onChange={e => setNewExam({ ...newExam, time: e.target.value })} className="text-xs h-9" />
+                  </div>
+                  <Input value={newExam.location} onChange={e => setNewExam({ ...newExam, location: e.target.value })} placeholder="Local / Laboratório" className="text-xs h-9" />
+                  <Textarea value={newExam.notes} onChange={e => setNewExam({ ...newExam, notes: e.target.value })} placeholder="Observações (jejum, preparo...)" className="text-xs min-h-[60px]" />
+                  <button onClick={addExam} className="py-2.5 rounded-xl bg-[hsl(var(--saude-green)/0.12)] text-[hsl(var(--saude-green))] text-xs font-bold hover:bg-[hsl(var(--saude-green)/0.2)] transition-colors">
+                    Salvar Exame
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {exams.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Especialidade</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Exame</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Data</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
                   <th className="px-2 py-3" />
                 </tr>
               </thead>
               <tbody>
-                {exams.sort((a, b) => b.date.localeCompare(a.date)).map(e => (
-                  <tr key={e.id} className="border-t border-border/50 hover:bg-muted/30 transition-colors">
+                {[...exams].sort((a, b) => b.date.localeCompare(a.date)).map(e => (
+                  <tr key={e.id} className={`border-t border-border/50 hover:bg-muted/30 transition-colors ${e.done ? "opacity-50" : ""}`}>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${getExamColor(e.name)}`}>
-                        {e.name.replace(/\.\w+$/, '')}
+                        {e.done ? "✓ " : ""}{e.name}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {new Date(e.date + "T12:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric", year: "numeric" })}
+                      {e.date ? new Date(e.date + "T12:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{e.type}</td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">{e.time || "—"}</td>
                     <td className="px-2 py-3">
                       <div className="flex gap-1">
-                        <a href={e.url} target="_blank" rel="noopener noreferrer"
-                          className="text-[10px] px-2 py-1 rounded-md bg-primary/10 text-primary font-bold">Ver</a>
+                        <button onClick={() => toggleExamDone(e.id)}
+                          className={`text-[10px] px-2 py-1 rounded-md font-bold transition-colors ${e.done ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"}`}>
+                          {e.done ? "Desfazer" : "Feito"}
+                        </button>
+                        {e.location && (
+                          <a href={`https://maps.google.com/?q=${encodeURIComponent(e.location)}`} target="_blank" rel="noopener noreferrer"
+                            className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
+                            <MapPin className="w-3.5 h-3.5 text-[hsl(var(--saude-blue))]" />
+                          </a>
+                        )}
+                        {e.notes && (
+                          <button onClick={() => setExpandedExam(expandedExam === e.id ? null : e.id)}
+                            className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
+                            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedExam === e.id ? "rotate-180" : ""}`} />
+                          </button>
+                        )}
                         <button onClick={() => setExams(prev => prev.filter(x => x.id !== e.id))}>
                           <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
                         </button>
@@ -290,15 +330,22 @@ export const MedicalLog = () => {
           </div>
         ) : (
           <div className="p-6 text-center">
-            <p className="text-sm text-muted-foreground">Nenhum exame salvo</p>
+            <p className="text-sm text-muted-foreground">Nenhum exame agendado</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Use o botão acima para agendar</p>
           </div>
         )}
-        <div className="px-4 pb-4 pt-2">
-          <button onClick={() => examFileRef.current?.click()} disabled={uploading}
-            className="w-full py-2.5 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary text-xs font-bold transition-colors flex items-center justify-center gap-2">
-            <Upload className="w-3.5 h-3.5" /> {uploading ? "Enviando..." : "Upload de Exame"}
-          </button>
-        </div>
+        {expandedExam && (() => {
+          const e = exams.find(x => x.id === expandedExam);
+          if (!e?.notes) return null;
+          return (
+            <div className="px-4 pb-4">
+              <div className="p-3 rounded-xl bg-muted text-xs text-muted-foreground">
+                <p className="font-bold text-foreground mb-1">📝 Observações:</p>
+                {e.notes}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* ── BIOMARCADORES ── */}

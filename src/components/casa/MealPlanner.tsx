@@ -108,7 +108,7 @@ const MealPlanner = () => {
             </div>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 };

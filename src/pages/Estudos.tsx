@@ -370,10 +370,9 @@ const Estudos = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ GRADE HORÁRIA ══════════ */}
-          <TabsContent value="grade" className="space-y-4 mt-4">
+          {activeTab === "grade" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-amber-300 dark:bg-amber-700/60 px-4 py-3 text-center">
                 <span className="text-3xl">🧑‍🎓</span>

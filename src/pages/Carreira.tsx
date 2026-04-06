@@ -283,6 +283,11 @@ const Networking = () => {
           <span className="col-span-2 text-right">Ações</span>
         </div>
         <div className="divide-y divide-border bg-card">
+          {contacts.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhum contato ainda</p>
+            </div>
+          )}
           {contacts.map(c => (
             <div key={c.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
               <span className="col-span-1 text-sm">{catEmoji[c.category]}</span>

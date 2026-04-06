@@ -84,15 +84,7 @@ const JobTracker = () => {
         </div>
       )}
 
-      <div className="flex gap-2">
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="flex-1 h-9 text-xs"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="all">Todas</SelectItem>{Object.entries(statusConfig).map(([k, v]) => <SelectItem key={k} value={k}>{v.emoji} {v.label}</SelectItem>)}</SelectContent>
-        </Select>
-        <Button size="sm" className="h-9" onClick={() => { setShowForm(true); setEditId(null); setForm({ status: "aplicado", favorite: false }); }}>
-          <Plus className="w-4 h-4" />
-        </Button>
-      </div>
+      
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">

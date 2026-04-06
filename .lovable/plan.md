@@ -1,50 +1,58 @@
+# Plano: Remover dados pré-preenchidos do Casa + Emojis coloridos nos headers
+
+## 1. Remover dados pré-preenchidos (manter estrutura visual)
 
 
-# Plano: Aplicar estilo notion-tab em todos os módulos
+| Componente            | Default atual                                                                                                | Novo default                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `CleaningRoutine.tsx` | 3 seções com 4 itens cada (Diária, Semanal, Mensal)                                                          | 3 seções vazias (mesmos nomes e cores, `items: []`) |
+| `MaintenanceLog.tsx`  | 4 tarefas pré-cadastradas (filtro, ar-cond, colchão, máquina)                                                | `[]` vazio                                          |
+| `SafetyChecks.tsx`    | 6 itens emergência + 6 itens viagem pré-cadastrados                                                          | `[]` vazio para ambos                               |
+| `MealPlanner.tsx`     | 4 receitas (arroz, macarrão, frango, salada)                                                                 | `[]` vazio                                          |
+| `RoomManager.tsx`     | 6 cômodos pré-cadastrados ( pode deixar os cômodos ) errado era se estivesse o que limpar dentro dos cômodos | `[]` vazio                                          |
+| `types.ts`            | `defaultCleaningTasks` com 6 itens, `defaultEmergencyItems` com 6, `defaultTravelChecklist` com 6            | Todos `[]`                                          |
 
-## Situação atual
-12 módulos ainda usam o `<Tabs>/<TabsList>/<TabsTrigger>` antigo do Shadcn. Saúde, Rotina e Casa já usam o estilo notion-tab com header sticky + abas no header.
 
-## Padrão alvo (igual Rotina/Casa)
-```text
-┌─────────────────────────────────┐
-│ ←  ≡  TÍTULO                   │
-│ 🔥Tab1  📋Tab2  ⚙️Tab3 ...    │  ← scroll horizontal, notion-tab
-└─────────────────────────────────┘
-<main>
-  {activeTab === "tab1" && <Component1 />}
-</main>
-```
+**Nota**: GroceryList mantém as categorias (HortiFrutti, Açougue, etc.) pois são estruturais, não dados do usuário.
 
-- Header sticky com `border-b border-border bg-card sticky top-0 z-50`
-- Abas como `<button>` com classe `notion-tab` / `notion-tab-active`
-- `useState` para controlar aba ativa + `reportTab?.()` no onChange
-- Conteúdo renderizado com `{activeTab === "x" && <Comp />}`
-- Remove imports de `Tabs, TabsContent, TabsList, TabsTrigger`
-- Remove `motion.div` wrappers desnecessários do header (simplifica para o padrão Notion)
+## 2. Adicionar emoji colorido no header de cada módulo
 
-## Módulos a alterar (12 arquivos)
+Atualmente todos os headers mostram só texto (ex: `CASA`). Vou adicionar o emoji do módulo com a cor correspondente da Home.
 
-| # | Arquivo | Título | Abas (emoji + label) |
-|---|---------|--------|---------------------|
-| 1 | `Hiperfoco.tsx` | MENTE | DIA, BUSCA, METAS, ESTRATÉGIA, TIMELINE, 🌙 SONHOS |
-| 2 | `Relacionamentos.tsx` | RELAÇÕES | 💜 PESSOAS, 📅 AGENDA, ✨ MOMENTOS, 🎁 PRESENTES, 📋 EVENTOS |
-| 3 | `Detox.tsx` | DETOX | 🌿 RASTREADOR, 📓 DIÁRIO, 🏆 CONQUISTAS, 📊 STATS |
-| 4 | `Pet.tsx` | PET | 🐾 PETS, 💉 SAÚDE, 📋 ROTINA, 💸 GASTOS, 📸 DIÁRIO |
-| 5 | `Viagens.tsx` | VIAGENS | 🧭 Destinos, 🗺️ Roteiro, 🎒 Mala, 💰 Budget, 👥 Rachar, 📍 Lugares, 📖 Diário, 🔄 Câmbio, 🛡️ SOS, ⏱️ Timer |
-| 6 | `Beleza.tsx` | BELEZA | ✨ Rotina, 🧪 Bancada, 📷 Diário |
-| 7 | `Dieta.tsx` | DIETA | 🍽️ CARDÁPIO, ⏱️ JEJUM, 👩‍🍳 RECEITAS, 🛒 LISTA, 📊 DIÁRIO |
-| 8 | `Treino.tsx` | TREINO | 🏋️ HOJE, 📅 SEMANA, ⚙️ CONFIG, 📊 RESUMO, 📈 PROGRESSÃO, 🏆 RECORDES |
-| 9 | `Estudos.tsx` | ESTUDOS | 📝 Estudos, 🎓 Grade, ✅ Tarefas, 📓 Caderno, 🍅 Pomodoro |
-| 10 | `Carreira.tsx` | CARREIRA | 💼 Vagas, 🏆 Portfolio, 👥 Rede, ⚡ Skills, 📖 Prep |
-| 11 | `DesenvolvimentoPessoal.tsx` | DESENV. PESSOAL | SOBRE MIM, METAS, DIÁRIO, HUMOR & SCORE, RESPIRAÇÃO, GRATIDÃO, CARTA, 30 DIAS |
-| 12 | `Biblioteca.tsx` | BIBLIOTECA | (mantém tabs existentes com notion-tab) |
+Cores por módulo (extraídas do `ModuleDrawer.tsx`):
 
-## Mudança em cada arquivo (mesmo padrão)
-1. Remover import de `Tabs, TabsContent, TabsList, TabsTrigger`
-2. Adicionar `useState` para `activeTab` (default = primeira aba)
-3. Header: sticky com título + barra de abas notion-tab com scroll horizontal
-4. Conteúdo: `{activeTab === "x" && <Component />}` em vez de `TabsContent`
-5. Manter `reportTab?.(tabId)` no handler de troca de aba
-6. Remover `motion.div` wrappers do header onde existirem (Hiperfoco, Relacionamentos, Detox, Pet)
 
+| Módulo       | Emoji | Cor do texto       |
+| ------------ | ----- | ------------------ |
+| Finanças     | 💰    | `text-amber-600`   |
+| Casa         | 🏠    | `text-cyan-600`    |
+| Rotina       | 📋    | `text-emerald-600` |
+| Saúde        | ❤️    | `text-red-600`     |
+| Treino       | 💪    | `text-blue-600`    |
+| Dieta        | 🍎    | `text-green-600`   |
+| Estudos      | 🎓    | `text-indigo-600`  |
+| Biblioteca   | 📚    | `text-orange-600`  |
+| Beleza       | 💧    | `text-pink-600`    |
+| Viagens      | ✈️    | `text-teal-600`    |
+| Carreira     | 💼    | `text-slate-600`   |
+| Mente        | 🧠    | `text-violet-600`  |
+| Relações     | 👥    | `text-rose-600`    |
+| Pet          | 🐾    | `text-amber-500`   |
+| Detox        | 🌿    | `text-lime-600`    |
+| Dev. Pessoal | ✨     | `text-purple-600`  |
+
+
+Formato do header: `<span className="text-cyan-600">🏠</span>` antes do `<h1>CASA</h1>`
+
+## Arquivos alterados
+
+
+| Arquivo                                   | Mudança                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `src/components/casa/CleaningRoutine.tsx` | Seções com `items: []`                                                                   |
+| `src/components/casa/MaintenanceLog.tsx`  | `defaultMaintenance = []`                                                                |
+| `src/components/casa/SafetyChecks.tsx`    | Listas vazias                                                                            |
+| `src/components/casa/MealPlanner.tsx`     | `defaultRecipes = []`                                                                    |
+| `src/components/casa/RoomManager.tsx`     | `defaultRooms = []`                                                                      |
+| `src/components/casa/types.ts`            | `defaultCleaningTasks = []`, `defaultEmergencyItems = []`, `defaultTravelChecklist = []` |
+| 15 páginas de módulo                      | Adicionar emoji colorido no `<h1>` do header                                             |

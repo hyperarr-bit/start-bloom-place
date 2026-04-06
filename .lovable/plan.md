@@ -1,37 +1,20 @@
 
 
-# Plano: Garantir que o Analytics novo funcione (problema de cache)
+# Plano: 3 ajustes — emoji 🔞 no Detox, metas vazia, mural vertical
 
-## Diagnóstico
+## 1. Detox — adicionar emoji 🔞 à lista de ícones
+No `src/components/detox/DetoxTracker.tsx`, linha 17, o array `iconOptions` tem `["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊"]`. Adicionar `"🔞"` ao array.
 
-O codigo do AdminAnalytics.tsx **ja esta completo** com todas as features:
-- Cards: usuarios, sessoes, tempo total, sessao media
-- Card "Hoje": sessoes e usuarios do dia + retencao
-- Grafico de atividade diaria (LineChart)
-- Grafico de horarios de pico (BarChart)
-- Ranking de modulos **clicavel** -> drill-down mostrando:
-  - Ranking de abas (tab_id) com sessoes, tempo e usuarios
-  - Lista de usuarios do modulo
+## 2. Metas — começar sem meta pré-cadastrada
+No `src/components/hiperfoco/GoalsBoardV2.tsx`, linha 43, mudar `defaultGoals` de `[emptyGoal("Minha Meta")]` para `[]`. O usuário verá a planilha vazia e usará o botão "Nova meta" para criar a primeira.
 
-O tracking de `tab_id` tambem ja esta implementado em todos os 16 modulos. Cada modulo reporta sua aba ativa via `useSetTrackedTab` ou `useTabReporter`.
+## 3. Mural dos Sonhos — fotos empilhadas verticalmente
+No `src/components/hiperfoco/GoalsBoardV2.tsx`, linhas 200-207, trocar o layout de `grid grid-cols-3 gap-2` para `space-y-3` (vertical). Cada imagem muda de `h-24 object-cover` para `w-full rounded-lg` com altura automática, ficando uma embaixo da outra em tamanho grande.
 
-A coluna `tab_id` ja foi adicionada na tabela `module_analytics`.
+## Alterações
 
-## Problema real
-
-O browser esta servindo o bundle JS antigo (cache). As network requests mostram a query antiga sem `tab_id`.
-
-## Solucao
-
-Forcando uma mudanca minima no arquivo para invalidar o cache do build:
-
-| Arquivo | Mudanca |
+| Arquivo | Mudança |
 |---------|---------|
-| `src/pages/AdminAnalytics.tsx` | Adicionar um comentario de versao no topo (`// v2 - analytics completo`) para forcar rebuild e invalidacao de cache. |
-
-Isso vai gerar um novo hash no bundle, forcando o browser a baixar a versao nova.
-
-## Nota
-
-Se mesmo apos o rebuild o browser continuar com cache, voce precisa fazer **Ctrl+Shift+R** (hard refresh) ou abrir em aba anonima.
+| `src/components/detox/DetoxTracker.tsx` | Adicionar `"🔞"` ao array `iconOptions` |
+| `src/components/hiperfoco/GoalsBoardV2.tsx` | (1) `defaultGoals = []` (2) Mural: trocar grid 3 colunas por stack vertical com imagens full-width |
 

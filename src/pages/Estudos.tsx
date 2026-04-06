@@ -619,8 +619,7 @@ const Estudos = () => {
                 <p className="text-xs text-muted-foreground">🍅 Pomodoros concluídos: <span className="font-bold">{pomodoroCount}</span></p>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>}
       </main>
     </div>
   );

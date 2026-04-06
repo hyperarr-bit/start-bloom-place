@@ -132,6 +132,15 @@ const RoomManager = () => {
         </div>
       )}
 
+      {/* Empty State */}
+      {rooms.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <span className="text-4xl mb-3">🚪</span>
+          <h4 className="text-sm font-semibold mb-1">Nenhum cômodo cadastrado</h4>
+          <p className="text-xs text-muted-foreground max-w-[240px]">Adicione seus cômodos e organize tarefas de cada ambiente da casa</p>
+        </div>
+      )}
+
       {/* Room Cards */}
       {rooms.map(room => {
         const bodyColor = BODY_COLORS[room.color] || "bg-card";

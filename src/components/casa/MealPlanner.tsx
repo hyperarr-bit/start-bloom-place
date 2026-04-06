@@ -80,8 +80,17 @@ const MealPlanner = () => {
         </div>
       )}
 
+      {/* Empty State */}
+      {recipes.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <span className="text-4xl mb-3">🍽️</span>
+          <h4 className="text-sm font-semibold mb-1">Nenhuma receita cadastrada</h4>
+          <p className="text-xs text-muted-foreground max-w-[240px]">Cadastre suas receitas favoritas no banco acima para montar o cardápio da semana</p>
+        </div>
+      )}
+
       {/* Weekly grid */}
-      <div className="space-y-2">
+      {recipes.length > 0 && <div className="space-y-2">
         {weekDays.map(day => (
           <div key={day} className={`bg-card rounded-xl border border-border border-l-4 ${dayColors[day]} p-3`}>
             <h4 className="text-xs font-bold mb-2">{day.toUpperCase()}</h4>

@@ -170,6 +170,15 @@ const CleaningRoutine = () => {
         </div>
       </div>
 
+      {/* Empty State */}
+      {sections.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <span className="text-4xl mb-3">🧴</span>
+          <h4 className="text-sm font-semibold mb-1">Nenhuma seção de limpeza</h4>
+          <p className="text-xs text-muted-foreground max-w-[240px]">Monte sua rotina de limpeza criando seções como Diária, Semanal e Mensal</p>
+        </div>
+      )}
+
       {/* Cleaning Sections */}
       {sections.map(section => {
         const bodyColor = BODY_COLORS[section.color] || "bg-card";

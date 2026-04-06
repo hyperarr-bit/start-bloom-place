@@ -1058,8 +1058,8 @@ const Rotina = () => {
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-lg">≡</span>
-          <h1 className="text-base font-bold tracking-tight"><h1 className="text-base font-bold tracking-tight">ROTINA</h1></h1>
+          <Calendar className="w-5 h-5 text-emerald-600" />
+          <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
         </div>
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

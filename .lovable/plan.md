@@ -1,58 +1,31 @@
-# Plano: Remover dados pré-preenchidos do Casa + Emojis coloridos nos headers
-
-## 1. Remover dados pré-preenchidos (manter estrutura visual)
 
 
-| Componente            | Default atual                                                                                                | Novo default                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
-| `CleaningRoutine.tsx` | 3 seções com 4 itens cada (Diária, Semanal, Mensal)                                                          | 3 seções vazias (mesmos nomes e cores, `items: []`) |
-| `MaintenanceLog.tsx`  | 4 tarefas pré-cadastradas (filtro, ar-cond, colchão, máquina)                                                | `[]` vazio                                          |
-| `SafetyChecks.tsx`    | 6 itens emergência + 6 itens viagem pré-cadastrados                                                          | `[]` vazio para ambos                               |
-| `MealPlanner.tsx`     | 4 receitas (arroz, macarrão, frango, salada)                                                                 | `[]` vazio                                          |
-| `RoomManager.tsx`     | 6 cômodos pré-cadastrados ( pode deixar os cômodos ) errado era se estivesse o que limpar dentro dos cômodos | `[]` vazio                                          |
-| `types.ts`            | `defaultCleaningTasks` com 6 itens, `defaultEmergencyItems` com 6, `defaultTravelChecklist` com 6            | Todos `[]`                                          |
+# Plano: Restaurar cômodos padrão no RoomManager
 
+## Problema
+O `defaultRooms` está como `[]`, então usuários novos não veem nenhum cômodo. O correto é já ter os cômodos principais pré-cadastrados, mas com `tasks: []` (sem tarefas pré-preenchidas).
 
-**Nota**: GroceryList mantém as categorias (HortiFrutti, Açougue, etc.) pois são estruturais, não dados do usuário.
+## Solução
+Alterar `defaultRooms` em `src/components/casa/RoomManager.tsx` para incluir cômodos padrão:
 
-## 2. Adicionar emoji colorido no header de cada módulo
+```ts
+const defaultRooms: Room[] = [
+  { id: "1", name: "COZINHA", color: "bg-yellow-200 dark:bg-yellow-900/40", tasks: [] },
+  { id: "2", name: "SALA", color: "bg-blue-200 dark:bg-blue-900/40", tasks: [] },
+  { id: "3", name: "QUARTO", color: "bg-purple-200 dark:bg-purple-900/40", tasks: [] },
+  { id: "4", name: "BANHEIRO", color: "bg-cyan-200 dark:bg-cyan-900/40", tasks: [] },
+  { id: "5", name: "ÁREA DE SERVIÇO", color: "bg-green-200 dark:bg-green-900/40", tasks: [] },
+  { id: "6", name: "ESCRITÓRIO", color: "bg-orange-200 dark:bg-orange-900/40", tasks: [] },
+];
+```
 
-Atualmente todos os headers mostram só texto (ex: `CASA`). Vou adicionar o emoji do módulo com a cor correspondente da Home.
+Cada cômodo aparece com seu card colorido, pronto para o usuário adicionar itens. Sem nenhuma tarefa pré-preenchida.
 
-Cores por módulo (extraídas do `ModuleDrawer.tsx`):
+**Nota**: Usuários que já têm dados em localStorage não serão afetados — o `usePersistedState` só usa o default se não houver dados salvos.
 
+## Alteração
 
-| Módulo       | Emoji | Cor do texto       |
-| ------------ | ----- | ------------------ |
-| Finanças     | 💰    | `text-amber-600`   |
-| Casa         | 🏠    | `text-cyan-600`    |
-| Rotina       | 📋    | `text-emerald-600` |
-| Saúde        | ❤️    | `text-red-600`     |
-| Treino       | 💪    | `text-blue-600`    |
-| Dieta        | 🍎    | `text-green-600`   |
-| Estudos      | 🎓    | `text-indigo-600`  |
-| Biblioteca   | 📚    | `text-orange-600`  |
-| Beleza       | 💧    | `text-pink-600`    |
-| Viagens      | ✈️    | `text-teal-600`    |
-| Carreira     | 💼    | `text-slate-600`   |
-| Mente        | 🧠    | `text-violet-600`  |
-| Relações     | 👥    | `text-rose-600`    |
-| Pet          | 🐾    | `text-amber-500`   |
-| Detox        | 🌿    | `text-lime-600`    |
-| Dev. Pessoal | ✨     | `text-purple-600`  |
+| Arquivo | Mudança |
+|---------|---------|
+| `src/components/casa/RoomManager.tsx` | Substituir `defaultRooms = []` pelos 6 cômodos padrão com `tasks: []` |
 
-
-Formato do header: `<span className="text-cyan-600">🏠</span>` antes do `<h1>CASA</h1>`
-
-## Arquivos alterados
-
-
-| Arquivo                                   | Mudança                                                                                  |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `src/components/casa/CleaningRoutine.tsx` | Seções com `items: []`                                                                   |
-| `src/components/casa/MaintenanceLog.tsx`  | `defaultMaintenance = []`                                                                |
-| `src/components/casa/SafetyChecks.tsx`    | Listas vazias                                                                            |
-| `src/components/casa/MealPlanner.tsx`     | `defaultRecipes = []`                                                                    |
-| `src/components/casa/RoomManager.tsx`     | `defaultRooms = []`                                                                      |
-| `src/components/casa/types.ts`            | `defaultCleaningTasks = []`, `defaultEmergencyItems = []`, `defaultTravelChecklist = []` |
-| 15 páginas de módulo                      | Adicionar emoji colorido no `<h1>` do header                                             |

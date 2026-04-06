@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -159,6 +158,7 @@ function estimate1RM(weight: number, reps: number): number {
 
 const Treino = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("hoje");
   const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
@@ -581,6 +581,25 @@ const Treino = () => {
             )}
           </div>
         </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {[
+            { id: "hoje", label: "HOJE", icon: "🏋️" },
+            { id: "semana", label: "SEMANA", icon: "📅" },
+            { id: "config", label: "CONFIG", icon: "⚙️" },
+            { id: "resumo", label: "RESUMO", icon: "📊" },
+            { id: "progressao", label: "PROGRESSÃO", icon: "📈" },
+            { id: "records", label: "RECORDES", icon: "🏆" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
@@ -592,24 +611,16 @@ const Treino = () => {
             "Acompanhe sua progressão de carga na aba 📈 PROGRESSÃO"
           ]}
         />
-        <Tabs defaultValue="hoje" className="w-full" onValueChange={v => reportTab?.(v)}>
-          <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-nowrap" ref={(el) => { if (el) requestAnimationFrame(() => { el.scrollLeft = 0; }); }}>
-            <TabsTrigger value="hoje" className="text-xs px-2.5 py-1.5 flex-shrink-0">🏋️ HOJE</TabsTrigger>
-            <TabsTrigger value="semana" className="text-xs px-2.5 py-1.5 flex-shrink-0">📅 SEMANA</TabsTrigger>
-            <TabsTrigger value="config" className="text-xs px-2.5 py-1.5 flex-shrink-0">⚙️ CONFIG</TabsTrigger>
-            <TabsTrigger value="resumo" className="text-xs px-2.5 py-1.5 flex-shrink-0">📊 RESUMO</TabsTrigger>
-            <TabsTrigger value="progressao" className="text-xs px-2.5 py-1.5 flex-shrink-0">📈 PROGRESSÃO</TabsTrigger>
-            <TabsTrigger value="records" className="text-xs px-2.5 py-1.5 flex-shrink-0">🏆 RECORDES</TabsTrigger>
-          </TabsList>
+
 
           {/* ========== HOJE — só o treino do dia ========== */}
-          <TabsContent value="hoje" className="space-y-3">
+          {activeTab === "hoje" && <div className="space-y-4">
             {/* Workout card — protagonist, nothing else */}
             <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
-          </TabsContent>
+          </div>}
 
           {/* ========== SEMANA — visão clara ========== */}
-          <TabsContent value="semana" className="space-y-4">
+          {activeTab === "semana" && <div className="space-y-4">
             <div className="bg-muted/30 rounded-lg px-4 py-3 border border-border">
               <p className="text-sm font-bold flex items-center gap-2"><Calendar className="w-4 h-4 text-blue-500" /> Visão geral da sua semana</p>
               <p className="text-xs text-muted-foreground mt-1">Toque em qualquer dia para ver e editar os exercícios</p>
@@ -641,10 +652,10 @@ const Treino = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {weekDays.map(day => renderWorkoutDay(day))}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== CONFIG ========== */}
-          <TabsContent value="config" className="space-y-4">
+          {activeTab === "config" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4 space-y-4">
               {/* Templates */}
               <div>
@@ -730,10 +741,10 @@ const Treino = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== RESUMO — stats + volume + distribuição ========== */}
-          <TabsContent value="resumo" className="space-y-4">
+          {activeTab === "resumo" && <div className="space-y-4">
             {/* 4 stat cards */}
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-card rounded-xl border border-border p-4 text-center">
@@ -858,10 +869,10 @@ const Treino = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== PROGRESSÃO ========== */}
-          <TabsContent value="progressao" className="space-y-4">
+          {activeTab === "progressao" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-green-500" /> PROGRESSÃO DE CARGA</h3>
               <p className="text-[10px] text-muted-foreground mb-3">Selecione um exercício para ver a evolução da carga ao longo do tempo</p>
@@ -936,10 +947,10 @@ const Treino = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== RECORDES ========== */}
-          <TabsContent value="records" className="space-y-4">
+          {activeTab === "records" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-yellow-500" /> MEUS RECORDES PESSOAIS (PRs)</h3>
               <p className="text-xs text-muted-foreground mb-3">Registre seus maiores pesos e conquistas 💪</p>
@@ -981,8 +992,8 @@ const Treino = () => {
                 ))}
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>}
+        
       </main>
 
       {/* ===== BOTTOM ACTION BAR ===== */}

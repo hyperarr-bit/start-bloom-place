@@ -6,7 +6,6 @@ import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Sta
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -299,13 +298,28 @@ const Biblioteca = () => {
   // ── RENDER ──
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
-      <div className="px-4 pt-6 pb-2 flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
-        <div>
-          <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><BookOpen className="w-5 h-5 text-orange-600" /> BIBLIOTECA</h1></h1>
-          <p className="text-xs text-muted-foreground">Sua estante digital inteligente</p>
+      <header className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
+          <BookOpen className="w-5 h-5 text-orange-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">BIBLIOTECA</h1>
+            <p className="text-[11px] text-muted-foreground">Sua estante digital inteligente</p>
+          </div>
         </div>
-      </div>
+        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.v}
+              onClick={() => setTab(t.v)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${tab === t.v ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{t.icon}</span>
+              {t.l}
+            </button>
+          ))}
+        </div>
+      </header>
 
       <ModuleTip moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
 
@@ -327,19 +341,10 @@ const Biblioteca = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="px-4">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full h-auto flex-wrap gap-0.5 bg-muted/50 p-1 rounded-xl">
-            {TABS.map(t => (
-              <TabsTrigger key={t.v} value={t.v} className="text-[10px] px-2 py-1.5 rounded-lg data-[state=active]:bg-orange-500 data-[state=active]:text-white font-bold">
-                {t.icon} {t.l}
-              </TabsTrigger>
-            ))}
-          </TabsList>
 
           {/* ══════ TAB: LENDO AGORA ══════ */}
-          <TabsContent value="lendo" className="space-y-4 mt-4">
+          {tab === "lendo" && <div className="space-y-4 mt-4">
             {currentBook ? (
               <>
                 <div className="rounded-xl border border-border overflow-hidden">
@@ -507,10 +512,10 @@ const Biblioteca = () => {
             )}
 
             {showForm && <BookForm />}
-          </TabsContent>
+          </div>}
 
           {/* ══════ TAB: ESTANTE ══════ */}
-          <TabsContent value="estante" className="space-y-4 mt-4">
+          {tab === "estante" && <div className="space-y-4 mt-4">
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
@@ -556,10 +561,10 @@ const Biblioteca = () => {
                 ))}
               </div>
             )}
-          </TabsContent>
+          </div>}
 
           {/* ══════ TAB: INSIGHTS ══════ */}
-          <TabsContent value="insights" className="space-y-4 mt-4">
+          {tab === "insights" && <div className="space-y-4 mt-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-sky-200 dark:bg-sky-800/60 px-4 py-2.5">
                 <span className="text-sm font-black uppercase tracking-wider">💡 COFRE DE CITAÇÕES ({allQuotes.length})</span>
@@ -597,10 +602,10 @@ const Biblioteca = () => {
                 )}
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ══════ TAB: EMPRESTADOS ══════ */}
-          <TabsContent value="emprestados" className="space-y-4 mt-4">
+          {tab === "emprestados" && <div className="space-y-4 mt-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-pink-200 dark:bg-pink-800/60 px-4 py-2.5">
                 <span className="text-sm font-black uppercase tracking-wider">📤 AGIOTA LITERÁRIO ({lentBooks.length})</span>
@@ -657,10 +662,10 @@ const Biblioteca = () => {
                 )}
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ══════ TAB: DESAFIO ══════ */}
-          <TabsContent value="desafio" className="space-y-4 mt-4">
+          {tab === "desafio" && <div className="space-y-4 mt-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-amber-200 dark:bg-amber-800/60 px-4 py-2.5">
                 <span className="text-sm font-black uppercase tracking-wider">🏆 DESAFIO DE LEITURA {currentYear}</span>
@@ -743,8 +748,7 @@ const Biblioteca = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>}
       </div>
 
       {/* FAB */}

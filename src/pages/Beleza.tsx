@@ -1,32 +1,54 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Sparkles, FlaskConical, Camera } from "lucide-react";
+import { ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { ModuleTip } from "@/components/ModuleTip";
 
+const tabs = [
+  { id: "routine", label: "Rotina", icon: "✨" },
+  { id: "shelf", label: "Bancada", icon: "🧪" },
+  { id: "diary", label: "Diário", icon: "📷" },
+];
+
 const Beleza = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("routine");
   const reportTab = useTabReporter();
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 z-30 bg-card">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-pink-600" /> BELEZA
-            </h1>
+          <Sparkles className="w-5 h-5 text-pink-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
             <p className="text-[11px] text-muted-foreground">Seu ritual de beleza inteligente</p>
           </div>
+        </div>
+        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -41,26 +63,11 @@ const Beleza = () => {
           ]}
         />
 
-        {/* Daily Mirror — always visible */}
         <DailyMirror />
 
-        {/* Tabs */}
-        <Tabs defaultValue="routine" onValueChange={v => reportTab?.(v)}>
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="routine" className="text-xs gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Rotina
-            </TabsTrigger>
-            <TabsTrigger value="shelf" className="text-xs gap-1">
-              <FlaskConical className="w-3.5 h-3.5" /> Bancada
-            </TabsTrigger>
-            <TabsTrigger value="diary" className="text-xs gap-1">
-              <Camera className="w-3.5 h-3.5" /> Diário
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="routine"><SkincareRoutine /></TabsContent>
-          <TabsContent value="shelf"><ProductShelf /></TabsContent>
-          <TabsContent value="diary"><SkinDiary /></TabsContent>
-        </Tabs>
+        {activeTab === "routine" && <SkincareRoutine />}
+        {activeTab === "shelf" && <ProductShelf />}
+        {activeTab === "diary" && <SkinDiary />}
       </main>
     </div>
   );

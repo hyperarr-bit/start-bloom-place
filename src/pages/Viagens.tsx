@@ -1,8 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Plane, Compass, Map, Package, Users, MapPin, DollarSign, BookOpen, Shield, ArrowRightLeft, Timer } from "lucide-react";
+import { ArrowLeft, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleTip } from "@/components/ModuleTip";
 import { TripCountdown } from "@/components/travel/TripCountdown";
 import { DailyTimeline } from "@/components/travel/DailyTimeline";
@@ -15,36 +15,53 @@ import { TravelDiary } from "@/components/travel/TravelDiary";
 import { TravelBudget } from "@/components/travel/TravelBudget";
 import { BucketList } from "@/components/travel/BucketList";
 
-const TABS = [
-  { value: "destinos", label: "Destinos", icon: Compass },
-  { value: "cronograma", label: "Roteiro", icon: Map },
-  { value: "mala", label: "Mala", icon: Package },
-  { value: "budget", label: "Budget", icon: DollarSign },
-  { value: "divisor", label: "Rachar", icon: Users },
-  { value: "lugares", label: "Lugares", icon: MapPin },
-  { value: "diario", label: "Diário", icon: BookOpen },
-  { value: "moeda", label: "Câmbio", icon: ArrowRightLeft },
-  { value: "seguranca", label: "SOS", icon: Shield },
-  { value: "countdown", label: "Timer", icon: Timer },
+const tabs = [
+  { id: "destinos", label: "Destinos", icon: "🧭" },
+  { id: "cronograma", label: "Roteiro", icon: "🗺️" },
+  { id: "mala", label: "Mala", icon: "🎒" },
+  { id: "budget", label: "Budget", icon: "💰" },
+  { id: "divisor", label: "Rachar", icon: "👥" },
+  { id: "lugares", label: "Lugares", icon: "📍" },
+  { id: "diario", label: "Diário", icon: "📖" },
+  { id: "moeda", label: "Câmbio", icon: "🔄" },
+  { id: "seguranca", label: "SOS", icon: "🛡️" },
+  { id: "countdown", label: "Timer", icon: "⏱️" },
 ];
 
 const Viagens = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("destinos");
   const reportTab = useTabReporter();
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Plane className="w-5 h-5 text-teal-600" /> VIAGENS
-            </h1>
+          <Plane className="w-5 h-5 text-teal-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">VIAGENS</h1>
             <p className="text-[11px] text-muted-foreground">Planeje, viva e eternize suas viagens</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -60,28 +77,16 @@ const Viagens = () => {
           ]}
         />
 
-        <Tabs defaultValue="destinos" onValueChange={v => reportTab?.(v)}>
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full">
-              {TABS.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value} className="text-[10px] gap-0.5 px-2">
-                  <tab.icon className="w-3 h-3" />
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-          <TabsContent value="destinos"><BucketList /></TabsContent>
-          <TabsContent value="cronograma"><DailyTimeline /></TabsContent>
-          <TabsContent value="mala"><PackingChecklist /></TabsContent>
-          <TabsContent value="budget"><TravelBudget /></TabsContent>
-          <TabsContent value="divisor"><BillSplitter /></TabsContent>
-          <TabsContent value="lugares"><PlacesBoard /></TabsContent>
-          <TabsContent value="diario"><TravelDiary /></TabsContent>
-          <TabsContent value="moeda"><CurrencyConverter /></TabsContent>
-          <TabsContent value="seguranca"><SafetyCard /></TabsContent>
-          <TabsContent value="countdown"><TripCountdown /></TabsContent>
-        </Tabs>
+        {activeTab === "destinos" && <BucketList />}
+        {activeTab === "cronograma" && <DailyTimeline />}
+        {activeTab === "mala" && <PackingChecklist />}
+        {activeTab === "budget" && <TravelBudget />}
+        {activeTab === "divisor" && <BillSplitter />}
+        {activeTab === "lugares" && <PlacesBoard />}
+        {activeTab === "diario" && <TravelDiary />}
+        {activeTab === "moeda" && <CurrencyConverter />}
+        {activeTab === "seguranca" && <SafetyCard />}
+        {activeTab === "countdown" && <TripCountdown />}
       </main>
     </div>
   );

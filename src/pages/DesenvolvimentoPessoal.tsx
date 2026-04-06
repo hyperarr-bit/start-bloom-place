@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 
@@ -49,6 +48,7 @@ const moodOptions = [
 
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("sobre");
   const reportTab = useTabReporter();
 
   // SOBRE MIM
@@ -183,15 +183,34 @@ const DesenvolvimentoPessoal = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" /> DESENVOLVIMENTO PESSOAL
-            </h1>
-            <p className="text-xs text-muted-foreground">Conheça-se, evolua, conquiste</p>
+          <Sparkles className="w-5 h-5 text-purple-600" />
+          <div>
+            <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
+            <p className="text-[11px] text-muted-foreground">Conheça-se, evolua, conquiste</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {[
+            { id: "sobre", label: "SOBRE MIM" },
+            { id: "metas", label: "METAS" },
+            { id: "diario", label: "DIÁRIO" },
+            { id: "humor", label: "HUMOR & SCORE" },
+            { id: "respiracao", label: "RESPIRAÇÃO" },
+            { id: "gratidao", label: "GRATIDÃO" },
+            { id: "carta", label: "CARTA" },
+            { id: "desafios", label: "30 DIAS" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -213,20 +232,10 @@ const DesenvolvimentoPessoal = () => {
             "Crie afirmações positivas e leia-as diariamente"
           ]}
         />
-        <Tabs defaultValue="sobre" className="w-full" onValueChange={v => reportTab?.(v)}>
-          <TabsList className="w-full flex overflow-x-auto gap-1 bg-muted/50 p-1 mb-4 h-auto flex-wrap">
-            {[
-              { v: "sobre", l: "SOBRE MIM" }, { v: "metas", l: "METAS" },
-              { v: "diario", l: "DIÁRIO" }, { v: "humor", l: "HUMOR & SCORE" }, { v: "respiracao", l: "RESPIRAÇÃO" },
-              { v: "gratidao", l: "GRATIDÃO" }, { v: "carta", l: "CARTA" },
-              { v: "desafios", l: "30 DIAS" },
-            ].map(t => (
-              <TabsTrigger key={t.v} value={t.v} className="text-xs px-3 py-1.5">{t.l}</TabsTrigger>
-            ))}
-          </TabsList>
+
 
           {/* ========== SOBRE MIM ========== */}
-          <TabsContent value="sobre" className="space-y-4">
+          {activeTab === "sobre" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</h3>
               <ListEditor items={motivations} setItems={setMotivations} newItem={newMotivation} setNewItem={setNewMotivation}
@@ -276,17 +285,15 @@ const DesenvolvimentoPessoal = () => {
                   placeholder="Adicionar..." colorClass="bg-slate-100/80 dark:bg-slate-500/10 border border-slate-200 dark:border-slate-500/20" />
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== METAS ========== */}
-          <TabsContent value="metas" className="space-y-4">
+          {activeTab === "metas" && <div className="space-y-4">
             <GoalsBoardV2 />
-          </TabsContent>
+          </div>}
 
           {/* ========== RODA DA VIDA ========== */}
-
-
-          <TabsContent value="diario" className="space-y-4">
+          {activeTab === "diario" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/30 p-4">
               <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><PenTool className="w-4 h-4 text-indigo-500" /> DIÁRIO DE REFLEXÃO — {new Date().toLocaleDateString("pt-BR")}</h3>
               <div className="bg-indigo-100/50 dark:bg-indigo-500/5 rounded-lg p-3 mb-3 border border-indigo-200/50">
@@ -311,10 +318,10 @@ const DesenvolvimentoPessoal = () => {
                 ))}
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== MOOD TRACKER ========== */}
-          <TabsContent value="humor" className="space-y-4">
+          {activeTab === "humor" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Brain className="w-4 h-4" /> COMO VOCÊ ESTÁ HOJE?</h3>
               <div className="flex justify-center gap-3 mb-4">
@@ -384,8 +391,8 @@ const DesenvolvimentoPessoal = () => {
                 </div>
               </div>
             )}
-          </TabsContent>
-          <TabsContent value="respiracao" className="space-y-4">
+          </div>}
+          {activeTab === "respiracao" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-500/10 dark:to-cyan-500/10 rounded-xl border border-teal-200 dark:border-teal-500/30 p-6 text-center">
               <h3 className="text-xs font-bold mb-4 flex items-center justify-center gap-2"><Wind className="w-4 h-4 text-teal-500" /> RESPIRAÇÃO 4-7-8</h3>
               <div className={`w-32 h-32 mx-auto rounded-full border-4 flex items-center justify-center mb-4 transition-all duration-1000 ${
@@ -407,10 +414,8 @@ const DesenvolvimentoPessoal = () => {
               )}
               <p className="text-xs text-muted-foreground mt-4">Inspire por 4s → Segure por 7s → Expire por 8s. Reduz ansiedade e estresse.</p>
             </div>
-          </TabsContent>
-
-
-          <TabsContent value="gratidao" className="space-y-4">
+          </div>}
+          {activeTab === "gratidao" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-500/10 dark:to-yellow-500/10 rounded-xl border border-amber-200 dark:border-amber-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-amber-500" /> GRATIDÃO — {new Date().toLocaleDateString("pt-BR")}</h3>
               {[0,1,2].map(i => (
@@ -430,10 +435,10 @@ const DesenvolvimentoPessoal = () => {
                 </div>
               ))}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== CARTA PARA O FUTURO ========== */}
-          <TabsContent value="carta" className="space-y-4">
+          {activeTab === "carta" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-500/10 dark:to-pink-500/10 rounded-xl border border-rose-200 dark:border-rose-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Mail className="w-4 h-4 text-rose-500" /> CARTA PARA O EU DO FUTURO</h3>
               {futureLetter.written && !canOpenLetter ? (
@@ -470,10 +475,10 @@ const DesenvolvimentoPessoal = () => {
                 </div>
               )}
             </div>
-          </TabsContent>
+          </div>}
 
           {/* ========== 30-DAY CHALLENGES ========== */}
-          <TabsContent value="desafios" className="space-y-4">
+          {activeTab === "desafios" && <div className="space-y-4">
             <div className="bg-card rounded-xl border border-border p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Flame className="w-4 h-4 text-orange-500" /> DESAFIOS DE 30 DIAS</h3>
               <div className="flex gap-2 mb-3">
@@ -505,11 +510,9 @@ const DesenvolvimentoPessoal = () => {
               ))}
               {challenges.length === 0 && <p className="text-xs text-muted-foreground text-center py-8">Crie um desafio de 30 dias! 🔥</p>}
             </div>
-          </TabsContent>
+          </div>}
 
 
-
-        </Tabs>
       </main>
     </div>
   );

@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 
 // ── Types ──
 interface Course { id: string; name: string; link?: string; }
@@ -132,19 +132,37 @@ const Estudos = () => {
     }, ...notebooks]);
   };
 
+  const [activeTab, setActiveTab] = useState("estudos");
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
+          <GraduationCap className="w-5 h-5 text-indigo-600" />
           <div>
-            <h1 className="text-lg font-bold tracking-tight flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-indigo-600" /> ESTUDOS
-            </h1>
+            <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
             <p className="text-[11px] text-muted-foreground">Cursos, grade, provas, tarefas e caderno</p>
           </div>
+        </div>
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {TABS.map((tab) => (
+            <button
+              key={tab.v}
+              onClick={() => handleTabChange(tab.v)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.v ? "notion-tab-active" : "hover:bg-muted"}`}
+            >
+              <span>{tab.icon}</span>
+              {tab.l}
+            </button>
+          ))}
         </div>
       </header>
 
@@ -156,19 +174,7 @@ const Estudos = () => {
           "Use o caderno para anotar resumos e dúvidas das aulas",
         ]} />
 
-        <Tabs defaultValue="estudos" className="w-full" onValueChange={v => reportTab?.(v)}>
-          <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-            <TabsList className="inline-flex w-auto min-w-full">
-              {TABS.map(t => (
-                <TabsTrigger key={t.v} value={t.v} className="text-[10px] gap-1 px-2.5">
-                  <span>{t.icon}</span> {t.l}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          {/* ══════════ ESTUDOS ══════════ */}
-          <TabsContent value="estudos" className="space-y-4 mt-4">
+        {activeTab === "estudos" && <div className="space-y-4">
 
             {/* Cursos em Andamento */}
             <div className="rounded-xl border border-border overflow-hidden">
@@ -364,10 +370,9 @@ const Estudos = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ GRADE HORÁRIA ══════════ */}
-          <TabsContent value="grade" className="space-y-4 mt-4">
+          {activeTab === "grade" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-amber-300 dark:bg-amber-700/60 px-4 py-3 text-center">
                 <span className="text-3xl">🧑‍🎓</span>
@@ -423,10 +428,9 @@ const Estudos = () => {
                 </table>
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ TAREFAS DA SEMANA ══════════ */}
-          <TabsContent value="tarefas" className="space-y-4 mt-4">
+          {activeTab === "tarefas" && <div className="space-y-4">
             {/* Header card */}
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-stone-300 dark:bg-stone-700/50 px-4 py-4 text-center">
@@ -487,10 +491,9 @@ const Estudos = () => {
                 </div>
               );
             })}
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ CADERNO ══════════ */}
-          <TabsContent value="caderno" className="space-y-4 mt-4">
+          {activeTab === "caderno" && <div className="space-y-4">
             <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={addNotebook}>
               <Plus className="w-3 h-3 mr-1" /> Nova Anotação
             </Button>
@@ -581,10 +584,9 @@ const Estudos = () => {
                 <p className="text-xs text-muted-foreground">Comece a anotar suas aulas 📝</p>
               </div>
             )}
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ POMODORO ══════════ */}
-          <TabsContent value="pomodoro" className="space-y-4 mt-4">
+          {activeTab === "pomodoro" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-red-300 dark:bg-red-700/60 px-4 py-2.5 text-center">
                 <span className="text-sm font-black uppercase tracking-wider">🍅 POMODORO DE ESTUDOS</span>
@@ -617,8 +619,7 @@ const Estudos = () => {
                 <p className="text-xs text-muted-foreground">🍅 Pomodoros concluídos: <span className="font-bold">{pomodoroCount}</span></p>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>}
       </main>
     </div>
   );

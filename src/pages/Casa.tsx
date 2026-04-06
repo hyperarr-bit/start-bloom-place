@@ -30,11 +30,11 @@ const tabs = [
 const Casa = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("comodos");
-  const setTrackedTab = useSetTrackedTab();
+  const reportTab = useTabReporter();
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
-    setTrackedTab?.(tabId);
+    reportTab?.(tabId);
   };
 
   return (

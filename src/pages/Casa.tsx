@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";
 import MaintenanceLog from "@/components/casa/MaintenanceLog";

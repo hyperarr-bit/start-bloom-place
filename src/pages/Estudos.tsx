@@ -428,10 +428,9 @@ const Estudos = () => {
                 </table>
               </div>
             </div>
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ TAREFAS DA SEMANA ══════════ */}
-          <TabsContent value="tarefas" className="space-y-4 mt-4">
+          {activeTab === "tarefas" && <div className="space-y-4">
             {/* Header card */}
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-stone-300 dark:bg-stone-700/50 px-4 py-4 text-center">

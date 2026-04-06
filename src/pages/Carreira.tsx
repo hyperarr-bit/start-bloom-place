@@ -36,11 +36,7 @@ const DEFAULT_PORTFOLIO: PortfolioItem[] = [];
 
 const DEFAULT_CONTACTS: Contact[] = [];
 
-const DEFAULT_SKILLS: Skill[] = [
-  { id: "ex-s1", name: "React", category: "técnica", level: 4, targetLevel: 5, notes: "" },
-  { id: "ex-s2", name: "TypeScript", category: "técnica", level: 3, targetLevel: 5, notes: "" },
-  { id: "ex-s3", name: "Inglês", category: "idioma", level: 3, targetLevel: 5, notes: "B2 - estudando para C1" },
-];
+const DEFAULT_SKILLS: Skill[] = [];
 
 // ============= JOB TRACKER =============
 const JobTracker = () => {

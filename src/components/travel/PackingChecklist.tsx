@@ -223,10 +223,17 @@ export const PackingChecklist = () => {
       )}
 
       {!current && lists.length === 0 && !showCreate && (
-        <div className="text-center py-12">
-          <Package className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-muted-foreground">Crie sua primeira lista de bagagem</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Com templates prontos para cada tipo de viagem</p>
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider">🧳 LISTAS DE MALA</span>
+            <button onClick={() => setShowCreate(true)}
+              className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+              <Plus className="w-3 h-3 inline mr-0.5" />Criar
+            </button>
+          </div>
+          <div className="bg-teal-50 dark:bg-teal-950/20 px-3 py-6 text-center">
+            <p className="text-xs text-muted-foreground">Nenhuma lista criada ainda</p>
+          </div>
         </div>
       )}
     </div>

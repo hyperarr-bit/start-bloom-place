@@ -87,11 +87,6 @@ export const BillSplitter = () => {
 
       {data.people.length >= 2 && (
         <>
-          <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowExpenseForm(!showExpenseForm)}>
-            <Receipt className="w-3 h-3 mr-1" /> Adicionar Despesa
-          </Button>
-
-          {showExpenseForm && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
               <Input placeholder="Descrição (ex: Jantar)" value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-9 rounded-xl text-xs" />
               <div className="grid grid-cols-2 gap-2">

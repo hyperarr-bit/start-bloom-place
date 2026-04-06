@@ -584,10 +584,9 @@ const Estudos = () => {
                 <p className="text-xs text-muted-foreground">Comece a anotar suas aulas 📝</p>
               </div>
             )}
-          </TabsContent>
+          </div>}
 
-          {/* ══════════ POMODORO ══════════ */}
-          <TabsContent value="pomodoro" className="space-y-4 mt-4">
+          {activeTab === "pomodoro" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-red-300 dark:bg-red-700/60 px-4 py-2.5 text-center">
                 <span className="text-sm font-black uppercase tracking-wider">🍅 POMODORO DE ESTUDOS</span>

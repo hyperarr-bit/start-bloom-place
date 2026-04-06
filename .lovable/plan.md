@@ -1,38 +1,29 @@
-# Plano: Traduzir textos em inglês + adicionar emojis no Detox
-
-## 1. Textos em inglês encontrados
-
-### Página 404 (`src/pages/NotFound.tsx`)
-
-- "Oops! Page not found" → "Ops! Página não encontrada"
-- "Return to Home" → "Voltar ao início"
-
-### Componentes UI (`src/components/ui/`)
-
-- **pagination.tsx**: "Previous" → "Anterior", "Next" → "Próximo", "More pages" → "Mais páginas", aria-labels traduzidos
-- **carousel.tsx**: sr-only "Previous slide" → "Slide anterior", "Next slide" → "Próximo slide"
-- **sheet.tsx**: sr-only "Close" → "Fechar"
-- **dialog.tsx**: sr-only "Close" → "Fechar"
-- **sidebar.tsx**: sr-only/title "Toggle Sidebar" → "Alternar menu lateral"
-- **breadcrumb.tsx**: sr-only "More" → "Mais"
-
-## 2. Emojis no Detox (`src/components/detox/DetoxTracker.tsx`)
-
-Array atual: `["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞"]`  
-Adicionar: `"🎰"`
-
-(apostas,)
-
-## Alterações
 
 
-| Arquivo                                 | Mudança                                                    |
-| --------------------------------------- | ---------------------------------------------------------- |
-| `src/pages/NotFound.tsx`                | Traduzir textos para PT-BR                                 |
-| `src/components/ui/pagination.tsx`      | "Previous"→"Anterior", "Next"→"Próximo", aria-labels em PT |
-| `src/components/ui/carousel.tsx`        | sr-only em PT                                              |
-| `src/components/ui/sheet.tsx`           | sr-only "Fechar"                                           |
-| `src/components/ui/dialog.tsx`          | sr-only "Fechar"                                           |
-| `src/components/ui/sidebar.tsx`         | title/sr-only em PT                                        |
-| `src/components/ui/breadcrumb.tsx`      | sr-only "Mais"                                             |
-| `src/components/detox/DetoxTracker.tsx` | Adicionar 🎰🍷💉🛒👃 ao `iconOptions`                      |
+# Plano: Limpar página Casa — remover aba Limpeza + adotar estilo de abas do Rotina
+
+## Mudanças
+
+### 1. Remover aba "Limpeza" (radar)
+Remover `{ v: "radar", l: "Limpeza", icon: Droplets }` do array `tabs` e o `<TabsContent value="radar">` correspondente. O import do `CleaningRadar` também sai.
+
+### 2. Remover stat cards e quick stats
+Eliminar todo o bloco dos 4 cards coloridos (linhas 77-98: Tarefas/Urgentes/Comprar/Vida) e o bloco "Quick Stats" (linhas 100-106). Remover os `usePersistedState` que alimentavam esses cards (`cleaningTasks`, `pantryItems`, `plants`, `shoppingList`) e as variáveis calculadas (`urgentTasks`, `lowStock`).
+
+### 3. Adotar estilo de abas do Rotina
+Trocar o sistema de `<Tabs>/<TabsList>/<TabsTrigger>` (shadcn) por abas manuais com `useState("comodos")` + botões com classe `notion-tab` / `notion-tab-active`, igual ao Rotina. As abas ficam dentro do header, abaixo do título, com scroll horizontal e emoji + label.
+
+### Layout final do header (como Rotina)
+```text
+┌─────────────────────────────────┐
+│ ← ≡  CASA                      │
+│ 🚪Cômodos 🍎Mercado 🧴Rotina...│
+└─────────────────────────────────┘
+```
+
+## Alteração
+
+| Arquivo | Mudança |
+|---------|---------|
+| `src/pages/Casa.tsx` | (1) Remover import CleaningRadar e Droplets. (2) Remover usePersistedState dos stats. (3) Remover stat cards + quick stats. (4) Trocar Tabs/TabsList/TabsTrigger por useState + notion-tab buttons no header. (5) Remover aba radar/Limpeza e seu TabsContent. (6) Renderizar conteúdo com `{activeTab === "comodos" && <RoomManager />}` etc. |
+

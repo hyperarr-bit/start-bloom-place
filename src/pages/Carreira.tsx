@@ -34,9 +34,7 @@ const DEFAULT_JOBS: JobApp[] = [];
 
 const DEFAULT_PORTFOLIO: PortfolioItem[] = [];
 
-const DEFAULT_CONTACTS: Contact[] = [
-  { id: "ex-c1", name: "Maria Silva", company: "Tech Corp", role: "Head of Engineering", linkedin: "", email: "", phone: "", notes: "Conheci no meetup de React", lastContact: new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10), category: "profissional" },
-];
+const DEFAULT_CONTACTS: Contact[] = [];
 
 const DEFAULT_SKILLS: Skill[] = [
   { id: "ex-s1", name: "React", category: "técnica", level: 4, targetLevel: 5, notes: "" },

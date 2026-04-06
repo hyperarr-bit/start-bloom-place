@@ -17,11 +17,7 @@ const priorityConfig: Record<string, { emoji: string; label: string; color: stri
   "próximo": { emoji: "🔜", label: "Próximo", color: "bg-green-200 dark:bg-green-800/50", bodyColor: "bg-green-50 dark:bg-green-950/20" },
 };
 
-const DEFAULT_DESTINATIONS: Destination[] = [
-  { id: "ex-1", name: "Tokyo", country: "Japão", continent: "Ásia", notes: "Shibuya, Akihabara, templos", visited: false, rating: 0, photoUrl: "", priority: "sonho" },
-  { id: "ex-2", name: "Lisboa", country: "Portugal", continent: "Europa", notes: "Pastéis de Belém, Alfama", visited: false, rating: 0, photoUrl: "", priority: "planejando" },
-  { id: "ex-3", name: "Buenos Aires", country: "Argentina", continent: "América do Sul", notes: "Caminito, La Boca, asado", visited: true, rating: 4, photoUrl: "", priority: "sonho" },
-];
+const DEFAULT_DESTINATIONS: Destination[] = [];
 
 export const BucketList = () => {
   const [destinations, setDestinations] = usePersistedState<Destination[]>("travel-bucket", DEFAULT_DESTINATIONS);

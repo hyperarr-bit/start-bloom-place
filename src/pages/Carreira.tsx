@@ -3,7 +3,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, Briefcase, Award, Users, Plus, Trash2, ExternalLink, Edit2, X, Star, CheckCircle, Clock, XCircle, Send, Trophy, Link2, Target, TrendingUp, BookOpen, Zap, DollarSign } from "lucide-react";
+import { ArrowLeft, Briefcase, Award, Users, Plus, Trash2, ExternalLink, Edit2, X, Star, CheckCircle, Clock, XCircle, Send, Trophy, Link2, Target, TrendingUp, BookOpen, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,24 +30,13 @@ const statusConfig: Record<string, { label: string; emoji: string; color: string
   desistiu: { label: "Desistiu", emoji: "🚪", color: "bg-muted text-muted-foreground border-border" },
 };
 
-const DEFAULT_JOBS: JobApp[] = [
-  { id: "ex-1", company: "Tech Corp", role: "Dev Frontend", link: "", status: "aplicado", date: new Date().toISOString().slice(0, 10), salary: "R$ 8.000 - 12.000", notes: "Vaga remota, React + TypeScript", favorite: false },
-  { id: "ex-2", company: "StartupXYZ", role: "Fullstack Engineer", link: "", status: "entrevista", date: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), salary: "R$ 10.000 - 15.000", notes: "Entrevista técnica na próxima semana", favorite: true },
-];
+const DEFAULT_JOBS: JobApp[] = [];
 
-const DEFAULT_PORTFOLIO: PortfolioItem[] = [
-  { id: "ex-p1", title: "Landing Page E-commerce", description: "Redesign completo com React e Tailwind", link: "", category: "projeto", date: new Date().toISOString().slice(0, 10), highlight: true },
-];
+const DEFAULT_PORTFOLIO: PortfolioItem[] = [];
 
-const DEFAULT_CONTACTS: Contact[] = [
-  { id: "ex-c1", name: "Maria Silva", company: "Tech Corp", role: "Head of Engineering", linkedin: "", email: "", phone: "", notes: "Conheci no meetup de React", lastContact: new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10), category: "profissional" },
-];
+const DEFAULT_CONTACTS: Contact[] = [];
 
-const DEFAULT_SKILLS: Skill[] = [
-  { id: "ex-s1", name: "React", category: "técnica", level: 4, targetLevel: 5, notes: "" },
-  { id: "ex-s2", name: "TypeScript", category: "técnica", level: 3, targetLevel: 5, notes: "" },
-  { id: "ex-s3", name: "Inglês", category: "idioma", level: 3, targetLevel: 5, notes: "B2 - estudando para C1" },
-];
+const DEFAULT_SKILLS: Skill[] = [];
 
 // ============= JOB TRACKER =============
 const JobTracker = () => {
@@ -376,13 +365,7 @@ const SkillsTracker = () => {
 
 // ============= INTERVIEW PREP =============
 const InterviewPrep = () => {
-  const [questions, setQuestions] = usePersistedState<{id: string; question: string; answer: string; category: string; practiced: boolean}[]>("career-interview-prep", [
-    { id: "1", question: "Fale sobre você", answer: "", category: "geral", practiced: false },
-    { id: "2", question: "Por que você quer trabalhar aqui?", answer: "", category: "geral", practiced: false },
-    { id: "3", question: "Qual seu maior defeito?", answer: "", category: "comportamental", practiced: false },
-    { id: "4", question: "Conte sobre um desafio que superou", answer: "", category: "comportamental", practiced: false },
-    { id: "5", question: "Onde você se vê em 5 anos?", answer: "", category: "geral", practiced: false },
-  ]);
+  const [questions, setQuestions] = usePersistedState<{id: string; question: string; answer: string; category: string; practiced: boolean}[]>("career-interview-prep", []);
   const [newQuestion, setNewQuestion] = useState("");
   const practiced = questions.filter(q => q.practiced).length;
   const pct = Math.round((practiced / Math.max(questions.length, 1)) * 100);
@@ -430,14 +413,6 @@ const InterviewPrep = () => {
 const Carreira = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
-  const [jobs] = usePersistedState<JobApp[]>("career-jobs", DEFAULT_JOBS);
-  const [skills] = usePersistedState<Skill[]>("career-skills", DEFAULT_SKILLS);
-  const [contacts] = usePersistedState<Contact[]>("career-contacts", DEFAULT_CONTACTS);
-  const [portfolio] = usePersistedState<PortfolioItem[]>("career-portfolio", DEFAULT_PORTFOLIO);
-
-  const activeJobs = jobs.filter(j => !["rejeitado", "desistiu"].includes(j.status)).length;
-  const interviews = jobs.filter(j => j.status === "entrevista").length;
-  const offers = jobs.filter(j => j.status === "oferta").length;
 
   const [activeTab, setActiveTab] = useState("jobs");
 
@@ -491,37 +466,6 @@ const Carreira = () => {
             "Adicione habilidades e acompanhe seu aprendizado"
           ]}
         />
-
-        {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-2">
-          {[
-            { label: "TOTAL", value: jobs.length, emoji: "📊", headerColor: "bg-indigo-200 dark:bg-indigo-800/50", bodyColor: "bg-indigo-50 dark:bg-indigo-950/20" },
-            { label: "ATIVAS", value: activeJobs, emoji: "🎯", headerColor: "bg-purple-200 dark:bg-purple-800/50", bodyColor: "bg-purple-50 dark:bg-purple-950/20" },
-            { label: "ENTREVISTAS", value: interviews, emoji: "🎤", headerColor: "bg-amber-200 dark:bg-amber-800/50", bodyColor: "bg-amber-50 dark:bg-amber-950/20" },
-            { label: "OFERTAS", value: offers, emoji: "🎉", headerColor: "bg-green-200 dark:bg-green-800/50", bodyColor: "bg-green-50 dark:bg-green-950/20" },
-          ].map(s => (
-            <div key={s.label} className="rounded-xl border border-border overflow-hidden">
-              <div className={`${s.headerColor} px-2 py-1 text-center`}>
-                <span className="text-[8px] font-bold uppercase tracking-wider">{s.emoji} {s.label}</span>
-              </div>
-              <div className={`${s.bodyColor} p-2 text-center`}>
-                <p className="text-xl font-black">{s.value}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Quick Stats */}
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="bg-gray-200 dark:bg-gray-800/50 px-3 py-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider">📋 RESUMO</span>
-          </div>
-          <div className="bg-gray-50 dark:bg-gray-950/20 px-4 py-2 flex items-center gap-4 text-[11px]">
-            <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-amber-500" /> {skills.length} skills</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3 text-indigo-500" /> {contacts.length} contatos</span>
-            <span className="flex items-center gap-1"><Trophy className="w-3 h-3 text-purple-500" /> {portfolio.length} conquistas</span>
-          </div>
-        </div>
 
         {activeTab === "jobs" && <JobTracker />}
         {activeTab === "portfolio" && <Portfolio />}

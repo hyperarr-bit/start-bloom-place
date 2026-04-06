@@ -40,7 +40,7 @@ const defaultTimeline: TimelineData = {
   "6meses": { items: [] }, "1ano": { items: [] }, "3anos": { items: [] }, "5anos": { items: [] },
 };
 const defaultHome: HomeData = { quote: "Eu crio a minha realidade.", dreamBoard: [] };
-const defaultGoals: GoalV2[] = [emptyGoal("Minha Meta")];
+const defaultGoals: GoalV2[] = [];
 
 const PERIODS: { key: keyof TimelineData; label: string; color: string }[] = [
   { key: "6meses", label: "6 MESES", color: "#FDE68A" },

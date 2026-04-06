@@ -127,32 +127,39 @@ export const BillSplitter = () => {
             </div>
           )}
 
-          {/* Entries - Notion-style */}
-          {data.entries.length > 0 && (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="bg-yellow-200 dark:bg-yellow-800/50 px-3 py-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">🧾 DESPESAS</span>
-              </div>
-              <div className="bg-yellow-50 dark:bg-yellow-950/20 divide-y divide-border">
-                {data.entries.map(e => (
-                  <div key={e.id} className="flex items-center justify-between px-3 py-2 group">
-                    <div>
-                      <p className="text-xs font-medium">{e.description}</p>
-                      <p className="text-[9px] text-muted-foreground">
-                        Pago por <span className="font-medium text-foreground">{e.paidBy}</span> • dividido entre {e.splitBetween.length}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold">{formatCurrency(e.amount)}</span>
-                      <button onClick={() => removeEntry(e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Entries - always visible */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="bg-yellow-200 dark:bg-yellow-800/50 px-3 py-1.5 flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider">🧾 DESPESAS</span>
+              <button onClick={() => setShowExpenseForm(!showExpenseForm)}
+                className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+                <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+              </button>
             </div>
-          )}
+            <div className="bg-yellow-50 dark:bg-yellow-950/20 divide-y divide-border">
+              {data.entries.length === 0 && (
+                <div className="px-3 py-6 text-center">
+                  <p className="text-xs text-muted-foreground">Nenhuma despesa ainda</p>
+                </div>
+              )}
+              {data.entries.map(e => (
+                <div key={e.id} className="flex items-center justify-between px-3 py-2 group">
+                  <div>
+                    <p className="text-xs font-medium">{e.description}</p>
+                    <p className="text-[9px] text-muted-foreground">
+                      Pago por <span className="font-medium text-foreground">{e.paidBy}</span> • dividido entre {e.splitBetween.length}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold">{formatCurrency(e.amount)}</span>
+                    <button onClick={() => removeEntry(e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Per-person summary - Notion-style */}
           {data.entries.length > 0 && (

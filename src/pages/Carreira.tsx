@@ -414,14 +414,6 @@ const InterviewPrep = () => {
 const Carreira = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
-  const [jobs] = usePersistedState<JobApp[]>("career-jobs", DEFAULT_JOBS);
-  const [skills] = usePersistedState<Skill[]>("career-skills", DEFAULT_SKILLS);
-  const [contacts] = usePersistedState<Contact[]>("career-contacts", DEFAULT_CONTACTS);
-  const [portfolio] = usePersistedState<PortfolioItem[]>("career-portfolio", DEFAULT_PORTFOLIO);
-
-  const activeJobs = jobs.filter(j => !["rejeitado", "desistiu"].includes(j.status)).length;
-  const interviews = jobs.filter(j => j.status === "entrevista").length;
-  const offers = jobs.filter(j => j.status === "oferta").length;
 
   const [activeTab, setActiveTab] = useState("jobs");
 

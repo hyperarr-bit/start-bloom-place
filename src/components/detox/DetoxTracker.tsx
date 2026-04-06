@@ -14,7 +14,7 @@ interface DetoxHabit {
   record: number;
 }
 
-const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊"];
+const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞"];
 
 export const DetoxTracker = () => {
   const { get, set } = useUserData();

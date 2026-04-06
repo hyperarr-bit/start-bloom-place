@@ -40,7 +40,7 @@ const defaultTimeline: TimelineData = {
   "6meses": { items: [] }, "1ano": { items: [] }, "3anos": { items: [] }, "5anos": { items: [] },
 };
 const defaultHome: HomeData = { quote: "Eu crio a minha realidade.", dreamBoard: [] };
-const defaultGoals: GoalV2[] = [emptyGoal("Minha Meta")];
+const defaultGoals: GoalV2[] = [];
 
 const PERIODS: { key: keyof TimelineData; label: string; color: string }[] = [
   { key: "6meses", label: "6 MESES", color: "#FDE68A" },
@@ -198,10 +198,10 @@ export const GoalsBoardV2 = () => {
           <div className="px-5 py-4 space-y-3">
             <h3 className="text-lg font-black tracking-tight">MURAL DOS SONHOS</h3>
             {homeData.dreamBoard.length > 0 && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-3">
                 {homeData.dreamBoard.map((img, i) => (
                   <div key={i} className="relative group/img rounded-lg overflow-hidden">
-                    <img src={img} alt="" className="w-full h-24 object-cover" />
+                    <img src={img} alt="" className="w-full rounded-lg" />
                     <button onClick={() => setHomeData(prev => ({ ...prev, dreamBoard: prev.dreamBoard.filter((_, idx) => idx !== i) }))}
                       className="absolute top-1 right-1 bg-black/60 rounded-full p-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
                       <X className="w-3 h-3 text-white" />

@@ -105,5 +105,6 @@ export const TripCountdown = () => {
           <Button onClick={add} className="w-full rounded-lg h-7 text-xs">Criar</Button>
         </div>
       )}
+    </div>
   );
 };

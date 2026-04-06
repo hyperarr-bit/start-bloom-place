@@ -1,8 +1,7 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Brain } from "lucide-react";
-import { motion } from "framer-motion";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThoughtCapture } from "@/components/hiperfoco/ThoughtCapture";
 import { ThoughtSearch } from "@/components/hiperfoco/ThoughtSearch";
 import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
@@ -10,57 +9,57 @@ import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 
+const tabs = [
+  { id: "dia", label: "DIA", icon: "💭" },
+  { id: "busca", label: "BUSCA", icon: "🔍" },
+  { id: "metas", label: "METAS", icon: "🎯" },
+  { id: "estrategia", label: "ESTRATÉGIA", icon: "♟️" },
+  { id: "timeline", label: "TIMELINE", icon: "📅" },
+  { id: "sonhos", label: "SONHOS", icon: "🌙" },
+];
+
 const Hiperfoco = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("dia");
   const reportTab = useTabReporter();
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-4">
-        <motion.div
-          className="flex items-center gap-3"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <button onClick={() => navigate("/")} className="p-2 rounded-xl hover:bg-muted transition-colors active:scale-95">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <motion.div
-              initial={{ rotate: -20, scale: 0 }}
-              animate={{ rotate: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, delay: 0.1 }}
+          <Brain className="w-5 h-5 text-violet-400" />
+          <h1 className="text-base font-bold tracking-tight">MENTE</h1>
+        </div>
+        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
-              <Brain className="w-5 h-5 text-violet-400" />
-            </motion.div>
-            <h1 className="text-lg font-bold tracking-tight">MENTE</h1>
-          </div>
-        </motion.div>
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </header>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
-        >
-          <Tabs defaultValue="dia" className="w-full" onValueChange={v => reportTab?.(v)}>
-            <TabsList className="w-full grid grid-cols-6">
-              <TabsTrigger value="dia" className="text-[10px]">DIA</TabsTrigger>
-              <TabsTrigger value="busca" className="text-[10px]">BUSCA</TabsTrigger>
-              <TabsTrigger value="metas" className="text-[10px]">METAS</TabsTrigger>
-              <TabsTrigger value="estrategia" className="text-[10px]">ESTRATÉGIA</TabsTrigger>
-              <TabsTrigger value="timeline" className="text-[10px]">TIMELINE</TabsTrigger>
-              <TabsTrigger value="sonhos" className="text-[10px]">🌙 SONHOS</TabsTrigger>
-            </TabsList>
-            <TabsContent value="dia"><ThoughtCapture /></TabsContent>
-            <TabsContent value="busca"><ThoughtSearch /></TabsContent>
-            <TabsContent value="metas"><GoalsPanel /></TabsContent>
-            <TabsContent value="estrategia"><StrategyPanel /></TabsContent>
-            <TabsContent value="timeline"><TimelinePanel /></TabsContent>
-            <TabsContent value="sonhos"><DreamJournal /></TabsContent>
-          </Tabs>
-        </motion.div>
-      </div>
+      <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        {activeTab === "dia" && <ThoughtCapture />}
+        {activeTab === "busca" && <ThoughtSearch />}
+        {activeTab === "metas" && <GoalsPanel />}
+        {activeTab === "estrategia" && <StrategyPanel />}
+        {activeTab === "timeline" && <TimelinePanel />}
+        {activeTab === "sonhos" && <DreamJournal />}
+      </main>
     </div>
   );
 };

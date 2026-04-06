@@ -1,63 +1,62 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Users } from "lucide-react";
-import { motion } from "framer-motion";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeoplePanel } from "@/components/relacionamentos/PeoplePanel";
 import { DateCalendar } from "@/components/relacionamentos/DateCalendar";
 import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
 
+const tabs = [
+  { id: "pessoas", label: "PESSOAS", icon: "💜" },
+  { id: "agenda", label: "AGENDA", icon: "📅" },
+  { id: "momentos", label: "MOMENTOS", icon: "✨" },
+  { id: "presentes", label: "PRESENTES", icon: "🎁" },
+  { id: "eventos", label: "EVENTOS", icon: "📋" },
+];
+
 const Relacionamentos = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("pessoas");
   const reportTab = useTabReporter();
+
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    reportTab?.(tabId);
+  };
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-24 space-y-4">
-        <motion.div
-          className="flex items-center gap-3"
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <button onClick={() => navigate("/")} className="p-2 rounded-xl hover:bg-muted transition-colors active:scale-95">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-2">
-            <motion.div
-              initial={{ rotate: -20, scale: 0 }}
-              animate={{ rotate: 0, scale: 1 }}
-              transition={{ type: "spring", stiffness: 300, delay: 0.1 }}
+          <Users className="w-5 h-5 text-rose-400" />
+          <h1 className="text-base font-bold tracking-tight">RELAÇÕES</h1>
+        </div>
+        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
-              <Users className="w-5 h-5 text-rose-400" />
-            </motion.div>
-            <h1 className="text-lg font-bold tracking-tight">RELAÇÕES</h1>
-          </div>
-        </motion.div>
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </header>
 
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: 0.15 }}
-        >
-          <Tabs defaultValue="pessoas" className="w-full" onValueChange={v => reportTab?.(v)}>
-            <TabsList className="w-full grid grid-cols-5">
-              <TabsTrigger value="pessoas" className="text-[10px]">💜 PESSOAS</TabsTrigger>
-              <TabsTrigger value="agenda" className="text-[10px]">📅 AGENDA</TabsTrigger>
-              <TabsTrigger value="momentos" className="text-[10px]">✨ MOMENTOS</TabsTrigger>
-              <TabsTrigger value="presentes" className="text-[10px]">🎁 PRESENTES</TabsTrigger>
-              <TabsTrigger value="eventos" className="text-[10px]">📋 EVENTOS</TabsTrigger>
-            </TabsList>
-            <TabsContent value="pessoas"><PeoplePanel /></TabsContent>
-            <TabsContent value="agenda"><DateCalendar /></TabsContent>
-            <TabsContent value="momentos"><MomentsTimeline /></TabsContent>
-            <TabsContent value="presentes"><GiftIdeas /></TabsContent>
-            <TabsContent value="eventos"><EventLog /></TabsContent>
-          </Tabs>
-        </motion.div>
-      </div>
+      <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        {activeTab === "pessoas" && <PeoplePanel />}
+        {activeTab === "agenda" && <DateCalendar />}
+        {activeTab === "momentos" && <MomentsTimeline />}
+        {activeTab === "presentes" && <GiftIdeas />}
+        {activeTab === "eventos" && <EventLog />}
+      </main>
     </div>
   );
 };

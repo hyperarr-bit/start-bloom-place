@@ -1,73 +1,43 @@
 
 
-# Plano: Aplicar design de cards coloridos nas abas restantes do Casa
+# Plano: Aplicar design Casa nos módulos Viagens e Carreira + remover stat cards
 
 ## Situacao atual
 
-As abas **Comodos**, **Mercado** e **Rotina** tem um design rico:
-- Cards com **header colorido** (bg-yellow-200, bg-green-500, etc.)
-- **Body com cor suave** correspondente (bg-yellow-50, etc.)
-- Cards ja existem vazios com texto "Nenhuma tarefa ainda" e input inline
-- Checkbox inline com placeholder "Adicionar item..."
-- Contadores (0/0) no header
+**Viagens**: Os componentes ja usam cards coloridos (notion-style), mas varios tem dados pre-preenchidos de exemplo (destinos, roteiro, etc.)
 
-As outras 7 abas (Despensa, Cardapio, Manutencao, Vida, CO-OP, Seguranca, Utilidades) usam cards simples bg-card com bordas neutras e muitas vezes somem quando vazios.
+**Carreira**: Tem 4 stat cards (TOTAL, ATIVAS, ENTREVISTAS, OFERTAS) + card RESUMO + dados pre-preenchidos (vagas, portfolio, contatos, skills, perguntas de entrevista)
 
-## O que muda
+## Mudancas
 
-Transformar cada aba para ter cards com **headers coloridos pre-existentes** e inputs inline, mesmo quando vazio. O usuario ve a estrutura pronta e so preenche.
+### 1. Carreira — Remover stat cards e dados pre-preenchidos
 
-### Despensa (`SmartPantry.tsx`)
-- Mostrar as 4 categorias (Geladeira, Armario, Limpeza, Banheiro) sempre, com headers coloridos distintos, mesmo quando vazias
-- Cada categoria com input inline "Adicionar produto..."
+| Item | De | Para |
+|------|----|------|
+| Stat cards (4 cards grid) | Grid com TOTAL/ATIVAS/ENTREVISTAS/OFERTAS | Removido |
+| Card RESUMO | Card com skills/contatos/conquistas | Removido |
+| `DEFAULT_JOBS` | 2 vagas exemplo | `[]` |
+| `DEFAULT_PORTFOLIO` | 1 item exemplo | `[]` |
+| `DEFAULT_CONTACTS` | 1 contato exemplo | `[]` |
+| `DEFAULT_SKILLS` | 3 skills exemplo | `[]` |
+| Interview Prep defaults | 5 perguntas pre-cadastradas | `[]` |
 
-### Cardapio (`MealPlanner.tsx`)
-- Os 7 dias da semana ja existem como cards, mas com estilo simples. Trocar para headers coloridos (cada dia uma cor, usando o padrao border-l que ja existe, mas agora como header colored completo)
-- Card do Banco de Receitas com header colorido
+O Pipeline visual da aba Vagas continua (so aparece quando tem dados). As tabelas notion-style com headers coloridos ja existem e ficam.
 
-### Manutencao (`MaintenanceLog.tsx`)
-- 3 secoes (Manutencao, Garantias, Medidas) como cards com headers coloridos permanentes em vez de botoes toggle
-- Cada secao mostra vazia com "Nenhum item" e input inline
+### 2. Viagens — Remover dados pre-preenchidos
 
-### Vida/Plantas (`PlantsAndPets.tsx`)
-- 2 cards permanentes: "PLANTAS" (header verde) e "PETS" (header amber), sempre visiveis
-- Dentro: lista de itens + form inline
+| Componente | De | Para |
+|------------|----|------|
+| `BucketList` DEFAULT_DESTINATIONS | 3 destinos exemplo | `[]` |
+| `DailyTimeline` DEFAULT_DAYS | 2 dias com atividades exemplo | `[]` |
 
-### CO-OP (`ChoreRotation.tsx`)
-- Card "MORADORES" com header colorido (roxo)
-- Card "TAREFAS" com header colorido (azul) com lista e input inline
+Os outros componentes de viagem (PackingChecklist, BillSplitter, PlacesBoard, SafetyCard, CurrencyConverter, TravelDiary, TripCountdown, TravelBudget) ja iniciam vazios.
 
-### Seguranca (`SafetyChecks.tsx`)
-- 2 cards permanentes com headers coloridos: "CHECKLIST DE SEGURANCA" (verde) e "ESTOQUE DE EMERGENCIA" (vermelho), ambos sempre visiveis em vez de toggle
-
-### Utilidades (`HomeUtilities.tsx`)
-- 4 secoes como cards permanentes todos visiveis: Contatos (azul), Anfitriao (rosa), Desapego (laranja), Consumo (amarelo)
-- Cada um com header colorido e body claro
-
-## Padrao de design aplicado (igual Comodos/Mercado/Rotina)
-
-```text
-┌──────────────────────────────┐
-│ bg-green-200  🌿 PLANTAS   │  ← header colorido
-├──────────────────────────────┤
-│ bg-green-50                  │  ← body suave
-│  item 1                      │
-│  item 2                      │
-│  Nenhum item ainda (italic)  │
-│  ─────────────────────────── │
-│  ☐ Adicionar item...         │  ← input inline
-└──────────────────────────────┘
-```
-
-## Arquivos alterados (7)
+## Arquivos alterados
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `SmartPantry.tsx` | 4 categorias sempre visiveis com headers coloridos |
-| `MealPlanner.tsx` | Dias da semana com headers coloridos, banco de receitas com header |
-| `MaintenanceLog.tsx` | 3 secoes como cards permanentes com headers coloridos (remove toggle) |
-| `PlantsAndPets.tsx` | 2 cards permanentes (Plantas verde, Pets amber) |
-| `ChoreRotation.tsx` | Cards Moradores e Tarefas com headers coloridos |
-| `SafetyChecks.tsx` | 2 cards permanentes com headers coloridos (remove toggle) |
-| `HomeUtilities.tsx` | 4 secoes como cards permanentes com headers coloridos (remove toggle) |
+| `src/pages/Carreira.tsx` | (1) Remover bloco stat cards linhas 496-512 (2) Remover bloco RESUMO linhas 514-524 (3) `DEFAULT_JOBS = []` (4) `DEFAULT_PORTFOLIO = []` (5) `DEFAULT_CONTACTS = []` (6) `DEFAULT_SKILLS = []` (7) Interview prep default `[]` (8) Remover leitura de stats no componente principal |
+| `src/components/travel/BucketList.tsx` | `DEFAULT_DESTINATIONS = []` |
+| `src/components/travel/DailyTimeline.tsx` | `DEFAULT_DAYS = []` |
 

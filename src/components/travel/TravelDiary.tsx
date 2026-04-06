@@ -77,9 +77,7 @@ export const TravelDiary = () => {
         </div>
       )}
 
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Check-in do Dia
-      </Button>
+      
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">

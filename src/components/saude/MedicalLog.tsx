@@ -15,12 +15,14 @@ interface Appointment {
   questions: string;
 }
 
-interface ExamFile {
+interface Exam {
   id: string;
   name: string;
   date: string;
-  type: string;
-  url: string;
+  time: string;
+  location: string;
+  notes: string;
+  done: boolean;
 }
 
 interface Biomarker {

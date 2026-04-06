@@ -168,10 +168,6 @@ const Portfolio = () => {
 
   return (
     <div className="space-y-4">
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Nova Conquista
-      </Button>
-
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Input placeholder="Título" value={form.title || ""} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="h-9 text-sm" />
@@ -186,8 +182,12 @@ const Portfolio = () => {
       )}
 
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-amber-200 dark:bg-amber-800/50 px-4 py-2">
+        <div className="bg-amber-200 dark:bg-amber-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">🏆 CONQUISTAS & PORTFOLIO</span>
+          <button onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+          </button>
         </div>
         <div className="bg-amber-100 dark:bg-amber-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
           <span className="col-span-1"></span>
@@ -197,6 +197,11 @@ const Portfolio = () => {
           <span className="col-span-2 text-right">Ações</span>
         </div>
         <div className="divide-y divide-border bg-card">
+          {items.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhuma conquista ainda</p>
+            </div>
+          )}
           {items.sort((a, b) => b.date.localeCompare(a.date)).map(item => (
             <div key={item.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
               <span className="col-span-1 text-sm">{catEmoji[item.category]}</span>

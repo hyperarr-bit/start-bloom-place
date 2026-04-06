@@ -91,23 +91,37 @@ export const DailyTimeline = () => {
         </button>
       )}
 
-      {/* Day chips */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {days.sort((a, b) => a.date.localeCompare(b.date)).map(d => (
-          <button key={d.id} onClick={() => setActiveDay(d.id)}
-            className={`shrink-0 rounded-xl px-4 py-2 border transition-all text-center min-w-[80px] ${
-              activeDay === d.id ? "border-foreground bg-foreground text-background shadow-sm"
-                : d.date === todayStr ? "border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-950/20"
-                : "border-border bg-card hover:border-foreground/30"
-            }`}>
-            <p className="text-xs font-bold">Dia {d.dayNumber}</p>
-            <p className="text-[9px] opacity-70">{new Date(d.date + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</p>
+      {/* Roteiro card — always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">🗓️ ROTEIRO</span>
+          <button onClick={() => setShowAddDay(true)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Novo Dia
           </button>
-        ))}
-        <button onClick={() => setShowAddDay(true)}
-          className="shrink-0 rounded-xl px-4 py-2 border border-dashed border-border hover:border-foreground/50 min-w-[80px] flex items-center justify-center text-muted-foreground">
-          <Plus className="w-4 h-4" />
-        </button>
+        </div>
+        <div className="bg-sky-50 dark:bg-sky-950/20">
+          {days.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhum dia planejado ainda</p>
+            </div>
+          )}
+          {days.length > 0 && (
+            <div className="p-3 flex gap-2 overflow-x-auto scrollbar-hide">
+              {days.sort((a, b) => a.date.localeCompare(b.date)).map(d => (
+                <button key={d.id} onClick={() => setActiveDay(d.id)}
+                  className={`shrink-0 rounded-xl px-4 py-2 border transition-all text-center min-w-[80px] ${
+                    activeDay === d.id ? "border-foreground bg-foreground text-background shadow-sm"
+                      : d.date === todayStr ? "border-teal-300 dark:border-teal-700 bg-teal-50 dark:bg-teal-950/20"
+                      : "border-border bg-card hover:border-foreground/30"
+                  }`}>
+                  <p className="text-xs font-bold">Dia {d.dayNumber}</p>
+                  <p className="text-[9px] opacity-70">{new Date(d.date + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {showAddDay && (

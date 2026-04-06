@@ -77,9 +77,7 @@ export const TravelDiary = () => {
         </div>
       )}
 
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Check-in do Dia
-      </Button>
+      
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -118,53 +116,53 @@ export const TravelDiary = () => {
         </div>
       )}
 
-      {/* Diary entries - Notion-style */}
-      <div className="space-y-3">
-        {filtered.map(entry => (
-          <div key={entry.id} className="rounded-xl border border-border overflow-hidden group hover:shadow-md transition-all">
-            {entry.photoUrl && (
-              <div className="h-40 overflow-hidden">
-                <img src={entry.photoUrl} alt="Momento" className="w-full h-full object-cover" />
-              </div>
-            )}
-            <div className="bg-orange-200 dark:bg-orange-800/50 px-3 py-1.5 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider">
-                {entry.mood} {new Date(entry.date).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
-              </span>
-              {entry.tripName && <Badge variant="secondary" className="text-[8px] px-1.5 h-4 bg-background/50">{entry.tripName}</Badge>}
-            </div>
-            <div className="bg-orange-50 dark:bg-orange-950/20 p-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  {entry.bestThing && (
-                    <div className="mb-2">
-                      <p className="text-[9px] font-bold text-muted-foreground mb-0.5">✨ MELHOR MOMENTO</p>
-                      <p className="text-xs">{entry.bestThing}</p>
-                    </div>
-                  )}
-                  {entry.wouldNotDoAgain && (
-                    <div>
-                      <p className="text-[9px] font-bold text-muted-foreground mb-0.5">🚫 NÃO FARIA DE NOVO</p>
-                      <p className="text-xs text-muted-foreground">{entry.wouldNotDoAgain}</p>
-                    </div>
-                  )}
-                </div>
-                <button onClick={() => remove(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                  <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filtered.length === 0 && !showForm && (
-        <div className="text-center py-12">
-          <BookOpen className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-muted-foreground">Suas memórias de viagem</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Faça um check-in no final de cada dia</p>
+      {/* Diary card — always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-orange-200 dark:bg-orange-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📔 DIÁRIO DE VIAGEM</span>
+          <button onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Check-in
+          </button>
         </div>
-      )}
+        <div className="bg-orange-50 dark:bg-orange-950/20">
+          {filtered.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhuma entrada ainda</p>
+            </div>
+          )}
+          <div className="divide-y divide-border">
+            {filtered.map(entry => (
+              <div key={entry.id} className="p-3 hover:bg-background/30 transition-colors group">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-sm">{entry.mood}</span>
+                      <span className="text-[10px] font-medium">{new Date(entry.date).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span>
+                      {entry.tripName && <Badge variant="secondary" className="text-[8px] px-1.5 h-4">{entry.tripName}</Badge>}
+                    </div>
+                    {entry.bestThing && (
+                      <div className="mb-1">
+                        <p className="text-[9px] font-bold text-muted-foreground">✨ MELHOR MOMENTO</p>
+                        <p className="text-xs">{entry.bestThing}</p>
+                      </div>
+                    )}
+                    {entry.wouldNotDoAgain && (
+                      <div>
+                        <p className="text-[9px] font-bold text-muted-foreground">🚫 NÃO FARIA DE NOVO</p>
+                        <p className="text-xs text-muted-foreground">{entry.wouldNotDoAgain}</p>
+                      </div>
+                    )}
+                  </div>
+                  <button onClick={() => remove(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

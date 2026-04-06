@@ -79,9 +79,23 @@ export const TripCountdown = () => {
         </div>
       )}
 
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Novo Countdown
-      </Button>
+      {/* Countdown card — always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">⏳ CONTAGENS REGRESSIVAS</span>
+          <button onClick={() => setShowForm(!showForm)}
+            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
+            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+          </button>
+        </div>
+        <div className="bg-teal-50 dark:bg-teal-950/20">
+          {countdowns.length === 0 && (
+            <div className="px-3 py-6 text-center">
+              <p className="text-xs text-muted-foreground">Nenhuma viagem ainda</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-3 space-y-2">
@@ -89,13 +103,6 @@ export const TripCountdown = () => {
           <Input type="date" value={form.departureDate} onChange={e => setForm(p => ({ ...p, departureDate: e.target.value }))} className="h-8 rounded-lg text-xs" />
           <Input placeholder="URL da foto (opcional)" value={form.photoUrl} onChange={e => setForm(p => ({ ...p, photoUrl: e.target.value }))} className="h-8 rounded-lg text-xs" />
           <Button onClick={add} className="w-full rounded-lg h-7 text-xs">Criar</Button>
-        </div>
-      )}
-
-      {countdowns.length === 0 && !showForm && (
-        <div className="text-center py-8">
-          <Plane className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-          <p className="text-xs text-muted-foreground">Contagem regressiva para suas viagens</p>
         </div>
       )}
     </div>

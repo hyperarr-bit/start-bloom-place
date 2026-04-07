@@ -17,24 +17,6 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
     return "hsl(var(--accent))";
   };
 
-  const getScoreLabel = () => {
-    if (score >= 90) return "Dia incrível!";
-    if (score >= 70) return "Mandando bem!";
-    if (score >= 50) return "Bom progresso";
-    if (score >= 30) return "Vamos lá!";
-    if (score > 0) return "Começando...";
-    return "Comece agora";
-  };
-
-  const getMotivation = () => {
-    if (score >= 90) return "Quase perfeito, continue assim";
-    if (score >= 70) return "Cada ação conta, siga firme";
-    if (score >= 50) return "Metade do caminho, bora subir!";
-    if (score >= 30) return "Beba água, registre algo";
-    if (score > 0) return "Pequenas ações movem o score";
-    return "Registre sua primeira atividade";
-  };
-
   return (
     <div className="flex items-center gap-5">
       <div className="relative w-[130px] h-[130px] flex-shrink-0">
@@ -77,9 +59,9 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          {getScoreLabel()}
+          Vamos lá!
         </motion.p>
-        <p className="text-[11px] text-muted-foreground mb-3">{getMotivation()}</p>
+        <p className="text-[11px] text-muted-foreground mb-3">Score do dia baseado em suas atividades</p>
         
         {streak > 0 && (
           <motion.div

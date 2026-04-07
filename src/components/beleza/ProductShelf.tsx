@@ -147,21 +147,20 @@ export const ProductShelf = () => {
 
       {/* Product table — always visible */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-          <span className="col-span-4">Produto</span>
+        <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-8 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+          <span className="col-span-3">Produto</span>
           <span className="col-span-2">Marca</span>
           <span className="col-span-2">Categoria</span>
-          <span className="col-span-2">Validade</span>
-          <span className="col-span-2 text-right">Ações</span>
+          <span className="col-span-1 text-right hidden sm:block">Validade</span>
         </div>
         <div className="divide-y divide-border bg-card">
           {activeProducts.map(p => {
             const cpd = costPerDose(p);
             const expiry = p.openedDate && p.paoMonths ? getExpiryProgress(p.openedDate, p.paoMonths) : null;
             return (
-              <div key={p.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center cursor-pointer hover:bg-muted/30 transition-colors group"
+              <div key={p.id} className="px-3 py-2 grid grid-cols-8 gap-1 items-center cursor-pointer hover:bg-muted/30 transition-colors group"
                 onClick={() => setSelectedProduct(p)}>
-                <div className="col-span-4 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex items-center gap-2 min-w-0">
                   <span className="text-sm shrink-0">{catEmoji[p.category] || "✨"}</span>
                   <div className="min-w-0">
                     <p className="text-xs font-medium truncate">{p.name}</p>
@@ -169,21 +168,11 @@ export const ProductShelf = () => {
                   </div>
                 </div>
                 <span className="col-span-2 text-[10px] text-muted-foreground truncate">{p.brand || "—"}</span>
-                <span className="col-span-2 text-[10px] text-muted-foreground">{p.category}</span>
-                <div className="col-span-2">
-                  {expiry && (
-                    <div>
-                      <div className="h-1 bg-muted rounded-full overflow-hidden w-full">
-                        <div className={`h-full rounded-full transition-all ${
-                          expiry.daysLeft < 15 ? "bg-red-500" : expiry.daysLeft < 30 ? "bg-amber-500" : "bg-emerald-500"
-                        }`} style={{ width: `${Math.min(100, expiry.percent)}%` }} />
-                      </div>
-                      <span className="text-[8px] text-muted-foreground">{expiry.expired ? "Vencido!" : `${expiry.daysLeft}d`}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="col-span-2 flex justify-end gap-1">
+                <div className="col-span-2 flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">{p.category}</span>
                   {p.repurchase && <span className="text-[8px]">🔄</span>}
+                </div>
+                <div className="col-span-1 flex justify-end">
                   <button onClick={e => { e.stopPropagation(); markFinished(p); }} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100">
                     <Package className="w-3 h-3" />
                   </button>
@@ -199,17 +188,15 @@ export const ProductShelf = () => {
           )}
 
           {/* Inline quick-add row */}
-          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center bg-muted/20">
-            <div className="col-span-4">
-              <Input
-                placeholder="Nome do produto"
-                value={quickName}
-                onChange={e => setQuickName(e.target.value)}
-                className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
-                onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
-              />
-            </div>
-            <div className="col-span-2">
+          <div className="px-3 py-2 space-y-1.5 bg-muted/20">
+            <Input
+              placeholder="Nome do produto"
+              value={quickName}
+              onChange={e => setQuickName(e.target.value)}
+              className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+              onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+            />
+            <div className="grid grid-cols-2 gap-1.5">
               <Input
                 placeholder="Marca"
                 value={quickBrand}
@@ -217,8 +204,6 @@ export const ProductShelf = () => {
                 className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
                 onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
               />
-            </div>
-            <div className="col-span-3">
               <Select value={quickCategory} onValueChange={setQuickCategory}>
                 <SelectTrigger className="h-7 text-[10px] border-dashed border-border/60 bg-background/50">
                   <SelectValue />
@@ -228,11 +213,11 @@ export const ProductShelf = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-3 flex justify-end gap-1">
-              <Button size="sm" className="h-7 px-2 text-[10px]" onClick={quickAdd}>
-                <Plus className="w-3 h-3 mr-0.5" /> Add
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-7 px-3 text-[10px] flex-1" onClick={quickAdd}>
+                <Plus className="w-3 h-3 mr-0.5" /> Adicionar
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => setShowForm(true)}>
+              <Button size="sm" variant="ghost" className="h-7 px-3 text-[10px]" onClick={() => setShowForm(true)}>
                 + Detalhes
               </Button>
             </div>

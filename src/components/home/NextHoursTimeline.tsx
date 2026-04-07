@@ -182,7 +182,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
       >
         <div className="flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground text-shine">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
             Pendências de hoje
           </h3>
         </div>

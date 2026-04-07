@@ -67,6 +67,10 @@ export const PetDiary = () => {
               {pets.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
             <Textarea placeholder="O que aconteceu hoje?" value={text} onChange={(e) => setText(e.target.value)} className="text-sm min-h-[60px]" />
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Input placeholder="URL da foto (opcional)" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="h-8 text-sm" />
+            </div>
             <div className="flex gap-1.5">
               {moods.map((m) => (
                 <motion.button

@@ -14,7 +14,7 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
   const getScoreColor = () => {
     if (score >= 80) return "hsl(var(--success))";
     if (score >= 50) return "hsl(var(--warning))";
-    return "hsl(var(--accent))";
+    return "hsl(var(--warning))";
   };
 
   return (

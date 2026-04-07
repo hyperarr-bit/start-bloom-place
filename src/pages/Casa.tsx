@@ -6,7 +6,6 @@ import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";
 import MaintenanceLog from "@/components/casa/MaintenanceLog";
-import PlantsAndPets from "@/components/casa/PlantsAndPets";
 import ChoreRotation from "@/components/casa/ChoreRotation";
 import SafetyChecks from "@/components/casa/SafetyChecks";
 import HomeUtilities from "@/components/casa/HomeUtilities";

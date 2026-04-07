@@ -16,10 +16,7 @@ const categories = ["Skincare", "Cabelo", "Corpo", "Outro"];
 const catEmoji: Record<string, string> = { Skincare: "🧴", Cabelo: "💇", Corpo: "🧼", Outro: "✨" };
 const paoOptions = [3, 6, 9, 12, 18, 24];
 
-const DEFAULT_PRODUCTS: Product[] = [
-  { id: "ex-1", name: "Protetor Solar FPS 60", brand: "La Roche-Posay", category: "Skincare", opened: true, openedDate: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), paoMonths: 12, expiry: "", notes: "Uso diário, reaplicar a cada 2h", rating: 0, repurchase: true, price: 89.90, sizeMl: 50, photoUrl: "", frequency: "Diário", finished: false },
-  { id: "ex-2", name: "Sérum Vitamina C", brand: "Principia", category: "Skincare", opened: true, openedDate: new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10), paoMonths: 6, expiry: "", notes: "Aplicar pela manhã antes do FPS", rating: 0, repurchase: false, price: 65.00, sizeMl: 30, photoUrl: "", frequency: "Diário", finished: false },
-];
+const DEFAULT_PRODUCTS: Product[] = [];
 
 const emptyProduct: Partial<Product> = {
   category: "Skincare", opened: false, rating: 0, repurchase: false,

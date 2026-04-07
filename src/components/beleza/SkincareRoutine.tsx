@@ -15,20 +15,9 @@ interface RoutineStep {
   isAcid?: boolean;
 }
 
-const DEFAULT_MORNING: RoutineStep[] = [
-  { name: "Gel de Limpeza" },
-  { name: "Tônico / Essência" },
-  { name: "Vitamina C (Tratamento)" },
-  { name: "Hidratante Leve" },
-  { name: "Protetor Solar FPS 60", isSunscreen: true },
-];
+const DEFAULT_MORNING: RoutineStep[] = [];
 
-const DEFAULT_NIGHT: RoutineStep[] = [
-  { name: "Cleansing Oil (Limpeza Dupla)" },
-  { name: "Sabonete Facial" },
-  { name: "Tratamento do Dia", isAcid: true },
-  { name: "Hidratação Profunda" },
-];
+const DEFAULT_NIGHT: RoutineStep[] = [];
 
 const SKIN_CYCLE_PHASES = [
   { label: "Esfoliação", emoji: "✨", desc: "Ácido Glicólico ou Lático", color: "text-emerald-600 dark:text-emerald-400" },

@@ -12,6 +12,7 @@ interface DiaryEntry {
   date: string;
   text: string;
   mood: string;
+  photoUrl?: string;
 }
 
 const moods = ["😍", "😊", "😴", "🤒", "😈", "🥺"];

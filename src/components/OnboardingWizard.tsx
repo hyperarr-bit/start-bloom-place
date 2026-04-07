@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, ArrowRight, ArrowLeft, Check, 
   DollarSign, CalendarCheck, Heart, Dumbbell, Apple, 
-  Home, GraduationCap, BookOpen, Droplets, Plane, Briefcase, Rocket
+  Home, GraduationCap, BookOpen, Droplets, Plane, Briefcase, Rocket,
+  Brain, Users, PawPrint, Leaf
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -33,7 +34,7 @@ const steps = [
   {
     id: "modules",
     emoji: "📦",
-    title: "12 Módulos para sua vida",
+    title: "16 Módulos para sua vida",
     subtitle: "Cada um com um propósito claro",
     description: "Não precisa usar todos de uma vez. Comece pelo que faz mais sentido pra você agora.",
     visual: (
@@ -51,6 +52,10 @@ const steps = [
           { icon: Droplets, color: "bg-pink-400/20 text-pink-600", label: "Beleza" },
           { icon: Plane, color: "bg-teal-400/20 text-teal-600", label: "Viagens" },
           { icon: Briefcase, color: "bg-slate-400/20 text-slate-600", label: "Carreira" },
+          { icon: Brain, color: "bg-violet-400/20 text-violet-600", label: "Mente" },
+          { icon: Users, color: "bg-rose-400/20 text-rose-600", label: "Relações" },
+          { icon: PawPrint, color: "bg-amber-400/20 text-amber-600", label: "Pet" },
+          { icon: Leaf, color: "bg-lime-400/20 text-lime-600", label: "Detox" },
         ].map((m, i) => (
           <motion.div
             key={i}

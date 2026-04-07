@@ -2,6 +2,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { TripCountdown as TripCountdownType, genId, daysUntil } from "./types";
 import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useState } from "react";
 
 export const TripCountdown = () => {

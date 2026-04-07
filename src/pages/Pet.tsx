@@ -7,6 +7,7 @@ import { PetHealth } from "@/components/pet/PetHealth";
 import { PetRoutine } from "@/components/pet/PetRoutine";
 import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "pets", label: "PETS", icon: "🐾" },

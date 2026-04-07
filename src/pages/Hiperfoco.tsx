@@ -8,6 +8,7 @@ import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
 import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
+import { IdeasPanel } from "@/components/hiperfoco/IdeasPanel";
 import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
@@ -16,6 +17,7 @@ const tabs = [
   { id: "metas", label: "METAS", icon: "🎯" },
   { id: "estrategia", label: "ESTRATÉGIA", icon: "" },
   { id: "timeline", label: "TIMELINE", icon: "📅" },
+  { id: "ideias", label: "IDEIAS", icon: "💡" },
   { id: "sonhos", label: "SONHOS", icon: "🌙" },
 ];
 
@@ -68,6 +70,7 @@ const Hiperfoco = () => {
         {activeTab === "metas" && <GoalsPanel />}
         {activeTab === "estrategia" && <StrategyPanel />}
         {activeTab === "timeline" && <TimelinePanel />}
+        {activeTab === "ideias" && <IdeasPanel />}
         {activeTab === "sonhos" && <DreamJournal />}
       </main>
     </div>

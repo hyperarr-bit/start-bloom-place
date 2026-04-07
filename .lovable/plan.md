@@ -1,22 +1,20 @@
 
 
-# Plano: Reverter textos do DayScoreRing para o original
+# Plano: Reverter cor do score baixo para amarelo-alaranjado
 
 ## Problema
-Os textos do score foram alterados. O usuario quer o estilo anterior com "Vamos la!" como label e "Score do dia baseado em suas atividades" como subtitulo fixo.
+Quando o score esta abaixo de 50, a cor do ring usa `hsl(var(--accent))` que e rosa/vermelho. Antes era amarelo-alaranjado.
 
 ## Mudanca
 
-No `src/components/home/DayScoreRing.tsx`:
+No `src/components/home/DayScoreRing.tsx`, linha 17:
+- Trocar `return "hsl(var(--accent))"` por `return "hsl(var(--warning))"`
 
-1. **Remover `getScoreLabel()`** — substituir por texto fixo "Vamos la!"
-2. **Remover `getMotivation()`** — substituir por texto fixo "Score do dia baseado em suas atividades"
-
-Tudo mais (cores, ring, streak, animacoes) permanece identico.
+Assim o ring fica amarelo-alaranjado para scores baixos e medios, e verde para scores altos (>=80).
 
 ## Arquivo alterado (1)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/home/DayScoreRing.tsx` | Reverter label para "Vamos la!" e subtitulo para "Score do dia baseado em suas atividades" |
+| `src/components/home/DayScoreRing.tsx` | Trocar fallback de `--accent` para `--warning` na funcao getScoreColor |
 

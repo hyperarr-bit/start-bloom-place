@@ -70,6 +70,7 @@ const Hiperfoco = () => {
         {activeTab === "metas" && <GoalsPanel />}
         {activeTab === "estrategia" && <StrategyPanel />}
         {activeTab === "timeline" && <TimelinePanel />}
+        {activeTab === "ideias" && <IdeasPanel />}
         {activeTab === "sonhos" && <DreamJournal />}
       </main>
     </div>

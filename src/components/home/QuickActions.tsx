@@ -452,36 +452,45 @@ export const QuickActions = () => {
                 </div>
               )}
 
-              {/* Meal form */}
-              {activeAction === "meal" && (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                    <Input
-                      ref={inputRef}
-                      placeholder="Nome da refeição"
-                      value={mealName}
-                      onChange={e => setMealName(e.target.value)}
-                      className="h-9 text-sm flex-1"
-                      onKeyDown={e => e.key === "Enter" && submitMeal()}
-                    />
+              {/* Meal selector from diet plan */}
+              {activeAction === "meal" && (() => {
+                const weekDayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+                const todayDay = weekDayNames[new Date().getDay()];
+                const mealPlan = get<Record<string, Record<string, string>>>("saude-meals", {});
+                const todayPlan = mealPlan[todayDay.toUpperCase()] || mealPlan[todayDay] || {};
+                const mealEmojis: Record<string, string> = { "Café da Manhã": "🌅", "Almoço": "🍽️", "Lanche": "🍎", "Janta": "🌙", "Pré-Treino": "⚡", "Pós-Treino": "💪", "Ceia": "🌙", "Café da Tarde": "☕" };
+                const entries = Object.entries(todayPlan).filter(([_, food]) => food && food.trim());
+                
+                if (entries.length === 0) {
+                  return (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Nenhuma refeição planejada para hoje.{" "}
+                      <button onClick={() => navigate("/dieta")} className="text-primary font-medium underline">Planejar em Dieta</button>
+                    </p>
+                  );
+                }
+                
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] text-muted-foreground">Qual refeição você fez?</p>
+                    {entries.map(([mealType, food]) => (
+                      <motion.button
+                        key={mealType}
+                        onClick={() => submitMealSelection(mealType, food)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left"
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        <span className="text-base">{mealEmojis[mealType] || "🍴"}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium block">{mealType}</span>
+                          <span className="text-[10px] text-muted-foreground truncate block">{food}</span>
+                        </div>
+                        <Check className="w-3.5 h-3.5 text-muted-foreground/50" />
+                      </motion.button>
+                    ))}
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Calorias (opcional)"
-                      value={mealCalories}
-                      onChange={e => setMealCalories(e.target.value)}
-                      className="h-9 text-sm flex-1"
-                      onKeyDown={e => e.key === "Enter" && submitMeal()}
-                    />
-                    <span className="flex items-center text-xs text-muted-foreground font-medium">kcal</span>
-                    <button onClick={submitMeal} className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold">
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Detox check-in */}
               {activeAction === "detox" && (

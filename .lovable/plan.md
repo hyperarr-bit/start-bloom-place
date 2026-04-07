@@ -1,27 +1,33 @@
 
 
-# Plano: Redesenhar cards de pets com foto (estilo da screenshot)
+# Plano: Redesenhar PetRoutine com avatar do pet + habitos customizaveis
 
-## Mudanca
+## Problema atual
+- Cards de rotina sao genericos sem identificacao visual do pet
+- Tarefas sao fixas (hardcoded) — usuario nao pode adicionar/remover
+- Nao tem emoji junto dos habitos customizados
 
-Redesenhar `PetList.tsx` para mostrar cada pet como um card individual (como na screenshot) em vez da tabela grid atual:
+## Mudancas
 
-**Cada pet card terá:**
-- Avatar circular à esquerda (emoji de animal como placeholder, ou foto se tiver `photoUrl`)
-- Nome em negrito
-- Linha de info: Espécie · Raça · Idade
-- Peso abaixo
-- Botão lixeira à direita
+### 1. Avatar do pet no header do card
+Adicionar foto/emoji do pet ao lado do nome (mesmo estilo do PetList — foto circular ou emoji baseado na especie via `getEmoji`).
 
-**Header do card amarelo permanece** com "Meus Pets" + contagem + botão "+ Adicionar" no canto direito.
+### 2. Habitos customizaveis com emoji
+- Manter os 6 defaults como sugestao inicial (so aparecem se usuario nao tem habitos salvos)
+- Novo storage key `pet-routine-tasks-{petId}` para habitos customizados por pet
+- Input inline no final do grid: campo emoji (selector simples com emojis comuns) + campo texto + botao Add
+- Cada habito customizado tem: `id`, `label`, `emoji`
+- Botao X discreto no hover para remover habito
 
-**Form de adicionar:** Mantém o design atual (inputs empilhados dentro do card amarelo) mas fica escondido por default, aparece ao clicar "+ Adicionar". Campos: Nome, Espécie, Raça, Peso, Data nascimento, campo de URL de foto (opcional). Botão "Salvar".
-
-**Interface PetItem:** Adicionar campo `photoUrl?: string` para foto opcional do pet.
+### 3. Header do card melhorado
+- Foto/emoji circular a esquerda
+- Nome do pet em bold
+- Badge de progresso a direita (mesmo de agora)
+- Barra de progresso abaixo
 
 ## Arquivo alterado (1)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/pet/PetList.tsx` | Trocar tabela grid por cards individuais com avatar/foto, adicionar photoUrl, form toggle com "+ Adicionar" |
+| `src/components/pet/PetRoutine.tsx` | Avatar pet no header, habitos customizaveis por pet com emoji, input inline para adicionar, funcao getEmoji reutilizada |
 

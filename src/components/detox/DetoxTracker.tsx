@@ -124,12 +124,6 @@ export const DetoxTracker = () => {
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
                     </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); removeHabit(h.id); }}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
                     <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                   </div>
                 </div>

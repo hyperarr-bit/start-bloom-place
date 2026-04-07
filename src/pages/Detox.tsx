@@ -6,6 +6,7 @@ import { DetoxTracker } from "@/components/detox/DetoxTracker";
 import { DetoxDiary } from "@/components/detox/DetoxDiary";
 import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "rastreador", label: "RASTREADOR", icon: "🌿" },

@@ -231,11 +231,9 @@ export const DetoxTracker = () => {
       <AlertDialog open={!!confirmRelapseId} onOpenChange={open => { if (!open) setConfirmRelapseId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar recaída</AlertDialogTitle>
+            <AlertDialogTitle>Ei, tudo bem 💚</AlertDialogTitle>
             <AlertDialogDescription>
-              {relapseHabit
-                ? `Tem certeza que recaiu em "${relapseHabit.name}"? Seu streak de ${getStreak(relapseHabit)} dia${getStreak(relapseHabit) !== 1 ? "s" : ""} será reiniciado.`
-                : ""}
+              Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -244,7 +242,28 @@ export const DetoxTracker = () => {
               onClick={() => confirmRelapseId && relapse(confirmRelapseId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Sim, recaí
+              Confirmar recaída
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir hábito</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDeleteId ? `Deseja excluir "${habits.find(h => h.id === confirmDeleteId)?.name}"? Todos os dados serão perdidos.` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (confirmDeleteId) { removeHabit(confirmDeleteId); setConfirmDeleteId(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

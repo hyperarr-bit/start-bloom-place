@@ -1,20 +1,17 @@
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { TripCountdown as TripCountdownType, genId, daysUntil } from "./types";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Plane } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
 export const TripCountdown = () => {
   const [countdowns, setCountdowns] = usePersistedState<TripCountdownType[]>("travel-countdowns", []);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ tripName: "", departureDate: "", photoUrl: "" });
+  const [inlineForm, setInlineForm] = useState({ tripName: "", departureDate: "", photoUrl: "" });
 
   const add = () => {
-    if (!form.tripName || !form.departureDate) return;
-    setCountdowns(prev => [...prev, { id: genId(), ...form }]);
-    setForm({ tripName: "", departureDate: "", photoUrl: "" });
-    setShowForm(false);
+    if (!inlineForm.tripName || !inlineForm.departureDate) return;
+    setCountdowns(prev => [...prev, { id: genId(), ...inlineForm }]);
+    setInlineForm({ tripName: "", departureDate: "", photoUrl: "" });
   };
 
   const remove = (id: string) => setCountdowns(prev => prev.filter(c => c.id !== id));
@@ -24,7 +21,7 @@ export const TripCountdown = () => {
 
   return (
     <div className="space-y-3">
-      {/* Upcoming - Notion-style */}
+      {/* Upcoming */}
       {upcoming.map(c => {
         const days = daysUntil(c.departureDate);
         return (
@@ -57,7 +54,7 @@ export const TripCountdown = () => {
         );
       })}
 
-      {/* Past trips - Notion-style */}
+      {/* Past trips */}
       {past.length > 0 && (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="bg-gray-200 dark:bg-gray-800/50 px-3 py-1.5">
@@ -79,32 +76,56 @@ export const TripCountdown = () => {
         </div>
       )}
 
-      {/* Countdown card — always visible */}
+      {/* Countdown card with inline form */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
+        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2">
           <span className="text-[10px] font-bold uppercase tracking-wider">⏳ CONTAGENS REGRESSIVAS</span>
-          <button onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
-          </button>
+        </div>
+        <div className="bg-teal-100 dark:bg-teal-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+          <span className="col-span-5">Viagem</span>
+          <span className="col-span-4">Data</span>
+          <span className="col-span-3 text-right">Ação</span>
         </div>
         <div className="bg-teal-50 dark:bg-teal-950/20">
           {countdowns.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma viagem ainda</p>
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhuma viagem ainda</p>
             </div>
           )}
+          {/* Inline add row */}
+          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center border-t border-dashed border-border/50">
+            <div className="col-span-5">
+              <Input
+                placeholder="Nome da viagem..."
+                value={inlineForm.tripName}
+                onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && add()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              />
+            </div>
+            <div className="col-span-4">
+              <Input
+                type="date"
+                value={inlineForm.departureDate}
+                onChange={e => setInlineForm(p => ({ ...p, departureDate: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && add()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0"
+              />
+            </div>
+            <div className="col-span-3 text-right">
+              <button onClick={add} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+            </div>
+          </div>
+          <div className="px-3 pb-2">
+            <Input
+              placeholder="📸 URL da foto (opcional)"
+              value={inlineForm.photoUrl}
+              onChange={e => setInlineForm(p => ({ ...p, photoUrl: e.target.value }))}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+            />
+          </div>
         </div>
       </div>
-
-      {showForm && (
-        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
-          <Input placeholder="Nome da viagem" value={form.tripName} onChange={e => setForm(p => ({ ...p, tripName: e.target.value }))} className="h-8 rounded-lg text-xs" />
-          <Input type="date" value={form.departureDate} onChange={e => setForm(p => ({ ...p, departureDate: e.target.value }))} className="h-8 rounded-lg text-xs" />
-          <Input placeholder="URL da foto (opcional)" value={form.photoUrl} onChange={e => setForm(p => ({ ...p, photoUrl: e.target.value }))} className="h-8 rounded-lg text-xs" />
-          <Button onClick={add} className="w-full rounded-lg h-7 text-xs">Criar</Button>
-        </div>
-      )}
     </div>
   );
 };

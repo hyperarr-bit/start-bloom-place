@@ -15,26 +15,19 @@ const TYPE_CONFIG = {
   compras: { icon: ShoppingBag, label: "Compras", color: "bg-pink-200 dark:bg-pink-800/50", bodyColor: "bg-pink-50 dark:bg-pink-950/20" },
 };
 
-const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-const dayAfter = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-
-const DEFAULT_DAYS: ItineraryDay[] = [];
-
 export const DailyTimeline = () => {
-  const [days, setDays] = usePersistedState<ItineraryDay[]>("travel-timeline-v2", DEFAULT_DAYS);
-  const [showAddDay, setShowAddDay] = useState(false);
-  const [newDay, setNewDay] = useState({ tripId: "", date: "", dayNumber: days.length + 1 });
+  const [days, setDays] = usePersistedState<ItineraryDay[]>("travel-timeline-v2", []);
+  const [inlineDay, setInlineDay] = useState({ tripId: "", date: "", dayNumber: days.length + 1 });
   const [activeDay, setActiveDay] = useState<string | null>(days.length > 0 ? days[0].id : null);
   const [showAddItem, setShowAddItem] = useState(false);
   const [itemForm, setItemForm] = useState<Partial<TimelineItem>>({ type: "atividade", done: false, pinned: false });
 
   const addDay = () => {
-    if (!newDay.date) return;
-    const day: ItineraryDay = { id: genId(), tripId: newDay.tripId, dayNumber: newDay.dayNumber, date: newDay.date, items: [] };
+    if (!inlineDay.date) return;
+    const day: ItineraryDay = { id: genId(), tripId: inlineDay.tripId, dayNumber: inlineDay.dayNumber, date: inlineDay.date, items: [] };
     setDays(prev => [...prev, day]);
     setActiveDay(day.id);
-    setNewDay(p => ({ ...p, dayNumber: p.dayNumber + 1, date: "" }));
-    setShowAddDay(false);
+    setInlineDay(p => ({ ...p, dayNumber: p.dayNumber + 1, date: "" }));
   };
 
   const addItem = (dayId: string) => {
@@ -91,21 +84,12 @@ export const DailyTimeline = () => {
         </button>
       )}
 
-      {/* Roteiro card — always visible */}
+      {/* Roteiro card with inline form */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
+        <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2">
           <span className="text-[10px] font-bold uppercase tracking-wider">🗓️ ROTEIRO</span>
-          <button onClick={() => setShowAddDay(true)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Novo Dia
-          </button>
         </div>
         <div className="bg-sky-50 dark:bg-sky-950/20">
-          {days.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhum dia planejado ainda</p>
-            </div>
-          )}
           {days.length > 0 && (
             <div className="p-3 flex gap-2 overflow-x-auto scrollbar-hide">
               {days.sort((a, b) => a.date.localeCompare(b.date)).map(d => (
@@ -121,20 +105,42 @@ export const DailyTimeline = () => {
               ))}
             </div>
           )}
+          {days.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhum dia planejado ainda</p>
+            </div>
+          )}
+          {/* Inline add day */}
+          <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border/50">
+            <Input placeholder="Viagem" value={inlineDay.tripId} onChange={e => setInlineDay(p => ({ ...p, tripId: e.target.value }))}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
+            <Input type="number" placeholder="Dia nº" value={inlineDay.dayNumber} onChange={e => setInlineDay(p => ({ ...p, dayNumber: Number(e.target.value) }))}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 w-16" />
+            <Input type="date" value={inlineDay.date} onChange={e => setInlineDay(p => ({ ...p, date: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && addDay()}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 w-28" />
+            <button onClick={addDay} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Dia</button>
+          </div>
         </div>
       </div>
 
-      {showAddDay && (
-        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            <Input placeholder="Viagem" value={newDay.tripId} onChange={e => setNewDay(p => ({ ...p, tripId: e.target.value }))} className="h-8 rounded-lg text-xs" />
-            <Input type="number" placeholder="Dia nº" value={newDay.dayNumber} onChange={e => setNewDay(p => ({ ...p, dayNumber: Number(e.target.value) }))} className="h-8 rounded-lg text-xs" />
-            <Input type="date" value={newDay.date} onChange={e => setNewDay(p => ({ ...p, date: e.target.value }))} className="h-8 rounded-lg text-xs" />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={addDay} className="flex-1 rounded-lg h-7 text-xs">Criar Dia</Button>
-            <Button variant="ghost" onClick={() => setShowAddDay(false)} className="rounded-lg h-7 text-xs">Cancelar</Button>
-          </div>
+      {/* Activity type legend when no day selected */}
+      {!currentDay && days.length === 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {Object.entries(TYPE_CONFIG).map(([key, cfg]) => {
+            const Icon = cfg.icon;
+            return (
+              <div key={key} className="rounded-xl border border-border overflow-hidden">
+                <div className={`${cfg.color} px-2 py-1.5 flex items-center gap-1 justify-center`}>
+                  <Icon className="w-3 h-3" />
+                  <span className="text-[9px] font-bold uppercase tracking-wider">{cfg.label}</span>
+                </div>
+                <div className={`${cfg.bodyColor} p-2 text-center`}>
+                  <p className="text-[9px] text-muted-foreground">0 itens</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

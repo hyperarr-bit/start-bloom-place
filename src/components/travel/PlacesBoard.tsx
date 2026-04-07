@@ -1,37 +1,33 @@
 import { useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Place, PLACE_CATEGORIES, PLACE_STATUS, genId } from "./types";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, ExternalLink, MapPin, Heart } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Trash2, ExternalLink, Heart } from "lucide-react";
 
-const CAT_COLORS: Record<string, { header: string; body: string }> = {
-  comida: { header: "bg-orange-200 dark:bg-orange-800/50", body: "bg-orange-50 dark:bg-orange-950/20" },
-  turistico: { header: "bg-blue-200 dark:bg-blue-800/50", body: "bg-blue-50 dark:bg-blue-950/20" },
-  compras: { header: "bg-pink-200 dark:bg-pink-800/50", body: "bg-pink-50 dark:bg-pink-950/20" },
-  cafe: { header: "bg-yellow-200 dark:bg-yellow-800/50", body: "bg-yellow-50 dark:bg-yellow-950/20" },
-  bar: { header: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20" },
-};
+const CAT_SECTIONS = [
+  { key: "comida" as const, emoji: "🍽️", label: "RESTAURANTES & COMIDA", header: "bg-orange-200 dark:bg-orange-800/50", body: "bg-orange-50 dark:bg-orange-950/20" },
+  { key: "turistico" as const, emoji: "📸", label: "PONTOS TURÍSTICOS", header: "bg-blue-200 dark:bg-blue-800/50", body: "bg-blue-50 dark:bg-blue-950/20" },
+  { key: "compras" as const, emoji: "🛍️", label: "COMPRAS", header: "bg-pink-200 dark:bg-pink-800/50", body: "bg-pink-50 dark:bg-pink-950/20" },
+  { key: "cafe" as const, emoji: "☕", label: "CAFÉS", header: "bg-yellow-200 dark:bg-yellow-800/50", body: "bg-yellow-50 dark:bg-yellow-950/20" },
+  { key: "bar" as const, emoji: "🍸", label: "BARES & NOITE", header: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20" },
+];
 
 export const PlacesBoard = () => {
   const [places, setPlaces] = usePersistedState<Place[]>("travel-places-v2", []);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<Partial<Place>>({ category: "comida", status: "quero_ir" });
-  const [filterCat, setFilterCat] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [inlineInputs, setInlineInputs] = useState<Record<string, { name: string; city: string }>>({
+    comida: { name: "", city: "" }, turistico: { name: "", city: "" }, compras: { name: "", city: "" },
+    cafe: { name: "", city: "" }, bar: { name: "", city: "" },
+  });
 
-  const save = () => {
-    if (!form.name) return;
+  const addInline = (category: string) => {
+    const inp = inlineInputs[category];
+    if (!inp?.name) return;
     setPlaces(prev => [...prev, {
-      id: genId(), name: form.name || "", category: form.category as Place["category"] || "comida",
-      address: form.address || "", mapsLink: form.mapsLink || "",
-      status: form.status as Place["status"] || "quero_ir", notes: form.notes || "", city: form.city || "",
+      id: genId(), name: inp.name, category: category as Place["category"],
+      address: "", mapsLink: "", status: "quero_ir", notes: "", city: inp.city,
     }]);
-    setForm({ category: "comida", status: "quero_ir" });
-    setShowForm(false);
+    setInlineInputs(prev => ({ ...prev, [category]: { name: "", city: "" } }));
   };
 
   const toggleFavorite = (id: string) => {
@@ -44,121 +40,86 @@ export const PlacesBoard = () => {
 
   const remove = (id: string) => setPlaces(prev => prev.filter(p => p.id !== id));
 
-  const filtered = places.filter(p =>
-    (filterCat === "all" || p.category === filterCat) &&
-    (filterStatus === "all" || p.status === filterStatus)
-  );
-
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-        <button onClick={() => setFilterCat("all")}
-          className={`shrink-0 rounded-full px-3 py-1 text-[10px] border transition-all ${filterCat === "all" ? "bg-foreground text-background" : "border-border"}`}>
-          Todos
-        </button>
-        {Object.entries(PLACE_CATEGORIES).map(([key, cat]) => (
-          <button key={key} onClick={() => setFilterCat(key)}
-            className={`shrink-0 rounded-full px-3 py-1 text-[10px] border transition-all ${filterCat === key ? "bg-foreground text-background" : "border-border"}`}>
-            {cat.emoji} {cat.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
-        {Object.entries(PLACE_STATUS).map(([key, s]) => (
-          <button key={key} onClick={() => setFilterStatus(filterStatus === key ? "all" : key)}
-            className={`shrink-0 rounded-full px-3 py-1 text-[10px] border transition-all ${filterStatus === key ? "bg-foreground text-background" : "border-border"}`}>
-            {s.emoji} {s.label}
-          </button>
-        ))}
-      </div>
-
-      
-
-      {showForm && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <Input placeholder="Nome do lugar" value={form.name || ""} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Cidade" value={form.city || ""} onChange={e => setForm(p => ({ ...p, city: e.target.value }))} className="h-9 rounded-xl text-xs" />
-            <Select value={form.category || "comida"} onValueChange={v => setForm(p => ({ ...p, category: v as Place["category"] }))}>
-              <SelectTrigger className="h-9 rounded-xl text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(PLACE_CATEGORIES).map(([k, c]) => (<SelectItem key={k} value={k}>{c.emoji} {c.label}</SelectItem>))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Input placeholder="Endereço" value={form.address || ""} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <Input placeholder="Link Google Maps (opcional)" value={form.mapsLink || ""} onChange={e => setForm(p => ({ ...p, mapsLink: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-xs min-h-[50px] rounded-xl" />
-          <div className="flex gap-2">
-            <Button onClick={save} className="flex-1 rounded-xl h-8 text-xs">Salvar</Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)} className="rounded-xl h-8 text-xs">Cancelar</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Places card — always visible */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider">📍 LUGARES SALVOS</span>
-          <button onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
-          </button>
-        </div>
-        <div className="bg-teal-50 dark:bg-teal-950/20">
-          {filtered.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhum lugar salvo ainda</p>
+      {CAT_SECTIONS.map(section => {
+        const items = places.filter(p => p.category === section.key);
+        const inp = inlineInputs[section.key];
+        return (
+          <div key={section.key} className="rounded-xl border border-border overflow-hidden">
+            <div className={`${section.header} px-4 py-2 flex items-center justify-between`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{section.emoji} {section.label}</span>
+              <span className="text-[10px] font-bold bg-background/40 rounded-full px-2 py-0.5">{items.length}</span>
             </div>
-          )}
-          <div className="divide-y divide-border">
-            {filtered.map(place => {
-              const cat = PLACE_CATEGORIES[place.category];
-              const status = PLACE_STATUS[place.status];
-              return (
-                <div key={place.id} className="p-3 hover:bg-background/30 transition-colors group">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs">{cat.emoji}</span>
-                        <h4 className="text-xs font-semibold">{place.name}</h4>
-                        <Badge variant="secondary" className="text-[8px] px-1.5 h-4">{status.emoji} {status.label}</Badge>
-                      </div>
-                      {place.city && <p className="text-[9px] text-muted-foreground mt-0.5"><MapPin className="w-2.5 h-2.5 inline" /> {place.city}</p>}
-                      {place.notes && <p className="text-[9px] text-muted-foreground mt-0.5 line-clamp-2">{place.notes}</p>}
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => toggleFavorite(place.id)}>
-                        <Heart className={`w-3.5 h-3.5 ${place.status === "favorito" ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
-                      </button>
-                      {place.mapsLink && (
-                        <a href={place.mapsLink} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                        </a>
-                      )}
-                      <button onClick={() => remove(place.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
-                    {(Object.entries(PLACE_STATUS) as [Place["status"], typeof PLACE_STATUS["quero_ir"]][]).map(([key, s]) => (
-                      <button key={key} onClick={() => updateStatus(place.id, key)}
-                        className={`rounded-md px-2 py-0.5 text-[8px] border transition-all ${
-                          place.status === key ? "bg-foreground/10 border-foreground/20 font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
-                        }`}>
-                        {s.emoji}
-                      </button>
-                    ))}
-                  </div>
+            <div className={`${section.body}`}>
+              {items.length === 0 && (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-[10px] text-muted-foreground">Nenhum lugar ainda</p>
                 </div>
-              );
-            })}
+              )}
+              <div className="divide-y divide-border">
+                {items.map(place => {
+                  const status = PLACE_STATUS[place.status];
+                  return (
+                    <div key={place.id} className="p-3 hover:bg-background/30 transition-colors group">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs font-semibold">{place.name}</h4>
+                            <Badge variant="secondary" className="text-[8px] px-1.5 h-4">{status.emoji} {status.label}</Badge>
+                          </div>
+                          {place.city && <p className="text-[9px] text-muted-foreground mt-0.5">📍 {place.city}</p>}
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => toggleFavorite(place.id)}>
+                            <Heart className={`w-3.5 h-3.5 ${place.status === "favorito" ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                          </button>
+                          {place.mapsLink && (
+                            <a href={place.mapsLink} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                            </a>
+                          )}
+                          <button onClick={() => remove(place.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
+                        {(Object.entries(PLACE_STATUS) as [Place["status"], typeof PLACE_STATUS["quero_ir"]][]).map(([key, s]) => (
+                          <button key={key} onClick={() => updateStatus(place.id, key)}
+                            className={`rounded-md px-2 py-0.5 text-[8px] border transition-all ${
+                              place.status === key ? "bg-foreground/10 border-foreground/20 font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                            }`}>
+                            {s.emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Inline add */}
+              <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border/50">
+                <Input
+                  placeholder="Nome do lugar..."
+                  value={inp?.name || ""}
+                  onChange={e => setInlineInputs(prev => ({ ...prev, [section.key]: { ...prev[section.key], name: e.target.value } }))}
+                  onKeyDown={e => e.key === "Enter" && addInline(section.key)}
+                  className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1"
+                />
+                <Input
+                  placeholder="Cidade"
+                  value={inp?.city || ""}
+                  onChange={e => setInlineInputs(prev => ({ ...prev, [section.key]: { ...prev[section.key], city: e.target.value } }))}
+                  onKeyDown={e => e.key === "Enter" && addInline(section.key)}
+                  className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 w-24"
+                />
+                <button onClick={() => addInline(section.key)} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Add</button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })}
     </div>
   );
 };

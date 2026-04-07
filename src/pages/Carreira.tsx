@@ -3,12 +3,11 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, Briefcase, Award, Users, Plus, Trash2, ExternalLink, Edit2, X, Star, CheckCircle, Clock, XCircle, Send, Trophy, Link2, Target, TrendingUp, BookOpen, DollarSign } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,21 +29,14 @@ const statusConfig: Record<string, { label: string; emoji: string; color: string
   desistiu: { label: "Desistiu", emoji: "🚪", color: "bg-muted text-muted-foreground border-border" },
 };
 
-const DEFAULT_JOBS: JobApp[] = [];
-
-const DEFAULT_PORTFOLIO: PortfolioItem[] = [];
-
-const DEFAULT_CONTACTS: Contact[] = [];
-
-const DEFAULT_SKILLS: Skill[] = [];
-
 // ============= JOB TRACKER =============
 const JobTracker = () => {
-  const [jobs, setJobs] = usePersistedState<JobApp[]>("career-jobs", DEFAULT_JOBS);
+  const [jobs, setJobs] = usePersistedState<JobApp[]>("career-jobs", []);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<JobApp>>({ status: "aplicado", favorite: false });
   const [filterStatus, setFilterStatus] = useState("all");
+  const [inlineForm, setInlineForm] = useState({ company: "", role: "", status: "aplicado" as JobApp["status"] });
 
   const save = () => {
     if (!form.company || !form.role) return;
@@ -53,12 +45,17 @@ const JobTracker = () => {
     setForm({ status: "aplicado", favorite: false }); setEditId(null); setShowForm(false);
   };
 
+  const addInline = () => {
+    if (!inlineForm.company || !inlineForm.role) return;
+    setJobs(prev => [...prev, { id: genId(), company: inlineForm.company, role: inlineForm.role, link: "", status: inlineForm.status, date: new Date().toISOString().slice(0, 10), salary: "", notes: "", favorite: false }]);
+    setInlineForm({ company: "", role: "", status: "aplicado" });
+  };
+
   const filtered = filterStatus === "all" ? jobs : jobs.filter(j => j.status === filterStatus);
-  const stats = { total: jobs.length, active: jobs.filter(j => !["rejeitado", "desistiu"].includes(j.status)).length, interviews: jobs.filter(j => j.status === "entrevista").length, offers: jobs.filter(j => j.status === "oferta").length };
 
   return (
     <div className="space-y-4">
-      {/* Pipeline Visual — Notion-style */}
+      {/* Pipeline */}
       {jobs.length > 0 && (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="bg-indigo-200 dark:bg-indigo-800/50 px-4 py-2">
@@ -84,8 +81,6 @@ const JobTracker = () => {
         </div>
       )}
 
-      
-
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <div className="flex justify-between items-center"><span className="font-semibold text-sm">{editId ? "Editar" : "Nova"} Candidatura</span><Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowForm(false)}><X className="w-4 h-4" /></Button></div>
@@ -98,13 +93,13 @@ const JobTracker = () => {
         </div>
       )}
 
-      {/* Jobs table — Notion-style */}
+      {/* Jobs table */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-indigo-200 dark:bg-indigo-800/50 px-4 py-2 flex items-center justify-between">
           <span className="text-[10px] font-bold uppercase tracking-wider">📋 CANDIDATURAS</span>
           <button onClick={() => { setShowForm(true); setEditId(null); setForm({ status: "aplicado", favorite: false }); }}
             className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+            <Plus className="w-3 h-3 inline mr-0.5" />Detalhada
           </button>
         </div>
         <div className="bg-indigo-100 dark:bg-indigo-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -116,8 +111,8 @@ const JobTracker = () => {
         </div>
         <div className="divide-y divide-border bg-card">
           {filtered.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma candidatura ainda</p>
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhuma candidatura ainda</p>
             </div>
           )}
           {filtered.sort((a, b) => b.date.localeCompare(a.date)).map(job => (
@@ -138,6 +133,29 @@ const JobTracker = () => {
               </div>
             </div>
           ))}
+          {/* Inline quick-add */}
+          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center border-t border-dashed border-border/50">
+            <div className="col-span-3">
+              <Input placeholder="Empresa..." value={inlineForm.company} onChange={e => setInlineForm(p => ({ ...p, company: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && addInline()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+            </div>
+            <div className="col-span-3">
+              <Input placeholder="Cargo..." value={inlineForm.role} onChange={e => setInlineForm(p => ({ ...p, role: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && addInline()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+            </div>
+            <div className="col-span-2">
+              <Select value={inlineForm.status} onValueChange={v => setInlineForm(p => ({ ...p, status: v as JobApp["status"] }))}>
+                <SelectTrigger className="h-7 text-[9px] border-none bg-transparent px-0 focus-visible:ring-0"><SelectValue /></SelectTrigger>
+                <SelectContent>{Object.entries(statusConfig).map(([k, v]) => <SelectItem key={k} value={k}>{v.emoji}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <span className="col-span-2 text-[9px] text-muted-foreground">Hoje</span>
+            <div className="col-span-2 text-right">
+              <button onClick={addInline} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -146,16 +164,34 @@ const JobTracker = () => {
 
 // ============= PORTFOLIO =============
 const Portfolio = () => {
-  const [items, setItems] = usePersistedState<PortfolioItem[]>("career-portfolio", DEFAULT_PORTFOLIO);
+  const [items, setItems] = usePersistedState<PortfolioItem[]>("career-portfolio", []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<PortfolioItem>>({ category: "projeto", highlight: false });
   const categories = ["projeto", "conquista", "certificado", "artigo", "link"];
   const catEmoji: Record<string, string> = { projeto: "🚀", conquista: "🏆", certificado: "📜", artigo: "📝", link: "🔗" };
+  const catColors: Record<string, { header: string; body: string; sub: string }> = {
+    projeto: { header: "bg-blue-200 dark:bg-blue-800/50", body: "bg-blue-50 dark:bg-blue-950/20", sub: "bg-blue-100 dark:bg-blue-900/20" },
+    conquista: { header: "bg-amber-200 dark:bg-amber-800/50", body: "bg-amber-50 dark:bg-amber-950/20", sub: "bg-amber-100 dark:bg-amber-900/20" },
+    certificado: { header: "bg-green-200 dark:bg-green-800/50", body: "bg-green-50 dark:bg-green-950/20", sub: "bg-green-100 dark:bg-green-900/20" },
+    artigo: { header: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20", sub: "bg-purple-100 dark:bg-purple-900/20" },
+    link: { header: "bg-teal-200 dark:bg-teal-800/50", body: "bg-teal-50 dark:bg-teal-950/20", sub: "bg-teal-100 dark:bg-teal-900/20" },
+  };
+  const [inlineInputs, setInlineInputs] = useState<Record<string, { title: string; link: string }>>({
+    projeto: { title: "", link: "" }, conquista: { title: "", link: "" }, certificado: { title: "", link: "" },
+    artigo: { title: "", link: "" }, link: { title: "", link: "" },
+  });
 
   const save = () => {
     if (!form.title) return;
     setItems(prev => [...prev, { id: genId(), title: form.title || "", description: form.description || "", link: form.link || "", category: form.category || "projeto", date: form.date || new Date().toISOString().slice(0, 10), highlight: form.highlight || false }]);
     setForm({ category: "projeto", highlight: false }); setShowForm(false);
+  };
+
+  const addInline = (cat: string) => {
+    const inp = inlineInputs[cat];
+    if (!inp?.title) return;
+    setItems(prev => [...prev, { id: genId(), title: inp.title, description: "", link: inp.link, category: cat, date: new Date().toISOString().slice(0, 10), highlight: false }]);
+    setInlineInputs(prev => ({ ...prev, [cat]: { title: "", link: "" } }));
   };
 
   return (
@@ -169,88 +205,115 @@ const Portfolio = () => {
             <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 text-sm" />
           </div>
           <Input placeholder="Link (opcional)" value={form.link || ""} onChange={e => setForm(p => ({ ...p, link: e.target.value }))} className="h-9 text-sm" />
-          <Button size="sm" className="w-full" onClick={save}>Salvar</Button>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+          </div>
         </div>
       )}
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-amber-200 dark:bg-amber-800/50 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider">🏆 CONQUISTAS & PORTFOLIO</span>
-          <button onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
-          </button>
-        </div>
-        <div className="bg-amber-100 dark:bg-amber-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-          <span className="col-span-1"></span>
-          <span className="col-span-4">Título</span>
-          <span className="col-span-3">Tipo</span>
-          <span className="col-span-2">Data</span>
-          <span className="col-span-2 text-right">Ações</span>
-        </div>
-        <div className="divide-y divide-border bg-card">
-          {items.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma conquista ainda</p>
+      {categories.map(cat => {
+        const catItems = items.filter(i => i.category === cat);
+        const colors = catColors[cat];
+        const inp = inlineInputs[cat];
+        return (
+          <div key={cat} className="rounded-xl border border-border overflow-hidden">
+            <div className={`${colors.header} px-4 py-2 flex items-center justify-between`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{catEmoji[cat]} {cat.toUpperCase()}</span>
+              <span className="text-[10px] font-bold bg-background/40 rounded-full px-2 py-0.5">{catItems.length}</span>
             </div>
-          )}
-          {items.sort((a, b) => b.date.localeCompare(a.date)).map(item => (
-            <div key={item.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
-              <span className="col-span-1 text-sm">{catEmoji[item.category]}</span>
-              <div className="col-span-4 min-w-0">
-                <p className="text-xs font-medium truncate">{item.title}</p>
-                {item.description && <p className="text-[9px] text-muted-foreground truncate">{item.description}</p>}
-              </div>
-              <div className="col-span-3"><Badge variant="outline" className="text-[8px] px-1 py-0">{item.category}</Badge></div>
-              <span className="col-span-2 text-[10px] text-muted-foreground">{item.date}</span>
-              <div className="col-span-2 flex justify-end gap-1">
-                {item.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(item.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
-                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}><Trash2 className="w-3 h-3" /></Button>
+            <div className={`${colors.sub} px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider`}>
+              <span className="col-span-5">Título</span>
+              <span className="col-span-3">Data</span>
+              <span className="col-span-4 text-right">Ações</span>
+            </div>
+            <div className={`${colors.body} divide-y divide-border`}>
+              {catItems.length === 0 && (
+                <div className="px-3 py-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Nenhum item ainda</p>
+                </div>
+              )}
+              {catItems.sort((a, b) => b.date.localeCompare(a.date)).map(item => (
+                <div key={item.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-background/30 transition-colors group">
+                  <div className="col-span-5 min-w-0">
+                    <p className="text-xs font-medium truncate">{item.title}</p>
+                    {item.description && <p className="text-[9px] text-muted-foreground truncate">{item.description}</p>}
+                  </div>
+                  <span className="col-span-3 text-[10px] text-muted-foreground">{item.date}</span>
+                  <div className="col-span-4 flex justify-end gap-1">
+                    {item.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(item.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
+                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                </div>
+              ))}
+              {/* Inline add */}
+              <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center border-t border-dashed border-border/50">
+                <div className="col-span-5">
+                  <Input placeholder="Título..." value={inp?.title || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat]: { ...prev[cat], title: e.target.value } }))}
+                    onKeyDown={e => e.key === "Enter" && addInline(cat)}
+                    className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                </div>
+                <div className="col-span-3">
+                  <Input placeholder="Link" value={inp?.link || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat]: { ...prev[cat], link: e.target.value } }))}
+                    onKeyDown={e => e.key === "Enter" && addInline(cat)}
+                    className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                </div>
+                <div className="col-span-4 text-right">
+                  <button onClick={() => addInline(cat)} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
 
 // ============= NETWORKING =============
 const Networking = () => {
-  const [contacts, setContacts] = usePersistedState<Contact[]>("career-contacts", DEFAULT_CONTACTS);
+  const [contacts, setContacts] = usePersistedState<Contact[]>("career-contacts", []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<Contact>>({ category: "profissional" });
   const categories = ["profissional", "mentor", "recrutador", "colega", "cliente"];
   const catEmoji: Record<string, string> = { profissional: "👔", mentor: "🧠", recrutador: "🎯", colega: "🤝", cliente: "💼" };
+  const [inlineForm, setInlineForm] = useState({ name: "", company: "" });
 
   const save = () => {
     if (!form.name) return;
     setContacts(prev => [...prev, { id: genId(), name: form.name || "", company: form.company || "", role: form.role || "", linkedin: form.linkedin || "", email: form.email || "", phone: form.phone || "", notes: form.notes || "", lastContact: form.lastContact || "", category: form.category || "profissional" }]);
     setForm({ category: "profissional" }); setShowForm(false);
   };
+
+  const addInline = () => {
+    if (!inlineForm.name) return;
+    setContacts(prev => [...prev, { id: genId(), name: inlineForm.name, company: inlineForm.company, role: "", linkedin: "", email: "", phone: "", notes: "", lastContact: new Date().toISOString().slice(0, 10), category: "profissional" }]);
+    setInlineForm({ name: "", company: "" });
+  };
+
   const needsFollowUp = contacts.filter(c => { if (!c.lastContact) return true; return (Date.now() - new Date(c.lastContact).getTime()) / (1000 * 60 * 60 * 24) > 30; });
 
   return (
     <div className="space-y-4">
-      {needsFollowUp.length > 0 && (
-        <div className="rounded-xl border border-border overflow-hidden">
-          <div className="bg-amber-200 dark:bg-amber-800/50 px-3 py-1.5 flex items-center gap-2">
-            <Clock className="w-3 h-3" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">⏰ FOLLOW-UP PENDENTE</span>
-            <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50 ml-auto">{needsFollowUp.length}</Badge>
-          </div>
-          <div className="bg-amber-50 dark:bg-amber-950/20 p-3 space-y-1">
-            {needsFollowUp.slice(0, 3).map(c => (
-              <div key={c.id} className="flex items-center justify-between">
-                <span className="text-xs">{catEmoji[c.category]} {c.name}</span>
-                <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: new Date().toISOString().slice(0, 10) } : x))}>Contatei ✓</Button>
-              </div>
-            ))}
-          </div>
+      {/* Follow-up always visible */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-amber-200 dark:bg-amber-800/50 px-3 py-2 flex items-center gap-2">
+          <Clock className="w-3 h-3" />
+          <span className="text-[10px] font-bold uppercase tracking-wider">⏰ FOLLOW-UP PENDENTE</span>
+          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50 ml-auto">{needsFollowUp.length}</Badge>
         </div>
-      )}
-
-      
+        <div className="bg-amber-50 dark:bg-amber-950/20 p-3">
+          {needsFollowUp.length === 0 && (
+            <p className="text-[10px] text-muted-foreground text-center py-1">Nenhum follow-up pendente 🎉</p>
+          )}
+          {needsFollowUp.slice(0, 5).map(c => (
+            <div key={c.id} className="flex items-center justify-between py-1">
+              <span className="text-xs">{catEmoji[c.category]} {c.name}</span>
+              <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: new Date().toISOString().slice(0, 10) } : x))}>Contatei ✓</Button>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -260,7 +323,10 @@ const Networking = () => {
           <Input placeholder="LinkedIn URL" value={form.linkedin || ""} onChange={e => setForm(p => ({ ...p, linkedin: e.target.value }))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2"><Input placeholder="Email" value={form.email || ""} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className="h-9 text-sm" /><Input placeholder="Telefone" value={form.phone || ""} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className="h-9 text-sm" /></div>
           <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
-          <Button size="sm" className="w-full" onClick={save}>Salvar</Button>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+          </div>
         </div>
       )}
 
@@ -269,7 +335,7 @@ const Networking = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider">🤝 REDE DE CONTATOS</span>
           <button onClick={() => setShowForm(!showForm)}
             className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
+            <Plus className="w-3 h-3 inline mr-0.5" />Detalhado
           </button>
         </div>
         <div className="bg-purple-100 dark:bg-purple-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -281,8 +347,8 @@ const Networking = () => {
         </div>
         <div className="divide-y divide-border bg-card">
           {contacts.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhum contato ainda</p>
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhum contato ainda</p>
             </div>
           )}
           {contacts.map(c => (
@@ -299,6 +365,24 @@ const Networking = () => {
               </div>
             </div>
           ))}
+          {/* Inline quick-add */}
+          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center border-t border-dashed border-border/50">
+            <div className="col-span-1">👔</div>
+            <div className="col-span-3">
+              <Input placeholder="Nome..." value={inlineForm.name} onChange={e => setInlineForm(p => ({ ...p, name: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && addInline()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+            </div>
+            <div className="col-span-3">
+              <Input placeholder="Empresa..." value={inlineForm.company} onChange={e => setInlineForm(p => ({ ...p, company: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && addInline()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+            </div>
+            <span className="col-span-3 text-[9px] text-muted-foreground">Hoje</span>
+            <div className="col-span-2 text-right">
+              <button onClick={addInline} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -307,13 +391,21 @@ const Networking = () => {
 
 // ============= SKILLS TRACKER =============
 const SkillsTracker = () => {
-  const [skills, setSkills] = usePersistedState<Skill[]>("career-skills", DEFAULT_SKILLS);
+  const [skills, setSkills] = usePersistedState<Skill[]>("career-skills", []);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<Skill>>({ category: "técnica", level: 1, targetLevel: 5 });
-  const categories = ["técnica", "soft skill", "idioma", "ferramenta", "certificação"];
-  const catEmoji: Record<string, string> = { "técnica": "💻", "soft skill": "🗣️", "idioma": "🌍", "ferramenta": "🔧", "certificação": "📜" };
+  const SKILL_CATS = [
+    { key: "técnica", emoji: "💻", label: "TÉCNICA", header: "bg-blue-200 dark:bg-blue-800/50", body: "bg-blue-50 dark:bg-blue-950/20" },
+    { key: "soft skill", emoji: "🗣️", label: "SOFT SKILL", header: "bg-pink-200 dark:bg-pink-800/50", body: "bg-pink-50 dark:bg-pink-950/20" },
+    { key: "idioma", emoji: "🌍", label: "IDIOMA", header: "bg-green-200 dark:bg-green-800/50", body: "bg-green-50 dark:bg-green-950/20" },
+    { key: "ferramenta", emoji: "🔧", label: "FERRAMENTA", header: "bg-yellow-200 dark:bg-yellow-800/50", body: "bg-yellow-50 dark:bg-yellow-950/20" },
+    { key: "certificação", emoji: "📜", label: "CERTIFICAÇÃO", header: "bg-purple-200 dark:bg-purple-800/50", body: "bg-purple-50 dark:bg-purple-950/20" },
+  ];
   const levels = ["Iniciante", "Básico", "Intermediário", "Avançado", "Expert"];
   const levelColors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-blue-400", "bg-green-400"];
+  const [inlineInputs, setInlineInputs] = useState<Record<string, string>>({
+    "técnica": "", "soft skill": "", "idioma": "", "ferramenta": "", "certificação": "",
+  });
 
   const save = () => {
     if (!form.name) return;
@@ -321,67 +413,70 @@ const SkillsTracker = () => {
     setForm({ category: "técnica", level: 1, targetLevel: 5 }); setShowForm(false);
   };
 
+  const addInline = (cat: string) => {
+    const name = inlineInputs[cat];
+    if (!name) return;
+    setSkills(prev => [...prev, { id: genId(), name, category: cat, level: 1, targetLevel: 5, notes: "" }]);
+    setInlineInputs(prev => ({ ...prev, [cat]: "" }));
+  };
+
   return (
     <div className="space-y-4">
-      
-
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Input placeholder="Nome da skill" value={form.name || ""} onChange={e => setForm(p => ({...p, name: e.target.value}))} className="h-9 text-sm" />
           <div className="grid grid-cols-2 gap-2">
-            <Select value={form.category || "técnica"} onValueChange={v => setForm(p => ({...p, category: v}))}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}</SelectContent></Select>
+            <Select value={form.category || "técnica"} onValueChange={v => setForm(p => ({...p, category: v}))}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{SKILL_CATS.map(c => <SelectItem key={c.key} value={c.key}>{c.emoji} {c.key}</SelectItem>)}</SelectContent></Select>
             <Select value={String(form.level || 1)} onValueChange={v => setForm(p => ({...p, level: Number(v)}))}><SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger><SelectContent>{[1,2,3,4,5].map(l => <SelectItem key={l} value={String(l)}>{l} - {levels[l-1]}</SelectItem>)}</SelectContent></Select>
           </div>
           <Textarea placeholder="Notas..." value={form.notes || ""} onChange={e => setForm(p => ({...p, notes: e.target.value}))} className="text-sm min-h-[40px]" />
-          <Button size="sm" className="w-full" onClick={save}>Salvar</Button>
+          <div className="flex gap-2">
+            <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
+          </div>
         </div>
       )}
 
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-green-200 dark:bg-green-800/50 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider">💻 SKILLS & COMPETÊNCIAS</span>
-          <button onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Adicionar
-          </button>
-        </div>
-        <div className="bg-green-100 dark:bg-green-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-          <span className="col-span-1"></span>
-          <span className="col-span-3">Skill</span>
-          <span className="col-span-2">Tipo</span>
-          <span className="col-span-4">Nível</span>
-          <span className="col-span-2 text-right">Ações</span>
-        </div>
-        <div className="divide-y divide-border bg-card">
-          {skills.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma skill ainda</p>
+      {SKILL_CATS.map(cat => {
+        const catSkills = skills.filter(s => s.category === cat.key);
+        return (
+          <div key={cat.key} className="rounded-xl border border-border overflow-hidden">
+            <div className={`${cat.header} px-4 py-2 flex items-center justify-between`}>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{cat.emoji} {cat.label}</span>
+              <span className="text-[10px] font-bold bg-background/40 rounded-full px-2 py-0.5">{catSkills.length}</span>
             </div>
-          )}
-          {skills.map(skill => (
-            <div key={skill.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-muted/30 transition-colors group">
-              <span className="col-span-1 text-sm">{catEmoji[skill.category]}</span>
-              <div className="col-span-3 min-w-0">
-                <p className="text-xs font-medium truncate">{skill.name}</p>
-                {skill.notes && <p className="text-[8px] text-muted-foreground truncate">{skill.notes}</p>}
-              </div>
-              <span className="col-span-2 text-[10px] text-muted-foreground">{skill.category}</span>
-              <div className="col-span-4 flex items-center gap-2">
-                <div className="flex gap-0.5 flex-1">
-                  {[1,2,3,4,5].map(l => (
-                    <div key={l} className={`h-2 flex-1 rounded-full transition-all ${l <= skill.level ? levelColors[skill.level - 1] : "bg-muted"}`} />
-                  ))}
+            <div className={`${cat.body} divide-y divide-border`}>
+              {catSkills.length === 0 && (
+                <div className="px-3 py-3 text-center">
+                  <p className="text-[10px] text-muted-foreground">Nenhuma skill ainda</p>
                 </div>
-                <Badge className={`text-[7px] px-1 py-0 text-white ${levelColors[skill.level - 1]}`}>{levels[skill.level - 1]}</Badge>
-              </div>
-              <div className="col-span-2 flex justify-end gap-1">
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setSkills(prev => prev.map(s => s.id === skill.id ? {...s, level: Math.min(s.level + 1, 5)} : s))}><TrendingUp className="w-3 h-3 text-green-500" /></Button>
-                <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setSkills(prev => prev.filter(s => s.id !== skill.id))}><Trash2 className="w-3 h-3" /></Button>
+              )}
+              {catSkills.map(skill => (
+                <div key={skill.id} className="px-3 py-2 flex items-center gap-2 hover:bg-background/30 transition-colors group">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{skill.name}</p>
+                  </div>
+                  <div className="flex gap-0.5 shrink-0">
+                    {[1,2,3,4,5].map(l => (
+                      <div key={l} className={`h-2 w-4 rounded-full transition-all ${l <= skill.level ? levelColors[skill.level - 1] : "bg-muted"}`} />
+                    ))}
+                  </div>
+                  <Badge className={`text-[7px] px-1 py-0 text-white shrink-0 ${levelColors[skill.level - 1]}`}>{levels[skill.level - 1]}</Badge>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => setSkills(prev => prev.map(s => s.id === skill.id ? {...s, level: Math.min(s.level + 1, 5)} : s))}><TrendingUp className="w-3 h-3 text-green-500" /></Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100 shrink-0" onClick={() => setSkills(prev => prev.filter(s => s.id !== skill.id))}><Trash2 className="w-3 h-3" /></Button>
+                </div>
+              ))}
+              {/* Inline add */}
+              <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border/50">
+                <Input placeholder="Adicionar skill..." value={inlineInputs[cat.key] || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat.key]: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && addInline(cat.key)}
+                  className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
+                <button onClick={() => addInline(cat.key)} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Add</button>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -400,24 +495,26 @@ const InterviewPrep = () => {
           <span className="text-[10px] font-bold uppercase tracking-wider">📝 PREPARAÇÃO PARA ENTREVISTA</span>
           <span className="text-xs font-bold">{pct}%</span>
         </div>
-        <div className="bg-sky-50 dark:bg-sky-950/20 p-3">
+        <div className="bg-sky-50 dark:bg-sky-950/20 p-3 space-y-2">
           <Progress value={pct} className="h-2" />
-          <p className="text-[10px] text-muted-foreground mt-1">{practiced} de {questions.length} perguntas praticadas</p>
+          <p className="text-[10px] text-muted-foreground">{practiced} de {questions.length} perguntas praticadas</p>
+          {/* Inline add inside the card */}
+          <div className="flex gap-2 pt-1 border-t border-dashed border-border/50">
+            <Input value={newQuestion} onChange={e => setNewQuestion(e.target.value)} placeholder="Nova pergunta..."
+              onKeyDown={e => { if (e.key === "Enter" && newQuestion.trim()) { setQuestions(prev => [...prev, { id: genId(), question: newQuestion.trim(), answer: "", category: "geral", practiced: false }]); setNewQuestion(""); } }}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
+            <button onClick={() => {
+              if (newQuestion.trim()) { setQuestions(prev => [...prev, { id: genId(), question: newQuestion.trim(), answer: "", category: "geral", practiced: false }]); setNewQuestion(""); }
+            }} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Add</button>
+          </div>
         </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Input value={newQuestion} onChange={e => setNewQuestion(e.target.value)} placeholder="Nova pergunta..." className="h-8 text-xs" />
-        <Button size="sm" className="h-8" onClick={() => {
-          if (newQuestion.trim()) { setQuestions(prev => [...prev, { id: genId(), question: newQuestion.trim(), answer: "", category: "geral", practiced: false }]); setNewQuestion(""); }
-        }}><Plus className="w-3 h-3" /></Button>
       </div>
 
       <div className="space-y-2">
         {questions.length === 0 && (
           <div className="rounded-xl border border-border overflow-hidden">
-            <div className="bg-card px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma pergunta ainda</p>
+            <div className="bg-card px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhuma pergunta ainda</p>
             </div>
           </div>
         )}

@@ -105,10 +105,7 @@ export const PetDiary = () => {
               </div>
             </div>
             <Textarea placeholder="O que aconteceu hoje?" value={text} onChange={e => setText(e.target.value)} className="text-[11px] min-h-[40px]" rows={2} />
-            <div className="flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <Input placeholder="URL da foto (opcional)" value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} className="h-7 text-[11px]" />
-            </div>
+            <PhotoPicker value={photoUrl} onChange={setPhotoUrl} onClear={() => setPhotoUrl(undefined)} />
             <button onClick={addEntry} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
               <Plus className="w-3 h-3" /> Registrar momento
             </button>

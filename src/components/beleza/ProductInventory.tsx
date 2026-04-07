@@ -142,7 +142,7 @@ export const ProductInventory = () => {
                 <SelectContent>{frequencyOptions.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <Input placeholder="URL da foto do produto (opcional)" value={form.photoUrl || ""} onChange={e => setForm(p => ({ ...p, photoUrl: e.target.value }))} className="h-9 text-sm" />
+            <PhotoPicker value={form.photoUrl || undefined} onChange={v => setForm(p => ({ ...p, photoUrl: v }))} onClear={() => setForm(p => ({ ...p, photoUrl: "" }))} />
             <Textarea placeholder="Notas (como usar, resultados...)" value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[50px]" />
             <label className="flex items-center gap-1.5 text-xs">
               <Checkbox checked={form.repurchase} onCheckedChange={v => setForm(p => ({ ...p, repurchase: !!v }))} /> Recomprar quando acabar

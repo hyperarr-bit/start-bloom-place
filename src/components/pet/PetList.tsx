@@ -85,7 +85,7 @@ export const PetList = () => {
                 <Input placeholder="Peso (kg)" value={weight} onChange={e => setWeight(e.target.value)} className="h-8 text-xs" />
                 <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-8 text-xs" />
               </div>
-              <Input placeholder="URL da foto (opcional)" value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} className="h-8 text-xs" />
+              <PhotoPicker value={photoUrl || undefined} onChange={setPhotoUrl} onClear={() => setPhotoUrl("")} />
               <button
                 onClick={addPet}
                 className="w-full flex items-center justify-center gap-1 text-[11px] font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-md py-2 transition-colors"

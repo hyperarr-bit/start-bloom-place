@@ -108,16 +108,19 @@ export const QuickActions = () => {
   const submitExpense = () => {
     const amount = parseFloat(expenseValue.replace(",", "."));
     if (!amount || amount <= 0) { toast.error("Informe um valor válido"); return; }
-    const expenses = get<any[]>("core-expenses", []);
+    const expenses = get<any[]>("finance-expenses", []);
+    const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
     expenses.push({
       id: crypto.randomUUID(),
       description: expenseCategory,
-      amount,
-      category: expenseCategory,
+      value: amount,
+      category: catMap[expenseCategory] || "outros",
       date: todayStr(),
+      paymentMethod: "pix",
     });
-    set("core-expenses", expenses);
+    set("finance-expenses", expenses);
     vibrate();
+    showSuccess("expense");
     toast.success(`💸 R$ ${amount.toFixed(2)} em ${expenseCategory}`);
     setExpenseValue("");
     setExpenseCategory("Outros");
@@ -132,6 +135,7 @@ export const QuickActions = () => {
     measures.push({ date: tStr, weight, id: crypto.randomUUID() });
     set("core-saude-measures", measures);
     vibrate();
+    showSuccess("weight");
     toast.success(`⚖️ ${weight}kg registrado!`);
     setWeightValue("");
     setActiveAction(null);

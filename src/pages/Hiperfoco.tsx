@@ -8,6 +8,7 @@ import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
 import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
+import { IdeasPanel } from "@/components/hiperfoco/IdeasPanel";
 import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [

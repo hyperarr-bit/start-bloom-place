@@ -1,77 +1,29 @@
 
 
-# Plano: Aplicar design de planilha viva nos modulos restantes
+# Plano: Atualizar onboarding para 16 modulos + PWA instalavel
 
-## Modulos afetados
+## 1. Atualizar OnboardingWizard.tsx
 
-4 modulos com 14 componentes que ainda usam o padrao antigo (empty state + botao toggle para form escondido). Precisam virar cards coloridos permanentes com input inline sempre visivel.
+**Problema**: O step "modules" diz "12 Modulos" e so mostra 12 icones. O app tem 16 modulos.
 
-## Padrao alvo (referencia: CleaningRoutine, RoomManager, SafetyChecks)
-- Card com **header colorido** (bg-X-200 dark:bg-X-900/60)
-- **Body com cor suave** correspondente
-- Quando vazio: texto italic "Nenhum item ainda" dentro do body
-- **Input inline sempre visivel** no final do card (border-dashed)
-- Remover showForm toggle e AnimatePresence do form
+**Solucao**: 
+- Mudar titulo para "16 Modulos para sua vida"
+- Adicionar os 4 modulos faltantes na grid: Brain/Mente (violet), Users/Relacoes (rose), PawPrint/Pet (amber), Leaf/Detox (lime)
+- Importar os icones `Brain, Users, PawPrint, Leaf` do Lucide
 
----
+## 2. Tornar o app instalavel no celular (PWA simples)
 
-### 1. Relacionamentos (5 componentes)
+O Supabase client ja persiste a sessao em localStorage. O problema e que sem PWA o usuario acessa pelo browser e pode perder a sessao. Com PWA instalado, o app fica no home screen e mantem a sessao.
 
-| Componente | Card permanente | Cor |
-|---|---|---|
-| **PeoplePanel** | Card "PESSOAS" com tabela Nome/Relacao/Aniversario/Notas + input inline 4 campos | rose-200 |
-| **DateCalendar** | Card "DATAS ESPECIAIS" com lista + input inline Titulo/Pessoa/Data | purple-200 |
-| **MomentsTimeline** | Card "MOMENTOS" com timeline + input inline Data/Pessoa/Descricao | pink-200 |
-| **GiftIdeas** | Card "PRESENTES" com tabela Pessoa/Ideia/Link/Status + input inline | amber-200 |
-| **EventLog** | Card "EVENTOS" com lista + input inline Nome/Data/Local | indigo-200 |
+**Solucao** (sem service worker, apenas manifest para instalabilidade):
+- O `manifest.json` ja existe em `public/manifest.json` com `display: standalone`
+- Verificar e adicionar meta tags PWA no `index.html` (apple-mobile-web-app-capable, theme-color, link rel=manifest)
+- Nao instalar vite-plugin-pwa nem service worker (desnecessario para apenas instalabilidade)
 
-### 2. Pet (4 componentes)
-
-| Componente | Card permanente | Cor |
-|---|---|---|
-| **PetList** | Card "MEUS PETS" com tabela Nome/Especie/Raca/Peso/Nascimento + input inline | amber-200 |
-| **PetHealth** | Card "SAUDE" com tabela Pet/Tipo/Nome/Data/Proxima + input inline | green-200 |
-| **PetExpenses** | Card "GASTOS" com header total do mes + tabela Pet/Categoria/Valor/Data + input inline | blue-200 |
-| **PetDiary** | Card "DIARIO" sempre visivel com tabela + input inline | violet-200 |
-
-### 3. Hiperfoco/Mente (2 componentes)
-
-| Componente | Card permanente | Cor |
-|---|---|---|
-| **StrategyPanel** | Card "ESTRATEGIAS" com cards por status (Planejando/Executando/Concluido) + input inline | blue-200 |
-| **DreamJournal** | Card "DIARIO DE SONHOS" com tabela Data/Descricao/Tags + input inline | indigo-200 |
-
-### 4. Detox (2 componentes)
-
-| Componente | Card permanente | Cor |
-|---|---|---|
-| **DetoxTracker** | Card "HABITOS" com lista + input inline Nome/Icone | lime-200 |
-| **DetoxDiary** | Card "REGISTRO DO DIA" com tabela Data/Gatilho/Dificuldade/Nota + input inline | amber-200 |
-
-## Padrao de mudanca em cada componente
-
-1. Remover `showForm` state e o toggle `setShowForm(!showForm)`
-2. Remover `AnimatePresence` wrapper do form
-3. Envolver todo o conteudo em card com header colorido + body
-4. Mover inputs do form para **dentro do body** como linha inline permanente
-5. Manter toda a logica existente (add, remove, etc.)
-6. Empty state: `<p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum X ainda</p>`
-
-## Arquivos alterados (13)
+## Arquivos alterados (2)
 
 | Arquivo | Mudanca |
-|---|---|
-| `src/components/relacionamentos/PeoplePanel.tsx` | Card permanente + input inline |
-| `src/components/relacionamentos/DateCalendar.tsx` | Card permanente + input inline |
-| `src/components/relacionamentos/MomentsTimeline.tsx` | Card permanente + input inline |
-| `src/components/relacionamentos/GiftIdeas.tsx` | Card permanente + input inline |
-| `src/components/relacionamentos/EventLog.tsx` | Card permanente + input inline |
-| `src/components/pet/PetList.tsx` | Card permanente + input inline |
-| `src/components/pet/PetHealth.tsx` | Card permanente + input inline |
-| `src/components/pet/PetExpenses.tsx` | Card permanente + input inline |
-| `src/components/pet/PetDiary.tsx` | Card permanente + input inline |
-| `src/components/hiperfoco/StrategyPanel.tsx` | Card permanente + input inline |
-| `src/components/hiperfoco/DreamJournal.tsx` | Card permanente + input inline |
-| `src/components/detox/DetoxTracker.tsx` | Card permanente + input inline |
-| `src/components/detox/DetoxDiary.tsx` | Card permanente + input inline |
+|---------|---------|
+| `src/components/OnboardingWizard.tsx` | Titulo "16 Modulos", adicionar 4 icones faltantes, imports |
+| `index.html` | Adicionar meta tags PWA (apple-mobile-web-app-capable, manifest link, theme-color) |
 

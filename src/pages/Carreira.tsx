@@ -563,7 +563,7 @@ const Carreira = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <span className="text-slate-600 text-lg">💼</span>
+          <Briefcase className="w-5 h-5 text-slate-600" />
           <div>
             <h1 className="text-base font-bold tracking-tight">CARREIRA</h1>
             <p className="text-[11px] text-muted-foreground">Vagas, portfolio, networking e skills</p>

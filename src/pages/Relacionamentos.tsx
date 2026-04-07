@@ -7,6 +7,7 @@ import { DateCalendar } from "@/components/relacionamentos/DateCalendar";
 import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "pessoas", label: "PESSOAS", icon: "💜" },

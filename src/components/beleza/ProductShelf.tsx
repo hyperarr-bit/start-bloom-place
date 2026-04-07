@@ -198,17 +198,15 @@ export const ProductShelf = () => {
           )}
 
           {/* Inline quick-add row */}
-          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center bg-muted/20">
-            <div className="col-span-4">
-              <Input
-                placeholder="Nome do produto"
-                value={quickName}
-                onChange={e => setQuickName(e.target.value)}
-                className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
-                onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
-              />
-            </div>
-            <div className="col-span-2">
+          <div className="px-3 py-2 space-y-1.5 bg-muted/20">
+            <Input
+              placeholder="Nome do produto"
+              value={quickName}
+              onChange={e => setQuickName(e.target.value)}
+              className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+              onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+            />
+            <div className="grid grid-cols-2 gap-1.5">
               <Input
                 placeholder="Marca"
                 value={quickBrand}
@@ -216,8 +214,6 @@ export const ProductShelf = () => {
                 className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
                 onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
               />
-            </div>
-            <div className="col-span-3">
               <Select value={quickCategory} onValueChange={setQuickCategory}>
                 <SelectTrigger className="h-7 text-[10px] border-dashed border-border/60 bg-background/50">
                   <SelectValue />
@@ -227,11 +223,11 @@ export const ProductShelf = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-3 flex justify-end gap-1">
-              <Button size="sm" className="h-7 px-2 text-[10px]" onClick={quickAdd}>
-                <Plus className="w-3 h-3 mr-0.5" /> Add
+            <div className="flex gap-1.5">
+              <Button size="sm" className="h-7 px-3 text-[10px] flex-1" onClick={quickAdd}>
+                <Plus className="w-3 h-3 mr-0.5" /> Adicionar
               </Button>
-              <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => setShowForm(true)}>
+              <Button size="sm" variant="ghost" className="h-7 px-3 text-[10px]" onClick={() => setShowForm(true)}>
                 + Detalhes
               </Button>
             </div>

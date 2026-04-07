@@ -49,8 +49,10 @@ const vibrate = () => {
 export const QuickActions = () => {
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
+  const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
   const [waterSplash, setWaterSplash] = useState(false);
+  const [successId, setSuccessId] = useState<ActionId | null>(null);
 
   // Form states
   const [expenseValue, setExpenseValue] = useState("");

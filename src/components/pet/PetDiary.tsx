@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Camera, BookOpen } from "lucide-react";
+import { Plus, Trash2, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

@@ -98,7 +98,7 @@ export const DetoxAchievements = () => {
                       {unlocked ? m.icon : "🔒"}
                     </motion.span>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-bold ${unlocked ? "" : "text-muted-foreground"}`}>{m.title}</p>
+                      <p className={`text-xs font-bold ${unlocked ? "text-shine" : "text-muted-foreground"}`}>{m.title}</p>
                       <p className="text-[10px] text-muted-foreground">{m.msg}</p>
                     </div>
                     {unlocked && (

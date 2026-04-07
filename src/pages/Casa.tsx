@@ -20,7 +20,7 @@ const tabs = [
   { id: "despensa", label: "DESPENSA", icon: "🛒" },
   { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
   { id: "manutencao", label: "MANUTENÇÃO", icon: "🔧" },
-  { id: "plantas", label: "VIDA", icon: "🌱" },
+  
   { id: "coop", label: "CO-OP", icon: "👥" },
   { id: "seguranca", label: "SEGURANÇA", icon: "🛡️" },
   { id: "utilidades", label: "UTILIDADES", icon: "⚙️" },

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Droplets, DollarSign, Scale, Lightbulb, Timer, ListTodo, Heart, SmilePlus, X, Check } from "lucide-react";
+import { Droplets, DollarSign, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-type ActionId = "water" | "expense" | "weight" | "idea" | "focus" | "task" | "gratitude" | "mood";
+type ActionId = "water" | "expense" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
 
 interface QuickAction {
   id: ActionId;
@@ -24,10 +24,13 @@ const actions: QuickAction[] = [
   { id: "mood", icon: SmilePlus, label: "Check de Humor", color: "bg-pink-400/20", iconColor: "text-pink-600" },
   { id: "expense", icon: DollarSign, label: "Registrar Gasto", color: "bg-amber-400/20", iconColor: "text-amber-600" },
   { id: "weight", icon: Scale, label: "Pesar Agora", color: "bg-purple-400/20", iconColor: "text-purple-600" },
+  { id: "workout", icon: Dumbbell, label: "Marcar Treino", color: "bg-orange-400/20", iconColor: "text-orange-600" },
+  { id: "sleep", icon: Moon, label: "Registrar Sono", color: "bg-indigo-400/20", iconColor: "text-indigo-600" },
+  { id: "meal", icon: Utensils, label: "Registrar Refeição", color: "bg-lime-400/20", iconColor: "text-lime-600" },
   { id: "idea", icon: Lightbulb, label: "Capturar Ideia", color: "bg-yellow-400/20", iconColor: "text-yellow-600" },
-  { id: "focus", icon: Timer, label: "Iniciar Foco", color: "bg-indigo-400/20", iconColor: "text-indigo-600" },
   { id: "task", icon: ListTodo, label: "Nova Tarefa", color: "bg-emerald-400/20", iconColor: "text-emerald-600" },
   { id: "gratitude", icon: Heart, label: "Gratidão do Dia", color: "bg-rose-400/20", iconColor: "text-rose-600" },
+  { id: "detox", icon: Shield, label: "Check-in Detox", color: "bg-teal-400/20", iconColor: "text-teal-600" },
 ];
 
 const moods = [
@@ -61,6 +64,9 @@ export const QuickActions = () => {
   const [ideaText, setIdeaText] = useState("");
   const [taskText, setTaskText] = useState("");
   const [gratitudeText, setGratitudeText] = useState("");
+  const [sleepHours, setSleepHours] = useState("");
+  const [mealName, setMealName] = useState("");
+  const [mealCalories, setMealCalories] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,8 +79,10 @@ export const QuickActions = () => {
   const handleAction = (id: ActionId) => {
     if (id === "water") {
       addWater();
-    } else if (id === "focus") {
-      startFocus();
+    } else if (id === "workout") {
+      markWorkout();
+    } else if (id === "detox") {
+      setActiveAction("detox");
     } else {
       setActiveAction(id);
     }
@@ -97,12 +105,13 @@ export const QuickActions = () => {
     toast.success(`💧 ${(current + 1) * 200}ml — ${lifeData.waterGoal - current - 1 > 0 ? `faltam ${lifeData.waterGoal - current - 1} copos` : "meta batida! 🎉"}`);
   };
 
-  const startFocus = () => {
-    set("core-focus-timer-start", Date.now());
-    set("core-focus-timer-running", true);
+  const markWorkout = () => {
+    const tStr = todayStr();
+    const log = get<Record<string, boolean>>("core-treino-log", {});
+    set("core-treino-log", { ...log, [tStr]: true });
     vibrate();
-    showSuccess("focus");
-    toast.success("⏱️ Timer de foco iniciado — 25 minutos!");
+    showSuccess("workout");
+    toast.success("💪 Treino do dia registrado!", { action: { label: "Ver Treino", onClick: () => navigate("/treino") } });
   };
 
   const submitExpense = () => {
@@ -143,7 +152,6 @@ export const QuickActions = () => {
 
   const submitIdea = () => {
     if (!ideaText.trim()) { toast.error("Digite sua ideia"); return; }
-    // Save to ThoughtCapture format (hiperfoco-thoughts)
     const dateKey = todayStr();
     const allDays = get<Record<string, any>>("hiperfoco-thoughts", {});
     const dayData = allDays[dateKey] || {};
@@ -161,12 +169,12 @@ export const QuickActions = () => {
 
   const submitTask = () => {
     if (!taskText.trim()) { toast.error("Digite a tarefa"); return; }
-    const tasks = get<any[]>("core-quick-tasks", []);
-    tasks.push({ id: crypto.randomUUID(), text: taskText.trim(), done: false, date: todayStr() });
-    set("core-quick-tasks", tasks);
+    const tasks = get<any[]>("rotina-urgencies", []);
+    tasks.push({ id: crypto.randomUUID(), text: taskText.trim(), done: false });
+    set("rotina-urgencies", tasks);
     vibrate();
     showSuccess("task");
-    toast.success("✅ Tarefa adicionada!");
+    toast.success("✅ Tarefa adicionada!", { action: { label: "Ver em Rotina", onClick: () => navigate("/rotina") } });
     setTaskText("");
     setActiveAction(null);
   };
@@ -196,7 +204,57 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
+  const submitSleep = () => {
+    const hours = parseFloat(sleepHours.replace(",", "."));
+    if (!hours || hours <= 0 || hours > 24) { toast.error("Informe horas válidas (1-24)"); return; }
+    const tStr = todayStr();
+    const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
+    set("core-saude-sleep", { ...sleepLog, [tStr]: hours });
+    vibrate();
+    showSuccess("sleep");
+    toast.success(`🌙 ${hours}h de sono registradas!`, { action: { label: "Ver Saúde", onClick: () => navigate("/saude") } });
+    setSleepHours("");
+    setActiveAction(null);
+  };
+
+  const submitMeal = () => {
+    if (!mealName.trim()) { toast.error("Nome da refeição"); return; }
+    const cal = parseFloat(mealCalories.replace(",", ".")) || 0;
+    const tStr = todayStr();
+    const dietLog = get<Record<string, any>>("core-dieta-log", {});
+    const dayMeals = dietLog[tStr] || {};
+    const mealId = crypto.randomUUID();
+    dayMeals[mealId] = { name: mealName.trim(), calories: cal };
+    set("core-dieta-log", { ...dietLog, [tStr]: dayMeals });
+    vibrate();
+    showSuccess("meal");
+    toast.success(`🍽️ ${mealName.trim()} registrado!${cal > 0 ? ` (${cal} kcal)` : ""}`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
+    setMealName("");
+    setMealCalories("");
+    setActiveAction(null);
+  };
+
+  const submitDetoxCheckin = (habitName: string) => {
+    const tStr = todayStr();
+    const habits = get<any[]>("detox-habits", []);
+    const updated = habits.map((h: any) => {
+      if (h.name === habitName) {
+        const checkins = h.checkins || {};
+        checkins[tStr] = (checkins[tStr] || 0) + 1;
+        return { ...h, checkins };
+      }
+      return h;
+    });
+    set("detox-habits", updated);
+    vibrate();
+    showSuccess("detox");
+    toast.success(`🛡️ Check-in: ${habitName}`, { action: { label: "Ver Detox", onClick: () => navigate("/detox") } });
+    setActiveAction(null);
+  };
+
   const close = () => setActiveAction(null);
+
+  const detoxHabits = get<any[]>("detox-habits", []);
 
   return (
     <div className="space-y-2">
@@ -376,6 +434,84 @@ export const QuickActions = () => {
                       <span className="text-[9px] text-muted-foreground font-medium">{m.label}</span>
                     </motion.button>
                   ))}
+                </div>
+              )}
+
+              {/* Sleep form */}
+              {activeAction === "sleep" && (
+                <div className="flex gap-2">
+                  <Input
+                    ref={inputRef}
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Quantas horas dormiu?"
+                    value={sleepHours}
+                    onChange={e => setSleepHours(e.target.value)}
+                    className="h-9 text-sm flex-1"
+                    onKeyDown={e => e.key === "Enter" && submitSleep()}
+                  />
+                  <span className="flex items-center text-xs text-muted-foreground font-medium">h</span>
+                  <button onClick={submitSleep} className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Meal form */}
+              {activeAction === "meal" && (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      ref={inputRef}
+                      placeholder="Nome da refeição"
+                      value={mealName}
+                      onChange={e => setMealName(e.target.value)}
+                      className="h-9 text-sm flex-1"
+                      onKeyDown={e => e.key === "Enter" && submitMeal()}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="Calorias (opcional)"
+                      value={mealCalories}
+                      onChange={e => setMealCalories(e.target.value)}
+                      className="h-9 text-sm flex-1"
+                      onKeyDown={e => e.key === "Enter" && submitMeal()}
+                    />
+                    <span className="flex items-center text-xs text-muted-foreground font-medium">kcal</span>
+                    <button onClick={submitMeal} className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Detox check-in */}
+              {activeAction === "detox" && (
+                <div className="space-y-1.5">
+                  {detoxHabits.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Nenhum hábito detox cadastrado.{" "}
+                      <button onClick={() => navigate("/detox")} className="text-primary font-medium underline">Criar em Detox</button>
+                    </p>
+                  ) : (
+                    detoxHabits.map((h: any) => (
+                      <motion.button
+                        key={h.name}
+                        onClick={() => submitDetoxCheckin(h.name)}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left"
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                        <span className="text-xs font-medium truncate">{h.name}</span>
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          {h.checkins?.[todayStr()] || 0}x hoje
+                        </span>
+                      </motion.button>
+                    ))
+                  )}
                 </div>
               )}
             </div>

@@ -1,8 +1,18 @@
 import { useState } from "react";
-import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { differenceInDays, format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface DetoxHabit {
   id: string;
@@ -11,6 +21,7 @@ interface DetoxHabit {
   startDate: string;
   relapses: string[];
   record: number;
+  checkins?: string[];
 }
 
 const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞", "🎰"];
@@ -21,26 +32,38 @@ export const DetoxTracker = () => {
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("📱");
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
+  const [confirmRelapseId, setConfirmRelapseId] = useState<string | null>(null);
 
   const today = new Date();
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const todayStr = new Date().toISOString().split("T")[0];
 
   const addHabit = () => {
     if (!name.trim()) return;
-    const updated = [...habits, { id: Date.now().toString(), name: name.trim(), icon, startDate: new Date().toISOString().split("T")[0], relapses: [], record: 0 }];
+    const updated = [...habits, { id: Date.now().toString(), name: name.trim(), icon, startDate: todayStr, relapses: [], record: 0, checkins: [] }];
     set("detox-habits", updated);
     setName("");
   };
 
   const relapse = (id: string) => {
-    const todayStr = new Date().toISOString().split("T")[0];
     const updated = habits.map(h => {
       if (h.id !== id) return h;
       const currentStreak = getStreak(h);
       const newRecord = Math.max(h.record, currentStreak);
       return { ...h, relapses: [...h.relapses, todayStr], startDate: todayStr, record: newRecord };
+    });
+    set("detox-habits", updated);
+    setConfirmRelapseId(null);
+  };
+
+  const checkin = (id: string) => {
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const checkins = h.checkins || [];
+      if (checkins.includes(todayStr)) return h;
+      return { ...h, checkins: [...checkins, todayStr] };
     });
     set("detox-habits", updated);
   };
@@ -52,6 +75,8 @@ export const DetoxTracker = () => {
     const from = lastRelapse || h.startDate;
     return differenceInDays(new Date(), new Date(from));
   };
+
+  const relapseHabit = confirmRelapseId ? habits.find(h => h.id === confirmRelapseId) : null;
 
   return (
     <div className="mt-3">
@@ -69,6 +94,7 @@ export const DetoxTracker = () => {
             const streak = getStreak(h);
             const best = Math.max(h.record, streak);
             const isExpanded = selectedHabit === h.id;
+            const checkedToday = (h.checkins || []).includes(todayStr);
 
             return (
               <div
@@ -91,7 +117,7 @@ export const DetoxTracker = () => {
                   </div>
                   <div className="flex gap-1 items-center">
                     <button
-                      onClick={e => { e.stopPropagation(); relapse(h.id); }}
+                      onClick={e => { e.stopPropagation(); setConfirmRelapseId(h.id); }}
                       className="p-1.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                       title="Recaí"
                     >
@@ -116,6 +142,20 @@ export const DetoxTracker = () => {
 
                 {isExpanded && (
                   <div className="mt-3 pt-3 border-t border-border">
+                    {/* Check-in button */}
+                    <button
+                      onClick={e => { e.stopPropagation(); checkin(h.id); }}
+                      disabled={checkedToday}
+                      className={`w-full mb-3 flex items-center justify-center gap-1.5 text-[11px] font-bold rounded-lg py-2 transition-colors ${
+                        checkedToday
+                          ? "bg-green-500/20 text-green-600 dark:text-green-400 cursor-default"
+                          : "bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20"
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      {checkedToday ? "Confirmado hoje ✓" : "Estou limpo hoje"}
+                    </button>
+
                     <p className="text-[10px] text-muted-foreground mb-2">{format(today, "MMMM yyyy")}</p>
                     <div className="grid grid-cols-7 gap-1">
                       {["D", "S", "T", "Q", "Q", "S", "S"].map((d, idx) => (
@@ -126,6 +166,7 @@ export const DetoxTracker = () => {
                         const ds = format(day, "yyyy-MM-dd");
                         const isRelapse = h.relapses.includes(ds);
                         const isFuture = day > today;
+                        const isCheckedIn = (h.checkins || []).includes(ds);
                         const isPure = !isRelapse && !isFuture && day >= new Date(h.startDate);
                         return (
                           <div
@@ -133,7 +174,8 @@ export const DetoxTracker = () => {
                             className={`aspect-square rounded flex items-center justify-center text-[9px] font-medium ${
                               isFuture ? "bg-muted/20 text-muted-foreground/30" :
                               isRelapse ? "bg-destructive/30 text-destructive" :
-                              isPure ? "bg-green-500/30 text-green-400" :
+                              isCheckedIn ? "bg-green-500/50 text-green-600 dark:text-green-300 ring-1 ring-green-500/30" :
+                              isPure ? "bg-green-500/20 text-green-400" :
                               "bg-muted/30 text-muted-foreground/50"
                             }`}
                           >
@@ -144,7 +186,10 @@ export const DetoxTracker = () => {
                     </div>
                     <div className="flex gap-3 mt-2.5 justify-center">
                       <span className="text-[9px] text-muted-foreground flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded bg-green-500/30" /> Puro
+                        <div className="w-2.5 h-2.5 rounded bg-green-500/50 ring-1 ring-green-500/30" /> Confirmado
+                      </span>
+                      <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded bg-green-500/20" /> Automático
                       </span>
                       <span className="text-[9px] text-muted-foreground flex items-center gap-1">
                         <div className="w-2.5 h-2.5 rounded bg-destructive/30" /> Recaída
@@ -179,6 +224,29 @@ export const DetoxTracker = () => {
           </div>
         </div>
       </div>
+
+      {/* Relapse confirmation dialog */}
+      <AlertDialog open={!!confirmRelapseId} onOpenChange={open => { if (!open) setConfirmRelapseId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar recaída</AlertDialogTitle>
+            <AlertDialogDescription>
+              {relapseHabit
+                ? `Tem certeza que recaiu em "${relapseHabit.name}"? Seu streak de ${getStreak(relapseHabit)} dia${getStreak(relapseHabit) !== 1 ? "s" : ""} será reiniciado.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRelapseId && relapse(confirmRelapseId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sim, recaí
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

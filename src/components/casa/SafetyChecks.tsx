@@ -6,8 +6,22 @@ import { Input } from "@/components/ui/input";
 import { EmergencyItem, daysSince } from "./types";
 
 const SafetyChecks = () => {
-  const [travelChecklist, setTravelChecklist] = usePersistedState<{ id: string; text: string; checked: boolean }[]>("casa-travel-checklist", []);
-  const [emergencyStock, setEmergencyStock] = usePersistedState<EmergencyItem[]>("casa-emergency-stock", []);
+  const [travelChecklist, setTravelChecklist] = usePersistedState<{ id: string; text: string; checked: boolean }[]>("casa-travel-checklist", [
+    { id: "t1", text: "Desligar gás", checked: false },
+    { id: "t2", text: "Tirar lixo da pia", checked: false },
+    { id: "t3", text: "Desligar eletrônicos da tomada", checked: false },
+    { id: "t4", text: "Trancar janelas", checked: false },
+    { id: "t5", text: "Conferir torneiras", checked: false },
+    { id: "t6", text: "Pedir para alguém regar plantas", checked: false },
+  ]);
+  const [emergencyStock, setEmergencyStock] = usePersistedState<EmergencyItem[]>("casa-emergency-stock", [
+    { id: "e1", name: "Velas", checked: false, lastChecked: "" },
+    { id: "e2", name: "Pilhas AA/AAA", checked: false, lastChecked: "" },
+    { id: "e3", name: "Lanterna", checked: false, lastChecked: "" },
+    { id: "e4", name: "Kit Primeiros Socorros", checked: false, lastChecked: "" },
+    { id: "e5", name: "Água mineral (reserva)", checked: false, lastChecked: "" },
+    { id: "e6", name: "Fósforos/Isqueiro", checked: false, lastChecked: "" },
+  ]);
   const [newTravelItem, setNewTravelItem] = useState("");
   const [newEmergItem, setNewEmergItem] = useState("");
 

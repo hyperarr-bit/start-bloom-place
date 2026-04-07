@@ -1,31 +1,22 @@
 
 
-# Plano: Adicionar aba IDEIAS no modulo Mente
+# Plano: Reverter textos do DayScoreRing para o original
 
-## O que muda
+## Problema
+Os textos do score foram alterados. O usuario quer o estilo anterior com "Vamos la!" como label e "Score do dia baseado em suas atividades" como subtitulo fixo.
 
-Adicionar uma nova aba "IDEIAS" (penultima, antes de SONHOS) que mostra todas as ideias capturadas — tanto as do modulo Mente quanto as das Acoes Rapidas da Home. Ambas ja salvam no mesmo storage key `hiperfoco-thoughts` com tag `ideia`.
+## Mudanca
 
-## Implementacao
+No `src/components/home/DayScoreRing.tsx`:
 
-### 1. Novo componente `src/components/hiperfoco/IdeasPanel.tsx`
+1. **Remover `getScoreLabel()`** — substituir por texto fixo "Vamos la!"
+2. **Remover `getMotivation()`** — substituir por texto fixo "Score do dia baseado em suas atividades"
 
-- Le `hiperfoco-thoughts` e filtra apenas thoughts com tag `ideia`
-- Lista todas as ideias em ordem cronologica reversa (mais recente primeiro)
-- Cada card mostra: texto, data/hora, botao remover
-- Input inline no topo para adicionar ideia rapida (mesmo formato do ThoughtCapture — salva com tag `ideia` na hora atual)
-- Design de planilha viva (card com header, input sempre visivel)
+Tudo mais (cores, ring, streak, animacoes) permanece identico.
 
-### 2. Atualizar `src/pages/Hiperfoco.tsx`
-
-- Importar `IdeasPanel`
-- Adicionar tab `{ id: "ideias", label: "IDEIAS", icon: "💡" }` como penultima (antes de SONHOS)
-- Renderizar `{activeTab === "ideias" && <IdeasPanel />}`
-
-## Arquivos alterados (2)
+## Arquivo alterado (1)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/hiperfoco/IdeasPanel.tsx` | **NOVO** — lista + input de ideias filtradas de hiperfoco-thoughts |
-| `src/pages/Hiperfoco.tsx` | Adicionar tab IDEIAS e renderizar IdeasPanel |
+| `src/components/home/DayScoreRing.tsx` | Reverter label para "Vamos la!" e subtitulo para "Score do dia baseado em suas atividades" |
 

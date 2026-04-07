@@ -40,7 +40,7 @@ export const PetDiary = () => {
       ...entries,
     ];
     set("pet-diary", updated);
-    setText(""); setPetName(""); setMood("😊"); setPhotoUrl("");
+    setText(""); setPetName(""); setMood("😊"); setPhotoUrl(undefined);
   };
 
   const removeEntry = (id: string) => {

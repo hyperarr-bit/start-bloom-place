@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Camera, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { format } from "date-fns";
 
 interface DiaryEntry {

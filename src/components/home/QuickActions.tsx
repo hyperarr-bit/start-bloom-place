@@ -65,7 +65,7 @@ export const QuickActions = () => {
   const [taskText, setTaskText] = useState("");
   const [gratitudeText, setGratitudeText] = useState("");
   const [sleepHours, setSleepHours] = useState("");
-  const [mealCalories, setMealCalories] = useState("");
+  
 
   const inputRef = useRef<HTMLInputElement>(null);
 

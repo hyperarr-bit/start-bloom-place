@@ -25,17 +25,19 @@ export const PetDiary = () => {
   const [petName, setPetName] = useState("");
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
+  const [photoUrl, setPhotoUrl] = useState("");
 
   const addEntry = () => {
     if (!text.trim()) return;
     const updated = [
-      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood },
+      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl.trim() || undefined },
       ...entries,
     ];
     set("pet-diary", updated);
     setText("");
     setPetName("");
     setMood("😊");
+    setPhotoUrl("");
     setShowForm(false);
   };
 

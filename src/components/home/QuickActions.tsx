@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 

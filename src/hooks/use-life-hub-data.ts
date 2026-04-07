@@ -137,31 +137,61 @@ export function useLifeHubData(): LifeHubData {
       set("core-hub-streak", { count: 1, lastDate: tStr });
     }
 
-    // Day Score
+    // Day Score — granular, every small action counts
     let scorePoints = 0;
-    let scoreMax = 0;
+    const scoreMax = 100;
 
-    scoreMax += 25;
-    if (workoutDone) scorePoints += 25;
-    else if (!todayGroup) scorePoints += 25;
+    // Treino (15pts)
+    if (workoutDone) scorePoints += 15;
+    else if (!todayGroup) scorePoints += 15; // rest day = free
 
+    // Hábitos (20pts)
     if (tasksTotal > 0) {
-      scoreMax += 25;
-      scorePoints += Math.round((tasksCompleted / tasksTotal) * 25);
+      scorePoints += Math.round((tasksCompleted / tasksTotal) * 20);
     }
 
-    scoreMax += 15;
+    // Água (15pts)
     scorePoints += Math.min(15, Math.round((waterGlasses / waterGoal) * 15));
 
+    // Refeições (10pts)
     if (mealsTotal > 0) {
-      scoreMax += 20;
-      scorePoints += Math.round((mealsLogged / mealsTotal) * 20);
+      scorePoints += Math.round((mealsLogged / mealsTotal) * 10);
     }
 
-    scoreMax += 15;
-    if (currentBook) scorePoints += 15;
+    // Leitura ativa (5pts)
+    if (currentBook) scorePoints += 5;
 
-    const dayScore = scoreMax > 0 ? Math.round((scorePoints / scoreMax) * 100) : 0;
+    // Humor registrado (5pts)
+    const moodLog = get<Record<string, any>>("core-mood-log", {});
+    if (moodLog[tStr]) scorePoints += 5;
+
+    // Gratidão registrada (5pts)
+    const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
+    if ((gratLog[tStr] || []).length > 0) scorePoints += 5;
+
+    // Ideia capturada hoje (5pts)
+    const thoughtsAll = get<Record<string, any>>("hiperfoco-thoughts", {});
+    const todayThoughts = thoughtsAll[tStr] || {};
+    const hasThoughtToday = Object.values(todayThoughts).some((arr: any) => Array.isArray(arr) && arr.length > 0);
+    if (hasThoughtToday) scorePoints += 5;
+
+    // Peso registrado (5pts)
+    const measures = get<any[]>("core-saude-measures", []);
+    if (measures.some((m: any) => m.date === tStr)) scorePoints += 5;
+
+    // Suplementos (5pts)
+    if (supplements.length > 0) {
+      scorePoints += Math.round((supplementsTaken / supplements.length) * 5);
+    }
+
+    // Sono registrado (5pts)
+    if (sleepHours) scorePoints += 5;
+
+    // Gasto registrado hoje (5pts)
+    const todayExpenses = variableExpenses.filter((e: any) => e.date === tStr);
+    if (todayExpenses.length > 0) scorePoints += 5;
+
+    const dayScore = Math.min(100, scorePoints);
     const userName = get<string>("core-user-name", "");
 
     return {

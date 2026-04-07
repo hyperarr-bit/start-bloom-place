@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, TrendingUp, Camera } from "lucide-react";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import type { SkinEntry } from "./utils";
 
 const genId = () => crypto.randomUUID();

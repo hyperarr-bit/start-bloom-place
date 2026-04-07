@@ -80,22 +80,28 @@ export const QuickActions = () => {
     }
   };
 
+  const showSuccess = (id: ActionId) => {
+    setSuccessId(id);
+    setTimeout(() => setSuccessId(null), 1500);
+  };
+
   const addWater = () => {
     const tStr = todayStr();
     const waterLog = get<Record<string, number>>("core-saude-water", {});
     const current = waterLog[tStr] || 0;
     set("core-saude-water", { ...waterLog, [tStr]: current + 1 });
     vibrate();
+    showSuccess("water");
     setWaterSplash(true);
     setTimeout(() => setWaterSplash(false), 800);
     toast.success(`💧 ${(current + 1) * 200}ml — ${lifeData.waterGoal - current - 1 > 0 ? `faltam ${lifeData.waterGoal - current - 1} copos` : "meta batida! 🎉"}`);
   };
 
   const startFocus = () => {
-    // Store focus start time so FocusTimerWidget picks it up
     set("core-focus-timer-start", Date.now());
     set("core-focus-timer-running", true);
     vibrate();
+    showSuccess("focus");
     toast.success("⏱️ Timer de foco iniciado — 25 minutos!");
   };
 

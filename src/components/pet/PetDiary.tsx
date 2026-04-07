@@ -24,7 +24,7 @@ export const PetDiary = () => {
   const [petName, setPetName] = useState("");
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
-  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
 
   // Auto-select if only one pet
   useEffect(() => {

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, Camera, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 
 interface DiaryEntry {
@@ -24,6 +25,13 @@ export const PetDiary = () => {
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
   const [photoUrl, setPhotoUrl] = useState("");
+
+  // Auto-select if only one pet
+  useEffect(() => {
+    if (pets.length === 1 && !petName) {
+      setPetName(pets[0].name);
+    }
+  }, [pets, petName]);
 
   const addEntry = () => {
     if (!text.trim()) return;

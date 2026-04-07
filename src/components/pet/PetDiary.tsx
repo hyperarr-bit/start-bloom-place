@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, Camera, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 
 interface DiaryEntry {
@@ -24,6 +25,13 @@ export const PetDiary = () => {
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
   const [photoUrl, setPhotoUrl] = useState("");
+
+  // Auto-select if only one pet
+  useEffect(() => {
+    if (pets.length === 1 && !petName) {
+      setPetName(pets[0].name);
+    }
+  }, [pets, petName]);
 
   const addEntry = () => {
     if (!text.trim()) return;
@@ -78,10 +86,16 @@ export const PetDiary = () => {
 
           <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
-              <Input placeholder="Nome do pet" value={petName} onChange={e => setPetName(e.target.value)} className="h-7 text-[11px]" list="diary-pet-list" />
-              <datalist id="diary-pet-list">
-                {pets.map((p: any) => <option key={p.id} value={p.name} />)}
-              </datalist>
+              <Select value={petName} onValueChange={setPetName}>
+                <SelectTrigger className="h-7 text-[11px]">
+                  <SelectValue placeholder={pets.length === 0 ? "Cadastre um pet primeiro" : "Selecionar pet"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {pets.map((p: any) => (
+                    <SelectItem key={p.id} value={p.name} className="text-[11px]">{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex gap-1 items-center">
                 {moods.map(m => (
                   <button key={m} onClick={() => setMood(m)} className={`text-sm p-0.5 rounded transition-all ${mood === m ? "bg-primary/20 ring-1 ring-primary scale-110" : "opacity-50 hover:opacity-80"}`}>

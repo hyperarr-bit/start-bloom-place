@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Sparkles, ArrowRight, ArrowLeft, Check, 
   DollarSign, CalendarCheck, Heart, Dumbbell, Apple, 
-  Home, GraduationCap, BookOpen, Droplets, Plane, Briefcase, Rocket
+  Home, GraduationCap, BookOpen, Droplets, Plane, Briefcase, Rocket,
+  Brain, Users, PawPrint, Leaf
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

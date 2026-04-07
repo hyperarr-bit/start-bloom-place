@@ -147,12 +147,11 @@ export const ProductShelf = () => {
 
       {/* Product table — always visible */}
       <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-          <span className="col-span-4">Produto</span>
+        <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-8 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+          <span className="col-span-3">Produto</span>
           <span className="col-span-2">Marca</span>
           <span className="col-span-2">Categoria</span>
-          <span className="col-span-2">Validade</span>
-          <span className="col-span-2 text-right">Ações</span>
+          <span className="col-span-1 text-right hidden sm:block">Validade</span>
         </div>
         <div className="divide-y divide-border bg-card">
           {activeProducts.map(p => {

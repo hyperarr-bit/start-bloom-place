@@ -33,6 +33,7 @@ export const DetoxTracker = () => {
   const [icon, setIcon] = useState("📱");
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
   const [confirmRelapseId, setConfirmRelapseId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const today = new Date();
   const monthStart = startOfMonth(today);
@@ -76,7 +77,7 @@ export const DetoxTracker = () => {
     return differenceInDays(new Date(), new Date(from));
   };
 
-  const relapseHabit = confirmRelapseId ? habits.find(h => h.id === confirmRelapseId) : null;
+  
 
   return (
     <div className="mt-3">
@@ -122,12 +123,6 @@ export const DetoxTracker = () => {
                       title="Recaí"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={e => { e.stopPropagation(); removeHabit(h.id); }}
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`} />
                   </div>
@@ -195,6 +190,13 @@ export const DetoxTracker = () => {
                         <div className="w-2.5 h-2.5 rounded bg-destructive/30" /> Recaída
                       </span>
                     </div>
+
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteId(h.id); }}
+                      className="mt-3 w-full flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground hover:text-destructive py-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir hábito
+                    </button>
                   </div>
                 )}
               </div>
@@ -229,11 +231,9 @@ export const DetoxTracker = () => {
       <AlertDialog open={!!confirmRelapseId} onOpenChange={open => { if (!open) setConfirmRelapseId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar recaída</AlertDialogTitle>
+            <AlertDialogTitle>Ei, tudo bem 💚</AlertDialogTitle>
             <AlertDialogDescription>
-              {relapseHabit
-                ? `Tem certeza que recaiu em "${relapseHabit.name}"? Seu streak de ${getStreak(relapseHabit)} dia${getStreak(relapseHabit) !== 1 ? "s" : ""} será reiniciado.`
-                : ""}
+              Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -242,7 +242,28 @@ export const DetoxTracker = () => {
               onClick={() => confirmRelapseId && relapse(confirmRelapseId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Sim, recaí
+              Confirmar recaída
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!confirmDeleteId} onOpenChange={open => { if (!open) setConfirmDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir hábito</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDeleteId ? `Deseja excluir "${habits.find(h => h.id === confirmDeleteId)?.name}"? Todos os dados serão perdidos.` : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => { if (confirmDeleteId) { removeHabit(confirmDeleteId); setConfirmDeleteId(null); } }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

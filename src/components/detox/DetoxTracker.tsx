@@ -190,6 +190,13 @@ export const DetoxTracker = () => {
                         <div className="w-2.5 h-2.5 rounded bg-destructive/30" /> Recaída
                       </span>
                     </div>
+
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteId(h.id); }}
+                      className="mt-3 w-full flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground hover:text-destructive py-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" /> Excluir hábito
+                    </button>
                   </div>
                 )}
               </div>

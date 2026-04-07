@@ -143,11 +143,18 @@ export const QuickActions = () => {
 
   const submitIdea = () => {
     if (!ideaText.trim()) { toast.error("Digite sua ideia"); return; }
-    const ideas = get<any[]>("core-ideas", []);
-    ideas.push({ id: crypto.randomUUID(), text: ideaText.trim(), date: todayStr(), time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) });
-    set("core-ideas", ideas);
+    // Save to ThoughtCapture format (hiperfoco-thoughts)
+    const dateKey = todayStr();
+    const allDays = get<Record<string, any>>("hiperfoco-thoughts", {});
+    const dayData = allDays[dateKey] || {};
+    const hour = new Date().getHours();
+    const thoughts = dayData[hour] || [];
+    thoughts.push({ id: crypto.randomUUID(), text: ideaText.trim(), tags: ["ideia"], hour });
+    dayData[hour] = thoughts;
+    set("hiperfoco-thoughts", { ...allDays, [dateKey]: dayData });
     vibrate();
-    toast.success("💡 Ideia capturada!");
+    showSuccess("idea");
+    toast.success("💡 Ideia capturada!", { action: { label: "Ver em Mente", onClick: () => navigate("/hiperfoco") } });
     setIdeaText("");
     setActiveAction(null);
   };
@@ -158,6 +165,7 @@ export const QuickActions = () => {
     tasks.push({ id: crypto.randomUUID(), text: taskText.trim(), done: false, date: todayStr() });
     set("core-quick-tasks", tasks);
     vibrate();
+    showSuccess("task");
     toast.success("✅ Tarefa adicionada!");
     setTaskText("");
     setActiveAction(null);
@@ -167,10 +175,11 @@ export const QuickActions = () => {
     if (!gratitudeText.trim()) { toast.error("Pelo que você é grato?"); return; }
     const tStr = todayStr();
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
-    const today = gratLog[tStr] || [];
-    today.push(gratitudeText.trim());
-    set("core-gratitude-log", { ...gratLog, [tStr]: today });
+    const todayEntries = gratLog[tStr] || [];
+    todayEntries.push(gratitudeText.trim());
+    set("core-gratitude-log", { ...gratLog, [tStr]: todayEntries });
     vibrate();
+    showSuccess("gratitude");
     toast.success("🙏 Gratidão registrada!");
     setGratitudeText("");
     setActiveAction(null);
@@ -182,6 +191,7 @@ export const QuickActions = () => {
     moodLog[tStr] = { value, emoji, time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) };
     set("core-mood-log", moodLog);
     vibrate();
+    showSuccess("mood");
     toast.success(`${emoji} Humor registrado!`);
     setActiveAction(null);
   };

@@ -76,7 +76,7 @@ const Casa = () => {
         {activeTab === "despensa" && <SmartPantry />}
         {activeTab === "cardapio" && <MealPlanner />}
         {activeTab === "manutencao" && <MaintenanceLog />}
-        {activeTab === "plantas" && <PlantsAndPets />}
+        
         {activeTab === "coop" && <ChoreRotation />}
         {activeTab === "seguranca" && <SafetyChecks />}
         {activeTab === "utilidades" && <HomeUtilities />}

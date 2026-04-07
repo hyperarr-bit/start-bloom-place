@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";

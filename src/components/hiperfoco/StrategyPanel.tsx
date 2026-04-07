@@ -65,7 +65,7 @@ export const StrategyPanel = () => {
           <span className="text-[10px] text-neutral-400">{strategies.length}</span>
         </div>
 
-        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-2 space-y-2">
+        <div className="bg-neutral-50/50 dark:bg-neutral-950/20 p-2 space-y-2">
           {strategies.map(s => {
             const status = STATUS_LABELS[s.status];
             return (

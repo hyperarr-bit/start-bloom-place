@@ -1,29 +1,31 @@
 
 
-# Plano: Atualizar onboarding para 16 modulos + PWA instalavel
+# Plano: Confirmacao de recaida + check-in diario no Detox
 
-## 1. Atualizar OnboardingWizard.tsx
+## Situacao atual
+O botao de recaida (RotateCcw) reseta o streak imediatamente sem confirmacao. O streak e automatico baseado em `differenceInDays` desde a ultima recaida — nao existe check-in diario.
 
-**Problema**: O step "modules" diz "12 Modulos" e so mostra 12 icones. O app tem 16 modulos.
+## Decisao de design
 
-**Solucao**: 
-- Mudar titulo para "16 Modulos para sua vida"
-- Adicionar os 4 modulos faltantes na grid: Brain/Mente (violet), Users/Relacoes (rose), PawPrint/Pet (amber), Leaf/Detox (lime)
-- Importar os icones `Brain, Users, PawPrint, Leaf` do Lucide
+O streak **continua automatico** (melhor UX — nao obriga o usuario a entrar todo dia). Mas adicionamos:
 
-## 2. Tornar o app instalavel no celular (PWA simples)
+1. **AlertDialog de confirmacao** antes de resetar o streak — "Tem certeza? Seu streak de X dias sera reiniciado"
+2. **Botao "Estou limpo hoje" (check-in opcional)** — um botao verde que marca o dia como confirmado. Nao e obrigatorio, mas da satisfacao visual. Dias confirmados ganham destaque no calendario (verde mais forte vs verde claro para dias nao confirmados)
 
-O Supabase client ja persiste a sessao em localStorage. O problema e que sem PWA o usuario acessa pelo browser e pode perder a sessao. Com PWA instalado, o app fica no home screen e mantem a sessao.
+## Mudancas
 
-**Solucao** (sem service worker, apenas manifest para instalabilidade):
-- O `manifest.json` ja existe em `public/manifest.json` com `display: standalone`
-- Verificar e adicionar meta tags PWA no `index.html` (apple-mobile-web-app-capable, theme-color, link rel=manifest)
-- Nao instalar vite-plugin-pwa nem service worker (desnecessario para apenas instalabilidade)
+### DetoxTracker.tsx
 
-## Arquivos alterados (2)
+1. Adicionar state `confirmRelapseId` para controlar qual habito esta pedindo confirmacao
+2. Botao RotateCcw agora so abre o AlertDialog em vez de chamar `relapse()` direto
+3. AlertDialog com texto "Tem certeza que recaiu? Seu streak de {streak} dias sera reiniciado." + botoes Cancelar/Confirmar
+4. Adicionar campo `checkins: string[]` na interface DetoxHabit
+5. Botao "Estou limpo hoje ✓" no card expandido — marca `todayStr` no array `checkins`
+6. No calendario, dias com check-in confirmado ficam `bg-green-500/50` (mais forte) vs `bg-green-500/20` (automatico sem check-in)
+7. Legenda atualizada: Confirmado / Automatico / Recaida
+8. Import `AlertDialog` do shadcn
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/OnboardingWizard.tsx` | Titulo "16 Modulos", adicionar 4 icones faltantes, imports |
-| `index.html` | Adicionar meta tags PWA (apple-mobile-web-app-capable, manifest link, theme-color) |
+| `src/components/detox/DetoxTracker.tsx` | AlertDialog confirmacao + checkins[] + botao check-in diario + legenda 3 cores |
 

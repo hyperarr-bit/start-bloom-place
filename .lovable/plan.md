@@ -1,31 +1,27 @@
 
 
-# Plano: Texto motivacional na recaida + mover botao excluir + confirmacao de exclusao
+# Plano: Remover emoji da aba Estrategia + adicionar ModuleTip nos 4 modulos faltantes
 
-## 1. Texto motivacional no AlertDialog de recaida
+## 1. Remover emoji da aba Estrategia no Hiperfoco
 
-Trocar o texto atual frio por algo acolhedor e curto:
+No `src/pages/Hiperfoco.tsx`, a tab "ESTRATEGIA" tem o emoji `♟️`. Remover o emoji do icon da tab (trocar por string vazia ou remover o span).
 
-**Titulo**: "Ei, tudo bem" (ou similar)
-**Texto**: "Recaidas fazem parte do processo. Cada dia que voce resistiu te tornou mais forte. Vamos de novo?"
-**Botoes**: "Confirmar recaida" e "Cancelar"
+## 2. Adicionar ModuleTip nos 4 modulos sem dicas
 
-## 2. Mover botao Trash2 para dentro do card expandido
+| Arquivo | moduleId | Dicas |
+|---------|----------|-------|
+| `src/pages/Hiperfoco.tsx` | `hiperfoco` | Capture pensamentos rapidos na aba Dia / Use a busca para encontrar ideias antigas / Defina metas e estrategias para manter o foco / Registre sonhos no diario noturno |
+| `src/pages/Relacionamentos.tsx` | `relacionamentos` | Cadastre pessoas importantes e seus aniversarios / Use a agenda para nunca esquecer datas / Registre momentos especiais na timeline / Salve ideias de presentes para cada pessoa |
+| `src/pages/Pet.tsx` | `pet` | Cadastre seus pets com foto e dados / Registre vacinas e consultas na aba Saude / Monte a rotina diaria do seu pet / Fotografe momentos no diario |
+| `src/pages/Detox.tsx` | `detox` | Adicione habitos que quer largar / Use o check-in diario para reforcar sua determinacao / Acompanhe seu streak no calendario / Registre reflexoes no diario |
 
-Atualmente o Trash2 fica ao lado do RotateCcw e do ChevronDown no header — muito proximo, causa clique acidental. Solucao:
-- Remover Trash2 da linha 126-130 (header do card)
-- Colocar dentro da area expandida (`isExpanded`), abaixo do calendario, como botao discreto "Excluir habito"
-
-## 3. Confirmacao de exclusao
-
-Adicionar um segundo AlertDialog (ou reusar com state) para confirmar exclusao:
-- State `confirmDeleteId`
-- Texto: "Deseja excluir o habito [nome]? Todos os dados serao perdidos."
-- Botoes: "Excluir" (destructive) e "Cancelar"
-
-## Arquivo alterado (1)
+## Arquivos alterados (5)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/components/detox/DetoxTracker.tsx` | (1) Texto motivacional no dialog de recaida (2) Mover Trash2 para area expandida (3) Novo AlertDialog de confirmacao de exclusao |
+| `src/pages/Hiperfoco.tsx` | Remover emoji `♟️` da tab estrategia, adicionar ModuleTip |
+| `src/pages/Relacionamentos.tsx` | Adicionar ModuleTip |
+| `src/pages/Pet.tsx` | Adicionar ModuleTip |
+| `src/pages/Detox.tsx` | Adicionar ModuleTip |
+| `src/components/ModuleTip.tsx` | Remover emoji `{icon}` do titulo "Dicas para comecar" (ja tem o icone Lightbulb ao lado) |
 

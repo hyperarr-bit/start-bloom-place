@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Camera, BookOpen } from "lucide-react";
+import { Plus, Trash2, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { format } from "date-fns";
 
 interface DiaryEntry {
@@ -24,7 +24,7 @@ export const PetDiary = () => {
   const [petName, setPetName] = useState("");
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
-  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
 
   // Auto-select if only one pet
   useEffect(() => {
@@ -40,7 +40,7 @@ export const PetDiary = () => {
       ...entries,
     ];
     set("pet-diary", updated);
-    setText(""); setPetName(""); setMood("😊"); setPhotoUrl("");
+    setText(""); setPetName(""); setMood("😊"); setPhotoUrl(undefined);
   };
 
   const removeEntry = (id: string) => {
@@ -105,10 +105,7 @@ export const PetDiary = () => {
               </div>
             </div>
             <Textarea placeholder="O que aconteceu hoje?" value={text} onChange={e => setText(e.target.value)} className="text-[11px] min-h-[40px]" rows={2} />
-            <div className="flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              <Input placeholder="URL da foto (opcional)" value={photoUrl} onChange={e => setPhotoUrl(e.target.value)} className="h-7 text-[11px]" />
-            </div>
+            <PhotoPicker value={photoUrl} onChange={setPhotoUrl} onClear={() => setPhotoUrl(undefined)} />
             <button onClick={addEntry} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
               <Plus className="w-3 h-3" /> Registrar momento
             </button>

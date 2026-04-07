@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -48,8 +49,10 @@ const vibrate = () => {
 export const QuickActions = () => {
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
+  const navigate = useNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
   const [waterSplash, setWaterSplash] = useState(false);
+  const [successId, setSuccessId] = useState<ActionId | null>(null);
 
   // Form states
   const [expenseValue, setExpenseValue] = useState("");
@@ -77,38 +80,47 @@ export const QuickActions = () => {
     }
   };
 
+  const showSuccess = (id: ActionId) => {
+    setSuccessId(id);
+    setTimeout(() => setSuccessId(null), 1500);
+  };
+
   const addWater = () => {
     const tStr = todayStr();
     const waterLog = get<Record<string, number>>("core-saude-water", {});
     const current = waterLog[tStr] || 0;
     set("core-saude-water", { ...waterLog, [tStr]: current + 1 });
     vibrate();
+    showSuccess("water");
     setWaterSplash(true);
     setTimeout(() => setWaterSplash(false), 800);
     toast.success(`💧 ${(current + 1) * 200}ml — ${lifeData.waterGoal - current - 1 > 0 ? `faltam ${lifeData.waterGoal - current - 1} copos` : "meta batida! 🎉"}`);
   };
 
   const startFocus = () => {
-    // Store focus start time so FocusTimerWidget picks it up
     set("core-focus-timer-start", Date.now());
     set("core-focus-timer-running", true);
     vibrate();
+    showSuccess("focus");
     toast.success("⏱️ Timer de foco iniciado — 25 minutos!");
   };
 
   const submitExpense = () => {
     const amount = parseFloat(expenseValue.replace(",", "."));
     if (!amount || amount <= 0) { toast.error("Informe um valor válido"); return; }
-    const expenses = get<any[]>("core-expenses", []);
+    const expenses = get<any[]>("finance-expenses", []);
+    const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
     expenses.push({
       id: crypto.randomUUID(),
       description: expenseCategory,
-      amount,
-      category: expenseCategory,
+      value: amount,
+      category: catMap[expenseCategory] || "outros",
       date: todayStr(),
+      paymentMethod: "pix",
     });
-    set("core-expenses", expenses);
+    set("finance-expenses", expenses);
     vibrate();
+    showSuccess("expense");
     toast.success(`💸 R$ ${amount.toFixed(2)} em ${expenseCategory}`);
     setExpenseValue("");
     setExpenseCategory("Outros");
@@ -123,6 +135,7 @@ export const QuickActions = () => {
     measures.push({ date: tStr, weight, id: crypto.randomUUID() });
     set("core-saude-measures", measures);
     vibrate();
+    showSuccess("weight");
     toast.success(`⚖️ ${weight}kg registrado!`);
     setWeightValue("");
     setActiveAction(null);
@@ -130,11 +143,18 @@ export const QuickActions = () => {
 
   const submitIdea = () => {
     if (!ideaText.trim()) { toast.error("Digite sua ideia"); return; }
-    const ideas = get<any[]>("core-ideas", []);
-    ideas.push({ id: crypto.randomUUID(), text: ideaText.trim(), date: todayStr(), time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) });
-    set("core-ideas", ideas);
+    // Save to ThoughtCapture format (hiperfoco-thoughts)
+    const dateKey = todayStr();
+    const allDays = get<Record<string, any>>("hiperfoco-thoughts", {});
+    const dayData = allDays[dateKey] || {};
+    const hour = new Date().getHours();
+    const thoughts = dayData[hour] || [];
+    thoughts.push({ id: crypto.randomUUID(), text: ideaText.trim(), tags: ["ideia"], hour });
+    dayData[hour] = thoughts;
+    set("hiperfoco-thoughts", { ...allDays, [dateKey]: dayData });
     vibrate();
-    toast.success("💡 Ideia capturada!");
+    showSuccess("idea");
+    toast.success("💡 Ideia capturada!", { action: { label: "Ver em Mente", onClick: () => navigate("/hiperfoco") } });
     setIdeaText("");
     setActiveAction(null);
   };
@@ -145,6 +165,7 @@ export const QuickActions = () => {
     tasks.push({ id: crypto.randomUUID(), text: taskText.trim(), done: false, date: todayStr() });
     set("core-quick-tasks", tasks);
     vibrate();
+    showSuccess("task");
     toast.success("✅ Tarefa adicionada!");
     setTaskText("");
     setActiveAction(null);
@@ -154,10 +175,11 @@ export const QuickActions = () => {
     if (!gratitudeText.trim()) { toast.error("Pelo que você é grato?"); return; }
     const tStr = todayStr();
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
-    const today = gratLog[tStr] || [];
-    today.push(gratitudeText.trim());
-    set("core-gratitude-log", { ...gratLog, [tStr]: today });
+    const todayEntries = gratLog[tStr] || [];
+    todayEntries.push(gratitudeText.trim());
+    set("core-gratitude-log", { ...gratLog, [tStr]: todayEntries });
     vibrate();
+    showSuccess("gratitude");
     toast.success("🙏 Gratidão registrada!");
     setGratitudeText("");
     setActiveAction(null);
@@ -169,6 +191,7 @@ export const QuickActions = () => {
     moodLog[tStr] = { value, emoji, time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) };
     set("core-mood-log", moodLog);
     vibrate();
+    showSuccess("mood");
     toast.success(`${emoji} Humor registrado!`);
     setActiveAction(null);
   };
@@ -183,16 +206,20 @@ export const QuickActions = () => {
           <motion.button
             key={a.id}
             onClick={() => handleAction(a.id)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card hover:bg-muted/50 transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden"
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
+              successId === a.id 
+                ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
+                : "border-border/50 bg-card hover:bg-muted/50"
+            }`}
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.05 * i }}
             whileTap={{ scale: 0.95 }}
           >
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${a.color}`}>
-              <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${successId === a.id ? "bg-green-400/20" : a.color}`}>
+              {successId === a.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />}
             </div>
-            <span className="text-[11px] font-medium">{a.label}</span>
+            <span className="text-[11px] font-medium">{successId === a.id ? "Feito!" : a.label}</span>
 
             {/* Water splash effect */}
             {a.id === "water" && waterSplash && (

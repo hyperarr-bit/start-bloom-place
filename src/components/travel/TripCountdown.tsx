@@ -2,6 +2,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { TripCountdown as TripCountdownType, genId, daysUntil } from "./types";
 import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useState } from "react";
 
 export const TripCountdown = () => {
@@ -117,12 +118,7 @@ export const TripCountdown = () => {
             </div>
           </div>
           <div className="px-3 pb-2">
-            <Input
-              placeholder="📸 URL da foto (opcional)"
-              value={inlineForm.photoUrl}
-              onChange={e => setInlineForm(p => ({ ...p, photoUrl: e.target.value }))}
-              className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60"
-            />
+            <PhotoPicker value={inlineForm.photoUrl || undefined} onChange={v => setInlineForm(p => ({ ...p, photoUrl: v }))} onClear={() => setInlineForm(p => ({ ...p, photoUrl: "" }))} />
           </div>
         </div>
       </div>

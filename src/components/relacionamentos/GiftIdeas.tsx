@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Gift } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Trash2, Gift, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 
@@ -12,17 +11,16 @@ interface GiftItem {
   status: "idea" | "bought" | "delivered";
 }
 
-const statusLabels: Record<string, { label: string; color: string; icon: string }> = {
-  idea: { label: "Ideia", color: "bg-muted text-muted-foreground", icon: "💡" },
-  bought: { label: "Comprado", color: "bg-amber-500/20 text-amber-400", icon: "🛒" },
-  delivered: { label: "Entregue", color: "bg-green-500/20 text-green-400", icon: "✅" },
+const statusLabels: Record<string, { label: string; color: string }> = {
+  idea: { label: "Ideia", color: "bg-muted text-muted-foreground" },
+  bought: { label: "Comprado", color: "bg-amber-500/20 text-amber-400" },
+  delivered: { label: "Entregue", color: "bg-green-500/20 text-green-400" },
 };
 
 export const GiftIdeas = () => {
   const { get, set } = useUserData();
   const gifts = get<GiftItem[]>("rel-gifts", []);
   const people = get<any[]>("rel-people", []);
-  const [showForm, setShowForm] = useState(false);
   const [person, setPerson] = useState("");
   const [idea, setIdea] = useState("");
   const [link, setLink] = useState("");
@@ -32,7 +30,6 @@ export const GiftIdeas = () => {
     const updated = [...gifts, { id: Date.now().toString(), person: person.trim(), idea: idea.trim(), link: link.trim(), status: "idea" as const }];
     set("rel-gifts", updated);
     setIdea(""); setPerson(""); setLink("");
-    setShowForm(false);
   };
 
   const cycleStatus = (id: string) => {
@@ -49,94 +46,67 @@ export const GiftIdeas = () => {
     set("rel-gifts", gifts.filter(g => g.id !== id));
   };
 
-  const grouped = people.reduce<Record<string, GiftItem[]>>((acc, p: any) => {
-    const personGifts = gifts.filter(g => g.person.toLowerCase() === p.name.toLowerCase());
-    if (personGifts.length > 0) acc[p.name] = personGifts;
-    return acc;
-  }, {});
-
-  const ungrouped = gifts.filter(g => !people.some((p: any) => p.name.toLowerCase() === g.person.toLowerCase()));
-  if (ungrouped.length > 0) grouped["Outros"] = ungrouped;
-
   return (
-    <div className="space-y-3 mt-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{gifts.length} ideia{gifts.length !== 1 ? "s" : ""}</p>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
-          <Plus className="w-3.5 h-3.5" /> Adicionar
-        </motion.button>
-      </div>
+    <div className="mt-3">
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-amber-200 dark:bg-amber-900/60 px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gift className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-200">Presentes</span>
+          </div>
+          <span className="text-[10px] text-amber-600 dark:text-amber-300">{gifts.length}</span>
+        </div>
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-card rounded-xl border border-border p-3 space-y-2 overflow-hidden"
-          >
-            <Input placeholder="Para quem?" value={person} onChange={e => setPerson(e.target.value)} className="h-8 text-sm" list="people-gift-list" />
-            <datalist id="people-gift-list">
+        <div className="bg-amber-50/50 dark:bg-amber-950/20 p-2 space-y-1.5">
+          <div className="grid grid-cols-12 gap-1 px-2 py-1">
+            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Pessoa</span>
+            <span className="col-span-4 text-[9px] font-bold uppercase text-muted-foreground">Ideia</span>
+            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Link</span>
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground text-right">Status</span>
+          </div>
+
+          {gifts.map(g => {
+            const st = statusLabels[g.status];
+            return (
+              <div key={g.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
+                <span className="col-span-3 text-xs truncate">{g.person || "—"}</span>
+                <span className={`col-span-4 text-xs truncate ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
+                <div className="col-span-3">
+                  {g.link ? (
+                    <a href={g.link.startsWith("http") ? g.link : `https://${g.link}`} target="_blank" rel="noopener noreferrer" className="text-[9px] text-primary truncate block hover:underline">{g.link}</a>
+                  ) : <span className="text-[10px] text-muted-foreground">—</span>}
+                </div>
+                <div className="col-span-2 flex items-center justify-end gap-1">
+                  <button onClick={() => cycleStatus(g.id)} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${st.color}`}>
+                    {st.label}
+                  </button>
+                  <button onClick={() => removeGift(g.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {gifts.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum presente ainda</p>
+          )}
+
+          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              <Input placeholder="Para quem?" value={person} onChange={e => setPerson(e.target.value)} className="h-7 text-[11px]" list="gift-people" />
+              <Input placeholder="Ideia" value={idea} onChange={e => setIdea(e.target.value)} className="h-7 text-[11px]" />
+              <Input placeholder="Link (opcional)" value={link} onChange={e => setLink(e.target.value)} className="h-7 text-[11px]" />
+            </div>
+            <datalist id="gift-people">
               {people.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
-            <Input placeholder="Ideia de presente" value={idea} onChange={e => setIdea(e.target.value)} className="h-8 text-sm" />
-            <Input placeholder="Onde comprar / link (opcional)" value={link} onChange={e => setLink(e.target.value)} className="h-8 text-sm" />
-            <motion.button whileTap={{ scale: 0.95 }} onClick={addGift} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {Object.keys(grouped).length === 0 && !showForm && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 text-muted-foreground text-sm">
-          <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-3xl mb-2">🎁</motion.div>
-          Anote ideias de presentes para pessoas especiais
-        </motion.div>
-      )}
-
-      {Object.entries(grouped).map(([name, items], gi) => (
-        <motion.div
-          key={name}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: gi * 0.08 }}
-        >
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1">
-            <Gift className="w-3 h-3" /> {name}
-          </p>
-          <div className="space-y-1.5">
-            <AnimatePresence mode="popLayout">
-              {items.map(g => {
-                const st = statusLabels[g.status];
-                return (
-                  <motion.div
-                    key={g.id}
-                    layout
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    className="bg-card rounded-lg border border-border p-2.5 flex items-center gap-2 hover:shadow-sm transition-shadow"
-                  >
-                    <motion.button
-                      whileTap={{ scale: 0.85 }}
-                      onClick={() => cycleStatus(g.id)}
-                      className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${st.color} flex items-center gap-1`}
-                    >
-                      <span>{st.icon}</span> {st.label}
-                    </motion.button>
-                    <div className="flex-1 min-w-0">
-                      <span className={`text-xs ${g.status === "delivered" ? "line-through text-muted-foreground" : ""}`}>{g.idea}</span>
-                      {g.link && <a href={g.link.startsWith("http") ? g.link : `https://${g.link}`} target="_blank" rel="noopener noreferrer" className="block text-[9px] text-primary truncate hover:underline">{g.link}</a>}
-                    </div>
-                    <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeGift(g.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                      <Trash2 className="w-3 h-3" />
-                    </motion.button>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+            <button onClick={addGift} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
+              <Plus className="w-3 h-3" /> Adicionar presente
+            </button>
           </div>
-        </motion.div>
-      ))}
+        </div>
+      </div>
     </div>
   );
 };

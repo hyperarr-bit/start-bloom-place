@@ -19,7 +19,6 @@ export const PetExpenses = () => {
   const { get, set } = useUserData();
   const pets = get<any[]>("pet-list", []);
   const expenses = get<PetExpense[]>("pet-expenses", []);
-  const [showForm, setShowForm] = useState(false);
   const [petId, setPetId] = useState("");
   const [category, setCategory] = useState("Ração");
   const [description, setDescription] = useState("");
@@ -32,7 +31,6 @@ export const PetExpenses = () => {
     const updated = [...expenses, { id: Date.now().toString(), petId, category, description: description.trim(), value: v, date }];
     set("pet-expenses", updated);
     setDescription(""); setValue("");
-    setShowForm(false);
   };
 
   const removeExpense = (id: string) => set("pet-expenses", expenses.filter(e => e.id !== id));
@@ -47,7 +45,8 @@ export const PetExpenses = () => {
   })).filter(c => c.total > 0).sort((a, b) => b.total - a.total);
 
   return (
-    <div className="space-y-3 mt-3">
+    <div className="mt-3 space-y-3">
+      {/* Summary */}
       <div className="bg-card rounded-xl border border-border p-3 text-center">
         <p className="text-[10px] text-muted-foreground">Gastos este mês</p>
         <p className="text-xl font-bold">R$ {totalMonth.toFixed(2)}</p>
@@ -62,44 +61,67 @@ export const PetExpenses = () => {
         )}
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{expenses.length} gasto{expenses.length !== 1 ? "s" : ""}</p>
-        <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
-          <Plus className="w-3.5 h-3.5" /> Adicionar
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="bg-card rounded-xl border border-border p-3 space-y-2">
-          <select value={petId} onChange={e => setPetId(e.target.value)} className="w-full h-8 text-sm bg-background border border-input rounded-md px-2">
-            <option value="">Selecionar pet</option>
-            {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select>
-          <select value={category} onChange={e => setCategory(e.target.value)} className="w-full h-8 text-sm bg-background border border-input rounded-md px-2">
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <Input placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} className="h-8 text-sm" />
-          <Input type="number" placeholder="Valor R$" value={value} onChange={e => setValue(e.target.value)} className="h-8 text-sm" />
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8 text-sm" />
-          <button onClick={addExpense} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</button>
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-blue-200 dark:bg-blue-900/60 px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5 text-blue-700 dark:text-blue-300" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-200">Gastos</span>
+          </div>
+          <span className="text-[10px] text-blue-600 dark:text-blue-300">{expenses.length}</span>
         </div>
-      )}
 
-      {monthExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => {
-        const pet = pets.find((p: any) => p.id === e.petId);
-        return (
-          <div key={e.id} className="bg-card rounded-lg border border-border p-2.5 flex items-center gap-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium">{e.description || e.category}</p>
-              <p className="text-[10px] text-muted-foreground">{pet?.name || "Pet"} · {e.category} · {format(new Date(e.date), "dd/MM")}</p>
+        <div className="bg-blue-50/50 dark:bg-blue-950/20 p-2 space-y-1.5">
+          <div className="grid grid-cols-12 gap-1 px-2 py-1">
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Pet</span>
+            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Categoria</span>
+            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Descrição</span>
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Data</span>
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground text-right">Valor</span>
+          </div>
+
+          {monthExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(e => {
+            const pet = pets.find((p: any) => p.id === e.petId);
+            return (
+              <div key={e.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
+                <span className="col-span-2 text-[10px] truncate">{pet?.name || "—"}</span>
+                <span className="col-span-3 text-[10px] text-muted-foreground truncate">{e.category}</span>
+                <span className="col-span-3 text-xs truncate">{e.description || "—"}</span>
+                <span className="col-span-2 text-[10px] text-muted-foreground">{format(new Date(e.date), "dd/MM")}</span>
+                <div className="col-span-2 flex items-center justify-end gap-1">
+                  <span className="text-xs font-bold text-destructive">-R${e.value.toFixed(0)}</span>
+                  <button onClick={() => removeExpense(e.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {monthExpenses.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum gasto este mês</p>
+          )}
+
+          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
+              <select value={petId} onChange={e => setPetId(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
+                <option value="">Pet</option>
+                {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={category} onChange={e => setCategory(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-            <span className="text-xs font-bold text-destructive">-R$ {e.value.toFixed(2)}</span>
-            <button onClick={() => removeExpense(e.id)} className="text-muted-foreground hover:text-destructive">
-              <Trash2 className="w-3 h-3" />
+            <div className="grid grid-cols-3 gap-1.5">
+              <Input placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} className="h-7 text-[11px]" />
+              <Input type="number" placeholder="R$" value={value} onChange={e => setValue(e.target.value)} className="h-7 text-[11px]" />
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
+            </div>
+            <button onClick={addExpense} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
+              <Plus className="w-3 h-3" /> Adicionar gasto
             </button>
           </div>
-        );
-      })}
+        </div>
+      </div>
     </div>
   );
 };

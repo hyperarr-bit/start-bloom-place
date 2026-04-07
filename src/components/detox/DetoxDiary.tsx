@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Trash2, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
@@ -13,10 +12,12 @@ interface DiaryEntry {
   note: string;
 }
 
+const difficultyEmoji = (d: number) => ["😌", "🙂", "😐", "😣", "😰"][d - 1] || "😐";
+const difficultyLabel = (d: number) => ["Tranquilo", "Leve", "Médio", "Difícil", "Intenso"][d - 1] || "Médio";
+
 export const DetoxDiary = () => {
   const { get, set } = useUserData();
   const entries = get<DiaryEntry[]>("detox-diary", []);
-  const [showForm, setShowForm] = useState(false);
   const [trigger, setTrigger] = useState("");
   const [difficulty, setDifficulty] = useState(3);
   const [note, setNote] = useState("");
@@ -27,108 +28,79 @@ export const DetoxDiary = () => {
     const updated = [{ id: Date.now().toString(), date: today, trigger: trigger.trim(), difficulty, note: note.trim() }, ...entries];
     set("detox-diary", updated);
     setTrigger(""); setNote(""); setDifficulty(3);
-    setShowForm(false);
   };
 
   const removeEntry = (id: string) => set("detox-diary", entries.filter(e => e.id !== id));
 
-  const difficultyEmoji = (d: number) => ["😌", "🙂", "😐", "😣", "😰"][d - 1] || "😐";
-  const difficultyLabel = (d: number) => ["Tranquilo", "Leve", "Médio", "Difícil", "Intenso"][d - 1] || "Médio";
-
   return (
-    <div className="space-y-3 mt-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{entries.length} entrada{entries.length !== 1 ? "s" : ""}</p>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
-          <Plus className="w-3.5 h-3.5" /> Registrar
-        </motion.button>
-      </div>
+    <div className="mt-3">
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-amber-200 dark:bg-amber-900/60 px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-200">Registro do Dia</span>
+          </div>
+          <span className="text-[10px] text-amber-600 dark:text-amber-300">{entries.length}</span>
+        </div>
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-card rounded-xl border border-border p-3 space-y-3 overflow-hidden"
-          >
-            <Input placeholder="O que te tentou? (gatilho)" value={trigger} onChange={e => setTrigger(e.target.value)} className="h-8 text-sm" />
+        <div className="bg-amber-50/50 dark:bg-amber-950/20 p-2 space-y-1.5">
+          {entries.map(e => (
+            <div key={e.id} className="bg-background/60 rounded-lg px-2.5 py-2 group">
+              <div className="flex items-start justify-between">
+                <div className="flex gap-2 flex-1 min-w-0">
+                  <span className="text-lg mt-0.5">{difficultyEmoji(e.difficulty)}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] text-muted-foreground">{format(new Date(e.date), "dd/MM/yyyy")}</span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        e.difficulty <= 2 ? "bg-green-500/20 text-green-400" :
+                        e.difficulty === 3 ? "bg-amber-500/20 text-amber-400" :
+                        "bg-destructive/20 text-destructive"
+                      }`}>
+                        {difficultyLabel(e.difficulty)}
+                      </span>
+                    </div>
+                    {e.trigger && <p className="text-xs"><span className="text-muted-foreground">Gatilho:</span> {e.trigger}</p>}
+                    {e.note && <p className="text-xs text-muted-foreground mt-0.5">{e.note}</p>}
+                  </div>
+                </div>
+                <button onClick={() => removeEntry(e.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 transition-all">
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {entries.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhum registro ainda</p>
+          )}
+
+          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
+            <Input placeholder="O que te tentou? (gatilho)" value={trigger} onChange={e => setTrigger(e.target.value)} className="h-7 text-[11px]" />
             <div>
-              <p className="text-[10px] text-muted-foreground mb-1.5">Dificuldade do dia</p>
+              <p className="text-[10px] text-muted-foreground mb-1">Dificuldade</p>
               <div className="flex gap-1 justify-center">
                 {[1, 2, 3, 4, 5].map(d => (
-                  <motion.button
+                  <button
                     key={d}
-                    whileTap={{ scale: 0.85 }}
                     onClick={() => setDifficulty(d)}
-                    className={`flex flex-col items-center gap-0.5 p-1.5 rounded-lg transition-all min-w-[50px] ${
+                    className={`flex flex-col items-center gap-0.5 p-1 rounded-lg transition-all min-w-[42px] ${
                       difficulty === d ? "bg-primary/10 ring-1 ring-primary scale-105" : "opacity-50 hover:opacity-80"
                     }`}
                   >
-                    <span className="text-xl">{difficultyEmoji(d)}</span>
-                    <span className="text-[8px] text-muted-foreground">{difficultyLabel(d)}</span>
-                  </motion.button>
+                    <span className="text-lg">{difficultyEmoji(d)}</span>
+                    <span className="text-[7px] text-muted-foreground">{difficultyLabel(d)}</span>
+                  </button>
                 ))}
               </div>
             </div>
-            <Input placeholder="Como se sentiu? (nota livre)" value={note} onChange={e => setNote(e.target.value)} className="h-8 text-sm" />
-            <motion.button whileTap={{ scale: 0.95 }} onClick={addEntry} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {entries.length === 0 && !showForm && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 text-muted-foreground text-sm">
-          <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-3xl mb-2">📓</motion.div>
-          Registre seus gatilhos e sentimentos
-        </motion.div>
-      )}
-
-      <AnimatePresence mode="popLayout">
-        {entries.map((e, i) => (
-          <motion.div
-            key={e.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            transition={{ delay: i * 0.04 }}
-            layout
-            className="bg-card rounded-xl border border-border p-3 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex gap-2.5 flex-1 min-w-0">
-                <motion.span
-                  className="text-xl mt-0.5"
-                  whileHover={{ scale: 1.3 }}
-                >
-                  {difficultyEmoji(e.difficulty)}
-                </motion.span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] text-muted-foreground">{format(new Date(e.date), "dd/MM/yyyy")}</span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                      e.difficulty <= 2 ? "bg-green-500/20 text-green-400" :
-                      e.difficulty === 3 ? "bg-amber-500/20 text-amber-400" :
-                      "bg-destructive/20 text-destructive"
-                    }`}>
-                      {difficultyLabel(e.difficulty)}
-                    </span>
-                  </div>
-                  {e.trigger && (
-                    <p className="text-xs">
-                      <span className="text-muted-foreground">Gatilho:</span> {e.trigger}
-                    </p>
-                  )}
-                  {e.note && <p className="text-xs text-muted-foreground mt-0.5">{e.note}</p>}
-                </div>
-              </div>
-              <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeEntry(e.id)} className="text-muted-foreground hover:text-destructive p-1 transition-colors">
-                <Trash2 className="w-3 h-3" />
-              </motion.button>
-            </div>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+            <Input placeholder="Como se sentiu?" value={note} onChange={e => setNote(e.target.value)} className="h-7 text-[11px]" />
+            <button onClick={addEntry} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
+              <Plus className="w-3 h-3" /> Registrar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Trash2, PawPrint, Plus, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { differenceInYears, differenceInMonths } from "date-fns";
 
 interface PetItem {

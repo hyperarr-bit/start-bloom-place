@@ -17,6 +17,7 @@ const tabs = [
   { id: "metas", label: "METAS", icon: "🎯" },
   { id: "estrategia", label: "ESTRATÉGIA", icon: "" },
   { id: "timeline", label: "TIMELINE", icon: "📅" },
+  { id: "ideias", label: "IDEIAS", icon: "💡" },
   { id: "sonhos", label: "SONHOS", icon: "🌙" },
 ];
 

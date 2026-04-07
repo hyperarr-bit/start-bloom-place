@@ -127,6 +127,9 @@ export const PetDiary = () => {
                   </motion.button>
                 </div>
                 <p className="text-xs mt-2 leading-relaxed">{entry.text}</p>
+                {entry.photoUrl && (
+                  <img src={entry.photoUrl} alt={`Foto de ${entry.petName || "pet"}`} className="mt-2 rounded-lg w-full max-h-48 object-cover" />
+                )}
               </div>
             </motion.div>
           ))}

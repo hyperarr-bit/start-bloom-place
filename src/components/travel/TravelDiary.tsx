@@ -3,9 +3,8 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { DiaryEntry, genId } from "./types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, BookOpen, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 const MOODS = [
   { emoji: "🤩", label: "Incrível" },
@@ -19,18 +18,16 @@ const MOODS = [
 
 export const TravelDiary = () => {
   const [entries, setEntries] = usePersistedState<DiaryEntry[]>("travel-diary-v2", []);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<Partial<DiaryEntry>>({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
+  const [inlineForm, setInlineForm] = useState<Partial<DiaryEntry>>({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
 
   const save = () => {
-    if (!form.bestThing) return;
+    if (!inlineForm.bestThing) return;
     setEntries(prev => [{
-      id: genId(), tripName: form.tripName || "", date: form.date || new Date().toISOString().slice(0, 10),
-      bestThing: form.bestThing || "", wouldNotDoAgain: form.wouldNotDoAgain || "",
-      photoUrl: form.photoUrl || "", mood: form.mood || "🤩",
+      id: genId(), tripName: inlineForm.tripName || "", date: inlineForm.date || new Date().toISOString().slice(0, 10),
+      bestThing: inlineForm.bestThing || "", wouldNotDoAgain: inlineForm.wouldNotDoAgain || "",
+      photoUrl: inlineForm.photoUrl || "", mood: inlineForm.mood || "🤩",
     }, ...prev]);
-    setForm({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
-    setShowForm(false);
+    setInlineForm({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
   };
 
   const remove = (id: string) => setEntries(prev => prev.filter(e => e.id !== id));
@@ -44,7 +41,7 @@ export const TravelDiary = () => {
 
   return (
     <div className="space-y-4">
-      {/* Mood overview - Notion-style */}
+      {/* Mood overview */}
       {entries.length > 0 && (
         <div className="rounded-xl border border-border overflow-hidden">
           <div className="bg-pink-200 dark:bg-pink-800/50 px-3 py-1.5 text-center">
@@ -77,58 +74,46 @@ export const TravelDiary = () => {
         </div>
       )}
 
-      
-
-      {showForm && (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <Input placeholder="Viagem" value={form.tripName || ""} onChange={e => setForm(p => ({ ...p, tripName: e.target.value }))} className="h-9 rounded-xl text-xs" />
-            <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground mb-1.5">Como foi o dia?</p>
+      {/* Diary card with inline quick-entry */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-orange-200 dark:bg-orange-800/50 px-4 py-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📔 DIÁRIO DE VIAGEM</span>
+        </div>
+        <div className="bg-orange-50 dark:bg-orange-950/20">
+          {/* Inline quick-entry form */}
+          <div className="p-3 border-b border-dashed border-border/50 space-y-2">
             <div className="flex gap-1.5 flex-wrap">
               {MOODS.map(m => (
-                <button key={m.emoji} onClick={() => setForm(p => ({ ...p, mood: m.emoji }))}
-                  className={`rounded-xl px-2 py-1 text-sm border transition-all ${
-                    form.mood === m.emoji ? "border-foreground bg-muted scale-110" : "border-border hover:border-foreground/30"
+                <button key={m.emoji} onClick={() => setInlineForm(p => ({ ...p, mood: m.emoji }))}
+                  className={`rounded-lg px-1.5 py-0.5 text-sm border transition-all ${
+                    inlineForm.mood === m.emoji ? "border-foreground bg-background/60 scale-110" : "border-transparent hover:border-border"
                   }`} title={m.label}>
                   {m.emoji}
                 </button>
               ))}
             </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input placeholder="Viagem" value={inlineForm.tripName || ""} onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+              <Input type="date" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0" />
+            </div>
+            <Input placeholder="✨ Melhor momento do dia..." value={inlineForm.bestThing || ""}
+              onChange={e => setInlineForm(p => ({ ...p, bestThing: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && save()}
+              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+            <div className="flex items-center gap-2">
+              <Input placeholder="🚫 Não faria de novo (opcional)" value={inlineForm.wouldNotDoAgain || ""}
+                onChange={e => setInlineForm(p => ({ ...p, wouldNotDoAgain: e.target.value }))}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
+              <button onClick={save} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Salvar</button>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground mb-1">✨ Qual foi a melhor coisa de hoje?</p>
-            <Textarea value={form.bestThing || ""} onChange={e => setForm(p => ({ ...p, bestThing: e.target.value }))}
-              className="text-xs min-h-[50px] rounded-xl" placeholder="O pôr do sol na praia foi mágico..." />
-          </div>
-          <div>
-            <p className="text-[10px] text-muted-foreground mb-1">🚫 O que não faria de novo?</p>
-            <Textarea value={form.wouldNotDoAgain || ""} onChange={e => setForm(p => ({ ...p, wouldNotDoAgain: e.target.value }))}
-              className="text-xs min-h-[40px] rounded-xl" placeholder="Aquele restaurante tourist trap..." />
-          </div>
-          <Input placeholder="📸 URL da foto do dia (opcional)" value={form.photoUrl || ""} onChange={e => setForm(p => ({ ...p, photoUrl: e.target.value }))} className="h-9 rounded-xl text-xs" />
-          <div className="flex gap-2">
-            <Button onClick={save} className="flex-1 rounded-xl h-8 text-xs">Salvar Momento</Button>
-            <Button variant="ghost" onClick={() => setShowForm(false)} className="rounded-xl h-8 text-xs">Cancelar</Button>
-          </div>
-        </div>
-      )}
 
-      {/* Diary card — always visible */}
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="bg-orange-200 dark:bg-orange-800/50 px-4 py-2 flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider">📔 DIÁRIO DE VIAGEM</span>
-          <button onClick={() => setShowForm(!showForm)}
-            className="rounded-lg bg-background/50 px-2 py-0.5 text-[10px] font-medium hover:bg-background/80 transition-colors">
-            <Plus className="w-3 h-3 inline mr-0.5" />Check-in
-          </button>
-        </div>
-        <div className="bg-orange-50 dark:bg-orange-950/20">
+          {/* Entries */}
           {filtered.length === 0 && (
-            <div className="px-3 py-6 text-center">
-              <p className="text-xs text-muted-foreground">Nenhuma entrada ainda</p>
+            <div className="px-3 py-4 text-center">
+              <p className="text-[10px] text-muted-foreground">Nenhuma entrada ainda</p>
             </div>
           )}
           <div className="divide-y divide-border">

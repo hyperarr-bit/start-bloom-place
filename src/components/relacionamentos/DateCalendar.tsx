@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, CalendarHeart } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Trash2, CalendarHeart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { differenceInDays, setYear, format } from "date-fns";
@@ -17,12 +16,10 @@ export const DateCalendar = () => {
   const { get, set } = useUserData();
   const customDates = get<SpecialDate[]>("rel-dates", []);
   const people = get<any[]>("rel-people", []);
-  const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [person, setPerson] = useState("");
   const [date, setDate] = useState("");
 
-  // Merge birthdays from people + custom dates
   const allDates: SpecialDate[] = [
     ...people.filter((p: any) => p.birthday).map((p: any) => ({
       id: `bday-${p.id}`,
@@ -48,10 +45,7 @@ export const DateCalendar = () => {
     if (!title.trim() || !date) return;
     const updated = [...customDates, { id: Date.now().toString(), title: title.trim(), person: person.trim(), date, type: "custom" as const }];
     set("rel-dates", updated);
-    setTitle("");
-    setPerson("");
-    setDate("");
-    setShowForm(false);
+    setTitle(""); setPerson(""); setDate("");
   };
 
   const removeDate = (id: string) => {
@@ -59,80 +53,71 @@ export const DateCalendar = () => {
   };
 
   const getColorClasses = (days: number) => {
-    if (days === 0) return "bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/30 animate-pulse";
+    if (days === 0) return "bg-rose-500/20 text-rose-400 animate-pulse";
     if (days <= 7) return "bg-rose-500/15 text-rose-400";
     if (days <= 30) return "bg-amber-500/15 text-amber-400";
-    return "bg-muted text-muted-foreground";
+    return "text-muted-foreground";
   };
 
   return (
-    <div className="space-y-3 mt-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{allDates.length} data{allDates.length !== 1 ? "s" : ""}</p>
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowForm(!showForm)} className="flex items-center gap-1 text-xs text-primary font-bold">
-          <Plus className="w-3.5 h-3.5" /> Adicionar
-        </motion.button>
-      </div>
+    <div className="mt-3">
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-purple-200 dark:bg-purple-900/60 px-3 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CalendarHeart className="w-3.5 h-3.5 text-purple-700 dark:text-purple-300" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-purple-800 dark:text-purple-200">Datas Especiais</span>
+          </div>
+          <span className="text-[10px] text-purple-600 dark:text-purple-300">{allDates.length}</span>
+        </div>
 
-      <AnimatePresence>
-        {showForm && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="bg-card rounded-xl border border-border p-3 space-y-2 overflow-hidden">
-            <Input placeholder="Título (ex: Natal, Casamento)" value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 text-sm" />
-            <Input placeholder="Pessoa (opcional)" value={person} onChange={(e) => setPerson(e.target.value)} className="h-8 text-sm" list="date-people-list" />
+        <div className="bg-purple-50/50 dark:bg-purple-950/20 p-2 space-y-1.5">
+          <div className="grid grid-cols-12 gap-1 px-2 py-1">
+            <span className="col-span-5 text-[9px] font-bold uppercase text-muted-foreground">Título</span>
+            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Data</span>
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Pessoa</span>
+            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground text-right">Falta</span>
+          </div>
+
+          {sorted.map(item => {
+            const days = getDaysUntil(item.date);
+            return (
+              <div key={item.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
+                <span className="col-span-5 text-xs font-medium truncate">{item.title}</span>
+                <span className="col-span-3 text-[10px] text-muted-foreground">{format(new Date(item.date), "dd/MM")}</span>
+                <span className="col-span-2 text-[10px] text-muted-foreground truncate">{item.person || "—"}</span>
+                <div className="col-span-2 flex items-center justify-end gap-1">
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${getColorClasses(days)}`}>
+                    {days === 0 ? "Hoje!" : `${days}d`}
+                  </span>
+                  {item.type === "custom" && (
+                    <button onClick={() => removeDate(item.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {allDates.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-3 text-center">Nenhuma data ainda</p>
+          )}
+
+          <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
+              <Input placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} className="h-7 text-[11px] col-span-1" />
+              <Input placeholder="Pessoa" value={person} onChange={e => setPerson(e.target.value)} className="h-7 text-[11px] col-span-1" list="date-people-list" />
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] col-span-1" />
+            </div>
             <datalist id="date-people-list">
               {people.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-sm" />
-            <motion.button whileTap={{ scale: 0.95 }} onClick={addDate} className="w-full bg-primary text-primary-foreground rounded-lg py-1.5 text-xs font-bold">Salvar</motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {sorted.length === 0 && !showForm && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 text-muted-foreground text-sm">
-          <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 2 }} className="text-3xl mb-2">📅</motion.div>
-          Adicione datas especiais para não esquecer
-        </motion.div>
-      )}
-
-      <AnimatePresence mode="popLayout">
-        {sorted.map((item, i) => {
-          const days = getDaysUntil(item.date);
-          return (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ delay: i * 0.05 }}
-              layout
-              className="bg-card rounded-xl border border-border p-3 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-rose-500/10 flex items-center justify-center text-lg shrink-0">
-                  {item.person ? item.person.charAt(0).toUpperCase() : <CalendarHeart className="w-4 h-4 text-rose-400" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold truncate">{item.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{format(new Date(item.date), "dd/MM")} {item.person && `· ${item.person}`}</p>
-                </div>
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${getColorClasses(days)}`}
-                >
-                  {days === 0 ? "🎉 Hoje!" : `${days}d`}
-                </motion.span>
-                {item.type === "custom" && (
-                  <motion.button whileTap={{ scale: 0.8 }} onClick={() => removeDate(item.id)} className="text-muted-foreground hover:text-destructive transition-colors p-1">
-                    <Trash2 className="w-3 h-3" />
-                  </motion.button>
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+            <button onClick={addDate} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
+              <Plus className="w-3 h-3" /> Adicionar data
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -12,6 +12,7 @@ interface DiaryEntry {
   date: string;
   text: string;
   mood: string;
+  photoUrl?: string;
 }
 
 const moods = ["😍", "😊", "😴", "🤒", "😈", "🥺"];
@@ -24,17 +25,19 @@ export const PetDiary = () => {
   const [petName, setPetName] = useState("");
   const [text, setText] = useState("");
   const [mood, setMood] = useState("😊");
+  const [photoUrl, setPhotoUrl] = useState("");
 
   const addEntry = () => {
     if (!text.trim()) return;
     const updated = [
-      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood },
+      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl.trim() || undefined },
       ...entries,
     ];
     set("pet-diary", updated);
     setText("");
     setPetName("");
     setMood("😊");
+    setPhotoUrl("");
     setShowForm(false);
   };
 
@@ -64,6 +67,10 @@ export const PetDiary = () => {
               {pets.map((p: any) => <option key={p.id} value={p.name} />)}
             </datalist>
             <Textarea placeholder="O que aconteceu hoje?" value={text} onChange={(e) => setText(e.target.value)} className="text-sm min-h-[60px]" />
+            <div className="flex items-center gap-2">
+              <Camera className="w-4 h-4 text-muted-foreground shrink-0" />
+              <Input placeholder="URL da foto (opcional)" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} className="h-8 text-sm" />
+            </div>
             <div className="flex gap-1.5">
               {moods.map((m) => (
                 <motion.button
@@ -120,6 +127,9 @@ export const PetDiary = () => {
                   </motion.button>
                 </div>
                 <p className="text-xs mt-2 leading-relaxed">{entry.text}</p>
+                {entry.photoUrl && (
+                  <img src={entry.photoUrl} alt={`Foto de ${entry.petName || "pet"}`} className="mt-2 rounded-lg w-full max-h-48 object-cover" />
+                )}
               </div>
             </motion.div>
           ))}

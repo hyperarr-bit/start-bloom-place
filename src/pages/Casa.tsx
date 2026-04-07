@@ -6,7 +6,6 @@ import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";
 import MaintenanceLog from "@/components/casa/MaintenanceLog";
-import PlantsAndPets from "@/components/casa/PlantsAndPets";
 import ChoreRotation from "@/components/casa/ChoreRotation";
 import SafetyChecks from "@/components/casa/SafetyChecks";
 import HomeUtilities from "@/components/casa/HomeUtilities";
@@ -21,7 +20,7 @@ const tabs = [
   { id: "despensa", label: "DESPENSA", icon: "🛒" },
   { id: "cardapio", label: "CARDÁPIO", icon: "🍽️" },
   { id: "manutencao", label: "MANUTENÇÃO", icon: "🔧" },
-  { id: "plantas", label: "VIDA", icon: "🌱" },
+  
   { id: "coop", label: "CO-OP", icon: "👥" },
   { id: "seguranca", label: "SEGURANÇA", icon: "🛡️" },
   { id: "utilidades", label: "UTILIDADES", icon: "⚙️" },
@@ -77,7 +76,7 @@ const Casa = () => {
         {activeTab === "despensa" && <SmartPantry />}
         {activeTab === "cardapio" && <MealPlanner />}
         {activeTab === "manutencao" && <MaintenanceLog />}
-        {activeTab === "plantas" && <PlantsAndPets />}
+        
         {activeTab === "coop" && <ChoreRotation />}
         {activeTab === "seguranca" && <SafetyChecks />}
         {activeTab === "utilidades" && <HomeUtilities />}

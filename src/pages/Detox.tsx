@@ -50,6 +50,15 @@ const Detox = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        <ModuleTip
+          moduleId="detox"
+          tips={[
+            "Adicione hábitos que quer largar",
+            "Use o check-in diário para reforçar sua determinação",
+            "Acompanhe seu streak no calendário",
+            "Registre reflexões no diário",
+          ]}
+        />
         {activeTab === "rastreador" && <DetoxTracker />}
         {activeTab === "diario" && <DetoxDiary />}
         {activeTab === "conquistas" && <DetoxAchievements />}

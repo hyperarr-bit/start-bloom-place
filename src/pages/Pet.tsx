@@ -52,6 +52,15 @@ const Pet = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        <ModuleTip
+          moduleId="pet"
+          tips={[
+            "Cadastre seus pets com foto e dados",
+            "Registre vacinas e consultas na aba Saúde",
+            "Monte a rotina diária do seu pet",
+            "Fotografe momentos no diário",
+          ]}
+        />
         {activeTab === "pets" && <PetList />}
         {activeTab === "saude" && <PetHealth />}
         {activeTab === "rotina" && <PetRoutine />}

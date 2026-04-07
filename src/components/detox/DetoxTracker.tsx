@@ -77,7 +77,7 @@ export const DetoxTracker = () => {
     return differenceInDays(new Date(), new Date(from));
   };
 
-  const relapseHabit = confirmRelapseId ? habits.find(h => h.id === confirmRelapseId) : null;
+  
 
   return (
     <div className="mt-3">

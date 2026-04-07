@@ -206,16 +206,20 @@ export const QuickActions = () => {
           <motion.button
             key={a.id}
             onClick={() => handleAction(a.id)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card hover:bg-muted/50 transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden"
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
+              successId === a.id 
+                ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
+                : "border-border/50 bg-card hover:bg-muted/50"
+            }`}
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.05 * i }}
             whileTap={{ scale: 0.95 }}
           >
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${a.color}`}>
-              <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${successId === a.id ? "bg-green-400/20" : a.color}`}>
+              {successId === a.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />}
             </div>
-            <span className="text-[11px] font-medium">{a.label}</span>
+            <span className="text-[11px] font-medium">{successId === a.id ? "Feito!" : a.label}</span>
 
             {/* Water splash effect */}
             {a.id === "water" && waterSplash && (

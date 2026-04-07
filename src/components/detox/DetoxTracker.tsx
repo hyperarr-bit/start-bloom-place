@@ -33,6 +33,7 @@ export const DetoxTracker = () => {
   const [icon, setIcon] = useState("📱");
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
   const [confirmRelapseId, setConfirmRelapseId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const today = new Date();
   const monthStart = startOfMonth(today);

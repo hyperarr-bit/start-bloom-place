@@ -1,41 +1,28 @@
 
+# Plano: Adicionar dados pre-preenchidos na aba Seguranca
 
-# Plano: Beleza dados vazios + Pet fotos no diario + Casa remover aba VIDA
+## Mudanca
 
-## 1. Beleza — defaults vazios
+Alterar os defaults vazios `[]` em `SafetyChecks.tsx` para incluir os itens mostrados nas screenshots:
 
-Os componentes de Beleza vem com dados pre-preenchidos. Trocar para arrays vazios:
+**Checklist de Seguranca (travelChecklist):**
+1. Desligar gas
+2. Tirar lixo da pia
+3. Desligar eletronicos da tomada
+4. Trancar janelas
+5. Conferir torneiras
+6. Pedir para alguem regar plantas
 
-| Arquivo | Variavel | Default atual | Novo default |
-|---------|----------|---------------|--------------|
-| `SkincareRoutine.tsx` | `DEFAULT_MORNING` | 5 steps (Gel, Tonico, Vit C, Hidratante, FPS) | `[]` |
-| `SkincareRoutine.tsx` | `DEFAULT_NIGHT` | 4 steps (Oil, Sabonete, Tratamento, Hidratacao) | `[]` |
-| `ProductShelf.tsx` | `DEFAULT_PRODUCTS` | 2 produtos (FPS, Serum Vit C) | `[]` |
+**Estoque de Emergencia (emergencyStock):**
+1. Velas
+2. Pilhas AA/AAA
+3. Lanterna
+4. Kit Primeiros Socorros
+5. Agua mineral (reserva)
+6. Fosforos/Isqueiro
 
-A estrutura visual (cards de Manha/Noite, Skin Cycling, Bancada) continua intacta — so os dados dentro ficam vazios com mensagem "Nenhum passo ainda" / "Nenhum produto ainda".
-
-## 2. Pet Diario — campo de foto
-
-Adicionar campo `photoUrl` na interface `DiaryEntry` e um input de URL de foto no form de registro. Na exibicao, mostrar a imagem abaixo do texto quando presente.
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `PetDiary.tsx` | (1) Adicionar `photoUrl: string` na interface (2) Input de URL no form (3) Exibir `<img>` no card da entrada |
-
-## 3. Casa — remover aba VIDA
-
-Remover `{ id: "plantas", label: "VIDA", icon: "🌱" }` do array `tabs`, remover `{activeTab === "plantas" && <PlantsAndPets />}` e o import de `PlantsAndPets`.
+## Arquivo alterado
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/Casa.tsx` | Remover aba plantas/VIDA, import PlantsAndPets |
-
-## Arquivos alterados (4)
-
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/components/beleza/SkincareRoutine.tsx` | `DEFAULT_MORNING = []`, `DEFAULT_NIGHT = []` |
-| `src/components/beleza/ProductShelf.tsx` | `DEFAULT_PRODUCTS = []` |
-| `src/components/pet/PetDiary.tsx` | Campo photoUrl + input URL + exibicao de imagem |
-| `src/pages/Casa.tsx` | Remover aba VIDA e import PlantsAndPets |
-
+| `src/components/casa/SafetyChecks.tsx` | Trocar defaults `[]` pelos arrays com os itens acima |

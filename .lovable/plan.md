@@ -1,27 +1,27 @@
 
 
-# Plano: Remover emoji da aba Estrategia + adicionar ModuleTip nos 4 modulos faltantes
+# Plano: Redesenhar cards de pets com foto (estilo da screenshot)
 
-## 1. Remover emoji da aba Estrategia no Hiperfoco
+## Mudanca
 
-No `src/pages/Hiperfoco.tsx`, a tab "ESTRATEGIA" tem o emoji `♟️`. Remover o emoji do icon da tab (trocar por string vazia ou remover o span).
+Redesenhar `PetList.tsx` para mostrar cada pet como um card individual (como na screenshot) em vez da tabela grid atual:
 
-## 2. Adicionar ModuleTip nos 4 modulos sem dicas
+**Cada pet card terá:**
+- Avatar circular à esquerda (emoji de animal como placeholder, ou foto se tiver `photoUrl`)
+- Nome em negrito
+- Linha de info: Espécie · Raça · Idade
+- Peso abaixo
+- Botão lixeira à direita
 
-| Arquivo | moduleId | Dicas |
-|---------|----------|-------|
-| `src/pages/Hiperfoco.tsx` | `hiperfoco` | Capture pensamentos rapidos na aba Dia / Use a busca para encontrar ideias antigas / Defina metas e estrategias para manter o foco / Registre sonhos no diario noturno |
-| `src/pages/Relacionamentos.tsx` | `relacionamentos` | Cadastre pessoas importantes e seus aniversarios / Use a agenda para nunca esquecer datas / Registre momentos especiais na timeline / Salve ideias de presentes para cada pessoa |
-| `src/pages/Pet.tsx` | `pet` | Cadastre seus pets com foto e dados / Registre vacinas e consultas na aba Saude / Monte a rotina diaria do seu pet / Fotografe momentos no diario |
-| `src/pages/Detox.tsx` | `detox` | Adicione habitos que quer largar / Use o check-in diario para reforcar sua determinacao / Acompanhe seu streak no calendario / Registre reflexoes no diario |
+**Header do card amarelo permanece** com "Meus Pets" + contagem + botão "+ Adicionar" no canto direito.
 
-## Arquivos alterados (5)
+**Form de adicionar:** Mantém o design atual (inputs empilhados dentro do card amarelo) mas fica escondido por default, aparece ao clicar "+ Adicionar". Campos: Nome, Espécie, Raça, Peso, Data nascimento, campo de URL de foto (opcional). Botão "Salvar".
+
+**Interface PetItem:** Adicionar campo `photoUrl?: string` para foto opcional do pet.
+
+## Arquivo alterado (1)
 
 | Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/Hiperfoco.tsx` | Remover emoji `♟️` da tab estrategia, adicionar ModuleTip |
-| `src/pages/Relacionamentos.tsx` | Adicionar ModuleTip |
-| `src/pages/Pet.tsx` | Adicionar ModuleTip |
-| `src/pages/Detox.tsx` | Adicionar ModuleTip |
-| `src/components/ModuleTip.tsx` | Remover emoji `{icon}` do titulo "Dicas para comecar" (ja tem o icone Lightbulb ao lado) |
+| `src/components/pet/PetList.tsx` | Trocar tabela grid por cards individuais com avatar/foto, adicionar photoUrl, form toggle com "+ Adicionar" |
 

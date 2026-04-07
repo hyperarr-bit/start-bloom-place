@@ -8,12 +8,13 @@ import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
 import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "dia", label: "DIA", icon: "💭" },
   { id: "busca", label: "BUSCA", icon: "🔍" },
   { id: "metas", label: "METAS", icon: "🎯" },
-  { id: "estrategia", label: "ESTRATÉGIA", icon: "♟️" },
+  { id: "estrategia", label: "ESTRATÉGIA", icon: "" },
   { id: "timeline", label: "TIMELINE", icon: "📅" },
   { id: "sonhos", label: "SONHOS", icon: "🌙" },
 ];

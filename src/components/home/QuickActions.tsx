@@ -216,20 +216,16 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
-  const submitMeal = () => {
-    if (!mealName.trim()) { toast.error("Nome da refeição"); return; }
-    const cal = parseFloat(mealCalories.replace(",", ".")) || 0;
+  const submitMealSelection = (mealType: string, food: string) => {
     const tStr = todayStr();
     const dietLog = get<Record<string, any>>("core-dieta-log", {});
     const dayMeals = dietLog[tStr] || {};
     const mealId = crypto.randomUUID();
-    dayMeals[mealId] = { name: mealName.trim(), calories: cal };
+    dayMeals[mealId] = { name: `${mealType}: ${food}`, calories: 0 };
     set("core-dieta-log", { ...dietLog, [tStr]: dayMeals });
     vibrate();
     showSuccess("meal");
-    toast.success(`🍽️ ${mealName.trim()} registrado!${cal > 0 ? ` (${cal} kcal)` : ""}`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
-    setMealName("");
-    setMealCalories("");
+    toast.success(`🍽️ ${mealType} registrado!`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
     setActiveAction(null);
   };
 

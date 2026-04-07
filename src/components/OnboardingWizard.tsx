@@ -34,7 +34,7 @@ const steps = [
   {
     id: "modules",
     emoji: "📦",
-    title: "12 Módulos para sua vida",
+    title: "16 Módulos para sua vida",
     subtitle: "Cada um com um propósito claro",
     description: "Não precisa usar todos de uma vez. Comece pelo que faz mais sentido pra você agora.",
     visual: (

@@ -3,7 +3,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -138,22 +138,22 @@ const JobTracker = () => {
             <div className="col-span-3">
               <Input placeholder="Empresa..." value={inlineForm.company} onChange={e => setInlineForm(p => ({ ...p, company: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && addInline()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
             </div>
             <div className="col-span-3">
               <Input placeholder="Cargo..." value={inlineForm.role} onChange={e => setInlineForm(p => ({ ...p, role: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && addInline()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
             </div>
             <div className="col-span-2">
               <Select value={inlineForm.status} onValueChange={v => setInlineForm(p => ({ ...p, status: v as JobApp["status"] }))}>
-                <SelectTrigger className="h-7 text-[9px] border-none bg-transparent px-0 focus-visible:ring-0"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-7 text-[9px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-0"><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.entries(statusConfig).map(([k, v]) => <SelectItem key={k} value={k}>{v.emoji}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <span className="col-span-2 text-[9px] text-muted-foreground">Hoje</span>
             <div className="col-span-2 text-right">
-              <button onClick={addInline} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+              <button onClick={addInline} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">+ Add</button>
             </div>
           </div>
         </div>
@@ -251,15 +251,15 @@ const Portfolio = () => {
                 <div className="col-span-5">
                   <Input placeholder="Título..." value={inp?.title || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat]: { ...prev[cat], title: e.target.value } }))}
                     onKeyDown={e => e.key === "Enter" && addInline(cat)}
-                    className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                    className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
                 </div>
                 <div className="col-span-3">
                   <Input placeholder="Link" value={inp?.link || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat]: { ...prev[cat], link: e.target.value } }))}
                     onKeyDown={e => e.key === "Enter" && addInline(cat)}
-                    className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                    className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
                 </div>
                 <div className="col-span-4 text-right">
-                  <button onClick={() => addInline(cat)} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+                  <button onClick={() => addInline(cat)} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">+ Add</button>
                 </div>
               </div>
             </div>
@@ -371,16 +371,16 @@ const Networking = () => {
             <div className="col-span-3">
               <Input placeholder="Nome..." value={inlineForm.name} onChange={e => setInlineForm(p => ({ ...p, name: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && addInline()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
             </div>
             <div className="col-span-3">
               <Input placeholder="Empresa..." value={inlineForm.company} onChange={e => setInlineForm(p => ({ ...p, company: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && addInline()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
             </div>
             <span className="col-span-3 text-[9px] text-muted-foreground">Hoje</span>
             <div className="col-span-2 text-right">
-              <button onClick={addInline} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+              <button onClick={addInline} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">+ Add</button>
             </div>
           </div>
         </div>
@@ -470,8 +470,8 @@ const SkillsTracker = () => {
               <div className="px-3 py-2 flex items-center gap-2 border-t border-dashed border-border/50">
                 <Input placeholder="Adicionar skill..." value={inlineInputs[cat.key] || ""} onChange={e => setInlineInputs(prev => ({ ...prev, [cat.key]: e.target.value }))}
                   onKeyDown={e => e.key === "Enter" && addInline(cat.key)}
-                  className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
-                <button onClick={() => addInline(cat.key)} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Add</button>
+                  className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 flex-1" />
+                <button onClick={() => addInline(cat.key)} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0">+ Add</button>
               </div>
             </div>
           </div>
@@ -502,10 +502,10 @@ const InterviewPrep = () => {
           <div className="flex gap-2 pt-1 border-t border-dashed border-border/50">
             <Input value={newQuestion} onChange={e => setNewQuestion(e.target.value)} placeholder="Nova pergunta..."
               onKeyDown={e => { if (e.key === "Enter" && newQuestion.trim()) { setQuestions(prev => [...prev, { id: genId(), question: newQuestion.trim(), answer: "", category: "geral", practiced: false }]); setNewQuestion(""); } }}
-              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
+              className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 flex-1" />
             <button onClick={() => {
               if (newQuestion.trim()) { setQuestions(prev => [...prev, { id: genId(), question: newQuestion.trim(), answer: "", category: "geral", practiced: false }]); setNewQuestion(""); }
-            }} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Add</button>
+            }} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0">+ Add</button>
           </div>
         </div>
       </div>
@@ -563,7 +563,7 @@ const Carreira = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <span className="text-slate-600 text-lg">💼</span>
+          <Briefcase className="w-5 h-5 text-slate-600" />
           <div>
             <h1 className="text-base font-bold tracking-tight">CARREIRA</h1>
             <p className="text-[11px] text-muted-foreground">Vagas, portfolio, networking e skills</p>

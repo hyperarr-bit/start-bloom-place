@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTabReporter } from "@/hooks/use-module-tracker";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DailyMirror } from "@/components/beleza/DailyMirror";
 import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
@@ -32,7 +32,7 @@ const Beleza = () => {
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <span className="text-pink-600 text-lg">💧</span>
+          <Droplets className="w-5 h-5 text-pink-600" />
           <div>
             <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
             <p className="text-[11px] text-muted-foreground">Seu ritual de beleza inteligente</p>

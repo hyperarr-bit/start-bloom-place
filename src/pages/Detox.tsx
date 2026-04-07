@@ -31,7 +31,7 @@ const Detox = () => {
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <span className="text-lime-600 text-lg">🌿</span>
+          <Leaf className="w-5 h-5 text-lime-600" />
           <h1 className="text-base font-bold tracking-tight">DETOX</h1>
         </div>
         <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

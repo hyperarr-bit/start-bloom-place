@@ -1,78 +1,100 @@
 
 
-# Plano: Tornar cards/tabelas sempre visíveis (estilo planilha) em Viagens e Carreira
+# Plano: Enriquecer Viagens e Carreira com estrutura de planilha viva
 
 ## Problema
-Atualmente quando não há dados, vários componentes mostram apenas um botão "Adicionar" e a tabela/card colorido fica invisível. O usuário quer ver a estrutura da planilha sempre presente, mesmo vazia, com texto "Nenhum item" e input inline.
+Muitos componentes mostram apenas 1 card com "Nenhum item ainda" + botao. O usuario quer ver estrutura rica sempre visivel, como TravelBudget (6 categorias com inputs inline) e SafetyCard (campos sempre visiveis).
 
-## Mudanças
+## Referencia de design rico (ja existente no app)
+- **TravelBudget**: 6 cards de categoria (Passagens, Hotel, Passeios...) cada um com header colorido + tabela Descricao/Estimado/Real + input inline
+- **SafetyCard**: 2 grupos de campos sempre visiveis com labels + inputs inline
+- **PackingChecklist**: Cards por categoria (Roupas, Higiene...) com checkboxes
 
-### Carreira (`src/pages/Carreira.tsx`)
+## Mudancas
 
-**JobTracker**: O Pipeline aparece só com `jobs.length > 0`. A tabela de vagas já tem header colorido mas o body fica vazio sem mensagem.
-- Adicionar mensagem "Nenhuma candidatura ainda" dentro da tabela quando vazia
-- Mover o botão "+" para dentro do header da tabela
-- Pipeline continua condicional (só faz sentido com dados)
+### VIAGENS
 
-**Portfolio**: Tabela com header "CONQUISTAS & PORTFOLIO" já existe mas body vazio sem feedback.
-- Adicionar "Nenhuma conquista ainda" quando vazio
-- Mover botão para header
+**1. BucketList** — Mostrar 3 cards de prioridade sempre visiveis
+Em vez de 1 tabela unica, mostrar 3 sections coloridas (Sonho/Planejando/Proximo) com destinos filtrados dentro de cada uma + input inline "Adicionar destino..." em cada card. Stats continuam no topo.
 
-**Networking**: Tabela "REDE DE CONTATOS" — mesmo padrão.
-- Adicionar "Nenhum contato ainda" + mover botão
+**2. DailyTimeline** — Mostrar cards de tipo de atividade quando nao tem dia selecionado
+Quando nao ha dias OU nenhum dia selecionado, mostrar os 6 tipos de atividade (Voo, Hotel, Restaurante, Atividade, Transporte, Compras) como cards coloridos informativos — servindo como "legenda visual" da timeline. Manter o form de novo dia inline no card principal (nao atras de botao).
 
-**SkillsTracker**: Tabela "SKILLS & COMPETÊNCIAS" — mesmo padrão.
-- Adicionar "Nenhuma skill ainda" + mover botão
+**3. TripCountdown** — Form inline dentro do card principal
+Mover os inputs (nome, data, foto URL) para dentro do card "CONTAGENS REGRESSIVAS" quando vazio, em vez de esconder atras de botao separado.
 
-**InterviewPrep**: Já tem estrutura boa, só adicionar "Nenhuma pergunta ainda" quando lista vazia.
+**4. TravelDiary** — Quick-entry inline no card principal
+Mostrar o seletor de humor + input "melhor momento" diretamente dentro do card "DIARIO DE VIAGEM" quando vazio, permitindo adicionar sem clicar em botao primeiro.
 
-### Viagens
+**5. PlacesBoard** — Mostrar 5 cards de categoria sempre visiveis
+Em vez de 1 lista unificada, mostrar 5 cards (Comida, Turistico, Compras, Cafe, Bar) com header colorido proprio + lugares filtrados + input inline em cada.
 
-**BucketList** (`BucketList.tsx`): Tabela "BUCKET LIST" já existe com headers de coluna. Quando vazia, adicionar linha "Nenhum destino ainda". Mover botão para header.
+### CARREIRA
 
-**PlacesBoard** (`PlacesBoard.tsx`): Quando vazio, só mostra botão. Criar card com header colorido "LUGARES SALVOS" sempre visível + "Nenhum lugar salvo" + botão no header.
+**6. JobTracker** — Input inline de quick-add na tabela
+Adicionar uma linha com inputs (Empresa, Cargo, Status) diretamente no body da tabela para adicionar vaga sem abrir form separado. Manter form completo como opcao.
 
-**TravelDiary** (`TravelDiary.tsx`): Quando vazio, só mostra botão. Criar card "DIÁRIO DE VIAGEM" sempre visível + "Nenhuma entrada" + botão no header.
+**7. Portfolio** — Input inline na tabela
+Adicionar linha com inputs (Titulo, Tipo, Data) no body da tabela.
 
-**BillSplitter** (`BillSplitter.tsx`): Card "PESSOAS" e "DESPESAS" sempre visíveis com "Nenhuma pessoa/despesa" quando vazios.
+**8. Networking** — Card FOLLOW-UP sempre visivel + input inline
+Mostrar o card de follow-up pendente sempre (com "Nenhum pendente" quando vazio). Adicionar input inline na tabela (Nome, Empresa).
 
-**CurrencyConverter** (`CurrencyConverter.tsx`): Já tem design bom com "MOEDAS RÁPIDAS" sempre visível.
+**9. SkillsTracker** — 5 cards de categoria sempre visiveis
+Em vez de 1 tabela, mostrar 5 cards (Tecnica, Soft Skill, Idioma, Ferramenta, Certificacao) com header colorido, skills dentro + input inline em cada.
 
-**TripCountdown** (`TripCountdown.tsx`): Quando vazio, adicionar card "CONTAGENS REGRESSIVAS" com "Nenhuma viagem" + botão no header.
+**10. InterviewPrep** — Input inline dentro do card principal
+Mover o input "Nova pergunta..." para dentro do card com header colorido, nao fora dele.
 
-**SafetyCard**: Já perfeito — campos sempre visíveis.
-
-**TravelBudget**: Já perfeito — categorias sempre visíveis.
-
-**PackingChecklist** (`PackingChecklist.tsx`): Quando vazio, mostrar card "LISTAS DE MALA" sempre visível + "Nenhuma lista criada" + botão no header.
-
-**DailyTimeline** (`DailyTimeline.tsx`): Quando vazio, mostrar card "ROTEIRO" sempre visível + "Nenhum dia planejado" + botão no header.
-
-## Padrão aplicado em cada componente
+## Padrao visual aplicado
 
 ```text
-┌──────────────────────────────────────────┐
-│ bg-color-200  📊 TÍTULO         [+ Add] │  ← header sempre visível
-├──────────────────────────────────────────┤
-│ bg-color-100  Col1  Col2  Col3  Col4    │  ← sub-header (se tabela)
-├──────────────────────────────────────────┤
-│ Nenhum item ainda                        │  ← quando vazio
-│ ou                                       │
-│ item 1                                   │  ← quando tem dados
-│ item 2                                   │
-└──────────────────────────────────────────┘
+BUCKETLIST (exemplo):
+┌──────────────────────────────────┐
+│ bg-purple-200  💭 SONHO    0    │
+├──────────────────────────────────┤
+│ bg-purple-50                     │
+│  Nenhum destino sonho ainda      │
+│  ────────────────────────────    │
+│  ☐ Adicionar destino...    [🌍] │
+└──────────────────────────────────┘
+┌──────────────────────────────────┐
+│ bg-yellow-200  📋 PLANEJANDO 0  │
+├──────────────────────────────────┤
+│  ...                             │
+└──────────────────────────────────┘
+┌──────────────────────────────────┐
+│ bg-green-200  🔜 PROXIMO    0   │
+├──────────────────────────────────┤
+│  ...                             │
+└──────────────────────────────────┘
+
+SKILLS (exemplo):
+┌──────────────────────────────────┐
+│ bg-blue-200  💻 TECNICA     0   │
+├──────────────────────────────────┤
+│  Nenhuma skill ainda             │
+│  ────────────────────────────    │
+│  Adicionar skill...        [+]  │
+└──────────────────────────────────┘
+┌──────────────────────────────────┐
+│ bg-pink-200  🗣️ SOFT SKILL  0  │
+│  ...                             │
+└──────────────────────────────────┘
 ```
 
 ## Arquivos alterados (8)
 
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
-| `src/pages/Carreira.tsx` | JobTracker, Portfolio, Networking, SkillsTracker, InterviewPrep: empty state "Nenhum item" + botão no header |
-| `src/components/travel/BucketList.tsx` | Empty state na tabela + botão no header |
-| `src/components/travel/PlacesBoard.tsx` | Card permanente "LUGARES SALVOS" + empty state |
-| `src/components/travel/TravelDiary.tsx` | Card permanente "DIÁRIO DE VIAGEM" + empty state |
-| `src/components/travel/BillSplitter.tsx` | Cards PESSOAS e DESPESAS sempre visíveis |
-| `src/components/travel/TripCountdown.tsx` | Card permanente + empty state |
-| `src/components/travel/PackingChecklist.tsx` | Card permanente + empty state |
-| `src/components/travel/DailyTimeline.tsx` | Card permanente + empty state |
+| `src/components/travel/BucketList.tsx` | 3 cards de prioridade sempre visiveis + inline input em cada |
+| `src/components/travel/DailyTimeline.tsx` | Cards de tipo de atividade como legenda + form inline |
+| `src/components/travel/TripCountdown.tsx` | Form inline dentro do card principal |
+| `src/components/travel/TravelDiary.tsx` | Quick-entry inline no card principal |
+| `src/components/travel/PlacesBoard.tsx` | 5 cards de categoria sempre visiveis |
+| `src/pages/Carreira.tsx` (JobTracker) | Input inline quick-add na tabela |
+| `src/pages/Carreira.tsx` (Portfolio) | Input inline na tabela |
+| `src/pages/Carreira.tsx` (Networking) | Follow-up sempre visivel + input inline |
+| `src/pages/Carreira.tsx` (SkillsTracker) | 5 cards de categoria sempre visiveis |
+| `src/pages/Carreira.tsx` (InterviewPrep) | Input dentro do card principal |
 

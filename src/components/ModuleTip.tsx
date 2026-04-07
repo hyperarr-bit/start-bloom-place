@@ -41,7 +41,7 @@ export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => 
               </div>
               <div className="flex-1 pr-4">
                 <p className="text-xs font-bold text-primary mb-1.5">
-                  {icon} Dicas para começar
+                  Dicas para começar
                 </p>
                 <ul className="space-y-1">
                   {tips.map((tip, i) => (

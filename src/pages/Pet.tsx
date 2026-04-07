@@ -7,6 +7,7 @@ import { PetHealth } from "@/components/pet/PetHealth";
 import { PetRoutine } from "@/components/pet/PetRoutine";
 import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "pets", label: "PETS", icon: "🐾" },
@@ -51,6 +52,15 @@ const Pet = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        <ModuleTip
+          moduleId="pet"
+          tips={[
+            "Cadastre seus pets com foto e dados",
+            "Registre vacinas e consultas na aba Saúde",
+            "Monte a rotina diária do seu pet",
+            "Fotografe momentos no diário",
+          ]}
+        />
         {activeTab === "pets" && <PetList />}
         {activeTab === "saude" && <PetHealth />}
         {activeTab === "rotina" && <PetRoutine />}

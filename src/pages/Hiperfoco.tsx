@@ -8,12 +8,13 @@ import { GoalsPanel } from "@/components/hiperfoco/GoalsPanel";
 import { StrategyPanel } from "@/components/hiperfoco/StrategyPanel";
 import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "dia", label: "DIA", icon: "💭" },
   { id: "busca", label: "BUSCA", icon: "🔍" },
   { id: "metas", label: "METAS", icon: "🎯" },
-  { id: "estrategia", label: "ESTRATÉGIA", icon: "♟️" },
+  { id: "estrategia", label: "ESTRATÉGIA", icon: "" },
   { id: "timeline", label: "TIMELINE", icon: "📅" },
   { id: "sonhos", label: "SONHOS", icon: "🌙" },
 ];
@@ -53,6 +54,15 @@ const Hiperfoco = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        <ModuleTip
+          moduleId="hiperfoco"
+          tips={[
+            "Capture pensamentos rápidos na aba Dia",
+            "Use a busca para encontrar ideias antigas",
+            "Defina metas e estratégias para manter o foco",
+            "Registre sonhos no diário noturno",
+          ]}
+        />
         {activeTab === "dia" && <ThoughtCapture />}
         {activeTab === "busca" && <ThoughtSearch />}
         {activeTab === "metas" && <GoalsPanel />}

@@ -7,6 +7,7 @@ import { DateCalendar } from "@/components/relacionamentos/DateCalendar";
 import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
+import { ModuleTip } from "@/components/ModuleTip";
 
 const tabs = [
   { id: "pessoas", label: "PESSOAS", icon: "💜" },
@@ -51,6 +52,15 @@ const Relacionamentos = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+        <ModuleTip
+          moduleId="relacionamentos"
+          tips={[
+            "Cadastre pessoas importantes e seus aniversários",
+            "Use a agenda para nunca esquecer datas",
+            "Registre momentos especiais na timeline",
+            "Salve ideias de presentes para cada pessoa",
+          ]}
+        />
         {activeTab === "pessoas" && <PeoplePanel />}
         {activeTab === "agenda" && <DateCalendar />}
         {activeTab === "momentos" && <MomentsTimeline />}

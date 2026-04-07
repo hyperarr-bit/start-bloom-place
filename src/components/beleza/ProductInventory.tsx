@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2, X, ShoppingCart, Package, AlertTriangle, DollarSign } from "lucide-react";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { type Product, calculateCostPerDose, getExpiryProgress } from "./utils";
 
 const genId = () => crypto.randomUUID();

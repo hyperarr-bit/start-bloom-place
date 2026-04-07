@@ -34,6 +34,9 @@ export const ProductShelf = () => {
   const [showShopping, setShowShopping] = useState(false);
   const [showTriggers, setShowTriggers] = useState(false);
   const [newTrigger, setNewTrigger] = useState("");
+  const [quickName, setQuickName] = useState("");
+  const [quickBrand, setQuickBrand] = useState("");
+  const [quickCategory, setQuickCategory] = useState("Skincare");
 
   const activeProducts = products.filter(p => !p.finished);
   const expiringSoon = activeProducts.filter(p => {
@@ -41,6 +44,20 @@ export const ProductShelf = () => {
     const { daysLeft } = getExpiryProgress(p.openedDate, p.paoMonths);
     return daysLeft > 0 && daysLeft < 30;
   });
+
+  const quickAdd = () => {
+    if (!quickName.trim()) return;
+    const product: Product = {
+      id: genId(), name: quickName.trim(), category: quickCategory, brand: quickBrand.trim(),
+      opened: false, openedDate: "", paoMonths: 12,
+      expiry: "", notes: "", rating: 0, repurchase: false,
+      price: 0, sizeMl: 0, photoUrl: "",
+      frequency: "Diário", finished: false,
+    };
+    setProducts(prev => [...prev, product]);
+    setQuickName("");
+    setQuickBrand("");
+  };
 
   const save = () => {
     if (!form.name) return;
@@ -128,7 +145,7 @@ export const ProductShelf = () => {
         </div>
       )}
 
-      {/* Product table — Notion-style */}
+      {/* Product table — always visible */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-pink-100 dark:bg-pink-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
           <span className="col-span-4">Produto</span>
@@ -174,14 +191,56 @@ export const ProductShelf = () => {
               </div>
             );
           })}
+
+          {activeProducts.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[11px] text-muted-foreground italic">Nenhum produto ainda — adicione abaixo</p>
+            </div>
+          )}
+
+          {/* Inline quick-add row */}
+          <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center bg-muted/20">
+            <div className="col-span-4">
+              <Input
+                placeholder="Nome do produto"
+                value={quickName}
+                onChange={e => setQuickName(e.target.value)}
+                className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+                onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+              />
+            </div>
+            <div className="col-span-2">
+              <Input
+                placeholder="Marca"
+                value={quickBrand}
+                onChange={e => setQuickBrand(e.target.value)}
+                className="h-7 text-[11px] border-dashed border-border/60 bg-background/50"
+                onKeyDown={e => { if (e.key === "Enter") quickAdd(); }}
+              />
+            </div>
+            <div className="col-span-3">
+              <Select value={quickCategory} onValueChange={setQuickCategory}>
+                <SelectTrigger className="h-7 text-[10px] border-dashed border-border/60 bg-background/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c} value={c}>{catEmoji[c]} {c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-3 flex justify-end gap-1">
+              <Button size="sm" className="h-7 px-2 text-[10px]" onClick={quickAdd}>
+                <Plus className="w-3 h-3 mr-0.5" /> Add
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 px-2 text-[10px]" onClick={() => setShowForm(true)}>
+                + Detalhes
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(!showForm)}>
-        <Plus className="w-3 h-3 mr-1" /> Adicionar Produto
-      </Button>
-
-      {/* Add form */}
+      {/* Add form (detailed) */}
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Input placeholder="Nome do produto" value={form.name || ""} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className="h-9 text-sm" />

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Sun, Moon, Plus, X, AlertTriangle, ShieldCheck, Settings2 } from "lucide-react";
+import { Sun, Moon, Plus, X, AlertTriangle, ShieldCheck } from "lucide-react";
 import { getStepIcon, checkConflicts } from "./utils";
 
 const getDateKey = () => new Date().toISOString().slice(0, 10);
@@ -16,7 +16,6 @@ interface RoutineStep {
 }
 
 const DEFAULT_MORNING: RoutineStep[] = [];
-
 const DEFAULT_NIGHT: RoutineStep[] = [];
 
 const SKIN_CYCLE_PHASES = [
@@ -36,8 +35,10 @@ export const SkincareRoutine = () => {
   const [checkins] = usePersistedState<Record<string, string>>("skincare-daily-checkin", {});
   const [triggers] = usePersistedState<string[]>("skincare-triggers", []);
   const [showGuide, setShowGuide] = useState(false);
-  const [newStep, setNewStep] = useState("");
-  const [editingPeriod, setEditingPeriod] = useState<"am" | "pm" | null>(null);
+  const [newStepAm, setNewStepAm] = useState("");
+  const [newStepPm, setNewStepPm] = useState("");
+  const [newStepSunscreen, setNewStepSunscreen] = useState(false);
+  const [newStepAcid, setNewStepAcid] = useState(false);
 
   const todaySkin = checkins[today] || "";
   const isSensitive = todaySkin === "sensivel";
@@ -74,11 +75,22 @@ export const SkincareRoutine = () => {
   const conflicts = checkConflicts(allStepNames);
 
   const addStep = (period: "am" | "pm") => {
-    if (!newStep.trim()) return;
-    const step: RoutineStep = { name: newStep.trim() };
-    if (period === "am") setMorningSteps(prev => [...prev, step]);
-    else setNightSteps(prev => [...prev, step]);
-    setNewStep("");
+    const text = period === "am" ? newStepAm : newStepPm;
+    if (!text.trim()) return;
+    const step: RoutineStep = {
+      name: text.trim(),
+      isSunscreen: period === "am" ? newStepSunscreen : false,
+      isAcid: period === "pm" ? newStepAcid : false,
+    };
+    if (period === "am") {
+      setMorningSteps(prev => [...prev, step]);
+      setNewStepAm("");
+      setNewStepSunscreen(false);
+    } else {
+      setNightSteps(prev => [...prev, step]);
+      setNewStepPm("");
+      setNewStepAcid(false);
+    }
   };
 
   const removeStep = (period: "am" | "pm", idx: number) => {
@@ -120,12 +132,7 @@ export const SkincareRoutine = () => {
             <Sun className="w-3.5 h-3.5" />
             <span className="text-[10px] font-bold uppercase tracking-wider">☀️ ROTINA DA MANHÃ</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayMorning.length}/{morningSteps.length}</Badge>
-            <button onClick={() => setEditingPeriod(editingPeriod === "am" ? null : "am")} className="text-foreground/70 hover:text-foreground">
-              <Settings2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayMorning.length}/{morningSteps.length}</Badge>
         </div>
         <div className="bg-green-50 dark:bg-green-950/20 p-4 space-y-2">
           {/* Progress bar */}
@@ -150,14 +157,16 @@ export const SkincareRoutine = () => {
                     OBRIGATÓRIO
                   </span>
                 )}
-                {editingPeriod === "am" && (
-                  <button onClick={() => removeStep("am", i)} className="text-red-400 hover:text-red-600">
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+                <button onClick={() => removeStep("am", i)} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             ))}
           </div>
+
+          {morningSteps.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-2 px-1">Adicione seus passos de skincare matinal abaixo</p>
+          )}
 
           {morningMissingSunscreen && (
             <div className="px-3 py-2 rounded-lg bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30">
@@ -165,15 +174,25 @@ export const SkincareRoutine = () => {
             </div>
           )}
 
-          {editingPeriod === "am" && (
-            <div className="flex gap-2">
-              <Input placeholder="Novo passo..." value={newStep} onChange={e => setNewStep(e.target.value)}
-                className="h-8 text-xs" onKeyDown={e => { if (e.key === "Enter") addStep("am"); }} />
-              <Button size="sm" className="h-8" onClick={() => addStep("am")}>
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
-          )}
+          {/* Always-visible inline input */}
+          <div className="flex gap-2 items-center pt-1">
+            <Input
+              placeholder="Ex: Gel de limpeza, Tônico, Vitamina C..."
+              value={newStepAm}
+              onChange={e => setNewStepAm(e.target.value)}
+              className="h-8 text-xs border-dashed border-border/60 bg-background/50 flex-1"
+              onKeyDown={e => { if (e.key === "Enter") addStep("am"); }}
+            />
+            <Button size="sm" className="h-8 px-2.5 shrink-0" onClick={() => addStep("am")}>
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-3 px-1">
+            <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+              <Checkbox checked={newStepSunscreen} onCheckedChange={v => setNewStepSunscreen(!!v)} className="w-3 h-3" />
+              ☀️ Protetor solar
+            </label>
+          </div>
         </div>
       </div>
 
@@ -184,12 +203,7 @@ export const SkincareRoutine = () => {
             <Moon className="w-3.5 h-3.5" />
             <span className="text-[10px] font-bold uppercase tracking-wider">🌙 ROTINA DA NOITE</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayNight.length}/{effectiveNightSteps.length}</Badge>
-            <button onClick={() => setEditingPeriod(editingPeriod === "pm" ? null : "pm")} className="text-foreground/70 hover:text-foreground">
-              <Settings2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{todayNight.length}/{effectiveNightSteps.length}</Badge>
         </div>
         <div className="bg-purple-50 dark:bg-purple-950/20 p-4 space-y-2">
           {/* Skin Cycling Phase */}
@@ -232,25 +246,37 @@ export const SkincareRoutine = () => {
                   {i === 0 && !todayNight.includes(0) && (
                     <span className="text-[8px] text-muted-foreground">Remova o protetor!</span>
                   )}
-                  {editingPeriod === "pm" && (
-                    <button onClick={() => removeStep("pm", i)} className="text-red-400 hover:text-red-600">
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
+                  <button onClick={() => removeStep("pm", i)} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <X className="w-3 h-3" />
+                  </button>
                 </div>
               );
             })}
           </div>
 
-          {editingPeriod === "pm" && (
-            <div className="flex gap-2">
-              <Input placeholder="Novo passo..." value={newStep} onChange={e => setNewStep(e.target.value)}
-                className="h-8 text-xs" onKeyDown={e => { if (e.key === "Enter") addStep("pm"); }} />
-              <Button size="sm" className="h-8" onClick={() => addStep("pm")}>
-                <Plus className="w-3 h-3" />
-              </Button>
-            </div>
+          {nightSteps.length === 0 && (
+            <p className="text-[11px] text-muted-foreground italic py-2 px-1">Adicione seus passos de skincare noturno abaixo</p>
           )}
+
+          {/* Always-visible inline input */}
+          <div className="flex gap-2 items-center pt-1">
+            <Input
+              placeholder="Ex: Demaquilante, Sérum, Hidratante..."
+              value={newStepPm}
+              onChange={e => setNewStepPm(e.target.value)}
+              className="h-8 text-xs border-dashed border-border/60 bg-background/50 flex-1"
+              onKeyDown={e => { if (e.key === "Enter") addStep("pm"); }}
+            />
+            <Button size="sm" className="h-8 px-2.5 shrink-0" onClick={() => addStep("pm")}>
+              <Plus className="w-3 h-3" />
+            </Button>
+          </div>
+          <div className="flex items-center gap-3 px-1">
+            <label className="flex items-center gap-1.5 text-[10px] text-muted-foreground cursor-pointer">
+              <Checkbox checked={newStepAcid} onCheckedChange={v => setNewStepAcid(!!v)} className="w-3 h-3" />
+              💎 Ácido / Tratamento ativo
+            </label>
+          </div>
         </div>
       </div>
 

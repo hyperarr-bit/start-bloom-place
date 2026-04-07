@@ -104,12 +104,6 @@ export const SkinDiary = () => {
         </div>
       </div>
 
-      {!todayEntry && (
-        <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={() => setShowForm(true)}>
-          <Plus className="w-3 h-3 mr-1" /> Registrar Hoje
-        </Button>
-      )}
-
       {/* Compare mode */}
       {compareMode && (
         <div className="rounded-xl border border-border overflow-hidden">
@@ -189,7 +183,7 @@ export const SkinDiary = () => {
         </div>
       )}
 
-      {/* Timeline — Notion-style rows */}
+      {/* Timeline — always-visible Notion-style table */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-amber-100 dark:bg-amber-900/20 px-3 py-1.5 grid grid-cols-12 gap-1 text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
           <span className="col-span-2">Foto</span>
@@ -238,16 +232,26 @@ export const SkinDiary = () => {
               </div>
             );
           })}
+
+          {entries.length === 0 && (
+            <div className="px-3 py-4 text-center">
+              <p className="text-[11px] text-muted-foreground italic">Nenhum registro ainda — registre sua primeira foto!</p>
+            </div>
+          )}
+
+          {/* Inline action row */}
+          {!todayEntry && !showForm && (
+            <div className="px-3 py-2 bg-muted/20 flex items-center justify-center">
+              <button
+                onClick={() => setShowForm(true)}
+                className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground font-medium transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Registrar Hoje
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {entries.length === 0 && !showForm && (
-        <div className="text-center py-10">
-          <Camera className="w-10 h-10 mx-auto text-muted-foreground/30 mb-3" />
-          <p className="text-sm text-muted-foreground">Registre sua primeira foto!</p>
-          <p className="text-[10px] text-muted-foreground/60 mt-1">Tire uma selfie por semana para acompanhar a evolução da sua pele</p>
-        </div>
-      )}
     </div>
   );
 };

@@ -158,9 +158,9 @@ export const ProductShelf = () => {
             const cpd = costPerDose(p);
             const expiry = p.openedDate && p.paoMonths ? getExpiryProgress(p.openedDate, p.paoMonths) : null;
             return (
-              <div key={p.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center cursor-pointer hover:bg-muted/30 transition-colors group"
+              <div key={p.id} className="px-3 py-2 grid grid-cols-8 gap-1 items-center cursor-pointer hover:bg-muted/30 transition-colors group"
                 onClick={() => setSelectedProduct(p)}>
-                <div className="col-span-4 flex items-center gap-2 min-w-0">
+                <div className="col-span-3 flex items-center gap-2 min-w-0">
                   <span className="text-sm shrink-0">{catEmoji[p.category] || "✨"}</span>
                   <div className="min-w-0">
                     <p className="text-xs font-medium truncate">{p.name}</p>
@@ -168,21 +168,11 @@ export const ProductShelf = () => {
                   </div>
                 </div>
                 <span className="col-span-2 text-[10px] text-muted-foreground truncate">{p.brand || "—"}</span>
-                <span className="col-span-2 text-[10px] text-muted-foreground">{p.category}</span>
-                <div className="col-span-2">
-                  {expiry && (
-                    <div>
-                      <div className="h-1 bg-muted rounded-full overflow-hidden w-full">
-                        <div className={`h-full rounded-full transition-all ${
-                          expiry.daysLeft < 15 ? "bg-red-500" : expiry.daysLeft < 30 ? "bg-amber-500" : "bg-emerald-500"
-                        }`} style={{ width: `${Math.min(100, expiry.percent)}%` }} />
-                      </div>
-                      <span className="text-[8px] text-muted-foreground">{expiry.expired ? "Vencido!" : `${expiry.daysLeft}d`}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="col-span-2 flex justify-end gap-1">
+                <div className="col-span-2 flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground">{p.category}</span>
                   {p.repurchase && <span className="text-[8px]">🔄</span>}
+                </div>
+                <div className="col-span-1 flex justify-end">
                   <button onClick={e => { e.stopPropagation(); markFinished(p); }} className="text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100">
                     <Package className="w-3 h-3" />
                   </button>

@@ -100,7 +100,7 @@ export const TripCountdown = () => {
                 value={inlineForm.tripName}
                 onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && add()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60"
               />
             </div>
             <div className="col-span-4">
@@ -109,11 +109,11 @@ export const TripCountdown = () => {
                 value={inlineForm.departureDate}
                 onChange={e => setInlineForm(p => ({ ...p, departureDate: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && add()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0"
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30"
               />
             </div>
             <div className="col-span-3 text-right">
-              <button onClick={add} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors">+ Add</button>
+              <button onClick={add} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">+ Add</button>
             </div>
           </div>
           <div className="px-3 pb-2">
@@ -121,7 +121,7 @@ export const TripCountdown = () => {
               placeholder="📸 URL da foto (opcional)"
               value={inlineForm.photoUrl}
               onChange={e => setInlineForm(p => ({ ...p, photoUrl: e.target.value }))}
-              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60"
             />
           </div>
         </div>

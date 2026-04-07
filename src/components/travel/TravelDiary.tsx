@@ -94,19 +94,19 @@ export const TravelDiary = () => {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="Viagem" value={inlineForm.tripName || ""} onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
               <Input type="date" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0" />
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30" />
             </div>
             <Input placeholder="✨ Melhor momento do dia..." value={inlineForm.bestThing || ""}
               onChange={e => setInlineForm(p => ({ ...p, bestThing: e.target.value }))}
               onKeyDown={e => e.key === "Enter" && save()}
-              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50" />
+              className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
             <div className="flex items-center gap-2">
               <Input placeholder="🚫 Não faria de novo (opcional)" value={inlineForm.wouldNotDoAgain || ""}
                 onChange={e => setInlineForm(p => ({ ...p, wouldNotDoAgain: e.target.value }))}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50 flex-1" />
-              <button onClick={save} className="text-[9px] font-medium text-muted-foreground hover:text-foreground transition-colors shrink-0">+ Salvar</button>
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 flex-1" />
+              <button onClick={save} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0">+ Salvar</button>
             </div>
           </div>
 

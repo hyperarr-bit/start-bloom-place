@@ -35,6 +35,7 @@ export const DetoxTracker = () => {
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
   const [confirmRelapseId, setConfirmRelapseId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [newReason, setNewReason] = useState("");
 
   const today = new Date();
   const monthStart = startOfMonth(today);

@@ -174,7 +174,7 @@ export const TravelBudget = () => {
                 type="date"
                 value={trip.startDate}
                 onChange={e => updateTrip({ startDate: e.target.value })}
-                className="h-8 rounded-lg text-xs bg-background/60"
+                className="h-8 rounded-lg text-xs bg-background/60 appearance-none [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
             <div>

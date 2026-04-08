@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check, X, Heart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { differenceInDays, format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";
@@ -22,6 +22,7 @@ interface DetoxHabit {
   relapses: string[];
   record: number;
   checkins?: string[];
+  reasons?: string[];
 }
 
 const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞", "🎰"];
@@ -34,6 +35,7 @@ export const DetoxTracker = () => {
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);
   const [confirmRelapseId, setConfirmRelapseId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [newReason, setNewReason] = useState("");
 
   const today = new Date();
   const monthStart = startOfMonth(today);
@@ -70,6 +72,27 @@ export const DetoxTracker = () => {
   };
 
   const removeHabit = (id: string) => set("detox-habits", habits.filter(h => h.id !== id));
+
+  const addReason = (id: string) => {
+    if (!newReason.trim()) return;
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const reasons = h.reasons || [];
+      return { ...h, reasons: [...reasons, newReason.trim()] };
+    });
+    set("detox-habits", updated);
+    setNewReason("");
+  };
+
+  const removeReason = (id: string, index: number) => {
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const reasons = [...(h.reasons || [])];
+      reasons.splice(index, 1);
+      return { ...h, reasons };
+    });
+    set("detox-habits", updated);
+  };
 
   const getStreak = (h: DetoxHabit) => {
     const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;
@@ -150,6 +173,41 @@ export const DetoxTracker = () => {
                       <Check className="w-3.5 h-3.5" />
                       {checkedToday ? "Confirmado hoje ✓" : "Estou limpo hoje"}
                     </button>
+
+                    {/* Por que quero parar? */}
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                        <Heart className="w-3 h-3" /> Por que quero parar?
+                      </p>
+                      {(h.reasons || []).map((reason, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-primary/5 rounded-md px-2 py-1.5">
+                          <span className="text-[10px]">💪</span>
+                          <span className="text-[10px] flex-1">{reason}</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); removeReason(h.id, idx); }}
+                            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex gap-1">
+                        <Input
+                          placeholder="Ex: Pela minha saúde, Pela minha família..."
+                          value={newReason}
+                          onChange={e => setNewReason(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); addReason(h.id); } }}
+                          className="h-6 text-[10px] flex-1"
+                        />
+                        <button
+                          onClick={e => { e.stopPropagation(); addReason(h.id); }}
+                          className="px-2 h-6 text-[9px] font-bold text-primary hover:bg-primary/10 rounded-md transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
 
                     <p className="text-[10px] text-muted-foreground mb-2">{format(today, "MMMM yyyy")}</p>
                     <div className="grid grid-cols-7 gap-1">
@@ -233,7 +291,21 @@ export const DetoxTracker = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Ei, tudo bem 💚</AlertDialogTitle>
             <AlertDialogDescription>
-              Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
+              {(() => {
+                const habit = habits.find(h => h.id === confirmRelapseId);
+                const reasons = habit?.reasons || [];
+                const randomReason = reasons.length > 0 ? reasons[Math.floor(Math.random() * reasons.length)] : null;
+                return (
+                  <>
+                    Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
+                    {randomReason && (
+                      <span className="block mt-2 text-sm font-medium text-primary">
+                        💪 Lembre-se: "{randomReason}"
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

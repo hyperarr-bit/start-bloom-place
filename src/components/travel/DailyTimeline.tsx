@@ -116,9 +116,12 @@ export const DailyTimeline = () => {
               className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 flex-1" />
             <Input type="number" placeholder="Dia nº" value={inlineDay.dayNumber} onChange={e => setInlineDay(p => ({ ...p, dayNumber: Number(e.target.value) }))}
               className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 w-16" />
-            <Input type="date" value={inlineDay.date} onChange={e => setInlineDay(p => ({ ...p, date: e.target.value }))}
-              onKeyDown={e => e.key === "Enter" && addDay()}
-              className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 w-28" />
+            <div className="relative w-28">
+              <Input type="date" value={inlineDay.date} onChange={e => setInlineDay(p => ({ ...p, date: e.target.value }))}
+                onKeyDown={e => e.key === "Enter" && addDay()}
+                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 appearance-none [&::-webkit-date-and-time-value]:text-left" />
+              {!inlineDay.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Data</span>}
+            </div>
             <button onClick={addDay} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0">+ Dia</button>
           </div>
         </div>

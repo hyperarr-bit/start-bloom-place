@@ -184,7 +184,7 @@ export const BodyEvolution = () => {
           {showForm && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden px-4 mb-3">
               <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-muted">
-                <Input type="date" value={newM.date} onChange={e => setNewM({ ...newM, date: e.target.value })} className="col-span-2 text-xs h-9" />
+                <Input type="date" value={newM.date} onChange={e => setNewM({ ...newM, date: e.target.value })} className="col-span-2 text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
                 {fields.map(f => (
                   <div key={f.key} className="relative">
                     <Input value={newM[f.key]} onChange={e => setNewM({ ...newM, [f.key]: e.target.value })} placeholder={f.label} className="text-xs h-9 pr-8" />

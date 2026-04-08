@@ -112,6 +112,7 @@ export const TripCountdown = () => {
                 onKeyDown={e => e.key === "Enter" && add()}
                 className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 appearance-none [&::-webkit-date-and-time-value]:text-left"
               />
+              {!inlineForm.departureDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Data</span>}
             </div>
             <div className="col-span-3 text-right">
               <button onClick={add} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">+ Add</button>

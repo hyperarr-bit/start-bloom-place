@@ -277,8 +277,8 @@ const Biblioteca = () => {
           <Input placeholder="Emprestado para..." value={form.lentTo || ""} onChange={e => setForm(p => ({ ...p, lentTo: e.target.value }))} className="h-8 text-xs" />
           {form.lentTo && (
             <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-[9px] text-muted-foreground">Data empréstimo</label><Input type="date" value={form.lentDate || ""} onChange={e => setForm(p => ({ ...p, lentDate: e.target.value }))} className="h-8 text-xs" /></div>
-              <div><label className="text-[9px] text-muted-foreground">Devolução</label><Input type="date" value={form.lentReturnDate || ""} onChange={e => setForm(p => ({ ...p, lentReturnDate: e.target.value }))} className="h-8 text-xs" /></div>
+              <div><label className="text-[9px] text-muted-foreground">Data empréstimo</label><Input type="date" value={form.lentDate || ""} onChange={e => setForm(p => ({ ...p, lentDate: e.target.value }))} className="h-8 text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>
+              <div><label className="text-[9px] text-muted-foreground">Devolução</label><Input type="date" value={form.lentReturnDate || ""} onChange={e => setForm(p => ({ ...p, lentReturnDate: e.target.value }))} className="h-8 text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>
             </div>
           )}
         </div>

@@ -50,7 +50,10 @@ export const CountdownWidget = () => {
       {adding && (
         <div className="flex gap-2 mb-3">
           <Input value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Meta ou evento" className="text-xs h-8" onKeyDown={e => e.key === "Enter" && addItem()} />
-          <Input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="text-xs h-8 w-32" />
+          <div className="relative w-32">
+            <Input type="date" value={newDate} onChange={e => setNewDate(e.target.value)} className="text-xs h-8 appearance-none [&::-webkit-date-and-time-value]:text-left" />
+            {!newDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+          </div>
         </div>
       )}
 

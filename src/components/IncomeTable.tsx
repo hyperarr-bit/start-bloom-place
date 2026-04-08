@@ -105,7 +105,7 @@ export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
                 type="date"
                 value={newIncome.date}
                 onChange={(e) => setNewIncome({ ...newIncome, date: e.target.value })}
-                className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0"
+                className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 appearance-none [&::-webkit-date-and-time-value]:text-left"
               />
             </td>
             <td className="px-3 py-2">

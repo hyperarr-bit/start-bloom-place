@@ -209,7 +209,10 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
               <div className="grid grid-cols-3 gap-2">
                 <Input type="number" placeholder="Total parcelas" value={newItem.totalInstallments} onChange={(e) => setNewItem({ ...newItem, totalInstallments: e.target.value })} className="text-xs" />
                 <Input type="number" placeholder="Pagas" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs" />
-                <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs" />
+                <div className="relative">
+                  <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                  {!newItem.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Select value={newItem.cardName} onValueChange={(v) => setNewItem({ ...newItem, cardName: v })}>

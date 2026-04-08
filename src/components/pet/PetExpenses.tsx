@@ -114,7 +114,9 @@ export const PetExpenses = () => {
             <div className="grid grid-cols-3 gap-1.5">
               <Input placeholder="Descrição" value={description} onChange={e => setDescription(e.target.value)} className="h-7 text-[11px]" />
               <Input type="number" placeholder="R$" value={value} onChange={e => setValue(e.target.value)} className="h-7 text-[11px]" />
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
+              <div className="relative">
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+              </div>
             </div>
             <button onClick={addExpense} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
               <Plus className="w-3 h-3" /> Adicionar gasto

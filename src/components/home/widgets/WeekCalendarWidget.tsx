@@ -19,7 +19,7 @@ export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large
     weekDays.push({ date: dateStr, label: dayNames[d.getDay()], labelFull: dayNamesFull[d.getDay()], dayNum: d.getDate(), isToday: dateStr === todayStr });
   }
 
-  const workoutLog = get<any>("core-treino-log", {});
+  const workoutLog = get<string[]>("saude-workout-log", []);
   const habitLog = get<any>("core-rotina-habit-log", {});
   const habits = get<any[]>("core-rotina-habits", []);
 

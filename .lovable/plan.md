@@ -1,30 +1,29 @@
 
 
-# Plano: Adicionar "Por que quero parar?" aos hábitos do Detox
+# Plano: Corrigir layout do campo de data no formulário de Pessoas
 
-## Ideia
+## Problema
+O input `type="date"` no formulário de adicionar pessoa está desconfigurado no mobile (iOS/Safari aplica estilos nativos que ignoram a altura definida). O campo fica maior que o campo "Notas" ao lado, quebrando o alinhamento do grid.
 
-Cada hábito ganha um campo de **motivos/frases motivacionais** que o usuário cadastra. Ao expandir o hábito, aparece uma seção "Por que quero parar?" com os motivos listados como cards inspiracionais. Um motivo aleatório também aparece no dialog de confirmação de recaída para reforçar a determinação.
+## Mudança
 
-## Mudanças
+No `src/components/relacionamentos/PeoplePanel.tsx`, linha 117:
 
-### 1. Expandir interface `DetoxHabit`
-- Adicionar `reasons?: string[]` — lista de motivos/frases
+- Adicionar `appearance-none` ao className do input de data para resetar estilos nativos do iOS
+- Adicionar `placeholder="dd/mm/aaaa"` para clareza visual
+- Garantir que o input tenha mesma altura com classes extras de controle
 
-### 2. Seção "Por que quero parar?" no card expandido
-- Aparece abaixo do botão de check-in, antes do calendário
-- Lista os motivos como mini-cards com emoji 💪
-- Input inline + botão para adicionar novo motivo
-- Botão X discreto para remover motivo
-- Placeholder: "Ex: Pela minha saúde, Pela minha família..."
+```tsx
+// De:
+<Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px]" />
 
-### 3. Motivo no dialog de recaída
-- Se o hábito tem motivos cadastrados, mostrar um aleatório no dialog de confirmação de recaída como lembrete antes de confirmar
-- Ex: "Lembre-se: Pela minha saúde"
+// Para:
+<Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" placeholder="dd/mm/aaaa" />
+```
 
 ## Arquivo alterado (1)
 
 | Arquivo | Mudança |
 |---------|---------|
-| `src/components/detox/DetoxTracker.tsx` | Adicionar `reasons` à interface, seção de motivos no card expandido, motivo aleatório no dialog de recaída |
+| `src/components/relacionamentos/PeoplePanel.tsx` | Adicionar `appearance-none` e classes de normalização ao input de data |
 

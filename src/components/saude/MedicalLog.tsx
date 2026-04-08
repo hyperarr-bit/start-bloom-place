@@ -137,7 +137,10 @@ export const MedicalLog = () => {
                   <Input value={newAppt.doctor} onChange={e => setNewAppt({ ...newAppt, doctor: e.target.value })} placeholder="Nome do médico" className="text-xs h-9" />
                   <Input value={newAppt.specialty} onChange={e => setNewAppt({ ...newAppt, specialty: e.target.value })} placeholder="Especialidade (ex: Dermatologista)" className="text-xs h-9" />
                   <div className="grid grid-cols-2 gap-2">
-                    <Input type="date" value={newAppt.date} onChange={e => setNewAppt({ ...newAppt, date: e.target.value })} className="text-xs h-9" />
+                    <div className="relative">
+                      <Input type="date" value={newAppt.date} onChange={e => setNewAppt({ ...newAppt, date: e.target.value })} className="text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                      {!newAppt.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                    </div>
                     <Input type="time" value={newAppt.time} onChange={e => setNewAppt({ ...newAppt, time: e.target.value })} className="text-xs h-9" />
                   </div>
                   <Input value={newAppt.address} onChange={e => setNewAppt({ ...newAppt, address: e.target.value })} placeholder="Endereço" className="text-xs h-9" />

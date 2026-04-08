@@ -58,10 +58,7 @@ export const StrategyPanel = () => {
     <div className="mt-3">
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-neutral-900 dark:bg-neutral-950 px-3 py-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Target className="w-3.5 h-3.5 text-neutral-300" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-100">Estratégias</span>
-          </div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-100">Estratégias</span>
           <span className="text-[10px] text-neutral-400">{strategies.length}</span>
         </div>
 

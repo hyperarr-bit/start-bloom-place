@@ -114,7 +114,10 @@ export const PeoplePanel = () => {
               <Input placeholder="Relação" value={relation} onChange={e => setRelation(e.target.value)} className="h-7 text-[11px]" />
             </div>
             <div className="grid grid-cols-2 gap-1.5">
-              <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" placeholder="dd/mm/aaaa" />
+              <div className="relative">
+                <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" placeholder="dd/mm/aaaa" />
+                {!birthday && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Aniversário</span>}
+              </div>
               <Input placeholder="Notas" value={notes} onChange={e => setNotes(e.target.value)} className="h-7 text-[11px]" />
             </div>
             <button onClick={addPerson} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">

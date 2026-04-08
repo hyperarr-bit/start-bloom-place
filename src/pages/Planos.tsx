@@ -1,16 +1,32 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Zap } from "lucide-react";
+import { ArrowLeft, Check, Zap, Loader2, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 
 const Planos = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
+  const [loading, setLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      toast.success("Assinatura realizada com sucesso! 🎉");
+    }
+    if (searchParams.get("canceled") === "true") {
+      toast.info("Checkout cancelado.");
+    }
+  }, [searchParams]);
 
   const plans = {
-    monthly: { price: "27,90", period: "/mês", total: "R$ 334,80/ano" },
-    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "47% de desconto" },
+    monthly: { price: "19,90", period: "/mês", total: "R$ 238,80/ano" },
+    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "25% de desconto" },
   };
 
   const currentPlan = plans[billing];
@@ -22,6 +38,38 @@ const Planos = () => {
     "Atualizações e novos recursos",
     "Suporte prioritário",
   ];
+
+  const handleCheckout = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: { billing },
+      });
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao iniciar checkout: " + (err.message || "tente novamente"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("customer-portal");
+      if (error) throw error;
+      if (data?.url) {
+        window.open(data.url, "_blank");
+      }
+    } catch (err: any) {
+      toast.error("Erro ao abrir portal: " + (err.message || "tente novamente"));
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -35,6 +83,23 @@ const Planos = () => {
       </header>
 
       <main className="max-w-md mx-auto px-4 py-8 space-y-8">
+        {isSubscribed && (
+          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center space-y-3">
+            <p className="text-sm font-medium text-green-600 dark:text-green-400">
+              ✅ Você já é assinante CORE Pro!
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManageSubscription}
+              disabled={portalLoading}
+            >
+              {portalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings className="w-4 h-4 mr-2" />}
+              Gerenciar assinatura
+            </Button>
+          </div>
+        )}
+
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">
           <button
@@ -54,7 +119,7 @@ const Planos = () => {
             Anual
             {billing === "annual" && (
               <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                -47%
+                -25%
               </span>
             )}
           </button>
@@ -100,11 +165,19 @@ const Planos = () => {
             ))}
           </ul>
 
-          <Button className="w-full" size="lg" onClick={() => {
-            // Stripe checkout will be integrated here
-            console.log("Checkout:", billing);
-          }}>
-            Assinar CORE Pro
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handleCheckout}
+            disabled={loading || isSubscribed}
+          >
+            {loading ? (
+              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
+            ) : isSubscribed ? (
+              "Já assinante"
+            ) : (
+              "Assinar CORE Pro"
+            )}
           </Button>
 
           <p className="text-[10px] text-muted-foreground text-center">

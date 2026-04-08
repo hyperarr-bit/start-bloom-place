@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +21,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [trialExpired, setTrialExpired] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -29,7 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          setTimeout(() => checkSubscriptionStatus(session.user.id), 0);
+          setTimeout(() => checkSubscriptionStatus(), 0);
         } else {
           setTrialExpired(false);
           setIsSubscribed(false);
@@ -42,41 +43,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        checkSubscriptionStatus(session.user.id);
+        checkSubscriptionStatus();
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Auto-refresh every 60s
+    intervalRef.current = setInterval(() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) checkSubscriptionStatus();
+      });
+    }, 60000);
+
+    return () => {
+      subscription.unsubscribe();
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, []);
 
-  const checkSubscriptionStatus = async (userId: string) => {
-    const { data: sub } = await (supabase as any)
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("status", "active")
-      .maybeSingle();
-
-    if (sub) {
-      setIsSubscribed(true);
-      setTrialExpired(false);
-      return;
+  const checkSubscriptionStatus = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("check-subscription");
+      if (error) {
+        console.error("check-subscription error:", error);
+        return;
+      }
+      setIsSubscribed(data?.subscribed ?? false);
+      setTrialExpired(data?.trial_expired ?? false);
+    } catch (err) {
+      console.error("check-subscription failed:", err);
     }
-
-    const { data: profile } = await (supabase as any)
-      .from("profiles")
-      .select("created_at")
-      .eq("id", userId)
-      .single();
-
-    if (profile) {
-      const createdAt = new Date(profile.created_at);
-      const now = new Date();
-      const hoursSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60 * 60);
-      setTrialExpired(hoursSinceCreation > 24);
-    }
-    setIsSubscribed(false);
   };
 
   const signUp = async (email: string, password: string) => {

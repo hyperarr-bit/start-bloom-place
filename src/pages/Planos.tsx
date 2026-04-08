@@ -47,7 +47,7 @@ const Planos = () => {
       });
       if (error) throw error;
       if (data?.url) {
-        window.open(data.url, "_blank");
+        window.location.href = data.url;
       }
     } catch (err: any) {
       toast.error("Erro ao iniciar checkout: " + (err.message || "tente novamente"));
@@ -62,7 +62,7 @@ const Planos = () => {
       const { data, error } = await supabase.functions.invoke("customer-portal");
       if (error) throw error;
       if (data?.url) {
-        window.open(data.url, "_blank");
+        window.location.href = data.url;
       }
     } catch (err: any) {
       toast.error("Erro ao abrir portal: " + (err.message || "tente novamente"));

@@ -1,22 +1,48 @@
 
 
-# Plano: Corrigir redirecionamento do checkout Stripe
+# Plano: Substituir troféu por "Minha Conta" + controlar onboarding
 
-## Problema
-A edge function `create-checkout` funciona e retorna a URL do Stripe (confirmado nos network logs). Porém, `window.open(url, "_blank")` é bloqueado pelo navegador (popup blocker) no mobile e no preview do Lovable.
+## Resumo
 
-## Solucao
-Trocar `window.open(data.url, "_blank")` por `window.location.href = data.url` em ambos os handlers (checkout e customer-portal) no `src/pages/Planos.tsx`.
+Trocar o botão de troféu no header por um botão de avatar/conta que abre um drawer/sheet "Minha Conta". Mover "Sair da conta" do ModuleDrawer para lá. A caneta de editar nome some após a primeira edição. O onboarding aparece só uma vez (já funciona assim, mas adicionar opção de rever).
 
-## Mudancas
+## Mudanças
 
-No `src/pages/Planos.tsx`:
-- Linha 50: `window.open(data.url, "_blank")` → `window.location.href = data.url`
-- Linha 65 (customer-portal): `window.open(data.url, "_blank")` → `window.location.href = data.url`
+### 1. Criar `src/components/home/AccountDrawer.tsx`
 
-## Arquivo alterado (1)
+Drawer (usando Sheet do shadcn) com:
+- Avatar com inicial do nome + email do usuário
+- **Editar nome** (abre o NameEditDialog existente)
+- **Conquistas** (navega para `/conquistas`)
+- **Gerenciar assinatura** (abre customer-portal ou navega para `/planos`)
+- **Alterar senha** (chama `supabase.auth.resetPasswordForEmail`)
+- **Rever tutorial** (reseta `core-onboarding-done` e mostra o onboarding)
+- **Sair da conta** (signOut)
 
-| Arquivo | Mudanca |
-|---------|---------|
-| `src/pages/Planos.tsx` | Trocar `window.open` por `window.location.href` |
+Design: card `bg-card rounded-2xl border border-border/50`, items com ícones Lucide, estilo lista minimal igual ao app.
+
+### 2. Alterar `src/components/home/GreetingHeader.tsx`
+
+- Trocar o botão Trophy por um botão de avatar (círculo com inicial do nome, ou ícone `UserCircle`)
+- Ao clicar, abre o `AccountDrawer`
+- Remover a caneta de editar nome: mostrar apenas se `core-user-name` ainda não foi definido (primeira vez)
+- Manter ThemeToggle no lugar
+
+### 3. Alterar `src/components/home/ModuleDrawer.tsx`
+
+- Remover o botão "Sair da conta" (vai para AccountDrawer)
+- Manter botão admin analytics
+
+### 4. Ajustar `src/pages/Home.tsx`
+
+- O onboarding já usa `core-onboarding-done` — já aparece só na primeira vez
+- Nenhuma mudança necessária aqui (o AccountDrawer cuidará do "rever tutorial" resetando a key)
+
+## Arquivos
+
+| Arquivo | Ação |
+|---------|------|
+| `src/components/home/AccountDrawer.tsx` | Criar |
+| `src/components/home/GreetingHeader.tsx` | Alterar (troféu → avatar, caneta condicional) |
+| `src/components/home/ModuleDrawer.tsx` | Remover "Sair da conta" |
 

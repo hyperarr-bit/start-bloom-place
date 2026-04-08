@@ -1,38 +1,63 @@
 
 
-# Plano: Atualizar preços e integrar Stripe
+# Plano: Integrar Stripe completo com checkout e webhook
 
-## 1. Atualizar preços na página de Planos
+## Resumo
 
-| Plano | Antes | Depois |
-|-------|-------|--------|
-| Mensal | R$ 27,90/mês (R$ 334,80/ano) | R$ 19,90/mês (R$ 238,80/ano) |
-| Anual | R$ 14,90/mês (R$ 178,80/ano, -47%) | R$ 14,90/mês (R$ 178,80/ano, -25%) |
+Salvar a chave secreta do Stripe como secret no Supabase, adicionar a chave publicável no `.env`, criar uma edge function de checkout, criar uma edge function de webhook, e conectar o botão "Assinar" na página de Planos.
 
-O desconto muda de 47% para ~25% (19,90 → 14,90).
+## Passos
 
-**Arquivo:** `src/pages/Planos.tsx` — atualizar o objeto `plans` com os novos valores e o badge de desconto.
+### 1. Salvar chave secreta como Supabase Secret
+- Adicionar `STRIPE_SECRET_KEY` com a chave `sk_live_...` como secret no Supabase (via ferramenta add_secret)
 
-## 2. Integrar com Stripe
+### 2. Adicionar chave publicável no `.env`
+- Adicionar `VITE_STRIPE_PUBLISHABLE_KEY` no `.env` (chave pública, seguro no código)
 
-Para integrar pagamentos reais com Stripe, preciso habilitar a integração Stripe do Lovable. Isso vai:
+### 3. Criar Edge Function `create-checkout` 
+**Arquivo:** `supabase/functions/create-checkout/index.ts`
+- Recebe `{ billing: "monthly" | "annual" }` + token do usuário autenticado
+- Cria (ou reutiliza) um Stripe Customer com o email do usuário
+- Cria uma Checkout Session com:
+  - Mensal: R$ 19,90/mês (`price_data` com `recurring.interval: "month"`)
+  - Anual: R$ 14,90/mês (`price_data` com `recurring.interval: "year"`, unit_amount: 17880)
+- Retorna a `url` do checkout do Stripe
+- Inclui CORS headers
 
-1. **Habilitar Stripe** — usando a ferramenta do Lovable que coleta sua chave secreta do Stripe
-2. **Criar produtos/preços** no Stripe (CORE Pro Mensal R$19,90 e CORE Pro Anual R$14,90/mês)
-3. **Criar edge function** para gerar sessão de checkout do Stripe
-4. **Conectar o botão "Assinar"** para redirecionar ao checkout do Stripe
-5. **Criar webhook** para atualizar a tabela `subscriptions` quando o pagamento for confirmado
+### 4. Criar Edge Function `stripe-webhook`
+**Arquivo:** `supabase/functions/stripe-webhook/index.ts`
+- Recebe eventos do Stripe (sem JWT, verificação por assinatura do webhook)
+- Adicionar `STRIPE_WEBHOOK_SECRET` como secret
+- Eventos tratados:
+  - `checkout.session.completed` → INSERT na tabela `subscriptions` com status "active"
+  - `customer.subscription.updated` → UPDATE status
+  - `customer.subscription.deleted` → UPDATE status para "canceled"
+- Usa `stripe.webhooks.constructEvent()` para validar
 
-### Passo a passo para você:
-1. Eu atualizo os preços agora
-2. Habilito o Stripe (vai pedir sua chave secreta do Stripe — você pega no [Dashboard do Stripe](https://dashboard.stripe.com/apikeys))
-3. Depois implemento o fluxo completo de checkout
+### 5. Atualizar `Planos.tsx`
+- Importar `supabase` e `useAuth`
+- No clique do botão "Assinar":
+  - Chamar `supabase.functions.invoke("create-checkout", { body: { billing } })`
+  - Redirecionar para `data.url` (Stripe Checkout)
+- Adicionar estado de loading no botão
 
-**Quer que eu prossiga com os dois passos (preços + habilitar Stripe)?**
+### 6. Configurar webhook no Stripe Dashboard
+- Instruir o usuário a criar um webhook no Stripe Dashboard apontando para:
+  `https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/stripe-webhook`
+- Eventos: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+- Copiar o signing secret e salvar como `STRIPE_WEBHOOK_SECRET`
 
-## Arquivos alterados
+## Arquivos criados/alterados
 
-| Arquivo | Mudança |
-|---------|---------|
-| `src/pages/Planos.tsx` | Atualizar preços para 19,90 mensal e 14,90 anual, desconto -25% |
+| Arquivo | Tipo |
+|---------|------|
+| `supabase/functions/create-checkout/index.ts` | Criar |
+| `supabase/functions/stripe-webhook/index.ts` | Criar |
+| `src/pages/Planos.tsx` | Alterar |
+| `.env` | Alterar (adicionar VITE_STRIPE_PUBLISHABLE_KEY) |
+
+## Nota importante
+Após aprovar, vou precisar que você:
+1. Crie um webhook no painel do Stripe (eu dou o link e instruções)
+2. Me passe o **Webhook Signing Secret** para eu salvar como secret
 

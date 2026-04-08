@@ -266,9 +266,9 @@ const Biblioteca = () => {
         {/* Only show dates for lendo/lido */}
         {(form.status === "lendo" || form.status === "lido") && (
           <div className="grid grid-cols-2 gap-2">
-            <div><label className="text-[10px] font-bold text-muted-foreground">INÍCIO</label><Input type="date" value={form.startDate || ""} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="h-9 text-sm" /></div>
-            {form.status === "lido" && <div><label className="text-[10px] font-bold text-muted-foreground">FIM</label><Input type="date" value={form.endDate || ""} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} className="h-9 text-sm" /></div>}
-          </div>
+            <div><label className="text-[10px] font-bold text-muted-foreground">INÍCIO</label><Input type="date" value={form.startDate || ""} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>
+             {form.status === "lido" && <div><label className="text-[10px] font-bold text-muted-foreground">FIM</label><Input type="date" value={form.endDate || ""} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>}
+           </div>
         )}
 
         {/* Loan fields */}

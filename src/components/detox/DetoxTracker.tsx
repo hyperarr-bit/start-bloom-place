@@ -73,6 +73,27 @@ export const DetoxTracker = () => {
 
   const removeHabit = (id: string) => set("detox-habits", habits.filter(h => h.id !== id));
 
+  const addReason = (id: string) => {
+    if (!newReason.trim()) return;
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const reasons = h.reasons || [];
+      return { ...h, reasons: [...reasons, newReason.trim()] };
+    });
+    set("detox-habits", updated);
+    setNewReason("");
+  };
+
+  const removeReason = (id: string, index: number) => {
+    const updated = habits.map(h => {
+      if (h.id !== id) return h;
+      const reasons = [...(h.reasons || [])];
+      reasons.splice(index, 1);
+      return { ...h, reasons };
+    });
+    set("detox-habits", updated);
+  };
+
   const getStreak = (h: DetoxHabit) => {
     const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;
     const from = lastRelapse || h.startDate;

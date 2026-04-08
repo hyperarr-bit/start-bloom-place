@@ -9,8 +9,8 @@ const Planos = () => {
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
 
   const plans = {
-    monthly: { price: "27,90", period: "/mês", total: "R$ 334,80/ano" },
-    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "47% de desconto" },
+    monthly: { price: "19,90", period: "/mês", total: "R$ 238,80/ano" },
+    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "25% de desconto" },
   };
 
   const currentPlan = plans[billing];

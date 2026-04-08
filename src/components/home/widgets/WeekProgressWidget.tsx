@@ -7,13 +7,50 @@ export const WeekProgressWidget = () => {
   const { get } = useUserData();
 
   const getWeekScores = (): number[] => {
-    const data = get<number[]>("core-week-scores", []);
-    if (data.length > 0) return data;
-    const today = new Date().getDay();
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+
+    const habits = get<any[]>("core-rotina-habits", []);
+    const habitLog = get<any>("core-rotina-habit-log", {});
+    const waterLog = get<Record<string, number>>("core-saude-water", {});
+    const waterGoal = get<number>("core-saude-water-goal", 8);
+    const workoutLog = get<string[]>("saude-workout-log", []);
+    const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
+    const moodLog = get<Record<string, any>>("core-mood-log", {});
+
+    const todayStr = today.toISOString().slice(0, 10);
+
     return DAYS.map((_, i) => {
-      const dayIndex = (i + 1) % 7;
-      if (dayIndex > today) return 0;
-      return Math.floor(Math.random() * 40 + 30);
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().slice(0, 10);
+
+      if (dateStr > todayStr) return 0;
+
+      let score = 0;
+
+      // Habits (40pts)
+      if (habits.length > 0) {
+        const dayHabits = habitLog[dateStr] || {};
+        const done = Object.keys(dayHabits).length;
+        score += Math.round((done / habits.length) * 40);
+      }
+
+      // Water (20pts)
+      const water = waterLog[dateStr] || 0;
+      score += Math.min(20, Math.round((water / waterGoal) * 20));
+
+      // Workout (20pts)
+      if (workoutLog.includes(dateStr)) score += 20;
+
+      // Sleep (10pts)
+      if (sleepLog[dateStr]) score += 10;
+
+      // Mood (10pts)
+      if (moodLog[dateStr]) score += 10;
+
+      return Math.min(100, score);
     });
   };
 

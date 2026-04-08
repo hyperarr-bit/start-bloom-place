@@ -107,7 +107,10 @@ export const DateCalendar = () => {
             <div className="grid grid-cols-3 gap-1.5">
               <Input placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} className="h-7 text-[11px] col-span-1" />
               <Input placeholder="Pessoa" value={person} onChange={e => setPerson(e.target.value)} className="h-7 text-[11px] col-span-1" list="date-people-list" />
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] col-span-1" />
+              <div className="relative col-span-1">
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                {!date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+              </div>
             </div>
             <datalist id="date-people-list">
               {people.map((p: any) => <option key={p.id} value={p.name} />)}

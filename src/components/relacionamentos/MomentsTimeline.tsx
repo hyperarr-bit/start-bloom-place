@@ -67,7 +67,9 @@ export const MomentsTimeline = () => {
 
           <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
+              <div className="relative">
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+              </div>
               <Input placeholder="Com quem?" value={person} onChange={e => setPerson(e.target.value)} className="h-7 text-[11px]" list="moments-people" />
             </div>
             <datalist id="moments-people">

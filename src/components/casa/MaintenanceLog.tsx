@@ -109,7 +109,10 @@ const MaintenanceLog = () => {
           {warranties.length === 0 && <p className="text-[11px] text-muted-foreground italic py-2 text-center">Nenhuma garantia ainda</p>}
           <div className="grid grid-cols-3 gap-2 pt-1">
             <Input value={wProduct} onChange={e => setWProduct(e.target.value)} placeholder="Produto" className="text-xs h-7 col-span-3 bg-background/70" />
-            <Input type="date" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 col-span-2 bg-background/70" />
+            <div className="relative col-span-2">
+              <Input type="date" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 bg-background/70 appearance-none [&::-webkit-date-and-time-value]:text-left" />
+              {!wDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data compra</span>}
+            </div>
             <Input type="number" value={wMonths} onChange={e => setWMonths(e.target.value)} placeholder="Meses" className="text-xs h-7 bg-background/70" />
           </div>
           <Button size="sm" className="h-7 w-full text-xs mt-1" onClick={addWarranty}>Salvar garantia</Button>

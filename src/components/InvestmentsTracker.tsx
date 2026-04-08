@@ -256,7 +256,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                   type="date"
                   value={newInvestment.startDate || ""}
                   onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                  className="h-8 text-xs"
+                  className="h-8 text-xs appearance-none [&::-webkit-date-and-time-value]:text-left"
                 />
                 {!newInvestment.startDate && (
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">

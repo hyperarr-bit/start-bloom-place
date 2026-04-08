@@ -92,7 +92,10 @@ export const BillSplitter = () => {
               <Input placeholder="Descrição (ex: Jantar)" value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-9 rounded-xl text-xs" />
               <div className="grid grid-cols-2 gap-2">
                 <Input type="number" placeholder="Valor R$" value={form.amount || ""} onChange={e => setForm(p => ({ ...p, amount: Number(e.target.value) }))} className="h-9 rounded-xl text-xs" />
-                <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs" />
+                <div className="relative">
+                  <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                  {!form.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                </div>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground mb-1.5">Quem pagou?</p>

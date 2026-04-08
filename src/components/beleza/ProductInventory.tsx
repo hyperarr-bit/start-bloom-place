@@ -125,7 +125,7 @@ export const ProductInventory = () => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-muted-foreground">Data de Abertura</label>
-                <Input type="date" value={form.openedDate || ""} onChange={e => setForm(p => ({ ...p, openedDate: e.target.value }))} className="h-9 text-sm" />
+                <Input type="date" value={form.openedDate || ""} onChange={e => setForm(p => ({ ...p, openedDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" />
               </div>
               <div>
                 <label className="text-[10px] text-muted-foreground">PAO (meses)</label>

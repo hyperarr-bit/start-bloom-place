@@ -95,8 +95,11 @@ export const TravelDiary = () => {
             <div className="grid grid-cols-2 gap-2">
               <Input placeholder="Viagem" value={inlineForm.tripName || ""} onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
                 className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
-              <Input type="date" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
-                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30" />
+              <div className="relative">
+                <Input type="date" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
+                  className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                {!inlineForm.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Data</span>}
+              </div>
             </div>
             <Input placeholder="✨ Melhor momento do dia..." value={inlineForm.bestThing || ""}
               onChange={e => setInlineForm(p => ({ ...p, bestThing: e.target.value }))}

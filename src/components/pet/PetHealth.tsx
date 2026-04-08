@@ -113,8 +113,13 @@ export const PetHealth = () => {
             </div>
             <Input placeholder="Nome (ex: V8, Antirrábica)" value={name} onChange={e => setName(e.target.value)} className="h-7 text-[11px]" />
             <div className="grid grid-cols-2 gap-1.5">
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
-              <Input type="date" placeholder="Próxima" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px]" />
+              <div className="relative">
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+              </div>
+              <div className="relative">
+                <Input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                {!nextDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Próxima</span>}
+              </div>
             </div>
             <button onClick={addRecord} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
               <Plus className="w-3 h-3" /> Adicionar registro

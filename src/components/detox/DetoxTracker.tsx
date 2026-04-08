@@ -22,6 +22,7 @@ interface DetoxHabit {
   relapses: string[];
   record: number;
   checkins?: string[];
+  reasons?: string[];
 }
 
 const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞", "🎰"];

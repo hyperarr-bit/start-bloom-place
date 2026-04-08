@@ -25,7 +25,7 @@ export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large
 
   const getDayStatus = (date: string): "done" | "partial" | "empty" | "future" => {
     if (date > todayStr) return "future";
-    const hasWorkout = !!workoutLog[date];
+    const hasWorkout = workoutLog.includes(date);
     const dayHabits = habitLog[date] || {};
     const habitsDone = Object.keys(dayHabits).length;
     const total = habits.length;

@@ -106,8 +106,10 @@ export const QuickActions = () => {
 
   const markWorkout = () => {
     const tStr = todayStr();
-    const log = get<Record<string, boolean>>("core-treino-log", {});
-    set("core-treino-log", { ...log, [tStr]: true });
+    const log = get<string[]>("saude-workout-log", []);
+    if (!log.includes(tStr)) {
+      set("saude-workout-log", [...log, tStr]);
+    }
     vibrate();
     showSuccess("workout");
     toast.success("💪 Treino do dia registrado!", { action: { label: "Ver Treino", onClick: () => navigate("/treino") } });

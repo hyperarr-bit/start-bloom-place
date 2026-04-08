@@ -1,48 +1,38 @@
 
 
-# Plano: Substituir troféu por "Minha Conta" + controlar onboarding
+# Verificacao: Widgets da Home e Conexao com Modulos
 
-## Resumo
+## Resultado da Analise
 
-Trocar o botão de troféu no header por um botão de avatar/conta que abre um drawer/sheet "Minha Conta". Mover "Sair da conta" do ModuleDrawer para lá. A caneta de editar nome some após a primeira edição. O onboarding aparece só uma vez (já funciona assim, mas adicionar opção de rever).
+Revisados todos os 16 widgets. A maioria esta corretamente conectada, mas encontrei **3 problemas reais**:
 
-## Mudanças
+### Problema 1: Chave de treino duplicada (BUG)
+- **WorkoutWidget** e **Treino.tsx** usam `saude-workout-log` (array de strings)
+- **WeekCalendarWidget** e **QuickActions** usam `core-treino-log` (objeto `{date: boolean}`)
+- Resultado: marcar treino pelo widget nao reflete no calendario semanal, e vice-versa
 
-### 1. Criar `src/components/home/AccountDrawer.tsx`
+**Correcao**: Unificar tudo para `saude-workout-log` (a chave do modulo real). Alterar `WeekCalendarWidget` e `QuickActions` para ler/escrever `saude-workout-log`.
 
-Drawer (usando Sheet do shadcn) com:
-- Avatar com inicial do nome + email do usuário
-- **Editar nome** (abre o NameEditDialog existente)
-- **Conquistas** (navega para `/conquistas`)
-- **Gerenciar assinatura** (abre customer-portal ou navega para `/planos`)
-- **Alterar senha** (chama `supabase.auth.resetPasswordForEmail`)
-- **Rever tutorial** (reseta `core-onboarding-done` e mostra o onboarding)
-- **Sair da conta** (signOut)
+### Problema 2: WeekProgressWidget usa dados aleatorios (BUG)
+- Le `core-week-scores` que **nunca e escrito** em nenhum lugar do app
+- Fallback gera numeros aleatorios — dados falsos mostrados ao usuario
 
-Design: card `bg-card rounded-2xl border border-border/50`, items com ícones Lucide, estilo lista minimal igual ao app.
+**Correcao**: Calcular o score real de cada dia da semana usando a mesma logica do `dayScore` no `use-life-hub-data.ts`, lendo hábitos, agua, treino etc. dos ultimos 7 dias.
 
-### 2. Alterar `src/components/home/GreetingHeader.tsx`
+### Problema 3: QuickActions marca treino em chave errada (BUG)
+- Escreve em `core-treino-log` em vez de `saude-workout-log`
+- Treino marcado via acao rapida nao aparece no widget de Treino nem no modulo
 
-- Trocar o botão Trophy por um botão de avatar (círculo com inicial do nome, ou ícone `UserCircle`)
-- Ao clicar, abre o `AccountDrawer`
-- Remover a caneta de editar nome: mostrar apenas se `core-user-name` ainda não foi definido (primeira vez)
-- Manter ThemeToggle no lugar
+**Correcao**: Mudar para `saude-workout-log` com formato array (igual ao modulo).
 
-### 3. Alterar `src/components/home/ModuleDrawer.tsx`
+## Widgets OK (sem problemas)
+- Financas, Calorias, Saude, Habitos, Leitura, Orcamento Restante, Ofensiva de Habitos, Frase do Dia, Notas Rapidas, Timer de Foco, Macros, Sono, Contagem Regressiva — todos leem/escrevem as mesmas chaves dos seus modulos.
 
-- Remover o botão "Sair da conta" (vai para AccountDrawer)
-- Manter botão admin analytics
+## Arquivos alterados
 
-### 4. Ajustar `src/pages/Home.tsx`
-
-- O onboarding já usa `core-onboarding-done` — já aparece só na primeira vez
-- Nenhuma mudança necessária aqui (o AccountDrawer cuidará do "rever tutorial" resetando a key)
-
-## Arquivos
-
-| Arquivo | Ação |
-|---------|------|
-| `src/components/home/AccountDrawer.tsx` | Criar |
-| `src/components/home/GreetingHeader.tsx` | Alterar (troféu → avatar, caneta condicional) |
-| `src/components/home/ModuleDrawer.tsx` | Remover "Sair da conta" |
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/components/home/widgets/WeekCalendarWidget.tsx` | Trocar `core-treino-log` por `saude-workout-log` e adaptar leitura (array → includes) |
+| `src/components/home/widgets/WeekProgressWidget.tsx` | Calcular scores reais dos ultimos 7 dias em vez de ler chave inexistente |
+| `src/components/home/QuickActions.tsx` | Trocar `core-treino-log` por `saude-workout-log` (formato array) |
 

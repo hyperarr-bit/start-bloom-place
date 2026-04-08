@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check } from "lucide-react";
+import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check, X, Heart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { differenceInDays, format, startOfMonth, endOfMonth, eachDayOfInterval } from "date-fns";

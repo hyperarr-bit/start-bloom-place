@@ -168,9 +168,16 @@ export const QuickActions = () => {
 
   const submitTask = () => {
     if (!taskText.trim()) { toast.error("Digite a tarefa"); return; }
-    const tasks = get<any[]>("rotina-urgencies", []);
-    tasks.push({ id: crypto.randomUUID(), text: taskText.trim(), done: false });
-    set("rotina-urgencies", tasks);
+    const taskId = crypto.randomUUID();
+    const trimmed = taskText.trim();
+    // Add to urgencies
+    const urgencies = get<any[]>("rotina-urgencies", []);
+    urgencies.push({ id: taskId, text: trimmed, done: false });
+    set("rotina-urgencies", urgencies);
+    // Also add to focus todo-list
+    const todos = get<any[]>("todo-list", []);
+    todos.push({ id: taskId, text: trimmed, priority: "alta", done: false });
+    set("todo-list", todos);
     vibrate();
     showSuccess("task");
     toast.success("✅ Tarefa adicionada!", { action: { label: "Ver em Rotina", onClick: () => navigate("/rotina") } });

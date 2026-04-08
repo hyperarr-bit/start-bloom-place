@@ -1,52 +1,22 @@
 
 
-# Plano: Integração completa com Stripe
+# Plano: Corrigir redirecionamento do checkout Stripe
 
-## Produtos criados no Stripe
+## Problema
+A edge function `create-checkout` funciona e retorna a URL do Stripe (confirmado nos network logs). Porém, `window.open(url, "_blank")` é bloqueado pelo navegador (popup blocker) no mobile e no preview do Lovable.
 
-| Plano | Produto | Preço | Price ID |
-|-------|---------|-------|----------|
-| Mensal | `prod_UIfkhw9OQMoenu` | R$ 19,90/mês | `price_1TK4P7QdjmrIbUhHqpHuNcut` |
-| Anual | `prod_UIfkjiyVcm4eTP` | R$ 178,80/ano (R$ 14,90/mês) | `price_1TK4POQdjmrIbUhH518MJrO4` |
+## Solucao
+Trocar `window.open(data.url, "_blank")` por `window.location.href = data.url` em ambos os handlers (checkout e customer-portal) no `src/pages/Planos.tsx`.
 
-## Mudanças
+## Mudancas
 
-### 1. Edge Function `create-checkout`
-- Recebe `{ billing: "monthly" | "annual" }` do frontend
-- Autentica o usuário via token JWT
-- Verifica se já existe customer no Stripe pelo email
-- Cria sessão de checkout com `mode: "subscription"` e o price_id correto
-- Retorna URL do Stripe Checkout
+No `src/pages/Planos.tsx`:
+- Linha 50: `window.open(data.url, "_blank")` → `window.location.href = data.url`
+- Linha 65 (customer-portal): `window.open(data.url, "_blank")` → `window.location.href = data.url`
 
-### 2. Edge Function `check-subscription`
-- Autentica o usuário
-- Busca customer no Stripe pelo email
-- Verifica se tem subscription ativa
-- Retorna `{ subscribed: boolean, subscription_end: string | null }`
+## Arquivo alterado (1)
 
-### 3. Edge Function `customer-portal`
-- Autentica o usuário
-- Cria sessão do Stripe Customer Portal (cancelar, trocar plano, etc.)
-- Retorna URL do portal
-
-### 4. Atualizar `src/pages/Planos.tsx`
-- Preços: mensal R$ 19,90, anual R$ 14,90/mês (desconto ~25%)
-- Botão "Assinar" chama `create-checkout` via `supabase.functions.invoke`
-- Redireciona para o Stripe Checkout
-- Estado de loading no botão
-
-### 5. Atualizar `src/hooks/use-auth.tsx`
-- Trocar `checkSubscriptionStatus` para chamar a edge function `check-subscription` (consulta Stripe direto) em vez de consultar tabela `subscriptions`
-- Chamar no login, page load, e a cada 60s
-- Manter `trialExpired` e `isSubscribed` no contexto
-
-## Arquivos criados/alterados
-
-| Arquivo | Ação |
-|---------|------|
-| `supabase/functions/create-checkout/index.ts` | Criar |
-| `supabase/functions/check-subscription/index.ts` | Criar |
-| `supabase/functions/customer-portal/index.ts` | Criar |
-| `src/pages/Planos.tsx` | Atualizar preços + integrar checkout |
-| `src/hooks/use-auth.tsx` | Verificar assinatura via Stripe |
+| Arquivo | Mudanca |
+|---------|---------|
+| `src/pages/Planos.tsx` | Trocar `window.open` por `window.location.href` |
 

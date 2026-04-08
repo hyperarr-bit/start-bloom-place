@@ -174,6 +174,41 @@ export const DetoxTracker = () => {
                       {checkedToday ? "Confirmado hoje ✓" : "Estou limpo hoje"}
                     </button>
 
+                    {/* Por que quero parar? */}
+                    <div className="mb-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-muted-foreground flex items-center gap-1">
+                        <Heart className="w-3 h-3" /> Por que quero parar?
+                      </p>
+                      {(h.reasons || []).map((reason, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-primary/5 rounded-md px-2 py-1.5">
+                          <span className="text-[10px]">💪</span>
+                          <span className="text-[10px] flex-1">{reason}</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); removeReason(h.id, idx); }}
+                            className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            <X className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <div className="flex gap-1">
+                        <Input
+                          placeholder="Ex: Pela minha saúde, Pela minha família..."
+                          value={newReason}
+                          onChange={e => setNewReason(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); addReason(h.id); } }}
+                          className="h-6 text-[10px] flex-1"
+                        />
+                        <button
+                          onClick={e => { e.stopPropagation(); addReason(h.id); }}
+                          className="px-2 h-6 text-[9px] font-bold text-primary hover:bg-primary/10 rounded-md transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
                     <p className="text-[10px] text-muted-foreground mb-2">{format(today, "MMMM yyyy")}</p>
                     <div className="grid grid-cols-7 gap-1">
                       {["D", "S", "T", "Q", "Q", "S", "S"].map((d, idx) => (

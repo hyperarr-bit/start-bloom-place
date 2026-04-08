@@ -356,7 +356,10 @@ const Estudos = () => {
                 )}
                 <div className="flex gap-2 pt-2">
                   <Input value={newExamTitle} onChange={e => setNewExamTitle(e.target.value)} placeholder="Título" className="text-xs h-8 flex-1 rounded-lg" />
-                  <Input type="date" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="text-xs h-8 w-32 rounded-lg" />
+                  <div className="relative w-32">
+                    <Input type="date" value={newExamDate} onChange={e => setNewExamDate(e.target.value)} className="text-xs h-8 rounded-lg appearance-none [&::-webkit-date-and-time-value]:text-left" />
+                    {!newExamDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                  </div>
                   <Input value={newExamTime} onChange={e => setNewExamTime(e.target.value)} placeholder="Hora" className="text-xs h-8 w-16 rounded-lg" />
                   <Button size="sm" className="h-8" onClick={() => {
                     if (newExamTitle.trim()) {

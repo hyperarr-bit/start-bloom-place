@@ -9,8 +9,8 @@ const Planos = () => {
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
 
   const plans = {
-    monthly: { price: "27,90", period: "/mês", total: "R$ 334,80/ano" },
-    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "47% de desconto" },
+    monthly: { price: "19,90", period: "/mês", total: "R$ 238,80/ano" },
+    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "25% de desconto" },
   };
 
   const currentPlan = plans[billing];
@@ -54,7 +54,7 @@ const Planos = () => {
             Anual
             {billing === "annual" && (
               <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                -47%
+                -25%
               </span>
             )}
           </button>

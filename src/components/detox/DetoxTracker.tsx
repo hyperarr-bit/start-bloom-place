@@ -291,7 +291,21 @@ export const DetoxTracker = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Ei, tudo bem 💚</AlertDialogTitle>
             <AlertDialogDescription>
-              Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
+              {(() => {
+                const habit = habits.find(h => h.id === confirmRelapseId);
+                const reasons = habit?.reasons || [];
+                const randomReason = reasons.length > 0 ? reasons[Math.floor(Math.random() * reasons.length)] : null;
+                return (
+                  <>
+                    Recaídas fazem parte do processo. Cada dia que você resistiu te tornou mais forte. Vamos de novo?
+                    {randomReason && (
+                      <span className="block mt-2 text-sm font-medium text-primary">
+                        💪 Lembre-se: "{randomReason}"
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil, Trophy } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Sun, Moon, CloudSun, Sunset, Pencil } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";
+import { AccountDrawer } from "./AccountDrawer";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface GreetingHeaderProps {
   data: LifeHubData;
   onNameChange?: (name: string) => void;
+  onReplayTutorial?: () => void;
 }
 
 const getGreeting = () => {
@@ -26,21 +28,12 @@ const getContextualMessage = (data: LifeHubData): string => {
   const dayOfWeek = new Date().getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-  // Time-based contextual messages
-  if (h < 6) {
-    return "Descanse bem, amanhã é um novo dia ✨";
-  }
-
+  if (h < 6) return "Descanse bem, amanhã é um novo dia ✨";
   if (h >= 6 && h < 9) {
-    if (data.todayWorkoutGroup && !data.workoutDone) {
-      return `Hora de começar! Treino de ${data.todayWorkoutGroup} te espera 💪`;
-    }
-    if (data.tasksTotal > 0 && data.tasksCompleted === 0) {
-      return `${data.tasksTotal} hábito${data.tasksTotal > 1 ? "s" : ""} para conquistar hoje 🎯`;
-    }
+    if (data.todayWorkoutGroup && !data.workoutDone) return `Hora de começar! Treino de ${data.todayWorkoutGroup} te espera 💪`;
+    if (data.tasksTotal > 0 && data.tasksCompleted === 0) return `${data.tasksTotal} hábito${data.tasksTotal > 1 ? "s" : ""} para conquistar hoje 🎯`;
     return isWeekend ? "Bom fim de semana! Cuide de você 🌿" : "Comece o dia com energia! ⚡";
   }
-
   if (h >= 9 && h < 12) {
     if (data.tasksTotal > 0) {
       const pct = Math.round((data.tasksCompleted / data.tasksTotal) * 100);
@@ -50,48 +43,42 @@ const getContextualMessage = (data: LifeHubData): string => {
     }
     return "Manhã produtiva te espera ☀️";
   }
-
   if (h >= 12 && h < 14) {
-    if (data.mealsTotal > 0 && data.mealsLogged < data.mealsTotal) {
-      return `Hora do almoço! ${data.mealsTotal - data.mealsLogged} refeição restante 🍽️`;
-    }
+    if (data.mealsTotal > 0 && data.mealsLogged < data.mealsTotal) return `Hora do almoço! ${data.mealsTotal - data.mealsLogged} refeição restante 🍽️`;
     return "Hora do almoço, recarregue as energias 🍽️";
   }
-
   if (h >= 14 && h < 18) {
-    if (data.waterGlasses < data.waterGoal) {
-      return `Hidrate-se! Faltam ${data.waterGoal - data.waterGlasses} copos de água 💧`;
-    }
-    if (data.todayWorkoutGroup && !data.workoutDone) {
-      return `Ainda dá tempo do treino de ${data.todayWorkoutGroup} 🏋️`;
-    }
+    if (data.waterGlasses < data.waterGoal) return `Hidrate-se! Faltam ${data.waterGoal - data.waterGlasses} copos de água 💧`;
+    if (data.todayWorkoutGroup && !data.workoutDone) return `Ainda dá tempo do treino de ${data.todayWorkoutGroup} 🏋️`;
     const remaining = data.tasksTotal - data.tasksCompleted;
     if (remaining > 0) return `${remaining} hábito${remaining > 1 ? "s" : ""} pendente${remaining > 1 ? "s" : ""} para fechar o dia ✅`;
     return "Tarde produtiva! Mantenha o ritmo 🌟";
   }
-
   if (h >= 18 && h < 21) {
     if (data.dayScore >= 80) return "Dia incrível! Você está arrasando 🏆";
     if (data.dayScore >= 50) return "Bom progresso hoje! Finalize o que falta 🌙";
     if (data.currentBook) return `Que tal ler um pouco de "${data.currentBook}"? 📖`;
     return isWeekend ? "Aproveite a noite de fim de semana 🌃" : "Boa noite! Hora de desacelerar 🌙";
   }
-
-  // After 21h
   if (data.dayScore >= 80) return "Dia completo! Descanse com orgulho 🌟";
   if (data.dayScore >= 50) return "Bom dia! Amanhã será ainda melhor 💫";
   return "Hora de descansar. Amanhã é uma nova chance ✨";
 };
 
-export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
+export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: GreetingHeaderProps) => {
   const { user } = useAuth();
-  const { set: setUserData } = useUserData();
-  const navigate = useNavigate();
+  const { get, set: setUserData } = useUserData();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
   const contextMessage = getContextualMessage(data);
   const displayName = data.userName || user?.email?.split("@")[0] || "";
+  const hasSetName = !!get<string>("core-user-name", "");
+
+  const initials = displayName
+    ? displayName.slice(0, 2).toUpperCase()
+    : "?";
 
   const handleNameSave = (name: string) => {
     setUserData("core-user-name", name);
@@ -112,34 +99,50 @@ export const GreetingHeader = ({ data, onNameChange }: GreetingHeaderProps) => {
             <h1 className="text-lg font-bold truncate">
               {greeting}{displayName ? `, ${displayName}` : ""} 👋
             </h1>
-            <button
-              onClick={() => setShowNameDialog(true)}
-              className="w-5 h-5 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
-              aria-label="Editar nome"
-            >
-              <Pencil className="w-2.5 h-2.5" />
-            </button>
+            {!hasSetName && (
+              <button
+                onClick={() => setShowNameDialog(true)}
+                className="w-5 h-5 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+                aria-label="Editar nome"
+              >
+                <Pencil className="w-2.5 h-2.5" />
+              </button>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <motion.button
-            onClick={() => navigate("/conquistas")}
-            className="w-8 h-8 rounded-xl flex items-center justify-center bg-muted hover:bg-yellow-500/10 hover:text-yellow-500 transition-colors"
+            onClick={() => setShowAccount(true)}
+            className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden"
             whileTap={{ scale: 0.9 }}
-            aria-label="Conquistas"
+            aria-label="Minha conta"
           >
-            <Trophy className="w-3.5 h-3.5" />
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold rounded-xl">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
           </motion.button>
           <ThemeToggle showPalette />
         </div>
       </motion.div>
 
-      <NameEditDialog
-        open={showNameDialog}
-        onOpenChange={setShowNameDialog}
-        currentName={displayName}
-        onSave={handleNameSave}
+      {!hasSetName && (
+        <NameEditDialog
+          open={showNameDialog}
+          onOpenChange={setShowNameDialog}
+          currentName={displayName}
+          onSave={handleNameSave}
+        />
+      )}
+
+      <AccountDrawer
+        open={showAccount}
+        onOpenChange={setShowAccount}
+        displayName={displayName}
+        onNameChange={onNameChange}
+        onReplayTutorial={onReplayTutorial}
       />
     </>
   );

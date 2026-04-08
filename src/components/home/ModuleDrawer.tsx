@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff, LogOut, BarChart3
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff, BarChart3
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useAuth } from "@/hooks/use-auth";
@@ -30,7 +30,7 @@ const modules = [
 
 export const ModuleDrawer = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
 
@@ -121,13 +121,6 @@ export const ModuleDrawer = () => {
         </button>
       )}
 
-      <button
-        onClick={signOut}
-        className={`w-full flex items-center justify-center gap-2 ${isAdmin(user?.id, user?.email) ? "mt-2" : "mt-4"} pt-3 border-t border-border text-xs text-destructive hover:text-destructive/80 transition-colors`}
-      >
-        <LogOut className="w-3.5 h-3.5" />
-        Sair da conta
-      </button>
     </div>
   );
 };

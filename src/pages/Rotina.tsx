@@ -1149,7 +1149,7 @@ const Rotina = () => {
               <div className="bg-card rounded-lg border border-border overflow-hidden">
                 <div className="bg-gradient-to-r from-pink-300 to-pink-400 px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-sm text-white">ROTINA SEMANAL</span>
-                  <span>🍎</span>
+                  
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">

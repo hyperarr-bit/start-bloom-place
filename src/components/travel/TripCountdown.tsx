@@ -104,13 +104,13 @@ export const TripCountdown = () => {
                 className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60"
               />
             </div>
-            <div className="col-span-4">
+            <div className="col-span-4 relative">
               <Input
                 type="date"
                 value={inlineForm.departureDate}
                 onChange={e => setInlineForm(p => ({ ...p, departureDate: e.target.value }))}
                 onKeyDown={e => e.key === "Enter" && add()}
-                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30"
+                className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 appearance-none [&::-webkit-date-and-time-value]:text-left"
               />
             </div>
             <div className="col-span-3 text-right">

@@ -1,33 +1,30 @@
 
 
-# Plano: Melhorar WelcomeScreen
+# Plano: Substituir mock screens pelo vídeo real do app
 
-## Mudancas
+## Resumo
 
-### 1. `src/components/WelcomeScreen.tsx`
+Substituir todo o conteúdo fake (mock screens, AnimatePresence, ícones) dentro do iPhone por um `<video>` com o vídeo enviado pelo usuário. O vídeo já contém a Dynamic Island (com indicador de gravação vermelho), então o frame do iPhone NÃO deve adicionar uma Dynamic Island própria — o vídeo já cobre isso.
 
-**Logo**: Remover o icone `Brain`. Manter apenas `<h1>CORE</h1>` centralizado.
+## Mudanças
 
-**Video dentro do iPhone**: Substituir todo o conteudo fake (MOCK_SCREENS, AnimatePresence com cards) por um `<video>` real tocando em loop dentro do frame do iPhone. O video sera copiado do upload do usuario para `public/videos/app-preview.mp4` e referenciado via `staticFile` ou path direto.
+### 1. Copiar vídeo para `public/videos/app-preview.mp4`
 
-**Frame do iPhone mais realista**: Atualizar o CSS do mockup para parecer um iPhone real:
-- Bordas mais grossas e arredondadas (como iPhone 15)
-- Dynamic Island no topo (pilula preta centralizada, nao notch oval)
-- Sombra mais pronunciada
-- Barra inferior (home indicator) mais fiel
-- Proporcoes corretas (~9:19.5 aspect ratio)
-- Fundo preto no frame (como iPhone real)
+Copiar `user-uploads://copy_ADA6DC93-25DF-4AE6-BC9B-941F009B092D.mov` para `public/videos/app-preview.mp4`.
 
-**Remover**: Array `MOCK_SCREENS`, imports de icones nao usados (DollarSign, Dumbbell, etc.), dots indicator, logica de `currentScreen`.
+### 2. Reescrever `src/components/WelcomeScreen.tsx`
 
-### 2. Copiar video do usuario
-
-Copiar `user-uploads://ScreenRecording_04-08-2026_20-49-38_1-2.mp4` para `public/videos/app-preview.mp4`.
+- **Remover**: Todos os mock screens (HomeScreen, FinanceScreen, HealthScreen, HabitsScreen), array SCREENS, lógica de `currentScreen`, dots indicator, bottom nav bar, imports de ícones não usados
+- **Remover Dynamic Island**: O vídeo já tem a Dynamic Island visível, não precisa de overlay
+- **Adicionar**: Tag `<video>` com autoPlay, loop, muted, playsInline dentro do frame do iPhone
+- **Proporção**: O vídeo é uma gravação de iPhone (aspect ratio ~9:19.5 / 1170x2532px). O frame vai usar `w-[240px]` e calcular a altura proporcional (~520px) para que o vídeo preencha 100% sem cortes. O `<video>` usa `object-fit: cover` e `border-radius` matching o frame
+- **Frame simplificado**: Apenas a borda preta do iPhone (rounded corners, sombra) + home indicator. Sem Dynamic Island artificial
+- **Manter**: Logo "CORE", subtítulo, botões "Começar" e "Já tem conta?", animação de entrada do iPhone
 
 ## Arquivos
 
-| Arquivo | Acao |
+| Arquivo | Ação |
 |---------|------|
 | `public/videos/app-preview.mp4` | Criar (copiar upload) |
-| `src/components/WelcomeScreen.tsx` | Reescrever (remover Brain, mock screens; adicionar video real, iPhone realista) |
+| `src/components/WelcomeScreen.tsx` | Reescrever (vídeo real, sem mocks) |
 

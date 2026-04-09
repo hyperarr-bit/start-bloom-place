@@ -1,64 +1,16 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { DollarSign, Dumbbell, Heart, BookOpen, Home, Utensils, Brain, Sparkles } from "lucide-react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
   onLogin: () => void;
 }
 
-const MOCK_SCREENS = [
-  {
-    title: "Finanças",
-    icon: DollarSign,
-    color: "hsl(var(--chart-1))",
-    items: ["Orçamento mensal", "Despesas fixas", "Metas financeiras"],
-  },
-  {
-    title: "Treino",
-    icon: Dumbbell,
-    color: "hsl(var(--chart-2))",
-    items: ["Treino de hoje", "Histórico", "Evolução"],
-  },
-  {
-    title: "Saúde",
-    icon: Heart,
-    color: "hsl(var(--chart-3))",
-    items: ["Hidratação", "Medicamentos", "Check-up"],
-  },
-  {
-    title: "Rotina",
-    icon: Home,
-    color: "hsl(var(--chart-4))",
-    items: ["Tarefas do dia", "Hábitos", "Lembretes"],
-  },
-  {
-    title: "Estudos",
-    icon: BookOpen,
-    color: "hsl(var(--chart-5))",
-    items: ["Metas de leitura", "Anotações", "Progresso"],
-  },
-  {
-    title: "Dieta",
-    icon: Utensils,
-    color: "hsl(var(--chart-1))",
-    items: ["Calorias do dia", "Refeições", "Macros"],
-  },
-];
-
 export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
-  const [currentScreen, setCurrentScreen] = useState(0);
   const [showButton, setShowButton] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentScreen((prev) => (prev + 1) % MOCK_SCREENS.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowButton(true), 3000);
+    const timer = setTimeout(() => setShowButton(true), 2000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -71,100 +23,48 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
     >
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/10 pointer-events-none" />
 
+      {/* Logo */}
       <motion.div
         className="relative z-10 text-center mb-8"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
       >
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <Brain className="w-6 h-6 text-primary" />
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">CORE</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-3xl font-bold text-foreground tracking-[0.2em]">CORE</h1>
+        <p className="text-sm text-muted-foreground mt-1">
           Organize toda a sua vida em um só lugar
         </p>
       </motion.div>
 
+      {/* iPhone Frame */}
       <motion.div
         className="relative z-10"
         initial={{ opacity: 0, y: 80, scale: 0.8 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.5 }}
       >
-        <div className="relative w-[220px] h-[440px] rounded-[36px] border-[3px] border-foreground/20 bg-card shadow-2xl overflow-hidden">
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-5 bg-foreground/10 rounded-full z-20" />
+        <div className="relative w-[240px] h-[490px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
+          {/* Dynamic Island */}
+          <div className="absolute top-[18px] left-1/2 -translate-x-1/2 w-[90px] h-[28px] bg-black rounded-full z-20" />
 
-          <div className="absolute inset-[3px] top-9 bottom-3 rounded-[28px] overflow-hidden bg-background">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentScreen}
-                className="absolute inset-0 p-4 flex flex-col"
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -60, opacity: 0 }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-              >
-                <div className="flex items-center gap-2 mb-4">
-                  <div
-                    className="w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: MOCK_SCREENS[currentScreen].color + "20" }}
-                  >
-                    {(() => {
-                      const Icon = MOCK_SCREENS[currentScreen].icon;
-                      return <Icon className="w-4 h-4" style={{ color: MOCK_SCREENS[currentScreen].color }} />;
-                    })()}
-                  </div>
-                  <span className="text-xs font-semibold text-foreground">
-                    {MOCK_SCREENS[currentScreen].title}
-                  </span>
-                </div>
-
-                <div className="space-y-2.5 flex-1">
-                  {MOCK_SCREENS[currentScreen].items.map((item, i) => (
-                    <motion.div
-                      key={item}
-                      className="rounded-xl border border-border/50 bg-card p-3"
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 + i * 0.1 }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: MOCK_SCREENS[currentScreen].color }}
-                        />
-                        <span className="text-[10px] text-foreground/80">{item}</span>
-                      </div>
-                      <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
-                        <motion.div
-                          className="h-full rounded-full"
-                          style={{ backgroundColor: MOCK_SCREENS[currentScreen].color }}
-                          initial={{ width: "0%" }}
-                          animate={{ width: `${40 + i * 20}%` }}
-                          transition={{ delay: 0.3 + i * 0.1, duration: 0.6 }}
-                        />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <div className="flex justify-around pt-3 border-t border-border/30 mt-auto">
-                  {[Home, DollarSign, Heart, Sparkles].map((Icon, i) => (
-                    <div key={i} className="w-6 h-6 rounded-lg bg-muted/50 flex items-center justify-center">
-                      <Icon className="w-3 h-3 text-muted-foreground" />
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            </AnimatePresence>
+          {/* Screen */}
+          <div className="w-full h-full rounded-[34px] overflow-hidden bg-black">
+            <video
+              src="/videos/app-preview.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
           </div>
 
-          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-1 bg-foreground/15 rounded-full" />
+          {/* Home Indicator */}
+          <div className="absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[100px] h-[4px] bg-white/20 rounded-full" />
         </div>
       </motion.div>
 
-      {/* CTA + Login link */}
+      {/* CTA + Login */}
       <AnimatePresence>
         {showButton && (
           <motion.div
@@ -189,18 +89,6 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Dots indicator */}
-      <div className="relative z-10 flex gap-1.5 mt-6">
-        {MOCK_SCREENS.map((_, i) => (
-          <div
-            key={i}
-            className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
-              i === currentScreen ? "bg-primary" : "bg-muted-foreground/30"
-            }`}
-          />
-        ))}
-      </div>
     </motion.div>
   );
 };

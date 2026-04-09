@@ -8,6 +8,7 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const [showButton, setShowButton] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -16,9 +17,32 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   }, []);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
+    const video = videoRef.current;
+    if (!video) return;
+
+    const tryPlay = () => {
+      video.play().catch(() => {});
+    };
+
+    if (video.readyState >= 3) {
+      setVideoReady(true);
+      tryPlay();
+    } else {
+      video.addEventListener('canplay', () => {
+        setVideoReady(true);
+        tryPlay();
+      }, { once: true });
     }
+
+    const interval = setInterval(() => {
+      if (video.readyState >= 3) {
+        setVideoReady(true);
+        tryPlay();
+        clearInterval(interval);
+      }
+    }, 300);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -52,14 +76,15 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
       >
         <div className="relative w-[240px] h-[519px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
           {/* Screen with video */}
-          <div className="w-full h-full rounded-[34px] overflow-hidden bg-black">
+          <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted">
             <video
               ref={videoRef}
               autoPlay
               loop
               muted
               playsInline
-              className="w-full h-full object-cover"
+              preload="auto"
+              className={`w-full h-full object-cover transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
               src="/videos/app-preview.mp4"
             />
           </div>

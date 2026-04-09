@@ -74,7 +74,7 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
         {showButton && (
           <motion.div
             className="relative z-10 mt-5 flex flex-col items-center gap-3"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >

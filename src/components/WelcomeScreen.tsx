@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface WelcomeScreenProps {
@@ -6,44 +6,74 @@ interface WelcomeScreenProps {
   onLogin: () => void;
 }
 
+type VideoState = "loading" | "playing" | "blocked" | "error";
+
 export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const [showButton, setShowButton] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
+  const [videoState, setVideoState] = useState<VideoState>("loading");
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const attemptPlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          setVideoState("playing");
+        })
+        .catch(() => {
+          setVideoState("blocked");
+        });
+    }
+  }, []);
+
+  // Show CTA after delay
   useEffect(() => {
     const timer = setTimeout(() => setShowButton(true), 2000);
     return () => clearTimeout(timer);
   }, []);
 
+  // Autoplay logic
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    const tryPlay = () => {
-      video.play().catch(() => {});
-    };
+    // Try play on various readiness events
+    const onReady = () => attemptPlay();
 
-    if (video.readyState >= 3) {
-      setVideoReady(true);
-      tryPlay();
-    } else {
-      video.addEventListener('canplay', () => {
-        setVideoReady(true);
-        tryPlay();
-      }, { once: true });
+    video.addEventListener("loadedmetadata", onReady, { once: true });
+    video.addEventListener("canplay", onReady, { once: true });
+
+    // If already loaded
+    if (video.readyState >= 2) {
+      attemptPlay();
     }
 
-    const interval = setInterval(() => {
-      if (video.readyState >= 3) {
-        setVideoReady(true);
-        tryPlay();
-        clearInterval(interval);
+    // Visibility change — resume when tab becomes visible
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && video.paused) {
+        attemptPlay();
       }
-    }, 300);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      video.removeEventListener("loadedmetadata", onReady);
+      video.removeEventListener("canplay", onReady);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [attemptPlay]);
+
+  // Tap-to-play fallback: any touch/click on the screen triggers play
+  const handleScreenTap = useCallback(() => {
+    if (videoState === "blocked") {
+      attemptPlay();
+    }
+  }, [videoState, attemptPlay]);
+
+  const isVideoVisible = videoState === "playing";
 
   return (
     <motion.div
@@ -51,6 +81,7 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.4 } }}
+      onClick={handleScreenTap}
     >
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/10 pointer-events-none" />
 
@@ -75,8 +106,17 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
         transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.5 }}
       >
         <div className="relative w-[240px] h-[519px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
-          {/* Screen with video */}
-          <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted">
+          {/* Screen */}
+          <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted relative">
+            {/* Poster image shown until video plays */}
+            <img
+              src="/videos/app-preview-poster.jpg"
+              alt=""
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                isVideoVisible ? "opacity-0" : "opacity-100"
+              }`}
+            />
+            {/* Video — pointer-events-none prevents iOS play button overlay */}
             <video
               ref={videoRef}
               autoPlay
@@ -84,9 +124,16 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
               muted
               playsInline
               preload="auto"
-              className={`w-full h-full object-cover transition-opacity duration-500 ${videoReady ? 'opacity-100' : 'opacity-0'}`}
-              src="/videos/app-preview.mp4"
-            />
+              poster="/videos/app-preview-poster.jpg"
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-500 ${
+                isVideoVisible ? "opacity-100" : "opacity-0"
+              }`}
+              // @ts-ignore — webkit attribute for iOS
+              webkit-playsinline="true"
+              disablePictureInPicture
+            >
+              <source src="/videos/app-preview.mp4" type="video/mp4" />
+            </video>
           </div>
 
           {/* Home Indicator */}

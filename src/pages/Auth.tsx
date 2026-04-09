@@ -68,9 +68,7 @@ const Auth = () => {
   // Welcome screen (before auth)
   if (showWelcome) {
     return (
-      <AnimatePresence>
-        <WelcomeScreen onComplete={handleWelcomeComplete} onLogin={handleWelcomeLogin} />
-      </AnimatePresence>
+      <WelcomeScreen onComplete={handleWelcomeComplete} onLogin={handleWelcomeLogin} />
     );
   }
 

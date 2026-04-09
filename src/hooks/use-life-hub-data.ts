@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 
 export interface LifeHubData {

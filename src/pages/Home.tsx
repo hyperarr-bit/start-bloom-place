@@ -69,7 +69,6 @@ const HomePage = () => {
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
     if (!loaded) return;
-    setShowWelcome(!get<string>("core-welcome-done", ""));
     setShowOnboarding(!get<string>("core-onboarding-done", ""));
   }, [loaded, get]);
 

@@ -1,26 +1,31 @@
 
 
-## Ajustes visuais da WelcomeScreen (baseado na referência)
+## Ajuste de proporções da WelcomeScreen
 
-Comparando a tela atual com a imagem de referência, as mudanças são:
+Analisando a imagem de referência vs. o código atual, os problemas são:
 
-### Layout e posição dos textos
-- **Remover** o logo "CORE" e subtítulo do topo — na referência, o texto fica **abaixo** do mockup do iPhone, não acima
-- **Mover** o título para baixo do mockup: "Organize sua vida em um só lugar" — texto grande, bold, centralizado
-- O mockup do iPhone fica na metade superior da tela, o texto e botões na metade inferior
+1. **Mockup muito grande** — ocupa espaço demais, empurrando o texto/botão para baixo
+2. **Espaçamento entre título, botão e "Entrar"** está diferente da referência
+3. **Layout vertical** precisa: mockup mais acima, com espaço generoso entre mockup → título → botão → link
 
-### Botão e texto de login
-- Botão "Começar" deve ser **full-width** (mesma largura do container ~90%), com fundo **preto** (`bg-foreground text-background`), cantos arredondados grandes (`rounded-2xl`), padding generoso (`py-4`), texto maior (`text-base font-semibold`)
-- Texto "Já tem uma conta? **Entrar**" abaixo do botão, mesmo estilo atual mas com mais espaçamento
+### Mudanças em `src/components/WelcomeScreen.tsx`
 
-### Fundo
-- Remover o gradiente (`bg-gradient-to-b from-primary/5 via-transparent to-primary/10`)
-- Fundo uniforme: apenas `bg-background` (branco no light, escuro no dark) — cor sólida e limpa em toda a página
+**Container principal (linha 80)**:
+- Trocar `justify-between py-12` por `justify-start pt-16 pb-10` — controle manual do espaçamento em vez de distribuir automaticamente
 
-### Resumo das edições em `WelcomeScreen.tsx`
-1. Remover o `<div>` do gradiente de fundo (linha 86)
-2. Remover o bloco do logo/título do topo (linhas 89-99)
-3. Adicionar título "Organize sua vida em um só lugar" entre o mockup e o botão — `text-2xl font-bold text-center`
-4. Alterar botão para full-width, preto, arredondado, maior
-5. Ajustar espaçamento: mockup mais para cima, texto+botão mais para baixo com `gap` adequado
+**Mockup do iPhone (linhas 87-121)**:
+- Reduzir de `w-[240px] h-[519px]` para `w-[220px] h-[476px]`
+- Reduzir border-radius proporcionalmente: `rounded-[40px]`, inner `rounded-[30px]`
+- Remover `flex-1` do wrapper — não deve crescer, tamanho fixo
+- Alinhar ao topo com margem inferior fixa
+
+**Bloco de texto + CTA (linhas 124-158)**:
+- Adicionar `mt-auto` para empurrar para o fundo da tela
+- Título: aumentar para `text-3xl` (na referência o texto é bem grande/bold)
+- Gap entre título e botão: `gap-6`
+- Gap entre botão e link "Entrar": `gap-5`
+- Botão: manter `py-4 rounded-2xl` mas adicionar `rounded-xl` (a referência tem cantos menos arredondados, ~12px)
+- Padding horizontal do container: `px-6` (mais largo, botão quase full-width)
+
+Resultado: mockup menor e mais acima, texto grande abaixo com espaçamento generoso, botão largo na base — matching a referência.
 

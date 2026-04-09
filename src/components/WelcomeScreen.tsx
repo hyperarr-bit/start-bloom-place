@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, forwardRef } from "react";
+import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { motion } from "framer-motion";
 
 interface WelcomeScreenProps {

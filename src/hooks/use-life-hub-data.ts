@@ -39,7 +39,41 @@ export function useLifeHubData(): LifeHubData {
   const { get, set, loaded } = useUserData();
   const streakHandled = useRef(false);
 
+  // Handle streak as a side-effect, only after data is loaded
+  useEffect(() => {
+    if (!loaded || streakHandled.current) return;
+    streakHandled.current = true;
+
+    const tStr = todayStr();
+    const streakData = get<any>("core-hub-streak", { count: 0, lastDate: "" });
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    if (streakData.lastDate === tStr) {
+      // already counted today
+    } else if (streakData.lastDate === yesterdayStr) {
+      set("core-hub-streak", { count: (streakData.count || 0) + 1, lastDate: tStr });
+    } else {
+      set("core-hub-streak", { count: 1, lastDate: tStr });
+    }
+  }, [loaded, get, set]);
+
   return useMemo(() => {
+    // Return safe defaults until Supabase data is loaded
+    if (!loaded) {
+      return {
+        dayScore: 0, streak: 0, monthBalance: 0,
+        nextBillName: null, nextBillDate: null,
+        todayWorkoutGroup: null, workoutDone: false, workoutTime: null,
+        caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 0, mealsTotal: 4,
+        waterGlasses: 0, waterGoal: 8, sleepHours: null,
+        supplementsTaken: 0, supplementsTotal: 0,
+        currentBook: null, readingProgress: 0, booksReadThisYear: 0,
+        tasksCompleted: 0, tasksTotal: 0, habits: [], userName: "",
+      };
+    }
+
     const tStr = todayStr();
 
     // Finance — read from the same keys used by the Finanças module
@@ -121,22 +155,9 @@ export function useLifeHubData(): LifeHubData {
     const tasksTotal = mappedHabits.length;
     const tasksCompleted = mappedHabits.filter(h => h.done).length;
 
-    // Streak
+    // Streak — read only, side-effect handled in useEffect above
     const streakData = get<any>("core-hub-streak", { count: 0, lastDate: "" });
-    let streak = streakData.count || 0;
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-    if (streakData.lastDate === tStr) {
-      // already counted
-    } else if (streakData.lastDate === yesterdayStr) {
-      streak += 1;
-      set("core-hub-streak", { count: streak, lastDate: tStr });
-    } else if (streakData.lastDate !== tStr) {
-      streak = 1;
-      set("core-hub-streak", { count: 1, lastDate: tStr });
-    }
+    const streak = streakData.count || 0;
 
     // Day Score — granular, every small action counts
     let scorePoints = 0;
@@ -206,5 +227,5 @@ export function useLifeHubData(): LifeHubData {
       booksReadThisYear: booksRead,
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
     };
-  }, [get, set]);
+  }, [get, loaded]);
 }

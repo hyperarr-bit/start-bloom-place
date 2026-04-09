@@ -5,7 +5,7 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
+
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
 import { QuickActions } from "@/components/home/QuickActions";
@@ -61,7 +61,7 @@ const HomePage = () => {
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded } = useUserData();
-  const [showWelcome, setShowWelcome] = useState(() => !get<string>("core-welcome-done", ""));
+
   const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
@@ -69,7 +69,6 @@ const HomePage = () => {
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
     if (!loaded) return;
-    setShowWelcome(!get<string>("core-welcome-done", ""));
     setShowOnboarding(!get<string>("core-onboarding-done", ""));
   }, [loaded, get]);
 
@@ -116,24 +115,14 @@ const HomePage = () => {
 
   return (
     <>
-      <AnimatePresence>
-        {showWelcome && (
-          <WelcomeScreen
-            onComplete={() => {
-              setData("core-welcome-done", "true");
-              setShowWelcome(false);
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
-        {!showWelcome && showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
+        {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <div className="max-w-lg mx-auto px-4 py-5 space-y-6">
-          <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowWelcome(true); setShowOnboarding(true); }} />
+          <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
 
           <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
             <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />

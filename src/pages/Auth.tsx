@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -17,6 +18,23 @@ const Auth = () => {
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Show welcome screen only if user hasn't seen it before
+  const [showWelcome, setShowWelcome] = useState(() => {
+    return !localStorage.getItem("core-welcome-done");
+  });
+
+  const handleWelcomeComplete = () => {
+    localStorage.setItem("core-welcome-done", "true");
+    setShowWelcome(false);
+    setIsLogin(false); // Go to signup
+  };
+
+  const handleWelcomeLogin = () => {
+    localStorage.setItem("core-welcome-done", "true");
+    setShowWelcome(false);
+    setIsLogin(true); // Go to login
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +64,15 @@ const Auth = () => {
     }
     setLoading(false);
   };
+
+  // Welcome screen (before auth)
+  if (showWelcome) {
+    return (
+      <AnimatePresence>
+        <WelcomeScreen onComplete={handleWelcomeComplete} onLogin={handleWelcomeLogin} />
+      </AnimatePresence>
+    );
+  }
 
   if (confirmationSent) {
     return (

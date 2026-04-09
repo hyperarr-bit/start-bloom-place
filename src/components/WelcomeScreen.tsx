@@ -8,10 +8,17 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const [showButton, setShowButton] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowButton(true), 2000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
   }, []);
 
   return (

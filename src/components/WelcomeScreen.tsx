@@ -11,7 +11,7 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowButton(true), 2000);
+    const timer = setTimeout(() => setShowButton(true), 2500);
     return () => clearTimeout(timer);
   }, []);
 

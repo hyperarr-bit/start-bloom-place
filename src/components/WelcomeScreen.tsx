@@ -77,38 +77,21 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden py-12"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/10 pointer-events-none" />
-
-        {/* Logo */}
+        {/* iPhone frame with video — upper half */}
         <motion.div
-          className="relative z-10 text-center mb-8"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-        >
-          <h1 className="text-3xl font-bold text-foreground tracking-[0.2em]">CORE</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Organize toda a sua vida em um só lugar
-          </p>
-        </motion.div>
-
-        {/* iPhone frame with video */}
-        <motion.div
-          className="relative z-10"
+          className="relative z-10 flex-1 flex items-center"
           initial={{ opacity: 0, y: 80, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.5 }}
+          transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
         >
           <div className="relative w-[240px] h-[519px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
-            {/* Screen */}
             <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted relative">
-              {/* Video — ALWAYS opacity-100 so iOS allows autoplay */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -118,15 +101,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 preload="auto"
                 poster="/videos/app-preview-poster.jpg"
                 className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
-                // @ts-ignore — webkit attribute for iOS
+                // @ts-ignore
                 webkit-playsinline="true"
                 disablePictureInPicture
                 onPlaying={() => setVideoState("playing")}
               >
                 <source src="/videos/app-preview.mp4" type="video/mp4" />
               </video>
-
-              {/* Poster overlay — sits on top, fades out when video plays */}
               <img
                 src="/videos/app-preview-poster.jpg"
                 alt=""
@@ -135,37 +116,46 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 }`}
               />
             </div>
-
-            {/* Home Indicator */}
             <div className="absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[100px] h-[4px] bg-white/20 rounded-full" />
           </div>
         </motion.div>
 
-        {/* CTA + Login */}
-        <AnimatePresence>
-          {showButton && (
-            <motion.div
-              className="relative z-10 mt-5 flex flex-col items-center gap-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-            >
-              <motion.button
-                onClick={onComplete}
-                className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
-                whileTap={{ scale: 0.96 }}
+        {/* Title + CTA — lower half */}
+        <motion.div
+          className="relative z-10 w-full px-8 flex flex-col items-center gap-5"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          <h1 className="text-2xl font-bold text-foreground text-center leading-tight">
+            Organize sua vida<br />em um só lugar
+          </h1>
+
+          <AnimatePresence>
+            {showButton && (
+              <motion.div
+                className="w-full flex flex-col items-center gap-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
               >
-                Começar
-              </motion.button>
-              <button
-                onClick={onLogin}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <motion.button
+                  onClick={onComplete}
+                  className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg"
+                  whileTap={{ scale: 0.96 }}
+                >
+                  Começar
+                </motion.button>
+                <button
+                  onClick={onLogin}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </motion.div>
     );
   }

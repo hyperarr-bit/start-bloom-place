@@ -115,16 +115,6 @@ const HomePage = () => {
 
   return (
     <>
-      <AnimatePresence>
-        {showWelcome && (
-          <WelcomeScreen
-            onComplete={() => {
-              setData("core-welcome-done", "true");
-              setShowWelcome(false);
-            }}
-          />
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {!showWelcome && showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}

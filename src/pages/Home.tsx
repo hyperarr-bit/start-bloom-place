@@ -61,6 +61,7 @@ const HomePage = () => {
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData } = useUserData();
+  const [showWelcome, setShowWelcome] = useState(() => !get<string>("core-welcome-done", ""));
   const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);

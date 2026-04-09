@@ -1,50 +1,54 @@
 
 
-# Plano: Tela de Boas-Vindas com iPhone Animado
+# Plano: Ativar premium via tabela local do Supabase
 
-## Resumo
+## Problema
+A edge function `check-subscription` só verifica o Stripe. Como não há assinatura ativa no Stripe para `cus_UIgvO0Jm16y3i8`, retorna `trial_expired: true`.
 
-Criar uma tela fullscreen de boas-vindas que aparece **apenas na primeira vez** que o usuário acessa o app (antes do onboarding). Um mockup de iPhone aparece com animação e dentro dele roda uma animação simulando telas do app (módulos, widgets, cards). Ao final, um botão "Começar" leva ao onboarding existente.
+## Solução em 2 passos
 
-## Fluxo
+### 1. Alterar `supabase/functions/check-subscription/index.ts`
+Adicionar fallback: se não encontrar assinatura ativa no Stripe, verificar a tabela `subscriptions` no Supabase. Se houver registro com `status = 'active'` para o `user_id`, retornar `subscribed: true`.
 
-```text
-1º acesso → WelcomeScreen (iPhone animado) → Botão "Começar"
-         → OnboardingWizard → Home
+Trecho a adicionar (após a verificação do Stripe, antes do return final):
+```typescript
+// Fallback: check local subscriptions table
+if (!hasActiveSub) {
+  const { data: localSub } = await supabaseClient
+    .from("subscriptions")
+    .select("status, current_period_end")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
 
-2º acesso em diante → Home (direto)
+  if (localSub) {
+    return new Response(JSON.stringify({
+      subscribed: true,
+      trial_expired: false,
+      subscription_end: localSub.current_period_end,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+  }
+}
 ```
 
-## Mudanças
+### 2. Inserir registro na tabela `subscriptions`
+Usando a ferramenta de insert do Supabase:
+```sql
+INSERT INTO subscriptions (user_id, status, plan, billing_period, current_period_start, current_period_end)
+VALUES (
+  '2c896992-6849-4ca6-9a66-5c2414bb9424',
+  'active',
+  'premium',
+  'lifetime',
+  now(),
+  '2099-12-31'
+);
+```
 
-### 1. Criar `src/components/WelcomeScreen.tsx`
-
-- Tela fullscreen com fundo gradiente escuro (usando tokens CSS)
-- Texto "Bem-vindo ao CORE" com fade-in
-- Subtítulo "Organize toda a sua vida em um só lugar"
-- Mockup de iPhone feito com CSS (bordas arredondadas, notch, moldura) — sem imagem externa
-- Dentro do iPhone: animação automática que simula scroll entre "telas" do app (cards coloridos representando módulos: Finanças, Treino, Saúde, etc.) usando Framer Motion
-- As "telas" fazem transição vertical automática a cada ~2s
-- O iPhone entra com animação de scale + slide-up (spring)
-- Botão "Começar" aparece após ~3s com fade-in
-- Ao clicar "Começar", salva `core-welcome-done: "true"` via `useUserData` e chama `onComplete()`
-
-### 2. Alterar `src/pages/Home.tsx`
-
-- Adicionar estado `showWelcome` baseado em `get("core-welcome-done", "") === ""`
-- Renderizar `<WelcomeScreen>` antes do `<OnboardingWizard>` quando `showWelcome === true`
-- Quando WelcomeScreen completa → mostrar OnboardingWizard (se primeiro acesso)
-- Fluxo: Welcome → Onboarding → Home
-
-### 3. Ajustar `src/components/home/AccountDrawer.tsx`
-
-- Na opção "Rever tutorial", também resetar `core-welcome-done` para que o usuário possa rever a tela de boas-vindas
-
-## Arquivos
+## Arquivos alterados
 
 | Arquivo | Ação |
 |---------|------|
-| `src/components/WelcomeScreen.tsx` | Criar |
-| `src/pages/Home.tsx` | Alterar (adicionar WelcomeScreen) |
-| `src/components/home/AccountDrawer.tsx` | Alterar (resetar welcome no "Rever tutorial") |
+| `supabase/functions/check-subscription/index.ts` | Adicionar fallback para tabela local |
+| Tabela `subscriptions` | Inserir registro premium para o usuário |
 

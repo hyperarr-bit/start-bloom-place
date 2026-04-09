@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface WelcomeScreenProps {
@@ -8,10 +8,17 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const [showButton, setShowButton] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowButton(true), 2000);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
   }, []);
 
   return (
@@ -47,6 +54,7 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
           {/* Screen with video */}
           <div className="w-full h-full rounded-[34px] overflow-hidden bg-black">
             <video
+              ref={videoRef}
               autoPlay
               loop
               muted

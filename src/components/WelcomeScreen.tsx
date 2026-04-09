@@ -33,9 +33,9 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
       {/* Logo */}
       <motion.div
         className="relative z-10 text-center mb-8"
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.6 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1, duration: 0.5 }}
       >
         <h1 className="text-3xl font-bold text-foreground tracking-[0.2em]">CORE</h1>
         <p className="text-sm text-muted-foreground mt-1">

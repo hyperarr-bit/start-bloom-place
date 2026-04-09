@@ -36,7 +36,8 @@ const weekDayMap: Record<number, string> = {
 };
 
 export function useLifeHubData(): LifeHubData {
-  const { get, set } = useUserData();
+  const { get, set, loaded } = useUserData();
+  const streakHandled = useRef(false);
 
   return useMemo(() => {
     const tStr = todayStr();

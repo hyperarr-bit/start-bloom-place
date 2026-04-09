@@ -77,7 +77,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden py-12"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-start bg-background overflow-hidden pt-16 pb-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
@@ -85,13 +85,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       >
         {/* iPhone frame with video — upper half */}
         <motion.div
-          className="relative z-10 flex-1 flex items-center"
+          className="relative z-10 flex items-center"
           initial={{ opacity: 0, y: 80, scale: 0.8 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
         >
-          <div className="relative w-[240px] h-[519px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
-            <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted relative">
+          <div className="relative w-[220px] h-[476px] rounded-[40px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
+            <div className="w-full h-full rounded-[30px] overflow-hidden bg-muted relative">
               <video
                 ref={videoRef}
                 autoPlay
@@ -122,26 +122,26 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
         {/* Title + CTA — lower half */}
         <motion.div
-          className="relative z-10 w-full px-8 flex flex-col items-center gap-5"
+          className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-6"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.5 }}
         >
-          <h1 className="text-2xl font-bold text-foreground text-center leading-tight">
+          <h1 className="text-3xl font-bold text-foreground text-center leading-tight">
             Organize sua vida<br />em um só lugar
           </h1>
 
           <AnimatePresence>
             {showButton && (
               <motion.div
-                className="w-full flex flex-col items-center gap-4"
+                className="w-full flex flex-col items-center gap-5"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
               >
                 <motion.button
                   onClick={onComplete}
-                  className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg"
+                  className="w-full py-4 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
                   whileTap={{ scale: 0.96 }}
                 >
                   Começar

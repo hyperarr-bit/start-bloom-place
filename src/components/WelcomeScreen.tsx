@@ -4,6 +4,7 @@ import { DollarSign, Dumbbell, Heart, BookOpen, Home, Utensils, Brain, Sparkles 
 
 interface WelcomeScreenProps {
   onComplete: () => void;
+  onLogin: () => void;
 }
 
 const MOCK_SCREENS = [
@@ -45,7 +46,7 @@ const MOCK_SCREENS = [
   },
 ];
 
-export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
+export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
   const [currentScreen, setCurrentScreen] = useState(0);
   const [showButton, setShowButton] = useState(false);
 
@@ -68,10 +69,8 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.4 } }}
     >
-      {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-primary/10 pointer-events-none" />
 
-      {/* Title */}
       <motion.div
         className="relative z-10 text-center mb-8"
         initial={{ opacity: 0, y: -20 }}
@@ -87,19 +86,15 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
         </p>
       </motion.div>
 
-      {/* iPhone mockup */}
       <motion.div
         className="relative z-10"
         initial={{ opacity: 0, y: 80, scale: 0.8 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.5 }}
       >
-        {/* Phone frame */}
         <div className="relative w-[220px] h-[440px] rounded-[36px] border-[3px] border-foreground/20 bg-card shadow-2xl overflow-hidden">
-          {/* Notch / Dynamic Island */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-5 bg-foreground/10 rounded-full z-20" />
 
-          {/* Screen content */}
           <div className="absolute inset-[3px] top-9 bottom-3 rounded-[28px] overflow-hidden bg-background">
             <AnimatePresence mode="wait">
               <motion.div
@@ -110,7 +105,6 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
                 exit={{ y: -60, opacity: 0 }}
                 transition={{ duration: 0.5, ease: "easeInOut" }}
               >
-                {/* Mini header */}
                 <div className="flex items-center gap-2 mb-4">
                   <div
                     className="w-8 h-8 rounded-xl flex items-center justify-center"
@@ -126,7 +120,6 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
                   </span>
                 </div>
 
-                {/* Mock cards */}
                 <div className="space-y-2.5 flex-1">
                   {MOCK_SCREENS[currentScreen].items.map((item, i) => (
                     <motion.div
@@ -143,7 +136,6 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
                         />
                         <span className="text-[10px] text-foreground/80">{item}</span>
                       </div>
-                      {/* Progress bar mock */}
                       <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
                         <motion.div
                           className="h-full rounded-full"
@@ -157,7 +149,6 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
                   ))}
                 </div>
 
-                {/* Bottom bar mock */}
                 <div className="flex justify-around pt-3 border-t border-border/30 mt-auto">
                   {[Home, DollarSign, Heart, Sparkles].map((Icon, i) => (
                     <div key={i} className="w-6 h-6 rounded-lg bg-muted/50 flex items-center justify-center">
@@ -169,24 +160,33 @@ export const WelcomeScreen = ({ onComplete }: WelcomeScreenProps) => {
             </AnimatePresence>
           </div>
 
-          {/* Home indicator */}
           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-24 h-1 bg-foreground/15 rounded-full" />
         </div>
       </motion.div>
 
-      {/* CTA Button */}
+      {/* CTA + Login link */}
       <AnimatePresence>
         {showButton && (
-          <motion.button
-            onClick={onComplete}
-            className="relative z-10 mt-8 px-8 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
+          <motion.div
+            className="relative z-10 mt-8 flex flex-col items-center gap-3"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            whileTap={{ scale: 0.96 }}
           >
-            Começar
-          </motion.button>
+            <motion.button
+              onClick={onComplete}
+              className="px-8 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg"
+              whileTap={{ scale: 0.96 }}
+            >
+              Começar
+            </motion.button>
+            <button
+              onClick={onLogin}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
+            </button>
+          </motion.div>
         )}
       </AnimatePresence>
 

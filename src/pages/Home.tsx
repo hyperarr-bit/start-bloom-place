@@ -5,7 +5,7 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
+
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
 import { QuickActions } from "@/components/home/QuickActions";

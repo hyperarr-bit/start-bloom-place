@@ -54,6 +54,7 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
           {/* Screen with video */}
           <div className="w-full h-full rounded-[34px] overflow-hidden bg-black">
             <video
+              ref={videoRef}
               autoPlay
               loop
               muted

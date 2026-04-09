@@ -1,54 +1,75 @@
 
 
-# Plano: Ativar premium via tabela local do Supabase
+# Plano: Reorganizar Fluxo de Onboarding
 
 ## Problema
-A edge function `check-subscription` só verifica o Stripe. Como não há assinatura ativa no Stripe para `cus_UIgvO0Jm16y3i8`, retorna `trial_expired: true`.
 
-## Solução em 2 passos
+O fluxo atual esta errado. Hoje:
+1. Usuario abre o app → ProtectedRoute redireciona para `/auth` → login/cadastro
+2. Apos login, vai para Home → WelcomeScreen (iPhone animado) → OnboardingWizard (16 modulos)
 
-### 1. Alterar `supabase/functions/check-subscription/index.ts`
-Adicionar fallback: se não encontrar assinatura ativa no Stripe, verificar a tabela `subscriptions` no Supabase. Se houver registro com `status = 'active'` para o `user_id`, retornar `subscribed: true`.
+O usuario quer:
+1. Usuario abre o app → **WelcomeScreen (iPhone animado)** com botao "Comecar" e link "Ja tem conta? Entrar"
+2. Clicando "Comecar" → vai para `/auth` (cadastro)
+3. Clicando "Ja tem conta? Entrar" → vai para `/auth` (login)
+4. Apos login/cadastro → Home com **OnboardingWizard** (16 modulos, "tudo em branco e intencional")
+5. Visitas seguintes → direto para Home
 
-Trecho a adicionar (após a verificação do Stripe, antes do return final):
-```typescript
-// Fallback: check local subscriptions table
-if (!hasActiveSub) {
-  const { data: localSub } = await supabaseClient
-    .from("subscriptions")
-    .select("status, current_period_end")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle();
+## Mudancas
 
-  if (localSub) {
-    return new Response(JSON.stringify({
-      subscribed: true,
-      trial_expired: false,
-      subscription_end: localSub.current_period_end,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
-  }
-}
-```
+### 1. Mover WelcomeScreen para ANTES do auth
 
-### 2. Inserir registro na tabela `subscriptions`
-Usando a ferramenta de insert do Supabase:
-```sql
-INSERT INTO subscriptions (user_id, status, plan, billing_period, current_period_start, current_period_end)
-VALUES (
-  '2c896992-6849-4ca6-9a66-5c2414bb9424',
-  'active',
-  'premium',
-  'lifetime',
-  now(),
-  '2099-12-31'
-);
+- Criar nova rota `/welcome` ou usar logica na rota `/auth`
+- WelcomeScreen aparece em `/auth` apenas se usuario nao esta logado e nunca viu a tela (localStorage `core-welcome-done`)
+- Adicionar botao "Comecar" que mostra o formulario de cadastro
+- Adicionar link "Ja tem uma conta? Entrar" que mostra o formulario de login
+
+### 2. Alterar `src/pages/Auth.tsx`
+
+- Integrar WelcomeScreen como tela inicial antes do formulario
+- Controlar estado: `welcome` → `auth-form`
+- Usar localStorage para saber se ja viu (nao depende de Supabase pois usuario ainda nao esta logado)
+- Botao "Comecar" → mostra formulario de cadastro (`isLogin = false`)
+- Link "Ja tem conta? Entrar" → mostra formulario de login (`isLogin = true`)
+
+### 3. Alterar `src/pages/Home.tsx`
+
+- Remover WelcomeScreen daqui (linhas 64, 70-74 e o render condicional)
+- Manter OnboardingWizard (16 modulos) — aparece apos primeiro login
+- O OnboardingWizard continua usando `core-onboarding-done` via useUserData (Supabase)
+
+### 4. Alterar `src/components/WelcomeScreen.tsx`
+
+- Adicionar link "Ja tem uma conta? Entrar" abaixo do botao "Comecar"
+- Prop `onComplete` vira navegacao para cadastro
+- Nova prop `onLogin` para ir direto ao login
+
+### 5. Alterar `src/components/home/AccountDrawer.tsx`
+
+- "Rever tutorial" reseta `core-onboarding-done` (onboarding dos modulos) e tambem `core-welcome-done` no localStorage
+
+## Fluxo final
+
+```text
+[App abre]
+   |
+   v
+[Nao logado?] --sim--> [Ja viu welcome?]
+   |                        |
+   |no                    nao → WelcomeScreen (iPhone + "Comecar" + "Ja tem conta?")
+   |                        |
+   |                      sim → Auth form direto
+   v
+[Home] → [Primeiro acesso?] → OnboardingWizard (16 modulos)
+         [Ja viu?] → Home normal
 ```
 
 ## Arquivos alterados
 
-| Arquivo | Ação |
+| Arquivo | Acao |
 |---------|------|
-| `supabase/functions/check-subscription/index.ts` | Adicionar fallback para tabela local |
-| Tabela `subscriptions` | Inserir registro premium para o usuário |
+| `src/pages/Auth.tsx` | Integrar WelcomeScreen antes do formulario |
+| `src/components/WelcomeScreen.tsx` | Adicionar link "Ja tem conta? Entrar", usar localStorage |
+| `src/pages/Home.tsx` | Remover WelcomeScreen, manter apenas OnboardingWizard |
+| `src/components/home/AccountDrawer.tsx` | Ajustar reset do tutorial |
 

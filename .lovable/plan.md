@@ -1,75 +1,33 @@
 
 
-# Plano: Reorganizar Fluxo de Onboarding
-
-## Problema
-
-O fluxo atual esta errado. Hoje:
-1. Usuario abre o app → ProtectedRoute redireciona para `/auth` → login/cadastro
-2. Apos login, vai para Home → WelcomeScreen (iPhone animado) → OnboardingWizard (16 modulos)
-
-O usuario quer:
-1. Usuario abre o app → **WelcomeScreen (iPhone animado)** com botao "Comecar" e link "Ja tem conta? Entrar"
-2. Clicando "Comecar" → vai para `/auth` (cadastro)
-3. Clicando "Ja tem conta? Entrar" → vai para `/auth` (login)
-4. Apos login/cadastro → Home com **OnboardingWizard** (16 modulos, "tudo em branco e intencional")
-5. Visitas seguintes → direto para Home
+# Plano: Melhorar WelcomeScreen
 
 ## Mudancas
 
-### 1. Mover WelcomeScreen para ANTES do auth
+### 1. `src/components/WelcomeScreen.tsx`
 
-- Criar nova rota `/welcome` ou usar logica na rota `/auth`
-- WelcomeScreen aparece em `/auth` apenas se usuario nao esta logado e nunca viu a tela (localStorage `core-welcome-done`)
-- Adicionar botao "Comecar" que mostra o formulario de cadastro
-- Adicionar link "Ja tem uma conta? Entrar" que mostra o formulario de login
+**Logo**: Remover o icone `Brain`. Manter apenas `<h1>CORE</h1>` centralizado.
 
-### 2. Alterar `src/pages/Auth.tsx`
+**Video dentro do iPhone**: Substituir todo o conteudo fake (MOCK_SCREENS, AnimatePresence com cards) por um `<video>` real tocando em loop dentro do frame do iPhone. O video sera copiado do upload do usuario para `public/videos/app-preview.mp4` e referenciado via `staticFile` ou path direto.
 
-- Integrar WelcomeScreen como tela inicial antes do formulario
-- Controlar estado: `welcome` → `auth-form`
-- Usar localStorage para saber se ja viu (nao depende de Supabase pois usuario ainda nao esta logado)
-- Botao "Comecar" → mostra formulario de cadastro (`isLogin = false`)
-- Link "Ja tem conta? Entrar" → mostra formulario de login (`isLogin = true`)
+**Frame do iPhone mais realista**: Atualizar o CSS do mockup para parecer um iPhone real:
+- Bordas mais grossas e arredondadas (como iPhone 15)
+- Dynamic Island no topo (pilula preta centralizada, nao notch oval)
+- Sombra mais pronunciada
+- Barra inferior (home indicator) mais fiel
+- Proporcoes corretas (~9:19.5 aspect ratio)
+- Fundo preto no frame (como iPhone real)
 
-### 3. Alterar `src/pages/Home.tsx`
+**Remover**: Array `MOCK_SCREENS`, imports de icones nao usados (DollarSign, Dumbbell, etc.), dots indicator, logica de `currentScreen`.
 
-- Remover WelcomeScreen daqui (linhas 64, 70-74 e o render condicional)
-- Manter OnboardingWizard (16 modulos) — aparece apos primeiro login
-- O OnboardingWizard continua usando `core-onboarding-done` via useUserData (Supabase)
+### 2. Copiar video do usuario
 
-### 4. Alterar `src/components/WelcomeScreen.tsx`
+Copiar `user-uploads://ScreenRecording_04-08-2026_20-49-38_1-2.mp4` para `public/videos/app-preview.mp4`.
 
-- Adicionar link "Ja tem uma conta? Entrar" abaixo do botao "Comecar"
-- Prop `onComplete` vira navegacao para cadastro
-- Nova prop `onLogin` para ir direto ao login
-
-### 5. Alterar `src/components/home/AccountDrawer.tsx`
-
-- "Rever tutorial" reseta `core-onboarding-done` (onboarding dos modulos) e tambem `core-welcome-done` no localStorage
-
-## Fluxo final
-
-```text
-[App abre]
-   |
-   v
-[Nao logado?] --sim--> [Ja viu welcome?]
-   |                        |
-   |no                    nao → WelcomeScreen (iPhone + "Comecar" + "Ja tem conta?")
-   |                        |
-   |                      sim → Auth form direto
-   v
-[Home] → [Primeiro acesso?] → OnboardingWizard (16 modulos)
-         [Ja viu?] → Home normal
-```
-
-## Arquivos alterados
+## Arquivos
 
 | Arquivo | Acao |
 |---------|------|
-| `src/pages/Auth.tsx` | Integrar WelcomeScreen antes do formulario |
-| `src/components/WelcomeScreen.tsx` | Adicionar link "Ja tem conta? Entrar", usar localStorage |
-| `src/pages/Home.tsx` | Remover WelcomeScreen, manter apenas OnboardingWizard |
-| `src/components/home/AccountDrawer.tsx` | Ajustar reset do tutorial |
+| `public/videos/app-preview.mp4` | Criar (copiar upload) |
+| `src/components/WelcomeScreen.tsx` | Reescrever (remover Brain, mock screens; adicionar video real, iPhone realista) |
 

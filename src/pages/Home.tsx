@@ -60,29 +60,27 @@ const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
-  const { get, set: setData } = useUserData();
+  const { get, set: setData, loaded } = useUserData();
   const [showWelcome, setShowWelcome] = useState(() => !get<string>("core-welcome-done", ""));
   const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
-  // Auto check-in on app open
+  // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
+    if (!loaded) return;
+    setShowWelcome(!get<string>("core-welcome-done", ""));
+    setShowOnboarding(!get<string>("core-onboarding-done", ""));
+  }, [loaded, get]);
+
+  // Auto check-in on app open (only after data loaded)
+  useEffect(() => {
+    if (!loaded) return;
     const today = new Date().toISOString().split("T")[0];
     const lastCheckIn = get<string>("gamification-lastCheckIn", "");
     if (lastCheckIn === today) return;
-
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-    const streakRaw = get<any>("core-hub-streak", 0);
-    const currentStreak = typeof streakRaw === "object" && streakRaw !== null ? (streakRaw.count || 0) : (Number(streakRaw) || 0);
-    const newStreak = lastCheckIn === yesterdayStr ? currentStreak + 1 : 1;
-
     setData("gamification-lastCheckIn", today);
-    setData("core-hub-streak", { count: newStreak, lastDate: today });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

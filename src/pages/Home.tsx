@@ -119,7 +119,18 @@ const HomePage = () => {
   return (
     <>
       <AnimatePresence>
-        {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
+        {showWelcome && (
+          <WelcomeScreen
+            onComplete={() => {
+              setData("core-welcome-done", "true");
+              setShowWelcome(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {!showWelcome && showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
       </AnimatePresence>
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>

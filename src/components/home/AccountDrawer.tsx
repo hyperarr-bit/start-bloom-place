@@ -68,6 +68,7 @@ export const AccountDrawer = ({
   };
 
   const handleReplayTutorial = () => {
+    setUserData("core-welcome-done", "");
     setUserData("core-onboarding-done", "");
     onOpenChange(false);
     onReplayTutorial?.();

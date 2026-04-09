@@ -75,6 +75,28 @@ serve(async (req) => {
       logStep("Active subscription", { subscriptionEnd });
     }
 
+    // Fallback: check local subscriptions table
+    if (!hasActiveSub) {
+      const { data: localSub } = await supabaseClient
+        .from("subscriptions")
+        .select("status, current_period_end")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (localSub) {
+        logStep("Found active local subscription");
+        return new Response(JSON.stringify({
+          subscribed: true,
+          trial_expired: false,
+          subscription_end: localSub.current_period_end,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+    }
+
     const trialExpired = hasActiveSub ? false : checkTrialExpired(profile?.created_at);
 
     return new Response(JSON.stringify({

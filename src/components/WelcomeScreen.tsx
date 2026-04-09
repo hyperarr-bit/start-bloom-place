@@ -46,9 +46,9 @@ export const WelcomeScreen = ({ onComplete, onLogin }: WelcomeScreenProps) => {
       {/* iPhone frame with video */}
       <motion.div
         className="relative z-10"
-        initial={{ opacity: 0, y: 80, scale: 0.8 }}
+        initial={{ opacity: 0, y: "100vh", scale: 0.85 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.5 }}
+        transition={{ type: "spring", stiffness: 60, damping: 18, delay: 0.3 }}
       >
         <div className="relative w-[240px] h-[519px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
           {/* Screen with video */}

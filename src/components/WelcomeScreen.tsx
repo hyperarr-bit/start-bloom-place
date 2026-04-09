@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -10,7 +10,6 @@ type VideoState = "loading" | "playing" | "blocked" | "error";
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
-    const [showButton, setShowButton] = useState(false);
     const [videoState, setVideoState] = useState<VideoState>("loading");
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -21,19 +20,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
-          .then(() => {
-            setVideoState("playing");
-          })
-          .catch(() => {
-            setVideoState("blocked");
-          });
+          .then(() => setVideoState("playing"))
+          .catch(() => setVideoState("blocked"));
       }
-    }, []);
-
-    // Show CTA after delay
-    useEffect(() => {
-      const timer = setTimeout(() => setShowButton(true), 2000);
-      return () => clearTimeout(timer);
     }, []);
 
     // Autoplay logic
@@ -64,14 +53,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
     }, [attemptPlay]);
 
-    // Tap-to-play fallback
     const handleScreenTap = useCallback(() => {
       if (videoState === "blocked" || videoState === "loading") {
         attemptPlay();
       }
     }, [videoState, attemptPlay]);
 
-    // Poster hides when video is playing
     const isPosterVisible = videoState !== "playing";
 
     return (
@@ -83,7 +70,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        {/* iPhone frame with video — upper half */}
+        {/* iPhone frame with video */}
         <motion.div
           className="relative z-10 flex items-center"
           initial={{ opacity: 0, y: 80, scale: 0.8 }}
@@ -120,42 +107,27 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           </div>
         </motion.div>
 
-        {/* Title + CTA — lower half */}
-        <motion.div
-          className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6, duration: 0.5 }}
-        >
+        {/* Title + CTA */}
+        <div className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-8">
           <h1 className="text-3xl font-bold text-foreground text-center leading-tight">
             Organize sua vida<br />em um só lugar
           </h1>
 
-          <AnimatePresence>
-            {showButton && (
-              <motion.div
-                className="w-full flex flex-col items-center gap-5"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-              >
-                <motion.button
-                  onClick={onComplete}
-                  className="w-full py-4 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
-                  whileTap={{ scale: 0.96 }}
-                >
-                  Começar
-                </motion.button>
-                <button
-                  onClick={onLogin}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+          <div className="w-full flex flex-col items-center gap-3">
+            <button
+              onClick={onComplete}
+              className="w-full py-5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
+            >
+              Começar
+            </button>
+            <button
+              onClick={onLogin}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1"
+            >
+              Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
+            </button>
+          </div>
+        </div>
       </motion.div>
     );
   }

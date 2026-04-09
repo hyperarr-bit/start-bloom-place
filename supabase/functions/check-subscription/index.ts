@@ -77,15 +77,21 @@ serve(async (req) => {
 
     // Fallback: check local subscriptions table
     if (!hasActiveSub) {
-      const { data: localSub } = await supabaseClient
+      const { data: localSub, error: localSubError } = await supabaseClient
         .from("subscriptions")
         .select("status, current_period_end")
         .eq("user_id", user.id)
         .eq("status", "active")
+        .order("current_period_end", { ascending: false, nullsFirst: false })
+        .limit(1)
         .maybeSingle();
 
+      if (localSubError) {
+        logStep("Local subscription lookup error", { message: localSubError.message });
+      }
+
       if (localSub) {
-        logStep("Found active local subscription");
+        logStep("Found active local subscription", { subscriptionEnd: localSub.current_period_end });
         return new Response(JSON.stringify({
           subscribed: true,
           trial_expired: false,

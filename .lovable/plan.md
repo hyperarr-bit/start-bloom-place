@@ -1,25 +1,14 @@
 
 
-## Correções na WelcomeScreen
+## Fix WelcomeScreen proportions
 
-Problemas identificados comparando com a referência:
+**Problem**: `mt-auto` on the CTA block pushes title+button+link flush to the bottom of the screen. In the reference, the text flows naturally below the mockup with balanced spacing — not pinned to the bottom edge.
 
-1. **Botão e texto "Entrar" só aparecem após 2s de delay** — na referência estão sempre visíveis
-2. **Animações desnecessárias** no botão (`whileTap`, `AnimatePresence` com fade-in) e no bloco de texto
-3. **Espaçamento entre título → botão → "Entrar"** não corresponde à referência
+### Changes in `src/components/WelcomeScreen.tsx`
 
-### Mudanças em `src/components/WelcomeScreen.tsx`
+**Line 111 — CTA container**:
+- Replace `mt-auto` with `mt-10` (40px gap between mockup and title)
+- This gives a natural flow: mockup → gap → title → button → link, with remaining space as bottom padding
 
-**Remover delay/animação do botão e texto:**
-- Remover `showButton` state e o `setTimeout` de 2s (linhas 13, 34-37)
-- Remover `AnimatePresence` wrapper (linhas 134-157) — botão e link ficam sempre visíveis
-- Trocar `motion.button` por `button` simples — sem `whileTap`
-- Trocar `motion.div` do bloco CTA (linha 124) por `div` simples — sem animação de entrada
-
-**Ajustar espaçamento (baseado na referência):**
-- Gap entre título e botão: `gap-8` (mais espaço, como na imagem)
-- Gap entre botão e "Entrar": `mt-4` no link (espaço menor)
-- Botão: `py-4.5` ou `py-5` para ser mais alto como na referência
-
-**Resultado:** Título, botão "Começar" e "Já tem uma conta? Entrar" aparecem imediatamente, sem animação, com espaçamento fiel à referência.
+That single change aligns the layout with the reference proportions. The mockup size (220x476), title size (text-3xl), button (py-5 rounded-xl), and bottom padding (pb-10) are already correct.
 

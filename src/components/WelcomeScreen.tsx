@@ -108,7 +108,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         </motion.div>
 
         {/* Title + CTA */}
-        <div className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-8">
+        <div className="relative z-10 w-full px-6 mt-10 flex flex-col items-center gap-8">
           <h1 className="text-3xl font-bold text-foreground text-center leading-tight">
             Organize sua vida<br />em um só lugar
           </h1>

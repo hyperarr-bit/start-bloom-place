@@ -1,19 +1,17 @@
 
 
-## Estilizar links da tela de Login como botões
+## Trocar estilo dos links de ação para texto inline com cor
 
-Na tela de **login** (isLogin = true), há dois links com estilo de texto simples que precisam do mesmo tratamento de botão dado ao "Faça login" na tela de cadastro.
+O estilo atual com `bg-foreground` está pesado demais. A referência mostra um estilo leve: texto normal + link colorido (verde/primary), tudo dentro de um card sutil com borda.
 
 ### Mudanças em `src/pages/Auth.tsx`
 
-**1. "Esqueci minha senha" (linha 175)**:
-- Trocar de link de texto simples para estilo de botão: `bg-foreground text-background rounded-lg px-4 py-2 font-medium text-sm hover:opacity-90 transition-opacity`
-- Manter como `Link to="/reset-password"`
+**Linhas 173-200** — Trocar os 3 links de ação (Esqueci senha, Crie agora, Faça login) de botões escuros para texto inline com link colorido:
 
-**2. "Não tem conta? Crie agora — 24h grátis" (linhas 179-185)**:
-- Separar em dois elementos como foi feito no "Faça login": texto "Não tem conta?" em `text-muted-foreground` + botão "Crie agora — 24h grátis" com `bg-foreground text-background rounded-lg px-4 py-2 font-medium text-sm hover:opacity-90 transition-opacity`
-- Usar `flex items-center gap-2 justify-center` no container
+1. **Container**: Envolver cada bloco em um `rounded-xl border border-border bg-card p-4` (card sutil como na imagem)
+2. **"Esqueci minha senha"**: Texto simples com `text-primary font-medium` (cor verde/primary do tema), sem fundo
+3. **"Não tem conta? Crie agora — 24h grátis"**: "Não tem conta?" em `text-muted-foreground` + "Crie agora — 24h grátis" em `text-primary font-medium`
+4. **"Já tem conta? Faça login"**: "Já tem conta?" em `text-muted-foreground` + "Fazer login" em `text-primary font-medium`
 
-### Resultado
-Os três links de ação (Esqueci senha, Crie agora, Faça login) terão o mesmo estilo visual de botão escuro em ambas as telas.
+Resultado: estilo limpo como na imagem — texto com link colorido dentro de um card com borda suave.
 

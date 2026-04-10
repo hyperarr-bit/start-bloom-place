@@ -170,19 +170,22 @@ const Auth = () => {
         </form>
 
         {/* Forgot password + Toggle */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
           {isLogin && (
-            <Link to="/reset-password" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/reset-password" className="inline-block text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity">
               Esqueci minha senha
             </Link>
           )}
           {isLogin ? (
-            <button
-              onClick={() => setIsLogin(false)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Não tem conta? Crie agora — 24h grátis
-            </button>
+            <div className="flex items-center gap-2 justify-center">
+              <span className="text-sm text-muted-foreground">Não tem conta?</span>
+              <button
+                onClick={() => setIsLogin(false)}
+                className="text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity"
+              >
+                Crie agora — 24h grátis
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2 justify-center">
               <span className="text-sm text-muted-foreground">Já tem conta?</span>

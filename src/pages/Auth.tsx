@@ -170,32 +170,26 @@ const Auth = () => {
         </form>
 
         {/* Forgot password + Toggle */}
-        <div className="text-center space-y-3">
+        <div className="rounded-xl border border-border bg-card p-4 text-center space-y-2">
           {isLogin && (
-            <Link to="/reset-password" className="inline-block text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity">
+            <Link to="/reset-password" className="text-sm text-primary font-medium hover:underline">
               Esqueci minha senha
             </Link>
           )}
           {isLogin ? (
-            <div className="flex items-center gap-2 justify-center">
-              <span className="text-sm text-muted-foreground">Não tem conta?</span>
-              <button
-                onClick={() => setIsLogin(false)}
-                className="text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity"
-              >
+            <p className="text-sm">
+              <span className="text-muted-foreground">Não tem conta? </span>
+              <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
                 Crie agora — 24h grátis
               </button>
-            </div>
+            </p>
           ) : (
-            <div className="flex items-center gap-2 justify-center">
-              <span className="text-sm text-muted-foreground">Já tem conta?</span>
-              <button
-                onClick={() => setIsLogin(true)}
-                className="text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity"
-              >
+            <p className="text-sm">
+              <span className="text-muted-foreground">Já tem conta? </span>
+              <button onClick={() => setIsLogin(true)} className="text-primary font-medium hover:underline">
                 Faça login
               </button>
-            </div>
+            </p>
           )}
         </div>
 

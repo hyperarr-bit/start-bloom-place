@@ -76,29 +76,42 @@ const Auth = () => {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-sm text-center space-y-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-sm space-y-8"
         >
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto"
-          >
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </motion.div>
-          <h2 className="text-2xl font-bold">Confirme seu e-mail</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Enviamos um link de confirmação para <strong className="text-foreground">{email}</strong>. 
-            Verifique sua caixa de entrada e clique no link para ativar sua conta.
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Seu trial gratuito de 24h começa assim que confirmar o e-mail.
-          </p>
-          <Button variant="outline" onClick={() => { setConfirmationSent(false); setIsLogin(true); }} className="w-full">
-            Já confirmei, fazer login
-          </Button>
+          <div className="text-center space-y-2">
+            <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-4">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto"
+            >
+              <CheckCircle className="w-7 h-7 text-primary" />
+            </motion.div>
+            <h2 className="text-xl font-bold">Confirme seu e-mail</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Enviamos um link de confirmação para <strong className="text-foreground">{email}</strong>. 
+              Verifique sua caixa de entrada e clique no link para ativar sua conta.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Seu teste grátis de 24h começa assim que confirmar o e-mail.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border bg-card p-4 text-center">
+            <button
+              onClick={() => { setConfirmationSent(false); setIsLogin(true); }}
+              className="text-sm text-primary font-medium hover:underline"
+            >
+              Já confirmei, fazer login
+            </button>
+          </div>
         </motion.div>
       </div>
     );

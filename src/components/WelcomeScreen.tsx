@@ -64,7 +64,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-start bg-background overflow-hidden pt-16 pb-10"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-start bg-background overflow-hidden className="fixed inset-0 z-[100] flex flex-col items-center justify-start bg-background overflow-hidden pt-8 pb-10""
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}

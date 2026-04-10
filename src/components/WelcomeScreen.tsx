@@ -77,8 +77,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
         >
-          <div className="relative w-[260px] h-[500px] rounded-[44px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
-            <div className="w-full h-full rounded-[34px] overflow-hidden bg-muted relative">
+          <div className="relative w-[220px] h-[476px] rounded-[40px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
+            <div className="w-full h-full rounded-[30px] overflow-hidden bg-muted relative">
               <video
                 ref={videoRef}
                 autoPlay
@@ -108,7 +108,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         </motion.div>
 
         {/* Title + CTA */}
-        <div className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-5">
+        <div className="relative z-10 w-full px-6 mt-auto flex flex-col items-center gap-8">
           <h1 className="text-3xl font-bold text-foreground text-center leading-tight">
             Organize sua vida<br />em um só lugar
           </h1>
@@ -116,7 +116,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <div className="w-full flex flex-col items-center gap-3">
             <button
               onClick={onComplete}
-              className="w-full py-5 rounded-full bg-foreground text-background text-base font-semibold shadow-lg"
+              className="w-full py-5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
             >
               Começar
             </button>

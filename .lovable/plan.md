@@ -1,21 +1,19 @@
 
 
-## Ajustes na tela de Criar Conta (Auth.tsx)
+## Estilizar links da tela de Login como botões
 
-### 1. Link "Faça login" com estilo de botão
-**Linha 179-184** — Quando está na tela de criar conta, o texto "Já tem conta? Faça login" precisa parecer um botão. Trocar de texto simples para um estilo com fundo escuro:
-- Separar em dois elementos: texto "Já tem conta?" em `text-muted-foreground` + botão "Faça login" com `bg-foreground text-background rounded-lg px-4 py-2 font-medium`
-- Ou aplicar ao bloco inteiro um estilo de botão outline/secundário
+Na tela de **login** (isLogin = true), há dois links com estilo de texto simples que precisam do mesmo tratamento de botão dado ao "Faça login" na tela de cadastro.
 
-### 2. Trocar "trial" por "teste grátis"
-- **Linha 119**: `"Crie sua conta — 24h grátis"` (já ok, mas verificar consistência)
-- **Linha 183**: `"24h grátis"` → manter
-- **Linha 197**: `"✨ O que está incluso no trial:"` → `"✨ O que está incluso no teste grátis:"`
-- **Linha 199**: `"Acesso a todos os 12 módulos por 24h"` → `"Acesso a todos os 16 módulos por 24h"`
+### Mudanças em `src/pages/Auth.tsx`
 
-### 3. Trocar 12 por 16 módulos
-- **Linha 199**: `12` → `16`
+**1. "Esqueci minha senha" (linha 175)**:
+- Trocar de link de texto simples para estilo de botão: `bg-foreground text-background rounded-lg px-4 py-2 font-medium text-sm hover:opacity-90 transition-opacity`
+- Manter como `Link to="/reset-password"`
 
-### Arquivos alterados
-- `src/pages/Auth.tsx`
+**2. "Não tem conta? Crie agora — 24h grátis" (linhas 179-185)**:
+- Separar em dois elementos como foi feito no "Faça login": texto "Não tem conta?" em `text-muted-foreground` + botão "Crie agora — 24h grátis" com `bg-foreground text-background rounded-lg px-4 py-2 font-medium text-sm hover:opacity-90 transition-opacity`
+- Usar `flex items-center gap-2 justify-center` no container
+
+### Resultado
+Os três links de ação (Esqueci senha, Crie agora, Faça login) terão o mesmo estilo visual de botão escuro em ambas as telas.
 

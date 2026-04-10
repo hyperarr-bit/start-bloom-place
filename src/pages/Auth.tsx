@@ -176,12 +176,24 @@ const Auth = () => {
               Esqueci minha senha
             </Link>
           )}
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {isLogin ? "Não tem conta? Crie agora — 24h grátis" : "Já tem conta? Faça login"}
-          </button>
+          {isLogin ? (
+            <button
+              onClick={() => setIsLogin(false)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Não tem conta? Crie agora — 24h grátis
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 justify-center">
+              <span className="text-sm text-muted-foreground">Já tem conta?</span>
+              <button
+                onClick={() => setIsLogin(true)}
+                className="text-sm font-medium bg-foreground text-background rounded-lg px-4 py-2 hover:opacity-90 transition-opacity"
+              >
+                Faça login
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Trial info */}
@@ -194,9 +206,9 @@ const Auth = () => {
               className="overflow-hidden"
             >
               <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs font-medium">✨ O que está incluso no trial:</p>
+                <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso a todos os 12 módulos por 24h</li>
+                  <li>• Acesso a todos os 16 módulos por 24h</li>
                   <li>• Personalize tudo do seu jeito</li>
                   <li>• Sem cartão de crédito necessário</li>
                 </ul>

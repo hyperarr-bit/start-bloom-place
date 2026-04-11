@@ -8,8 +8,8 @@ const corsHeaders = {
 };
 
 const PLANS = {
-  monthly: { name: "CORE PRO MENSAL", price: 1990 },
-  annual: { name: "CORE PRO ANUAL", price: 17880 },
+  monthly: { externalId: "prod_QUxD3yUQYrmWzL4LXGArxm2w", name: "CORE PRO MENSAL", price: 1990 },
+  annual: { externalId: "prod_aLJdEEysjhgXc3Raug1dD6N0", name: "CORE PRO ANUAL", price: 17880 },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -64,37 +64,102 @@ serve(async (req) => {
       logStep("Profile updated", { userId: user.id, hasName: !!name, hasCpf: !!cpf });
     }
 
-    // Create PIX QR Code via AbacatePay
-    logStep("Creating PIX QR Code", { plan: plan.name, price: plan.price });
-    const pixResponse = await fetch("https://api.abacatepay.com/v1/pixQrCode/create", {
+    // Get or create AbacatePay customer
+    let customerId: string | null = null;
+    const { data: cached } = await supabaseAdmin
+      .from("user_data")
+      .select("value")
+      .eq("user_id", user.id)
+      .eq("key", "abacatepay_customer_id")
+      .single();
+
+    if (cached?.value) {
+      customerId = cached.value as string;
+      logStep("Using cached customerId", { customerId });
+    } else {
+      logStep("Creating customer", { email: email || user.email });
+      const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          name: name || user.email.split("@")[0],
+          email: email || user.email,
+          cellphone: "11999999999",
+          taxId: cpf || "00000000000",
+        }),
+      });
+
+      const customerResult = await customerResponse.json();
+      logStep("Customer response", { status: customerResponse.status, data: customerResult });
+
+      if (!customerResponse.ok && !customerResult?.data?.id) {
+        throw new Error(customerResult?.error || customerResult?.message || "Failed to create customer");
+      }
+
+      customerId = customerResult?.data?.id;
+      if (!customerId) throw new Error("No customer ID returned");
+
+      await supabaseAdmin.from("user_data").upsert({
+        user_id: user.id,
+        key: "abacatepay_customer_id",
+        value: customerId,
+      }, { onConflict: "user_id,key" });
+      logStep("Cached customerId", { customerId });
+    }
+
+    // Create billing with the real product IDs for recurrence
+    const origin = "https://coreaplicativo.lovable.app";
+    logStep("Creating billing", { plan: plan.name, price: plan.price, externalId: plan.externalId, customerId });
+    
+    const billingResponse = await fetch("https://api.abacatepay.com/v1/billing/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        amount: plan.price,
-        externalId: user.id,
-        description: plan.name,
+        frequency: "MULTIPLE_PAYMENTS",
+        methods: ["PIX"],
+        products: [
+          {
+            externalId: plan.externalId,
+            name: plan.name,
+            quantity: 1,
+            price: plan.price,
+          },
+        ],
+        returnUrl: `${origin}/planos`,
+        completionUrl: `${origin}/planos?success=true`,
+        customerId,
+        metadata: {
+          user_id: user.id,
+          billing_period: billing,
+        },
       }),
     });
 
-    const pixResult = await pixResponse.json();
-    logStep("PIX response", { status: pixResponse.status, data: pixResult });
+    const billingResult = await billingResponse.json();
+    logStep("Billing response", { status: billingResponse.status, result: billingResult });
 
-    if (!pixResponse.ok) {
-      throw new Error(pixResult?.error || pixResult?.message || "Failed to create PIX QR Code");
+    if (!billingResponse.ok) {
+      throw new Error(billingResult?.error || billingResult?.message || "AbacatePay billing API error");
     }
 
-    const pixData = pixResult?.data;
-    if (!pixData) throw new Error("No PIX data returned");
+    const billingData = billingResult?.data;
+    if (!billingData) throw new Error("No billing data returned");
 
-    // Store PIX metadata for webhook reconciliation
+    const billingId = billingData.id;
+    const checkoutUrl = billingData.url;
+
+    // Store billing metadata for webhook reconciliation
     await supabaseAdmin.from("user_data").upsert({
       user_id: user.id,
       key: "pending_pix",
       value: {
-        pix_id: pixData.id,
+        billing_id: billingId,
         billing_period: billing,
         plan_name: plan.name,
         price: plan.price,
@@ -105,14 +170,60 @@ serve(async (req) => {
       },
     }, { onConflict: "user_id,key" });
 
+    // Now try to get the PIX QR code from the billing
+    // Fetch the billing charges to get PIX brCode
+    let brCode: string | null = null;
+    let brCodeBase64: string | null = null;
+    let pixId: string | null = null;
+    let expiresAt: string | null = null;
+
+    // Try to list charges for this billing
+    try {
+      const chargesResponse = await fetch(`https://api.abacatepay.com/v1/billing/list`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+      const chargesResult = await chargesResponse.json();
+      logStep("Charges list response", { status: chargesResponse.status });
+      
+      // Find our billing and its PIX data
+      const ourBilling = chargesResult?.data?.find((b: any) => b.id === billingId);
+      if (ourBilling?.pix) {
+        brCode = ourBilling.pix.brCode;
+        brCodeBase64 = ourBilling.pix.brCodeBase64;
+        pixId = ourBilling.pix.id;
+        expiresAt = ourBilling.pix.expiresAt;
+        logStep("Found PIX data from billing", { pixId });
+      }
+    } catch (e) {
+      logStep("Could not fetch PIX from billing charges", { error: String(e) });
+    }
+
+    // If we couldn't get PIX data directly, fall back to returning the checkout URL
+    if (!brCode) {
+      logStep("No inline PIX data, returning checkout URL", { checkoutUrl });
+      return new Response(JSON.stringify({
+        checkoutUrl,
+        billingId,
+        amount: plan.price,
+        planName: plan.name,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     return new Response(JSON.stringify({
-      brCode: pixData.brCode,
-      brCodeBase64: pixData.brCodeBase64,
-      pixId: pixData.id,
-      status: pixData.status,
-      expiresAt: pixData.expiresAt,
+      brCode,
+      brCodeBase64,
+      pixId,
+      status: "PENDING",
+      expiresAt,
       amount: plan.price,
       planName: plan.name,
+      billingId,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

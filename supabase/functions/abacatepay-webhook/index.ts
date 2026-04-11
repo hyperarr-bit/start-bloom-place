@@ -11,11 +11,15 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Validate webhook secret
+  // Validate webhook signature (v2 uses X-Webhook-Signature)
   const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
-  const receivedSecret = req.headers.get("x-webhook-secret") || new URL(req.url).searchParams.get("secret");
-  if (webhookSecret && receivedSecret !== webhookSecret) {
-    logStep("Invalid webhook secret");
+  const receivedSignature =
+    req.headers.get("x-webhook-signature") ||
+    req.headers.get("x-webhook-secret") ||
+    new URL(req.url).searchParams.get("secret");
+
+  if (webhookSecret && receivedSignature !== webhookSecret) {
+    logStep("Invalid webhook signature");
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -30,18 +34,21 @@ serve(async (req) => {
     logStep("Webhook received", { event: body.event, id: body.id });
 
     const event = body.event;
-    const metadata = body.data?.metadata || body.data?.subscription?.metadata || body.data?.billing?.metadata || {};
+    const metadata = body.data?.metadata || body.data?.billing?.metadata || {};
     const userId = metadata.user_id;
     const billingPeriod = metadata.billing_period || "monthly";
-    const customerEmail = body.data?.customer?.email || body.data?.subscription?.customer?.email || null;
-    const subscriptionId = body.data?.subscription?.id || body.data?.billing?.id || null;
+    const customerEmail = body.data?.customer?.email || null;
+    const billingId = body.data?.id || body.data?.billing?.id || null;
 
     const now = new Date();
 
-    // Handle v2 subscription events
-    if (event === "subscription.completed" || event === "billing.paid") {
-      // First payment completed — activate subscription
-      logStep("Subscription completed", { userId, subscriptionId, email: customerEmail });
+    // Handle v2 checkout/billing events
+    if (
+      event === "checkout.completed" ||
+      event === "billing.paid" ||
+      event === "subscription.completed"
+    ) {
+      logStep("Payment completed", { userId, billingId, email: customerEmail });
 
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
@@ -59,7 +66,7 @@ serve(async (req) => {
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
-              abacatepay_billing_id: subscriptionId,
+              abacatepay_billing_id: billingId,
               customer_email: customerEmail,
               current_period_start: now.toISOString(),
               current_period_end: periodEnd.toISOString(),
@@ -76,7 +83,7 @@ serve(async (req) => {
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
-              abacatepay_billing_id: subscriptionId,
+              abacatepay_billing_id: billingId,
               customer_email: customerEmail,
               current_period_start: now.toISOString(),
               current_period_end: periodEnd.toISOString(),
@@ -91,37 +98,13 @@ serve(async (req) => {
           status: "active",
           plan: "core-pro",
           billing_period: billingPeriod,
-          abacatepay_billing_id: subscriptionId,
+          abacatepay_billing_id: billingId,
           customer_email: customerEmail,
           current_period_start: now.toISOString(),
           current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         });
       }
-    } else if (event === "subscription.renewed") {
-      // Automatic renewal — extend period
-      logStep("Subscription renewed", { userId, subscriptionId });
-
-      if (userId) {
-        const periodEnd = new Date(now);
-        if (billingPeriod === "annual") {
-          periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-        } else {
-          periodEnd.setMonth(periodEnd.getMonth() + 1);
-        }
-
-        await supabaseClient
-          .from("subscriptions")
-          .update({
-            status: "active",
-            current_period_start: now.toISOString(),
-            current_period_end: periodEnd.toISOString(),
-          })
-          .eq("user_id", userId);
-
-        logStep("Subscription period extended", { userId, newEnd: periodEnd.toISOString() });
-      }
     } else if (event === "subscription.cancelled" || event === "billing.disputed") {
-      // Subscription cancelled or disputed
       logStep("Subscription cancelled/disputed", { userId, event });
 
       if (userId) {

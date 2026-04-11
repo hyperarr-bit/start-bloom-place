@@ -1,23 +1,33 @@
 
 
-## Plano: Otimizar checkout e corrigir texto
+## Plano: Configurar recorrência nos produtos AbacatePay
 
-### 1. Corrigir texto "12 módulos" → "16 módulos"
-- Linha 34 de `Planos.tsx`: trocar `"Todos os 12 módulos desbloqueados"` por `"Todos os 16 módulos desbloqueados"`
+### Passo 1 — Você faz no dashboard (app.abacatepay.com)
+Criar **2 novos produtos** em "Criar produto":
 
-### 2. Acelerar redirecionamento
-O delay atual vem de criar customer + billing em sequência (2 requests à API da AbacatePay antes de redirecionar).
+**Produto 1:**
+- Nome: CORE PRO MENSAL
+- Ciclo de pagamento: **Mensal**
+- Valor: R$ 19,90 (1990 centavos)
 
-Otimização: abrir uma nova aba/janela imediatamente ao clicar, mostrar feedback visual, e redirecionar assim que a URL chegar. Também podemos cachear o `customerId` para evitar recriar o customer toda vez.
+**Produto 2:**
+- Nome: CORE PRO ANUAL
+- Ciclo de pagamento: **Anual**
+- Valor: R$ 178,80 (17880 centavos)
 
-Mudanças em `Planos.tsx`:
-- Usar `window.open` com target para abrir checkout em nova aba (redirecionamento percebido como instantâneo)
-- Ou manter na mesma aba mas mostrar skeleton/loading mais rápido
+Depois de criar, copie os **IDs dos produtos** que o dashboard gera.
 
-Mudanças em `abacatepay-checkout/index.ts`:
-- Fazer as duas chamadas (customer + billing) em paralelo quando possível, ou cachear customerId no metadata do usuário para pular a criação de customer em checkouts futuros
+### Passo 2 — Eu atualizo a edge function
+Em `supabase/functions/abacatepay-checkout/index.ts`:
+- Trocar o `externalId` dos planos pelos novos IDs de produto
+- Nomes em maiúsculo (CORE PRO MENSAL / CORE PRO ANUAL)
+- Manter `frequency: "MULTIPLE_PAYMENTS"` — a recorrência agora é controlada pelo ciclo do produto
 
-### Arquivos modificados
-- `src/pages/Planos.tsx` — texto + UX de loading
-- `supabase/functions/abacatepay-checkout/index.ts` — otimizar fluxo
+### Resultado
+- A AbacatePay cobra automaticamente no ciclo definido no produto
+- Nomes aparecem em maiúsculo no checkout
+- Nenhuma mudança no frontend
+
+### Próximo passo
+Me passe os 2 IDs dos produtos novos após criá-los no dashboard.
 

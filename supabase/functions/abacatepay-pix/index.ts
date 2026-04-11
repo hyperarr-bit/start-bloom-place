@@ -52,8 +52,17 @@ serve(async (req) => {
       });
     }
 
-    const { billing } = await req.json();
+    const { billing, name, email, cpf } = await req.json();
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
+
+    // Save profile data
+    if (name || cpf) {
+      const profileUpdate: Record<string, string> = {};
+      if (name) profileUpdate.display_name = name;
+      if (cpf) profileUpdate.tax_id = cpf;
+      await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", user.id);
+      logStep("Profile updated", { userId: user.id, hasName: !!name, hasCpf: !!cpf });
+    }
 
     // Create PIX QR Code via AbacatePay
     logStep("Creating PIX QR Code", { plan: plan.name, price: plan.price });
@@ -89,6 +98,9 @@ serve(async (req) => {
         billing_period: billing,
         plan_name: plan.name,
         price: plan.price,
+        customer_name: name,
+        customer_email: email,
+        customer_cpf: cpf,
         created_at: new Date().toISOString(),
       },
     }, { onConflict: "user_id,key" });

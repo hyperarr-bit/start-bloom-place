@@ -149,11 +149,8 @@ const Planos = () => {
 
           {billing === "annual" && (
             <p className="text-xs text-green-600 font-medium">
-              {currentPlan.total} · {plans.annual.savings}
+              {plans.annual.savings}
             </p>
-          )}
-          {billing === "monthly" && (
-            <p className="text-xs text-muted-foreground">{currentPlan.total}</p>
           )}
 
           <ul className="space-y-3">

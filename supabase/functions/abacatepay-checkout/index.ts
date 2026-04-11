@@ -64,6 +64,8 @@ serve(async (req) => {
       body: JSON.stringify({
         name: user.email.split("@")[0],
         email: user.email,
+        cellphone: "00000000000",
+        taxId: "00000000000",
       }),
     });
 

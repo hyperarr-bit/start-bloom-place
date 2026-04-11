@@ -11,7 +11,6 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Validate webhook secret (v1 uses x-webhook-secret or query param)
   const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
   const receivedSecret =
     req.headers.get("x-webhook-secret") ||
@@ -41,9 +40,11 @@ serve(async (req) => {
 
     const now = new Date();
 
-    // v1 billing paid event
-    if (event === "billing.paid") {
-      logStep("Billing paid", { userId, billingId, email: customerEmail });
+    // Handle paid events: billing.paid, payment.confirmed, etc.
+    const paidEvents = ["billing.paid", "billing.confirmed", "payment.paid", "payment.confirmed"];
+    
+    if (paidEvents.includes(event)) {
+      logStep("Payment confirmed", { event, userId, billingId, email: customerEmail });
 
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
@@ -52,12 +53,46 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      if (userId) {
+      let resolvedUserId = userId;
+
+      // If no user_id in metadata, try to find by billing_id in user_data
+      if (!resolvedUserId && billingId) {
+        logStep("No user_id, searching by billing_id", { billingId });
+        const { data: userData } = await supabaseClient
+          .from("user_data")
+          .select("user_id, value")
+          .eq("key", "pending_pix")
+          .order("updated_at", { ascending: false });
+
+        if (userData) {
+          for (const row of userData) {
+            const val = row.value as any;
+            if (val?.billing_id === billingId) {
+              resolvedUserId = row.user_id;
+              logStep("Found user by billing_id", { resolvedUserId });
+              break;
+            }
+          }
+        }
+      }
+
+      // Also try matching by customer email
+      if (!resolvedUserId && customerEmail) {
+        logStep("Trying to match by email", { customerEmail });
+        const { data: authUsers } = await supabaseClient.auth.admin.listUsers();
+        const matched = authUsers?.users?.find((u: any) => u.email === customerEmail);
+        if (matched) {
+          resolvedUserId = matched.id;
+          logStep("Found user by email", { resolvedUserId });
+        }
+      }
+
+      if (resolvedUserId) {
         const { error } = await supabaseClient
           .from("subscriptions")
           .upsert(
             {
-              user_id: userId,
+              user_id: resolvedUserId,
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
@@ -74,7 +109,7 @@ serve(async (req) => {
           const { error: insertError } = await supabaseClient
             .from("subscriptions")
             .insert({
-              user_id: userId,
+              user_id: resolvedUserId,
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
@@ -85,9 +120,16 @@ serve(async (req) => {
             });
           if (insertError) logStep("Insert error", { message: insertError.message });
         }
-        logStep("Subscription activated", { userId });
+        logStep("Subscription activated", { userId: resolvedUserId, event });
+
+        // Clean up pending_pix
+        await supabaseClient
+          .from("user_data")
+          .delete()
+          .eq("user_id", resolvedUserId)
+          .eq("key", "pending_pix");
       } else {
-        logStep("No user_id in metadata, storing with placeholder");
+        logStep("No user_id resolved, storing with placeholder", { billingId, customerEmail });
         await supabaseClient.from("subscriptions").insert({
           user_id: "00000000-0000-0000-0000-000000000000",
           status: "active",
@@ -98,6 +140,16 @@ serve(async (req) => {
           current_period_start: now.toISOString(),
           current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         });
+      }
+    } else if (event === "billing.warning" || event === "subscription.warning") {
+      logStep("Payment warning - subscription may expire soon", { userId, billingId });
+    } else if (event === "billing.canceled" || event === "subscription.canceled") {
+      logStep("Subscription canceled", { userId, billingId });
+      if (userId) {
+        await supabaseClient
+          .from("subscriptions")
+          .update({ status: "canceled" })
+          .eq("user_id", userId);
       }
     } else {
       logStep("Unhandled event type", { event });

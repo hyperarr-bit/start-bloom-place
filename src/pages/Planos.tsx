@@ -31,6 +31,7 @@ const isValidCpf = (cpf: string) => cpf.replace(/\D/g, "").length === 11;
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 type Step = "plans" | "form" | "pix";
+type PaymentMethod = "pix" | "card";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ const Planos = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
 
   useEffect(() => {
     if (searchParams.get("success") === "true") toast.success("Assinatura realizada com sucesso! 🎉");
@@ -106,14 +108,21 @@ const Planos = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-pix", {
-        body: { billing, name: name.trim(), email: email.trim(), cpf: cpf.replace(/\D/g, "") },
+        body: { billing, name: name.trim(), email: email.trim(), cpf: cpf.replace(/\D/g, ""), method: paymentMethod },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.checkoutUrl) {
-        // Billing API didn't return inline PIX, redirect to checkout
         window.open(data.checkoutUrl, "_blank");
         toast.success("Redirecionando para o pagamento...");
+        return;
+      }
+      if (paymentMethod === "card" && !data?.brCode) {
+        // Card payments always go through checkout URL
+        if (data?.checkoutUrl) {
+          window.open(data.checkoutUrl, "_blank");
+        }
+        toast.success("Redirecionando para pagamento com cartão...");
         return;
       }
       setPixData(data);
@@ -232,8 +241,26 @@ const Planos = () => {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-sm">Forma de pagamento</Label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPaymentMethod("pix")}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border-2 transition-all ${paymentMethod === "pix" ? "border-primary bg-primary/10" : "border-border"}`}
+                  >
+                    PIX
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod("card")}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border-2 transition-all ${paymentMethod === "card" ? "border-primary bg-primary/10" : "border-border"}`}
+                  >
+                    Cartão de Crédito
+                  </button>
+                </div>
+              </div>
+
               <Button className="w-full" size="lg" onClick={handleGeneratePix} disabled={loading}>
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando PIX...</> : "Gerar PIX e pagar"}
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Processando...</> : paymentMethod === "pix" ? "Gerar PIX e pagar" : "Pagar com Cartão"}
               </Button>
             </motion.div>
           ) : (
@@ -264,7 +291,7 @@ const Planos = () => {
                 <Button className="w-full" size="lg" onClick={handleGoToForm} disabled={isSubscribed}>
                   {isSubscribed ? "Já assinante" : "Assinar CORE PRO"}
                 </Button>
-                <p className="text-[10px] text-muted-foreground text-center">Pagamento via PIX · Cancele quando quiser</p>
+                <p className="text-[10px] text-muted-foreground text-center">Pagamento via PIX ou Cartão · Cancele quando quiser</p>
               </motion.div>
             </motion.div>
           )}

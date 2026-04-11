@@ -50,6 +50,7 @@ async function getOrCreateProduct(
       price: plan.price,
       externalId: plan.externalId,
       cycle: plan.cycle,
+      currency: "BRL",
       description: `Assinatura ${plan.name}`,
     }),
   });

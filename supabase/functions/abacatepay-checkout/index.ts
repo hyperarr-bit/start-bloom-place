@@ -32,12 +32,41 @@ serve(async (req) => {
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated");
 
-    const { billing } = await req.json();
+    const { billing, customerName, customerPhone, customerTaxId } = await req.json();
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
+
+    // Validate required customer fields
+    if (!customerName || !customerPhone || !customerTaxId) {
+      throw new Error("Nome, telefone e CPF/CNPJ são obrigatórios para o checkout");
+    }
 
     const origin = req.headers.get("origin") || "https://coreaplicativo.lovable.app";
 
-    // Use v1/billing/create with inline products (no pre-created products needed)
+    // Step 1: Create or get customer
+    const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        name: customerName,
+        email: user.email,
+        cellphone: customerPhone,
+        taxId: customerTaxId,
+      }),
+    });
+
+    const customerResult = await customerResponse.json();
+    console.log("[ABACATEPAY-CHECKOUT] Customer response:", JSON.stringify(customerResult));
+
+    if (!customerResponse.ok && !customerResult?.data?.id) {
+      throw new Error(customerResult?.error || "Failed to create customer");
+    }
+
+    const customerId = customerResult?.data?.id;
+
+    // Step 2: Create billing with complete customer data
     const response = await fetch("https://api.abacatepay.com/v1/billing/create", {
       method: "POST",
       headers: {
@@ -59,7 +88,10 @@ serve(async (req) => {
         returnUrl: `${origin}/planos`,
         completionUrl: `${origin}/planos?success=true`,
         customer: {
+          name: customerName,
           email: user.email,
+          cellphone: customerPhone,
+          taxId: customerTaxId,
         },
         metadata: {
           user_id: user.id,
@@ -69,7 +101,7 @@ serve(async (req) => {
     });
 
     const result = await response.json();
-    console.log("[ABACATEPAY-CHECKOUT] Response:", JSON.stringify(result));
+    console.log("[ABACATEPAY-CHECKOUT] Billing response:", JSON.stringify(result));
 
     if (!response.ok) {
       throw new Error(result?.error || result?.message || "AbacatePay API error");

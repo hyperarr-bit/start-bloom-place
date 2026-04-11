@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, Zap, Loader2, Copy, CheckCircle2, Clock, User, Mail, CreditCard } from "lucide-react";
+import { ArrowLeft, Check, Loader2, Copy, CheckCircle2, Clock, User, Mail, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -110,6 +110,12 @@ const Planos = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      if (data?.checkoutUrl) {
+        // Billing API didn't return inline PIX, redirect to checkout
+        window.open(data.checkoutUrl, "_blank");
+        toast.success("Redirecionando para o pagamento...");
+        return;
+      }
       setPixData(data);
       setStep("pix");
       toast.success("PIX gerado! Escaneie o QR Code ou copie o código.");

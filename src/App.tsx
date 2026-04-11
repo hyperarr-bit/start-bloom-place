@@ -48,7 +48,7 @@ const AnimatedRoutes = () => {
         <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
-        <Route path="/planos" element={<PageTransition><Planos /></PageTransition>} />
+        <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
         <Route path="/" element={<ProtectedRoute><PageTransition><><TrialBanner /><Home /></></PageTransition></ProtectedRoute>} />
         <Route path="/financas" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="financas"><Index /></TrackedModule></></PageTransition></ProtectedRoute>} />
         <Route path="/rotina" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></></PageTransition></ProtectedRoute>} />

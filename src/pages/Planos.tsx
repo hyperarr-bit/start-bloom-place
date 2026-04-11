@@ -68,6 +68,14 @@ const Planos = () => {
   ];
 
   const handleCheckout = async () => {
+    // Check auth first
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Sua sessão expirou. Faça login novamente.");
+      navigate("/auth");
+      return;
+    }
+
     // Check if we have all required data
     if (!customerName.trim() || !customerPhone.trim() || !customerTaxId.trim()) {
       setShowForm(true);
@@ -78,17 +86,14 @@ const Planos = () => {
     setLoading(true);
     try {
       // Save profile data
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from("profiles")
-          .update({
-            display_name: customerName,
-            phone: customerPhone,
-            tax_id: customerTaxId,
-          })
-          .eq("id", user.id);
-      }
+      await supabase
+        .from("profiles")
+        .update({
+          display_name: customerName,
+          phone: customerPhone,
+          tax_id: customerTaxId,
+        })
+        .eq("id", user.id);
 
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
         body: { billing, customerName, customerPhone, customerTaxId },
@@ -99,7 +104,13 @@ const Planos = () => {
         window.location.href = data.url;
       }
     } catch (err: any) {
-      toast.error(err.message || "Erro ao iniciar checkout");
+      const msg = err.message || "";
+      if (msg.includes("not authenticated") || msg.includes("missing sub claim")) {
+        toast.error("Sua sessão expirou. Faça login novamente.");
+        navigate("/auth");
+      } else {
+        toast.error(msg || "Erro ao iniciar checkout");
+      }
     } finally {
       setLoading(false);
     }

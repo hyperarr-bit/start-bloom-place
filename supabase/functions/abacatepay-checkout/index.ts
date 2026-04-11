@@ -26,11 +26,23 @@ serve(async (req) => {
     const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
     if (!apiKey) throw new Error("ABACATEPAY_API_KEY is not set");
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Authorization header missing" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated");
+    const { data, error: authError } = await supabaseClient.auth.getUser(token);
+    const user = data?.user;
+    if (authError || !user?.email) {
+      console.error("[ABACATEPAY-CHECKOUT] Auth failed:", authError?.message || "no user/email");
+      return new Response(JSON.stringify({ error: "User not authenticated" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     const { billing, customerName, customerPhone, customerTaxId } = await req.json();
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;

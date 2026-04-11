@@ -2,6 +2,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,7 +15,12 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
-  
+
+  // Customer data for checkout
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerTaxId, setCustomerTaxId] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -23,6 +30,27 @@ const Planos = () => {
       toast.info("Checkout cancelado.");
     }
   }, [searchParams]);
+
+  // Load existing profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name, phone, tax_id")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        if (profile.display_name) setCustomerName(profile.display_name);
+        if (profile.phone) setCustomerPhone(profile.phone);
+        if (profile.tax_id) setCustomerTaxId(profile.tax_id);
+      }
+    };
+    loadProfile();
+  }, []);
 
   const plans = {
     monthly: { price: "19,90", period: "/mês", total: "R$ 238,80/ano" },
@@ -40,20 +68,68 @@ const Planos = () => {
   ];
 
   const handleCheckout = async () => {
+    // Check if we have all required data
+    if (!customerName.trim() || !customerPhone.trim() || !customerTaxId.trim()) {
+      setShowForm(true);
+      toast.info("Preencha seus dados para continuar com o pagamento");
+      return;
+    }
+
     setLoading(true);
     try {
+      // Save profile data
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from("profiles")
+          .update({
+            display_name: customerName,
+            phone: customerPhone,
+            tax_id: customerTaxId,
+          })
+          .eq("id", user.id);
+      }
+
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
-        body: { billing },
+        body: { billing, customerName, customerPhone, customerTaxId },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       if (data?.url) {
         window.location.href = data.url;
       }
     } catch (err: any) {
-      toast.error("Erro ao iniciar checkout: " + (err.message || "tente novamente"));
+      toast.error(err.message || "Erro ao iniciar checkout");
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatCPF = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 14);
+    if (digits.length <= 11) {
+      return digits
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    }
+    return digits
+      .replace(/(\d{2})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1.$2")
+      .replace(/(\d{3})(\d)/, "$1/$2")
+      .replace(/(\d{4})(\d{1,2})$/, "$1-$2");
+  };
+
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 10) {
+      return digits
+        .replace(/(\d{2})(\d)/, "($1) $2")
+        .replace(/(\d{4})(\d)/, "$1-$2");
+    }
+    return digits
+      .replace(/(\d{2})(\d)/, "($1) $2")
+      .replace(/(\d{5})(\d)/, "$1-$2");
   };
 
   return (
@@ -144,6 +220,46 @@ const Planos = () => {
             ))}
           </ul>
 
+          {/* Customer data form */}
+          {showForm && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="space-y-4 pt-2 border-t border-border"
+            >
+              <p className="text-xs text-muted-foreground font-medium">
+                Dados para pagamento
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-xs">Nome completo</Label>
+                <Input
+                  id="name"
+                  placeholder="Seu nome completo"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-xs">Telefone</Label>
+                <Input
+                  id="phone"
+                  placeholder="(11) 99999-9999"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(formatPhone(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="taxId" className="text-xs">CPF ou CNPJ</Label>
+                <Input
+                  id="taxId"
+                  placeholder="123.456.789-01"
+                  value={customerTaxId}
+                  onChange={(e) => setCustomerTaxId(formatCPF(e.target.value))}
+                />
+              </div>
+            </motion.div>
+          )}
+
           <Button
             className="w-full"
             size="lg"
@@ -154,6 +270,8 @@ const Planos = () => {
               <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
             ) : isSubscribed ? (
               "Já assinante"
+            ) : showForm ? (
+              "Continuar para pagamento"
             ) : (
               "Assinar CORE Pro"
             )}

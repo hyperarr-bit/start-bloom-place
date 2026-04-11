@@ -45,7 +45,7 @@ serve(async (req) => {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        frequency: billing === "monthly" ? "MONTHLY" : "YEARLY",
+        frequency: "ONE_TIME",
         methods: ["PIX"],
         products: [
           {

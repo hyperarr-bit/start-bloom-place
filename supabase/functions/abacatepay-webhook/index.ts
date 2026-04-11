@@ -30,24 +30,19 @@ serve(async (req) => {
     logStep("Webhook received", { event: body.event, id: body.id });
 
     const event = body.event;
+    const metadata = body.data?.metadata || body.data?.subscription?.metadata || body.data?.billing?.metadata || {};
+    const userId = metadata.user_id;
+    const billingPeriod = metadata.billing_period || "monthly";
+    const customerEmail = body.data?.customer?.email || body.data?.subscription?.customer?.email || null;
+    const subscriptionId = body.data?.subscription?.id || body.data?.billing?.id || null;
 
-    if (event === "billing.paid") {
-      const billing = body.data?.billing;
-      const customer = body.data?.customer;
-      const metadata = billing?.metadata || body.data?.metadata || {};
+    const now = new Date();
 
-      if (!customer?.email) {
-        logStep("No customer email in webhook payload");
-        return new Response(JSON.stringify({ received: true }), { status: 200 });
-      }
+    // Handle v2 subscription events
+    if (event === "subscription.completed" || event === "billing.paid") {
+      // First payment completed — activate subscription
+      logStep("Subscription completed", { userId, subscriptionId, email: customerEmail });
 
-      const userId = metadata.user_id;
-      const billingPeriod = metadata.billing_period || "monthly";
-      const billingId = billing?.id;
-
-      logStep("Processing payment", { email: customer.email, userId, billingId });
-
-      const now = new Date();
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
         periodEnd.setFullYear(periodEnd.getFullYear() + 1);
@@ -64,8 +59,8 @@ serve(async (req) => {
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
-              abacatepay_billing_id: billingId,
-              customer_email: customer.email,
+              abacatepay_billing_id: subscriptionId,
+              customer_email: customerEmail,
               current_period_start: now.toISOString(),
               current_period_end: periodEnd.toISOString(),
             },
@@ -73,7 +68,7 @@ serve(async (req) => {
           );
 
         if (error) {
-          logStep("DB upsert error, trying insert", { message: error.message });
+          logStep("Upsert error, trying insert", { message: error.message });
           const { error: insertError } = await supabaseClient
             .from("subscriptions")
             .insert({
@@ -81,42 +76,64 @@ serve(async (req) => {
               status: "active",
               plan: "core-pro",
               billing_period: billingPeriod,
-              abacatepay_billing_id: billingId,
-              customer_email: customer.email,
+              abacatepay_billing_id: subscriptionId,
+              customer_email: customerEmail,
               current_period_start: now.toISOString(),
               current_period_end: periodEnd.toISOString(),
             });
-          if (insertError) logStep("DB insert error", { message: insertError.message });
+          if (insertError) logStep("Insert error", { message: insertError.message });
         }
         logStep("Subscription activated", { userId });
       } else {
         logStep("No user_id in metadata, storing with placeholder");
-        const { error } = await supabaseClient
+        await supabaseClient.from("subscriptions").insert({
+          user_id: "00000000-0000-0000-0000-000000000000",
+          status: "active",
+          plan: "core-pro",
+          billing_period: billingPeriod,
+          abacatepay_billing_id: subscriptionId,
+          customer_email: customerEmail,
+          current_period_start: now.toISOString(),
+          current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+      }
+    } else if (event === "subscription.renewed") {
+      // Automatic renewal — extend period
+      logStep("Subscription renewed", { userId, subscriptionId });
+
+      if (userId) {
+        const periodEnd = new Date(now);
+        if (billingPeriod === "annual") {
+          periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+        } else {
+          periodEnd.setMonth(periodEnd.getMonth() + 1);
+        }
+
+        await supabaseClient
           .from("subscriptions")
-          .insert({
-            user_id: "00000000-0000-0000-0000-000000000000",
+          .update({
             status: "active",
-            plan: "core-pro",
-            billing_period: billingPeriod,
-            abacatepay_billing_id: billingId,
-            customer_email: customer.email,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
-          });
-        if (error) logStep("Fallback insert error", { message: error.message });
+          })
+          .eq("user_id", userId);
+
+        logStep("Subscription period extended", { userId, newEnd: periodEnd.toISOString() });
       }
-    } else if (event === "billing.disputed") {
-      const metadata = body.data?.billing?.metadata || body.data?.metadata || {};
-      const userId = metadata.user_id;
+    } else if (event === "subscription.cancelled" || event === "billing.disputed") {
+      // Subscription cancelled or disputed
+      logStep("Subscription cancelled/disputed", { userId, event });
 
       if (userId) {
         await supabaseClient
           .from("subscriptions")
-          .update({ status: "disputed" })
-          .eq("user_id", userId)
-          .eq("status", "active");
-        logStep("Subscription disputed", { userId });
+          .update({ status: event === "subscription.cancelled" ? "cancelled" : "disputed" })
+          .eq("user_id", userId);
+
+        logStep("Subscription status updated", { userId, status: event });
       }
+    } else {
+      logStep("Unhandled event type", { event });
     }
 
     return new Response(JSON.stringify({ received: true }), {

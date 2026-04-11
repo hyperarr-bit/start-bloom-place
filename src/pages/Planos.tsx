@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, Crown, Loader2, Copy, CheckCircle2, Clock, User, Mail, CreditCard } from "lucide-react";
+import { ArrowLeft, Check, Zap, Loader2, Copy, CheckCircle2, Clock, User, Mail, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -242,7 +242,7 @@ const Planos = () => {
 
               <motion.div key={billing} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border-2 border-primary/20 bg-card p-6 space-y-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center"><Crown className="w-5 h-5 text-amber-500" /></div>
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Zap className="w-5 h-5 text-primary" /></div>
                   <div><h2 className="font-bold text-lg">CORE Pro</h2><p className="text-xs text-muted-foreground">Acesso completo</p></div>
                 </div>
                 <div className="flex items-baseline gap-1">

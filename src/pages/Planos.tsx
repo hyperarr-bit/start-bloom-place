@@ -24,8 +24,8 @@ const Planos = () => {
   }, [searchParams]);
 
   const plans = {
-    monthly: { price: "19,90", period: "/mês", total: "R$ 238,80/ano" },
-    annual: { price: "14,90", period: "/mês", total: "R$ 178,80/ano", savings: "25% de desconto" },
+    monthly: { price: "19,90", period: "/mês" },
+    annual: { price: "14,90", period: "/mês", savings: "Economia de R$ 60/ano" },
   };
 
   const currentPlan = plans[billing];

@@ -53,7 +53,7 @@ serve(async (req) => {
     }
 
     const { billing, name, email, cpf, method } = await req.json();
-    const paymentMethod = method === "card" ? "CREDIT_CARD" : "PIX";
+    const paymentMethod = method === "card" ? "CARD" : "PIX";
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
 
     // Save profile data

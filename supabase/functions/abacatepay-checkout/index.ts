@@ -7,14 +7,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const PLANS = {
-  monthly: { externalId: "prod_QUxD3yUQYrmWzL4LXGArxm2w", name: "CORE PRO MENSAL", price: 1990 },
-  annual: { externalId: "prod_aLJdEEysjhgXc3Raug1dD6N0", name: "CORE PRO ANUAL", price: 17880 },
-};
-
-const logStep = (step: string, details?: unknown) => {
-  const d = details ? ` - ${JSON.stringify(details)}` : "";
-  console.log(`[ABACATEPAY-CHECKOUT] ${step}${d}`);
+const PLAN_LINKS: Record<string, string> = {
+  monthly: "https://app.abacatepay.com/pay/bill_sLEKFXn23xDfmXm4w0YenBZM",
+  annual: "https://app.abacatepay.com/pay/bill_tQZey5eLr4JtaKgcMMASu6n1",
 };
 
 serve(async (req) => {
@@ -22,16 +17,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-
-  const supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-
   try {
-    const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
-    if (!apiKey) throw new Error("ABACATEPAY_API_KEY is not set");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -40,11 +29,10 @@ serve(async (req) => {
         status: 401,
       });
     }
+
     const token = authHeader.replace("Bearer ", "");
     const { data, error: authError } = await supabaseAnonClient.auth.getUser(token);
-    const user = data?.user;
-    if (authError || !user?.email) {
-      logStep("Auth failed", { message: authError?.message || "no user/email" });
+    if (authError || !data?.user) {
       return new Response(JSON.stringify({ error: "User not authenticated" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
@@ -52,110 +40,14 @@ serve(async (req) => {
     }
 
     const { billing } = await req.json();
-    const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
-    const origin = req.headers.get("origin") || "https://coreaplicativo.lovable.app";
+    const url = PLAN_LINKS[billing] || PLAN_LINKS.monthly;
 
-    // Try to get cached customerId from profiles
-    let customerId: string | null = null;
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("phone")
-      .eq("id", user.id)
-      .single();
-
-    // We store abacatepay customer id in a user_data row for caching
-    const { data: cached } = await supabaseAdmin
-      .from("user_data")
-      .select("value")
-      .eq("user_id", user.id)
-      .eq("key", "abacatepay_customer_id")
-      .single();
-
-    if (cached?.value) {
-      customerId = cached.value as string;
-      logStep("Using cached customerId", { customerId });
-    } else {
-      // Create customer via v1
-      logStep("Creating customer v1", { email: user.email });
-      const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          name: user.email.split("@")[0],
-          email: user.email,
-          cellphone: "11999999999",
-          taxId: "52998224725",
-        }),
-      });
-
-      const customerResult = await customerResponse.json();
-      logStep("Customer response", { status: customerResponse.status, data: customerResult });
-
-      if (!customerResponse.ok && !customerResult?.data?.id) {
-        throw new Error(customerResult?.error || customerResult?.message || "Failed to create customer");
-      }
-
-      customerId = customerResult?.data?.id;
-      if (!customerId) throw new Error("No customer ID returned");
-
-      // Cache the customerId for future checkouts
-      await supabaseAdmin.from("user_data").upsert({
-        user_id: user.id,
-        key: "abacatepay_customer_id",
-        value: customerId,
-      }, { onConflict: "user_id,key" });
-      logStep("Cached customerId", { customerId });
-    }
-
-    // Create billing via v1 with MULTIPLE_PAYMENTS for recurrence
-    logStep("Creating billing v1", { plan: plan.name, price: plan.price, customerId });
-    const billingResponse = await fetch("https://api.abacatepay.com/v1/billing/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        frequency: "MULTIPLE_PAYMENTS",
-        methods: ["PIX"],
-        products: [
-          {
-            externalId: plan.externalId,
-            name: plan.name,
-            quantity: 1,
-            price: plan.price,
-          },
-        ],
-        returnUrl: `${origin}/planos`,
-        completionUrl: `${origin}/planos?success=true`,
-        customerId,
-        metadata: {
-          user_id: user.id,
-          billing_period: billing,
-        },
-      }),
-    });
-
-    const billingResult = await billingResponse.json();
-    logStep("Billing response", { status: billingResponse.status, result: billingResult });
-
-    if (!billingResponse.ok) {
-      throw new Error(billingResult?.error || billingResult?.message || "AbacatePay billing API error");
-    }
-
-    const checkoutUrl = billingResult?.data?.url || billingResult?.url;
-    if (!checkoutUrl) throw new Error("No checkout URL returned");
-
-    return new Response(JSON.stringify({ url: checkoutUrl }), {
+    return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: msg });
     return new Response(JSON.stringify({ error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

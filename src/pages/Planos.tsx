@@ -291,7 +291,7 @@ const Planos = () => {
                 <Button className="w-full" size="lg" onClick={handleGoToForm} disabled={isSubscribed}>
                   {isSubscribed ? "Já assinante" : "Assinar CORE PRO"}
                 </Button>
-                <p className="text-[10px] text-muted-foreground text-center">Pagamento via PIX · Cancele quando quiser</p>
+                <p className="text-[10px] text-muted-foreground text-center">Pagamento via PIX ou Cartão · Cancele quando quiser</p>
               </motion.div>
             </motion.div>
           )}

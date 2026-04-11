@@ -8,8 +8,8 @@ const corsHeaders = {
 };
 
 const PLANS = {
-  monthly: { name: "CORE Pro Mensal", price: 1990 },
-  annual: { name: "CORE Pro Anual", price: 17880 },
+  monthly: { externalId: "core-pro-monthly", name: "CORE Pro Mensal", price: 1990 },
+  annual: { externalId: "core-pro-annual", name: "CORE Pro Anual", price: 17880 },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -49,33 +49,26 @@ serve(async (req) => {
       });
     }
 
-    const { billing, customerName, customerPhone, customerTaxId } = await req.json();
+    const { billing } = await req.json();
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
-
-    if (!customerName || !customerPhone || !customerTaxId) {
-      throw new Error("Nome, telefone e CPF/CNPJ são obrigatórios para o checkout");
-    }
-
     const origin = req.headers.get("origin") || "https://coreaplicativo.lovable.app";
 
-    // Step 1: Create or get customer via v2
-    logStep("Creating customer", { name: customerName, email: user.email });
-    const customerResponse = await fetch("https://api.abacatepay.com/v2/customers/create", {
+    // Step 1: Create customer via v1 (name/email only — no need for phone/taxId upfront)
+    logStep("Creating customer v1", { email: user.email });
+    const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        name: customerName,
+        name: user.email.split("@")[0],
         email: user.email,
-        cellphone: customerPhone,
-        taxId: customerTaxId,
       }),
     });
 
     const customerResult = await customerResponse.json();
-    logStep("Customer response", { status: customerResponse.status, data: customerResult?.data?.id });
+    logStep("Customer response", { status: customerResponse.status, data: customerResult });
 
     if (!customerResponse.ok && !customerResult?.data?.id) {
       throw new Error(customerResult?.error || customerResult?.message || "Failed to create customer");
@@ -84,19 +77,28 @@ serve(async (req) => {
     const customerId = customerResult?.data?.id;
     if (!customerId) throw new Error("No customer ID returned");
 
-    // Step 2: Create checkout via v2
-    logStep("Creating checkout", { plan: plan.name, price: plan.price, customerId });
-    const checkoutResponse = await fetch("https://api.abacatepay.com/v2/checkouts/create", {
+    // Step 2: Create billing via v1 with MULTIPLE_PAYMENTS for recurrence
+    logStep("Creating billing v1", { plan: plan.name, price: plan.price, customerId });
+    const billingResponse = await fetch("https://api.abacatepay.com/v1/billing/create", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        products: [{ name: plan.name, quantity: 1, price: plan.price }],
-        customerId,
+        frequency: "MULTIPLE_PAYMENTS",
+        methods: ["PIX"],
+        products: [
+          {
+            externalId: plan.externalId,
+            name: plan.name,
+            quantity: 1,
+            price: plan.price,
+          },
+        ],
         returnUrl: `${origin}/planos`,
         completionUrl: `${origin}/planos?success=true`,
+        customerId,
         metadata: {
           user_id: user.id,
           billing_period: billing,
@@ -104,14 +106,14 @@ serve(async (req) => {
       }),
     });
 
-    const checkoutResult = await checkoutResponse.json();
-    logStep("Checkout response", { status: checkoutResponse.status, result: checkoutResult });
+    const billingResult = await billingResponse.json();
+    logStep("Billing response", { status: billingResponse.status, result: billingResult });
 
-    if (!checkoutResponse.ok) {
-      throw new Error(checkoutResult?.error || checkoutResult?.message || "AbacatePay checkout API error");
+    if (!billingResponse.ok) {
+      throw new Error(billingResult?.error || billingResult?.message || "AbacatePay billing API error");
     }
 
-    const checkoutUrl = checkoutResult?.data?.url || checkoutResult?.url;
+    const checkoutUrl = billingResult?.data?.url || billingResult?.url;
     if (!checkoutUrl) throw new Error("No checkout URL returned");
 
     return new Response(JSON.stringify({ url: checkoutUrl }), {

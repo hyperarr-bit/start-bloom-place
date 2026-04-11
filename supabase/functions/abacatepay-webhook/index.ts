@@ -11,15 +11,14 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Validate webhook signature (v2 uses X-Webhook-Signature)
+  // Validate webhook secret (v1 uses x-webhook-secret or query param)
   const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
-  const receivedSignature =
-    req.headers.get("x-webhook-signature") ||
+  const receivedSecret =
     req.headers.get("x-webhook-secret") ||
     new URL(req.url).searchParams.get("secret");
 
-  if (webhookSecret && receivedSignature !== webhookSecret) {
-    logStep("Invalid webhook signature");
+  if (webhookSecret && receivedSecret !== webhookSecret) {
+    logStep("Invalid webhook secret");
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -34,21 +33,17 @@ serve(async (req) => {
     logStep("Webhook received", { event: body.event, id: body.id });
 
     const event = body.event;
-    const metadata = body.data?.metadata || body.data?.billing?.metadata || {};
+    const metadata = body.data?.metadata || {};
     const userId = metadata.user_id;
     const billingPeriod = metadata.billing_period || "monthly";
     const customerEmail = body.data?.customer?.email || null;
-    const billingId = body.data?.id || body.data?.billing?.id || null;
+    const billingId = body.data?.id || null;
 
     const now = new Date();
 
-    // Handle v2 checkout/billing events
-    if (
-      event === "checkout.completed" ||
-      event === "billing.paid" ||
-      event === "subscription.completed"
-    ) {
-      logStep("Payment completed", { userId, billingId, email: customerEmail });
+    // v1 billing paid event
+    if (event === "billing.paid") {
+      logStep("Billing paid", { userId, billingId, email: customerEmail });
 
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
@@ -103,17 +98,6 @@ serve(async (req) => {
           current_period_start: now.toISOString(),
           current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         });
-      }
-    } else if (event === "subscription.cancelled" || event === "billing.disputed") {
-      logStep("Subscription cancelled/disputed", { userId, event });
-
-      if (userId) {
-        await supabaseClient
-          .from("subscriptions")
-          .update({ status: event === "subscription.cancelled" ? "cancelled" : "disputed" })
-          .eq("user_id", userId);
-
-        logStep("Subscription status updated", { userId, status: event });
       }
     } else {
       logStep("Unhandled event type", { event });

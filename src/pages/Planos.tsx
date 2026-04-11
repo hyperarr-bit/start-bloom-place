@@ -241,8 +241,26 @@ const Planos = () => {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-sm">Forma de pagamento</Label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPaymentMethod("pix")}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border-2 transition-all ${paymentMethod === "pix" ? "border-primary bg-primary/10" : "border-border"}`}
+                  >
+                    PIX
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod("card")}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-medium border-2 transition-all ${paymentMethod === "card" ? "border-primary bg-primary/10" : "border-border"}`}
+                  >
+                    Cartão de Crédito
+                  </button>
+                </div>
+              </div>
+
               <Button className="w-full" size="lg" onClick={handleGeneratePix} disabled={loading}>
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando PIX...</> : "Gerar PIX e pagar"}
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Processando...</> : paymentMethod === "pix" ? "Gerar PIX e pagar" : "Pagar com Cartão"}
               </Button>
             </motion.div>
           ) : (

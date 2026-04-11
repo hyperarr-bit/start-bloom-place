@@ -227,7 +227,7 @@ const Planos = () => {
               </div>
 
               <Button className="w-full" size="lg" onClick={handleGeneratePix} disabled={loading}>
-                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando PIX...</> : "Gerar PIX"}
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando PIX...</> : "Gerar PIX e pagar"}
               </Button>
             </motion.div>
           ) : (
@@ -256,7 +256,7 @@ const Planos = () => {
                   ))}
                 </ul>
                 <Button className="w-full" size="lg" onClick={handleGoToForm} disabled={isSubscribed}>
-                  {isSubscribed ? "Já assinante" : "Pagar com PIX"}
+                  {isSubscribed ? "Já assinante" : "Assinar CORE PRO"}
                 </Button>
                 <p className="text-[10px] text-muted-foreground text-center">Pagamento via PIX · Cancele quando quiser</p>
               </motion.div>

@@ -11,6 +11,14 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
+  // Validate webhook secret
+  const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
+  const receivedSecret = req.headers.get("x-webhook-secret") || new URL(req.url).searchParams.get("secret");
+  if (webhookSecret && receivedSecret !== webhookSecret) {
+    logStep("Invalid webhook secret");
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",

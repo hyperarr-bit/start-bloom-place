@@ -1,33 +1,23 @@
-## Plano: Migrar checkout para AbacatePay v1 e verificar se tá acontecendo o pagamento recorrente e não pedir os dados do cliente no saas e sim só no checkout além de fazer o redirecionamento ser rápido 
 
-O código está chamando endpoints `/v2/...` com uma chave v1, causando o erro "API key version mismatch". Solução: reverter tudo para a API v1.
 
-### Mudanças no `abacatepay-checkout/index.ts`
+## Plano: Otimizar checkout e corrigir texto
 
-1. **Customer**: trocar `/v2/customers/create` → `/v1/customer/create`
-2. **Billing**: trocar `/v2/checkouts/create` → `/v1/billing/create` com o formato v1:
-  ```json
-   {
-     "frequency": "MULTIPLE_PAYMENTS",
-     "methods": ["PIX"],
-     "products": [{ "externalId": "core-pro-monthly", "name": "CORE Pro Mensal", "quantity": 1, "price": 1990 }],
-     "returnUrl": "...",
-     "completionUrl": "...",
-     "customerId": "...",
-     "metadata": { "user_id": "...", "billing_period": "monthly" }
-   }
-  ```
-3. Extrair URL de retorno do formato v1 (`data.url`)
+### 1. Corrigir texto "12 módulos" → "16 módulos"
+- Linha 34 de `Planos.tsx`: trocar `"Todos os 12 módulos desbloqueados"` por `"Todos os 16 módulos desbloqueados"`
 
-### Mudanças no `abacatepay-webhook/index.ts`
+### 2. Acelerar redirecionamento
+O delay atual vem de criar customer + billing em sequência (2 requests à API da AbacatePay antes de redirecionar).
 
-- Manter `billing.paid` como evento principal (v1)
-- Manter validação via `x-webhook-secret` (v1)
-- Remover referências a eventos v2 (`checkout.completed`, `subscription.completed`, `subscription.cancelled`)
-- Lógica de upsert na tabela `subscriptions` permanece igual
+Otimização: abrir uma nova aba/janela imediatamente ao clicar, mostrar feedback visual, e redirecionar assim que a URL chegar. Também podemos cachear o `customerId` para evitar recriar o customer toda vez.
+
+Mudanças em `Planos.tsx`:
+- Usar `window.open` com target para abrir checkout em nova aba (redirecionamento percebido como instantâneo)
+- Ou manter na mesma aba mas mostrar skeleton/loading mais rápido
+
+Mudanças em `abacatepay-checkout/index.ts`:
+- Fazer as duas chamadas (customer + billing) em paralelo quando possível, ou cachear customerId no metadata do usuário para pular a criação de customer em checkouts futuros
 
 ### Arquivos modificados
+- `src/pages/Planos.tsx` — texto + UX de loading
+- `supabase/functions/abacatepay-checkout/index.ts` — otimizar fluxo
 
-- `supabase/functions/abacatepay-checkout/index.ts`
-- `supabase/functions/abacatepay-webhook/index.ts`
-- Deploy de ambas as functions

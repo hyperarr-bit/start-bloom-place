@@ -1,90 +1,85 @@
 
-Diagnóstico confirmado
 
-O texto da imagem é:
-`Edge Function returned a non-2xx status code`
+## Correção completa: Migrar para assinatura recorrente AbacatePay v2
 
-O que isso significa:
-- a tela só está mostrando um erro genérico do `supabase.functions.invoke(...)`
-- o erro real está no backend da edge function
+### Contexto
+Hoje o checkout usa `POST /v1/billing/create` com `frequency: "ONE_TIME"` — o usuário paga uma vez e não renova automaticamente. A AbacatePay v2 tem um fluxo próprio de assinatura recorrente.
 
-Do I know what the issue is?
-Sim.
+### O que muda
 
-O erro real atual, pelos logs da função, é:
-`[ABACATEPAY-CHECKOUT] ERROR: User not authenticated`
+**1. Criar produtos recorrentes na AbacatePay (via edge function)**
 
-Leitura fria do problema
+A API v2 exige que produtos de assinatura sejam criados previamente com o campo `cycle`. O checkout de assinatura referencia o produto pelo `id`.
 
-1. A rota `/planos` hoje é pública
-- em `src/App.tsx`, a rota `"/planos"` não está dentro de `ProtectedRoute`
+Vou adicionar lógica na edge function de checkout para criar os produtos na AbacatePay (se ainda não existirem) usando `POST /v2/products/create`:
+- Produto mensal: `cycle: "MONTHLY"`, preço R$ 19,90
+- Produto anual: `cycle: "ANNUALLY"`, preço R$ 178,80
 
-2. O checkout depende obrigatoriamente de usuário autenticado
-- em `supabase/functions/abacatepay-checkout/index.ts`, a função busca o usuário pelo token e falha se não houver sessão:
-  - `if (!user?.email) throw new Error("User not authenticated")`
+Os IDs dos produtos serão armazenados em cache (tabela `app_config` ou variável de ambiente). Se já existirem, reutiliza.
 
-3. A tela de planos não barra usuário deslogado antes de chamar a função
-- em `src/pages/Planos.tsx`, `handleCheckout()` tenta seguir o fluxo mesmo se `supabase.auth.getUser()` voltar sem usuário
-- então o frontend chama a edge function sem sessão válida e recebe o erro genérico da imagem
+**2. Refatorar `abacatepay-checkout` para v2 subscriptions**
 
-4. O problema atual não é mais o payload do cliente
-- `phone` e `tax_id` já foram adicionados
-- o bloqueio agora acontece antes, na autenticação
+Trocar de:
+```
+POST /v1/billing/create  (frequency: ONE_TIME)
+```
+Para:
+```
+POST /v2/subscriptions/create
+```
 
-5. A migração para recorrência AbacatePay continua sendo importante, mas é uma etapa separada
-- primeiro precisamos fazer o fluxo parar de falhar por auth
-- não faz sentido mexer em webhook/recorrência enquanto o checkout nem passa da autenticação
+Com o body:
+```json
+{
+  "items": [{ "id": "prod_xxx", "quantity": 1 }],
+  "returnUrl": "...",
+  "completionUrl": "...",
+  "customerId": "cust_xxx",
+  "metadata": { "user_id": "...", "billing_period": "monthly" }
+}
+```
 
-Plano de correção
+O customer continua sendo criado via `/v1/customer/create` (funciona igual).
 
-1. Fechar a entrada errada do fluxo
-- proteger a rota `/planos` com `ProtectedRoute`
-- assim, se alguém tentar abrir planos sem login, vai para `/auth`
+**3. Refatorar `abacatepay-webhook` para eventos de assinatura**
 
-2. Adicionar uma segunda proteção na própria tela
-- em `src/pages/Planos.tsx`, antes de invocar `abacatepay-checkout`, validar sessão explicitamente
-- se não houver usuário:
-  - mostrar mensagem clara tipo `Faça login para assinar`
-  - redirecionar para `/auth`
-  - não chamar a edge function
+Os eventos mudam de `billing.paid` / `billing.disputed` para:
+- `subscription.completed` — primeira cobrança paga, ativar assinatura
+- `subscription.renewed` — renovação automática, estender período
+- `subscription.cancelled` — assinatura cancelada
 
-3. Endurecer a edge function
-- em `supabase/functions/abacatepay-checkout/index.ts`:
-  - validar `Authorization` com segurança, sem `!`
-  - retornar erro explícito de autenticação quando faltar token/sessão
-  - manter logs claros para diferenciar:
-    - sem header
-    - token inválido
-    - usuário inexistente
-- opcionalmente devolver resposta estruturada (`ok: false`) para o frontend conseguir exibir o erro real
+O webhook vai extrair o `metadata` do payload e atualizar a tabela `subscriptions` conforme o evento.
 
-4. Melhorar a mensagem mostrada no app
-- em `Planos.tsx`, tratar melhor o retorno de erro da função
-- se vier erro conhecido de autenticação, mostrar algo como:
-  - `Sua sessão expirou. Entre novamente para continuar.`
-em vez do genérico `non-2xx`
+**4. Criar tabela `app_config` para armazenar IDs dos produtos**
 
-5. Só depois retomar a parte da recorrência
-- com o auth resolvido e o checkout abrindo, aí sim revisar a integração AbacatePay para assinatura recorrente real
-- essa parte deve vir numa segunda rodada, separada do bug atual
+Uma tabela simples key-value para guardar os IDs dos produtos criados na AbacatePay, evitando criar duplicados a cada checkout.
 
-Arquivos que entram nesta correção
-- `src/App.tsx`
-- `src/pages/Planos.tsx`
-- `supabase/functions/abacatepay-checkout/index.ts`
+```sql
+CREATE TABLE public.app_config (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz DEFAULT now()
+);
+-- RLS: somente service_role pode ler/escrever
+```
 
-Arquivos que não precisam entrar agora
-- `supabase/functions/abacatepay-webhook/index.ts`
-- novas migrations no banco
+**5. Frontend — sem mudanças visuais**
 
-Detalhes técnicos
-- causa imediata: rota pública + checkout dependente de sessão
-- sintoma visual: toast genérico do Supabase Functions
-- causa real no backend: `User not authenticated`
-- evidência adicional: o replay/snapshot mostra sessão caindo em `/auth`, reforçando que houve tentativa sem autenticação ativa
+A tela de Planos (`Planos.tsx`) já coleta os dados necessários e chama a edge function. Nenhuma mudança visual é necessária — apenas a edge function por trás muda.
 
-Resultado esperado após a implementação
-- usuário deslogado não consegue mais disparar checkout
-- usuário logado consegue chamar a edge function com sessão válida
-- se a sessão expirar, o app mostra erro claro e redireciona corretamente
-- aí fica possível depurar somente o que sobrar da integração com a AbacatePay, sem esse falso ruído de autenticação
+### Arquivos modificados
+- `supabase/functions/abacatepay-checkout/index.ts` — migrar para v2 subscriptions
+- `supabase/functions/abacatepay-webhook/index.ts` — tratar eventos de assinatura
+- Nova migration SQL — criar tabela `app_config`
+
+### Arquivos que não mudam
+- `src/pages/Planos.tsx` — já está correto
+- `src/hooks/use-auth.tsx` — já chama `check-subscription` que lê da tabela `subscriptions`
+- `supabase/functions/check-subscription/index.ts` — já consulta `subscriptions` corretamente
+
+### Resultado esperado
+- Usuário paga via PIX e a assinatura é ativada automaticamente
+- A cada ciclo (mensal ou anual), a AbacatePay cobra automaticamente e envia webhook de renovação
+- Se o usuário cancelar, o webhook atualiza o status para cancelado
+- O app reflete o status em tempo real via `check-subscription`
+

@@ -49,6 +49,7 @@ const Planos = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [cpf, setCpf] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("pix");
 
   useEffect(() => {
     if (searchParams.get("success") === "true") toast.success("Assinatura realizada com sucesso! 🎉");

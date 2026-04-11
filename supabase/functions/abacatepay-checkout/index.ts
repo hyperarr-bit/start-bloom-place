@@ -34,7 +34,6 @@ serve(async (req) => {
 
     const { billing } = await req.json();
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
-    const frequency = billing === "monthly" ? "MONTHLY" : "YEARLY";
 
     const origin = req.headers.get("origin") || "https://coreaplicativo.lovable.app";
 

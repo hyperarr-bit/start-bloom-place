@@ -22,10 +22,12 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const supabaseAnonClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-  );
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+
+  const supabaseAnonClient = createClient(supabaseUrl, supabaseAnonKey);
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
@@ -53,33 +55,62 @@ serve(async (req) => {
     const plan = billing === "monthly" ? PLANS.monthly : PLANS.annual;
     const origin = req.headers.get("origin") || "https://coreaplicativo.lovable.app";
 
-    // Step 1: Create customer via v1 (name/email only — no need for phone/taxId upfront)
-    logStep("Creating customer v1", { email: user.email });
-    const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        name: user.email.split("@")[0],
-        email: user.email,
-        cellphone: "11999999999",
-        taxId: "52998224725",
-      }),
-    });
+    // Try to get cached customerId from profiles
+    let customerId: string | null = null;
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("phone")
+      .eq("id", user.id)
+      .single();
 
-    const customerResult = await customerResponse.json();
-    logStep("Customer response", { status: customerResponse.status, data: customerResult });
+    // We store abacatepay customer id in a user_data row for caching
+    const { data: cached } = await supabaseAdmin
+      .from("user_data")
+      .select("value")
+      .eq("user_id", user.id)
+      .eq("key", "abacatepay_customer_id")
+      .single();
 
-    if (!customerResponse.ok && !customerResult?.data?.id) {
-      throw new Error(customerResult?.error || customerResult?.message || "Failed to create customer");
+    if (cached?.value) {
+      customerId = cached.value as string;
+      logStep("Using cached customerId", { customerId });
+    } else {
+      // Create customer via v1
+      logStep("Creating customer v1", { email: user.email });
+      const customerResponse = await fetch("https://api.abacatepay.com/v1/customer/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          name: user.email.split("@")[0],
+          email: user.email,
+          cellphone: "11999999999",
+          taxId: "52998224725",
+        }),
+      });
+
+      const customerResult = await customerResponse.json();
+      logStep("Customer response", { status: customerResponse.status, data: customerResult });
+
+      if (!customerResponse.ok && !customerResult?.data?.id) {
+        throw new Error(customerResult?.error || customerResult?.message || "Failed to create customer");
+      }
+
+      customerId = customerResult?.data?.id;
+      if (!customerId) throw new Error("No customer ID returned");
+
+      // Cache the customerId for future checkouts
+      await supabaseAdmin.from("user_data").upsert({
+        user_id: user.id,
+        key: "abacatepay_customer_id",
+        value: customerId,
+      }, { onConflict: "user_id,key" });
+      logStep("Cached customerId", { customerId });
     }
 
-    const customerId = customerResult?.data?.id;
-    if (!customerId) throw new Error("No customer ID returned");
-
-    // Step 2: Create billing via v1 with MULTIPLE_PAYMENTS for recurrence
+    // Create billing via v1 with MULTIPLE_PAYMENTS for recurrence
     logStep("Creating billing v1", { plan: plan.name, price: plan.price, customerId });
     const billingResponse = await fetch("https://api.abacatepay.com/v1/billing/create", {
       method: "POST",

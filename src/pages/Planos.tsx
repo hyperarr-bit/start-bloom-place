@@ -73,15 +73,9 @@ const Planos = () => {
             <p className="text-sm font-medium text-green-600 dark:text-green-400">
               ✅ Você já é assinante CORE Pro!
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleManageSubscription}
-              disabled={portalLoading}
-            >
-              {portalLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Settings className="w-4 h-4 mr-2" />}
-              Gerenciar assinatura
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              Para cancelar, entre em contato pelo email suporte@coreaplicativo.com
+            </p>
           </div>
         )}
 

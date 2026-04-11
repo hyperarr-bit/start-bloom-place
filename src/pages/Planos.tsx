@@ -108,7 +108,7 @@ const Planos = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-pix", {
-        body: { billing, name: name.trim(), email: email.trim(), cpf: cpf.replace(/\D/g, "") },
+        body: { billing, name: name.trim(), email: email.trim(), cpf: cpf.replace(/\D/g, ""), method: paymentMethod },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

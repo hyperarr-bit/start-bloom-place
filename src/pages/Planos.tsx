@@ -92,7 +92,7 @@ const Planos = () => {
         {isSubscribed && (
           <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center space-y-3">
             <p className="text-sm font-medium text-green-600 dark:text-green-400">
-              ✅ Você já é assinante CORE Pro!
+              ✅ Você já é assinante CORE PRO!
             </p>
             <p className="text-xs text-muted-foreground">
               Para cancelar, entre em contato pelo email suporte@coreaplicativo.com
@@ -173,7 +173,7 @@ const Planos = () => {
             ) : isSubscribed ? (
               "Já assinante"
             ) : (
-              "Assinar CORE Pro"
+              "Assinar CORE PRO"
             )}
           </Button>
 

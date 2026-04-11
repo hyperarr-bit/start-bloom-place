@@ -31,6 +31,7 @@ const isValidCpf = (cpf: string) => cpf.replace(/\D/g, "").length === 11;
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 type Step = "plans" | "form" | "pix";
+type PaymentMethod = "pix" | "card";
 
 const Planos = () => {
   const navigate = useNavigate();

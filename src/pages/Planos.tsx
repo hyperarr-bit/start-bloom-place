@@ -113,9 +113,16 @@ const Planos = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.checkoutUrl) {
-        // Billing API didn't return inline PIX, redirect to checkout
         window.open(data.checkoutUrl, "_blank");
         toast.success("Redirecionando para o pagamento...");
+        return;
+      }
+      if (paymentMethod === "card" && !data?.brCode) {
+        // Card payments always go through checkout URL
+        if (data?.checkoutUrl) {
+          window.open(data.checkoutUrl, "_blank");
+        }
+        toast.success("Redirecionando para pagamento com cartão...");
         return;
       }
       setPixData(data);

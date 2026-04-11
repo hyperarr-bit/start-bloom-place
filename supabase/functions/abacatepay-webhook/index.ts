@@ -7,7 +7,6 @@ const logStep = (step: string, details?: unknown) => {
 };
 
 serve(async (req) => {
-  // Webhooks are POST only
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
@@ -24,11 +23,10 @@ serve(async (req) => {
 
     const event = body.event;
 
-    // Handle subscription events
-    if (event === "subscription.completed" || event === "billing.paid") {
-      const subscription = body.data?.subscription || body.data?.billing;
+    if (event === "billing.paid") {
+      const billing = body.data?.billing;
       const customer = body.data?.customer;
-      const metadata = body.data?.billing?.metadata || body.data?.metadata || {};
+      const metadata = billing?.metadata || body.data?.metadata || {};
 
       if (!customer?.email) {
         logStep("No customer email in webhook payload");
@@ -37,11 +35,10 @@ serve(async (req) => {
 
       const userId = metadata.user_id;
       const billingPeriod = metadata.billing_period || "monthly";
-      const billingId = subscription?.id || body.data?.billing?.id;
+      const billingId = billing?.id;
 
       logStep("Processing payment", { email: customer.email, userId, billingId });
 
-      // Calculate period end based on billing period
       const now = new Date();
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
@@ -51,7 +48,6 @@ serve(async (req) => {
       }
 
       if (userId) {
-        // Upsert subscription record
         const { error } = await supabaseClient
           .from("subscriptions")
           .upsert(
@@ -69,8 +65,7 @@ serve(async (req) => {
           );
 
         if (error) {
-          logStep("DB upsert error", { message: error.message });
-          // Try insert if upsert fails (no unique constraint on user_id)
+          logStep("DB upsert error, trying insert", { message: error.message });
           const { error: insertError } = await supabaseClient
             .from("subscriptions")
             .insert({
@@ -83,21 +78,11 @@ serve(async (req) => {
               current_period_start: now.toISOString(),
               current_period_end: periodEnd.toISOString(),
             });
-          if (insertError) {
-            logStep("DB insert error", { message: insertError.message });
-          }
+          if (insertError) logStep("DB insert error", { message: insertError.message });
         }
         logStep("Subscription activated", { userId });
       } else {
-        logStep("No user_id in metadata, trying email lookup");
-        // Fallback: look up user by email
-        const { data: profiles } = await supabaseClient
-          .from("profiles")
-          .select("id")
-          .limit(1);
-
-        // We can't easily look up by email without auth.users access
-        // Store with email for manual resolution
+        logStep("No user_id in metadata, storing with placeholder");
         const { error } = await supabaseClient
           .from("subscriptions")
           .insert({
@@ -112,18 +97,17 @@ serve(async (req) => {
           });
         if (error) logStep("Fallback insert error", { message: error.message });
       }
-    } else if (event === "subscription.cancelled") {
-      const customer = body.data?.customer;
-      const metadata = body.data?.metadata || {};
+    } else if (event === "billing.disputed") {
+      const metadata = body.data?.billing?.metadata || body.data?.metadata || {};
       const userId = metadata.user_id;
 
       if (userId) {
         await supabaseClient
           .from("subscriptions")
-          .update({ status: "cancelled" })
+          .update({ status: "disputed" })
           .eq("user_id", userId)
           .eq("status", "active");
-        logStep("Subscription cancelled", { userId });
+        logStep("Subscription disputed", { userId });
       }
     }
 

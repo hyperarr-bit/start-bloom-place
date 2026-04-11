@@ -123,7 +123,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         frequency: "MULTIPLE_PAYMENTS",
-        methods: ["PIX"],
+        methods: [paymentMethod],
         products: [
           {
             externalId: plan.externalId,

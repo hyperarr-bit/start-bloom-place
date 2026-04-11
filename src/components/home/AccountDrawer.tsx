@@ -50,21 +50,9 @@ export const AccountDrawer = ({
     }
   };
 
-  const handleManageSubscription = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data, error } = await supabase.functions.invoke("customer-portal", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (error || !data?.url) {
-        navigate("/planos");
-        return;
-      }
-      window.location.href = data.url;
-    } catch {
-      navigate("/planos");
-    }
+  const handleManageSubscription = () => {
+    onOpenChange(false);
+    navigate("/planos");
   };
 
   const handleReplayTutorial = () => {

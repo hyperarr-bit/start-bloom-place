@@ -11,7 +11,6 @@ serve(async (req) => {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Validate webhook secret (v1 uses x-webhook-secret or query param)
   const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
   const receivedSecret =
     req.headers.get("x-webhook-secret") ||
@@ -34,16 +33,43 @@ serve(async (req) => {
 
     const event = body.event;
     const metadata = body.data?.metadata || {};
-    const userId = metadata.user_id;
+    let userId = metadata.user_id || null;
     const billingPeriod = metadata.billing_period || "monthly";
     const customerEmail = body.data?.customer?.email || null;
     const billingId = body.data?.id || null;
 
     const now = new Date();
 
-    // v1 billing paid event
     if (event === "billing.paid") {
       logStep("Billing paid", { userId, billingId, email: customerEmail });
+
+      // If no user_id in metadata, look up by email
+      if (!userId && customerEmail) {
+        logStep("No user_id in metadata, looking up by email", { email: customerEmail });
+        const { data: usersData, error: listError } = await supabaseClient.auth.admin.listUsers();
+
+        if (listError) {
+          logStep("Error listing users", { message: listError.message });
+        } else {
+          const matchedUser = usersData.users.find(
+            (u: { email?: string }) => u.email?.toLowerCase() === customerEmail.toLowerCase()
+          );
+          if (matchedUser) {
+            userId = matchedUser.id;
+            logStep("Found user by email", { userId, email: customerEmail });
+          } else {
+            logStep("No user found for email", { email: customerEmail });
+          }
+        }
+      }
+
+      if (!userId) {
+        logStep("Cannot associate payment - no user_id and no matching email");
+        return new Response(JSON.stringify({ received: true, warning: "no_user_found" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
 
       const periodEnd = new Date(now);
       if (billingPeriod === "annual") {
@@ -52,53 +78,39 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      if (userId) {
-        const { error } = await supabaseClient
-          .from("subscriptions")
-          .upsert(
-            {
-              user_id: userId,
-              status: "active",
-              plan: "core-pro",
-              billing_period: billingPeriod,
-              abacatepay_billing_id: billingId,
-              customer_email: customerEmail,
-              current_period_start: now.toISOString(),
-              current_period_end: periodEnd.toISOString(),
-            },
-            { onConflict: "user_id" }
-          );
+      const { error } = await supabaseClient
+        .from("subscriptions")
+        .upsert(
+          {
+            user_id: userId,
+            status: "active",
+            plan: "core-pro",
+            billing_period: billingPeriod,
+            abacatepay_billing_id: billingId,
+            customer_email: customerEmail,
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
 
-        if (error) {
-          logStep("Upsert error, trying insert", { message: error.message });
-          const { error: insertError } = await supabaseClient
-            .from("subscriptions")
-            .insert({
-              user_id: userId,
-              status: "active",
-              plan: "core-pro",
-              billing_period: billingPeriod,
-              abacatepay_billing_id: billingId,
-              customer_email: customerEmail,
-              current_period_start: now.toISOString(),
-              current_period_end: periodEnd.toISOString(),
-            });
-          if (insertError) logStep("Insert error", { message: insertError.message });
-        }
-        logStep("Subscription activated", { userId });
-      } else {
-        logStep("No user_id in metadata, storing with placeholder");
-        await supabaseClient.from("subscriptions").insert({
-          user_id: "00000000-0000-0000-0000-000000000000",
-          status: "active",
-          plan: "core-pro",
-          billing_period: billingPeriod,
-          abacatepay_billing_id: billingId,
-          customer_email: customerEmail,
-          current_period_start: now.toISOString(),
-          current_period_end: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        });
+      if (error) {
+        logStep("Upsert error, trying insert", { message: error.message });
+        const { error: insertError } = await supabaseClient
+          .from("subscriptions")
+          .insert({
+            user_id: userId,
+            status: "active",
+            plan: "core-pro",
+            billing_period: billingPeriod,
+            abacatepay_billing_id: billingId,
+            customer_email: customerEmail,
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+          });
+        if (insertError) logStep("Insert error", { message: insertError.message });
       }
+      logStep("Subscription activated", { userId });
     } else {
       logStep("Unhandled event type", { event });
     }

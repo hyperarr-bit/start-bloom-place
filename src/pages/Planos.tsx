@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Zap, Loader2, Settings } from "lucide-react";
+import { ArrowLeft, Check, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,7 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
+  
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -42,7 +42,7 @@ const Planos = () => {
   const handleCheckout = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
+      const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
         body: { billing },
       });
       if (error) throw error;
@@ -53,21 +53,6 @@ const Planos = () => {
       toast.error("Erro ao iniciar checkout: " + (err.message || "tente novamente"));
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleManageSubscription = async () => {
-    setPortalLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("customer-portal");
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    } catch (err: any) {
-      toast.error("Erro ao abrir portal: " + (err.message || "tente novamente"));
-    } finally {
-      setPortalLoading(false);
     }
   };
 

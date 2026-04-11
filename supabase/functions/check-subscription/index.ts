@@ -1,14 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const logStep = (step: string, details?: any) => {
-  const d = details ? ` - ${JSON.stringify(details)}` : '';
+const logStep = (step: string, details?: unknown) => {
+  const d = details ? ` - ${JSON.stringify(details)}` : "";
   console.log(`[CHECK-SUBSCRIPTION] ${step}${d}`);
 };
 
@@ -26,9 +26,6 @@ serve(async (req) => {
   try {
     logStep("Function started");
 
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header");
 
@@ -39,80 +36,55 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { email: user.email });
 
-    // Also get profile created_at for trial check
+    // Check profile created_at for trial
     const { data: profile } = await supabaseClient
       .from("profiles")
       .select("created_at")
       .eq("id", user.id)
       .single();
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+    // Check local subscriptions table
+    const { data: localSub } = await supabaseClient
+      .from("subscriptions")
+      .select("status, current_period_end, plan, billing_period")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("current_period_end", { ascending: false, nullsFirst: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (customers.data.length === 0) {
-      logStep("No Stripe customer found");
-      const trialExpired = checkTrialExpired(profile?.created_at);
-      return new Response(JSON.stringify({ subscribed: false, trial_expired: trialExpired, subscription_end: null }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
+    if (localSub) {
+      // Check if subscription is still valid
+      const endDate = localSub.current_period_end
+        ? new Date(localSub.current_period_end)
+        : null;
+      const isActive = !endDate || endDate > new Date();
 
-    const customerId = customers.data[0].id;
-    logStep("Found customer", { customerId });
-
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 1,
-    });
-
-    const hasActiveSub = subscriptions.data.length > 0;
-    let subscriptionEnd = null;
-
-    if (hasActiveSub) {
-      subscriptionEnd = new Date(subscriptions.data[0].current_period_end * 1000).toISOString();
-      logStep("Active subscription", { subscriptionEnd });
-    }
-
-    // Fallback: check local subscriptions table
-    if (!hasActiveSub) {
-      const { data: localSub, error: localSubError } = await supabaseClient
-        .from("subscriptions")
-        .select("status, current_period_end")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .order("current_period_end", { ascending: false, nullsFirst: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (localSubError) {
-        logStep("Local subscription lookup error", { message: localSubError.message });
-      }
-
-      if (localSub) {
-        logStep("Found active local subscription", { subscriptionEnd: localSub.current_period_end });
-        return new Response(JSON.stringify({
-          subscribed: true,
-          trial_expired: false,
-          subscription_end: localSub.current_period_end,
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200,
-        });
+      if (isActive) {
+        logStep("Active subscription found", { end: localSub.current_period_end });
+        return new Response(
+          JSON.stringify({
+            subscribed: true,
+            trial_expired: false,
+            subscription_end: localSub.current_period_end,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
       }
     }
 
-    const trialExpired = hasActiveSub ? false : checkTrialExpired(profile?.created_at);
+    // No active subscription — check trial
+    const trialExpired = checkTrialExpired(profile?.created_at);
+    logStep("No active subscription", { trialExpired });
 
-    return new Response(JSON.stringify({
-      subscribed: hasActiveSub,
-      trial_expired: trialExpired,
-      subscription_end: subscriptionEnd,
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
+    return new Response(
+      JSON.stringify({
+        subscribed: false,
+        trial_expired: trialExpired,
+        subscription_end: null,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });

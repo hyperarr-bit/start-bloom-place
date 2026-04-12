@@ -41,7 +41,7 @@ export const TrialBanner = () => {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex items-center justify-center px-4"
+        className="fixed inset-0 z-50 bg-background flex items-center justify-center px-4"
       >
         <div className="max-w-sm w-full text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto">

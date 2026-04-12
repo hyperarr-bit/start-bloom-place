@@ -1,15 +1,19 @@
+## Plano: Gerar templates HTML de e-mail para o Supabase
 
+### Contexto
 
-## Plano: Corrigir overlay de trial expirado
+O usuário quer templates HTML bonitos para colocar no painel do Supabase (Authentication → Email Templates), seguindo a identidade visual do app CORE: fonte Inter, estilo minimalista, cores neutras.
 
-### Problema
-O banner de trial expirado usa `bg-background/95` (95% opacidade), permitindo que o conteúdo da Home sangre por trás, criando a sobreposição visual visível na screenshot.
+### O que será gerado
 
-### Correção em `src/components/TrialBanner.tsx`
+Um script Python que cria 4 arquivos HTML em `/mnt/documents/`:
 
-**Linha 44** — Trocar a opacidade do overlay:
-- De: `bg-background/95 backdrop-blur-sm`
-- Para: `bg-background` (100% opaco, sem blur necessário)
+1. **confirm-signup.html** — Confirmação de cadastro
+2. **reset-password.html** — Redefinição de senha
+3. **magic-link.html** — Link mágico de login
+4. **change-email.html** — Confirmação de troca de e-mail
+5. Trocar senha 
 
-Isso faz o overlay cobrir completamente a tela, sem deixar o conteúdo aparecer por trás.
+### Estilo dos templates
 
+- Fundo branco, container

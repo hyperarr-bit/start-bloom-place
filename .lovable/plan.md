@@ -1,14 +1,15 @@
-## Plano: Atualizar texto de pagamento na página de Planos
 
-E troque o título CORE Pro para CORE PRO 
 
-Troque no mensal e anual 
+## Plano: Corrigir overlay de trial expirado
 
-### Alteração em `src/pages/Planos.tsx`
+### Problema
+O banner de trial expirado usa `bg-background/95` (95% opacidade), permitindo que o conteúdo da Home sangre por trás, criando a sobreposição visual visível na screenshot.
 
-Linha ~170 (rodapé do card):
+### Correção em `src/components/TrialBanner.tsx`
 
-- De: `Pagamento via PIX · Cancele quando quiser`
-- Para: `Pagamento via PIX e Cartão · Cancele quando quiser`
+**Linha 44** — Trocar a opacidade do overlay:
+- De: `bg-background/95 backdrop-blur-sm`
+- Para: `bg-background` (100% opaco, sem blur necessário)
 
-Nenhuma outra alteração necessária.
+Isso faz o overlay cobrir completamente a tela, sem deixar o conteúdo aparecer por trás.
+

@@ -12,6 +12,8 @@ const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
+const PRODUCT_VERSION = "v3";
+
 const PRODUCTS: Record<BillingPeriod, { name: string; price: number; cycle: string }> = {
   monthly: { name: "CORE Pro Mensal", price: 1990, cycle: "MONTHLY" },
   annual: { name: "CORE Pro Anual", price: 17880, cycle: "ANNUALLY" },

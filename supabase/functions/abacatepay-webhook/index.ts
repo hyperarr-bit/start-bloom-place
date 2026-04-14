@@ -37,34 +37,39 @@ serve(async (req) => {
     const billingPeriod = metadata.billing_period || "monthly";
     const customerEmail = body.data?.customer?.email || null;
     const billingId = body.data?.id || null;
+    const subscriptionId = body.data?.subscriptionId || body.data?.subscription_id || billingId;
 
     const now = new Date();
 
-    if (event === "billing.paid") {
-      logStep("Billing paid", { userId, billingId, email: customerEmail });
+    // Helper to find user by email if no user_id in metadata
+    async function resolveUserId() {
+      if (userId) return userId;
+      if (!customerEmail) return null;
 
-      // If no user_id in metadata, look up by email
-      if (!userId && customerEmail) {
-        logStep("No user_id in metadata, looking up by email", { email: customerEmail });
-        const { data: usersData, error: listError } = await supabaseClient.auth.admin.listUsers();
-
-        if (listError) {
-          logStep("Error listing users", { message: listError.message });
-        } else {
-          const matchedUser = usersData.users.find(
-            (u: { email?: string }) => u.email?.toLowerCase() === customerEmail.toLowerCase()
-          );
-          if (matchedUser) {
-            userId = matchedUser.id;
-            logStep("Found user by email", { userId, email: customerEmail });
-          } else {
-            logStep("No user found for email", { email: customerEmail });
-          }
-        }
+      logStep("Looking up user by email", { email: customerEmail });
+      const { data: usersData, error: listError } = await supabaseClient.auth.admin.listUsers();
+      if (listError) {
+        logStep("Error listing users", { message: listError.message });
+        return null;
       }
+      const matched = usersData.users.find(
+        (u: { email?: string }) => u.email?.toLowerCase() === customerEmail.toLowerCase()
+      );
+      if (matched) {
+        logStep("Found user by email", { userId: matched.id });
+        return matched.id;
+      }
+      logStep("No user found for email", { email: customerEmail });
+      return null;
+    }
+
+    // Handle billing.paid (legacy one-time) and subscription.paid (recurring)
+    if (event === "billing.paid" || event === "subscription.paid") {
+      userId = await resolveUserId();
+      logStep("Payment received", { event, userId, billingId, email: customerEmail });
 
       if (!userId) {
-        logStep("Cannot associate payment - no user_id and no matching email");
+        logStep("Cannot associate payment - no user found");
         return new Response(JSON.stringify({ received: true, warning: "no_user_found" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -87,6 +92,7 @@ serve(async (req) => {
             plan: "core-pro",
             billing_period: billingPeriod,
             abacatepay_billing_id: billingId,
+            abacatepay_subscription_id: subscriptionId,
             customer_email: customerEmail,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
@@ -104,13 +110,39 @@ serve(async (req) => {
             plan: "core-pro",
             billing_period: billingPeriod,
             abacatepay_billing_id: billingId,
+            abacatepay_subscription_id: subscriptionId,
             customer_email: customerEmail,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
           });
         if (insertError) logStep("Insert error", { message: insertError.message });
       }
-      logStep("Subscription activated", { userId });
+      logStep("Subscription activated", { userId, event });
+
+    } else if (event === "subscription.cancelled") {
+      userId = await resolveUserId();
+      logStep("Subscription cancelled", { userId, subscriptionId });
+
+      if (userId) {
+        await supabaseClient
+          .from("subscriptions")
+          .update({ status: "canceled" })
+          .eq("user_id", userId);
+        logStep("Marked as canceled", { userId });
+      }
+
+    } else if (event === "subscription.overdue") {
+      userId = await resolveUserId();
+      logStep("Subscription overdue", { userId, subscriptionId });
+
+      if (userId) {
+        await supabaseClient
+          .from("subscriptions")
+          .update({ status: "past_due" })
+          .eq("user_id", userId);
+        logStep("Marked as past_due", { userId });
+      }
+
     } else {
       logStep("Unhandled event type", { event });
     }

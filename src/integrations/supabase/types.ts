@@ -89,6 +89,7 @@ export type Database = {
       subscriptions: {
         Row: {
           abacatepay_billing_id: string | null
+          abacatepay_subscription_id: string | null
           billing_period: string | null
           created_at: string
           current_period_end: string | null
@@ -101,6 +102,7 @@ export type Database = {
         }
         Insert: {
           abacatepay_billing_id?: string | null
+          abacatepay_subscription_id?: string | null
           billing_period?: string | null
           created_at?: string
           current_period_end?: string | null
@@ -113,6 +115,7 @@ export type Database = {
         }
         Update: {
           abacatepay_billing_id?: string | null
+          abacatepay_subscription_id?: string | null
           billing_period?: string | null
           created_at?: string
           current_period_end?: string | null

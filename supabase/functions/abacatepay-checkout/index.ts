@@ -268,7 +268,7 @@ serve(async (req) => {
     const subscriptionBody: Record<string, unknown> = {
       externalId,
       items: [{ id: productId, quantity: 1 }],
-      methods: ["CARD"],
+      methods: ["PIX", "CARD"],
       customerId,
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,

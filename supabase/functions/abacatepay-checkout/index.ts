@@ -65,6 +65,7 @@ async function getOrCreateProduct(
     name: product.name,
     price: product.price,
     billingCycle: product.cycle,
+    currency: "BRL",
   });
 
   const productId = result.data?.id || result.id;

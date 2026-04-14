@@ -1,84 +1,81 @@
 
-Plano direto para fazer o checkout funcionar de verdade
+Objetivo: corrigir o checkout da AbacatePay de forma definitiva. O erro atual já está localizado.
 
-Problema realmente localizado
-- O erro atual não é genérico: os logs da edge function mostram claramente `422` em `/v2/subscriptions/create` com `"Property 'items' is missing"`.
-- A documentação v2 da AbacatePay confirma que assinaturas exigem payload com:
-  - `items` contendo exatamente 1 item
-  - `methods`
-  - opcionalmente `customerId`
-- O código atual envia `productId` no topo e um objeto `customer`, então a API rejeita a requisição.
-- Existe um segundo problema provável no pós-pagamento: o webhook usa `upsert(..., { onConflict: "user_id" })`, mas a tabela `subscriptions` não tem constraint única em `user_id`. Isso pode impedir ativação correta da assinatura ou criar duplicidade.
+Problema real identificado
+- O log mais recente não aponta mais para `items`: agora a API responde `Subscription checkout only accepts products with cycle defined`.
+- No código atual, o produto é criado com `billingCycle`, mas a documentação v2 mostra que o campo correto é `cycle`.
+- Resultado: os produtos criados pela edge function provavelmente foram salvos como produtos avulsos, sem ciclo de assinatura.
+- Existe um agravante: `getOrCreateProduct()` reutiliza o `productId` salvo em `app_config`, então mesmo corrigindo o payload, o sistema continuará usando o produto antigo inválido até forçar recriação/recache.
 
-O que vou corrigir
-1. Corrigir a edge function `abacatepay-checkout`
-- Trocar o payload de assinatura para o formato aceito pela v2:
+O que vou implementar
+1. Corrigir a criação do produto em `supabase/functions/abacatepay-checkout/index.ts`
+- Trocar `billingCycle` por `cycle` no payload de `/products/create`.
+- Manter `currency: "BRL"` e o restante do payload compatível com a doc v2.
+
+2. Parar de confiar cegamente no cache do produto
+- Ajustar `getOrCreateProduct()` para validar se o produto em cache tem `cycle` compatível com o plano antes de reutilizar.
+- Se o produto salvo estiver sem `cycle` ou com ciclo errado:
+  - ignorar o cache
+  - criar ou localizar um produto válido
+  - atualizar `app_config` com o novo `productId`
+
+3. Evitar reaproveitar produtos antigos inválidos
+- Alterar o `externalId` dos produtos recorrentes para uma nova chave estável/versionada, por exemplo:
+  - `core-pro-monthly-v2`
+  - `core-pro-annual-v2`
+- Isso evita colisão com os produtos antigos criados sem ciclo.
+
+4. Confirmar o payload da assinatura
+- Manter `/subscriptions/create` com o formato correto que já estava no caminho certo:
+  - `externalId`
   - `items: [{ id: productId, quantity: 1 }]`
   - `methods: ["CARD"]`
-  - `externalId`
-  - `returnUrl` e `completionUrl`
-  - `customerId` quando disponível
-- Remover o envio do `productId` no topo e do objeto `customer` dentro de `/subscriptions/create`.
+  - `customerId`
+  - `returnUrl`
+  - `completionUrl`
+  - `metadata`
 
-2. Reusar/criar cliente AbacatePay corretamente
-- Ler `abacatepay_customer_id` do `user_data` antes de abrir o checkout.
-- Se não existir, criar cliente via `/v2/customers/create` com:
-  - `email` obrigatório
-  - `name`, `cellphone`, `taxId` quando existirem no perfil
-- Salvar o `customerId` em `user_data` para reutilizar nos próximos checkouts.
+5. Preservar o restante do fluxo
+- Manter a lógica de `customerId` em `user_data`, pois ela não é o erro atual.
+- Manter o webhook com update/insert, porque isso melhora a persistência após o pagamento, embora não seja o bloqueio do checkout neste momento.
 
-3. Melhorar URLs de retorno
-- Parar de fixar somente `https://coreaplicativo.lovable.app`.
-- Usar a origem da requisição quando disponível, com fallback para a URL publicada.
-- Isso evita confusão ao testar no preview.
+Validação que vou fazer depois de implementar
+- Testar checkout mensal e anual.
+- Confirmar nos logs que o produto usado possui `cycle: "MONTHLY"` ou `cycle: "ANNUALLY"`.
+- Confirmar que `/subscriptions/create` devolve uma `url` válida em vez de erro 400.
+- Verificar que o checkout abre normalmente no preview.
+- Depois do pagamento, verificar se `abacatepay-webhook` grava a assinatura e se `check-subscription` passa a reconhecer o plano ativo.
 
-4. Corrigir persistência da assinatura no webhook
-- Ajustar `abacatepay-webhook` para não depender de `upsert` com conflito inexistente.
-- Opção segura:
-  - primeiro tentar `update` por `user_id`
-  - se não houver linha, fazer `insert`
-- Se necessário, complementar com migration para garantir unicidade por usuário em `subscriptions`.
-
-5. Ajustar a UI para não prometer método errado
-- A página `/planos` hoje diz `Pagamento via PIX e Cartão`.
-- Pela doc de assinatura, o fluxo recorrente deve usar `CARD`.
-- Vou alinhar a copy para não induzir erro de expectativa.
-
-Validação após implementar
-- Testar plano mensal e anual.
-- Confirmar que a edge function retorna `url` válida.
-- Confirmar que o checkout abre sem 422.
-- Confirmar que o webhook grava/atualiza `subscriptions` corretamente.
-- Confirmar que `check-subscription` passa a reconhecer a assinatura ativa após pagamento.
-- Verificar logs da edge function depois do teste para garantir que o problema real foi eliminado, não apenas mascarado.
-
-Arquivos que serão mexidos
+Arquivos que serão ajustados
 - `supabase/functions/abacatepay-checkout/index.ts`
-- `supabase/functions/abacatepay-webhook/index.ts`
-- `src/pages/Planos.tsx`
-- migration SQL em `supabase/migrations/`
+- possivelmente uma migration leve em `supabase/migrations/` se eu decidir limpar/renovar cache de `app_config` com segurança
 
-Detalhes técnicos
-- Payload correto da assinatura:
+Detalhe técnico importante
 ```text
+Hoje:
+POST /products/create
 {
   externalId,
-  items: [{ id: productId, quantity: 1 }],
-  methods: ["CARD"],
-  customerId,
-  returnUrl,
-  completionUrl,
-  metadata
+  name,
+  price,
+  billingCycle,   <- errado
+  currency: "BRL"
 }
-```
-- Cliente AbacatePay:
-```text
-POST /v2/customers/create
+
+Correto:
+POST /products/create
 {
-  email,
-  name?,
-  cellphone?,
-  taxId?
+  externalId,
+  name,
+  price,
+  currency: "BRL",
+  cycle: "MONTHLY" | "ANNUALLY"
 }
 ```
-- Se aparecer um erro seguinte sobre ciclo/frequency do produto, eu também ajusto a criação/recriação dos produtos para o formato exato que a v2 exige para produtos recorrentes. Mas o erro atual confirmado é o payload inválido da assinatura.
+
+Resumo do diagnóstico
+- Sim, agora eu sei qual é o problema.
+- O checkout falha porque o produto enviado na assinatura não é um produto recorrente válido.
+- Isso acontece por dois motivos combinados:
+  1. campo errado ao criar o produto (`billingCycle` em vez de `cycle`)
+  2. reaproveitamento de `productId` inválido salvo em cache

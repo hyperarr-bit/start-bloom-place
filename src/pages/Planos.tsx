@@ -46,8 +46,6 @@ const Planos = () => {
       return;
     }
 
-    // Open blank tab immediately for perceived speed
-    const checkoutTab = window.open("about:blank", "_blank");
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
@@ -56,15 +54,9 @@ const Planos = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       if (data?.url) {
-        if (checkoutTab) {
-          checkoutTab.location.href = data.url;
-        } else {
-          window.location.href = data.url;
-        }
-        toast.success("Checkout aberto em nova aba!");
+        window.location.href = data.url;
       }
     } catch (err: any) {
-      checkoutTab?.close();
       const msg = err.message || "";
       if (msg.includes("not authenticated") || msg.includes("missing sub claim")) {
         toast.error("Sua sessão expirou. Faça login novamente.");
@@ -72,7 +64,6 @@ const Planos = () => {
       } else {
         toast.error(msg || "Erro ao iniciar checkout");
       }
-    } finally {
       setLoading(false);
     }
   };

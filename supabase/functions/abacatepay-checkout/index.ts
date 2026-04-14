@@ -168,7 +168,8 @@ async function getOrCreateCustomer(
 
   logStep("Creating customer", { userId, email: userEmail });
   const result = await abacateRequest("/customers/create", apiKey, customerBody);
-  const customerId = extractId(result.data) ?? extractId((result.data or {}).get("customer")) ?? extractId(result.id);
+  const customerData = result.data as { customer?: unknown } | string | null | undefined;
+  const customerId = extractId(customerData) ?? extractId(customerData && typeof customerData === "object" ? customerData.customer : null) ?? extractId(result.id);
 
   if (!customerId) {
     throw new Error("No customer ID returned from AbacatePay");

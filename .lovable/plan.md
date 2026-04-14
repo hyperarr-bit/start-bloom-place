@@ -1,27 +1,25 @@
 
 
-# Abrir checkout na mesma aba
+# Ativar PIX no checkout da AbacatePay
 
-## Situação atual
-- O checkout da AbacatePay **já está funcionando** (logs confirmam criação de assinatura com sucesso).
-- O webhook está configurado corretamente para gravar a assinatura na tabela `subscriptions`.
-- O `check-subscription` lê a tabela `subscriptions` e reconhece assinaturas ativas.
-- As URLs de retorno estão corretas: `completionUrl` volta para `/planos?success=true` e `returnUrl` volta para `/planos?canceled=true`.
+## O que fazer
+A linha 271 do `abacatepay-checkout/index.ts` define `methods: ["CARD"]`. Basta adicionar `"PIX"` ao array.
 
-## Problema
-O código em `Planos.tsx` usa `window.open("about:blank", "_blank")` para abrir o checkout em nova aba. O usuário quer que abra na mesma aba.
+## Alteração
 
-## O que vou fazer
+**Arquivo**: `supabase/functions/abacatepay-checkout/index.ts` (linha 271)
 
-### 1. Alterar `Planos.tsx` para redirecionar na mesma aba
-- Remover `window.open("about:blank", "_blank")`.
-- Usar `window.location.href = data.url` diretamente para redirecionar na mesma aba.
-- Remover a referência ao `checkoutTab` e o toast "Checkout aberto em nova aba".
+Trocar:
+```typescript
+methods: ["CARD"],
+```
+Por:
+```typescript
+methods: ["PIX", "CARD"],
+```
 
-### 2. Verificar o fluxo pós-pagamento
-- Após pagamento, a AbacatePay redireciona para `completionUrl` = `/planos?success=true`.
-- O `useEffect` já detecta `?success=true` e mostra toast de sucesso.
-- O botão de voltar (`ArrowLeft`) usa `navigate(-1)`, que volta para a página anterior no histórico do navegador.
+Depois, fazer deploy da edge function.
 
-### Arquivos
-- `src/pages/Planos.tsx` -- remover lógica de nova aba, usar redirect na mesma aba.
+## Observação
+Com assinaturas recorrentes, o PIX funciona apenas para o primeiro pagamento. As cobranças seguintes dependem de cartão cadastrado. Se a AbacatePay não suportar PIX recorrente, o checkout mostrará PIX apenas como opção inicial e pedirá cartão para as renovações. Se der erro, basta remover `"PIX"` do array.
+

@@ -61,6 +61,7 @@ async function getOrCreateProduct(
   logStep("Creating product", { billing, product });
 
   const result = await abacateRequest("/products/create", apiKey, {
+    externalId: `core-pro-${billing}`,
     name: product.name,
     price: product.price,
     billingCycle: product.cycle,
@@ -138,7 +139,10 @@ serve(async (req) => {
     // Create subscription via AbacatePay v2
     logStep("Creating subscription", { productId, billingPeriod, customerName });
 
+    const externalId = `${userId}-${billingPeriod}-${Date.now()}`;
+
     const subscriptionBody: Record<string, unknown> = {
+      externalId,
       productId,
       returnUrl: "https://coreaplicativo.lovable.app/planos?success=true",
       completionUrl: "https://coreaplicativo.lovable.app/planos?success=true",

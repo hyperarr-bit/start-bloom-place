@@ -56,20 +56,40 @@ async function getOrCreateProduct(
     return productId;
   }
 
-  // Create product via API
+  // Create product via API (or find existing)
   const product = PRODUCTS[billing];
   logStep("Creating product", { billing, product });
 
-  const result = await abacateRequest("/products/create", apiKey, {
-    externalId: `core-pro-${billing}`,
-    name: product.name,
-    price: product.price,
-    billingCycle: product.cycle,
-    currency: "BRL",
-  });
-
-  const productId = result.data?.id || result.id;
-  logStep("Product created", { productId });
+  let productId: string;
+  try {
+    const result = await abacateRequest("/products/create", apiKey, {
+      externalId: `core-pro-${billing}`,
+      name: product.name,
+      price: product.price,
+      billingCycle: product.cycle,
+      currency: "BRL",
+    });
+    productId = result.data?.id || result.id;
+    logStep("Product created", { productId });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("already exists")) {
+      logStep("Product already exists, listing products to find it");
+      const listRes = await fetch(`${API_BASE}/products/list`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      const listData = await listRes.json();
+      const found = listData.data?.find(
+        (p: Record<string, unknown>) => p.externalId === `core-pro-${billing}`
+      );
+      if (!found?.id) throw new Error("Could not find existing product");
+      productId = found.id;
+      logStep("Found existing product", { productId });
+    } else {
+      throw err;
+    }
+  }
 
   // Cache product ID
   await supabaseClient.from("app_config").upsert(

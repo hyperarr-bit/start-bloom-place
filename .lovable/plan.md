@@ -1,56 +1,84 @@
 
+Plano direto para fazer o checkout funcionar de verdade
 
-# Plano: Implementar Assinaturas Recorrentes com AbacatePay API v2
+Problema realmente localizado
+- O erro atual não é genérico: os logs da edge function mostram claramente `422` em `/v2/subscriptions/create` com `"Property 'items' is missing"`.
+- A documentação v2 da AbacatePay confirma que assinaturas exigem payload com:
+  - `items` contendo exatamente 1 item
+  - `methods`
+  - opcionalmente `customerId`
+- O código atual envia `productId` no topo e um objeto `customer`, então a API rejeita a requisição.
+- Existe um segundo problema provável no pós-pagamento: o webhook usa `upsert(..., { onConflict: "user_id" })`, mas a tabela `subscriptions` não tem constraint única em `user_id`. Isso pode impedir ativação correta da assinatura ou criar duplicidade.
 
-## Situação atual
-A edge function `abacatepay-checkout` apenas retorna links estáticos pré-criados no dashboard. Não há criação dinâmica de cobrança nem recorrência real via API.
+O que vou corrigir
+1. Corrigir a edge function `abacatepay-checkout`
+- Trocar o payload de assinatura para o formato aceito pela v2:
+  - `items: [{ id: productId, quantity: 1 }]`
+  - `methods: ["CARD"]`
+  - `externalId`
+  - `returnUrl` e `completionUrl`
+  - `customerId` quando disponível
+- Remover o envio do `productId` no topo e do objeto `customer` dentro de `/subscriptions/create`.
 
-## O que muda
+2. Reusar/criar cliente AbacatePay corretamente
+- Ler `abacatepay_customer_id` do `user_data` antes de abrir o checkout.
+- Se não existir, criar cliente via `/v2/customers/create` com:
+  - `email` obrigatório
+  - `name`, `cellphone`, `taxId` quando existirem no perfil
+- Salvar o `customerId` em `user_data` para reutilizar nos próximos checkouts.
 
-### 1. Criar produtos na AbacatePay via API
-Antes de tudo, a edge function vai criar (ou reutilizar) dois produtos na AbacatePay com o campo `cycle`:
-- **Produto Mensal**: `cycle: "MONTHLY"`, preço R$19,90 (1990 centavos)
-- **Produto Anual**: `cycle: "ANNUALLY"`, preço R$178,80 (17880 centavos = R$14,90 x 12)
+3. Melhorar URLs de retorno
+- Parar de fixar somente `https://coreaplicativo.lovable.app`.
+- Usar a origem da requisição quando disponível, com fallback para a URL publicada.
+- Isso evita confusão ao testar no preview.
 
-Os IDs dos produtos serão armazenados na tabela `app_config` para não recriar toda vez.
+4. Corrigir persistência da assinatura no webhook
+- Ajustar `abacatepay-webhook` para não depender de `upsert` com conflito inexistente.
+- Opção segura:
+  - primeiro tentar `update` por `user_id`
+  - se não houver linha, fazer `insert`
+- Se necessário, complementar com migration para garantir unicidade por usuário em `subscriptions`.
 
-### 2. Reescrever `abacatepay-checkout` edge function
-Em vez de retornar links estáticos, a function vai:
-1. Autenticar o usuário (já faz)
-2. Buscar o email/nome do usuário no perfil
-3. Chamar `POST https://api.abacatepay.com/v2/subscriptions/create` com:
-   - O produto correto (mensal ou anual)
-   - `returnUrl` e `completionUrl` apontando para `/planos?success=true`
-   - Dados do cliente (email, nome)
-   - `metadata` com `user_id` e `billing_period`
-4. Retornar a `url` do checkout de assinatura
+5. Ajustar a UI para não prometer método errado
+- A página `/planos` hoje diz `Pagamento via PIX e Cartão`.
+- Pela doc de assinatura, o fluxo recorrente deve usar `CARD`.
+- Vou alinhar a copy para não induzir erro de expectativa.
 
-### 3. Atualizar `abacatepay-webhook` edge function
-Adicionar tratamento para novos eventos de subscription:
-- `subscription.paid` — renovação automática processada
-- `subscription.cancelled` — marcar status como `canceled` na tabela `subscriptions`
-- `subscription.overdue` — marcar como `past_due`
+Validação após implementar
+- Testar plano mensal e anual.
+- Confirmar que a edge function retorna `url` válida.
+- Confirmar que o checkout abre sem 422.
+- Confirmar que o webhook grava/atualiza `subscriptions` corretamente.
+- Confirmar que `check-subscription` passa a reconhecer a assinatura ativa após pagamento.
+- Verificar logs da edge function depois do teste para garantir que o problema real foi eliminado, não apenas mascarado.
 
-### 4. Atualizar o secret `ABACATEPAY_API_KEY`
-Confirmar que o secret já existente contém a chave v2. Se a chave mudou, será necessário atualizar.
+Arquivos que serão mexidos
+- `supabase/functions/abacatepay-checkout/index.ts`
+- `supabase/functions/abacatepay-webhook/index.ts`
+- `src/pages/Planos.tsx`
+- migration SQL em `supabase/migrations/`
 
-## Detalhes técnicos
-
-**Edge function `abacatepay-checkout`** — chamada à API v2:
+Detalhes técnicos
+- Payload correto da assinatura:
+```text
+{
+  externalId,
+  items: [{ id: productId, quantity: 1 }],
+  methods: ["CARD"],
+  customerId,
+  returnUrl,
+  completionUrl,
+  metadata
+}
 ```
-POST https://api.abacatepay.com/v2/subscriptions/create
-Authorization: Bearer {ABACATEPAY_API_KEY}
-Body: { productId, returnUrl, completionUrl, metadata, customer }
+- Cliente AbacatePay:
+```text
+POST /v2/customers/create
+{
+  email,
+  name?,
+  cellphone?,
+  taxId?
+}
 ```
-
-**Webhook** — novos eventos tratados: `subscription.paid`, `subscription.cancelled`, `subscription.overdue`
-
-**Tabela `subscriptions`** — adicionar coluna `abacatepay_subscription_id` (text, nullable) via migration para rastrear o ID da subscription na AbacatePay.
-
-**Nenhuma mudança no frontend** — a página `/planos` continua funcionando igual, só o checkout agora gera cobrança recorrente real.
-
-## Arquivos alterados
-- `supabase/functions/abacatepay-checkout/index.ts` — reescrita completa
-- `supabase/functions/abacatepay-webhook/index.ts` — novos eventos
-- Migration SQL — adicionar coluna `abacatepay_subscription_id`
-
+- Se aparecer um erro seguinte sobre ciclo/frequency do produto, eu também ajusto a criação/recriação dos produtos para o formato exato que a v2 exige para produtos recorrentes. Mas o erro atual confirmado é o payload inválido da assinatura.

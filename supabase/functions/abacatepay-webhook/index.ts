@@ -6,6 +6,12 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[ABACATEPAY-WEBHOOK] ${step}${d}`);
 };
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
 serve(async (req) => {
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -41,6 +47,67 @@ serve(async (req) => {
 
     const now = new Date();
 
+    async function updateStatus(filters: { userId?: string | null; subscriptionId?: string | null; billingId?: string | null }, status: string) {
+      let query = supabaseClient.from("subscriptions").update({ status });
+
+      if (filters.userId) {
+        query = query.eq("user_id", filters.userId);
+      } else {
+        const clauses = [
+          filters.subscriptionId ? `abacatepay_subscription_id.eq.${filters.subscriptionId}` : null,
+          filters.billingId ? `abacatepay_billing_id.eq.${filters.billingId}` : null,
+        ].filter(Boolean);
+
+        if (!clauses.length) return;
+        query = query.or(clauses.join(","));
+      }
+
+      const { error } = await query;
+      if (error) {
+        logStep("Status update error", { status, message: error.message, filters });
+      }
+    }
+
+    async function saveActiveSubscription(resolvedUserId: string) {
+      const periodEnd = new Date(now);
+      if (billingPeriod === "annual") {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+      } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+      }
+
+      const payload = {
+        user_id: resolvedUserId,
+        status: "active",
+        plan: "core-pro",
+        billing_period: billingPeriod,
+        abacatepay_billing_id: billingId,
+        abacatepay_subscription_id: subscriptionId,
+        customer_email: customerEmail,
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+      };
+
+      const { data: updated, error: updateError } = await supabaseClient
+        .from("subscriptions")
+        .update(payload)
+        .eq("user_id", resolvedUserId)
+        .select("id");
+
+      if (updateError) {
+        logStep("Update error", { message: updateError.message, userId: resolvedUserId });
+      }
+
+      if (updated && updated.length > 0) {
+        return;
+      }
+
+      const { error: insertError } = await supabaseClient.from("subscriptions").insert(payload);
+      if (insertError) {
+        logStep("Insert error", { message: insertError.message, userId: resolvedUserId });
+      }
+    }
+
     // Helper to find user by email if no user_id in metadata
     async function resolveUserId() {
       if (userId) return userId;
@@ -70,90 +137,34 @@ serve(async (req) => {
 
       if (!userId) {
         logStep("Cannot associate payment - no user found");
-        return new Response(JSON.stringify({ received: true, warning: "no_user_found" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        return jsonResponse({ received: true, warning: "no_user_found" });
       }
 
-      const periodEnd = new Date(now);
-      if (billingPeriod === "annual") {
-        periodEnd.setFullYear(periodEnd.getFullYear() + 1);
-      } else {
-        periodEnd.setMonth(periodEnd.getMonth() + 1);
-      }
-
-      const { error } = await supabaseClient
-        .from("subscriptions")
-        .upsert(
-          {
-            user_id: userId,
-            status: "active",
-            plan: "core-pro",
-            billing_period: billingPeriod,
-            abacatepay_billing_id: billingId,
-            abacatepay_subscription_id: subscriptionId,
-            customer_email: customerEmail,
-            current_period_start: now.toISOString(),
-            current_period_end: periodEnd.toISOString(),
-          },
-          { onConflict: "user_id" }
-        );
-
-      if (error) {
-        logStep("Upsert error, trying insert", { message: error.message });
-        const { error: insertError } = await supabaseClient
-          .from("subscriptions")
-          .insert({
-            user_id: userId,
-            status: "active",
-            plan: "core-pro",
-            billing_period: billingPeriod,
-            abacatepay_billing_id: billingId,
-            abacatepay_subscription_id: subscriptionId,
-            customer_email: customerEmail,
-            current_period_start: now.toISOString(),
-            current_period_end: periodEnd.toISOString(),
-          });
-        if (insertError) logStep("Insert error", { message: insertError.message });
-      }
+      await saveActiveSubscription(userId);
       logStep("Subscription activated", { userId, event });
 
     } else if (event === "subscription.cancelled") {
       userId = await resolveUserId();
       logStep("Subscription cancelled", { userId, subscriptionId });
 
-      if (userId) {
-        await supabaseClient
-          .from("subscriptions")
-          .update({ status: "canceled" })
-          .eq("user_id", userId);
-        logStep("Marked as canceled", { userId });
-      }
+      await updateStatus({ userId, subscriptionId, billingId }, "canceled");
+      logStep("Marked as canceled", { userId, subscriptionId, billingId });
 
     } else if (event === "subscription.overdue") {
       userId = await resolveUserId();
       logStep("Subscription overdue", { userId, subscriptionId });
 
-      if (userId) {
-        await supabaseClient
-          .from("subscriptions")
-          .update({ status: "past_due" })
-          .eq("user_id", userId);
-        logStep("Marked as past_due", { userId });
-      }
+      await updateStatus({ userId, subscriptionId, billingId }, "past_due");
+      logStep("Marked as past_due", { userId, subscriptionId, billingId });
 
     } else {
       logStep("Unhandled event type", { event });
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return jsonResponse({ received: true });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logStep("ERROR", { message: msg });
-    return new Response(JSON.stringify({ error: msg }), { status: 500 });
+    return jsonResponse({ error: msg }, 500);
   }
 });

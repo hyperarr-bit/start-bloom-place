@@ -178,7 +178,7 @@ const Planos = () => {
           </Button>
 
           <p className="text-[10px] text-muted-foreground text-center">
-            Pagamento via PIX e Cartão · Cancele quando quiser
+            Assinatura recorrente no cartão · Cancele quando quiser
           </p>
         </motion.div>
       </main>

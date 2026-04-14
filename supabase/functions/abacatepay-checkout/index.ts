@@ -61,6 +61,7 @@ async function getOrCreateProduct(
   logStep("Creating product", { billing, product });
 
   const result = await abacateRequest("/products/create", apiKey, {
+    externalId: `core-pro-${billing}`,
     name: product.name,
     price: product.price,
     billingCycle: product.cycle,

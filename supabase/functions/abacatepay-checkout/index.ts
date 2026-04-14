@@ -81,7 +81,7 @@ async function getOrCreateProduct(
   apiKey: string,
   supabaseClient: ReturnType<typeof createClient>
 ): Promise<string> {
-  const configKey = `abacatepay_product_${billing}`;
+  const configKey = `abacatepay_product_${billing}_${PRODUCT_VERSION}`;
 
   // Check if product ID is cached in app_config
   const { data: cached } = await supabaseClient
@@ -91,26 +91,30 @@ async function getOrCreateProduct(
     .maybeSingle();
 
   if (cached?.value) {
-    const productId = (cached.value as { id: string }).id;
-    logStep("Using cached product", { billing, productId });
-    return productId;
+    const cachedValue = cached.value as { id: string; version?: string };
+    if (cachedValue.version === PRODUCT_VERSION && cachedValue.id) {
+      logStep("Using cached product", { billing, productId: cachedValue.id });
+      return cachedValue.id;
+    }
+    logStep("Cached product outdated, recreating", { billing });
   }
 
-  // Create product via API (or find existing)
+  // Create product via API with correct cycle field
   const product = PRODUCTS[billing];
-  logStep("Creating product", { billing, product });
+  const externalId = `core-pro-${billing}-${PRODUCT_VERSION}`;
+  logStep("Creating product", { billing, product, externalId });
 
   let productId: string;
   try {
     const result = await abacateRequest("/products/create", apiKey, {
-      externalId: `core-pro-${billing}`,
+      externalId,
       name: product.name,
       price: product.price,
-      billingCycle: product.cycle,
+      cycle: product.cycle,
       currency: "BRL",
     });
     productId = result.data?.id || result.id;
-    logStep("Product created", { productId });
+    logStep("Product created", { productId, cycle: product.cycle });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("already exists")) {
@@ -121,7 +125,7 @@ async function getOrCreateProduct(
       });
       const listData = await listRes.json();
       const found = listData.data?.find(
-        (p: Record<string, unknown>) => p.externalId === `core-pro-${billing}`
+        (p: Record<string, unknown>) => p.externalId === externalId
       );
       if (!found?.id) throw new Error("Could not find existing product");
       productId = found.id;
@@ -131,9 +135,9 @@ async function getOrCreateProduct(
     }
   }
 
-  // Cache product ID
+  // Cache product ID with version
   await supabaseClient.from("app_config").upsert(
-    { key: configKey, value: { id: productId }, updated_at: new Date().toISOString() },
+    { key: configKey, value: { id: productId, version: PRODUCT_VERSION }, updated_at: new Date().toISOString() },
     { onConflict: "key" }
   );
 

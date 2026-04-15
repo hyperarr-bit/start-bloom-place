@@ -30,14 +30,14 @@ const Relacionamentos = () => {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Users className="w-5 h-5 text-rose-600" />
           <h1 className="text-base font-bold tracking-tight">RELAÇÕES</h1>
         </div>
-        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -51,7 +51,7 @@ const Relacionamentos = () => {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-5 pb-24 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
         <ModuleTip
           moduleId="relacionamentos"
           tips={[

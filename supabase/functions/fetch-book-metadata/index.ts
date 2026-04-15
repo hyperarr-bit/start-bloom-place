@@ -1,7 +1,33 @@
+import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+const ALLOWED_DOMAINS = [
+  'amazon.com', 'amazon.com.br', 'amazon.co.uk', 'amazon.de', 'amazon.fr', 'amazon.es', 'amazon.it', 'amazon.co.jp',
+  'goodreads.com',
+  'books.google.com',
+  'saraiva.com.br',
+  'magazineluiza.com.br',
+  'submarino.com.br',
+  'americanas.com.br',
+  'estantevirtual.com.br',
+  'livrariacultura.com.br',
+  'travessa.com.br',
+];
+
+function isAllowedUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    return ALLOWED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -9,9 +35,35 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } }, auth: { persistSession: false } }
+    );
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { url } = await req.json();
     if (!url) {
       return new Response(JSON.stringify({ success: false, error: 'URL is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!isAllowedUrl(url)) {
+      return new Response(JSON.stringify({ success: false, error: 'URL domain not allowed' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -65,7 +117,6 @@ Deno.serve(async (req) => {
 
     // Strategy 1: Amazon-specific image patterns
     if (!image) {
-      // Amazon main product image (landingImage, imgBlkFront, etc.)
       const amazonImgPatterns = [
         /id=["'](?:landingImage|imgBlkFront|ebooksImgBlkFront|main-image)["'][^>]*src=["']([^"']+)["']/i,
         /data-old-hires=["']([^"']+)["']/i,
@@ -99,7 +150,6 @@ Deno.serve(async (req) => {
           (src.includes('images-amazon') || src.includes('m.media-amazon') ||
            src.includes('books.google') || src.includes('goodreads') ||
            src.includes('bookcover') || src.includes('cover'))) {
-          // Prefer larger images
           if (!src.includes('sprite') && !src.includes('icon') && !src.includes('pixel') && !src.includes('1x1')) {
             image = src;
             break;
@@ -128,7 +178,6 @@ Deno.serve(async (req) => {
 
     // Clean up Amazon image URL - get highest resolution
     if (image && (image.includes('images-amazon') || image.includes('m.media-amazon'))) {
-      // Remove size constraints from Amazon image URLs to get full resolution
       image = image.replace(/\._[^.]+_\./, '.');
     }
 
@@ -164,7 +213,7 @@ Deno.serve(async (req) => {
       .trim();
 
     // Clean up author
-    const cleanAuthor = author
+    const cleanAuthor = (author || '')
       .replace(/\s*\(.*\)$/, '')
       .trim();
 
@@ -178,7 +227,7 @@ Deno.serve(async (req) => {
       },
     };
 
-    console.log('Metadata extracted:', { title: cleanTitle, author: cleanAuthor, hasImage: !!image, imageUrl: image?.slice(0, 100) });
+    console.log('Metadata extracted:', { title: cleanTitle, author: cleanAuthor, hasImage: !!image });
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -187,7 +236,7 @@ Deno.serve(async (req) => {
     console.error('Error fetching metadata:', error);
     return new Response(JSON.stringify({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch metadata'
+      error: 'Failed to fetch metadata'
     }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

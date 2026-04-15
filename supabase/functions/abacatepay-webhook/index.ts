@@ -18,11 +18,16 @@ serve(async (req) => {
   }
 
   const webhookSecret = Deno.env.get("ABACATEPAY_WEBHOOK_SECRET");
+  if (!webhookSecret) {
+    logStep("ABACATEPAY_WEBHOOK_SECRET not configured — rejecting request");
+    return new Response("Server misconfiguration", { status: 500 });
+  }
+
   const receivedSecret =
     req.headers.get("x-webhook-secret") ||
     new URL(req.url).searchParams.get("secret");
 
-  if (webhookSecret && receivedSecret !== webhookSecret) {
+  if (receivedSecret !== webhookSecret) {
     logStep("Invalid webhook secret");
     return new Response("Unauthorized", { status: 401 });
   }

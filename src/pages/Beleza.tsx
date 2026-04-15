@@ -28,7 +28,7 @@ const Beleza = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
       <header className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -38,7 +38,7 @@ const Beleza = () => {
             <p className="text-[11px] text-muted-foreground">Seu ritual de beleza inteligente</p>
           </div>
         </div>
-        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -52,7 +52,7 @@ const Beleza = () => {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
         <ModuleTip
           moduleId="beleza"
           tips={[

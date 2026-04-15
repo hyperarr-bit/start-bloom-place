@@ -299,7 +299,7 @@ const Biblioteca = () => {
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
       <header className="border-b border-border bg-card sticky top-0 z-50">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <BookOpen className="w-5 h-5 text-orange-600" />
           <div>
@@ -307,7 +307,7 @@ const Biblioteca = () => {
             <p className="text-[11px] text-muted-foreground">Sua estante digital inteligente</p>
           </div>
         </div>
-        <div className="max-w-2xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
+        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.v}

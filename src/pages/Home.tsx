@@ -6,8 +6,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 
-import { GreetingHeader } from "@/components/home/GreetingHeader";
-import { DayScoreRing } from "@/components/home/DayScoreRing";
+import { HomeHero } from "@/components/home/HomeHero";
 import { QuickActions } from "@/components/home/QuickActions";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -121,21 +120,34 @@ const HomePage = () => {
       </AnimatePresence>
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
-        <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-6">
-          <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+        <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-8">
+          <HomeHero data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
 
-          <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
-            <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold tracking-tight">Ações rápidas</h2>
+              <p className="text-xs text-muted-foreground">Registre algo em 1 toque</p>
+            </div>
             <QuickActions />
-          </div>
+          </section>
 
           {/* Widgets */}
           {activeWidgets.length > 0 && (
-            <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+            <section className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+              <div className="flex items-end justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">Seus widgets</h2>
+                  <p className="text-xs text-muted-foreground">Toque e segure para reorganizar</p>
+                </div>
+                {!editingWidgets && (
+                  <button
+                    onClick={() => setEditingWidgets(true)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={activeWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
                   <WidgetGrid
@@ -168,27 +180,38 @@ const HomePage = () => {
                   </button>
                 </motion.div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* Add widget button - always visible when not editing */}
+          {/* Add widget button */}
           {!editingWidgets && (
             <motion.button
               onClick={() => setShowWidgetPicker(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
               whileTap={{ scale: 0.98 }}
             >
               <Plus className="w-4 h-4" />
-              <span className="text-xs font-medium">Adicionar widget</span>
+              <span className="text-xs font-medium">
+                {activeWidgets.length === 0 ? "Adicionar seu primeiro widget" : "Adicionar widget"}
+              </span>
             </motion.button>
           )}
 
-          <NextHoursTimeline data={lifeData} />
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold tracking-tight">Próximas horas</h2>
+              <p className="text-xs text-muted-foreground">O que está pendente no seu dia</p>
+            </div>
+            <NextHoursTimeline data={lifeData} />
+          </section>
+
           <ModuleDrawer />
 
-          <p className="text-center text-[10px] text-muted-foreground py-2">
-            Core © {new Date().getFullYear()} — Organize sua vida
-          </p>
+          <div className="pt-4 border-t border-border/40">
+            <p className="text-center text-[10px] text-muted-foreground">
+              Core © {new Date().getFullYear()} — Organize sua vida
+            </p>
+          </div>
         </div>
       </div>
 

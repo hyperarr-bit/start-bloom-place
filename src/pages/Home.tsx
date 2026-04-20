@@ -6,8 +6,7 @@ import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSe
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
 
-import { GreetingHeader } from "@/components/home/GreetingHeader";
-import { DayScoreRing } from "@/components/home/DayScoreRing";
+import { HomeHero } from "@/components/home/HomeHero";
 import { QuickActions } from "@/components/home/QuickActions";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -121,17 +120,16 @@ const HomePage = () => {
       </AnimatePresence>
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
-        <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-6">
-          <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+        <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-8">
+          <HomeHero data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
 
-          <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
-            <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold tracking-tight">Ações rápidas</h2>
+              <p className="text-xs text-muted-foreground">Registre algo em 1 toque</p>
+            </div>
             <QuickActions />
-          </div>
+          </section>
 
           {/* Widgets */}
           {activeWidgets.length > 0 && (

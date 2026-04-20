@@ -133,7 +133,21 @@ const HomePage = () => {
 
           {/* Widgets */}
           {activeWidgets.length > 0 && (
-            <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+            <section className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+              <div className="flex items-end justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold tracking-tight">Seus widgets</h2>
+                  <p className="text-xs text-muted-foreground">Toque e segure para reorganizar</p>
+                </div>
+                {!editingWidgets && (
+                  <button
+                    onClick={() => setEditingWidgets(true)}
+                    className="text-xs font-medium text-primary hover:underline"
+                  >
+                    Editar
+                  </button>
+                )}
+              </div>
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={activeWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
                   <WidgetGrid
@@ -166,27 +180,38 @@ const HomePage = () => {
                   </button>
                 </motion.div>
               )}
-            </div>
+            </section>
           )}
 
-          {/* Add widget button - always visible when not editing */}
+          {/* Add widget button */}
           {!editingWidgets && (
             <motion.button
               onClick={() => setShowWidgetPicker(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
               whileTap={{ scale: 0.98 }}
             >
               <Plus className="w-4 h-4" />
-              <span className="text-xs font-medium">Adicionar widget</span>
+              <span className="text-xs font-medium">
+                {activeWidgets.length === 0 ? "Adicionar seu primeiro widget" : "Adicionar widget"}
+              </span>
             </motion.button>
           )}
 
-          <NextHoursTimeline data={lifeData} />
+          <section>
+            <div className="mb-3">
+              <h2 className="text-base font-semibold tracking-tight">Próximas horas</h2>
+              <p className="text-xs text-muted-foreground">O que está pendente no seu dia</p>
+            </div>
+            <NextHoursTimeline data={lifeData} />
+          </section>
+
           <ModuleDrawer />
 
-          <p className="text-center text-[10px] text-muted-foreground py-2">
-            Core © {new Date().getFullYear()} — Organize sua vida
-          </p>
+          <div className="pt-4 border-t border-border/40">
+            <p className="text-center text-[10px] text-muted-foreground">
+              Core © {new Date().getFullYear()} — Organize sua vida
+            </p>
+          </div>
         </div>
       </div>
 

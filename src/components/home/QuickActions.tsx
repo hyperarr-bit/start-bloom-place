@@ -263,35 +263,30 @@ export const QuickActions = () => {
   return (
     <div className="space-y-2">
       {/* Action buttons row */}
-      <div
-        className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide"
-        style={{
-          maskImage: "linear-gradient(to right, transparent, black 12px, black calc(100% - 24px), transparent)",
-          WebkitMaskImage: "linear-gradient(to right, transparent, black 12px, black calc(100% - 24px), transparent)",
-        }}
-      >
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
         {actions.map((a, i) => (
           <motion.button
             key={a.id}
             onClick={() => handleAction(a.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all whitespace-nowrap flex-shrink-0 relative overflow-hidden shadow-sm ${
-              successId === a.id
-                ? "border-green-400 bg-green-50 dark:bg-green-500/10"
-                : "border-border/40 bg-card hover:bg-muted/50 hover:border-border hover:-translate-y-0.5"
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-colors whitespace-nowrap flex-shrink-0 relative overflow-hidden ${
+              successId === a.id 
+                ? "border-green-400 bg-green-50 dark:bg-green-500/10" 
+                : "border-border/50 bg-card hover:bg-muted/50"
             }`}
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.05 * i }}
             whileTap={{ scale: 0.95 }}
           >
-            <div className={`w-7 h-7 rounded-xl flex items-center justify-center ${successId === a.id ? "bg-green-400/20" : a.color}`}>
-              {successId === a.id ? <Check className="w-4 h-4 text-green-600" /> : <a.icon className={`w-4 h-4 ${a.iconColor}`} />}
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${successId === a.id ? "bg-green-400/20" : a.color}`}>
+              {successId === a.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <a.icon className={`w-3.5 h-3.5 ${a.iconColor}`} />}
             </div>
-            <span className="text-xs font-medium">{successId === a.id ? "Feito!" : a.label}</span>
+            <span className="text-[11px] font-medium">{successId === a.id ? "Feito!" : a.label}</span>
 
+            {/* Water splash effect */}
             {a.id === "water" && waterSplash && (
               <motion.div
-                className="absolute inset-0 bg-cyan-400/20 rounded-2xl"
+                className="absolute inset-0 bg-cyan-400/20 rounded-xl"
                 initial={{ scale: 0, opacity: 1 }}
                 animate={{ scale: 2, opacity: 0 }}
                 transition={{ duration: 0.6 }}

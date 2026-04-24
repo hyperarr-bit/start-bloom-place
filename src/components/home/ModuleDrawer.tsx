@@ -45,21 +45,17 @@ export const ModuleDrawer = () => {
 
   return (
     <div>
-      <div className="flex items-end justify-between mb-3">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">Módulos</h2>
-          <p className="text-xs text-muted-foreground">Acesse todas as áreas da sua vida</p>
-        </div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Módulos</h3>
         <button
           onClick={() => setEditMode(!editMode)}
-          className={`p-2 rounded-xl transition-colors ${editMode ? "bg-primary text-primary-foreground" : "bg-muted/60 text-muted-foreground hover:text-foreground"}`}
-          aria-label="Editar módulos"
+          className={`p-1.5 rounded-lg transition-colors ${editMode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
           <Settings className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
         {visible.map((m, i) => (
           <motion.div
             key={m.id}
@@ -88,13 +84,11 @@ export const ModuleDrawer = () => {
                 </button>
               </div>
             )}
-            <motion.button
+            <button
               onClick={() => !editMode && navigate(m.path)}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full flex flex-col items-center gap-2 py-3 px-1 rounded-2xl hover:bg-muted/40 hover:shadow-sm transition-all"
+              className="w-full flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <div className={`w-12 h-12 rounded-2xl ${m.color} flex items-center justify-center relative shadow-sm`}>
+              <div className={`w-10 h-10 rounded-xl ${m.color} flex items-center justify-center relative`}>
                 <m.Icon className="w-5 h-5" />
                 {isFavorite(m.id) && !editMode && (
                   <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-yellow-400 flex items-center justify-center">
@@ -102,8 +96,8 @@ export const ModuleDrawer = () => {
                   </div>
                 )}
               </div>
-              <span className="text-[11px] font-medium text-center leading-tight">{m.label}</span>
-            </motion.button>
+              <span className="text-[10px] font-medium text-center leading-tight">{m.label}</span>
+            </button>
           </motion.div>
         ))}
       </div>

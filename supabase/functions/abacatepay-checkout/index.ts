@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const API_BASE = "https://api.abacatepay.com/v1";
+const API_BASE = "https://api.abacatepay.com/v2";
 const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
@@ -128,7 +128,7 @@ serve(async (req) => {
     };
 
     logStep("Creating billing", { billingPeriod, product: product.name });
-    const result = await abacateRequest("/billing/create", apiKey, billingBody);
+    const result = await abacateRequest("/checkouts/create", apiKey, billingBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {

@@ -1,57 +1,54 @@
-## O que fazer
+# Ajustes finais no mockup do iPhone (WelcomeScreen)
 
-Três ajustes na tela inicial (`WelcomeScreen`):
+Alterações concentradas em `src/components/WelcomeScreen.tsx` e geração de um novo poster a partir do vídeo.
 
-### 1. Remover faixa cinza restante no topo do mockup ✅ (já feito)
+## 1. Tamanhos e insets separados (mobile vs desktop)
 
-Identifiquei via análise de pixels uma faixa cinza (~RGB 215) entre y=145 e y=157 do PNG, presa entre dois bandas pretas — era um reflexo do bezel do iPhone que sobrava após a primeira limpeza. Já estendi o recorte transparente para começar em y=145 (antes era y=160). O PNG agora mostra apenas a moldura prateada com o "buraco" totalmente vazio no formato da tela.
+Hoje mobile e desktop compartilham os mesmos insets percentuais. Vou separar para permitir ajuste fino:
 
-### 2. Ajustar insets + aumentar tamanho do iPhone
+- **Mobile** (`w-[230px]`): insets `top: 13.4%`, `bottom: 13.4%`, `left: 19.6%`, `right: 19.6%`, `borderRadius: 9%`
+- **Desktop** (`md:w-[300px]`): insets via classes responsivas (`md:top-[13.2%] md:bottom-[13.2%] md:left-[19.4%] md:right-[19.4%] md:rounded-[9.5%]`)
 
-**Arquivo:** `src/components/WelcomeScreen.tsx` (linhas 82-92)
+Vídeo sempre `object-cover` + `inset-0` dentro do container, garantindo centralização independente do tamanho.
 
-```tsx
-<div className="relative w-[240px] md:w-[290px]" style={{ aspectRatio: "593 / 1080" }}>
-  <div
-    className="absolute overflow-hidden bg-muted"
-    style={{
-      top: "13.4%",
-      bottom: "13.4%",
-      left: "19.6%",
-      right: "19.6%",
-      borderRadius: "9%",
-    }}
-  >
+## 2. Loop garantido sem travar
+
+Além do atributo `loop`, adicionar listener `onEnded` que força:
+```ts
+video.currentTime = 0;
+video.play().catch(() => setVideoState("blocked"));
 ```
+Isso cobre casos (iOS Safari principalmente) onde o `loop` nativo falha após perda de foco/visibilidade.
 
-Mudanças:
-- Largura: `200px → 240px` (mobile) e `240px → 290px` (desktop) — ~20% maior.
-- `top`: `14.8% → 13.4%` (acompanha o novo recorte do PNG).
-- `borderRadius`: `8% → 9%`.
+Também adicionar listener `onPause` que tenta retomar automaticamente se a pausa não foi causada pelo usuário (quando `videoState === "playing"` e a aba está visível).
 
-### 3. Garantir autoplay do vídeo
+## 3. Poster = primeira frame do vídeo
 
-O `<video>` já tem `autoPlay muted playsInline preload="auto"` — tecnicamente o browser deve tocar automaticamente. O usuário relata que está pausado. Suspeitas:
-- O **poster (`<img>`)** sobreposto com `z-10` pode estar sendo percebido como "vídeo pausado", pois ele só some quando o estado vira `"playing"` (via `onPlaying`). Se o evento não disparar (ex: frame inicial demora), o usuário vê o poster estático.
+Gerar um novo `app-preview-poster.jpg` extraindo a frame em `00:00:00.1` do `public/videos/app-preview.mp4` com ffmpeg, sobrescrevendo o atual. Assim a tela inicial mostra exatamente o que o vídeo vai começar a exibir, sem "salto" visual.
 
-Mitigações que vou aplicar:
-- Adicionar `onCanPlay` e `onLoadedData` que também tentam `video.play()` e marcam estado como `"playing"`.
-- Adicionar fallback: se após 1.5s o vídeo não estiver tocando, esconder o poster mesmo assim (pois ele está cobrindo o vídeo que pode estar tocando silenciosamente).
+O poster continua sobreposto via `<img>` e some com `opacity-0` quando `videoState === "playing"` (transição 500ms já existente).
 
-Trecho relevante:
-```tsx
-onCanPlay={() => attemptPlay()}
-onLoadedData={() => attemptPlay()}
-// useEffect adicional:
-useEffect(() => {
-  const t = setTimeout(() => {
-    const v = videoRef.current;
-    if (v && !v.paused) setVideoState("playing");
-  }, 1500);
-  return () => clearTimeout(t);
-}, []);
-```
+## 4. Botão de play manual quando autoplay falha
 
-## Resultado esperado
+Quando `videoState === "blocked"` (ou `"error"`), exibir um botão sobreposto e centralizado dentro da moldura:
 
-iPhone maior, sem nenhum cinza/borda dentro da moldura, vídeo tocando assim que carrega.
+- Ícone `Play` (lucide-react) dentro de um círculo `bg-background/80 backdrop-blur` com `border`
+- Tamanho `w-14 h-14`, sombra suave
+- `aria-label="Tocar vídeo"`
+- Ao clicar: chama `attemptPlay()` e impede propagação para o overlay externo
+
+Quando `videoState === "loading"`, mostrar um spinner discreto (mesmo container, ícone `Loader2 animate-spin`).
+
+Quando `playing`, nenhum overlay.
+
+## Arquivos afetados
+
+- `src/components/WelcomeScreen.tsx` — refator de insets responsivos, handlers `onEnded`/`onPause`, overlay de play/loading
+- `public/videos/app-preview-poster.jpg` — regenerado a partir da 1ª frame do mp4
+
+## Detalhes técnicos
+
+- Sem mudança de API do componente (`onComplete`, `onLogin` permanecem)
+- Sem novas dependências (Play e Loader2 já vêm do `lucide-react` usado no projeto)
+- Mantém `playsInline`, `muted`, `webkit-playsinline`, `preload="auto"` para máxima compatibilidade iOS
+- O clique no botão de play usa `e.stopPropagation()` para não disparar `handleScreenTap` do wrapper

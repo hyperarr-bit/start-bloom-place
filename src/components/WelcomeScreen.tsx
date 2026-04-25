@@ -46,10 +46,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
       document.addEventListener("visibilitychange", onVisibility);
 
+      // Fallback: if the video is actually playing but the "playing" event never fired,
+      // hide the poster after a short delay so the user sees the video.
+      const fallback = setTimeout(() => {
+        if (video && !video.paused && video.currentTime > 0) {
+          setVideoState("playing");
+        }
+      }, 1500);
+
       return () => {
         video.removeEventListener("loadedmetadata", onReady);
         video.removeEventListener("canplay", onReady);
         document.removeEventListener("visibilitychange", onVisibility);
+        clearTimeout(fallback);
       };
     }, [attemptPlay]);
 
@@ -79,16 +88,16 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
           >
-            <div className="relative w-[200px] md:w-[240px]" style={{ aspectRatio: "593 / 1080" }}>
+            <div className="relative w-[240px] md:w-[290px]" style={{ aspectRatio: "593 / 1080" }}>
               {/* Screen content (video + poster) sits behind the frame */}
               <div
                 className="absolute overflow-hidden bg-muted"
                 style={{
-                  top: "14.8%",
-                  bottom: "13.6%",
+                  top: "13.4%",
+                  bottom: "13.4%",
                   left: "19.6%",
                   right: "19.6%",
-                  borderRadius: "8%",
+                  borderRadius: "9%",
                 }}
               >
                 <video

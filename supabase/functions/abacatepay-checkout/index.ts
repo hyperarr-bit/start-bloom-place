@@ -151,7 +151,8 @@ async function getOrCreateCustomer(
   customerName: string,
   profile: { phone: string | null; tax_id: string | null } | null,
   apiKey: string,
-  supabaseClient: ReturnType<typeof createClient>
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any
 ) {
   const { data: existingRecord } = await supabaseClient
     .from("user_data")

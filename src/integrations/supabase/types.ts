@@ -96,6 +96,7 @@ export type Database = {
           current_period_start: string | null
           customer_email: string | null
           id: string
+          payment_method: string
           plan: string | null
           status: string
           user_id: string
@@ -109,6 +110,7 @@ export type Database = {
           current_period_start?: string | null
           customer_email?: string | null
           id?: string
+          payment_method?: string
           plan?: string | null
           status?: string
           user_id: string
@@ -122,6 +124,7 @@ export type Database = {
           current_period_start?: string | null
           customer_email?: string | null
           id?: string
+          payment_method?: string
           plan?: string | null
           status?: string
           user_id?: string

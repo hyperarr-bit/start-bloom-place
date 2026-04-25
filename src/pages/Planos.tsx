@@ -161,8 +161,9 @@ const Planos = () => {
             )}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center">
-            Você escolhe Pix ou Cartão na próxima tela · Pagamento válido por {billing === "annual" ? "1 ano" : "1 mês"}
+          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+            Você escolhe Pix ou Cartão na próxima tela · Cartão renova automaticamente ·
+            Pix você renova manualmente a cada {billing === "annual" ? "ano" : "mês"}
           </p>
         </motion.div>
       </main>

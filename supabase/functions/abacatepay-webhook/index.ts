@@ -148,8 +148,25 @@ serve(async (req) => {
       return null;
     }
 
-    // Handle billing.paid (legacy one-time) and subscription.paid (recurring)
-    if (event === "billing.paid" || event === "subscription.paid") {
+    const paidEvents = new Set([
+      "billing.paid",
+      "subscription.paid",
+      "subscription.charged",
+      "subscription.created",
+      "subscription.renewed",
+    ]);
+    const cancelEvents = new Set([
+      "subscription.cancelled",
+      "subscription.canceled",
+      "subscription.ended",
+    ]);
+    const overdueEvents = new Set([
+      "subscription.overdue",
+      "subscription.payment_failed",
+      "subscription.past_due",
+    ]);
+
+    if (paidEvents.has(event)) {
       userId = await resolveUserId();
       logStep("Payment received", { event, userId, billingId, email: customerEmail });
 
@@ -161,14 +178,14 @@ serve(async (req) => {
       await saveActiveSubscription(userId);
       logStep("Subscription activated", { userId, event });
 
-    } else if (event === "subscription.cancelled") {
+    } else if (cancelEvents.has(event)) {
       userId = await resolveUserId();
       logStep("Subscription cancelled", { userId, subscriptionId });
 
       await updateStatus({ userId, subscriptionId, billingId }, "canceled");
       logStep("Marked as canceled", { userId, subscriptionId, billingId });
 
-    } else if (event === "subscription.overdue") {
+    } else if (overdueEvents.has(event)) {
       userId = await resolveUserId();
       logStep("Subscription overdue", { userId, subscriptionId });
 

@@ -1,59 +1,69 @@
 ## Objetivo
 
-Substituir os dois botões ("Cartão" e "Pix") por **um único botão** que leva o usuário ao checkout da AbacatePay, onde **ele escolhe** Pix ou Cartão na própria tela do gateway.
+Permitir um único checkout com **Cartão recorrente + Pix** usando o endpoint `/v2/subscriptions/create` da AbacatePay, criando os 2 produtos (Mensal/Anual) automaticamente via uma edge function utilitária.
 
-## Por que mudar a abordagem
+## Etapas
 
-A API `/subscriptions/create` (recorrente) **só aceita CARD**. Para oferecer Pix + Cartão na mesma tela é necessário usar `/billing/create` (cobrança avulsa AbacatePay), que aceita `methods: ["PIX", "CARD"]` simultaneamente. Como Pix não tem recorrência nativa, o fluxo passa a ser **pagamento avulso para os dois métodos** — com renovação manual e os 3 dias de carência já implementados aplicando-se a ambos.
+### 1. Migration: tabela `app_config` já existe — usar para guardar os IDs dos produtos
+Vamos salvar 2 chaves:
+- `abacatepay_product_monthly_id`
+- `abacatepay_product_annual_id`
 
-Esse é o trade-off: ganhamos a UX unificada que você quer, perdemos a recorrência automática do cartão. O usuário no cartão vai precisar pagar de novo todo mês/ano (mesma lógica do Pix). Se isso for inaceitável, a alternativa é manter dois botões.
+Nenhuma migration nova de schema é necessária.
 
-## Mudanças
+### 2. Nova edge function `abacatepay-setup-products` (rodar 1 vez)
+Função que:
+- Lê `ABACATEPAY_API_KEY` dos secrets
+- Cria 2 produtos via `POST /v2/products/create`:
+  - **CORE Pro Mensal** — R$ 19,90 — frequência mensal
+  - **CORE Pro Anual** — R$ 178,80 — frequência anual
+- Salva os IDs retornados em `app_config` (via service role)
+- Retorna os IDs para confirmação
+- Idempotente: se já existir ID em `app_config`, retorna o existente em vez de duplicar
 
-### 1. `abacatepay-checkout` (edge function)
-- Remover parâmetro `method`. Sempre criar uma cobrança única via `POST /billing/create` com:
-  - `methods: ["PIX", "CARD"]`
-  - `frequency: "ONE_TIME"`
-  - `products: [{ externalId, name, quantity: 1, price }]` (preço em centavos do plano)
-  - `customer: { id: customerId }` ou dados inline
-  - `returnUrl` / `completionUrl` apontando para `/planos`
-  - `metadata: { user_id, billing_period, payment_type: "one_time" }`
-- Remover toda a lógica de `getOrCreateProduct` + `/subscriptions/create` (não precisa mais criar produto recorrente — manda os items inline).
-- Retornar `{ url }` da cobrança.
+Você chama 1 vez (ex: pelo botão de teste ou via curl) e pronto.
 
-### 2. `abacatepay-webhook` (edge function)
-- Tratar evento `billing.paid` para gravar/renovar `subscriptions`:
-  - `status = "active"`, `plan = "core-pro"`, `payment_method` ← do payload (PIX ou CARD)
-  - `current_period_end` = agora + 30 dias (mensal) ou +365 (anual), lido do `metadata.billing_period`
-- A coluna `payment_method` já existe; passa a refletir o método real escolhido pelo usuário no checkout.
+### 3. Refatorar `abacatepay-checkout`
+Mudanças:
+- Trocar endpoint `/checkouts/create` → `/subscriptions/create`
+- Ler os IDs dos produtos de `app_config` (em vez de criar items inline)
+- Payload novo:
+  ```json
+  {
+    "frequency": "MONTHLY" | "ANNUAL",
+    "methods": ["PIX", "CARD"],
+    "products": [{ "productId": "<id>", "quantity": 1 }],
+    "returnUrl": "...",
+    "completionUrl": "...",
+    "customer": {...},
+    "metadata": { "user_id": "...", "billing_period": "..." }
+  }
+  ```
+- Se `app_config` não tiver os IDs, retorna erro claro pedindo pra rodar `abacatepay-setup-products`
 
-### 3. `check-subscription` (edge function)
-- Manter a lógica de carência de 3 dias **para qualquer pagamento** (não só Pix), já que agora cartão também é avulso.
-- Banner `PixGraceBanner` continua funcionando — talvez renomear o texto para "Sua assinatura venceu" (sem mencionar Pix).
+### 4. Atualizar `abacatepay-webhook`
+Adicionar tratamento dos eventos de assinatura:
+- `subscription.created` / `subscription.charged` → marcar `subscriptions.status = 'active'`, atualizar `current_period_end`, salvar `abacatepay_subscription_id`
+- `subscription.canceled` / `subscription.payment_failed` → marcar `status = 'canceled'` ou `past_due`
+- Manter compat com eventos antigos de billing avulso (caso já tenha algum em produção)
 
-### 4. `src/pages/Planos.tsx`
-- Voltar a ter **um único botão** "Assinar CORE PRO".
-- Texto abaixo: "Você escolhe Pix ou Cartão na próxima tela. Pagamento válido por 1 mês/ano."
-- Remover a chamada com `method` no `invoke`.
+### 5. UI (`Planos.tsx`)
+Mínima mudança: o texto "Você escolhe Pix ou Cartão na próxima tela" continua válido. Adicionar nota: "Cartão = renovação automática. Pix = você renova manualmente quando quiser." (Pix em assinatura na Abacate ainda exige ação do usuário no vencimento.)
 
-### 5. `src/components/PixGraceBanner.tsx`
-- Texto ajustado para "Sua assinatura venceu. Renove em X dias para manter o acesso." (genérico).
+## Detalhes técnicos
 
-## Diagrama do fluxo
+- **Endpoint produtos**: `POST https://api.abacatepay.com/v2/products/create` com `{ name, description, price (centavos), externalId, returnUrl?, ... }` — confirmo a forma exata ao implementar consultando a doc, ajusto se diferente
+- **Idempotência**: usamos `externalId` `core-pro-monthly` / `core-pro-annual` para evitar duplicação no lado da Abacate também
+- **Storage dos IDs**: `app_config` (RLS service-role only) — frontend nunca lê
+- **Auth**: setup-products fica protegido — só roda se vier com header de service role OU se ainda não houver IDs salvos (auto-bootstrap seguro)
 
-```text
-Planos → [Assinar CORE PRO]
-   ↓
-edge: abacatepay-checkout
-   ↓ POST /billing/create methods=[PIX, CARD]
-AbacatePay Checkout
-   ↓ usuário escolhe PIX ou CARD e paga
-webhook billing.paid
-   ↓ grava subscription com payment_method real
-   ↓ current_period_end = +30d ou +365d
-Acesso liberado · após vencer: 3 dias de carência · depois bloqueia
-```
+## Arquivos afetados
 
-## Confirmar antes de implementar
+- `supabase/functions/abacatepay-setup-products/index.ts` (novo)
+- `supabase/functions/abacatepay-checkout/index.ts` (refator)
+- `supabase/functions/abacatepay-webhook/index.ts` (estender)
+- `src/pages/Planos.tsx` (texto)
 
-Você está ok em **perder a renovação automática do cartão** em troca da tela unificada? Se quiser manter recorrência no cartão, a única forma é continuar com dois botões (recorrente vs. avulso) — diga e eu ajusto o plano.
+## Após aprovar
+
+Eu implemento, deployo, e te passo o comando `curl` (ou uso o `curl_edge_functions`) pra rodar o `abacatepay-setup-products` 1 vez. Depois disso o checkout unificado já funciona.

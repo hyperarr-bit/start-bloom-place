@@ -46,6 +46,7 @@ serve(async (req) => {
     const metadata = body.data?.metadata || {};
     let userId = metadata.user_id || null;
     const billingPeriod = metadata.billing_period || "monthly";
+    const paymentType: "pix" | "card" = metadata.payment_type === "pix" ? "pix" : "card";
     const customerEmail = body.data?.customer?.email || null;
     const billingId = body.data?.id || null;
     const subscriptionId = body.data?.subscriptionId || body.data?.subscription_id || billingId;
@@ -86,8 +87,9 @@ serve(async (req) => {
         status: "active",
         plan: "core-pro",
         billing_period: billingPeriod,
+        payment_method: paymentType,
         abacatepay_billing_id: billingId,
-        abacatepay_subscription_id: subscriptionId,
+        abacatepay_subscription_id: paymentType === "pix" ? null : subscriptionId,
         customer_email: customerEmail,
         current_period_start: now.toISOString(),
         current_period_end: periodEnd.toISOString(),

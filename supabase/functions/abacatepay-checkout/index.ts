@@ -130,8 +130,8 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    const subscriptionBody = {
-      frequency: cfg.frequency,
+    const checkoutBody = {
+      frequency: "SUBSCRIPTION",
       methods: ["PIX", "CARD"],
       items: [{ id: productId, quantity: 1 }],
       returnUrl: `${baseUrl}/planos?canceled=true`,
@@ -148,8 +148,8 @@ serve(async (req) => {
       },
     };
 
-    logStep("Creating subscription", { billingPeriod, productId });
-    const result = await abacateRequest("/subscriptions/create", apiKey, subscriptionBody);
+    logStep("Creating checkout", { billingPeriod, productId });
+    const result = await abacateRequest("/checkouts/create", apiKey, checkoutBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {

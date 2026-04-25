@@ -35,6 +35,8 @@ export const TrialBanner = () => {
     return () => clearInterval(interval);
   }, [user, isSubscribed]);
 
+  if (gracePeriod) return <PixGraceBanner />;
+
   if (isSubscribed || !user) return null;
 
   if (trialExpired) {

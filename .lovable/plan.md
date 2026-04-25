@@ -1,32 +1,20 @@
-Plano para corrigir a tela bugada:
+Ajustar moldura CSS do iPhone para ficar igual à imagem de referência:
 
-1. Corrigir a moldura do iPhone
-- Desfazer o problema visual criado pelo recorte anterior do PNG, que deixou uma área preta grande atrás do iPhone.
-- Usar a moldura como overlay limpo, sem “caixa” preta externa aparecendo nas laterais.
-- Ajustar o vídeo para ficar somente dentro da tela do aparelho, centralizado e sem vazar para fora da moldura.
+1. Remover a Dynamic Island em CSS
+- Apagar o elemento `.iphone-island` do componente e o estilo correspondente em `src/index.css` (já aparece dentro do vídeo, não precisa duplicar).
 
-2. Recalibrar tamanho e proporção
-- Reduzir o iPhone no mobile para não dominar a tela inteira nem esmagar o texto/botões.
-- Manter o iPhone grande o suficiente para ser destaque, mas com proporção equilibrada com o título e CTA.
-- Separar medidas mobile e desktop para evitar que um ajuste quebre o outro.
+2. Bordas pretas mais finas
+- Reduzir o `padding` do bezel preto (`.iphone-bezel`) para deixar a faixa preta entre a moldura metálica e a tela bem mais fina.
+- Remover o "anel" extra escuro do `box-shadow` do bezel.
 
-3. Corrigir espaçamentos da landing
-- Diminuir o espaço morto no topo.
-- Ajustar a distância entre iPhone, título, botão “Começar” e link “Entrar”.
-- Garantir que tudo caiba bem em telas como 390x844, 414x896 e também desktop.
+3. Cantos mais arredondados
+- Aumentar o `border-radius` do `.iphone-frame`, `.iphone-bezel` e `.iphone-screen` para deixar os cantos suaves como na imagem (curva mais contínua, no estilo iPhone 15/16).
+- Diminuir levemente o `padding` da moldura externa para reforçar o look "fino" do aparelho.
 
-4. Corrigir o fundo cinza/preto indesejado
-- Remover qualquer fundo de placeholder visível fora da área real da tela do iPhone.
-- Manter o fundo do vídeo/poster apenas dentro do display do aparelho.
-- Evitar bordas laterais, superiores ou inferiores aparecendo ao redor da moldura.
-
-5. Preservar comportamento do vídeo
-- Manter autoplay, loop forçado, poster inicial e botão manual de play quando autoplay falhar.
-- Garantir que esses controles continuem funcionando após o ajuste visual.
+4. Botões laterais
+- Manter o conjunto de botões (silent, volume, power) com tamanhos um pouco mais discretos para combinar com a moldura mais fina.
 
 Detalhes técnicos
-- Arquivo principal: `src/components/WelcomeScreen.tsx`.
-- Provável ajuste do asset `src/assets/iphone-mockup.png`, restaurando/recortando corretamente a moldura sem criar retângulo preto externo.
-- Recalcular `aspectRatio`, `width`, `maxHeight`, `insets` e `borderRadius` do container do vídeo.
-- Substituir os estilos atuais por medidas mais seguras, usando `clamp()`/breakpoints para mobile e desktop.
-- Testar visualmente no viewport mobile atual do usuário e em pelo menos um desktop antes de finalizar.
+- Arquivos: `src/index.css` (classes `.iphone-frame`, `.iphone-bezel`, `.iphone-screen`, `.iphone-island`, `.iphone-btn-*`) e `src/components/WelcomeScreen.tsx` (remover `<div className="iphone-island" />`).
+- Sem mudanças no comportamento do vídeo (autoplay, loop, poster, botão manual).
+- Validar visualmente em viewport mobile depois da alteração.

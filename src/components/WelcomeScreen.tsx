@@ -79,16 +79,16 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
           >
-            <div className="relative w-[200px] md:w-[240px]" style={{ aspectRatio: "596 / 1184" }}>
+            <div className="relative w-[200px] md:w-[240px]" style={{ aspectRatio: "593 / 1080" }}>
               {/* Screen content (video + poster) sits behind the frame */}
               <div
                 className="absolute overflow-hidden bg-muted"
                 style={{
-                  top: "2.4%",
-                  bottom: "2.4%",
-                  left: "5.4%",
-                  right: "5.4%",
-                  borderRadius: "11%",
+                  top: "14.8%",
+                  bottom: "13.6%",
+                  left: "19.6%",
+                  right: "19.6%",
+                  borderRadius: "8%",
                 }}
               >
                 <video

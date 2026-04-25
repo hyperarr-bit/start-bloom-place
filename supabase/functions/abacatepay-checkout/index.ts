@@ -12,11 +12,11 @@ const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
-const PRODUCT_VERSION = "v3";
+const PRODUCT_VERSION = "v4";
 
 const PRODUCTS: Record<BillingPeriod, { name: string; price: number; cycle: string }> = {
   monthly: { name: "CORE Pro Mensal", price: 1990, cycle: "MONTHLY" },
-  annual: { name: "CORE Pro Anual", price: 17880, cycle: "ANNUALLY" },
+  annual: { name: "CORE Pro Anual", price: 17880, cycle: "YEARLY" },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -268,7 +268,7 @@ serve(async (req) => {
     const subscriptionBody: Record<string, unknown> = {
       externalId,
       items: [{ id: productId, quantity: 1 }],
-      methods: ["PIX", "CARD"],
+      methods: ["CARD"],
       customerId,
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,

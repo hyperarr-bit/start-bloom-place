@@ -242,3 +242,89 @@
     @apply bg-card rounded-2xl p-4 border border-border shadow-sm;
   }
 }
+
+/* ============ iPhone CSS mockup ============ */
+.iphone-frame {
+  /* Outer titanium frame */
+  border-radius: 14% / 6.5%;
+  padding: 2.2%;
+  background:
+    linear-gradient(135deg, #d8d8db 0%, #f4f4f6 18%, #b9b9bd 38%, #e9e9ec 58%, #a8a8ac 82%, #cfcfd3 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.85) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.25) inset,
+    0 30px 60px -20px rgba(0, 0, 0, 0.45),
+    0 12px 24px -10px rgba(0, 0, 0, 0.25);
+}
+
+.iphone-bezel {
+  /* Black inner bezel between frame and screen */
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12% / 5.6%;
+  background: #050507;
+  padding: 1.6%;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 0 0 2px rgba(0, 0, 0, 0.9);
+}
+
+.iphone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 11% / 5.2%;
+  overflow: hidden;
+  background: #000;
+}
+
+/* Dynamic Island */
+.iphone-island {
+  position: absolute;
+  top: 2.2%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 33%;
+  height: 3.6%;
+  background: #000;
+  border-radius: 999px;
+  z-index: 30;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+/* Side buttons */
+.iphone-btn {
+  position: absolute;
+  background: linear-gradient(90deg, #9a9a9e, #d4d4d7 50%, #8e8e92);
+  border-radius: 2px;
+  z-index: 1;
+}
+.iphone-btn-silent {
+  left: -1.2%;
+  top: 13%;
+  width: 1.4%;
+  height: 3.2%;
+  border-radius: 2px 0 0 2px;
+}
+.iphone-btn-volup {
+  left: -1.4%;
+  top: 19%;
+  width: 1.6%;
+  height: 7.5%;
+  border-radius: 2px 0 0 2px;
+}
+.iphone-btn-voldown {
+  left: -1.4%;
+  top: 28.5%;
+  width: 1.6%;
+  height: 7.5%;
+  border-radius: 2px 0 0 2px;
+}
+.iphone-btn-power {
+  right: -1.4%;
+  top: 22%;
+  width: 1.6%;
+  height: 10%;
+  border-radius: 0 2px 2px 0;
+}

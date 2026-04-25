@@ -673,10 +673,11 @@ const Biblioteca = () => {
               </div>
               <div className="bg-amber-50/80 dark:bg-amber-950/20 p-4 space-y-4">
                 {!pagesHintDismissed && books.length > 0 && books.some(b => (b.pages || 0) === 0) && (
-                  <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
-                    <span className="flex-1">Dica: adicione o total de páginas dos seus livros na Estante para ver as estatísticas.</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    <span className="flex-1 truncate">Cadastre o total de páginas na Estante</span>
                     <button onClick={() => setPagesHintDismissed(true)} className="text-muted-foreground/60 hover:text-foreground flex-shrink-0" aria-label="Dispensar">
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 )}

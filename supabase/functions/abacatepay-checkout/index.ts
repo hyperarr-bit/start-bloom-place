@@ -128,7 +128,7 @@ serve(async (req) => {
     };
 
     logStep("Creating billing", { billingPeriod, product: product.name });
-    const result = await abacateRequest("/billing/create", apiKey, billingBody);
+    const result = await abacateRequest("/checkouts/create", apiKey, billingBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {

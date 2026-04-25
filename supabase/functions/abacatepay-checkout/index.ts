@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 
 const corsHeaders = {
@@ -133,7 +133,7 @@ serve(async (req) => {
     const subscriptionBody = {
       frequency: cfg.frequency,
       methods: ["PIX", "CARD"],
-      items: [{ productId, quantity: 1 }],
+      items: [{ id: productId, quantity: 1 }],
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {

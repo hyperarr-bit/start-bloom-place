@@ -671,6 +671,11 @@ const Biblioteca = () => {
                 <span className="text-sm font-black uppercase tracking-wider">🏆 DESAFIO DE LEITURA {currentYear}</span>
               </div>
               <div className="bg-amber-50/80 dark:bg-amber-950/20 p-4 space-y-4">
+                {books.length > 0 && books.some(b => (b.pages || 0) === 0) && (
+                  <div className="rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/40 p-3 text-[11px] text-yellow-900 dark:text-yellow-200">
+                    ⚠️ Alguns livros estão sem o total de páginas preenchido. Edite cada livro na aba <b>Estante</b> e adicione o número de páginas para ver as estatísticas corretas.
+                  </div>
+                )}
                 {/* Goal setter */}
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-bold text-muted-foreground">Meta anual:</span>

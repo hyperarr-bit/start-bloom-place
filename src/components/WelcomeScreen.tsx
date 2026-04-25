@@ -105,23 +105,27 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6 py-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        <div className="flex flex-col md:flex-row items-center gap-8 md:gap-16 max-w-4xl w-full">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-10 md:gap-16 max-w-4xl w-full">
           {/* iPhone frame with video */}
           <motion.div
-            className="relative z-10 flex items-center shrink-0"
+            className="relative z-10 flex items-center justify-center shrink-0"
             initial={{ opacity: 0, y: 80, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
           >
             <div
-              className="relative w-[230px] md:w-[300px]"
-              style={{ aspectRatio: "593 / 1080" }}
+              className="relative"
+              style={{
+                aspectRatio: "593 / 1080",
+                width: "min(72vw, 300px)",
+                maxHeight: "55vh",
+              }}
             >
               {/* Screen content (video + poster) — insets responsivos */}
               <div

@@ -1,54 +1,52 @@
-# Ajustes finais no mockup do iPhone (WelcomeScreen)
+# Reequilibrar proporções da WelcomeScreen
 
-Alterações concentradas em `src/components/WelcomeScreen.tsx` e geração de um novo poster a partir do vídeo.
+Analisando o screenshot atual no viewport mobile (430×697):
 
-## 1. Tamanhos e insets separados (mobile vs desktop)
+**Problemas:**
+- iPhone pequeno demais (~230px num espaço com muita "sobra" em cima)
+- Gap enorme entre o mockup e o título "Organize sua vida..."
+- Botão "Começar" parece estourar/encostar nas margens (sem padding lateral suficiente nos elementos internos)
+- Subtítulo "Já tem uma conta? Entrar" cortado na imagem (ficou na borda inferior)
 
-Hoje mobile e desktop compartilham os mesmos insets percentuais. Vou separar para permitir ajuste fino:
+## Mudanças (apenas em `src/components/WelcomeScreen.tsx`)
 
-- **Mobile** (`w-[230px]`): insets `top: 13.4%`, `bottom: 13.4%`, `left: 19.6%`, `right: 19.6%`, `borderRadius: 9%`
-- **Desktop** (`md:w-[300px]`): insets via classes responsivas (`md:top-[13.2%] md:bottom-[13.2%] md:left-[19.4%] md:right-[19.4%] md:rounded-[9.5%]`)
+### 1. iPhone com tamanho fluido e maior
 
-Vídeo sempre `object-cover` + `inset-0` dentro do container, garantindo centralização independente do tamanho.
+Trocar `w-[230px] md:w-[300px]` por largura responsiva ao viewport:
 
-## 2. Loop garantido sem travar
-
-Além do atributo `loop`, adicionar listener `onEnded` que força:
-```ts
-video.currentTime = 0;
-video.play().catch(() => setVideoState("blocked"));
+```tsx
+style={{
+  aspectRatio: "593 / 1080",
+  width: "min(72vw, 300px)",
+  maxHeight: "55vh", // impede estourar em telas baixas
+}}
 ```
-Isso cobre casos (iOS Safari principalmente) onde o `loop` nativo falha após perda de foco/visibilidade.
 
-Também adicionar listener `onPause` que tenta retomar automaticamente se a pausa não foi causada pelo usuário (quando `videoState === "playing"` e a aba está visível).
+Isso faz o iPhone ocupar **~72% da largura no mobile** (cerca de 310px no viewport 430px), mantendo um teto sensato (300px) em desktop e nunca passando de 55% da altura.
 
-## 3. Poster = primeira frame do vídeo
+### 2. Espaçamentos consistentes
 
-Gerar um novo `app-preview-poster.jpg` extraindo a frame em `00:00:00.1` do `public/videos/app-preview.mp4` com ffmpeg, sobrescrevendo o atual. Assim a tela inicial mostra exatamente o que o vídeo vai começar a exibir, sem "salto" visual.
+Container principal: `gap-10 md:gap-16` (era `gap-8`) — distância iPhone↔texto mais respirável e proporcional.
 
-O poster continua sobreposto via `<img>` e some com `opacity-0` quando `videoState === "playing"` (transição 500ms já existente).
+Wrapper externo: adicionar `py-8` e usar `flex-col items-center justify-center` para garantir centralização vertical real e impedir que o texto inferior fique colado na borda.
 
-## 4. Botão de play manual quando autoplay falha
+Bloco de título+CTA: trocar `gap-8` por `gap-6` para aproximar título e botão (hoje exagerado), e reduzir `py-5` do botão para `py-4` (botão alto demais para o conteúdo).
 
-Quando `videoState === "blocked"` (ou `"error"`), exibir um botão sobreposto e centralizado dentro da moldura:
+### 3. Largura do CTA controlada
 
-- Ícone `Play` (lucide-react) dentro de um círculo `bg-background/80 backdrop-blur` com `border`
-- Tamanho `w-14 h-14`, sombra suave
-- `aria-label="Tocar vídeo"`
-- Ao clicar: chama `attemptPlay()` e impede propagação para o overlay externo
+Adicionar `max-w-sm` ao bloco de título+CTA também no **mobile** (hoje só `md:max-w-sm`), assim o botão "Começar" não encosta nas bordas do viewport quando o `px-6` do wrapper não é suficiente.
 
-Quando `videoState === "loading"`, mostrar um spinner discreto (mesmo container, ícone `Loader2 animate-spin`).
+### 4. Tipografia equilibrada
 
-Quando `playing`, nenhum overlay.
+`text-3xl md:text-4xl` → `text-[28px] md:text-4xl` no h1 para casar melhor com a largura do botão no mobile (e evitar a quebra "Organize sua vida / em um só lugar" ficar maior que o CTA).
+
+## Resultado esperado
+
+- iPhone visivelmente maior, ocupando boa parte da tela
+- Distâncias regulares: topo ↔ iPhone ↔ título ↔ botão ↔ link "Entrar"
+- Tudo respeitando as margens laterais, sem cortes
+- Mantém comportamento desktop (lado a lado) inalterado em telas md+
 
 ## Arquivos afetados
 
-- `src/components/WelcomeScreen.tsx` — refator de insets responsivos, handlers `onEnded`/`onPause`, overlay de play/loading
-- `public/videos/app-preview-poster.jpg` — regenerado a partir da 1ª frame do mp4
-
-## Detalhes técnicos
-
-- Sem mudança de API do componente (`onComplete`, `onLogin` permanecem)
-- Sem novas dependências (Play e Loader2 já vêm do `lucide-react` usado no projeto)
-- Mantém `playsInline`, `muted`, `webkit-playsinline`, `preload="auto"` para máxima compatibilidade iOS
-- O clique no botão de play usa `e.stopPropagation()` para não disparar `handleScreenTap` do wrapper
+- `src/components/WelcomeScreen.tsx` — apenas ajustes de classes utilitárias e `style` inline do container do mockup

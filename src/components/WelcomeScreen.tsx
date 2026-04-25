@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { motion } from "framer-motion";
+import { Play, Loader2 } from "lucide-react";
 import iphoneMockup from "@/assets/iphone-mockup.png";
 
 interface WelcomeScreenProps {
@@ -31,9 +32,29 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       if (!video) return;
 
       const onReady = () => attemptPlay();
+      const onEnded = () => {
+        // Garantir loop mesmo quando o atributo nativo falha (iOS Safari)
+        try {
+          video.currentTime = 0;
+          const p = video.play();
+          if (p !== undefined) p.catch(() => setVideoState("blocked"));
+        } catch {
+          setVideoState("blocked");
+        }
+      };
+      const onPause = () => {
+        // Se pausou sozinho enquanto a aba está visível, tenta retomar
+        if (document.visibilityState === "visible" && !video.ended) {
+          attemptPlay();
+        }
+      };
+      const onError = () => setVideoState("error");
 
       video.addEventListener("loadedmetadata", onReady, { once: true });
       video.addEventListener("canplay", onReady, { once: true });
+      video.addEventListener("ended", onEnded);
+      video.addEventListener("pause", onPause);
+      video.addEventListener("error", onError);
 
       if (video.readyState >= 2) {
         attemptPlay();
@@ -46,8 +67,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
       document.addEventListener("visibilitychange", onVisibility);
 
-      // Fallback: if the video is actually playing but the "playing" event never fired,
-      // hide the poster after a short delay so the user sees the video.
       const fallback = setTimeout(() => {
         if (video && !video.paused && video.currentTime > 0) {
           setVideoState("playing");
@@ -57,6 +76,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       return () => {
         video.removeEventListener("loadedmetadata", onReady);
         video.removeEventListener("canplay", onReady);
+        video.removeEventListener("ended", onEnded);
+        video.removeEventListener("pause", onPause);
+        video.removeEventListener("error", onError);
         document.removeEventListener("visibilitychange", onVisibility);
         clearTimeout(fallback);
       };
@@ -68,7 +90,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       }
     }, [videoState, attemptPlay]);
 
+    const handleManualPlay = useCallback(
+      (e: React.MouseEvent) => {
+        e.stopPropagation();
+        attemptPlay();
+      },
+      [attemptPlay]
+    );
+
     const isPosterVisible = videoState !== "playing";
+    const showPlayButton = videoState === "blocked" || videoState === "error";
+    const showLoader = videoState === "loading";
 
     return (
       <motion.div
@@ -79,7 +111,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        {/* Mobile: vertical stack / Desktop: side-by-side */}
         <div className="flex flex-col md:flex-row items-center gap-8 md:gap-16 max-w-4xl w-full">
           {/* iPhone frame with video */}
           <motion.div
@@ -88,17 +119,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
           >
-            <div className="relative w-[240px] md:w-[290px]" style={{ aspectRatio: "593 / 1080" }}>
-              {/* Screen content (video + poster) sits behind the frame */}
+            <div
+              className="relative w-[230px] md:w-[300px]"
+              style={{ aspectRatio: "593 / 1080" }}
+            >
+              {/* Screen content (video + poster) — insets responsivos */}
               <div
-                className="absolute overflow-hidden bg-muted"
-                style={{
-                  top: "13.4%",
-                  bottom: "13.4%",
-                  left: "19.6%",
-                  right: "19.6%",
-                  borderRadius: "9%",
-                }}
+                className="absolute overflow-hidden bg-muted top-[13.4%] bottom-[13.4%] left-[19.6%] right-[19.6%] rounded-[9%] md:top-[13.2%] md:bottom-[13.2%] md:left-[19.4%] md:right-[19.4%] md:rounded-[9.5%]"
               >
                 <video
                   ref={videoRef}
@@ -116,6 +143,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 >
                   <source src="/videos/app-preview.mp4" type="video/mp4" />
                 </video>
+
                 <img
                   src="/videos/app-preview-poster.jpg"
                   alt=""
@@ -123,13 +151,34 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     isPosterVisible ? "opacity-100" : "opacity-0 pointer-events-none"
                   }`}
                 />
+
+                {/* Overlay: botão de play manual ou loader */}
+                {(showPlayButton || showLoader) && (
+                  <div className="absolute inset-0 z-20 flex items-center justify-center">
+                    {showPlayButton ? (
+                      <button
+                        type="button"
+                        onClick={handleManualPlay}
+                        aria-label="Tocar vídeo"
+                        className="w-14 h-14 rounded-full bg-background/80 backdrop-blur border border-border shadow-lg flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition-transform"
+                      >
+                        <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
+                      </button>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-background/70 backdrop-blur flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-foreground" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
               {/* iPhone frame overlay */}
               <img
                 src={iphoneMockup}
                 alt=""
                 aria-hidden
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 select-none"
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none z-30 select-none"
                 draggable={false}
               />
             </div>

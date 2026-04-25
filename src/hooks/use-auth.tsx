@@ -24,6 +24,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [trialExpired, setTrialExpired] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [gracePeriod, setGracePeriod] = useState(false);
+  const [daysLeft, setDaysLeft] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "pix" | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -37,6 +40,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setTrialExpired(false);
           setIsSubscribed(false);
+          setGracePeriod(false);
+          setDaysLeft(0);
+          setPaymentMethod(null);
         }
         setLoading(false);
       }
@@ -73,6 +79,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
+      setGracePeriod(data?.grace_period ?? false);
+      setDaysLeft(data?.days_left ?? 0);
+      setPaymentMethod(data?.payment_method ?? null);
     } catch (err) {
       console.error("check-subscription failed:", err);
     }
@@ -97,7 +106,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, gracePeriod, daysLeft, paymentMethod, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

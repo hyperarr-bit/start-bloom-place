@@ -7,16 +7,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const API_BASE = "https://api.abacatepay.com/v2";
+const API_BASE = "https://api.abacatepay.com/v1";
 const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
-const PRODUCT_VERSION = "v4";
-
-const PRODUCTS: Record<BillingPeriod, { name: string; price: number; cycle: string }> = {
-  monthly: { name: "CORE Pro Mensal", price: 1990, cycle: "MONTHLY" },
-  annual: { name: "CORE Pro Anual", price: 17880, cycle: "YEARLY" },
+const PRODUCTS: Record<BillingPeriod, { name: string; price: number; externalId: string }> = {
+  monthly: { name: "CORE Pro Mensal", price: 1990, externalId: "core-pro-monthly" },
+  annual: { name: "CORE Pro Anual", price: 17880, externalId: "core-pro-annual" },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -30,14 +28,6 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     status,
   });
 
-const extractId = (value: unknown): string | null => {
-  if (typeof value === "string" && value.trim()) return value;
-  if (value && typeof value === "object" && "id" in value && typeof value.id === "string") {
-    return value.id;
-  }
-  return null;
-};
-
 const sanitizeDigits = (value?: string | null) => {
   const digits = value?.replace(/\D/g, "") ?? "";
   return digits || undefined;
@@ -46,26 +36,17 @@ const sanitizeDigits = (value?: string | null) => {
 const getBaseUrl = (req: Request) => {
   const origin = req.headers.get("origin");
   if (origin) return origin;
-
   const referer = req.headers.get("referer");
   if (referer) {
-    try {
-      return new URL(referer).origin;
-    } catch {
-      logStep("Invalid referer header", { referer });
-    }
+    try { return new URL(referer).origin; } catch { /* noop */ }
   }
-
   return DEFAULT_APP_URL;
 };
 
 async function abacateRequest(path: string, apiKey: string, body?: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();
@@ -74,132 +55,6 @@ async function abacateRequest(path: string, apiKey: string, body?: unknown) {
     throw new Error(`AbacatePay API error: ${res.status} - ${JSON.stringify(data)}`);
   }
   return data;
-}
-
-async function getOrCreateProduct(
-  billing: BillingPeriod,
-  apiKey: string,
-  // deno-lint-ignore no-explicit-any
-  supabaseClient: any
-): Promise<string> {
-  const configKey = `abacatepay_product_${billing}_${PRODUCT_VERSION}`;
-
-  // Check if product ID is cached in app_config
-  const { data: cached } = await supabaseClient
-    .from("app_config")
-    .select("value")
-    .eq("key", configKey)
-    .maybeSingle();
-
-  if (cached?.value) {
-    const cachedValue = cached.value as { id: string; version?: string };
-    if (cachedValue.version === PRODUCT_VERSION && cachedValue.id) {
-      logStep("Using cached product", { billing, productId: cachedValue.id });
-      return cachedValue.id;
-    }
-    logStep("Cached product outdated, recreating", { billing });
-  }
-
-  // Create product via API with correct cycle field
-  const product = PRODUCTS[billing];
-  const externalId = `core-pro-${billing}-${PRODUCT_VERSION}`;
-  logStep("Creating product", { billing, product, externalId });
-
-  let productId: string;
-  try {
-    const result = await abacateRequest("/products/create", apiKey, {
-      externalId,
-      name: product.name,
-      price: product.price,
-      cycle: product.cycle,
-      currency: "BRL",
-    });
-    productId = result.data?.id || result.id;
-    logStep("Product created", { productId, cycle: product.cycle });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("already exists")) {
-      logStep("Product already exists, listing products to find it");
-      const listRes = await fetch(`${API_BASE}/products/list`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${apiKey}` },
-      });
-      const listData = await listRes.json();
-      const found = listData.data?.find(
-        (p: Record<string, unknown>) => p.externalId === externalId
-      );
-      if (!found?.id) throw new Error("Could not find existing product");
-      productId = found.id;
-      logStep("Found existing product", { productId });
-    } else {
-      throw err;
-    }
-  }
-
-  // Cache product ID with version
-  await supabaseClient.from("app_config").upsert(
-    { key: configKey, value: { id: productId, version: PRODUCT_VERSION }, updated_at: new Date().toISOString() },
-    { onConflict: "key" }
-  );
-
-  return productId;
-}
-
-async function getOrCreateCustomer(
-  userId: string,
-  userEmail: string,
-  customerName: string,
-  profile: { phone: string | null; tax_id: string | null } | null,
-  apiKey: string,
-  // deno-lint-ignore no-explicit-any
-  supabaseClient: any
-) {
-  const { data: existingRecord } = await supabaseClient
-    .from("user_data")
-    .select("id, value")
-    .eq("user_id", userId)
-    .eq("key", "abacatepay_customer_id")
-    .maybeSingle();
-
-  const cachedCustomerId = extractId(existingRecord?.value);
-  if (cachedCustomerId) {
-    logStep("Using cached customer", { userId, customerId: cachedCustomerId });
-    return cachedCustomerId;
-  }
-
-  const customerBody = {
-    email: userEmail,
-    name: customerName,
-    ...(profile?.phone ? { cellphone: sanitizeDigits(profile.phone) } : {}),
-    ...(profile?.tax_id ? { taxId: sanitizeDigits(profile.tax_id) } : {}),
-  };
-
-  logStep("Creating customer", { userId, email: userEmail });
-  const result = await abacateRequest("/customers/create", apiKey, customerBody);
-  const customerData = result.data as { customer?: unknown } | string | null | undefined;
-  const customerId =
-    extractId(customerData) ??
-    extractId(customerData && typeof customerData === "object" ? customerData.customer : null) ??
-    extractId(result.id);
-
-  if (!customerId) {
-    throw new Error("No customer ID returned from AbacatePay");
-  }
-
-  if (existingRecord?.id) {
-    await supabaseClient
-      .from("user_data")
-      .update({ value: customerId, updated_at: new Date().toISOString() })
-      .eq("id", existingRecord.id);
-  } else {
-    await supabaseClient.from("user_data").insert({
-      user_id: userId,
-      key: "abacatepay_customer_id",
-      value: customerId,
-    });
-  }
-
-  return customerId;
 }
 
 serve(async (req) => {
@@ -220,11 +75,8 @@ serve(async (req) => {
       auth: { persistSession: false },
     });
 
-    // Authenticate user
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return jsonResponse({ error: "Authorization header missing" }, 401);
-    }
+    if (!authHeader) return jsonResponse({ error: "Authorization header missing" }, 401);
 
     const token = authHeader.replace("Bearer ", "");
     const { data: authData, error: authError } = await supabaseAnon.auth.getUser(token);
@@ -237,15 +89,10 @@ serve(async (req) => {
     const userEmail = user.email ?? "";
     logStep("Authenticated user", { userId, email: userEmail });
 
-    // Get billing period and payment method from request
-    const { billing, method } = await req.json();
+    const { billing } = await req.json();
     const billingPeriod: BillingPeriod = billing === "annual" ? "annual" : "monthly";
-    const paymentMethod: "card" | "pix" = method === "pix" ? "pix" : "card";
+    const product = PRODUCTS[billingPeriod];
 
-    // Get or create product
-    const productId = await getOrCreateProduct(billingPeriod, apiKey, supabaseAdmin);
-
-    // Get user display name from profiles
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("display_name, phone, tax_id")
@@ -253,64 +100,42 @@ serve(async (req) => {
       .maybeSingle();
 
     const customerName = profile?.display_name || userEmail.split("@")[0];
-    const customerId = await getOrCreateCustomer(
-      userId,
-      userEmail,
-      customerName,
-      profile,
-      apiKey,
-      supabaseAdmin
-    );
     const baseUrl = getBaseUrl(req);
 
-    const externalId = `${userId}-${billingPeriod}-${paymentMethod}-${Date.now()}`;
-
-    const metadata = {
-      user_id: userId,
-      billing_period: billingPeriod,
-      payment_type: paymentMethod,
+    const billingBody = {
+      frequency: "ONE_TIME",
+      methods: ["PIX", "CARD"],
+      products: [
+        {
+          externalId: `${product.externalId}-${userId}-${Date.now()}`,
+          name: product.name,
+          quantity: 1,
+          price: product.price,
+        },
+      ],
+      returnUrl: `${baseUrl}/planos?canceled=true`,
+      completionUrl: `${baseUrl}/planos?success=true`,
+      customer: {
+        name: customerName,
+        email: userEmail,
+        ...(profile?.phone ? { cellphone: sanitizeDigits(profile.phone) } : {}),
+        ...(profile?.tax_id ? { taxId: sanitizeDigits(profile.tax_id) } : {}),
+      },
+      metadata: {
+        user_id: userId,
+        billing_period: billingPeriod,
+      },
     };
 
-    let endpoint: string;
-    let body: Record<string, unknown>;
-
-    if (paymentMethod === "pix") {
-      // One-time PIX checkout (not a subscription)
-      const product = PRODUCTS[billingPeriod];
-      logStep("Creating PIX checkout", { billingPeriod, customerId, baseUrl });
-      endpoint = "/checkouts/create";
-      body = {
-        externalId,
-        items: [{ id: productId, quantity: 1, name: product.name, price: product.price }],
-        methods: ["PIX"],
-        customerId,
-        returnUrl: `${baseUrl}/planos?canceled=true`,
-        completionUrl: `${baseUrl}/planos?success=true&method=pix`,
-        metadata,
-      };
-    } else {
-      // Recurring CARD subscription
-      logStep("Creating subscription", { productId, billingPeriod, customerId, baseUrl });
-      endpoint = "/subscriptions/create";
-      body = {
-        externalId,
-        items: [{ id: productId, quantity: 1 }],
-        methods: ["CARD"],
-        customerId,
-        returnUrl: `${baseUrl}/planos?canceled=true`,
-        completionUrl: `${baseUrl}/planos?success=true`,
-        metadata,
-      };
-    }
-
-    const result = await abacateRequest(endpoint, apiKey, body);
-    logStep("Checkout created", { paymentMethod, result });
+    logStep("Creating billing", { billingPeriod, product: product.name });
+    const result = await abacateRequest("/billing/create", apiKey, billingBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {
       throw new Error("No checkout URL returned from AbacatePay");
     }
 
+    logStep("Billing created", { url: checkoutUrl });
     return jsonResponse({ url: checkoutUrl });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

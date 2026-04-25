@@ -1,1 +1,0 @@
-ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS payment_method TEXT NOT NULL DEFAULT 'card';

@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Crown, Loader2, QrCode } from "lucide-react";
+import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,7 @@ const Planos = () => {
   const [searchParams] = useSearchParams();
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
-  const [loading, setLoading] = useState<null | "card" | "pix">(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
@@ -38,7 +38,7 @@ const Planos = () => {
     "Suporte prioritário",
   ];
 
-  const handleCheckout = async (method: "card" | "pix") => {
+  const handleCheckout = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Sua sessão expirou. Faça login novamente.");
@@ -46,10 +46,10 @@ const Planos = () => {
       return;
     }
 
-    setLoading(method);
+    setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
-        body: { billing, method },
+        body: { billing },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -64,7 +64,7 @@ const Planos = () => {
       } else {
         toast.error(msg || "Erro ao iniciar checkout");
       }
-      setLoading(null);
+      setLoading(false);
     }
   };
 
@@ -153,40 +153,23 @@ const Planos = () => {
             ))}
           </ul>
 
-          <div className="space-y-3">
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={() => handleCheckout("card")}
-              disabled={!!loading || isSubscribed}
-            >
-              {loading === "card" ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
-              ) : isSubscribed ? (
-                "Já assinante"
-              ) : (
-                "Assinar com Cartão"
-              )}
-            </Button>
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={handleCheckout}
+            disabled={loading || isSubscribed}
+          >
+            {loading ? (
+              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
+            ) : isSubscribed ? (
+              "Já assinante"
+            ) : (
+              "Assinar CORE PRO"
+            )}
+          </Button>
 
-            <Button
-              className="w-full"
-              size="lg"
-              variant="outline"
-              onClick={() => handleCheckout("pix")}
-              disabled={!!loading || isSubscribed}
-            >
-              {loading === "pix" ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando Pix...</>
-              ) : (
-                <><QrCode className="w-4 h-4 mr-2" /> Pagar com Pix</>
-              )}
-            </Button>
-          </div>
-
-          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            <strong>Cartão:</strong> renovação automática · cancele quando quiser<br />
-            <strong>Pix:</strong> pagamento único válido por {billing === "annual" ? "1 ano" : "1 mês"} · renove manualmente
+          <p className="text-[10px] text-muted-foreground text-center">
+            Você escolhe Pix ou Cartão na próxima tela · Pagamento válido por {billing === "annual" ? "1 ano" : "1 mês"}
           </p>
         </motion.div>
       </main>

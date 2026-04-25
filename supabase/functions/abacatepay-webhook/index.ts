@@ -46,7 +46,6 @@ serve(async (req) => {
     const metadata = body.data?.metadata || {};
     let userId = metadata.user_id || null;
     const billingPeriod = metadata.billing_period || "monthly";
-    const paymentType: "pix" | "card" = metadata.payment_type === "pix" ? "pix" : "card";
     const customerEmail = body.data?.customer?.email || null;
     const billingId = body.data?.id || null;
     const subscriptionId = body.data?.subscriptionId || body.data?.subscription_id || billingId;
@@ -82,14 +81,26 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
+      // Detect payment method from payload (PIX or CARD)
+      const rawMethod =
+        body.data?.paymentMethod ||
+        body.data?.payment_method ||
+        body.data?.method ||
+        body.data?.billing?.paymentMethod ||
+        null;
+      const paymentMethod =
+        typeof rawMethod === "string" && rawMethod.toUpperCase().includes("PIX")
+          ? "pix"
+          : "card";
+
       const payload = {
         user_id: resolvedUserId,
         status: "active",
         plan: "core-pro",
         billing_period: billingPeriod,
-        payment_method: paymentType,
+        payment_method: paymentMethod,
         abacatepay_billing_id: billingId,
-        abacatepay_subscription_id: paymentType === "pix" ? null : subscriptionId,
+        abacatepay_subscription_id: subscriptionId,
         customer_email: customerEmail,
         current_period_start: now.toISOString(),
         current_period_end: periodEnd.toISOString(),

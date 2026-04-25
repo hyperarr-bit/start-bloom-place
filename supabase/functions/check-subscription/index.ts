@@ -43,10 +43,10 @@ serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    // Check local subscriptions table — get most recent active sub regardless of date
+    // Check local subscriptions table
     const { data: localSub } = await supabaseClient
       .from("subscriptions")
-      .select("status, current_period_end, plan, billing_period, payment_method")
+      .select("status, current_period_end, plan, billing_period")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("current_period_end", { ascending: false, nullsFirst: false })
@@ -54,11 +54,11 @@ serve(async (req) => {
       .maybeSingle();
 
     if (localSub) {
+      // Check if subscription is still valid
       const endDate = localSub.current_period_end
         ? new Date(localSub.current_period_end)
         : null;
-      const now = new Date();
-      const isActive = !endDate || endDate > now;
+      const isActive = !endDate || endDate > new Date();
 
       if (isActive) {
         logStep("Active subscription found", { end: localSub.current_period_end });
@@ -67,33 +67,9 @@ serve(async (req) => {
             subscribed: true,
             trial_expired: false,
             subscription_end: localSub.current_period_end,
-            grace_period: false,
-            days_left: 0,
-            payment_method: localSub.payment_method || "card",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         );
-      }
-
-      // Expired — apply 3-day grace period only for PIX one-time payments
-      if (endDate && localSub.payment_method === "pix") {
-        const msSinceEnd = now.getTime() - endDate.getTime();
-        const daysSinceEnd = msSinceEnd / (1000 * 60 * 60 * 24);
-        if (daysSinceEnd <= 3) {
-          const daysLeft = Math.max(0, Math.ceil(3 - daysSinceEnd));
-          logStep("PIX grace period active", { daysLeft });
-          return new Response(
-            JSON.stringify({
-              subscribed: true,
-              trial_expired: false,
-              subscription_end: localSub.current_period_end,
-              grace_period: true,
-              days_left: daysLeft,
-              payment_method: "pix",
-            }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-          );
-        }
       }
     }
 
@@ -106,8 +82,6 @@ serve(async (req) => {
         subscribed: false,
         trial_expired: trialExpired,
         subscription_end: null,
-        grace_period: false,
-        days_left: 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

@@ -1,69 +1,33 @@
 ## Objetivo
 
-Permitir um único checkout com **Cartão recorrente + Pix** usando o endpoint `/v2/subscriptions/create` da AbacatePay, criando os 2 produtos (Mensal/Anual) automaticamente via uma edge function utilitária.
+Substituir o mockup CSS atual do iPhone na `WelcomeScreen` por um mockup PNG realista (com botões laterais, Dynamic Island, bordas finas e moldura prateada estilo iPhone 15 Pro), mantendo o vídeo `app-preview.mp4` tocando dentro da tela.
 
-## Etapas
+## O que muda
 
-### 1. Migration: tabela `app_config` já existe — usar para guardar os IDs dos produtos
-Vamos salvar 2 chaves:
-- `abacatepay_product_monthly_id`
-- `abacatepay_product_annual_id`
+**Arquivo:** `src/components/WelcomeScreen.tsx`
 
-Nenhuma migration nova de schema é necessária.
+A estrutura visual atual é apenas uma `div` arredondada preta (`#1a1a1a`) com padding — não tem botões, nem Dynamic Island, e o raio é genérico. Vou trocar por um **frame PNG transparente** sobreposto, com o vídeo posicionado por trás na área da tela.
 
-### 2. Nova edge function `abacatepay-setup-products` (rodar 1 vez)
-Função que:
-- Lê `ABACATEPAY_API_KEY` dos secrets
-- Cria 2 produtos via `POST /v2/products/create`:
-  - **CORE Pro Mensal** — R$ 19,90 — frequência mensal
-  - **CORE Pro Anual** — R$ 178,80 — frequência anual
-- Salva os IDs retornados em `app_config` (via service role)
-- Retorna os IDs para confirmação
-- Idempotente: se já existir ID em `app_config`, retorna o existente em vez de duplicar
+## Implementação
 
-Você chama 1 vez (ex: pelo botão de teste ou via curl) e pronto.
+1. **Salvar a imagem anexada** como asset do projeto:
+   - `src/assets/iphone-mockup.png` (importada via ES6 module)
 
-### 3. Refatorar `abacatepay-checkout`
-Mudanças:
-- Trocar endpoint `/checkouts/create` → `/subscriptions/create`
-- Ler os IDs dos produtos de `app_config` (em vez de criar items inline)
-- Payload novo:
-  ```json
-  {
-    "frequency": "MONTHLY" | "ANNUAL",
-    "methods": ["PIX", "CARD"],
-    "products": [{ "productId": "<id>", "quantity": 1 }],
-    "returnUrl": "...",
-    "completionUrl": "...",
-    "customer": {...},
-    "metadata": { "user_id": "...", "billing_period": "..." }
-  }
-  ```
-- Se `app_config` não tiver os IDs, retorna erro claro pedindo pra rodar `abacatepay-setup-products`
+2. **Refatorar o frame no `WelcomeScreen.tsx`**:
+   - Container externo com a proporção da imagem (≈ 596×1184 → aspect ratio ~1:1.99).
+   - Camada 1 (fundo, z-0): `<video>` posicionado absolutamente na **área interna da tela** do mockup (insets calculados em %, aprox. `top: 2.4%`, `bottom: 2.4%`, `left: 5.4%`, `right: 5.4%`, com `border-radius` ~12% para acompanhar o canto da tela do iPhone).
+   - Camada 2 (frente, z-10): `<img src={iphoneMockup}>` cobrindo 100% do container, `pointer-events-none`, fornecendo a moldura, botões laterais e Dynamic Island.
+   - Poster da `<video>` continua aparecendo até o vídeo começar a tocar (mantém a lógica de `videoState`).
 
-### 4. Atualizar `abacatepay-webhook`
-Adicionar tratamento dos eventos de assinatura:
-- `subscription.created` / `subscription.charged` → marcar `subscriptions.status = 'active'`, atualizar `current_period_end`, salvar `abacatepay_subscription_id`
-- `subscription.canceled` / `subscription.payment_failed` → marcar `status = 'canceled'` ou `past_due`
-- Manter compat com eventos antigos de billing avulso (caso já tenha algum em produção)
+3. **Tamanhos responsivos** (mantém o layout atual):
+   - Mobile: `w-[200px]` (altura proporcional ~398px)
+   - Desktop (`md:`): `w-[240px]` (altura ~478px)
+   - Removidas as classes `bg-[#1a1a1a]`, `p-[10px]`, `rounded-[40px]` e a barra inferior simulada — tudo isso passa a vir da imagem PNG.
 
-### 5. UI (`Planos.tsx`)
-Mínima mudança: o texto "Você escolhe Pix ou Cartão na próxima tela" continua válido. Adicionar nota: "Cartão = renovação automática. Pix = você renova manualmente quando quiser." (Pix em assinatura na Abacate ainda exige ação do usuário no vencimento.)
+4. **Sem mudanças** em: lógica de autoplay, fallback de poster, props (`onComplete`, `onLogin`), título e CTAs ao lado.
 
 ## Detalhes técnicos
 
-- **Endpoint produtos**: `POST https://api.abacatepay.com/v2/products/create` com `{ name, description, price (centavos), externalId, returnUrl?, ... }` — confirmo a forma exata ao implementar consultando a doc, ajusto se diferente
-- **Idempotência**: usamos `externalId` `core-pro-monthly` / `core-pro-annual` para evitar duplicação no lado da Abacate também
-- **Storage dos IDs**: `app_config` (RLS service-role only) — frontend nunca lê
-- **Auth**: setup-products fica protegido — só roda se vier com header de service role OU se ainda não houver IDs salvos (auto-bootstrap seguro)
-
-## Arquivos afetados
-
-- `supabase/functions/abacatepay-setup-products/index.ts` (novo)
-- `supabase/functions/abacatepay-checkout/index.ts` (refator)
-- `supabase/functions/abacatepay-webhook/index.ts` (estender)
-- `src/pages/Planos.tsx` (texto)
-
-## Após aprovar
-
-Eu implemento, deployo, e te passo o comando `curl` (ou uso o `curl_edge_functions`) pra rodar o `abacatepay-setup-products` 1 vez. Depois disso o checkout unificado já funciona.
+- A imagem anexada tem fundo branco/transparente em volta do iPhone — vou copiá-la como está; se o fundo aparecer não-transparente no preview, removo o branco com um filtro/edição posterior.
+- Os insets exatos da área da tela serão ajustados após render visual (faço QA via screenshot do preview e refino os percentuais se necessário).
+- Não mexe em nenhum outro arquivo do projeto.

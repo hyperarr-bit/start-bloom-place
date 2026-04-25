@@ -73,41 +73,25 @@ const HomeUtilities = () => {
       {/* ANFITRIÃO */}
       <div className="rounded-xl overflow-hidden border border-border">
         <div className="bg-pink-200 dark:bg-pink-900/60 px-3 py-2">
-          <h4 className="text-xs font-bold text-foreground">🏠 ANFITRIÃO</h4>
+          <h4 className="text-xs font-bold text-foreground">🍽️ ANFITRIÃO — RESTRIÇÕES DOS AMIGOS</h4>
         </div>
-        <div className="bg-pink-50 dark:bg-pink-950/30 p-3 space-y-3">
-          <div className="text-center">
-            <Wifi className="w-5 h-5 mx-auto mb-1 text-primary" />
-            <p className="text-[10px] font-bold mb-2">QR Code do Wi-Fi</p>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <Input value={wifiSSID} onChange={e => setWifiSSID(e.target.value)} placeholder="Nome da rede" className="text-xs h-7 bg-background/70" />
-              <Input value={wifiPass} onChange={e => setWifiPass(e.target.value)} placeholder="Senha" className="text-xs h-7 bg-background/70" type="password" />
+        <div className="bg-pink-50 dark:bg-pink-950/30 p-3">
+          {allergies.map(a => (
+            <div key={a.id} className="flex items-center gap-2 text-xs bg-background/50 rounded-lg p-2 mb-1 group">
+              <span className="font-bold">{a.name}</span>
+              <span className="text-muted-foreground">→ {a.restriction}</span>
+              <button onClick={() => setAllergies(prev => prev.filter(x => x.id !== a.id))} className="ml-auto opacity-0 group-hover:opacity-100">
+                <X className="w-3 h-3 text-muted-foreground" />
+              </button>
             </div>
-            {wifiSSID && wifiPass && (
-              <div className="bg-white p-3 rounded-lg inline-block">
-                <QRCodeSVG value={`WIFI:T:WPA;S:${wifiSSID};P:${wifiPass};;`} size={120} />
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="text-[10px] font-bold mb-1">🍽️ Restrições Alimentares dos Amigos</p>
-            {allergies.map(a => (
-              <div key={a.id} className="flex items-center gap-2 text-xs bg-background/50 rounded-lg p-2 mb-1 group">
-                <span className="font-bold">{a.name}</span>
-                <span className="text-muted-foreground">→ {a.restriction}</span>
-                <button onClick={() => setAllergies(prev => prev.filter(x => x.id !== a.id))} className="ml-auto opacity-0 group-hover:opacity-100">
-                  <X className="w-3 h-3 text-muted-foreground" />
-                </button>
-              </div>
-            ))}
-            {allergies.length === 0 && <p className="text-[11px] text-muted-foreground italic py-1 text-center">Nenhuma restrição</p>}
-            <div className="flex gap-2 mt-1">
-              <Input value={aName} onChange={e => setAName(e.target.value)} placeholder="Nome" className="text-xs h-7 flex-1 bg-background/70" />
-              <Input value={aRestriction} onChange={e => setARestriction(e.target.value)} placeholder="Restrição" className="text-xs h-7 flex-1 bg-background/70" />
-              <Button size="sm" className="h-7 px-2" onClick={() => {
-                if (aName.trim()) { setAllergies(prev => [...prev, { id: Date.now().toString(), name: aName.trim(), restriction: aRestriction.trim() }]); setAName(""); setARestriction(""); }
-              }}><Plus className="w-3 h-3" /></Button>
-            </div>
+          ))}
+          {allergies.length === 0 && <p className="text-[11px] text-muted-foreground italic py-1 text-center">Nenhuma restrição</p>}
+          <div className="flex gap-2 mt-1">
+            <Input value={aName} onChange={e => setAName(e.target.value)} placeholder="Nome" className="text-xs h-7 flex-1 bg-background/70" />
+            <Input value={aRestriction} onChange={e => setARestriction(e.target.value)} placeholder="Restrição" className="text-xs h-7 flex-1 bg-background/70" />
+            <Button size="sm" className="h-7 px-2" onClick={() => {
+              if (aName.trim()) { setAllergies(prev => [...prev, { id: Date.now().toString(), name: aName.trim(), restriction: aRestriction.trim() }]); setAName(""); setARestriction(""); }
+            }}><Plus className="w-3 h-3" /></Button>
           </div>
         </div>
       </div>

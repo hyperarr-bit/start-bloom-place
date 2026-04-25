@@ -1,18 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, X, Trash2, Wifi } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { QRCodeSVG } from "qrcode.react";
 import { ServiceContact, DeclutterItem, UtilityRecord, GuestAllergy } from "./types";
 
 const HomeUtilities = () => {
   const [contacts, setContacts] = usePersistedState<ServiceContact[]>("casa-contacts", []);
-  const [wifiSSID, setWifiSSID] = usePersistedState("casa-wifi-ssid", "");
-  const [wifiPass, setWifiPass] = usePersistedState("casa-wifi-pass", "");
   const [allergies, setAllergies] = usePersistedState<GuestAllergy[]>("casa-allergies", []);
   const [declutter, setDeclutter] = usePersistedState<DeclutterItem[]>("casa-declutter", []);
   const [utilities, setUtilities] = usePersistedState<UtilityRecord[]>("casa-utilities", []);
+
+  // Limpa qualquer senha de Wi-Fi salva anteriormente
+  useEffect(() => {
+    try {
+      localStorage.removeItem("casa-wifi-ssid");
+      localStorage.removeItem("casa-wifi-pass");
+    } catch {}
+  }, []);
 
   // Forms
   const [cName, setCName] = useState("");

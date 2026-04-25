@@ -8,6 +8,9 @@ interface AuthContextType {
   loading: boolean;
   trialExpired: boolean;
   isSubscribed: boolean;
+  gracePeriod: boolean;
+  daysLeft: number;
+  paymentMethod: "card" | "pix" | null;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;

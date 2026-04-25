@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { motion } from "framer-motion";
+import iphoneMockup from "@/assets/iphone-mockup.png";
 
 interface WelcomeScreenProps {
   onComplete: () => void;

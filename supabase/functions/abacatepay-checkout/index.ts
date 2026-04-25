@@ -90,9 +90,44 @@ serve(async (req) => {
     const userEmail = user.email ?? "";
     logStep("Authenticated user", { userId, email: userEmail });
 
-    const { billing } = await req.json();
-    const billingPeriod: BillingPeriod = billing === "annual" ? "annual" : "monthly";
+    const RequestSchema = z.object({
+      billing: z.enum(["monthly", "annual"]).default("monthly"),
+    });
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+    const parsed = RequestSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
+    }
+    const billingPeriod: BillingPeriod = parsed.data.billing;
     const product = PRODUCTS[billingPeriod];
+
+    // Build & validate the items array required by AbacatePay v2
+    const items = [
+      {
+        id: `${product.externalId}-${userId}-${Date.now()}`,
+        name: product.name,
+        quantity: 1,
+        price: product.price,
+      },
+    ];
+    const ItemsSchema = z.array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1),
+        quantity: z.number().int().positive(),
+        price: z.number().int().positive(),
+      })
+    ).min(1);
+    const itemsCheck = ItemsSchema.safeParse(items);
+    if (!itemsCheck.success) {
+      logStep("Invalid items", itemsCheck.error.flatten());
+      return jsonResponse({ error: "Invalid 'items' payload" }, 400);
+    }
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")

@@ -86,6 +86,7 @@ serve(async (req) => {
         name: p.name,
         description: p.description,
         price: p.price,
+        currency: "BRL",
         externalId: p.externalId,
       };
       const resp = await abacateRequest("/products/create", apiKey, payload);

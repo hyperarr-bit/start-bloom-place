@@ -2,10 +2,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
+import { PaymentStatus } from "@/components/PaymentStatus";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -13,15 +14,6 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (searchParams.get("success") === "true") {
-      toast.success("Assinatura realizada com sucesso! 🎉");
-    }
-    if (searchParams.get("canceled") === "true") {
-      toast.info("Checkout cancelado.");
-    }
-  }, [searchParams]);
 
   const plans = {
     monthly: { price: "19,90", period: "/mês" },
@@ -70,6 +62,7 @@ const Planos = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <PaymentStatus />
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-muted">

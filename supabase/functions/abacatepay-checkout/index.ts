@@ -79,7 +79,8 @@ async function abacateRequest(path: string, apiKey: string, body?: unknown) {
 async function getOrCreateProduct(
   billing: BillingPeriod,
   apiKey: string,
-  supabaseClient: ReturnType<typeof createClient>
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any
 ): Promise<string> {
   const configKey = `abacatepay_product_${billing}_${PRODUCT_VERSION}`;
 

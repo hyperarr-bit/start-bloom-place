@@ -107,7 +107,7 @@ serve(async (req) => {
       methods: ["PIX", "CARD"],
       items: [
         {
-          externalId: `${product.externalId}-${userId}-${Date.now()}`,
+          id: `${product.externalId}-${userId}-${Date.now()}`,
           name: product.name,
           quantity: 1,
           price: product.price,

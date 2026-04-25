@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
 import { motion } from "framer-motion";
 import { Play, Loader2 } from "lucide-react";
-import iphoneMockup from "@/assets/iphone-mockup.png";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -18,7 +17,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const attemptPlay = useCallback(() => {
       const video = videoRef.current;
       if (!video) return;
-
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
@@ -33,7 +31,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
       const onReady = () => attemptPlay();
       const onEnded = () => {
-        // Garantir loop mesmo quando o atributo nativo falha (iOS Safari)
         try {
           video.currentTime = 0;
           const p = video.play();
@@ -43,7 +40,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         }
       };
       const onPause = () => {
-        // Se pausou sozinho enquanto a aba está visível, tenta retomar
         if (document.visibilityState === "visible" && !video.ended) {
           attemptPlay();
         }
@@ -56,22 +52,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       video.addEventListener("pause", onPause);
       video.addEventListener("error", onError);
 
-      if (video.readyState >= 2) {
-        attemptPlay();
-      }
+      if (video.readyState >= 2) attemptPlay();
 
       const onVisibility = () => {
-        if (document.visibilityState === "visible" && video.paused) {
-          attemptPlay();
-        }
+        if (document.visibilityState === "visible" && video.paused) attemptPlay();
       };
       document.addEventListener("visibilitychange", onVisibility);
-
-      const fallback = setTimeout(() => {
-        if (video && !video.paused && video.currentTime > 0) {
-          setVideoState("playing");
-        }
-      }, 1500);
 
       return () => {
         video.removeEventListener("loadedmetadata", onReady);
@@ -80,14 +66,11 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         video.removeEventListener("pause", onPause);
         video.removeEventListener("error", onError);
         document.removeEventListener("visibilitychange", onVisibility);
-        clearTimeout(fallback);
       };
     }, [attemptPlay]);
 
     const handleScreenTap = useCallback(() => {
-      if (videoState === "blocked" || videoState === "loading") {
-        attemptPlay();
-      }
+      if (videoState === "blocked" || videoState === "loading") attemptPlay();
     }, [videoState, attemptPlay]);
 
     const handleManualPlay = useCallback(
@@ -105,93 +88,86 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6 pt-8 pb-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6 pt-10 pb-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 max-w-4xl w-full min-h-0">
-          {/* iPhone frame with video — sized by height to never overflow */}
+        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 max-w-4xl w-full min-h-0">
+          {/* iPhone CSS mockup */}
           <motion.div
             className="relative z-10 flex items-center justify-center shrink min-h-0"
-            initial={{ opacity: 0, y: 80, scale: 0.8 }}
+            initial={{ opacity: 0, y: 60, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
+            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.2 }}
           >
             <div
-              className="relative"
+              className="iphone-frame relative"
               style={{
-                aspectRatio: "398 / 818",
-                height: "min(58vh, 560px)",
+                aspectRatio: "9 / 19.5",
+                height: "min(60vh, 600px)",
                 maxWidth: "78vw",
               }}
             >
-              {/* Screen content (video + poster) — insets reais do PNG recortado */}
-              <div
-                className="absolute overflow-hidden bg-black"
-                style={{
-                  top: "1.6%",
-                  bottom: "1.6%",
-                  left: "4.3%",
-                  right: "4.5%",
-                  borderRadius: "11%",
-                }}
-              >
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  preload="auto"
-                  poster="/videos/app-preview-poster.jpg"
-                  className="absolute inset-0 w-full h-full object-cover bg-black pointer-events-none z-0"
-                  // @ts-ignore
-                  webkit-playsinline="true"
-                  disablePictureInPicture
-                  onPlaying={() => setVideoState("playing")}
-                >
-                  <source src="/videos/app-preview.mp4" type="video/mp4" />
-                </video>
+              {/* Side buttons */}
+              <span className="iphone-btn iphone-btn-silent" />
+              <span className="iphone-btn iphone-btn-volup" />
+              <span className="iphone-btn iphone-btn-voldown" />
+              <span className="iphone-btn iphone-btn-power" />
 
-                <img
-                  src="/videos/app-preview-poster.jpg"
-                  alt=""
-                  className={`absolute inset-0 w-full h-full object-cover z-10 transition-opacity duration-500 ${
-                    isPosterVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-                  }`}
-                />
+              {/* Inner bezel + screen */}
+              <div className="iphone-bezel">
+                <div className="iphone-screen">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    preload="auto"
+                    poster="/videos/app-preview-poster.jpg"
+                    className="absolute inset-0 w-full h-full object-cover bg-black pointer-events-none"
+                    // @ts-ignore
+                    webkit-playsinline="true"
+                    disablePictureInPicture
+                    onPlaying={() => setVideoState("playing")}
+                  >
+                    <source src="/videos/app-preview.mp4" type="video/mp4" />
+                  </video>
 
-                {/* Overlay: botão de play manual ou loader */}
-                {(showPlayButton || showLoader) && (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center">
-                    {showPlayButton ? (
-                      <button
-                        type="button"
-                        onClick={handleManualPlay}
-                        aria-label="Tocar vídeo"
-                        className="w-14 h-14 rounded-full bg-background/80 backdrop-blur border border-border shadow-lg flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition-transform"
-                      >
-                        <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
-                      </button>
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-background/70 backdrop-blur flex items-center justify-center">
-                        <Loader2 className="w-5 h-5 animate-spin text-foreground" />
-                      </div>
-                    )}
-                  </div>
-                )}
+                  <img
+                    src="/videos/app-preview-poster.jpg"
+                    alt=""
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                      isPosterVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+                    }`}
+                  />
+
+                  {/* Dynamic Island */}
+                  <div className="iphone-island" aria-hidden />
+
+                  {/* Overlay: play / loader */}
+                  {(showPlayButton || showLoader) && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center">
+                      {showPlayButton ? (
+                        <button
+                          type="button"
+                          onClick={handleManualPlay}
+                          aria-label="Tocar vídeo"
+                          className="w-14 h-14 rounded-full bg-background/80 backdrop-blur border border-border shadow-lg flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition-transform"
+                        >
+                          <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
+                        </button>
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-background/70 backdrop-blur flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 animate-spin text-foreground" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-
-              {/* iPhone frame overlay */}
-              <img
-                src={iphoneMockup}
-                alt=""
-                aria-hidden
-                className="absolute inset-0 w-full h-full object-contain pointer-events-none z-30 select-none"
-                draggable={false}
-              />
             </div>
           </motion.div>
 

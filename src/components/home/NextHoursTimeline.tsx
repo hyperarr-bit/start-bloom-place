@@ -99,7 +99,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const remaining = data.mealsTotal - data.mealsLogged;
   if (remaining > 0) {
     items.push({
-      label: `${remaining} refeição${remaining > 1 ? "ões" : ""} para registrar`,
+      label: `${remaining} ${remaining > 1 ? "refeições" : "refeição"} para registrar`,
       done: false,
       emoji: "🍽️",
       priority: 3,

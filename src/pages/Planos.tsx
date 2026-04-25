@@ -38,7 +38,7 @@ const Planos = () => {
     "Suporte prioritário",
   ];
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (method: "card" | "pix") => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error("Sua sessão expirou. Faça login novamente.");
@@ -46,10 +46,10 @@ const Planos = () => {
       return;
     }
 
-    setLoading(true);
+    setLoading(method);
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
-        body: { billing },
+        body: { billing, method },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
@@ -64,7 +64,7 @@ const Planos = () => {
       } else {
         toast.error(msg || "Erro ao iniciar checkout");
       }
-      setLoading(false);
+      setLoading(null);
     }
   };
 

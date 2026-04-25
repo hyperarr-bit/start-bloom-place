@@ -1,63 +1,59 @@
 ## Objetivo
 
-Adicionar a opção de pagar com **Pix avulso** (não recorrente) na página `/planos`, ao lado da assinatura recorrente (CARD). O Pix paga 1 mês ou 1 ano de acesso. Quando vence, o usuário tem **3 dias de carência** com aviso antes do bloqueio total.
+Substituir os dois botões ("Cartão" e "Pix") por **um único botão** que leva o usuário ao checkout da AbacatePay, onde **ele escolhe** Pix ou Cartão na própria tela do gateway.
 
-## Como vai funcionar para o usuário
+## Por que mudar a abordagem
 
-Na tela de Planos, dentro do card do plano selecionado (Mensal ou Anual), aparecem dois botões:
+A API `/subscriptions/create` (recorrente) **só aceita CARD**. Para oferecer Pix + Cartão na mesma tela é necessário usar `/billing/create` (cobrança avulsa AbacatePay), que aceita `methods: ["PIX", "CARD"]` simultaneamente. Como Pix não tem recorrência nativa, o fluxo passa a ser **pagamento avulso para os dois métodos** — com renovação manual e os 3 dias de carência já implementados aplicando-se a ambos.
 
-1. **Assinar com Cartão** — fluxo recorrente atual (renova sozinho)
-2. **Pagar com Pix** — gera QR Code, pagamento único; precisa repetir manualmente quando vencer
-
-Após o vencimento do Pix:
-- Dia 0–3 após vencer → acesso liberado + banner amarelo "Sua assinatura via Pix venceu. Renove em X dias para evitar bloqueio."
-- Dia 4+ → bloqueio total, igual a quem nunca assinou
+Esse é o trade-off: ganhamos a UX unificada que você quer, perdemos a recorrência automática do cartão. O usuário no cartão vai precisar pagar de novo todo mês/ano (mesma lógica do Pix). Se isso for inaceitável, a alternativa é manter dois botões.
 
 ## Mudanças
 
-### 1. Edge function `abacatepay-checkout`
-Aceitar novo parâmetro `method: "card" | "pix"`. 
+### 1. `abacatepay-checkout` (edge function)
+- Remover parâmetro `method`. Sempre criar uma cobrança única via `POST /billing/create` com:
+  - `methods: ["PIX", "CARD"]`
+  - `frequency: "ONE_TIME"`
+  - `products: [{ externalId, name, quantity: 1, price }]` (preço em centavos do plano)
+  - `customer: { id: customerId }` ou dados inline
+  - `returnUrl` / `completionUrl` apontando para `/planos`
+  - `metadata: { user_id, billing_period, payment_type: "one_time" }`
+- Remover toda a lógica de `getOrCreateProduct` + `/subscriptions/create` (não precisa mais criar produto recorrente — manda os items inline).
+- Retornar `{ url }` da cobrança.
 
-- Se `card` (padrão): comportamento atual (`/subscriptions/create`, methods `["CARD"]`).
-- Se `pix`: chama `/checkouts/create` (cobrança avulsa, não assinatura) com `methods: ["PIX"]`, item sendo o produto do plano escolhido. Retorna a `url` do checkout AbacatePay onde o usuário paga o Pix.
+### 2. `abacatepay-webhook` (edge function)
+- Tratar evento `billing.paid` para gravar/renovar `subscriptions`:
+  - `status = "active"`, `plan = "core-pro"`, `payment_method` ← do payload (PIX ou CARD)
+  - `current_period_end` = agora + 30 dias (mensal) ou +365 (anual), lido do `metadata.billing_period`
+- A coluna `payment_method` já existe; passa a refletir o método real escolhido pelo usuário no checkout.
 
-### 2. Edge function `abacatepay-webhook`
-Diferenciar Pix avulso de assinatura recorrente pelo metadata `payment_type: "pix" | "card"`. Quando `billing.paid` chega para Pix, gravar em `subscriptions`:
-- `status = "active"`
-- `plan = "core-pro"`
-- `billing_period = "monthly" | "annual"`
-- `current_period_end` = agora + 30 dias (mensal) ou +365 (anual)
-- novo campo `payment_method = "pix"` para diferenciar
+### 3. `check-subscription` (edge function)
+- Manter a lógica de carência de 3 dias **para qualquer pagamento** (não só Pix), já que agora cartão também é avulso.
+- Banner `PixGraceBanner` continua funcionando — talvez renomear o texto para "Sua assinatura venceu" (sem mencionar Pix).
 
-### 3. Edge function `check-subscription` (lógica de carência)
-Quando há subscription com `payment_method = "pix"` e `current_period_end` já passou:
-- Se passou ≤ 3 dias → retornar `subscribed: true` + `grace_period: true` + `days_left: N`
-- Se passou > 3 dias → retornar `subscribed: false` (bloqueio normal)
+### 4. `src/pages/Planos.tsx`
+- Voltar a ter **um único botão** "Assinar CORE PRO".
+- Texto abaixo: "Você escolhe Pix ou Cartão na próxima tela. Pagamento válido por 1 mês/ano."
+- Remover a chamada com `method` no `invoke`.
 
-Para `card`, comportamento atual (renovação automática via webhook).
+### 5. `src/components/PixGraceBanner.tsx`
+- Texto ajustado para "Sua assinatura venceu. Renove em X dias para manter o acesso." (genérico).
 
-### 4. Schema (migração)
-Adicionar coluna `payment_method TEXT DEFAULT 'card'` em `subscriptions`.
+## Diagrama do fluxo
 
-### 5. UI `src/pages/Planos.tsx`
-Adicionar segundo botão **"Pagar com Pix"** abaixo do "Assinar CORE PRO". Texto explicativo curto: "Pagamento único, válido por 1 mês/ano. Você renova manualmente."
+```text
+Planos → [Assinar CORE PRO]
+   ↓
+edge: abacatepay-checkout
+   ↓ POST /billing/create methods=[PIX, CARD]
+AbacatePay Checkout
+   ↓ usuário escolhe PIX ou CARD e paga
+webhook billing.paid
+   ↓ grava subscription com payment_method real
+   ↓ current_period_end = +30d ou +365d
+Acesso liberado · após vencer: 3 dias de carência · depois bloqueia
+```
 
-### 6. Banner de carência
-Novo componente exibido no Home (e em outras telas chave) quando `check-subscription` retornar `grace_period: true`: "Sua assinatura Pix venceu. Renove em X dias para manter o acesso." Botão "Renovar" → `/planos`.
+## Confirmar antes de implementar
 
-### 7. `useAuth` hook
-Expor `gracePeriod` e `daysLeft` vindos da resposta de `check-subscription`.
-
-## Detalhes técnicos
-
-- Pix usa endpoint `POST /checkouts/create` (não `/subscriptions/create`) com `methods: ["PIX"]` e `frequency: "ONE_TIME"` (padrão).
-- Metadata enviado: `{ user_id, billing_period, payment_type: "pix" }`.
-- Webhook AbacatePay envia `event: "billing.paid"` para Pix avulso.
-- Carência calculada em `check-subscription`: `(now - current_period_end) <= 3 dias`.
-- Para Pix, NÃO chamar `subscription.cancelled` nem `subscription.overdue` (não existem em pagamento avulso).
-
-## Fora de escopo
-
-- Notificações por email/push antes do vencimento (apenas banner in-app).
-- Renovação automática de Pix (por design é manual).
-- Histórico de pagamentos Pix.
+Você está ok em **perder a renovação automática do cartão** em troca da tela unificada? Se quiser manter recorrência no cartão, a única forma é continuar com dois botões (recorrente vs. avulso) — diga e eu ajusto o plano.

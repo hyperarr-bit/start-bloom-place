@@ -81,11 +81,24 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
+      // Detect payment method from payload (PIX or CARD)
+      const rawMethod =
+        body.data?.paymentMethod ||
+        body.data?.payment_method ||
+        body.data?.method ||
+        body.data?.billing?.paymentMethod ||
+        null;
+      const paymentMethod =
+        typeof rawMethod === "string" && rawMethod.toUpperCase().includes("PIX")
+          ? "pix"
+          : "card";
+
       const payload = {
         user_id: resolvedUserId,
         status: "active",
         plan: "core-pro",
         billing_period: billingPeriod,
+        payment_method: paymentMethod,
         abacatepay_billing_id: billingId,
         abacatepay_subscription_id: subscriptionId,
         customer_email: customerEmail,

@@ -192,7 +192,20 @@ const SOSCard = () => {
 const BMICalculator = () => {
   const [bmiHeight, setBmiHeight] = usePersistedState("saude-bmi-height", "");
   const [bmiWeight, setBmiWeight] = usePersistedState("saude-bmi-weight", "");
-  const bmi = bmiHeight && bmiWeight ? (Number(bmiWeight) / Math.pow(Number(bmiHeight) / 100, 2)).toFixed(1) : null;
+
+  const parseNum = (v: string) => {
+    const n = Number(String(v).replace(",", "."));
+    return Number.isFinite(n) ? n : NaN;
+  };
+
+  const heightRaw = parseNum(bmiHeight);
+  const weightRaw = parseNum(bmiWeight);
+  // Aceita altura em cm (ex: 176) ou metros (ex: 1.76 / 1,76). Se < 3, assume metros.
+  const heightM = heightRaw > 3 ? heightRaw / 100 : heightRaw;
+  const valid =
+    Number.isFinite(heightM) && heightM > 0.5 && heightM < 2.7 &&
+    Number.isFinite(weightRaw) && weightRaw > 0 && weightRaw < 500;
+  const bmi = valid ? (weightRaw / (heightM * heightM)).toFixed(1) : null;
   const bmiCategory = bmi ? (Number(bmi) < 18.5 ? "Abaixo" : Number(bmi) < 25 ? "Normal ✅" : Number(bmi) < 30 ? "Sobrepeso" : "Obesidade") : "";
   const bmiColor = bmi ? (Number(bmi) < 18.5 ? "text-[hsl(var(--saude-blue))]" : Number(bmi) < 25 ? "text-[hsl(var(--saude-green))]" : Number(bmi) < 30 ? "text-[hsl(var(--saude-yellow))]" : "text-[hsl(var(--saude-red))]") : "";
 

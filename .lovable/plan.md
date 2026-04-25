@@ -1,52 +1,37 @@
-# Reequilibrar proporções da WelcomeScreen
+# Corrigir bordas cinzas e bug do iPhone na WelcomeScreen
 
-Analisando o screenshot atual no viewport mobile (430×697):
+## Diagnóstico
 
-**Problemas:**
-- iPhone pequeno demais (~230px num espaço com muita "sobra" em cima)
-- Gap enorme entre o mockup e o título "Organize sua vida..."
-- Botão "Começar" parece estourar/encostar nas margens (sem padding lateral suficiente nos elementos internos)
-- Subtítulo "Já tem uma conta? Entrar" cortado na imagem (ficou na borda inferior)
+Inspecionei o PNG `src/assets/iphone-mockup.png` e o screenshot. Dois problemas:
 
-## Mudanças (apenas em `src/components/WelcomeScreen.tsx`)
+1. **Margem transparente externa no PNG**: o conteúdo visível do iPhone vai de (98,131) até (496,949) num canvas de 593×1080. Sobravam ~98px de transparência à esquerda, ~97px à direita, ~131px no topo e ~131px embaixo. Isso fazia o `aspectRatio: 593/1080` desperdiçar espaço e desalinhar com o container do vídeo.
 
-### 1. iPhone com tamanho fluido e maior
+2. **Tela interna mostrando faixas brancas/cinzas**: o container do vídeo usa `bg-muted` (cinza claro no light mode). Quando o vídeo (16:9 ou similar) é colocado num retângulo alto e estreito, sobram faixas — essas faixas aparecem cinzas. Também os insets antigos (~13.4%/19.6%) eram calculados sobre o canvas com margem, então não fechavam direito após o crop.
 
-Trocar `w-[230px] md:w-[300px]` por largura responsiva ao viewport:
+## Correções
 
-```tsx
-style={{
-  aspectRatio: "593 / 1080",
-  width: "min(72vw, 300px)",
-  maxHeight: "55vh", // impede estourar em telas baixas
-}}
-```
+### 1. Recortar o PNG para o bbox real (já executado)
 
-Isso faz o iPhone ocupar **~72% da largura no mobile** (cerca de 310px no viewport 430px), mantendo um teto sensato (300px) em desktop e nunca passando de 55% da altura.
+PNG agora é 398×818 (sem margem transparente externa). Novos insets reais da área transparente da "tela":
+- top/bottom: ~1.6%
+- left/right: ~4.3%
 
-### 2. Espaçamentos consistentes
+### 2. Atualizar `src/components/WelcomeScreen.tsx`
 
-Container principal: `gap-10 md:gap-16` (era `gap-8`) — distância iPhone↔texto mais respirável e proporcional.
+- Trocar `aspectRatio: "593 / 1080"` por `"398 / 818"` (proporção real do PNG recortado).
+- Ajustar os insets do container interno do vídeo para os novos valores reais:
+  - Mobile: `top/bottom: 1.6%`, `left/right: 4.3%`, `borderRadius: 11%` (corner radius proporcional do iPhone agora que o quadro é menor)
+  - Desktop: mesmos valores (não há mais necessidade de variação fina)
+- Trocar `bg-muted` por `bg-black` no container do vídeo (qualquer faixa que sobrar fica preta como uma TV/iPhone real, não cinza claro chamativo).
+- Adicionar `bg-black` também no `<video>` para evitar flash branco antes do primeiro frame.
 
-Wrapper externo: adicionar `py-8` e usar `flex-col items-center justify-center` para garantir centralização vertical real e impedir que o texto inferior fique colado na borda.
+### Resultado esperado
 
-Bloco de título+CTA: trocar `gap-8` por `gap-6` para aproximar título e botão (hoje exagerado), e reduzir `py-5` do botão para `py-4` (botão alto demais para o conteúdo).
-
-### 3. Largura do CTA controlada
-
-Adicionar `max-w-sm` ao bloco de título+CTA também no **mobile** (hoje só `md:max-w-sm`), assim o botão "Começar" não encosta nas bordas do viewport quando o `px-6` do wrapper não é suficiente.
-
-### 4. Tipografia equilibrada
-
-`text-3xl md:text-4xl` → `text-[28px] md:text-4xl` no h1 para casar melhor com a largura do botão no mobile (e evitar a quebra "Organize sua vida / em um só lugar" ficar maior que o CTA).
-
-## Resultado esperado
-
-- iPhone visivelmente maior, ocupando boa parte da tela
-- Distâncias regulares: topo ↔ iPhone ↔ título ↔ botão ↔ link "Entrar"
-- Tudo respeitando as margens laterais, sem cortes
-- Mantém comportamento desktop (lado a lado) inalterado em telas md+
+- iPhone preenche o espaço com proporção correta, sem sobras transparentes
+- Sem faixas cinza/branca ao redor da tela do iPhone (top/bot/left/right)
+- Vídeo encaixado exatamente dentro da moldura
 
 ## Arquivos afetados
 
-- `src/components/WelcomeScreen.tsx` — apenas ajustes de classes utilitárias e `style` inline do container do mockup
+- `src/assets/iphone-mockup.png` — já recortado (398×818)
+- `src/components/WelcomeScreen.tsx` — atualizar `aspectRatio`, insets e cor de fundo

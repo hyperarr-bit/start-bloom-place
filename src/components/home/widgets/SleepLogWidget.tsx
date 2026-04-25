@@ -19,15 +19,15 @@ export const SleepLogWidget = () => {
   const quality = hours >= 7 ? "Ótimo 😊" : hours >= 5 ? "Regular 😐" : hours > 0 ? "Pouco 😴" : "Não registrado";
 
   return (
-    <div className="bg-card rounded-2xl p-4 border border-border/50 shadow-sm">
+    <div className="bg-card rounded-2xl p-4 border border-border/50 shadow-sm w-full max-w-full overflow-hidden">
       <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">😴 Sono de Hoje</h4>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 min-w-0">
         <Moon className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button onClick={() => update(hours - 0.5)} className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80">
             <Minus className="w-3 h-3" />
           </button>
-          <div className="text-center min-w-[3rem]">
+          <div className="text-center min-w-[2.5rem]">
             <span className="text-lg font-bold">{hours}</span>
             <span className="text-[10px] text-muted-foreground ml-0.5">h</span>
           </div>
@@ -35,7 +35,7 @@ export const SleepLogWidget = () => {
             <Plus className="w-3 h-3" />
           </button>
         </div>
-        <span className="text-[10px] text-muted-foreground ml-auto">{quality}</span>
+        <span className="text-[10px] text-muted-foreground ml-auto text-right truncate min-w-0">{quality}</span>
       </div>
     </div>
   );

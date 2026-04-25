@@ -141,14 +141,7 @@ serve(async (req) => {
     const billingBody = {
       frequency: "ONE_TIME",
       methods: ["PIX", "CARD"],
-      items: [
-        {
-          id: `${product.externalId}-${userId}-${Date.now()}`,
-          name: product.name,
-          quantity: 1,
-          price: product.price,
-        },
-      ],
+      items,
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {

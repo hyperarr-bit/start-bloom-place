@@ -46,10 +46,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
       document.addEventListener("visibilitychange", onVisibility);
 
+      // Fallback: if the video is actually playing but the "playing" event never fired,
+      // hide the poster after a short delay so the user sees the video.
+      const fallback = setTimeout(() => {
+        if (video && !video.paused && video.currentTime > 0) {
+          setVideoState("playing");
+        }
+      }, 1500);
+
       return () => {
         video.removeEventListener("loadedmetadata", onReady);
         video.removeEventListener("canplay", onReady);
         document.removeEventListener("visibilitychange", onVisibility);
+        clearTimeout(fallback);
       };
     }, [attemptPlay]);
 

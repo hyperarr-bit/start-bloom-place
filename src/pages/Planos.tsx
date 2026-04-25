@@ -169,7 +169,7 @@ const Planos = () => {
           </Button>
 
           <p className="text-[10px] text-muted-foreground text-center">
-            Assinatura recorrente no cartão · Cancele quando quiser
+            Você escolhe Pix ou Cartão na próxima tela · Pagamento válido por {billing === "annual" ? "1 ano" : "1 mês"}
           </p>
         </motion.div>
       </main>

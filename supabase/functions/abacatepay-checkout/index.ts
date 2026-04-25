@@ -13,9 +13,9 @@ const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
-const PRODUCTS: Record<BillingPeriod, { name: string; price: number; externalId: string }> = {
-  monthly: { name: "CORE Pro Mensal", price: 1990, externalId: "core-pro-monthly" },
-  annual: { name: "CORE Pro Anual", price: 17880, externalId: "core-pro-annual" },
+const PRODUCT_CONFIG: Record<BillingPeriod, { configKey: string; frequency: "MONTHLY" | "ANNUAL" }> = {
+  monthly: { configKey: "abacatepay_product_monthly_id", frequency: "MONTHLY" },
+  annual: { configKey: "abacatepay_product_annual_id", frequency: "ANNUAL" },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -50,7 +50,7 @@ async function abacateRequest(path: string, apiKey: string, body?: unknown) {
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     logStep("API error", { status: res.status, path, data });
     throw new Error(`AbacatePay API error: ${res.status} - ${JSON.stringify(data)}`);
@@ -104,29 +104,21 @@ serve(async (req) => {
       return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
     }
     const billingPeriod: BillingPeriod = parsed.data.billing;
-    const product = PRODUCTS[billingPeriod];
+    const cfg = PRODUCT_CONFIG[billingPeriod];
 
-    // Build & validate the items array required by AbacatePay v2
-    const items = [
-      {
-        id: `${product.externalId}-${userId}-${Date.now()}`,
-        name: product.name,
-        quantity: 1,
-        price: product.price,
-      },
-    ];
-    const ItemsSchema = z.array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1),
-        quantity: z.number().int().positive(),
-        price: z.number().int().positive(),
-      })
-    ).min(1);
-    const itemsCheck = ItemsSchema.safeParse(items);
-    if (!itemsCheck.success) {
-      logStep("Invalid items", itemsCheck.error.flatten());
-      return jsonResponse({ error: "Invalid 'items' payload" }, 400);
+    // Load product id from app_config
+    const { data: configRow, error: configErr } = await supabaseAdmin
+      .from("app_config")
+      .select("value")
+      .eq("key", cfg.configKey)
+      .maybeSingle();
+    if (configErr) throw new Error(`Failed to load app_config: ${configErr.message}`);
+
+    const productId = (configRow?.value as { id?: string } | null)?.id;
+    if (!productId) {
+      return jsonResponse({
+        error: `Product '${cfg.configKey}' not configured. Run the 'abacatepay-setup-products' edge function once to create products.`,
+      }, 500);
     }
 
     const { data: profile } = await supabaseAdmin
@@ -138,10 +130,10 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    const billingBody = {
-      frequency: "ONE_TIME",
+    const subscriptionBody = {
+      frequency: cfg.frequency,
       methods: ["PIX", "CARD"],
-      items,
+      products: [{ productId, quantity: 1 }],
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {
@@ -156,15 +148,15 @@ serve(async (req) => {
       },
     };
 
-    logStep("Creating billing", { billingPeriod, product: product.name });
-    const result = await abacateRequest("/checkouts/create", apiKey, billingBody);
+    logStep("Creating subscription", { billingPeriod, productId });
+    const result = await abacateRequest("/subscriptions/create", apiKey, subscriptionBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {
       throw new Error("No checkout URL returned from AbacatePay");
     }
 
-    logStep("Billing created", { url: checkoutUrl });
+    logStep("Subscription created", { url: checkoutUrl });
     return jsonResponse({ url: checkoutUrl });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

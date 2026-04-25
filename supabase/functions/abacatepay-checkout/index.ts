@@ -133,7 +133,7 @@ serve(async (req) => {
     const subscriptionBody = {
       frequency: cfg.frequency,
       methods: ["PIX", "CARD"],
-      items: [{ productId, quantity: 1 }],
+      items: [{ id: productId, quantity: 1 }],
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {

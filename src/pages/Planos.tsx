@@ -12,7 +12,7 @@ const Planos = () => {
   const [searchParams] = useSearchParams();
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<null | "card" | "pix">(null);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {

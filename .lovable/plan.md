@@ -1,16 +1,32 @@
-# Corrigir overflow do widget "Sono de Hoje"
+# Reverter aviso visual em Biblioteca → minimalista e dispensável
 
-## Bug
-Em `src/components/home/widgets/SleepLogWidget.tsx`, o texto "Não registrado" (linha 38) é `nowrap` por padrão no flex e fica em uma única linha. Combinado com `gap-4` e `min-w-[3rem]`, o widget excede a largura do container, quebra a proporção da Home e cria a borda branca lateral com scroll horizontal.
+## O que mudar
 
-## Solução
-Tornar o widget verdadeiramente contido e o texto truncável:
+Em `src/pages/Biblioteca.tsx`:
 
-1. Container: adicionar `w-full max-w-full overflow-hidden`.
-2. Linha do flex: trocar `gap-4` por `gap-3` e adicionar `min-w-0` (permite filho truncar).
-3. Bloco dos botões +/−: marcar como `flex-shrink-0` para nunca encolher.
-4. Span do status: adicionar `truncate min-w-0 text-right` para que ele encolha em vez de transbordar.
-5. Reduzir `min-w-[3rem]` do número para `min-w-[2.5rem]`.
+1. Remover o aviso amarelo grande adicionado na aba Desafio (linhas 674-678).
+2. Substituir por um aviso **minimalista**: apenas uma linha de texto cinza (cor `text-muted-foreground`), com um botão `X` à direita para dispensar.
+3. Persistir a dispensa em `lib-pages-hint-dismissed` via `usePersistedState`. Uma vez fechado, **não aparece mais**.
+
+## Código
+
+```tsx
+// Adicionar no topo do componente Biblioteca:
+const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState("lib-pages-hint-dismissed", false);
+const showPagesHint = !pagesHintDismissed && books.length > 0 && books.some(b => (b.pages || 0) === 0);
+
+// Substituir o aviso atual por:
+{showPagesHint && (
+  <div className="flex items-start gap-2 text-[11px] text-muted-foreground border-b border-border/50 pb-2">
+    <span className="flex-1">Dica: adicione o total de páginas dos seus livros na Estante para ver as estatísticas.</span>
+    <button onClick={() => setPagesHintDismissed(true)} className="text-muted-foreground/60 hover:text-foreground flex-shrink-0" aria-label="Dispensar">
+      <X className="w-3.5 h-3.5" />
+    </button>
+  </div>
+)}
+```
+
+Backend (correções em `use-persisted-state.ts` e `use-user-data.tsx`) **fica como está** — eram correções reais de race condition e não afetam o visual.
 
 ## Arquivo alterado
-- `src/components/home/widgets/SleepLogWidget.tsx`
+- `src/pages/Biblioteca.tsx`

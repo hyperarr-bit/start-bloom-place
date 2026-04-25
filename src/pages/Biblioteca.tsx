@@ -101,6 +101,7 @@ const Biblioteca = () => {
   const navigate = useNavigate();
   const [books, setBooks] = usePersistedState<Book[]>("lib-books", []);
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
+  const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);
   const [tab, setTab] = useState("lendo");
   useSetTrackedTab(tab);
 

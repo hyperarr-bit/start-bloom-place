@@ -1,42 +1,57 @@
-## Objetivo
+## O que fazer
 
-Fazer o vídeo aparecer dentro da moldura do iPhone na `WelcomeScreen` — removendo a "tela cinza com argolas" do PNG atual e ajustando o posicionamento do vídeo para preencher exatamente o buraco da tela.
+Três ajustes na tela inicial (`WelcomeScreen`):
 
-## O que já fiz
+### 1. Remover faixa cinza restante no topo do mockup ✅ (já feito)
 
-Tornei a área da tela do PNG (`src/assets/iphone-mockup.png`) **transparente** — agora ele é apenas a moldura prateada do iPhone com botões laterais, sem nada na tela. Isso permite que o vídeo posicionado por trás apareça através do "buraco".
+Identifiquei via análise de pixels uma faixa cinza (~RGB 215) entre y=145 e y=157 do PNG, presa entre dois bandas pretas — era um reflexo do bezel do iPhone que sobrava após a primeira limpeza. Já estendi o recorte transparente para começar em y=145 (antes era y=160). O PNG agora mostra apenas a moldura prateada com o "buraco" totalmente vazio no formato da tela.
 
-## O que falta (precisa de aprovação)
+### 2. Ajustar insets + aumentar tamanho do iPhone
 
-**Arquivo:** `src/components/WelcomeScreen.tsx`
-
-Ajustar o container do vídeo para casar com a nova área transparente do PNG (medidas exatas extraídas via análise de pixels da imagem 593×1080):
+**Arquivo:** `src/components/WelcomeScreen.tsx` (linhas 82-92)
 
 ```tsx
-<div className="relative w-[200px] md:w-[240px]" style={{ aspectRatio: "593 / 1080" }}>
+<div className="relative w-[240px] md:w-[290px]" style={{ aspectRatio: "593 / 1080" }}>
   <div
     className="absolute overflow-hidden bg-muted"
     style={{
-      top: "14.8%",
-      bottom: "13.6%",
+      top: "13.4%",
+      bottom: "13.4%",
       left: "19.6%",
       right: "19.6%",
-      borderRadius: "8%",
+      borderRadius: "9%",
     }}
   >
-    {/* video + poster (sem mudanças) */}
-  </div>
-  {/* iphoneMockup overlay (sem mudanças) */}
-</div>
 ```
 
-Mudanças específicas:
-- `aspectRatio`: `596 / 1184` → `593 / 1080` (proporção real do PNG)
-- Insets da tela: `top/bottom 2.4%` e `left/right 5.4%` → `top 14.8% / bottom 13.6% / left/right 19.6%`
-- `borderRadius`: `11%` → `8%`
+Mudanças:
+- Largura: `200px → 240px` (mobile) e `240px → 290px` (desktop) — ~20% maior.
+- `top`: `14.8% → 13.4%` (acompanha o novo recorte do PNG).
+- `borderRadius`: `8% → 9%`.
 
-Nada mais muda — autoplay, poster, título e CTAs ficam idênticos.
+### 3. Garantir autoplay do vídeo
 
-## Observação
+O `<video>` já tem `autoPlay muted playsInline preload="auto"` — tecnicamente o browser deve tocar automaticamente. O usuário relata que está pausado. Suspeitas:
+- O **poster (`<img>`)** sobreposto com `z-10` pode estar sendo percebido como "vídeo pausado", pois ele só some quando o estado vira `"playing"` (via `onPlaying`). Se o evento não disparar (ex: frame inicial demora), o usuário vê o poster estático.
 
-Não consegui usar a imagem nova que você enviou (`Untitled_design-2.png`) porque a ferramenta de cópia de upload não está disponível neste turno. Em vez disso, transformei o mockup que já estava no projeto para o mesmo resultado visual: moldura prateada do iPhone com tela vazia, pronta para receber o vídeo. Visualmente o efeito é o mesmo do mockup que você anexou.
+Mitigações que vou aplicar:
+- Adicionar `onCanPlay` e `onLoadedData` que também tentam `video.play()` e marcam estado como `"playing"`.
+- Adicionar fallback: se após 1.5s o vídeo não estiver tocando, esconder o poster mesmo assim (pois ele está cobrindo o vídeo que pode estar tocando silenciosamente).
+
+Trecho relevante:
+```tsx
+onCanPlay={() => attemptPlay()}
+onLoadedData={() => attemptPlay()}
+// useEffect adicional:
+useEffect(() => {
+  const t = setTimeout(() => {
+    const v = videoRef.current;
+    if (v && !v.paused) setVideoState("playing");
+  }, 1500);
+  return () => clearTimeout(t);
+}, []);
+```
+
+## Resultado esperado
+
+iPhone maior, sem nenhum cinza/borda dentro da moldura, vídeo tocando assim que carrega.

@@ -144,9 +144,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     }`}
                   />
 
-                  {/* Dynamic Island */}
-                  <div className="iphone-island" aria-hidden />
-
                   {/* Overlay: play / loader */}
                   {(showPlayButton || showLoader) && (
                     <div className="absolute inset-0 z-20 flex items-center justify-center">

@@ -153,23 +153,40 @@ const Planos = () => {
             ))}
           </ul>
 
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handleCheckout}
-            disabled={loading || isSubscribed}
-          >
-            {loading ? (
-              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
-            ) : isSubscribed ? (
-              "Já assinante"
-            ) : (
-              "Assinar CORE PRO"
-            )}
-          </Button>
+          <div className="space-y-3">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => handleCheckout("card")}
+              disabled={!!loading || isSubscribed}
+            >
+              {loading === "card" ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
+              ) : isSubscribed ? (
+                "Já assinante"
+              ) : (
+                "Assinar com Cartão"
+              )}
+            </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center">
-            Assinatura recorrente no cartão · Cancele quando quiser
+            <Button
+              className="w-full"
+              size="lg"
+              variant="outline"
+              onClick={() => handleCheckout("pix")}
+              disabled={!!loading || isSubscribed}
+            >
+              {loading === "pix" ? (
+                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Gerando Pix...</>
+              ) : (
+                <><QrCode className="w-4 h-4 mr-2" /> Pagar com Pix</>
+              )}
+            </Button>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+            <strong>Cartão:</strong> renovação automática · cancele quando quiser<br />
+            <strong>Pix:</strong> pagamento único válido por {billing === "annual" ? "1 ano" : "1 mês"} · renove manualmente
           </p>
         </motion.div>
       </main>

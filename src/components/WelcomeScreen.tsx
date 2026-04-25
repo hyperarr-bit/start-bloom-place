@@ -79,8 +79,18 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
           >
-            <div className="relative w-[180px] h-[390px] md:w-[220px] md:h-[476px] rounded-[40px] bg-[#1a1a1a] shadow-[0_20px_60px_-10px_rgba(0,0,0,0.5)] p-[10px]">
-              <div className="w-full h-full rounded-[30px] overflow-hidden bg-muted relative">
+            <div className="relative w-[200px] md:w-[240px]" style={{ aspectRatio: "596 / 1184" }}>
+              {/* Screen content (video + poster) sits behind the frame */}
+              <div
+                className="absolute overflow-hidden bg-muted"
+                style={{
+                  top: "2.4%",
+                  bottom: "2.4%",
+                  left: "5.4%",
+                  right: "5.4%",
+                  borderRadius: "11%",
+                }}
+              >
                 <video
                   ref={videoRef}
                   autoPlay
@@ -105,7 +115,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   }`}
                 />
               </div>
-              <div className="absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[100px] h-[4px] bg-white/20 rounded-full" />
+              {/* iPhone frame overlay */}
+              <img
+                src={iphoneMockup}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20 select-none"
+                draggable={false}
+              />
             </div>
           </motion.div>
 

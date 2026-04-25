@@ -196,21 +196,21 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           </motion.div>
 
           {/* Title + CTA */}
-          <div className="relative z-10 w-full max-w-sm flex flex-col items-center md:items-start gap-6">
-            <h1 className="text-[28px] md:text-4xl font-bold text-foreground text-center md:text-left leading-tight">
+          <div className="relative z-10 w-full max-w-sm flex flex-col items-center md:items-start gap-5 shrink-0">
+            <h1 className="text-2xl md:text-4xl font-bold text-foreground text-center md:text-left leading-tight">
               Organize sua vida<br />em um só lugar
             </h1>
 
-            <div className="w-full flex flex-col items-center md:items-start gap-3">
+            <div className="w-full flex flex-col items-center md:items-start gap-2">
               <button
                 onClick={onComplete}
-                className="w-full py-4 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
+                className="w-full py-3.5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
               >
                 Começar
               </button>
               <button
                 onClick={onLogin}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors mt-1"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
               </button>

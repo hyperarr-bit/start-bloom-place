@@ -5,9 +5,10 @@ import { Clock, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { PixGraceBanner } from "@/components/PixGraceBanner";
 
 export const TrialBanner = () => {
-  const { user, trialExpired, isSubscribed } = useAuth();
+  const { user, trialExpired, isSubscribed, gracePeriod } = useAuth();
   const navigate = useNavigate();
   const [hoursLeft, setHoursLeft] = useState<number | null>(null);
 
@@ -33,6 +34,8 @@ export const TrialBanner = () => {
     const interval = setInterval(fetchTrialTime, 60000);
     return () => clearInterval(interval);
   }, [user, isSubscribed]);
+
+  if (gracePeriod) return <PixGraceBanner />;
 
   if (isSubscribed || !user) return null;
 

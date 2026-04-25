@@ -79,7 +79,8 @@ async function abacateRequest(path: string, apiKey: string, body?: unknown) {
 async function getOrCreateProduct(
   billing: BillingPeriod,
   apiKey: string,
-  supabaseClient: ReturnType<typeof createClient>
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any
 ): Promise<string> {
   const configKey = `abacatepay_product_${billing}_${PRODUCT_VERSION}`;
 
@@ -150,7 +151,8 @@ async function getOrCreateCustomer(
   customerName: string,
   profile: { phone: string | null; tax_id: string | null } | null,
   apiKey: string,
-  supabaseClient: ReturnType<typeof createClient>
+  // deno-lint-ignore no-explicit-any
+  supabaseClient: any
 ) {
   const { data: existingRecord } = await supabaseClient
     .from("user_data")
@@ -235,9 +237,10 @@ serve(async (req) => {
     const userEmail = user.email ?? "";
     logStep("Authenticated user", { userId, email: userEmail });
 
-    // Get billing period from request
-    const { billing } = await req.json();
+    // Get billing period and payment method from request
+    const { billing, method } = await req.json();
     const billingPeriod: BillingPeriod = billing === "annual" ? "annual" : "monthly";
+    const paymentMethod: "card" | "pix" = method === "pix" ? "pix" : "card";
 
     // Get or create product
     const productId = await getOrCreateProduct(billingPeriod, apiKey, supabaseAdmin);
@@ -260,26 +263,48 @@ serve(async (req) => {
     );
     const baseUrl = getBaseUrl(req);
 
-    // Create subscription via AbacatePay v2
-    logStep("Creating subscription", { productId, billingPeriod, customerId, baseUrl });
+    const externalId = `${userId}-${billingPeriod}-${paymentMethod}-${Date.now()}`;
 
-    const externalId = `${userId}-${billingPeriod}-${Date.now()}`;
-
-    const subscriptionBody: Record<string, unknown> = {
-      externalId,
-      items: [{ id: productId, quantity: 1 }],
-      methods: ["CARD"],
-      customerId,
-      returnUrl: `${baseUrl}/planos?canceled=true`,
-      completionUrl: `${baseUrl}/planos?success=true`,
-      metadata: {
-        user_id: userId,
-        billing_period: billingPeriod,
-      },
+    const metadata = {
+      user_id: userId,
+      billing_period: billingPeriod,
+      payment_type: paymentMethod,
     };
 
-    const result = await abacateRequest("/subscriptions/create", apiKey, subscriptionBody);
-    logStep("Subscription created", { result });
+    let endpoint: string;
+    let body: Record<string, unknown>;
+
+    if (paymentMethod === "pix") {
+      // One-time PIX checkout (not a subscription)
+      const product = PRODUCTS[billingPeriod];
+      logStep("Creating PIX checkout", { billingPeriod, customerId, baseUrl });
+      endpoint = "/checkouts/create";
+      body = {
+        externalId,
+        items: [{ id: productId, quantity: 1, name: product.name, price: product.price }],
+        methods: ["PIX"],
+        customerId,
+        returnUrl: `${baseUrl}/planos?canceled=true`,
+        completionUrl: `${baseUrl}/planos?success=true&method=pix`,
+        metadata,
+      };
+    } else {
+      // Recurring CARD subscription
+      logStep("Creating subscription", { productId, billingPeriod, customerId, baseUrl });
+      endpoint = "/subscriptions/create";
+      body = {
+        externalId,
+        items: [{ id: productId, quantity: 1 }],
+        methods: ["CARD"],
+        customerId,
+        returnUrl: `${baseUrl}/planos?canceled=true`,
+        completionUrl: `${baseUrl}/planos?success=true`,
+        metadata,
+      };
+    }
+
+    const result = await abacateRequest(endpoint, apiKey, body);
+    logStep("Checkout created", { paymentMethod, result });
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {

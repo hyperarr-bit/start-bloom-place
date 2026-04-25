@@ -96,25 +96,34 @@ serve(async (req) => {
         continue;
       }
 
-      log("Creating product on AbacatePay", { name: p.name, externalId: p.externalId });
-      const payload = {
-        name: p.name,
-        description: p.description,
-        price: p.price,
-        currency: "BRL",
-        externalId: p.externalId,
-      };
-      const resp = await abacateRequest("/products/create", apiKey, payload);
-      const newId: string | undefined = resp?.data?.id || resp?.id;
-      if (!newId) throw new Error(`No product id returned for ${p.name}: ${JSON.stringify(resp)}`);
+      // Try to find existing product on AbacatePay first (idempotent recovery)
+      let newId: string | null = await findProductByExternalId(apiKey, p.externalId);
+      let created = false;
+
+      if (!newId) {
+        log("Creating product on AbacatePay", { name: p.name, externalId: p.externalId });
+        const payload = {
+          name: p.name,
+          description: p.description,
+          price: p.price,
+          currency: "BRL",
+          externalId: p.externalId,
+        };
+        const resp = await abacateRequest("/products/create", apiKey, "POST", payload);
+        newId = resp?.data?.id || resp?.id || null;
+        if (!newId) throw new Error(`No product id returned for ${p.name}: ${JSON.stringify(resp)}`);
+        created = true;
+      } else {
+        log("Found existing product on AbacatePay", { externalId: p.externalId, id: newId });
+      }
 
       const { error: upsertErr } = await supabase
         .from("app_config")
         .upsert({ key: p.configKey, value: { id: newId, externalId: p.externalId, name: p.name } });
       if (upsertErr) throw new Error(`Failed to save app_config: ${upsertErr.message}`);
 
-      log("Product created and saved", { key: p.configKey, id: newId });
-      result[p.configKey] = { id: newId, created: true, name: p.name };
+      log("Product saved to app_config", { key: p.configKey, id: newId, created });
+      result[p.configKey] = { id: newId, created, name: p.name };
     }
 
     return jsonResponse({ ok: true, products: result });

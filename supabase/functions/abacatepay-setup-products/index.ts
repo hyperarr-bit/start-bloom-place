@@ -37,9 +37,9 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     status,
   });
 
-async function abacateRequest(path: string, apiKey: string, body?: unknown) {
+async function abacateRequest(path: string, apiKey: string, method: "GET" | "POST" = "POST", body?: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
+    method,
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -49,6 +49,21 @@ async function abacateRequest(path: string, apiKey: string, body?: unknown) {
     throw new Error(`AbacatePay API error ${res.status}: ${JSON.stringify(data)}`);
   }
   return data;
+}
+
+async function findProductByExternalId(apiKey: string, externalId: string): Promise<string | null> {
+  try {
+    const resp = await abacateRequest("/products/list", apiKey, "GET");
+    const list: Array<{ id: string; externalId?: string }> =
+      resp?.data || resp?.products || resp || [];
+    const match = Array.isArray(list)
+      ? list.find((p) => p.externalId === externalId)
+      : null;
+    return match?.id ?? null;
+  } catch (e) {
+    log("findProductByExternalId failed", { externalId, error: (e as Error).message });
+    return null;
+  }
 }
 
 serve(async (req) => {

@@ -122,14 +122,21 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             <div
               className="relative"
               style={{
-                aspectRatio: "593 / 1080",
+                aspectRatio: "398 / 818",
                 width: "min(72vw, 300px)",
                 maxHeight: "55vh",
               }}
             >
-              {/* Screen content (video + poster) — insets responsivos */}
+              {/* Screen content (video + poster) — insets reais do PNG recortado */}
               <div
-                className="absolute overflow-hidden bg-muted top-[13.4%] bottom-[13.4%] left-[19.6%] right-[19.6%] rounded-[9%] md:top-[13.2%] md:bottom-[13.2%] md:left-[19.4%] md:right-[19.4%] md:rounded-[9.5%]"
+                className="absolute overflow-hidden bg-black"
+                style={{
+                  top: "1.6%",
+                  bottom: "1.6%",
+                  left: "4.3%",
+                  right: "4.5%",
+                  borderRadius: "11%",
+                }}
               >
                 <video
                   ref={videoRef}
@@ -139,7 +146,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   playsInline
                   preload="auto"
                   poster="/videos/app-preview-poster.jpg"
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+                  className="absolute inset-0 w-full h-full object-cover bg-black pointer-events-none z-0"
                   // @ts-ignore
                   webkit-playsinline="true"
                   disablePictureInPicture

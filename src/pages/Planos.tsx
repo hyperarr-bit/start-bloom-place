@@ -46,12 +46,16 @@ const Planos = () => {
       ) {
         return;
       }
-      // Re-push so the user stays on /planos
-      window.history.pushState({ planosGuard: true }, "");
-      const opened = await winbackRef.current.triggerNow("abandon_planos");
-      if (!opened) {
+      const opened = await winbackRef.current.triggerNow("abandon_planos", { bypassCooldown: true });
+      if (opened) {
+        // Roleta abriu — re-empurra o sentinel para o usuário continuar em /planos.
+        window.history.pushState({ planosGuard: true }, "");
+      } else {
+        // Não conseguimos abrir aqui — marca intent para o GlobalWinback da próxima
+        // rota disparar a roleta automaticamente. Deixa o popstate prosseguir
+        // (já consumiu uma entrada do histórico, então o usuário sai com 1 clique).
+        winbackRef.current.markIntent();
         allowExitRef.current = true;
-        navigate(-1);
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -65,8 +69,10 @@ const Planos = () => {
       navigate(-1);
       return;
     }
-    const opened = await winback.triggerNow("abandon_planos");
+    const opened = await winback.triggerNow("abandon_planos", { bypassCooldown: true });
     if (!opened) {
+      // Fallback: marca intent para a roleta abrir na próxima rota.
+      winback.markIntent();
       allowExitRef.current = true;
       navigate(-1);
     }

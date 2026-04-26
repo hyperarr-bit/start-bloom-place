@@ -1,28 +1,44 @@
-## Roleta não dispara ao voltar de /planos
+## Diagnóstico
 
-### Causa raiz
+Há dois bugs no fluxo de voltar em `/planos`:
 
-O guard está condicionado a `trialExpired === true`:
+**1. Voltar exige 2 cliques e cai na tela "trial acabou" em vez da roleta**
+O `triggerNow` no `useWinbackTrigger` aplica um cooldown de 30 dias consultando `winback_attempts`. Confirmei no banco que o usuário atual já tem uma tentativa registrada (em 26/04). Resultado: ao clicar voltar, `triggerNow` retorna `false` (bloqueado pelo cooldown), o `handleBack` então faz `navigate(-1)` → vai para `/`, onde aparece o `TrialBanner` de trial expirado. Como o `popstate` também é assíncrono e re-empurra o sentinel antes de decidir, o usuário percebe como "precisei clicar 2 vezes".
 
-```ts
-const shouldGuard = !!user && !isSubscribed && trialExpired;
-```
+**2. A roleta não aparece após sair**
+O `GlobalWinback` montado dentro do `TrialBanner` só dispara automaticamente se houver `?canceled=true` ou `subscribe_intent_at` recente no sessionStorage. Sair de `/planos` não seta nada disso, então mesmo se a roleta pudesse abrir na home, ela não dispara.
 
-Se você está testando com trial ainda ativo (ou se `check-subscription` ainda não retornou `trial_expired: true`), `shouldGuard` é `false`, o `popstate` não é interceptado e o `handleBack` cai direto no `navigate(-1)`.
+## Solução
 
-Secundariamente, se já existe um registro recente em `winback_attempts` (cooldown de 30 dias), `triggerNow` retorna `false` silenciosamente — mesmo com o guard ativo.
+### 1. Permitir bypass do cooldown para a saída de `/planos`
 
-### Correções
+Em `src/hooks/use-winback-trigger.ts`:
 
-**`src/pages/Planos.tsx`**
-- Trocar `shouldGuard` para `!!user && !isSubscribed` (remover a exigência de `trialExpired`). Faz sentido: quem chega em /planos, escolhe não assinar e tenta sair, deve receber a oferta de retenção independentemente do estado do trial.
+- Adicionar parâmetro opcional `{ bypassCooldown?: boolean }` em `triggerNow`.
+- Quando `true`, pula a checagem de `winback_attempts` (mantém checagens de auth, assinatura ativa, `alreadyShown` e lock).
+- Mantém checagem de assinatura ativa (não vamos importunar quem já pagou).
 
-**`src/hooks/use-winback-trigger.ts`**
-- Adicionar `console.debug` curtos em `triggerNow` indicando o motivo do retorno `false` (no user, sub ativa, cooldown 30d, já mostrado, locked) — ajuda a diagnosticar quando a roleta não aparece.
+Isso garante que o usuário sempre veja a roleta ao tentar abandonar `/planos`, mesmo que já tenha visto antes.
 
-### Observação sobre cooldown
-Não vou alterar a lógica de cooldown de 30 dias agora. Se durante o teste a roleta continuar não abrindo após o fix do guard, o motivo será visível no console e podemos limpar `winback_attempts` para o seu user.
+### 2. Voltar com 1 clique e ir para a roleta na home
 
-### Arquivos modificados
-- `src/pages/Planos.tsx`
-- `src/hooks/use-winback-trigger.ts`
+Em `src/pages/Planos.tsx`:
+
+- Em `handleBack` e no listener de `popstate`, chamar `triggerNow("abandon_planos", { bypassCooldown: true })`.
+- Antes de qualquer `navigate(-1)` "fallback" (caso `triggerNow` ainda retorne false por outro motivo), chamar `winback.markIntent()`. Assim, o `GlobalWinback` da próxima rota detecta o intent recente e abre a roleta automaticamente.
+- Em `handleWinbackClose`: além de `navigate(-1)`, garantir que o intent seja limpo para a roleta não reabrir na home (o `triggerNow` já remove `INTENT_KEY` ao abrir; aqui só precisa não re-marcar).
+
+### 3. Pequeno ajuste no `popstate`
+
+O handler atual re-empurra o sentinel **antes** de saber se a roleta vai abrir. Se `triggerNow` retorna false, ele faz `navigate(-1)` — mas com o sentinel re-empurrado, isso consome o sentinel e não sai da página, exigindo um segundo clique. Ajuste: só re-empurrar o sentinel quando `triggerNow` retornar `true` (roleta abriu). Quando retornar `false`, marcar intent e deixar o `popstate` original prosseguir naturalmente (já consumiu uma entrada do histórico, então `navigate(-1)` adicional não é necessário).
+
+## Arquivos alterados
+
+- `src/hooks/use-winback-trigger.ts` — assinatura `triggerNow(source, opts?)` com `bypassCooldown`.
+- `src/pages/Planos.tsx` — usar `bypassCooldown: true` na saída, marcar intent como fallback, ajustar lógica do `popstate` para não exigir 2 cliques.
+
+## Resultado esperado
+
+- 1 clique na seta voltar → roleta abre imediatamente sobre `/planos` (sem ir para a tela de trial expirado).
+- Se por algum motivo a roleta não puder abrir (ex: usuário já é assinante), o fallback navega e o `GlobalWinback` na home dispara via intent recente.
+- Após fechar a roleta, `navigate(-1)` leva à rota anterior sem reabrir o modal.

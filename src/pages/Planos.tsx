@@ -37,7 +37,13 @@ const Planos = () => {
     window.history.pushState({ planosGuard: true }, "");
 
     const onPopState = async () => {
-      if (allowExitRef.current || winbackRef.current.alreadyShown) return;
+      if (
+        allowExitRef.current ||
+        winbackRef.current.alreadyShown ||
+        winbackRef.current.open
+      ) {
+        return;
+      }
       // Re-push so the user stays on /planos
       window.history.pushState({ planosGuard: true }, "");
       const opened = await winbackRef.current.triggerNow("abandon_planos");
@@ -52,6 +58,7 @@ const Planos = () => {
 
   // Intercept the in-page back button.
   const handleBack = useCallback(async () => {
+    if (winback.open) return;
     if (!shouldGuard || allowExitRef.current || winback.alreadyShown) {
       navigate(-1);
       return;
@@ -63,10 +70,12 @@ const Planos = () => {
     }
   }, [shouldGuard, winback, navigate]);
 
-  // After winback closes, allow leaving on the next attempt.
+  // After winback closes, leave the page immediately (no second click needed).
   const handleWinbackClose = () => {
     allowExitRef.current = true;
     winback.close();
+    // Defer slightly so the modal can start its exit animation cleanly.
+    setTimeout(() => navigate(-1), 50);
   };
 
   const plans = {
@@ -224,10 +233,6 @@ const Planos = () => {
             )}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            Você escolhe Pix ou Cartão na próxima tela · Cartão renova automaticamente ·
-            Pix você renova manualmente a cada {billing === "annual" ? "ano" : "mês"}
-          </p>
         </motion.div>
       </main>
     </div>

@@ -40,9 +40,12 @@ export function useWinbackTrigger() {
    * Returns true if it opened, false otherwise.
    */
   const triggerNow = useCallback(async (source: Source): Promise<boolean> => {
-    if (alreadyShown || triggeringRef.current) return false;
+    // Synchronous lock — runs before any await to block reentrancy from
+    // rapid back/popstate races.
+    if (alreadyShown || open || triggeringRef.current) return false;
     triggeringRef.current = true;
 
+    let opened = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;
@@ -78,11 +81,14 @@ export function useWinbackTrigger() {
       setOpen(true);
       setAlreadyShown(true);
       trackEvent("winback_triggered", { source });
+      opened = true;
       return true;
     } finally {
-      triggeringRef.current = false;
+      // Keep the lock engaged on success so concurrent callers can't open
+      // a second roulette before React state propagates.
+      if (!opened) triggeringRef.current = false;
     }
-  }, [alreadyShown]);
+  }, [alreadyShown, open]);
 
   // Auto-detect on mount: ?canceled=true OR recent intent (came back from checkout)
   useEffect(() => {

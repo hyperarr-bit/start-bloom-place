@@ -122,7 +122,10 @@ export function useWinbackTrigger() {
     if (!canceled && !recentIntent) return;
 
     (async () => {
-      const opened = await triggerNow(canceled ? "canceled_url" : "intent_timeout");
+      const opened = await triggerNow(
+        canceled ? "canceled_url" : "intent_timeout",
+        { bypassCooldown: true },
+      );
       if (opened && canceled) {
         searchParams.delete("canceled");
         setSearchParams(searchParams, { replace: true });

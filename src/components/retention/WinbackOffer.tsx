@@ -16,9 +16,10 @@ const COUNTDOWN_SECONDS = 10 * 60;
 
 interface Props {
   attemptId: string | null;
+  onDismiss?: () => void;
 }
 
-export function WinbackOffer({ attemptId }: Props) {
+export function WinbackOffer({ attemptId, onDismiss }: Props) {
   const [loading, setLoading] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
 

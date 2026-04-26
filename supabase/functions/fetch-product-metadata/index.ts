@@ -94,7 +94,6 @@ Deno.serve(async (req) => {
     };
 
     const response = await fetchWithGuard(url);
-    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch URL: ${response.status}`);

@@ -1,106 +1,95 @@
-## 3 entregas: Auto-aplicação de descontos, Painel de Retention e Tracking de Trial
+## Aprofundar Admin: tabela de ofertas + painel completo de churn
 
-### 1. Auto-aplicar descontos pendentes no AbacatePay
+### O que é entregue
 
-#### 1a. Migration — controle de aplicação
-Adicionar à `retention_offers_used`:
-- `status TEXT` (`active` | `applied` | `failed` | `expired` | `consumed`)
-- `applied_at TIMESTAMPTZ`
-- `apply_attempts INT DEFAULT 0`
-- `last_apply_error TEXT`
-
-Mais índice parcial em `(user_id, offer_type, status) WHERE status='active'` e RPC `pending_discount_for_user(uuid)`.
-
-#### 1b. Edge function `apply-pending-discounts`
-Lógica:
-1. Busca ofertas `offer_type='discount' AND status='active' AND apply_attempts<5`
-2. Para cada oferta, pega `abacatepay_subscription_id` da `subscriptions` ativa do user
-3. Chama AbacatePay (com fallback): `POST /v2/subscriptions/{id}/discount` → se falhar, tenta `POST /v2/billings/{billingId}/discount`
-4. Sucesso → marca `status='applied'` + emite evento `retention_discount_applied`
-5. Falha → incrementa `apply_attempts`, salva `last_apply_error`; após 5 tentativas vira `status='failed'`
-
-> Como a documentação pública do AbacatePay não confirma o nome exato dos endpoints de desconto, a function tenta dois caminhos comuns e loga a resposta. **Você pode precisar me passar a doc/endpoint correto do AbacatePay** (suporte deles) — aí ajusto numa segunda iteração.
-
-#### 1c. Hook no `abacatepay-webhook`
-Quando o evento for `subscription.charged` / `subscription.renewed` / `billing.created`, **antes de gravar** a próxima cobrança, dispara `apply-pending-discounts` com `{ userId, billingId }` (fire-and-forget, não bloqueia a resposta do webhook).
-
-#### 1d. Cron de segurança
-Job diário (3h da manhã) que chama `apply-pending-discounts` sem args para varrer ofertas que escaparam (caso webhook tenha falhado).
-
-```sql
-select cron.schedule(
-  'sweep-pending-discounts',
-  '0 3 * * *',
-  $$ select net.http_post(
-    url:='https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/apply-pending-discounts',
-    headers:='{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
-    body:='{}'::jsonb
-  ); $$
-);
-```
+Tudo que o admin precisa saber sobre **por que os usuários cancelam**, **o que está funcionando** com as ofertas de retenção e **em que dia do trial o app perde gente**.
 
 ---
 
-### 2. Painel admin `/admin/retention`
+### 1. Tabela de breakdown em `/admin/retention` (finalizar)
 
-#### Componentes
-- **`src/pages/admin/AdminRetention.tsx`**: chama `admin_retention_stats()` e `admin_retention_offers_breakdown()` (RPC nova, ver abaixo)
-- 4 cards no topo: Total tentativas (30d), Save rate %, Salvos por desconto, Salvos por pausa
-- Gráfico de pizza: motivos de cancelamento (recharts, já no projeto)
-- Tabela: funil opened → reason_given → offer_shown → saved/churned
-- Tabela: ofertas — desconto vs pausa, quantos aceitaram, status (active/applied/failed)
+Substituir a tabela única atual por **uma tabela por tipo de oferta**, cada uma com:
 
-#### RPC adicional `admin_retention_offers_breakdown()`
-Retorna por `offer_type` e `status`: `count`, `apply_success_rate`. Necessária pra mostrar quantos descontos foram **efetivamente aplicados** no AbacatePay (vs só aceitos pelo user).
+- Header com **taxa de sucesso de aplicação** (cor verde/âmbar/vermelho conforme % ≥80/≥50/<50)
+- Subtotal: total aceitas, aplicadas, falharam
+- Barra visual da distribuição por status
 
-#### Nav update
-Adicionar `{ to: "/admin/retention", label: "Retention", Icon: ShieldCheck }` em `AdminLayout.tsx`.
+Exemplo visual:
+```
+┌─ Desconto 50% / 2 ciclos ─────────────────── 87.5% sucesso ┐
+│ Status      Qtd   % do tipo   ▓▓▓▓▓▓░░░░               │
+│ Aplicado    14    66%         ████████████              │
+│ Aguardando   5    24%         ████                      │
+│ Falhou       2    10%         ██                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+> Esses dados já vêm da RPC `admin_retention_offers_breakdown` que criei na turn anterior — nenhuma migration necessária.
 
 ---
 
-### 3. Tracking de trial — eventos faltantes
+### 2. Reformular `/admin/churn` num painel executivo profundo
 
-| Evento | Onde dispara | Payload |
-|---|---|---|
-| `trial_started` | Trigger DB no `auth.users` insert (hoje só seeda emails) | `{ source }` |
-| `trial_day_X_active` | Cron diário que varre `auth.users` criados há 1-7 dias **com sessão na última 24h** | `{ trial_day }` |
-| `trial_converted` | `abacatepay-webhook` quando `status` muda pra `active` (renomeio o atual `subscription_started` → `trial_converted` e mantenho ambos por 30 dias pra compat) | `{ plan, billing_period, trial_day, days_to_convert }` |
-| `trial_canceled_reason` | `cancel-subscription-flow` → action `confirm_cancel` (já temos `cancel_confirmed`, adiciono este com `{ reason }` p/ análise por motivo) | `{ reason, trial_day, was_paying }` |
+Substituir a página atual (que só mostra inativos + cards básicos) por **6 seções de análise de churn**:
 
-#### 3a. Trigger SQL
-Estender `handle_new_user()` para também inserir um row em `analytics_events`:
-```sql
-INSERT INTO public.analytics_events (user_id, event_name, event_data, trial_day)
-VALUES (NEW.id, 'trial_started', jsonb_build_object('source','signup'), 0);
-```
+#### 2a. KPIs principais (linha de cards)
+- Churn rate 30d (vem de `admin_metrics_overview`)
+- Voluntary churn (cancelaram pelo app) vs Involuntary (falha de pagamento)
+- Tempo médio até cancelar
+- LTV impactado pelo churn (R$ perdidos/mês)
 
-#### 3b. Edge function `tick-trial-active-days`
-Roda 1x/dia (cron). Para cada user em `auth.users` com `created_at` entre 1-7 dias atrás:
-- Se teve `module_analytics` nas últimas 24h → emite `trial_day_X_active` (X = dia do trial)
-- Idempotente: checa se já existe esse evento hoje pra esse user
+#### 2b. Curva de retenção do trial (D1→D7)
+Gráfico de linha mostrando, para usuários cadastrados nos últimos 60d, **quantos % ainda voltavam ao app em cada dia do trial**. Identifica visualmente o "cliff" — onde a maioria abandona.
 
-#### 3c. Update `abacatepay-webhook`
-No `emitConversionEvent`, **acrescenta** evento `trial_converted` com `days_to_convert` calculado de `auth.users.created_at`. Mantém o `subscription_started` por compat.
+#### 2c. Análise de cupons/ofertas — "o que está dando certo"
+Card duplo lado a lado:
+- **Desconto 50%**: aceitos × ainda assinantes hoje × % retenção
+- **Pausa**: idem
+Com badge "vencedor" no que tem maior retenção e diagnóstico textual: *"Desconto retém 67% vs Pausa 41% — focar em desconto"*
 
-#### 3d. Update `cancel-subscription-flow`
-No handler `confirm_cancel`, além do `cancel_confirmed`, emite `trial_canceled_reason` com `{ reason: attempt.reason, trial_day, was_paying: subStatus === 'active' }`.
+#### 2d. Motivos × eficácia de save
+Tabela mostrando para cada motivo (`too_expensive`, `not_using`, etc.):
+- Total que cancelou por esse motivo
+- Quantos foram salvos com desconto
+- Quantos foram salvos com pausa
+- **Save rate por motivo** (cor verde/vermelho)
+
+Insight automático: "Motivo X tem save rate Y% — oferta atual [está/não está] funcionando"
+
+#### 2e. Cohort dos últimos 6 meses
+Tabela cohort mensal:
+| Mês | Signups | Conversão | Cancelados | Retenção 30d |
+
+Mostra tendência: a retenção está melhorando ou piorando mês a mês.
+
+#### 2f. Pagantes inativos em risco (mantém o atual)
+Lista de usuários que não usam o app há 7+ dias mas ainda pagam — candidatos a re-engajamento proativo.
+
+---
+
+### 3. Estratégia de implementação dos dados
+
+Para evitar dependência de novas RPCs (a tool de migration está intermitente nesta sessão), faço as queries **direto do client com a service de admin** usando as tabelas que o admin já consegue ler via RLS:
+
+- `cancel_attempts` (admin tem SELECT) → motivos, outcomes, voluntary churn
+- `retention_offers_used` (admin tem SELECT) → efetividade das ofertas
+- `subscriptions` (admin tem SELECT) → cancelados, involuntary, MRR perdido
+- `module_analytics` (admin tem SELECT) → curva de retenção do trial
+- `admin_metrics_overview` RPC já existente → KPIs gerais
+
+As agregações ficam num hook `useChurnDeepMetrics()` em `src/hooks/use-churn-metrics.ts` — todas client-side mas leves (volumes pequenos no admin, no máx ~60d de dados).
+
+> Caso prefira, depois posso converter num RPC único `admin_churn_deep_metrics()` quando a migration tool estiver disponível, melhorando performance e centralizando lógica. Por ora, client-side entrega o painel hoje.
 
 ---
 
 ### Arquivos
-**Novos:**
-- `supabase/functions/apply-pending-discounts/index.ts`
-- `supabase/functions/tick-trial-active-days/index.ts`
-- `src/pages/admin/AdminRetention.tsx`
-- 2 migrations (campos da `retention_offers_used` + RPC breakdown; trigger trial_started; cron jobs via insert tool por terem URL/anon)
 
 **Editados:**
-- `supabase/functions/abacatepay-webhook/index.ts` (chamar apply-discounts + emitir `trial_converted`)
-- `supabase/functions/cancel-subscription-flow/index.ts` (emitir `trial_canceled_reason`)
-- `src/pages/admin/AdminLayout.tsx` (nav item)
-- `src/App.tsx` (rota `/admin/retention`)
+- `src/pages/admin/AdminRetention.tsx` — tabela de breakdown agrupada por offer_type
+- `src/pages/admin/AdminChurn.tsx` — reescrita completa com as 6 seções
 
----
+**Novos:**
+- `src/hooks/use-churn-metrics.ts` — hook que agrega queries das tabelas
 
-### Pergunta antes de implementar
-**A doc do AbacatePay** que você tem (ou suporte deles) confirma quais são os endpoints corretos de desconto/cupom? Vou implementar com os caminhos `/subscriptions/{id}/discount` e `/billings/{id}/discount` por padrão e logar qualquer 404 — mas se você já souber o caminho oficial, me passa pra eu acertar de primeira (evita rodar com falha logada).
+**Sem migrations** nesta entrega. Se quiser que eu suba o RPC `admin_churn_deep_metrics()` depois (mais performático), basta pedir.

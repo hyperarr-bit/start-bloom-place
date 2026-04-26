@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ShieldCheck, TrendingDown, Gift, Pause } from "lucide-react";
+import { Loader2, ShieldCheck, TrendingDown, Gift, Pause, Sparkles, RotateCw, Eye, MousePointerClick, CheckCircle2, DollarSign } from "lucide-react";
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
 } from "recharts";
+import { useWinbackStats } from "@/hooks/use-winback-stats";
 
 interface RetentionStats {
   reasons_30d: { reason: string; count: number }[];

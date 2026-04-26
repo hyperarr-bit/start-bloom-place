@@ -127,6 +127,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       pendingWrites.current[key] = value;
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, DEBOUNCE_MS);
+      // Fire-and-forget activation tracking
+      checkActivation(key, value);
     }
   }, [flush]);
 

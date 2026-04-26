@@ -13,9 +13,9 @@ const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
-const PRODUCT_CONFIG: Record<BillingPeriod, { configKey: string; frequency: "MONTHLY" | "ANNUAL" }> = {
-  monthly: { configKey: "abacatepay_product_monthly_id", frequency: "MONTHLY" },
-  annual: { configKey: "abacatepay_product_annual_id", frequency: "ANNUAL" },
+const PRODUCT_CONFIG: Record<BillingPeriod, { configKey: string; frequency: "MONTHLY" | "ANNUAL"; basePriceCents: number }> = {
+  monthly: { configKey: "abacatepay_product_monthly_id", frequency: "MONTHLY", basePriceCents: 1990 },
+  annual: { configKey: "abacatepay_product_annual_id", frequency: "ANNUAL", basePriceCents: 17880 },
 };
 
 const logStep = (step: string, details?: unknown) => {
@@ -152,10 +152,21 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
+    // Compute discounted unit price for the WINBACK80 coupon (80% off)
+    const discountedUnitPrice = couponValid
+      ? Math.round(cfg.basePriceCents * 0.20)
+      : null;
+
+    const lineItem: Record<string, unknown> = { id: productId, quantity: 1 };
+    if (discountedUnitPrice !== null) {
+      // Override the line-item price so the customer sees and pays the promo amount
+      lineItem.price = discountedUnitPrice;
+    }
+
     const checkoutBody: Record<string, unknown> = {
       frequency: "SUBSCRIPTION",
       methods: ["PIX", "CARD"],
-      items: [{ id: productId, quantity: 1 }],
+      items: [lineItem],
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {
@@ -167,13 +178,13 @@ serve(async (req) => {
       metadata: {
         user_id: userId,
         billing_period: billingPeriod,
-        ...(couponValid ? { coupon: couponRaw, discount_pct: 80 } : {}),
+        ...(couponValid ? { coupon: couponRaw, discount_pct: 80, original_price_cents: cfg.basePriceCents } : {}),
       },
     };
 
     if (couponValid) {
-      // Padrão da API AbacatePay para descontos em checkout
-      checkoutBody.discount = { type: "PERCENTAGE", value: 80 };
+      // Also pass the coupon code to AbacatePay so it appears on the checkout UI
+      checkoutBody.coupons = [couponRaw];
     }
 
     logStep("Creating checkout", { billingPeriod, productId, coupon: couponValid ? couponRaw : null });

@@ -39,7 +39,10 @@ export function useWinbackTrigger() {
    * and not already shown in this session.
    * Returns true if it opened, false otherwise.
    */
-  const triggerNow = useCallback(async (source: Source): Promise<boolean> => {
+  const triggerNow = useCallback(async (
+    source: Source,
+    opts?: { bypassCooldown?: boolean },
+  ): Promise<boolean> => {
     if (alreadyShown || open || triggeringRef.current) {
       console.debug("[winback] skipped: already shown / open / locked", { alreadyShown, open });
       return false;
@@ -65,16 +68,18 @@ export function useWinbackTrigger() {
         return false;
       }
 
-      const cutoff = new Date(Date.now() - COOLDOWN_DAYS * 86400000).toISOString();
-      const { data: prior } = await supabase
-        .from("winback_attempts")
-        .select("id")
-        .eq("user_id", user.id)
-        .gte("triggered_at", cutoff)
-        .limit(1);
-      if (prior && prior.length > 0) {
-        console.debug("[winback] skipped: 30d cooldown active");
-        return false;
+      if (!opts?.bypassCooldown) {
+        const cutoff = new Date(Date.now() - COOLDOWN_DAYS * 86400000).toISOString();
+        const { data: prior } = await supabase
+          .from("winback_attempts")
+          .select("id")
+          .eq("user_id", user.id)
+          .gte("triggered_at", cutoff)
+          .limit(1);
+        if (prior && prior.length > 0) {
+          console.debug("[winback] skipped: 30d cooldown active");
+          return false;
+        }
       }
 
       const { data: created, error } = await supabase

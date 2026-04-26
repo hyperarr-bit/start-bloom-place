@@ -1,148 +1,125 @@
 ## Objetivo
 
-Duas frentes complementares:
-1. **Variantes dinâmicas D1-D7**: cada e-mail escolhe uma de 2-3 versões com base no que o usuário já fez (registrou transação? iniciou hábito? logou treino?), focando em fechar a próxima lacuna de ativação.
-2. **Eventos de analytics**: medir cliques no banner de trial, conclusão de ações-chave por dia do trial, e conversão D6/D7 — tudo visível no `/admin`.
+Trocar o foco da estratégia de trial: **comunicação fica dentro do app** via tour guiado contextual por dia. Emails D1-D7 ficam pausados (infra preservada). Analytics ganha novos eventos para medir o tour.
 
----
+Domínio segue 100% no Supabase — nada de Lovable Emails será tocado.
 
-## 1. Variantes dinâmicas D1-D7
+## 1. Pausar emails do trial (sem deletar código)
 
-### 1.1 Tabela de "ações-chave" (key activation events)
+- Adicionar coluna `app_config.value` com chave `trial_emails_enabled = false`.
+- Ajustar `dispatch-trial-emails/index.ts`: ler essa flag no início e sair com `{ paused: true }` se desabilitada. Mantém todo o código existente (variantes, schedule) intacto para reativar no futuro.
+- O cron continua rodando, mas não envia nada. Linhas em `trial_email_schedule` permanecem `pending`.
 
-Nova tabela `user_activations` (uma linha por user × ação) com:
-- `user_id`, `action_key` (ex: `first_transaction`, `first_habit`, `first_workout`, `first_meal`, `first_task`, `first_water_log`, `first_note`)
-- `completed_at`, `metadata jsonb`
+## 2. Tour guiado por dia (D1-D7) — dinâmico
 
-Preenchida de duas formas:
-- **Backfill via SQL**: detecta a partir de `user_data` chaves existentes (`financas_transactions`, `habits`, `treino_sessions`, etc.) — uma única migration roda uma vez para popular.
-- **Tempo real via frontend**: helper `markActivation(actionKey)` chamado nos pontos de criação (ex: ao salvar primeira transação). Idempotente (`ON CONFLICT DO NOTHING`).
+### Componente novo: `src/components/onboarding/DailyNudge.tsx`
 
-### 1.2 Mapa de variantes por dia
+Bottom-sheet (mobile-first, 430px) que aparece **uma vez por dia** quando o usuário abre o app durante o trial. Estrutura:
 
-Para cada `email_key` D1-D7, defino 2-3 variantes no `dispatch-trial-emails`:
+- Ícone + título contextual ("Dia 2 de 7 — Comece pelo dinheiro")
+- 1 ação-chave sugerida (botão CTA leva direto ao módulo)
+- Link "agora não" (fecha e marca dismiss do dia)
+- Botão X no canto
 
-| Dia | Variante padrão | Variante se já fez X |
-|-----|-----------------|----------------------|
-| D1 `first-action` | "Comece pela Rotina" | Se já criou tarefa → "Que tal anotar uma transação agora?" |
-| D2 `finance` | "Adicione 1 transação" | Se já tem transação → "Veja o resumo do mês no Painel" |
-| D3 `habit` | "Crie 1 hábito" | Se já tem hábito → "Mantenha sua sequência hoje" |
-| D4 `progress` | Recap genérico | Recap personalizado com módulos mais usados |
-| D5 `value` | "Veja seu painel" | Se baixo engajamento → "Que tal explorar [módulo X]?" |
-| D6 `convert` | CTA padrão | Se alto engajamento → "Você usou X módulos. Continue." |
-| D7 `last-call` | Urgência padrão | Se assinatura iminente provável → reforço de valor |
+Regras de exibição:
+- Só aparece se `user && !isSubscribed && !trialExpired`
+- Marca `dismissed_day_N` em localStorage + envia evento analytics
+- Não reaparece no mesmo dia após dismiss/CTA
 
-**Lógica**: a edge function `dispatch-trial-emails` calcula `variant_key` por usuário antes de chamar `send-transactional-email`, passando-o como `templateData.variant` + dados ricos (`templateData.modulesUsed`, `templateData.transactionsCount`, etc.). Os templates React Email (criados quando o domínio for configurado) ramificam pela variant.
+### Lógica de seleção dinâmica: `src/lib/dailyNudge.ts`
 
-### 1.3 Persistência da variante escolhida
+Função `pickDailyNudge(trialDay, activations)` retorna `{ key, title, description, ctaLabel, ctaRoute, actionKey }`.
 
-`trial_email_schedule` ganha uma coluna `variant_key text` populada no momento do dispatch — assim conseguimos medir no admin qual variante converte mais.
+Mesma filosofia do `pickVariant` do edge function, mas para UI. Exemplo:
 
----
+```ts
+// D2 — finanças
+if (trialDay === 2) {
+  if (activations.has("first_transaction")) {
+    return { key: "d2-finance-summary", ctaRoute: "/financas", 
+             title: "Veja onde seu dinheiro está indo", ... };
+  }
+  return { key: "d2-finance-first", ctaRoute: "/financas",
+           title: "Registre sua primeira transação", ... };
+}
+```
 
-## 2. Eventos de analytics
+Mapa completo (8 dias, 2-3 variantes cada):
 
-### 2.1 Tabela `analytics_events`
+| Dia | Sem ativação | Com ativação relevante |
+|-----|---|---|
+| D0 boas-vindas | Tour inicial: escolha um módulo | — |
+| D1 primeira ação | Crie sua 1ª tarefa | Já criou tarefa? Adicione transação |
+| D2 finanças | Registre 1ª transação | Veja resumo do mês |
+| D3 hábitos | Crie 1º hábito | Acompanhe streak |
+| D4 progresso | Explore 1 novo módulo | Veja seu recap |
+| D5 valor | Por que assinar | (engajado) Compare planos |
+| D6 conversão | Garantir acesso | (engajado) Oferta destacada |
+| D7 last call | Última chance | (engajado) CTA final |
 
-Genérica para qualquer evento custom:
-- `user_id`, `event_name`, `event_data jsonb`, `created_at`, `trial_day` (calculado), `session_id`
+### Hook: `src/hooks/use-daily-nudge.ts`
 
-Eventos rastreados:
-- `trial_banner_view` — quando o banner aparece (uma vez por sessão por fase)
-- `trial_banner_click` — clique no CTA "Assinar"/"Garantir acesso"
-- `trial_email_sent` — quando dispatch envia (com `email_key`, `variant_key`)
-- `key_action_completed` — ao chamar `markActivation` (mesma chave)
-- `subscription_started` — quando subscription vira `active` (já existe no webhook AbacatePay; só adicionamos `trial_day` no momento)
-- `paywall_view` — quando tela bloqueante D7+ aparece
-- `planos_view` — quando entra em `/planos`
+- Usa `useAuth()` e `useTrialActivations()`
+- Calcula chave do dia: `nudge-${userId}-day-${trialDay}`
+- Lê localStorage para checar dismiss
+- Expõe `{ nudge, show, dismiss, complete }`
 
-### 2.2 Helper frontend
+### Integração
 
-`src/lib/analytics.ts` exportando `trackEvent(name, data)`:
-- Insere em `analytics_events`
-- Calcula `trial_day` a partir de `useAuth().trialDay`
-- Não-bloqueante (fire-and-forget)
+Montar `<DailyNudge />` em `src/pages/Home.tsx` (logo abaixo do `TrialBanner`). Aparece com delay de 1.5s após o load para não atropelar a primeira impressão.
 
-Pontos de integração:
-- `TrialBanner.tsx`: dispara `trial_banner_view` no mount + `trial_banner_click` no botão.
-- `Planos.tsx`: `planos_view` no mount.
-- `markActivation` helper já dispara `key_action_completed`.
-- `abacatepay-webhook` (edge function): adiciona `subscription_started` ao confirmar pagamento.
+## 3. Analytics — novos eventos
 
-### 2.3 Novas views no /admin
+Adicionar em `src/lib/analytics.ts` (já existe). Novos eventos a serem registrados via `trackEvent`:
 
-Duas páginas novas em `src/pages/admin/`:
-- **AdminActivation.tsx** — tabela: por dia do trial, % de usuários que completou cada `action_key`. Funil de ativação.
-- **AdminEmailVariants.tsx** — por `email_key` × `variant_key`: enviados, cliques no banner subsequente, conversões em 48h. CTR e taxa de conversão.
+- `daily_nudge_shown` — `{ trial_day, nudge_key, has_activation }`
+- `daily_nudge_clicked` — `{ trial_day, nudge_key, cta_route }`
+- `daily_nudge_dismissed` — `{ trial_day, nudge_key, method: "x" | "later" }`
+- `onboarding_step_completed` — disparado quando a `actionKey` do nudge é ativada (ex: usuário clicou no CTA do D2 e registrou a transação dentro de 24h)
 
-E enriquecimentos:
-- **AdminConversion.tsx** existente: gráfico de conversões por `trial_day` (D6 vs D7 vs antes).
-- **AdminDashboard.tsx**: cards "CTR banner trial" e "Top variant convertendo".
+### Nova RPC admin: `admin_nudge_stats()`
 
-Funções RPC novas (SECURITY DEFINER + checagem `has_role admin`):
-- `admin_activation_funnel()` — retorna (action_key, completed_count, total_users, pct).
-- `admin_email_variant_stats()` — retorna (email_key, variant_key, sent, clicks_after, conversions_48h).
-- `admin_conversion_by_trial_day()` — retorna (trial_day, conversions).
+Retorna por `trial_day` + `nudge_key`:
+- shown, clicked, dismissed
+- CTR (clicked/shown)
+- completion rate (step_completed em 24h após shown)
+- conversion rate (subscriptions ativas em 48h após shown)
 
----
+### Página admin nova: `src/pages/admin/AdminOnboarding.tsx`
 
-## 3. Integração com trial-banner já existente
+Tabela com performance de cada nudge. Adicionar link no `AdminLayout`.
 
-O `TrialBanner.tsx` ganha:
-- `useEffect` que dispara `trackEvent('trial_banner_view', { phase, trial_day })` por fase.
-- `onClick` do botão dispara `trackEvent('trial_banner_click', { phase, trial_day })` antes do `navigate`.
+## 4. Migração de banco
 
----
+```sql
+-- 1. App config para a flag
+INSERT INTO app_config (key, value)
+VALUES ('trial_emails_enabled', 'false'::jsonb)
+ON CONFLICT (key) DO UPDATE SET value = excluded.value;
 
-## 4. Pontos de `markActivation` no código
+-- 2. RPC nova
+CREATE FUNCTION admin_nudge_stats() RETURNS TABLE(...) ...;
+```
 
-Adicionar chamadas onde o usuário cria/registra pela primeira vez:
-- `Rotina.tsx` (criar tarefa) → `first_task`
-- componentes financeiros (criar transação) → `first_transaction`
-- `Saude.tsx`/hábitos (criar hábito) → `first_habit`
-- `Treino.tsx` (logar sessão) → `first_workout`
-- `Dieta.tsx` (registrar refeição) → `first_meal`
-- `HydrationTracker.tsx` (primeiro registro) → `first_water_log`
-- `Notes.tsx` (criar nota) → `first_note`
+Sem alteração estrutural em tabelas existentes — `analytics_events` já comporta os novos eventos.
 
-Helper é idempotente — chamar várias vezes não polui dados.
+## 5. Arquivos
 
----
+**Novos:**
+- `src/components/onboarding/DailyNudge.tsx`
+- `src/hooks/use-daily-nudge.ts`
+- `src/lib/dailyNudge.ts`
+- `src/pages/admin/AdminOnboarding.tsx`
+- `supabase/migrations/<timestamp>_pause_emails_and_nudge_rpc.sql`
 
-## 5. Mudanças no banco (1 migração)
+**Modificados:**
+- `src/pages/Home.tsx` (montar DailyNudge)
+- `src/lib/analytics.ts` (helpers tipados pros novos eventos)
+- `src/App.tsx` + `src/pages/admin/AdminLayout.tsx` (rota admin)
+- `supabase/functions/dispatch-trial-emails/index.ts` (checar flag e abortar)
 
-1. `user_activations` (user_id, action_key, completed_at, metadata) + RLS (user lê próprias; admin lê todas).
-2. `analytics_events` (user_id, event_name, event_data, trial_day, created_at, session_id) + RLS (user insere próprias; admin lê todas).
-3. Coluna `variant_key text` em `trial_email_schedule`.
-4. Backfill de `user_activations` a partir de `user_data` existente.
-5. Funções `admin_activation_funnel`, `admin_email_variant_stats`, `admin_conversion_by_trial_day`.
+## Fora do escopo
 
----
-
-## 6. Arquivos
-
-**Novos**
-- `src/lib/analytics.ts` — `trackEvent`, `markActivation`
-- `src/hooks/use-trial-activations.ts` — leitura das ativações no frontend
-- `src/pages/admin/AdminActivation.tsx`
-- `src/pages/admin/AdminEmailVariants.tsx`
-
-**Editados**
-- `supabase/functions/dispatch-trial-emails/index.ts` — calcula variante por usuário, grava `variant_key`, dispara `trial_email_sent`
-- `supabase/functions/abacatepay-webhook/index.ts` — adiciona `subscription_started` event
-- `src/components/TrialBanner.tsx` — view + click events
-- `src/pages/Planos.tsx` — view event
-- `src/pages/admin/AdminLayout.tsx` — links para novas abas
-- `src/pages/admin/AdminDashboard.tsx` — cards extras
-- `src/pages/admin/AdminConversion.tsx` — gráfico por trial_day
-- Vários componentes/módulos: chamadas a `markActivation` nos pontos de criação
-
----
-
-## Resultado esperado
-
-- Cada e-mail D1-D7 fala exatamente da próxima ação que falta para o usuário ativar — não recomenda algo que ele já fez.
-- Tudo o que o usuário faz com o banner (ver, clicar) e com o trial (ações-chave, conversão D6/D7) vai parar em `analytics_events`.
-- Duas páginas novas no `/admin` mostram funil de ativação e qual variante de e-mail converte melhor.
-- Dashboard ganha cards de CTR e variante vencedora.
-- Quando o domínio de e-mail for configurado, os templates já consomem `templateData.variant` automaticamente — zero retrabalho.
+- Não mexer em domínio (segue Supabase, nada de Lovable Emails).
+- Não criar templates de email novos.
+- Não remover infraestrutura de email existente — só pausar.

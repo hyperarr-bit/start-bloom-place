@@ -85,11 +85,18 @@ const Planos = () => {
             <p className="text-sm font-medium text-green-600 dark:text-green-400">
               ✅ Você já é assinante CORE PRO!
             </p>
-            <p className="text-xs text-muted-foreground">
-              Para cancelar, entre em contato pelo email suporte@coreaplicativo.com
-            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCancelOpen(true)}
+              className="text-xs text-muted-foreground hover:text-destructive"
+            >
+              Cancelar assinatura
+            </Button>
           </div>
         )}
+
+        <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} />
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">

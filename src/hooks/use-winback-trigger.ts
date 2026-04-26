@@ -81,11 +81,14 @@ export function useWinbackTrigger() {
       setOpen(true);
       setAlreadyShown(true);
       trackEvent("winback_triggered", { source });
+      opened = true;
       return true;
     } finally {
-      triggeringRef.current = false;
+      // Keep the lock engaged on success so concurrent callers can't open
+      // a second roulette before React state propagates.
+      if (!opened) triggeringRef.current = false;
     }
-  }, [alreadyShown]);
+  }, [alreadyShown, open]);
 
   // Auto-detect on mount: ?canceled=true OR recent intent (came back from checkout)
   useEffect(() => {

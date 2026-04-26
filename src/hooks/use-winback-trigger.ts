@@ -40,9 +40,12 @@ export function useWinbackTrigger() {
    * Returns true if it opened, false otherwise.
    */
   const triggerNow = useCallback(async (source: Source): Promise<boolean> => {
-    if (alreadyShown || triggeringRef.current) return false;
+    // Synchronous lock — runs before any await to block reentrancy from
+    // rapid back/popstate races.
+    if (alreadyShown || open || triggeringRef.current) return false;
     triggeringRef.current = true;
 
+    let opened = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return false;

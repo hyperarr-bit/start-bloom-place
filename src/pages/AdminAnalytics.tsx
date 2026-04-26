@@ -241,7 +241,7 @@ const AdminAnalytics = () => {
   }, [data]);
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="text-muted-foreground text-sm">Carregando...</div></div>;
-  if (!user || !isAdmin(user.id)) return null;
+  if (!user || isAdminUser !== true) return null;
 
   return (
     <div className="min-h-screen bg-background text-foreground">

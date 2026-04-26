@@ -89,6 +89,7 @@ const AnimatedRoutes = () => {
           <Route path="ativacao" element={<AdminActivation />} />
           <Route path="emails" element={<AdminEmailVariants />} />
           <Route path="onboarding" element={<AdminOnboarding />} />
+          <Route path="retention" element={<AdminRetention />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

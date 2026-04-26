@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Clock, Lock, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,14 @@ import { trackEvent } from "@/lib/analytics";
 export const TrialBanner = () => {
   const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  // Never render the trial banner/paywall over /planos, /auth or admin pages.
+  const suppressOnRoute =
+    location.pathname.startsWith("/planos") ||
+    location.pathname.startsWith("/auth") ||
+    location.pathname.startsWith("/reset-password") ||
+    location.pathname.startsWith("/update-password") ||
+    location.pathname.startsWith("/admin");
   const phase = trialExpired
     ? "expired"
     : trialDay <= 3
@@ -36,6 +44,7 @@ export const TrialBanner = () => {
   };
 
   if (isSubscribed || !user) return null;
+  if (suppressOnRoute) return null;
 
   // Trial expired — blocking screen
   if (trialExpired) {

@@ -23,6 +23,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [trialExpired, setTrialExpired] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [trialDay, setTrialDay] = useState(1);
+  const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -72,6 +74,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
+      if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
+      if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
     } catch (err) {
       console.error("check-subscription failed:", err);
     }
@@ -96,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, trialDay, trialHoursLeft, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

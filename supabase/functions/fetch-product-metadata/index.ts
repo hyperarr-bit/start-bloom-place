@@ -70,14 +70,30 @@ Deno.serve(async (req) => {
 
     console.log('Fetching product metadata from:', url);
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
-      },
-      redirect: 'follow',
+    // SECURITY: redirect manual + timeout para mitigar SSRF (rebind/redirect to internal IPs)
+    const fetchWithGuard = async (target: string, depth = 0): Promise<Response> => {
+      if (depth > 3) throw new Error('Too many redirects');
+      if (!isAllowedUrl(target)) throw new Error('Redirect target not allowed');
+      const r = await fetch(target, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Cache-Control': 'no-cache',
+        },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.status >= 300 && r.status < 400) {
+        const loc = r.headers.get('location');
+        if (!loc) return r;
+        const next = new URL(loc, target).toString();
+        return fetchWithGuard(next, depth + 1);
+      }
+      return r;
+    };
+
+    const response = await fetchWithGuard(url);
     });
 
     if (!response.ok) {

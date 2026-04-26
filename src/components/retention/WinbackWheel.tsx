@@ -1,154 +1,128 @@
 import { motion, useAnimation } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Gift, Loader2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 
-/**
- * Roleta "Win exclusive offers" — sempre para na fatia 🎁 (que é revelada como 80%).
- * Adaptada à identidade visual do app: tokens semânticos, sem gradientes berrantes.
- */
 const SLICES = [
-  { label: "50%", color: "hsl(var(--primary) / 0.85)" },
-  { label: "Sem sorte", color: "hsl(var(--muted))" },
-  { label: "70%", color: "hsl(var(--accent))" },
-  { label: "90%", color: "hsl(var(--primary) / 0.6)" },
-  { label: "30%", color: "hsl(var(--destructive) / 0.7)" },
-  { label: "🎁", color: "hsl(var(--foreground))", isPrize: true },
+  { label: "Tente +", color: "hsl(var(--muted))" },
+  { label: "10% OFF", color: "hsl(var(--accent))" },
+  { label: "Quase!", color: "hsl(var(--muted))" },
+  { label: "30% OFF", color: "hsl(var(--accent))" },
+  { label: "Tente +", color: "hsl(var(--muted))" },
+  { label: "50% OFF", color: "hsl(var(--accent))" },
+  { label: "Vazio", color: "hsl(var(--muted))" },
+  { label: "80% OFF", color: "hsl(var(--primary))" }, // Winning slice (index 7)
 ];
 
-const SLICE_DEG = 360 / SLICES.length;
-// índice 5 = 🎁. Centro da fatia: i*60 + 30 = 330. Para alinhar com o ponteiro (topo, 0deg)
-// rotação alvo final: -330 + N*360 (várias voltas) — subtração inverte sentido.
-const TARGET_INDEX = 5;
-const TARGET_DEG = -(TARGET_INDEX * SLICE_DEG + SLICE_DEG / 2) + 360 * 6; // 6 voltas
+const SLICE_DEG = 360 / SLICES.length; // 45
+const WIN_INDEX = 7;
 
 interface Props {
-  onContinue: () => void;
+  attemptId: string | null;
+  onSpinComplete: () => void;
 }
 
-export function WinbackWheel({ onContinue }: Props) {
+export function WinbackWheel({ attemptId, onSpinComplete }: Props) {
   const controls = useAnimation();
-  const [phase, setPhase] = useState<"idle" | "spinning" | "done">("idle");
+  const [spinning, setSpinning] = useState(false);
+  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    trackEvent("winback_wheel_shown");
-  }, []);
+    if (attemptId) {
+      supabase
+        .from("winback_attempts")
+        .update({ wheel_shown_at: new Date().toISOString() })
+        .eq("id", attemptId)
+        .then(() => {});
+    }
+  }, [attemptId]);
 
   const spin = async () => {
-    if (phase !== "idle") return;
-    setPhase("spinning");
-    trackEvent("winback_wheel_spun");
+    if (spinning || done) return;
+    setSpinning(true);
+    trackEvent("winback_wheel_spun", {});
+
+    // Pointer is at top (12 o'clock). Slice 0 starts at top going clockwise.
+    // To land on WIN_INDEX, rotate so its center is at top.
+    const targetCenter = WIN_INDEX * SLICE_DEG + SLICE_DEG / 2; // degrees of slice center from start
+    const fullSpins = 5 * 360;
+    const finalAngle = fullSpins + (360 - targetCenter); // rotate counter-clockwise effect
+
     await controls.start({
-      rotate: TARGET_DEG,
-      transition: { duration: 4.2, ease: [0.17, 0.67, 0.32, 0.99] },
+      rotate: finalAngle,
+      transition: { duration: 4.2, ease: [0.17, 0.67, 0.32, 1] },
     });
-    setPhase("done");
-  };
 
-  const handleContinue = () => {
-    trackEvent("winback_wheel_continued");
-    onContinue();
+    setDone(true);
+    if (attemptId) {
+      await supabase
+        .from("winback_attempts")
+        .update({ wheel_spun_at: new Date().toISOString() })
+        .eq("id", attemptId);
+    }
+    setTimeout(onSpinComplete, 900);
   };
-
-  // Build conic-gradient CSS for the wheel
-  const conic = SLICES.map((s, i) => {
-    const start = i * SLICE_DEG;
-    const end = (i + 1) * SLICE_DEG;
-    return `${s.color} ${start}deg ${end}deg`;
-  }).join(", ");
 
   return (
-    <div className="flex flex-col items-center text-center px-6 pt-8 pb-6 min-h-screen bg-background">
-      <div className="space-y-2 mb-10 mt-4">
-        <h1 className="text-3xl font-bold tracking-tight">Ofertas exclusivas</h1>
-        <p className="text-muted-foreground text-base">
-          Garanta seu desconto <span className="text-primary font-semibold">permanente</span>
-        </p>
+    <div className="flex flex-col items-center justify-center gap-6 py-4">
+      <div className="text-center space-y-2">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+          <Sparkles className="w-3 h-3" />
+          Você ganhou um giro grátis
+        </div>
+        <h2 className="text-2xl font-bold leading-tight">Gire e descubra<br />sua oferta secreta</h2>
+        <p className="text-sm text-muted-foreground">Só agora, antes de você sair.</p>
       </div>
 
-      <div className="relative w-72 h-72 my-6">
+      <div className="relative w-72 h-72">
         {/* Pointer */}
-        <div className="absolute -right-1 top-1/2 -translate-y-1/2 z-10">
-          <div
-            className="w-0 h-0"
-            style={{
-              borderTop: "12px solid transparent",
-              borderBottom: "12px solid transparent",
-              borderRight: "20px solid hsl(var(--primary))",
-            }}
-          />
+        <div className="absolute -top-1 left-1/2 -translate-x-1/2 z-10">
+          <div className="w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-t-[18px] border-t-primary drop-shadow-md" />
         </div>
 
         {/* Wheel */}
         <motion.div
+          className="w-full h-full rounded-full border-4 border-primary/30 shadow-2xl relative overflow-hidden"
           animate={controls}
-          initial={{ rotate: 0 }}
-          className="w-full h-full rounded-full border-4 border-foreground/20 shadow-2xl relative overflow-hidden"
-          style={{ background: `conic-gradient(${conic})` }}
+          style={{
+            background: `conic-gradient(${SLICES.map(
+              (s, i) => `${s.color} ${i * SLICE_DEG}deg ${(i + 1) * SLICE_DEG}deg`
+            ).join(",")})`,
+          }}
         >
           {SLICES.map((s, i) => {
             const angle = i * SLICE_DEG + SLICE_DEG / 2;
             return (
               <div
                 key={i}
-                className="absolute left-1/2 top-1/2 origin-left text-sm font-bold text-background flex items-center justify-end pr-3"
+                className="absolute top-1/2 left-1/2 origin-left text-[11px] font-bold text-foreground/90"
                 style={{
-                  width: "50%",
-                  height: "32px",
-                  transform: `translate(0, -50%) rotate(${angle}deg)`,
-                  color: s.isPrize ? "hsl(var(--background))" : "hsl(var(--background))",
+                  transform: `rotate(${angle}deg) translateX(60px) rotate(90deg) translateX(-50%)`,
+                  whiteSpace: "nowrap",
                 }}
               >
-                {s.isPrize ? <Gift className="w-5 h-5" /> : s.label}
+                {s.label}
               </div>
             );
           })}
-          {/* Center hub */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-14 h-14 rounded-full bg-foreground border-4 border-background flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-background" />
-            </div>
-          </div>
         </motion.div>
+
+        {/* Center hub */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-12 h-12 rounded-full bg-card border-4 border-primary shadow-lg" />
+        </div>
       </div>
 
-      <div className="mt-8 w-full max-w-xs space-y-3">
-        {phase !== "done" ? (
-          <Button
-            size="lg"
-            className="w-full h-14 text-base font-semibold"
-            onClick={spin}
-            disabled={phase === "spinning"}
-          >
-            {phase === "spinning" ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Girando...
-              </>
-            ) : (
-              "Girar a roleta"
-            )}
-          </Button>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-3"
-          >
-            <p className="text-sm text-muted-foreground">
-              🎉 Você ganhou uma oferta surpresa!
-            </p>
-            <Button
-              size="lg"
-              className="w-full h-14 text-base font-semibold"
-              onClick={handleContinue}
-            >
-              Revelar minha oferta
-            </Button>
-          </motion.div>
-        )}
-      </div>
+      <Button
+        size="lg"
+        onClick={spin}
+        disabled={spinning || done}
+        className="w-full max-w-xs h-14 text-base font-semibold"
+      >
+        {done ? "Revelando prêmio..." : spinning ? "Girando..." : "GIRAR AGORA"}
+      </Button>
     </div>
   );
 }

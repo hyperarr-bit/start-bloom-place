@@ -1,41 +1,56 @@
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { X, Sparkles, Loader2, Check } from "lucide-react";
-import { trackEvent } from "@/lib/analytics";
+import { Check, Loader2, Crown, Timer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+
+const FULL_MONTHLY = 19.90;
+const FULL_ANNUAL = 238.80; // 12 × 19,90 — preço cheio percebido
+const OFFER_ANNUAL = 47.76; // 80% off
+const OFFER_MONTHLY_EQUIV = 3.98;
+const SAVINGS = 191.04;
+
+const COUNTDOWN_SECONDS = 10 * 60;
 
 interface Props {
-  onClose: () => void;
+  attemptId: string | null;
 }
 
-const FULL_MONTHLY = 14.9; // R$ por mês no plano anual cheio
-const DISCOUNTED_MONTHLY = 2.98; // 80% off
-const DISCOUNTED_YEARLY = 35.76;
-
-const fmt = (n: number) =>
-  n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-export function WinbackOffer({ onClose }: Props) {
-  const navigate = useNavigate();
+export function WinbackOffer({ attemptId }: Props) {
   const [loading, setLoading] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(COUNTDOWN_SECONDS);
 
   useEffect(() => {
-    trackEvent("winback_offer_shown");
+    if (attemptId) {
+      supabase
+        .from("winback_attempts")
+        .update({ offer_shown_at: new Date().toISOString() })
+        .eq("id", attemptId)
+        .then(() => {});
+      trackEvent("winback_offer_shown", { discount_pct: 80 });
+    }
+  }, [attemptId]);
+
+  useEffect(() => {
+    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
   }, []);
 
-  const handleAccept = async () => {
-    trackEvent("winback_offer_accepted");
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+
+  const accept = async () => {
     setLoading(true);
+    trackEvent("winback_offer_accepted", { discount_pct: 80 });
+    if (attemptId) {
+      await supabase
+        .from("winback_attempts")
+        .update({ accepted_at: new Date().toISOString() })
+        .eq("id", attemptId);
+    }
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Sessão expirada. Faça login novamente.");
-        navigate("/auth");
-        return;
-      }
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
         body: { billing: "annual", coupon: "WINBACK80" },
       });
@@ -45,121 +60,105 @@ export function WinbackOffer({ onClose }: Props) {
         window.location.href = data.url;
         return;
       }
-      throw new Error("URL de checkout não retornada");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao iniciar checkout");
+      toast.error(err?.message || "Erro ao iniciar checkout");
       setLoading(false);
     }
   };
 
-  const handleDismiss = () => {
-    trackEvent("winback_offer_dismissed");
-    onClose();
-  };
-
   return (
-    <div className="min-h-screen bg-background flex flex-col px-5 py-4">
-      {/* Close button */}
-      <button
-        onClick={handleDismiss}
-        className="self-start p-2 -ml-2 rounded-lg hover:bg-muted transition-colors"
-        aria-label="Fechar oferta"
-      >
-        <X className="w-6 h-6" />
-      </button>
-
-      <main className="flex-1 flex flex-col items-center text-center pt-6 pb-8 max-w-md mx-auto w-full">
-        <motion.h1
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-3xl font-bold tracking-tight mb-10"
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4 }}
+      className="space-y-5"
+    >
+      <div className="text-center space-y-2">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold tracking-wide"
         >
-          Sua oferta única
-        </motion.h1>
+          <Crown className="w-3 h-3" /> VOCÊ GANHOU 80% OFF
+        </motion.div>
+        <h2 className="text-2xl font-bold leading-tight">
+          Sua oferta exclusiva<br />no plano <span className="text-primary">Anual</span>
+        </h2>
+      </div>
 
-        {/* Hero badge */}
-        <div className="relative my-2">
-          {/* Sparkles around */}
-          <Sparkles className="absolute -left-10 top-2 w-7 h-7 text-foreground/40" />
-          <Sparkles className="absolute -right-12 top-6 w-9 h-9 text-foreground/60" />
-          <Sparkles className="absolute -left-14 bottom-4 w-5 h-5 text-foreground/30" />
-          <Sparkles className="absolute -right-8 -bottom-2 w-6 h-6 text-foreground/40" />
-
-          <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, type: "spring", stiffness: 180 }}
-            className="rounded-3xl bg-foreground text-background px-10 py-8 shadow-2xl"
-          >
-            <div className="text-4xl font-black leading-tight">80% OFF</div>
-            <div className="text-2xl font-bold tracking-wider mt-1">PARA SEMPRE</div>
-          </motion.div>
+      {/* Pricing card */}
+      <div className="rounded-2xl border-2 border-primary bg-gradient-to-br from-primary/5 via-card to-card p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground">CORE PRO Anual</p>
+            <div className="mt-1 space-y-0.5">
+              <p className="text-xs text-muted-foreground line-through">
+                De R$ {FULL_MONTHLY.toFixed(2).replace(".", ",")}/mês
+                {" · "}R$ {FULL_ANNUAL.toFixed(2).replace(".", ",")}/ano
+              </p>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-primary">
+                  R$ {OFFER_MONTHLY_EQUIV.toFixed(2).replace(".", ",")}
+                </span>
+                <span className="text-muted-foreground text-sm">/mês</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cobrado R$ {OFFER_ANNUAL.toFixed(2).replace(".", ",")}/ano à vista
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-lg font-bold">
+              -80%
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">só agora</p>
+          </div>
         </div>
 
-        {/* Price */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-10 flex items-baseline justify-center gap-3"
-        >
-          <span className="text-2xl text-muted-foreground line-through">
-            R$ {fmt(FULL_MONTHLY)}
-          </span>
-          <span className="text-3xl font-bold">R$ {fmt(DISCOUNTED_MONTHLY)}</span>
-          <span className="text-base text-muted-foreground">/mês</span>
-        </motion.div>
+        <div className="rounded-lg bg-primary/10 px-3 py-2 text-center">
+          <p className="text-xs font-semibold text-primary">
+            Você economiza R$ {SAVINGS.toFixed(2).replace(".", ",")} no primeiro ano
+          </p>
+        </div>
 
-        <p className="mt-6 text-sm text-muted-foreground max-w-xs leading-relaxed">
-          Uma vez que você fechar essa oferta, ela vai embora.
-          <br />
-          Disponível só no plano <span className="font-semibold text-foreground">anual</span>.
-        </p>
+        <ul className="space-y-2">
+          {[
+            "Todos os 16 módulos desbloqueados",
+            "Acesso por 12 meses",
+            "Sem fidelidade — cancele quando quiser",
+            "Pix ou Cartão na próxima tela",
+          ].map((f) => (
+            <li key={f} className="flex items-center gap-2 text-sm">
+              <Check className="w-4 h-4 text-primary shrink-0" />
+              {f}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        {/* Plan card */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="mt-8 w-full rounded-2xl border-2 border-primary bg-card p-5 text-left"
-        >
-          <div className="text-[11px] font-bold tracking-widest text-primary uppercase text-center pb-3 border-b border-border">
-            Plano anual · 12 meses · R$ {fmt(DISCOUNTED_YEARLY)}
-          </div>
-          <div className="flex items-center justify-between pt-4">
-            <div>
-              <div className="font-bold text-base">Plano Anual</div>
-              <div className="text-xs text-muted-foreground">CORE PRO completo</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xl font-bold">R$ {fmt(DISCOUNTED_MONTHLY)}</div>
-              <div className="text-xs text-muted-foreground">/mês</div>
-            </div>
-          </div>
-        </motion.div>
+      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+        <Timer className="w-3.5 h-3.5" />
+        Oferta expira em <span className="font-mono font-bold text-foreground">{mm}:{ss}</span>
+      </div>
 
-        {/* CTA */}
-        <Button
-          size="lg"
-          className="w-full mt-6 h-14 text-base font-semibold"
-          onClick={handleAccept}
-          disabled={loading}
-        >
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Redirecionando...
-            </>
-          ) : (
-            "Garantir 80% OFF agora"
-          )}
-        </Button>
+      <Button
+        size="lg"
+        onClick={accept}
+        disabled={loading || secondsLeft === 0}
+        className="w-full h-14 text-base font-bold"
+      >
+        {loading ? (
+          <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
+        ) : (
+          "GARANTIR 80% OFF AGORA"
+        )}
+      </Button>
 
-        <p className="mt-4 text-xs text-muted-foreground flex items-center gap-1.5">
-          <Check className="w-3.5 h-3.5 text-green-500" />
-          Sem compromisso — cancele quando quiser
-        </p>
-      </main>
-    </div>
+      <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
+        Renovação anual no preço cheio (R$ {FULL_ANNUAL.toFixed(2).replace(".", ",")}/ano).
+        Cancele a qualquer momento dentro do app.
+      </p>
+    </motion.div>
   );
 }

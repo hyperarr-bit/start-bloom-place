@@ -1,130 +1,148 @@
 ## Objetivo
 
-Mudar o trial de **24h** para **7 dias sem cartão**, criar uma jornada de **onboarding D1-D7** (e-mail + push web opcional) que incentiva ativação de módulos, e fazer o paywall aparecer só no D6/D7 — sem nunca tirar do usuário a opção de assinar antes.
+Duas frentes complementares:
+1. **Variantes dinâmicas D1-D7**: cada e-mail escolhe uma de 2-3 versões com base no que o usuário já fez (registrou transação? iniciou hábito? logou treino?), focando em fechar a próxima lacuna de ativação.
+2. **Eventos de analytics**: medir cliques no banner de trial, conclusão de ações-chave por dia do trial, e conversão D6/D7 — tudo visível no `/admin`.
 
 ---
 
-## 1. Trial: 24h → 7 dias (sem cartão)
+## 1. Variantes dinâmicas D1-D7
 
-**Backend (`check-subscription/index.ts`)**
+### 1.1 Tabela de "ações-chave" (key activation events)
 
-- `checkTrialExpired`: trocar `hours > 24` por `days > 7`.
-- Retornar também `trial_day` (1–7) e `trial_hours_left` para o frontend renderizar prompts diferentes por dia.
+Nova tabela `user_activations` (uma linha por user × ação) com:
+- `user_id`, `action_key` (ex: `first_transaction`, `first_habit`, `first_workout`, `first_meal`, `first_task`, `first_water_log`, `first_note`)
+- `completed_at`, `metadata jsonb`
 
-**Frontend (`TrialBanner.tsx` + `use-auth.tsx`)**
+Preenchida de duas formas:
+- **Backfill via SQL**: detecta a partir de `user_data` chaves existentes (`financas_transactions`, `habits`, `treino_sessions`, etc.) — uma única migration roda uma vez para popular.
+- **Tempo real via frontend**: helper `markActivation(actionKey)` chamado nos pontos de criação (ex: ao salvar primeira transação). Idempotente (`ON CONFLICT DO NOTHING`).
 
-- `useAuth` passa a expor `trialDay` e `trialHoursLeft`.
-- Banner muda de tom por fase:
-  - **D1-D3** (descoberta): banner discreto "Você está no seu teste grátis — explore à vontade. [Assinar agora]".
-  - **D4-D5** (engajamento): banner mostra progresso de ativação ("Você já usou X módulos. Faltam Y dias.") + CTA suave.
-  - **D6** (conversão): banner sticky no topo com countdown "Resta 1 dia. Garanta seu acesso." + CTA primário.
-  - **D7** (último dia): modal não-bloqueante ao abrir o app + banner urgente.
-  - **Pós-D7**: tela bloqueante atual (já existe), redireciona para `/planos`.
-- Botão **"Assinar agora"** sempre visível em todos os estados (mesmo D1) → garante a opção de pagar quando quiser.
+### 1.2 Mapa de variantes por dia
 
-**Auth (`Auth.tsx` linha 229)**
+Para cada `email_key` D1-D7, defino 2-3 variantes no `dispatch-trial-emails`:
 
-- Trocar copy "Sem cartão de crédito necessário" por "**7 dias grátis. Sem cartão. Cancele quando quiser.**"
+| Dia | Variante padrão | Variante se já fez X |
+|-----|-----------------|----------------------|
+| D1 `first-action` | "Comece pela Rotina" | Se já criou tarefa → "Que tal anotar uma transação agora?" |
+| D2 `finance` | "Adicione 1 transação" | Se já tem transação → "Veja o resumo do mês no Painel" |
+| D3 `habit` | "Crie 1 hábito" | Se já tem hábito → "Mantenha sua sequência hoje" |
+| D4 `progress` | Recap genérico | Recap personalizado com módulos mais usados |
+| D5 `value` | "Veja seu painel" | Se baixo engajamento → "Que tal explorar [módulo X]?" |
+| D6 `convert` | CTA padrão | Se alto engajamento → "Você usou X módulos. Continue." |
+| D7 `last-call` | Urgência padrão | Se assinatura iminente provável → reforço de valor |
 
----
+**Lógica**: a edge function `dispatch-trial-emails` calcula `variant_key` por usuário antes de chamar `send-transactional-email`, passando-o como `templateData.variant` + dados ricos (`templateData.modulesUsed`, `templateData.transactionsCount`, etc.). Os templates React Email (criados quando o domínio for configurado) ramificam pela variant.
 
-## 2. Sequência de onboarding D1-D7
+### 1.3 Persistência da variante escolhida
 
-### Infraestrutura de e-mail
-
-Usar **Lovable Emails** (built-in). Sequência:
-
-1. Configurar domínio de e-mail (vai aparecer botão de setup se ainda não tiver).
-2. Scaffold de transactional emails.
-3. Criar 7 templates React Email em `_shared/transactional-email-templates/`:
-
-
-| Dia         | Template                | Gatilho                            | Mensagem-chave                                                              |
-| ----------- | ----------------------- | ---------------------------------- | --------------------------------------------------------------------------- |
-| D0 (signup) | `trial-welcome`         | imediato após signup               | "Bem-vindo. Seus 7 dias começaram. Comece pelo módulo Rotina."              |
-| D1          | `trial-d1-first-action` | 24h após signup, se não criou nada | "Que tal registrar sua primeira tarefa?" (deep-link `/rotina`)              |
-| D2          | `trial-d2-finance`      | 48h                                | "Adicione 1 transação e veja seu primeiro insight financeiro."              |
-| D3          | `trial-d3-habit`        | 72h                                | "Crie 1 hábito. Estudo mostra: 3 dias = início de rotina."                  |
-| D4          | `trial-d4-progress`     | 96h                                | Recap personalizado: "Você usou X módulos esta semana."                     |
-| D5          | `trial-d5-value`        | 120h                               | "Veja seu painel de progresso. Faltam 2 dias do trial."                     |
-| **D6**      | `trial-d6-convert`      | 144h                               | **Primeiro CTA forte de pagamento** — "Garanta seu acesso por R$14,90/mês." |
-| **D7**      | `trial-d7-last-call`    | 168h                               | **Último dia** — desconto opcional / urgência.                              |
-
-
-### Agendamento (cron)
-
-- Tabela nova: `trial_email_schedule` (`user_id`, `email_key`, `send_at`, `sent_at`, `status`).
-- No signup (trigger DB ou edge function `schedule-trial-emails`): inserir 8 linhas (D0–D7) com `send_at` calculado a partir de `created_at`.
-- Cron job pg_cron a cada 15min: chamar edge function `dispatch-trial-emails` que:
-  1. Busca rows com `send_at <= now()` e `status='pending'`.
-  2. Para cada uma, checa se usuário ainda está em trial e não pagou; se sim, invoca `send-transactional-email`.
-  3. Marca como `sent` (ou `skipped` se já é assinante).
-- **Idempotência**: `idempotencyKey = "trial-${user_id}-${email_key}"`.
-
-### Dados dinâmicos por e-mail
-
-Edge function de dispatch lê `module_analytics` e `user_data` do usuário para personalizar:
-
-- "Você ainda não criou nenhuma transação" vs. "Você já registrou 5 transações"
-- Lista os 3 módulos mais usados no D4.
-
-### Push notifications (web)
-
-- **Opt-in suave**: na primeira sessão >2min, modal "Quer dicas para aproveitar seu trial? Ative as notificações."
-- Usar Web Push API + Service Worker (`public/sw.js` já existe? — verificar; se não, criar).
-- Mesma sequência D1-D7 reaproveitada (push só dispara se permissão concedida; e-mail é fallback universal).
-- Para começar simples: implementar apenas o opt-in + persistência da subscription no Supabase (`push_subscriptions` table). Disparo real de push pode ficar para iteração futura — **e-mail é o canal principal**.
+`trial_email_schedule` ganha uma coluna `variant_key text` populada no momento do dispatch — assim conseguimos medir no admin qual variante converte mais.
 
 ---
 
-## 3. Pagamento sempre disponível
+## 2. Eventos de analytics
 
-- Botão "Assinar" persistente no `AccountDrawer` e no `TrialBanner` em **todos** os dias (D1-D7).
-- Página `/planos` acessível a qualquer momento via menu/conta.
-- Em todos os e-mails (mesmo D1-D5), incluir link discreto no rodapé: "Já quer assinar? [Garantir acesso]".
+### 2.1 Tabela `analytics_events`
+
+Genérica para qualquer evento custom:
+- `user_id`, `event_name`, `event_data jsonb`, `created_at`, `trial_day` (calculado), `session_id`
+
+Eventos rastreados:
+- `trial_banner_view` — quando o banner aparece (uma vez por sessão por fase)
+- `trial_banner_click` — clique no CTA "Assinar"/"Garantir acesso"
+- `trial_email_sent` — quando dispatch envia (com `email_key`, `variant_key`)
+- `key_action_completed` — ao chamar `markActivation` (mesma chave)
+- `subscription_started` — quando subscription vira `active` (já existe no webhook AbacatePay; só adicionamos `trial_day` no momento)
+- `paywall_view` — quando tela bloqueante D7+ aparece
+- `planos_view` — quando entra em `/planos`
+
+### 2.2 Helper frontend
+
+`src/lib/analytics.ts` exportando `trackEvent(name, data)`:
+- Insere em `analytics_events`
+- Calcula `trial_day` a partir de `useAuth().trialDay`
+- Não-bloqueante (fire-and-forget)
+
+Pontos de integração:
+- `TrialBanner.tsx`: dispara `trial_banner_view` no mount + `trial_banner_click` no botão.
+- `Planos.tsx`: `planos_view` no mount.
+- `markActivation` helper já dispara `key_action_completed`.
+- `abacatepay-webhook` (edge function): adiciona `subscription_started` ao confirmar pagamento.
+
+### 2.3 Novas views no /admin
+
+Duas páginas novas em `src/pages/admin/`:
+- **AdminActivation.tsx** — tabela: por dia do trial, % de usuários que completou cada `action_key`. Funil de ativação.
+- **AdminEmailVariants.tsx** — por `email_key` × `variant_key`: enviados, cliques no banner subsequente, conversões em 48h. CTR e taxa de conversão.
+
+E enriquecimentos:
+- **AdminConversion.tsx** existente: gráfico de conversões por `trial_day` (D6 vs D7 vs antes).
+- **AdminDashboard.tsx**: cards "CTR banner trial" e "Top variant convertendo".
+
+Funções RPC novas (SECURITY DEFINER + checagem `has_role admin`):
+- `admin_activation_funnel()` — retorna (action_key, completed_count, total_users, pct).
+- `admin_email_variant_stats()` — retorna (email_key, variant_key, sent, clicks_after, conversions_48h).
+- `admin_conversion_by_trial_day()` — retorna (trial_day, conversions).
 
 ---
 
-## 4. Mudanças no banco
+## 3. Integração com trial-banner já existente
 
-Migração nova (apenas schema, sem dados):
-
-1. `trial_email_schedule` (id, user_id, email_key, send_at, sent_at, status, created_at) com RLS.
-2. `push_subscriptions` (id, user_id, endpoint, p256dh, auth, created_at) com RLS.
-3. Trigger `on_auth_user_created`: além de criar profile, popular `trial_email_schedule` com 8 entradas.
-4. Cron pg_cron `dispatch-trial-emails` a cada 15min via pg_net.
-
-Funções `admin_metrics_overview` e similares: nada muda; passam a refletir naturalmente o trial de 7 dias.
+O `TrialBanner.tsx` ganha:
+- `useEffect` que dispara `trackEvent('trial_banner_view', { phase, trial_day })` por fase.
+- `onClick` do botão dispara `trackEvent('trial_banner_click', { phase, trial_day })` antes do `navigate`.
 
 ---
 
-## 5. Detalhes técnicos
+## 4. Pontos de `markActivation` no código
 
-**Arquivos novos**
+Adicionar chamadas onde o usuário cria/registra pela primeira vez:
+- `Rotina.tsx` (criar tarefa) → `first_task`
+- componentes financeiros (criar transação) → `first_transaction`
+- `Saude.tsx`/hábitos (criar hábito) → `first_habit`
+- `Treino.tsx` (logar sessão) → `first_workout`
+- `Dieta.tsx` (registrar refeição) → `first_meal`
+- `HydrationTracker.tsx` (primeiro registro) → `first_water_log`
+- `Notes.tsx` (criar nota) → `first_note`
 
-- `supabase/functions/dispatch-trial-emails/index.ts`
-- `supabase/functions/_shared/transactional-email-templates/trial-welcome.tsx` (e D1-D7)
-- `supabase/functions/_shared/transactional-email-templates/registry.ts` (atualizar)
-- `src/hooks/use-push-notifications.ts`
-- `src/components/PushOptInModal.tsx`
-- `public/sw.js` (se não existir)
+Helper é idempotente — chamar várias vezes não polui dados.
 
-**Arquivos editados**
+---
 
-- `supabase/functions/check-subscription/index.ts` — 24h → 7d, expor `trial_day`.
-- `src/hooks/use-auth.tsx` — expor `trialDay`, `trialHoursLeft`.
-- `src/components/TrialBanner.tsx` — UI por fase + CTA sempre visível.
-- `src/pages/Auth.tsx` — copy "7 dias sem cartão".
-- `src/components/home/AccountDrawer.tsx` — botão "Assinar" permanente.
+## 5. Mudanças no banco (1 migração)
 
-**Pré-requisito de e-mail**: Se o domínio ainda não estiver configurado, o setup vai aparecer como primeiro passo. Após configuração, a sequência é ativada automaticamente.
+1. `user_activations` (user_id, action_key, completed_at, metadata) + RLS (user lê próprias; admin lê todas).
+2. `analytics_events` (user_id, event_name, event_data, trial_day, created_at, session_id) + RLS (user insere próprias; admin lê todas).
+3. Coluna `variant_key text` em `trial_email_schedule`.
+4. Backfill de `user_activations` a partir de `user_data` existente.
+5. Funções `admin_activation_funnel`, `admin_email_variant_stats`, `admin_conversion_by_trial_day`.
+
+---
+
+## 6. Arquivos
+
+**Novos**
+- `src/lib/analytics.ts` — `trackEvent`, `markActivation`
+- `src/hooks/use-trial-activations.ts` — leitura das ativações no frontend
+- `src/pages/admin/AdminActivation.tsx`
+- `src/pages/admin/AdminEmailVariants.tsx`
+
+**Editados**
+- `supabase/functions/dispatch-trial-emails/index.ts` — calcula variante por usuário, grava `variant_key`, dispara `trial_email_sent`
+- `supabase/functions/abacatepay-webhook/index.ts` — adiciona `subscription_started` event
+- `src/components/TrialBanner.tsx` — view + click events
+- `src/pages/Planos.tsx` — view event
+- `src/pages/admin/AdminLayout.tsx` — links para novas abas
+- `src/pages/admin/AdminDashboard.tsx` — cards extras
+- `src/pages/admin/AdminConversion.tsx` — gráfico por trial_day
+- Vários componentes/módulos: chamadas a `markActivation` nos pontos de criação
 
 ---
 
 ## Resultado esperado
 
-- Trial de 7 dias real, sem fricção de cartão na entrada.
-- 8 toques de e-mail bem-cronometrados aumentando ativação e empurrando conversão só quando faz sentido (D6/D7).
-- Push como canal complementar (opt-in).
-- Pagamento disponível a qualquer momento — usuário decidido converte no D2 se quiser.
-- Métricas do `/admin` continuam funcionando e agora ficam mais ricas (vão mostrar conversão por dia do trial).
+- Cada e-mail D1-D7 fala exatamente da próxima ação que falta para o usuário ativar — não recomenda algo que ele já fez.
+- Tudo o que o usuário faz com o banner (ver, clicar) e com o trial (ações-chave, conversão D6/D7) vai parar em `analytics_events`.
+- Duas páginas novas no `/admin` mostram funil de ativação e qual variante de e-mail converte melhor.
+- Dashboard ganha cards de CTR e variante vencedora.
+- Quando o domínio de e-mail for configurado, os templates já consomem `templateData.variant` automaticamente — zero retrabalho.

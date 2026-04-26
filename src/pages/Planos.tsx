@@ -1,8 +1,8 @@
-import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -21,30 +21,47 @@ const Planos = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
   const allowExitRef = useRef(false);
+  const winbackRef = useRef(winback);
+  winbackRef.current = winback;
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
   }, []);
 
-  // Block navigation away from /planos when user has expired trial and is not subscribed.
-  // On block, trigger the winback flow instead of leaving.
-  const shouldBlock = !!user && !isSubscribed && trialExpired && !winback.alreadyShown && !allowExitRef.current;
-  const blocker = useBlocker(shouldBlock);
+  const shouldGuard = !!user && !isSubscribed && trialExpired;
 
+  // Intercept browser back button (popstate) when we should guard the exit.
+  // We push a sentinel state on mount; on back, we re-push it and trigger winback.
   useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    (async () => {
-      const opened = await winback.triggerNow("abandon_planos");
+    if (!shouldGuard) return;
+    window.history.pushState({ planosGuard: true }, "");
+
+    const onPopState = async () => {
+      if (allowExitRef.current || winbackRef.current.alreadyShown) return;
+      // Re-push so the user stays on /planos
+      window.history.pushState({ planosGuard: true }, "");
+      const opened = await winbackRef.current.triggerNow("abandon_planos");
       if (!opened) {
-        // Cooldown active or other reason — let the user leave
         allowExitRef.current = true;
-        blocker.proceed();
-      } else {
-        // Stay on page; user must interact with the wheel/offer.
-        blocker.reset();
+        navigate(-1);
       }
-    })();
-  }, [blocker, winback]);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [shouldGuard, navigate]);
+
+  // Intercept the in-page back button.
+  const handleBack = useCallback(async () => {
+    if (!shouldGuard || allowExitRef.current || winback.alreadyShown) {
+      navigate(-1);
+      return;
+    }
+    const opened = await winback.triggerNow("abandon_planos");
+    if (!opened) {
+      allowExitRef.current = true;
+      navigate(-1);
+    }
+  }, [shouldGuard, winback, navigate]);
 
   // After winback closes, allow leaving on the next attempt.
   const handleWinbackClose = () => {

@@ -2,12 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
-  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff, BarChart3
+  BookOpen, Droplets, Plane, Briefcase, Dumbbell, Apple, Brain, Users, PawPrint, Leaf, Star, Settings, Eye, EyeOff
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
-import { useAuth } from "@/hooks/use-auth";
-import { checkIsAdmin } from "@/lib/admin";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const modules = [
   { id: "financas", path: "/financas", Icon: DollarSign, label: "Finanças", color: "bg-amber-400/20 text-amber-600" },
@@ -30,16 +28,8 @@ const modules = [
 
 export const ModuleDrawer = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
-  const [isAdminUser, setIsAdminUser] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    checkIsAdmin(user?.id).then(v => { if (active) setIsAdminUser(v); });
-    return () => { active = false; };
-  }, [user?.id]);
 
   const sorted = [...modules].sort((a, b) => {
     const af = isFavorite(a.id) ? 0 : 1;
@@ -115,16 +105,6 @@ export const ModuleDrawer = () => {
           className="w-full text-center mt-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
         >
           +{hiddenCount} oculto{hiddenCount > 1 ? "s" : ""} · Editar
-        </button>
-      )}
-
-      {isAdminUser && (
-        <button
-          onClick={() => navigate("/admin/analytics")}
-          className="w-full flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border text-xs text-primary hover:text-primary/80 transition-colors"
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          Painel Analytics
         </button>
       )}
 

@@ -35,7 +35,14 @@ import Relacionamentos from "./pages/Relacionamentos";
 import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
-import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
+import AdminConversion from "./pages/admin/AdminConversion";
+import AdminChurn from "./pages/admin/AdminChurn";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminFunnel from "./pages/admin/AdminFunnel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -67,7 +74,15 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="pet"><PetPage /></TrackedModule></></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="detox"><Detox /></TrackedModule></></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/admin/analytics" element={<ProtectedRoute><PageTransition><AdminAnalytics /></PageTransition></ProtectedRoute>} />
+        <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route path="dashboard" element={<AdminDashboard />} />
+          <Route path="analytics" element={<AdminAnalyticsPage />} />
+          <Route path="conversao" element={<AdminConversion />} />
+          <Route path="churn" element={<AdminChurn />} />
+          <Route path="usuarios" element={<AdminUsers />} />
+          <Route path="funil" element={<AdminFunnel />} />
+        </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>

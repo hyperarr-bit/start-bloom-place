@@ -159,9 +159,178 @@ export default function AdminRetention() {
           aplicada no AbacatePay (job <code className="text-zinc-400">apply-pending-discounts</code>).
         </p>
       </Section>
+
+      {/* WIN-BACK 80% OFF SECTION */}
+      <WinbackSection />
     </div>
   );
 }
+
+function WinbackSection() {
+  const { data, loading, error } = useWinbackStats();
+
+  if (loading) {
+    return (
+      <section className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-4">
+        <div className="flex items-center text-zinc-500 text-sm">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Carregando win-back…
+        </div>
+      </section>
+    );
+  }
+  if (error || !data) {
+    return <div className="text-red-400 text-sm">Erro win-back: {error ?? "sem dados"}</div>;
+  }
+
+  const a = data.all_time;
+  const a30 = data.last_30d;
+  const oneInX = a.converted > 0 ? Math.round(a.offer_shown / a.converted) : null;
+
+  // Drop-off computation
+  const steps = [
+    { key: "triggered", label: "Funil disparado", value: a.triggered, icon: <Sparkles className="w-3.5 h-3.5" /> },
+    { key: "wheel_spun", label: "Girou a roleta", value: a.wheel_spun, icon: <RotateCw className="w-3.5 h-3.5" /> },
+    { key: "offer_shown", label: "Viu a oferta", value: a.offer_shown, icon: <Eye className="w-3.5 h-3.5" /> },
+    { key: "accepted", label: "Clicou em garantir", value: a.accepted, icon: <MousePointerClick className="w-3.5 h-3.5" /> },
+    { key: "converted", label: "Pagamento confirmado", value: a.converted, icon: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> },
+  ];
+
+  const maxTriggered = Math.max(1, ...data.by_day.map((d) => d.triggered + d.converted));
+
+  return (
+    <section className="rounded-lg border border-primary/30 bg-gradient-to-br from-primary/5 to-zinc-900/30 p-4 space-y-4">
+      <header className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary" />
+          <h2 className="text-base font-semibold">Win-back 80% OFF (Anual)</h2>
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-zinc-500">
+          Roleta + oferta R$ {data.monthly_equiv_brl.toFixed(2).replace(".", ",")}/mês
+        </span>
+      </header>
+
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <MiniKpi icon={<Sparkles className="w-3.5 h-3.5" />} label="Disparados" value={a.triggered} sub={`${a30.triggered} em 30d`} />
+        <MiniKpi icon={<RotateCw className="w-3.5 h-3.5" />} label="Roleta girada" value={a.wheel_spun} sub={`${a.spin_rate_pct ?? 0}% dos disparos`} />
+        <MiniKpi icon={<Eye className="w-3.5 h-3.5" />} label="Oferta vista" value={a.offer_shown} sub={`${a.offer_view_rate_pct ?? 0}% dos giros`} />
+        <MiniKpi icon={<MousePointerClick className="w-3.5 h-3.5 text-amber-400" />} label="Aceitaram" value={a.accepted} sub={`${a.accept_rate_pct ?? 0}% das ofertas`} />
+        <MiniKpi
+          icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}
+          label="Converteram"
+          value={a.converted}
+          sub={`${a.conversion_rate_pct}% das ofertas`}
+          highlight
+        />
+        <MiniKpi
+          icon={<DollarSign className="w-3.5 h-3.5 text-emerald-400" />}
+          label="Receita recuperada"
+          value={`R$ ${a.revenue_recovered_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+          sub={`${data.annual_price_brl.toFixed(2).replace(".", ",")} por conversão`}
+          highlight
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Funil */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
+          <h3 className="text-xs font-medium text-zinc-300 mb-3">Funil completo</h3>
+          <div className="space-y-2">
+            {steps.map((s, i) => {
+              const pct = steps[0].value > 0 ? (s.value / steps[0].value) * 100 : 0;
+              const dropFromPrev = i > 0 && steps[i - 1].value > 0
+                ? Math.round(100 - (s.value / steps[i - 1].value) * 100)
+                : 0;
+              return (
+                <div key={s.key} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-zinc-300">{s.icon}{s.label}</span>
+                    <span className="text-zinc-100 font-semibold">
+                      {s.value}
+                      {i > 0 && dropFromPrev > 0 && (
+                        <span className="ml-2 text-[10px] text-red-400">−{dropFromPrev}%</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${s.key === "converted" ? "bg-emerald-400" : "bg-primary"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-zinc-800 space-y-1 text-[11px] text-zinc-400">
+            <div className="flex justify-between">
+              <span>Conversão geral (sobre disparos)</span>
+              <span className="text-zinc-100 font-semibold">{a.global_conversion_pct ?? 0}%</span>
+            </div>
+            {oneInX && (
+              <div className="flex justify-between">
+                <span>Eficiência da oferta</span>
+                <span className="text-emerald-400 font-semibold">1 a cada {oneInX} converte</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Sparkline 30d */}
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xs font-medium text-zinc-300">Últimos 30 dias</h3>
+            <div className="flex items-center gap-3 text-[10px] text-zinc-500">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary/50" />Disparados</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400" />Converteram</span>
+            </div>
+          </div>
+          <div className="flex items-end gap-[2px] h-32">
+            {data.by_day.map((d) => {
+              const tH = (d.triggered / maxTriggered) * 100;
+              const cH = (d.converted / maxTriggered) * 100;
+              return (
+                <div key={d.date} className="flex-1 flex flex-col justify-end gap-[1px] group relative" title={`${d.date}: ${d.triggered} disparos · ${d.converted} conv.`}>
+                  {d.converted > 0 && (
+                    <div className="bg-emerald-400 rounded-sm" style={{ height: `${Math.max(2, cH)}%` }} />
+                  )}
+                  <div className="bg-primary/40 rounded-sm" style={{ height: `${Math.max(1, tH - cH)}%` }} />
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-zinc-800 text-[11px]">
+            <PeriodStat label="7d" period={data.last_7d} />
+            <PeriodStat label="30d" period={a30} />
+            <PeriodStat label="Total" period={a} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function MiniKpi({ icon, label, value, sub, highlight }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; highlight?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-2.5 ${highlight ? "border-emerald-500/30 bg-emerald-500/5" : "border-zinc-800 bg-zinc-950/50"}`}>
+      <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-zinc-500">{icon}{label}</div>
+      <div className={`text-xl font-bold mt-1 ${highlight ? "text-emerald-400" : "text-zinc-100"}`}>{value}</div>
+      {sub && <div className="text-[10px] text-zinc-500 mt-0.5">{sub}</div>}
+    </div>
+  );
+}
+
+function PeriodStat({ label, period }: { label: string; period: { triggered: number; converted: number; revenue_recovered_brl: number } }) {
+  return (
+    <div className="text-center">
+      <div className="text-[10px] uppercase text-zinc-500">{label}</div>
+      <div className="text-zinc-100 font-semibold mt-0.5">
+        {period.converted}<span className="text-zinc-500">/{period.triggered}</span>
+      </div>
+      <div className="text-[10px] text-emerald-400">R$ {period.revenue_recovered_brl.toFixed(0)}</div>
+    </div>
+  );
 
 function OffersBreakdownTable({ rows }: { rows: OfferRow[] }) {
   const grouped = rows.reduce<Record<string, { rows: OfferRow[]; total: number; applied: number; failed: number }>>(

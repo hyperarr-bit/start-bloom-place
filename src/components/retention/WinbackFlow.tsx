@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { WinbackWheel } from "./WinbackWheel";
 import { WinbackOffer } from "./WinbackOffer";
-import { supabase } from "@/integrations/supabase/client";
-import { trackEvent } from "@/lib/analytics";
+import { X } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -15,70 +14,28 @@ export function WinbackFlow({ open, onClose, attemptId }: Props) {
   const [step, setStep] = useState<"wheel" | "offer">("wheel");
 
   useEffect(() => {
-    if (open) {
-      setStep("wheel");
-      trackEvent("winback_triggered");
-      // mark wheel_shown timestamp
-      if (attemptId) {
-        supabase
-          .from("winback_attempts")
-          .update({ wheel_shown_at: new Date().toISOString() })
-          .eq("id", attemptId)
-          .then(() => {});
-      }
-    }
-  }, [open, attemptId]);
-
-  const handleWheelDone = async () => {
-    if (attemptId) {
-      await supabase
-        .from("winback_attempts")
-        .update({
-          wheel_spun_at: new Date().toISOString(),
-          offer_shown_at: new Date().toISOString(),
-        })
-        .eq("id", attemptId);
-    }
-    setStep("offer");
-  };
-
-  const handleClose = async () => {
-    if (attemptId) {
-      await supabase
-        .from("winback_attempts")
-        .update({ dismissed_at: new Date().toISOString() })
-        .eq("id", attemptId);
-    }
-    onClose();
-  };
-
-  if (!open) return null;
+    if (open) setStep("wheel");
+  }, [open]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
-      <AnimatePresence mode="wait">
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent
+        className="max-w-md w-[calc(100%-2rem)] max-h-[95vh] overflow-y-auto p-6 gap-0 [&>button]:hidden"
+      >
+        <button
+          onClick={onClose}
+          aria-label="Fechar"
+          className="absolute top-3 right-3 z-50 w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
         {step === "wheel" ? (
-          <motion.div
-            key="wheel"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
-            <WinbackWheel onContinue={handleWheelDone} />
-          </motion.div>
+          <WinbackWheel attemptId={attemptId} onSpinComplete={() => setStep("offer")} />
         ) : (
-          <motion.div
-            key="offer"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            <WinbackOffer onClose={handleClose} />
-          </motion.div>
+          <WinbackOffer attemptId={attemptId} />
         )}
-      </AnimatePresence>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

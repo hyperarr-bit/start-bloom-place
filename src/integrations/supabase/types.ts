@@ -383,6 +383,45 @@ export type Database = {
         }
         Relationships: []
       }
+      winback_attempts: {
+        Row: {
+          accepted_at: string | null
+          converted_at: string | null
+          created_at: string
+          dismissed_at: string | null
+          id: string
+          offer_shown_at: string | null
+          triggered_at: string
+          user_id: string
+          wheel_shown_at: string | null
+          wheel_spun_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          converted_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          offer_shown_at?: string | null
+          triggered_at?: string
+          user_id: string
+          wheel_shown_at?: string | null
+          wheel_spun_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          converted_at?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          id?: string
+          offer_shown_at?: string | null
+          triggered_at?: string
+          user_id?: string
+          wheel_shown_at?: string | null
+          wheel_spun_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

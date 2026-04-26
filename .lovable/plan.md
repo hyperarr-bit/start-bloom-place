@@ -1,42 +1,52 @@
-# Corrigir conflito entre paywall antigo e novo win-back
+# Ajustar fluxo: preços normais primeiro, roleta como win-back
 
-## Problema (visível no screenshot)
-Na Home, com trial expirado, três fluxos antigos sobrepõem a tela ao mesmo tempo:
-
-1. **TrialBanner** (tela cheia bloqueante) — "Seu trial de 7 dias terminou · Ver planos a partir de R$14,90/mês"
-2. **DailyNudge** (drawer inferior) — "DIA 7 DE 7 · TRIAL CORE · Seu trial terminou · Ver planos"
-3. O novo **WinbackFlow (roleta + 80% OFF)** só aparece em `/planos` quando o usuário clica em assinar e desiste — então hoje ele nem é o fluxo principal de paywall.
-
-Resultado: dois CTAs antigos ("Ver planos a partir de R$14,90") competindo entre si e mascarando a oferta nova de R$ 3,98/mês.
-
-## Decisão
-Unificar tudo em torno do novo win-back. O paywall expirado vira **um único ponto de entrada** que leva ao funil novo (roleta → 80% OFF anual).
+## Comportamento correto (do usuário)
+1. Trial termina → tela bloqueante "Ver planos" (sem oferta especial visível).
+2. Usuário cai em `/planos` e vê os preços **normais** (mensal R$ 19,90 · anual R$ 14,90/mês).
+3. **Roleta dispara apenas se:**
+   - (a) Usuário tenta sair de `/planos` sem assinar (back/fechar/navegar pra outra rota), OU
+   - (b) Usuário foi pro checkout e voltou pro app sem ter completado a assinatura.
 
 ## Mudanças
 
-### 1. `src/components/TrialBanner.tsx` — paywall expirado
-- Manter o lock screen full-screen para `trialExpired`, mas:
-  - Trocar CTA "Ver planos a partir de R$14,90/mês" por **"Resgatar oferta especial → 80% OFF"** (subtítulo: "R$ 3,98/mês no plano anual").
-  - Ao clicar: chamar `markIntent()` (do `use-winback-trigger`) e navegar para `/planos?canceled=true` para forçar o disparo do `WinbackFlow`.
-- Banners não-expirados (D1–D7) seguem iguais.
+### 1. `src/components/TrialBanner.tsx` — voltar ao paywall simples
+Reverter a tela "trial expirado" para mostrar apenas:
+- Lock + "Seu trial de 7 dias terminou"
+- Texto curto: "Continue de onde parou. Escolha o plano que combina com você."
+- Botão único "Ver planos" → navega para `/planos?from=trial_expired`
+- **Sem** card de oferta 80% OFF, sem mencionar desconto.
 
-### 2. `src/lib/dailyNudge.ts` — remover duplicata
-- Remover o case `trialExpired` (linhas 26–35). Quando o trial expirou, o `TrialBanner` full-screen já cobre tudo; não faz sentido ter um drawer abaixo dele.
-- `pickDailyNudge` retorna `null` se `trialExpired === true`.
+### 2. `src/hooks/use-winback-trigger.ts` — remover gatilho automático por trial expirado
+- Remover a lógica `fromTrialExpired` que dispara a roleta só por chegar em /planos.
+- Manter apenas dois gatilhos válidos:
+  - `?canceled=true` na URL (volta do checkout cancelado).
+  - `recentIntent` (clicou em "Assinar" nos últimos 10 min e voltou).
+- Adicionar **3º gatilho novo**: detectar **abandono de /planos**. Quando o usuário tem trial expirado (ou não-assinante) e está em /planos, escutar:
+  - `popstate` (botão voltar do navegador), OR
+  - clique no botão "voltar" interno da página, OR
+  - tentativa de navegar para outra rota (via React Router `useBlocker` ou interceptando cliques em links/nav).
+  - Quando detectado → disparar a roleta no lugar de deixar sair.
 
-### 3. `src/hooks/use-winback-trigger.ts` — permitir trigger via expiração
-- Adicionar nova fonte: se `trialExpired === true` e usuário não assinou, considerar isso como gatilho válido (mesmo sem `?canceled=true` ou intent recente), respeitando o cooldown de 30 dias.
-- Adicionar `source: "trial_expired"` no `trackEvent`.
+### 3. `src/pages/Planos.tsx` — bloquear saída de não-assinantes com trial expirado
+- Usar `useBlocker` do React Router (v6.4+) ou listener de `popstate` para interceptar a saída.
+- Condição de bloqueio: `trialExpired === true && !isSubscribed && !winbackJaMostrado`.
+- Ao tentar sair → cancelar navegação e abrir `WinbackFlow`.
+- Após o usuário fechar a roleta (`dismissed_at` registrado), liberar a próxima tentativa de saída (não bloquear infinitamente).
+- O botão "voltar" do header da página `/planos` também aciona o mesmo bloqueio.
 
-### 4. `src/pages/Planos.tsx`
-- Já monta `WinbackFlow` — sem mudança estrutural. Garantir que `markIntent()` é chamado no clique do botão "Assinar" (provavelmente já é).
+### 4. Detectar volta do checkout sem pagamento
+- Quando usuário clica "Assinar" → `markIntent()` já é chamado (Planos.tsx linha 52) e ele é redirecionado pro AbacatePay.
+- Se ele voltar pro app **sem** ter finalizado o pagamento, em qualquer rota com `useWinbackTrigger` montado (já está em `/planos`), o `recentIntent` (10 min) dispara a roleta. **Já funciona hoje.**
+- Garantir que o `Home` ou rota raiz também monte um listener leve do winback caso o usuário volte direto pra `/` em vez de `/planos`. Adicionar um `WinbackFlow` mount no `App.tsx` (ou num componente global) que escuta o `recentIntent` em qualquer rota.
 
 ## Resultado esperado
-- Trial expirado → vê **apenas** o lock screen com CTA da oferta 80% OFF → clica → cai direto na roleta + oferta anual de R$ 3,98/mês.
-- Sem drawer duplicado.
-- DailyNudge continua funcionando normalmente nos dias 1–7 do trial ativo.
+- Trial expirado → vê preços normais primeiro, sem desconto à vista.
+- Tenta fechar/voltar de /planos → **aí** aparece a roleta com 80% OFF anual.
+- Vai pro checkout AbacatePay e desiste → ao voltar pro app, dispara a roleta.
+- Cooldown de 30 dias continua valendo (só uma tentativa de winback por mês).
 
 ## Arquivos
 - editar `src/components/TrialBanner.tsx`
-- editar `src/lib/dailyNudge.ts`
 - editar `src/hooks/use-winback-trigger.ts`
+- editar `src/pages/Planos.tsx`
+- editar `src/App.tsx` (montar WinbackFlow global para capturar volta do checkout em qualquer rota)

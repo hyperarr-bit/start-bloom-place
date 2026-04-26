@@ -38,30 +38,33 @@ export const TrialBanner = () => {
 
   if (isSubscribed || !user) return null;
 
-  // Trial expired — blocking screen com oferta especial 80% OFF
+  // Trial expired — blocking screen
   if (trialExpired) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="fixed inset-0 z-50 bg-background flex items-center justify-center px-4"
-      >
-        <div className="max-w-sm w-full text-center space-y-6">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-            <Lock className="w-8 h-8 text-primary" />
+      <>
+        <GlobalWinback />
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed inset-0 z-50 bg-background flex items-center justify-center px-4"
+        >
+          <div className="max-w-sm w-full text-center space-y-6">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+              <Lock className="w-8 h-8 text-primary" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Continue de onde parou com acesso completo a todos os módulos.
+                Escolha o plano que combina com você.
+              </p>
+            </div>
+            <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>
+              Ver planos
+            </Button>
           </div>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Continue de onde parou com acesso completo a todos os módulos.
-              Escolha o plano que combina com você.
-            </p>
-          </div>
-          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>
-            Ver planos
-          </Button>
-        </div>
-      </motion.div>
+        </motion.div>
+      </>
     );
   }
 

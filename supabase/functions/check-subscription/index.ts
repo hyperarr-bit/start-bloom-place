@@ -73,14 +73,16 @@ serve(async (req) => {
       }
     }
 
-    // No active subscription — check trial
-    const trialExpired = checkTrialExpired(profile?.created_at);
-    logStep("No active subscription", { trialExpired });
+    // No active subscription — compute trial state (7-day trial, no card)
+    const trialState = computeTrialState(profile?.created_at);
+    logStep("No active subscription", trialState);
 
     return new Response(
       JSON.stringify({
         subscribed: false,
-        trial_expired: trialExpired,
+        trial_expired: trialState.expired,
+        trial_day: trialState.day,
+        trial_hours_left: trialState.hoursLeft,
         subscription_end: null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -95,8 +97,14 @@ serve(async (req) => {
   }
 });
 
-function checkTrialExpired(createdAt: string | null | undefined): boolean {
-  if (!createdAt) return false;
-  const hours = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60);
-  return hours > 24;
+const TRIAL_DAYS = 7;
+function computeTrialState(createdAt: string | null | undefined) {
+  if (!createdAt) return { expired: false, day: 1, hoursLeft: TRIAL_DAYS * 24 };
+  const ms = Date.now() - new Date(createdAt).getTime();
+  const totalHours = ms / (1000 * 60 * 60);
+  const totalDays = totalHours / 24;
+  const expired = totalDays > TRIAL_DAYS;
+  const day = Math.min(TRIAL_DAYS, Math.max(1, Math.ceil(totalDays === 0 ? 1 : totalDays)));
+  const hoursLeft = Math.max(0, TRIAL_DAYS * 24 - totalHours);
+  return { expired, day, hoursLeft };
 }

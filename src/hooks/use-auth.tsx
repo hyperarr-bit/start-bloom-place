@@ -8,6 +8,8 @@ interface AuthContextType {
   loading: boolean;
   trialExpired: boolean;
   isSubscribed: boolean;
+  trialDay: number;
+  trialHoursLeft: number;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;

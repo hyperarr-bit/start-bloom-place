@@ -121,7 +121,7 @@ const Planos = () => {
       <WinbackFlow open={winback.open} onClose={handleWinbackClose} attemptId={winback.attemptId} />
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-muted">
+          <button onClick={handleBack} className="p-2 rounded-lg hover:bg-muted">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold">Escolha seu plano</h1>

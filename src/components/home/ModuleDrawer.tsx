@@ -6,8 +6,8 @@ import {
 } from "lucide-react";
 import { useModulePreferences } from "@/hooks/use-module-preferences";
 import { useAuth } from "@/hooks/use-auth";
-import { isAdmin } from "@/lib/admin";
-import { useState } from "react";
+import { checkIsAdmin } from "@/lib/admin";
+import { useEffect, useState } from "react";
 
 const modules = [
   { id: "financas", path: "/financas", Icon: DollarSign, label: "Finanças", color: "bg-amber-400/20 text-amber-600" },
@@ -33,6 +33,13 @@ export const ModuleDrawer = () => {
   const { user } = useAuth();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    checkIsAdmin(user?.id).then(v => { if (active) setIsAdminUser(v); });
+    return () => { active = false; };
+  }, [user?.id]);
 
   const sorted = [...modules].sort((a, b) => {
     const af = isFavorite(a.id) ? 0 : 1;
@@ -111,7 +118,7 @@ export const ModuleDrawer = () => {
         </button>
       )}
 
-      {isAdmin(user?.id, user?.email) && (
+      {isAdminUser && (
         <button
           onClick={() => navigate("/admin/analytics")}
           className="w-full flex items-center justify-center gap-2 mt-4 pt-3 border-t border-border text-xs text-primary hover:text-primary/80 transition-colors"

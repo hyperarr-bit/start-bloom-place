@@ -15,14 +15,14 @@ const PRODUCTS = [
     externalId: "core-pro-monthly",
     name: "CORE Pro Mensal",
     description: "Assinatura mensal do CORE Pro - acesso completo a todos os módulos",
-    price: 1990, // R$ 19,90 em centavos
+    price: 1990,
   },
   {
     configKey: "abacatepay_product_annual_id",
     externalId: "core-pro-annual",
     name: "CORE Pro Anual",
     description: "Assinatura anual do CORE Pro - acesso completo a todos os módulos",
-    price: 17880, // R$ 178,80 em centavos (R$ 14,90 x 12)
+    price: 17880,
   },
 ];
 
@@ -70,19 +70,43 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // ── ADMIN AUTH GUARD ──
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    const supaAuth = createClient(supabaseUrl, anonKey);
+    const { data: authData, error: authErr } = await supaAuth.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (authErr || !authData?.user) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+
+    // Use service-role client to check role (bypasses RLS safely server-side)
+    const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+    const { data: roleRow, error: roleErr } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (roleErr || !roleRow) {
+      log("Forbidden non-admin attempt", { userId: authData.user.id });
+      return jsonResponse({ error: "Forbidden" }, 403);
+    }
+
     const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
     if (!apiKey) throw new Error("ABACATEPAY_API_KEY not configured");
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
 
     const result: Record<string, { id: string; created: boolean; name: string }> = {};
 
     for (const p of PRODUCTS) {
-      // Check if we already saved an id
       const { data: existing } = await supabase
         .from("app_config")
         .select("value")
@@ -96,7 +120,6 @@ serve(async (req) => {
         continue;
       }
 
-      // Try to find existing product on AbacatePay first (idempotent recovery)
       let newId: string | null = await findProductByExternalId(apiKey, p.externalId);
       let created = false;
 

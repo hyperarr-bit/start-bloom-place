@@ -1,5 +1,21 @@
-export const ADMIN_ID = "2c896992-6849-4ca6-9a66-5c2414bb9424";
-export const ADMIN_EMAIL = "jv20101958@gmail.com";
+import { supabase } from "@/integrations/supabase/client";
 
-export const isAdmin = (userId: string | undefined, email?: string | null): boolean =>
-  userId === ADMIN_ID || email === ADMIN_EMAIL;
+/**
+ * Server-side admin check via `user_roles` table + `has_role` RPC pattern.
+ * NEVER trust client-side hardcoded ids for security decisions — always
+ * also enforce via RLS policies on the server.
+ */
+export const checkIsAdmin = async (userId: string | undefined): Promise<boolean> => {
+  if (!userId) return false;
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (error) {
+    console.error("[admin] role check failed:", error);
+    return false;
+  }
+  return !!data;
+};

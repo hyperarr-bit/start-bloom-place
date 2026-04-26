@@ -23,12 +23,10 @@ export function WinbackFlow({ open, onClose, attemptId }: Props) {
         className="max-w-md w-[calc(100%-2rem)] max-h-[95vh] overflow-y-auto p-6 gap-0 [&>button]:hidden z-[200]"
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <VisuallyHidden>
-          <DialogTitle>Sua oferta especial</DialogTitle>
-          <DialogDescription>
-            Gire a roleta e descubra o desconto exclusivo que reservamos para você.
-          </DialogDescription>
-        </VisuallyHidden>
+        <DialogTitle className="sr-only">Sua oferta especial</DialogTitle>
+        <DialogDescription className="sr-only">
+          Gire a roleta e descubra o desconto exclusivo que reservamos para você.
+        </DialogDescription>
 
         <button
           onClick={onClose}

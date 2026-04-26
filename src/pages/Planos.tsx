@@ -21,6 +21,7 @@ const Planos = () => {
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
   const allowExitRef = useRef(false);
+  const sentinelPushedRef = useRef(false);
   const winbackRef = useRef(winback);
   winbackRef.current = winback;
 
@@ -29,61 +30,75 @@ const Planos = () => {
   }, []);
 
   // Guard exit whenever the user is logged in and not yet a paying subscriber.
-  // (Includes trial-active users — abandoning /planos always offers the win-back.)
   const shouldGuard = !!user && !isSubscribed;
 
-  // Intercept browser back button (popstate) when we should guard the exit.
-  // We push a sentinel state on mount; on back, we re-push it and trigger winback.
+  // Safe exit: navigate back if there's history, otherwise go home.
+  const safeExit = useCallback(() => {
+    allowExitRef.current = true;
+    // Se já empurramos o sentinel, history.length tem +1; a entrada anterior
+    // ainda existe, então navigate(-1) volta para a tela de origem (ex.: trial).
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/", { replace: true });
+    }
+  }, [navigate]);
+
+  // Intercept browser back button (popstate). Push a sentinel once; when the
+  // user presses back, try to open the winback. If it opens, hold them on
+  // /planos until they close it. If it doesn't open, let the navigation through.
   useEffect(() => {
     if (!shouldGuard) return;
-    window.history.pushState({ planosGuard: true }, "");
+    if (!sentinelPushedRef.current) {
+      window.history.pushState({ planosGuard: true }, "");
+      sentinelPushedRef.current = true;
+    }
 
     const onPopState = async () => {
-      if (
-        allowExitRef.current ||
-        winbackRef.current.alreadyShown ||
-        winbackRef.current.open
-      ) {
+      if (allowExitRef.current) return;
+      if (winbackRef.current.open) {
+        // Roleta aberta: re-empurra para manter na página enquanto a oferta exibe.
+        window.history.pushState({ planosGuard: true }, "");
+        return;
+      }
+      if (winbackRef.current.alreadyShown) {
+        // Já mostrou nesta sessão — sai sem segurar.
+        safeExit();
         return;
       }
       const opened = await winbackRef.current.triggerNow("abandon_planos", { bypassCooldown: true });
       if (opened) {
-        // Roleta abriu — re-empurra o sentinel para o usuário continuar em /planos.
+        // Re-empurra o sentinel para o usuário continuar em /planos durante a oferta.
         window.history.pushState({ planosGuard: true }, "");
       } else {
-        // Não conseguimos abrir aqui — marca intent para o GlobalWinback da próxima
-        // rota disparar a roleta automaticamente. Deixa o popstate prosseguir
-        // (já consumiu uma entrada do histórico, então o usuário sai com 1 clique).
+        // Não abriu — marca intent e libera a saída.
         winbackRef.current.markIntent();
-        allowExitRef.current = true;
+        safeExit();
       }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [shouldGuard, navigate]);
+  }, [shouldGuard, safeExit]);
 
   // Intercept the in-page back button.
   const handleBack = useCallback(async () => {
     if (winback.open) return;
     if (!shouldGuard || allowExitRef.current || winback.alreadyShown) {
-      navigate(-1);
+      safeExit();
       return;
     }
     const opened = await winback.triggerNow("abandon_planos", { bypassCooldown: true });
     if (!opened) {
-      // Fallback: marca intent para a roleta abrir na próxima rota.
       winback.markIntent();
-      allowExitRef.current = true;
-      navigate(-1);
+      safeExit();
     }
-  }, [shouldGuard, winback, navigate]);
+  }, [shouldGuard, winback, safeExit]);
 
   // After winback closes, leave the page immediately (no second click needed).
   const handleWinbackClose = () => {
-    allowExitRef.current = true;
     winback.close();
     // Defer slightly so the modal can start its exit animation cleanly.
-    setTimeout(() => navigate(-1), 50);
+    setTimeout(() => safeExit(), 50);
   };
 
   const plans = {

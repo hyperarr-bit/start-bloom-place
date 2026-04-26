@@ -49,6 +49,7 @@ const Planos = () => {
     }
 
     setLoading(true);
+    winback.markIntent();
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
         body: { billing },

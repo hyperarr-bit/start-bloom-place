@@ -145,49 +145,105 @@ export default function AdminRetention() {
         </Section>
       </div>
 
-      {/* Offers breakdown */}
-      <Section title="Status das ofertas (todo o histórico)">
+      {/* Offers breakdown - grouped by offer_type with success rate */}
+      <Section title="Performance por tipo de oferta">
         {offers.length === 0 ? (
           <Empty>Nenhuma oferta de retenção ainda</Empty>
         ) : (
-          <div className="overflow-x-auto">
+          <OffersBreakdownTable rows={offers} />
+        )}
+        <p className="text-xs text-zinc-500 mt-3">
+          <strong className="text-zinc-400">Taxa de sucesso na aplicação</strong> = aplicados ÷ (aplicados + falhas).
+          Não conta ofertas ainda aguardando próxima cobrança. "Aguardando" = aceita pelo usuário mas ainda não
+          aplicada no AbacatePay (job <code className="text-zinc-400">apply-pending-discounts</code>).
+        </p>
+      </Section>
+    </div>
+  );
+}
+
+function OffersBreakdownTable({ rows }: { rows: OfferRow[] }) {
+  const grouped = rows.reduce<Record<string, { rows: OfferRow[]; total: number; applied: number; failed: number }>>(
+    (acc, r) => {
+      if (!acc[r.offer_type]) acc[r.offer_type] = { rows: [], total: 0, applied: 0, failed: 0 };
+      acc[r.offer_type].rows.push(r);
+      acc[r.offer_type].total += r.count;
+      if (r.status === "applied") acc[r.offer_type].applied += r.count;
+      if (r.status === "failed") acc[r.offer_type].failed += r.count;
+      return acc;
+    },
+    {},
+  );
+
+  return (
+    <div className="space-y-4">
+      {Object.entries(grouped).map(([type, g]) => {
+        const successDenom = g.applied + g.failed;
+        const successRate = successDenom > 0 ? Math.round((g.applied / successDenom) * 1000) / 10 : null;
+        const typeLabel = type === "discount" ? "Desconto 50% / 2 ciclos" : type === "pause" ? "Pausa 1-3 meses" : type;
+        const rateColor = successRate === null ? "text-zinc-500"
+          : successRate >= 80 ? "text-emerald-400"
+          : successRate >= 50 ? "text-amber-400" : "text-red-400";
+
+        return (
+          <div key={type} className="rounded-lg border border-zinc-800 overflow-hidden">
+            <div className="flex items-center justify-between bg-zinc-900/60 px-4 py-3 border-b border-zinc-800">
+              <div>
+                <div className="text-sm font-medium text-zinc-100">{typeLabel}</div>
+                <div className="text-xs text-zinc-500 mt-0.5">
+                  {g.total} aceitas · {g.applied} aplicadas · {g.failed} falharam
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`text-2xl font-semibold ${rateColor}`}>
+                  {successRate === null ? "—" : `${successRate}%`}
+                </div>
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">taxa de sucesso</div>
+              </div>
+            </div>
             <table className="w-full text-sm">
-              <thead className="text-zinc-500 text-xs uppercase border-b border-zinc-800">
+              <thead className="text-zinc-500 text-xs uppercase">
                 <tr>
-                  <th className="text-left py-2">Tipo</th>
-                  <th className="text-left py-2">Status</th>
-                  <th className="text-right py-2">Qtd</th>
-                  <th className="text-right py-2">% do tipo</th>
+                  <th className="text-left px-4 py-2">Status</th>
+                  <th className="text-right px-4 py-2">Qtd</th>
+                  <th className="text-right px-4 py-2">% do tipo</th>
+                  <th className="text-left px-4 py-2 pr-4 w-1/3">Distribuição</th>
                 </tr>
               </thead>
               <tbody>
-                {offers.map((o, i) => (
-                  <tr key={i} className="border-b border-zinc-900">
-                    <td className="py-2">{o.offer_type === "discount" ? "Desconto 50%" : "Pausa"}</td>
-                    <td className="py-2">
+                {g.rows.map((r, i) => (
+                  <tr key={i} className="border-t border-zinc-900">
+                    <td className="px-4 py-2">
                       <span className={`px-2 py-0.5 rounded text-xs ${
-                        o.status === "applied" ? "bg-emerald-500/10 text-emerald-400" :
-                        o.status === "failed" ? "bg-red-500/10 text-red-400" :
-                        o.status === "active" ? "bg-amber-500/10 text-amber-400" :
+                        r.status === "applied" ? "bg-emerald-500/10 text-emerald-400" :
+                        r.status === "failed" ? "bg-red-500/10 text-red-400" :
+                        r.status === "active" ? "bg-amber-500/10 text-amber-400" :
                         "bg-zinc-800 text-zinc-400"
                       }`}>
-                        {STATUS_LABELS[o.status] ?? o.status}
+                        {STATUS_LABELS[r.status] ?? r.status}
                       </span>
                     </td>
-                    <td className="text-right py-2">{o.count}</td>
-                    <td className="text-right py-2 text-zinc-500">{o.pct_of_type}%</td>
+                    <td className="text-right px-4 py-2 font-medium text-zinc-100">{r.count}</td>
+                    <td className="text-right px-4 py-2 text-zinc-500">{r.pct_of_type}%</td>
+                    <td className="px-4 py-2 pr-4">
+                      <div className="w-full bg-zinc-900 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            r.status === "applied" ? "bg-emerald-400" :
+                            r.status === "failed" ? "bg-red-400" :
+                            r.status === "active" ? "bg-amber-400" : "bg-zinc-600"
+                          }`}
+                          style={{ width: `${Math.min(100, r.pct_of_type)}%` }}
+                        />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )}
-        <p className="text-xs text-zinc-500 mt-3">
-          "Aguardando" = aceita pelo usuário mas ainda não aplicada na próxima cobrança do AbacatePay.
-          O job <code className="text-zinc-400">apply-pending-discounts</code> tenta automaticamente
-          a cada cobrança nova e em sweep diário.
-        </p>
-      </Section>
+        );
+      })}
     </div>
   );
 }

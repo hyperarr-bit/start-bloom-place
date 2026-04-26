@@ -186,6 +186,7 @@ serve(async (req) => {
 
       if (updated && updated.length > 0) {
         await emitConversionEvent();
+        triggerDiscountApply();
         return;
       }
 
@@ -194,6 +195,7 @@ serve(async (req) => {
         logStep("Insert error", { message: insertError.message, userId: resolvedUserId });
       } else {
         await emitConversionEvent();
+        triggerDiscountApply();
       }
     }
 

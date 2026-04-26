@@ -1,12 +1,39 @@
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Clock, Lock, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 
 export const TrialBanner = () => {
   const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();
   const navigate = useNavigate();
+  const phase = trialExpired
+    ? "expired"
+    : trialDay <= 3
+    ? "discovery"
+    : trialDay <= 5
+    ? "engagement"
+    : "conversion";
+  const viewedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || isSubscribed) return;
+    const key = `${phase}-${trialDay}`;
+    if (viewedRef.current === key) return;
+    viewedRef.current = key;
+    trackEvent(
+      trialExpired ? "paywall_view" : "trial_banner_view",
+      { phase, trial_day: trialDay },
+      { trialDay },
+    );
+  }, [user, isSubscribed, phase, trialDay, trialExpired]);
+
+  const goToPlanos = (cta: string) => {
+    trackEvent("trial_banner_click", { phase, trial_day: trialDay, cta }, { trialDay });
+    navigate("/planos");
+  };
 
   if (isSubscribed || !user) return null;
 

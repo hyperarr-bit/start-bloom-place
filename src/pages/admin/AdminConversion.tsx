@@ -9,11 +9,16 @@ interface UserRow {
 
 export default function AdminConversion() {
   const [rows, setRows] = useState<UserRow[]>([]);
+  const [byDay, setByDay] = useState<Array<{ trial_day: number; conversions: number }>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (supabase as any).rpc("admin_list_users").then(({ data }: any) => {
-      setRows(data || []);
+    Promise.all([
+      (supabase as any).rpc("admin_list_users"),
+      (supabase as any).rpc("admin_conversion_by_trial_day"),
+    ]).then(([users, days]: any[]) => {
+      setRows(users.data || []);
+      setByDay(days.data || []);
       setLoading(false);
     });
   }, []);
@@ -65,6 +70,33 @@ export default function AdminConversion() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">Conversões por dia do trial</h3>
+        {byDay.length === 0 ? (
+          <p className="text-xs text-zinc-500">Sem conversões registradas ainda.</p>
+        ) : (
+          <div className="space-y-2">
+            {Array.from({ length: 8 }, (_, i) => i + 1).map(day => {
+              const row = byDay.find(b => b.trial_day === day);
+              const count = row?.conversions || 0;
+              const max = Math.max(...byDay.map(b => b.conversions), 1);
+              const pct = (count / max) * 100;
+              const isLate = day >= 6;
+              return (
+                <div key={day} className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-400 w-12">D{day}{day === 8 ? "+" : ""}</span>
+                  <div className="flex-1 h-5 bg-zinc-800 rounded overflow-hidden">
+                    <div className={`h-full ${isLate ? "bg-violet-500" : "bg-emerald-500"} transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs text-zinc-300 w-10 text-right">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[10px] text-zinc-500 mt-3">Roxo = D6/D7 (janela de conversão pós-engajamento).</p>
       </div>
 
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">

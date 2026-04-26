@@ -1,12 +1,39 @@
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Clock, Lock, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 
 export const TrialBanner = () => {
   const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();
   const navigate = useNavigate();
+  const phase = trialExpired
+    ? "expired"
+    : trialDay <= 3
+    ? "discovery"
+    : trialDay <= 5
+    ? "engagement"
+    : "conversion";
+  const viewedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || isSubscribed) return;
+    const key = `${phase}-${trialDay}`;
+    if (viewedRef.current === key) return;
+    viewedRef.current = key;
+    trackEvent(
+      trialExpired ? "paywall_view" : "trial_banner_view",
+      { phase, trial_day: trialDay },
+      { trialDay },
+    );
+  }, [user, isSubscribed, phase, trialDay, trialExpired]);
+
+  const goToPlanos = (cta: string) => {
+    trackEvent("trial_banner_click", { phase, trial_day: trialDay, cta }, { trialDay });
+    navigate("/planos");
+  };
 
   if (isSubscribed || !user) return null;
 
@@ -28,7 +55,7 @@ export const TrialBanner = () => {
             com acesso completo a todos os módulos.
           </p>
           <div className="space-y-3">
-            <Button className="w-full" onClick={() => navigate("/planos")}>
+            <Button className="w-full" onClick={() => goToPlanos("expired")}>
               Ver planos a partir de R$14,90/mês
             </Button>
           </div>
@@ -54,7 +81,7 @@ export const TrialBanner = () => {
               Trial grátis · Dia <strong>{trialDay}</strong> de 7
             </span>
           </div>
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate("/planos")}>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => goToPlanos("discovery")}>
             Assinar agora
           </Button>
         </div>
@@ -77,7 +104,7 @@ export const TrialBanner = () => {
               Faltam <strong>{daysLeft} {daysLeft === 1 ? "dia" : "dias"}</strong> do seu teste grátis
             </span>
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => navigate("/planos")}>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => goToPlanos("engagement")}>
             Garantir acesso
           </Button>
         </div>
@@ -108,7 +135,7 @@ export const TrialBanner = () => {
             )}
           </span>
         </div>
-        <Button size="sm" className="h-7 text-xs" onClick={() => navigate("/planos")}>
+        <Button size="sm" className="h-7 text-xs" onClick={() => goToPlanos("conversion")}>
           Assinar
         </Button>
       </div>

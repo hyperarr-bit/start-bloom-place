@@ -1,6 +1,38 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { markActivation } from "@/lib/analytics";
+
+// Map user_data keys → activation action_key. Triggered first time a key is written
+// with non-empty value.
+const ACTIVATION_RULES: Array<{ match: RegExp; action: string }> = [
+  { match: /transac|financ/i, action: "first_transaction" },
+  { match: /habit/i, action: "first_habit" },
+  { match: /workout|treino/i, action: "first_workout" },
+  { match: /meal|dieta/i, action: "first_meal" },
+  { match: /task|rotina/i, action: "first_task" },
+  { match: /water|hidrat/i, action: "first_water_log" },
+  { match: /note/i, action: "first_note" },
+];
+
+const isMeaningful = (value: any): boolean => {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return value > 0;
+  return Boolean(value);
+};
+
+const checkActivation = (key: string, value: any) => {
+  if (!isMeaningful(value)) return;
+  for (const rule of ACTIVATION_RULES) {
+    if (rule.match.test(key)) {
+      markActivation(rule.action, { source_key: key });
+      break;
+    }
+  }
+};
 
 interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
@@ -95,6 +127,8 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       pendingWrites.current[key] = value;
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, DEBOUNCE_MS);
+      // Fire-and-forget activation tracking
+      checkActivation(key, value);
     }
   }, [flush]);
 

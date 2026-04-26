@@ -2,7 +2,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -14,6 +15,10 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
+  }, []);
 
   const plans = {
     monthly: { price: "19,90", period: "/mês" },

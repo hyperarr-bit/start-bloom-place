@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
+import { WinbackFlow } from "@/components/retention/WinbackFlow";
+import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ const Planos = () => {
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const winback = useWinbackTrigger();
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
@@ -46,6 +49,7 @@ const Planos = () => {
     }
 
     setLoading(true);
+    winback.markIntent();
     try {
       const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
         body: { billing },
@@ -70,6 +74,7 @@ const Planos = () => {
   return (
     <div className="min-h-screen bg-background">
       <PaymentStatus />
+      <WinbackFlow open={winback.open} onClose={winback.close} attemptId={winback.attemptId} />
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-muted">

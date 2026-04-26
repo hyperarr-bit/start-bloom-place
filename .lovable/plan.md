@@ -1,24 +1,25 @@
-# Corrigir erro 400 do checkout WINBACK80
+# Forçar preço promocional no checkout WINBACK80
 
 ## Problema
-Logs do edge function mostram:
-```
-AbacatePay API error: 400 - "Could not find coupons WINBACK80"
-```
-
-O AbacatePay exige que cupons sejam pré-cadastrados no painel deles. Como o cupom `WINBACK80` não existe lá, a API rejeita a requisição inteira.
-
-A boa notícia: o desconto já está sendo aplicado corretamente via `price` override no item (R$ 47,76 em vez de R$ 178,80). Não precisamos do cupom no AbacatePay — ele só serviria para exibição visual.
+O checkout do AbacatePay está mostrando R$ 178,80 (preço cheio anual) mesmo com o cupom WINBACK80 ativo. O override `price` no item está sendo ignorado porque enviamos junto o `id` do produto cadastrado — nesse caso o AbacatePay usa o preço salvo do produto e descarta o `price` enviado.
 
 ## Correção
 
-**`supabase/functions/abacatepay-checkout/index.ts`**:
-- Remover o bloco que envia `checkoutBody.coupons = [couponRaw]`
-- Manter o override de preço (`lineItem.price = discountedUnitPrice`) que já garante o valor promocional
-- Manter o registro em `retention_offers_used` e `winback_attempts` para rastreamento interno
-- Manter `metadata.coupon` para histórico
+**`supabase/functions/abacatepay-checkout/index.ts`** (linhas 155-164):
 
-Resultado: o checkout abrirá com o preço já descontado (R$ 47,76/ano) sem tentar validar um cupom inexistente no AbacatePay.
+Quando o cupom WINBACK80 for válido, enviar o item como **produto avulso** (sem `id`, com `name` + `description` + `price`) em vez de referenciar o produto cadastrado. Sem `id`, o AbacatePay usa exatamente o preço enviado (R$ 47,76 anual / R$ 3,98 mensal).
 
-## Alternativa opcional (não incluída)
-Se quiser que o código "WINBACK80" apareça visualmente no checkout, seria necessário criar o cupom manualmente no painel do AbacatePay. Isso pode ser feito depois — a correção atual já entrega o desconto correto ao cliente.
+Sem cupom, mantém o comportamento atual (referencia o produto pelo `id` com preço cheio).
+
+```typescript
+const lineItem = discountedUnitPrice !== null
+  ? {
+      name: "CORE Pro Anual (Oferta 80% OFF)",
+      description: "Oferta exclusiva WINBACK80 - 80% de desconto",
+      quantity: 1,
+      price: discountedUnitPrice,
+    }
+  : { id: productId, quantity: 1 };
+```
+
+Resultado: o checkout abrirá com R$ 47,76 (anual) e o nome do item indicará a oferta aplicada.

@@ -73,76 +73,85 @@ export const TrialBanner = () => {
   // Phase 1 — Discovery (D1-D3): discreet info
   if (trialDay <= 3) {
     return (
-      <motion.div
-        initial={{ height: 0, opacity: 0 }}
-        animate={{ height: "auto", opacity: 1 }}
-        className="bg-primary/5 border-b border-primary/20"
-      >
-        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span>
-              Trial grátis · Dia <strong>{trialDay}</strong> de 7
-            </span>
+      <>
+        <GlobalWinback />
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          className="bg-primary/5 border-b border-primary/20"
+        >
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span>
+                Trial grátis · Dia <strong>{trialDay}</strong> de 7
+              </span>
+            </div>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => goToPlanos("discovery")}>
+              Assinar agora
+            </Button>
           </div>
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => goToPlanos("discovery")}>
-            Assinar agora
-          </Button>
-        </div>
-      </motion.div>
+        </motion.div>
+      </>
     );
   }
 
   // Phase 2 — Engagement (D4-D5): gentle nudge
   if (trialDay <= 5) {
     return (
-      <motion.div
-        initial={{ height: 0, opacity: 0 }}
-        animate={{ height: "auto", opacity: 1 }}
-        className="bg-primary/10 border-b border-primary/30"
-      >
-        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs">
-            <Zap className="w-3.5 h-3.5 text-primary" />
-            <span>
-              Faltam <strong>{daysLeft} {daysLeft === 1 ? "dia" : "dias"}</strong> do seu teste grátis
-            </span>
+      <>
+        <GlobalWinback />
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          className="bg-primary/10 border-b border-primary/30"
+        >
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Zap className="w-3.5 h-3.5 text-primary" />
+              <span>
+                Faltam <strong>{daysLeft} {daysLeft === 1 ? "dia" : "dias"}</strong> do seu teste grátis
+              </span>
+            </div>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => goToPlanos("engagement")}>
+              Garantir acesso
+            </Button>
           </div>
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => goToPlanos("engagement")}>
-            Garantir acesso
-          </Button>
-        </div>
-      </motion.div>
+        </motion.div>
+      </>
     );
   }
 
   // Phase 3 — Conversion (D6-D7): urgent sticky banner
   const isLastDay = trialDay >= 7;
   return (
-    <motion.div
-      initial={{ height: 0, opacity: 0 }}
-      animate={{ height: "auto", opacity: 1 }}
-      className={
-        isLastDay
-          ? "bg-destructive/10 border-b-2 border-destructive/40 sticky top-0 z-40"
-          : "bg-primary/15 border-b-2 border-primary/40 sticky top-0 z-40"
-      }
-    >
-      <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-xs">
-          <Clock className={`w-3.5 h-3.5 ${isLastDay ? "text-destructive" : "text-primary"}`} />
-          <span>
-            {isLastDay ? (
-              <><strong>Último dia!</strong> Seu trial termina em poucas horas.</>
-            ) : (
-              <>Resta <strong>{daysLeft} {daysLeft === 1 ? "dia" : "dias"}</strong> · Garanta seu acesso antes que expire.</>
-            )}
-          </span>
+    <>
+      <GlobalWinback />
+      <motion.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: "auto", opacity: 1 }}
+        className={
+          isLastDay
+            ? "bg-destructive/10 border-b-2 border-destructive/40 sticky top-0 z-40"
+            : "bg-primary/15 border-b-2 border-primary/40 sticky top-0 z-40"
+        }
+      >
+        <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs">
+            <Clock className={`w-3.5 h-3.5 ${isLastDay ? "text-destructive" : "text-primary"}`} />
+            <span>
+              {isLastDay ? (
+                <><strong>Último dia!</strong> Seu trial termina em poucas horas.</>
+              ) : (
+                <>Resta <strong>{daysLeft} {daysLeft === 1 ? "dia" : "dias"}</strong> · Garanta seu acesso antes que expire.</>
+              )}
+            </span>
+          </div>
+          <Button size="sm" className="h-7 text-xs" onClick={() => goToPlanos("conversion")}>
+            Assinar
+          </Button>
         </div>
-        <Button size="sm" className="h-7 text-xs" onClick={() => goToPlanos("conversion")}>
-          Assinar
-        </Button>
-      </div>
-    </motion.div>
+      </motion.div>
+    </>
   );
 };

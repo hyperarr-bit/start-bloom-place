@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BarChart3, Clock, Users, TrendingUp, Trophy, Activity, Calendar, ArrowLeftCircle, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { isAdmin } from "@/lib/admin";
+import { checkIsAdmin } from "@/lib/admin";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip,
   LineChart, Line, CartesianGrid
@@ -146,13 +146,18 @@ const AdminAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"7d" | "30d" | "all">("30d");
   const [selectedModule, setSelectedModule] = useState<string | null>(null);
+  const [isAdminUser, setIsAdminUser] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!authLoading && user && !isAdmin(user.id, user.email)) navigate("/");
+    if (authLoading || !user) return;
+    checkIsAdmin(user.id).then(v => {
+      setIsAdminUser(v);
+      if (!v) navigate("/");
+    });
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (authLoading || !user || !isAdmin(user.id)) return;
+    if (authLoading || !user || !isAdminUser) return;
     const load = async () => {
       setLoading(true);
       let query = (supabase as any)

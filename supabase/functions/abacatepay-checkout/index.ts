@@ -216,11 +216,7 @@ serve(async (req) => {
       },
     };
 
-    // Note: we intentionally do NOT send `coupons` to AbacatePay because the coupon
-    // code is not registered in their dashboard. The discount is fully applied via
-    // the `price` override on the line item above.
-
-    logStep("Creating checkout", { billingPeriod, productId, coupon: couponValid ? couponRaw : null, discountedUnitPrice });
+    logStep("Creating checkout", { billingPeriod, productIdToUse, coupon: couponValid ? couponRaw : null });
     const result = await abacateRequest("/checkouts/create", apiKey, checkoutBody);
 
     const checkoutUrl = result.data?.url || result.url;

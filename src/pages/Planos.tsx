@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
+import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });

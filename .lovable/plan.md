@@ -1,125 +1,120 @@
-## Objetivo
+## Save Flow de Cancelamento (Anti-Churn)
 
-Trocar o foco da estratégia de trial: **comunicação fica dentro do app** via tour guiado contextual por dia. Emails D1-D7 ficam pausados (infra preservada). Analytics ganha novos eventos para medir o tour.
+### Problema atual
+Hoje em `Planos.tsx` existe apenas o texto "Para cancelar, entre em contato pelo email suporte@coreaplicativo.com". Não há fluxo in-app, nenhuma tentativa de retenção, nenhum dado sobre por que as pessoas cancelam.
 
-Domínio segue 100% no Supabase — nada de Lovable Emails será tocado.
+### Objetivo
+Quando o assinante clicar em **Cancelar assinatura**, abrir um fluxo guiado em 4 etapas que:
+1. Captura o motivo (insight de produto)
+2. Oferece a solução certa pro motivo
+3. Oferece desconto + pausar (último argumento)
+4. Confirma cancelamento se tudo falhar
 
-## 1. Pausar emails do trial (sem deletar código)
+---
 
-- Adicionar coluna `app_config.value` com chave `trial_emails_enabled = false`.
-- Ajustar `dispatch-trial-emails/index.ts`: ler essa flag no início e sair com `{ paused: true }` se desabilitada. Mantém todo o código existente (variantes, schedule) intacto para reativar no futuro.
-- O cron continua rodando, mas não envia nada. Linhas em `trial_email_schedule` permanecem `pending`.
+### Fluxo proposto
 
-## 2. Tour guiado por dia (D1-D7) — dinâmico
-
-### Componente novo: `src/components/onboarding/DailyNudge.tsx`
-
-Bottom-sheet (mobile-first, 430px) que aparece **uma vez por dia** quando o usuário abre o app durante o trial. Estrutura:
-
-- Ícone + título contextual ("Dia 2 de 7 — Comece pelo dinheiro")
-- 1 ação-chave sugerida (botão CTA leva direto ao módulo)
-- Link "agora não" (fecha e marca dismiss do dia)
-- Botão X no canto
-
-Regras de exibição:
-- Só aparece se `user && !isSubscribed && !trialExpired`
-- Marca `dismissed_day_N` em localStorage + envia evento analytics
-- Não reaparece no mesmo dia após dismiss/CTA
-
-### Lógica de seleção dinâmica: `src/lib/dailyNudge.ts`
-
-Função `pickDailyNudge(trialDay, activations)` retorna `{ key, title, description, ctaLabel, ctaRoute, actionKey }`.
-
-Mesma filosofia do `pickVariant` do edge function, mas para UI. Exemplo:
-
-```ts
-// D2 — finanças
-if (trialDay === 2) {
-  if (activations.has("first_transaction")) {
-    return { key: "d2-finance-summary", ctaRoute: "/financas", 
-             title: "Veja onde seu dinheiro está indo", ... };
-  }
-  return { key: "d2-finance-first", ctaRoute: "/financas",
-           title: "Registre sua primeira transação", ... };
-}
+```text
+[Botão "Cancelar assinatura" em /planos]
+        │
+        ▼
+┌─────────────────────────────┐
+│ Etapa 1: Por que cancelar?  │ ← captura motivo
+│ ○ Tá caro                   │
+│ ○ Não usei o suficiente     │
+│ ○ Faltou um recurso         │
+│ ○ Problema técnico          │
+│ ○ Outro motivo              │
+└─────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ Etapa 2: Resposta segmentada│
+│ - "caro" → pula pra Etapa 3 │
+│ - "não usei" → tour rápido  │
+│   + "experimente mais 1 mês │
+│   grátis"                   │
+│ - "faltou recurso" → form   │
+│   de feedback + "vou avisar │
+│   quando lançar"            │
+│ - "técnico" → link suporte  │
+│ - "outro" → pula pra Etapa 3│
+└─────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────┐
+│ Etapa 3: Ofertas (escolha)  │
+│ ┌─────────────────────────┐ │
+│ │ 🎁 50% off por 2 meses  │ │ ← cupom Stripe
+│ │ [Aceitar oferta]        │ │
+│ ├─────────────────────────┤ │
+│ │ ⏸  Pausar 1, 2 ou 3 mês │ │ ← pause Stripe
+│ │ [Pausar]                │ │
+│ ├─────────────────────────┤ │
+│ │ Cancelar mesmo assim    │ │
+│ └─────────────────────────┘ │
+└─────────────────────────────┘
+        │ (se "cancelar mesmo assim")
+        ▼
+┌─────────────────────────────┐
+│ Etapa 4: Confirmação final  │
+│ "Sua assinatura fica ativa  │
+│ até DD/MM. Tem certeza?"    │
+│ [Voltar] [Confirmar]        │
+└─────────────────────────────┘
 ```
 
-Mapa completo (8 dias, 2-3 variantes cada):
+Limite: o desconto e a pausa podem ser usados **1x a cada 365 dias** por usuário (anti-abuso leve, ainda permissivo).
 
-| Dia | Sem ativação | Com ativação relevante |
-|-----|---|---|
-| D0 boas-vindas | Tour inicial: escolha um módulo | — |
-| D1 primeira ação | Crie sua 1ª tarefa | Já criou tarefa? Adicione transação |
-| D2 finanças | Registre 1ª transação | Veja resumo do mês |
-| D3 hábitos | Crie 1º hábito | Acompanhe streak |
-| D4 progresso | Explore 1 novo módulo | Veja seu recap |
-| D5 valor | Por que assinar | (engajado) Compare planos |
-| D6 conversão | Garantir acesso | (engajado) Oferta destacada |
-| D7 last call | Última chance | (engajado) CTA final |
+---
 
-### Hook: `src/hooks/use-daily-nudge.ts`
+### Mudanças técnicas
 
-- Usa `useAuth()` e `useTrialActivations()`
-- Calcula chave do dia: `nudge-${userId}-day-${trialDay}`
-- Lê localStorage para checar dismiss
-- Expõe `{ nudge, show, dismiss, complete }`
+#### 1. Banco (migração)
+Tabela `cancel_attempts` para registrar cada tentativa de cancelamento + motivo + outcome (saved-by-discount, saved-by-pause, saved-by-feedback, churned). RLS: usuário insere/lê os próprios; admin lê todos.
 
-### Integração
+Tabela `retention_offers_used` (`user_id`, `offer_type`, `used_at`) para enforcar limite 1x/ano por tipo (`discount` | `pause`).
 
-Montar `<DailyNudge />` em `src/pages/Home.tsx` (logo abaixo do `TrialBanner`). Aparece com delay de 1.5s após o load para não atropelar a primeira impressão.
+#### 2. Edge Functions novas
+- **`cancel-subscription-flow`** — Recebe `{ action, reason?, offerAccepted? }`. Orquestra:
+  - `action: "log_reason"` → grava motivo em `cancel_attempts`
+  - `action: "apply_discount"` → cria/aplica cupom Stripe de 50% por 2 ciclos via `subscriptions.update` com `discounts: [{ coupon }]`, registra em `retention_offers_used`
+  - `action: "pause_subscription"` → usa `subscriptions.update` com `pause_collection: { behavior: "void", resumes_at }` por 1/2/3 meses
+  - `action: "confirm_cancel"` → cancela no fim do período (`cancel_at_period_end: true`), atualiza `cancel_attempts.outcome = 'churned'`
+  - Valida via Zod, idempotente, retorna estado atualizado
 
-## 3. Analytics — novos eventos
+- **`get-retention-eligibility`** — Retorna `{ canUseDiscount, canUsePause, currentPeriodEnd }` consultando `retention_offers_used`.
 
-Adicionar em `src/lib/analytics.ts` (já existe). Novos eventos a serem registrados via `trackEvent`:
+> Nota: hoje o app usa AbacatePay como gateway (webhook `abacatepay-webhook`), mas há `STRIPE_SECRET_KEY` configurado. **Preciso confirmar com você qual gateway as assinaturas estão de fato passando** antes de codar — ver "Pergunta antes de implementar" abaixo.
 
-- `daily_nudge_shown` — `{ trial_day, nudge_key, has_activation }`
-- `daily_nudge_clicked` — `{ trial_day, nudge_key, cta_route }`
-- `daily_nudge_dismissed` — `{ trial_day, nudge_key, method: "x" | "later" }`
-- `onboarding_step_completed` — disparado quando a `actionKey` do nudge é ativada (ex: usuário clicou no CTA do D2 e registrou a transação dentro de 24h)
+#### 3. Frontend
+- **`src/components/retention/CancelFlowDialog.tsx`** — Dialog stepper com as 4 etapas (shadcn `Dialog` + state machine simples com `useState<Step>`).
+- **`src/components/retention/steps/`** — `ReasonStep.tsx`, `SegmentedResponseStep.tsx`, `OffersStep.tsx`, `ConfirmStep.tsx`.
+- **`src/hooks/use-cancel-flow.ts`** — Hook que invoca as edge functions, gerencia loading, toasts.
+- **`src/pages/Planos.tsx`** — Substitui o texto atual por botão `Cancelar assinatura` que abre o `CancelFlowDialog`.
 
-### Nova RPC admin: `admin_nudge_stats()`
+#### 4. Analytics
+Eventos novos em `analytics_events`:
+- `cancel_flow_opened`
+- `cancel_reason_selected` (com `reason`)
+- `retention_offer_shown` (com tipo)
+- `retention_offer_accepted` (com tipo)
+- `cancel_confirmed`
 
-Retorna por `trial_day` + `nudge_key`:
-- shown, clicked, dismissed
-- CTR (clicked/shown)
-- completion rate (step_completed em 24h após shown)
-- conversion rate (subscriptions ativas em 48h após shown)
+#### 5. Admin
+Nova página `src/pages/admin/AdminRetention.tsx` com:
+- Top motivos de cancelamento (últimos 30d)
+- Save rate: % de tentativas que aceitaram desconto/pausa
+- Funil: opened → reason_selected → offer_shown → offer_accepted | churned
+- RPC `admin_retention_stats()` agregando `cancel_attempts`
 
-### Página admin nova: `src/pages/admin/AdminOnboarding.tsx`
+---
 
-Tabela com performance de cada nudge. Adicionar link no `AdminLayout`.
+### Pergunta antes de implementar
+Vejo que o webhook `abacatepay-webhook` é quem move status de assinatura hoje, mas a chave do Stripe também está nos secrets. **Preciso confirmar**: as assinaturas ativas hoje rodam no **AbacatePay** ou no **Stripe**? A resposta muda quais APIs eu chamo (Stripe tem `coupons` e `pause_collection` nativos; AbacatePay precisaria de uma alternativa — possivelmente cancelar e recriar com novo preço, ou contatar suporte deles para ver se suportam pause/coupon).
 
-## 4. Migração de banco
+Se for AbacatePay, sugiro alternativas:
+- **Desconto**: cancelar a assinatura atual e abrir um novo billing com 50% off por 2 meses, depois reverter para o preço cheio.
+- **Pausar**: cancelar a assinatura mantendo `current_period_end`, e enviar email de retorno antes do prazo.
 
-```sql
--- 1. App config para a flag
-INSERT INTO app_config (key, value)
-VALUES ('trial_emails_enabled', 'false'::jsonb)
-ON CONFLICT (key) DO UPDATE SET value = excluded.value;
-
--- 2. RPC nova
-CREATE FUNCTION admin_nudge_stats() RETURNS TABLE(...) ...;
-```
-
-Sem alteração estrutural em tabelas existentes — `analytics_events` já comporta os novos eventos.
-
-## 5. Arquivos
-
-**Novos:**
-- `src/components/onboarding/DailyNudge.tsx`
-- `src/hooks/use-daily-nudge.ts`
-- `src/lib/dailyNudge.ts`
-- `src/pages/admin/AdminOnboarding.tsx`
-- `supabase/migrations/<timestamp>_pause_emails_and_nudge_rpc.sql`
-
-**Modificados:**
-- `src/pages/Home.tsx` (montar DailyNudge)
-- `src/lib/analytics.ts` (helpers tipados pros novos eventos)
-- `src/App.tsx` + `src/pages/admin/AdminLayout.tsx` (rota admin)
-- `supabase/functions/dispatch-trial-emails/index.ts` (checar flag e abortar)
-
-## Fora do escopo
-
-- Não mexer em domínio (segue Supabase, nada de Lovable Emails).
-- Não criar templates de email novos.
-- Não remover infraestrutura de email existente — só pausar.
+Confirma qual gateway está em produção pra eu finalizar o plano técnico?

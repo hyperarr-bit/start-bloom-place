@@ -13,9 +13,9 @@ const DEFAULT_APP_URL = "https://coreaplicativo.lovable.app";
 
 type BillingPeriod = "monthly" | "annual";
 
-const PRODUCT_CONFIG: Record<BillingPeriod, { configKey: string; frequency: "MONTHLY" | "ANNUAL" }> = {
-  monthly: { configKey: "abacatepay_product_monthly_id", frequency: "MONTHLY" },
-  annual: { configKey: "abacatepay_product_annual_id", frequency: "ANNUAL" },
+const PRODUCT_CONFIG: Record<BillingPeriod, { configKey: string; frequency: "MONTHLY" | "ANNUAL"; basePriceCents: number }> = {
+  monthly: { configKey: "abacatepay_product_monthly_id", frequency: "MONTHLY", basePriceCents: 1990 },
+  annual: { configKey: "abacatepay_product_annual_id", frequency: "ANNUAL", basePriceCents: 17880 },
 };
 
 const logStep = (step: string, details?: unknown) => {

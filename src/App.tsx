@@ -12,6 +12,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialBanner } from "@/components/TrialBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
+import { GlobalWinback } from "@/components/retention/GlobalWinback";
 
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
@@ -108,6 +109,7 @@ const App = () => (
           <OfflineBanner />
           <BrowserRouter>
             <AnimatedRoutes />
+            <GlobalWinback />
           </BrowserRouter>
         </TooltipProvider>
         </UserDataProvider>

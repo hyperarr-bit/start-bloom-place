@@ -1,29 +1,28 @@
-## Fixes para o fluxo de win-back em /planos
+## Roleta não dispara ao voltar de /planos
 
-### 1. Bloquear disparo duplo da roleta
+### Causa raiz
 
-**Problema**: ao apertar "voltar" rápido (ou back do navegador seguido do botão da UI), o `popstate` e o `handleBack` podem entrar em corrida — `alreadyShown` ainda é `false` quando o segundo disparo começa.
+O guard está condicionado a `trialExpired === true`:
 
-**Correção em `src/hooks/use-winback-trigger.ts`**:
-- Mover o "lock" `triggeringRef.current = true` para a primeira linha do `triggerNow`, antes de qualquer `await`, e mantê-lo ligado **mesmo após sucesso** (só liberar em erro). Hoje ele libera no `finally`, deixando uma janela aberta entre o `await` e o `setAlreadyShown`.
-- Adicionar checagem dupla: `if (alreadyShown || open || triggeringRef.current) return false`.
+```ts
+const shouldGuard = !!user && !isSubscribed && trialExpired;
+```
 
-**Correção em `src/pages/Planos.tsx`**:
-- Adicionar guarda local `if (winback.open) return` no `onPopState` e no `handleBack` para nunca tentar abrir quando já existe roleta na tela.
+Se você está testando com trial ainda ativo (ou se `check-subscription` ainda não retornou `trial_expired: true`), `shouldGuard` é `false`, o `popstate` não é interceptado e o `handleBack` cai direto no `navigate(-1)`.
 
-### 2. Sair de primeira após fechar a roleta
+Secundariamente, se já existe um registro recente em `winback_attempts` (cooldown de 30 dias), `triggerNow` retorna `false` silenciosamente — mesmo com o guard ativo.
 
-**Problema**: `handleWinbackClose` apenas marca `allowExitRef = true` e fecha o modal. O usuário precisa apertar voltar de novo para realmente sair.
+### Correções
 
-**Correção em `src/pages/Planos.tsx`**:
-- No `handleWinbackClose`, após `winback.close()`, chamar `navigate(-1)` direto (com pequeno timeout para o modal animar de saída) e remover o sentinel state via `window.history.back()` apenas se já tivermos consumido o push extra.
-- Implementação simples: setar `allowExitRef.current = true`, fechar o modal e disparar `navigate(-1)` imediatamente. O listener de `popstate` vai ver `allowExitRef.current === true` e deixar passar.
+**`src/pages/Planos.tsx`**
+- Trocar `shouldGuard` para `!!user && !isSubscribed` (remover a exigência de `trialExpired`). Faz sentido: quem chega em /planos, escolhe não assinar e tenta sair, deve receber a oferta de retenção independentemente do estado do trial.
 
-### 3. Remover texto da escolha de planos
+**`src/hooks/use-winback-trigger.ts`**
+- Adicionar `console.debug` curtos em `triggerNow` indicando o motivo do retorno `false` (no user, sub ativa, cooldown 30d, já mostrado, locked) — ajuda a diagnosticar quando a roleta não aparece.
 
-**Em `src/pages/Planos.tsx`** (linhas 227-230): remover o parágrafo:
-> "Você escolhe Pix ou Cartão na próxima tela · Cartão renova automaticamente · Pix você renova manualmente a cada mês/ano"
+### Observação sobre cooldown
+Não vou alterar a lógica de cooldown de 30 dias agora. Se durante o teste a roleta continuar não abrindo após o fix do guard, o motivo será visível no console e podemos limpar `winback_attempts` para o seu user.
 
 ### Arquivos modificados
-- `src/hooks/use-winback-trigger.ts`
 - `src/pages/Planos.tsx`
+- `src/hooks/use-winback-trigger.ts`

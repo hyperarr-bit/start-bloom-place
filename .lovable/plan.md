@@ -1,37 +1,39 @@
-Plano para corrigir a roleta que não aparece
+## Problema
 
-1. Fazer o GlobalWinback reagir à troca de rota
-- Ajustar `use-winback-trigger.ts` para observar também a rota atual (`useLocation`).
-- Quando o usuário sair de `/planos` e voltar para a tela anterior, o hook vai re-checar o `sessionStorage` e abrir a roleta imediatamente.
-- Remover a trava que hoje faz a verificação acontecer só uma vez no ciclo do app.
+Na tela do print, a tela de "Trial expirado" aparece bugada: o botão "Ver planos" e o texto aparecem **misturados** com o conteúdo da home (saudação, score, módulos, ações rápidas). O overlay deveria cobrir tudo, mas não está cobrindo.
 
-2. Garantir que a roleta apareça por cima da tela de trial expirado
-- Aumentar a prioridade visual do modal da roleta para ficar acima do bloqueio de trial expirado.
-- Se necessário, reduzir o `z-index` da tela de trial expirado ou elevar o `DialogContent/overlay` do WinbackFlow.
+## Causa raiz
 
-3. Corrigir acessibilidade do Dialog
-- Adicionar `DialogTitle` e `DialogDescription` escondidos visualmente no `WinbackFlow`.
-- Isso remove os erros atuais do console: `DialogContent requires a DialogTitle` e `Missing Description`.
+O `TrialBanner` está sendo renderizado **dentro** do `<PageTransition>`, que é um `motion.div` com animação de `opacity` e `y` (transform). 
 
-4. Preservar o fluxo desejado
-```text
-Trial expirado -> Ver planos -> /planos
-Usuário clica voltar -> volta para Trial expirado
-Roleta aparece por cima imediatamente
-Roleta gira automática
-Mostra oferta 80%
-Usuário fecha no X -> fica na tela de trial expirado
-Usuário clica Ver planos de novo -> pode repetir
-```
+Dois problemas combinados:
 
-Arquivos a alterar
-- `src/hooks/use-winback-trigger.ts`
-- `src/components/retention/WinbackFlow.tsx`
-- Possivelmente `src/components/TrialBanner.tsx` se precisar ajustar o `z-index` do bloqueio de trial expirado
+1. **`position: fixed` quebra dentro de elementos com `transform`** — uma regra do CSS: quando um ancestral tem `transform`, qualquer filho com `position: fixed` passa a se posicionar em relação a esse ancestral, não à viewport. Resultado: o overlay `fixed inset-0` não cobre a tela inteira de forma confiável.
 
-Critério de sucesso
-- Ao clicar em voltar na tela de planos, a roleta aparece automaticamente por cima da tela de trial expirado.
-- A roleta gira sozinha.
-- A oferta de 80% aparece.
-- O X fecha a oferta e deixa o usuário na tela de trial expirado.
-- O fluxo pode ser repetido ao clicar em “Ver planos” novamente.
+2. **Stacking context isolado** — o `motion.div` cria seu próprio stacking context, então o `z-40` do overlay fica preso dentro do PageTransition, podendo ficar atrás de outros elementos da home renderizados depois.
+
+Foi exatamente isso que o ajuste anterior (mudar de `z-50` pra `z-40`) acabou expondo.
+
+## Correção
+
+Tirar o `TrialBanner` de dentro do `PageTransition` em todas as rotas, e renderizar ele uma única vez no nível raiz do `App` (igual ao `GlobalWinback` já é hoje). Assim o overlay fica solto na árvore, sem ancestral com transform, e o `fixed inset-0` cobre a viewport inteira como deveria.
+
+### Mudanças técnicas
+
+**`src/App.tsx`**
+- Remover `<TrialBanner />` de cada uma das ~18 rotas.
+- Renderizar `<TrialBanner />` uma única vez fora do `<BrowserRouter>` ou logo após `<AnimatedRoutes />`, no mesmo nível do `<GlobalWinback />`.
+- Como o `TrialBanner` usa `useNavigate`, ele precisa ficar dentro do `<BrowserRouter>` — então o lugar certo é logo após `<AnimatedRoutes />`, junto do `GlobalWinback`.
+
+**`src/components/TrialBanner.tsx`**
+- Voltar o overlay de trial expirado para `z-50` (o `WinbackFlow` usa `z-[200]` no DialogContent do Radix, então continua por cima sem conflito).
+- Garantir que o `motion.div` do overlay expirado não esteja dentro de fragmento desnecessário.
+
+**`src/components/retention/GlobalWinback.tsx`**
+- Sem mudanças (continua funcionando porque já está fora do PageTransition).
+
+### Resultado esperado
+
+- Trial expirado: tela preta/background cobre 100% da viewport, sem vazar conteúdo da home por baixo nem por cima.
+- Roleta winback: continua aparecendo por cima do trial expirado (z-[200] > z-50).
+- Banners de trial não-expirado (dia 1-7): continuam funcionando normalmente porque são inline (não fixed), não dependem de stacking context.

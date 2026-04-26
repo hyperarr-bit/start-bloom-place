@@ -152,7 +152,7 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    const checkoutBody = {
+    const checkoutBody: Record<string, unknown> = {
       frequency: "SUBSCRIPTION",
       methods: ["PIX", "CARD"],
       items: [{ id: productId, quantity: 1 }],
@@ -167,15 +167,47 @@ serve(async (req) => {
       metadata: {
         user_id: userId,
         billing_period: billingPeriod,
+        ...(couponValid ? { coupon: couponRaw, discount_pct: 80 } : {}),
       },
     };
 
-    logStep("Creating checkout", { billingPeriod, productId });
+    if (couponValid) {
+      // Padrão da API AbacatePay para descontos em checkout
+      checkoutBody.discount = { type: "PERCENTAGE", value: 80 };
+    }
+
+    logStep("Creating checkout", { billingPeriod, productId, coupon: couponValid ? couponRaw : null });
     const result = await abacateRequest("/checkouts/create", apiKey, checkoutBody);
 
     const checkoutUrl = result.data?.url || result.url;
     if (!checkoutUrl) {
       throw new Error("No checkout URL returned from AbacatePay");
+    }
+
+    // Registra o uso do cupom para o apply-pending-discounts garantir aplicação nas renovações
+    if (couponValid) {
+      const { error: insertErr } = await supabaseAdmin
+        .from("retention_offers_used")
+        .insert({
+          user_id: userId,
+          offer_type: "winback80",
+          status: "active",
+          metadata: { discount_pct: 80, billing: billingPeriod, coupon: couponRaw },
+        });
+      if (insertErr) {
+        logStep("Failed to register winback80 in retention_offers_used", { err: insertErr.message });
+      }
+
+      // Marca o winback_attempts mais recente como aceito
+      const { error: updErr } = await supabaseAdmin
+        .from("winback_attempts")
+        .update({ accepted_at: new Date().toISOString() })
+        .eq("user_id", userId)
+        .is("accepted_at", null)
+        .gte("triggered_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      if (updErr) {
+        logStep("Failed to update winback_attempts.accepted_at", { err: updErr.message });
+      }
     }
 
     logStep("Subscription created", { url: checkoutUrl });

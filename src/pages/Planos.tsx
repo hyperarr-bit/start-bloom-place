@@ -233,11 +233,11 @@ const Planos = () => {
             )}
           </Button>
 
-          <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            Você escolhe Pix ou Cartão na próxima tela · Cartão renova automaticamente ·
-            Pix você renova manualmente a cada {billing === "annual" ? "ano" : "mês"}
-          </p>
         </motion.div>
+      </main>
+    </div>
+  );
+};
       </main>
     </div>
   );

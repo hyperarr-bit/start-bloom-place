@@ -160,6 +160,15 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         Renovação anual no preço cheio (R$ {FULL_ANNUAL.toFixed(2).replace(".", ",")}/ano).
         Cancele a qualquer momento dentro do app.
       </p>
+
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          className="w-full text-center text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 py-2"
+        >
+          Agora não, talvez depois
+        </button>
+      )}
     </motion.div>
   );
 }

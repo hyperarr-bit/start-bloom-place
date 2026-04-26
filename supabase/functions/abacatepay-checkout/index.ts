@@ -162,6 +162,7 @@ serve(async (req) => {
     // Without coupon, reference the saved product by id (regular full price).
     const lineItem: Record<string, unknown> = discountedUnitPrice !== null
       ? {
+          id: productId,
           name: billingPeriod === "annual" ? "CORE Pro Anual (Oferta 80% OFF)" : "CORE Pro Mensal (Oferta 80% OFF)",
           description: "Oferta exclusiva WINBACK80 - 80% de desconto aplicado",
           quantity: 1,

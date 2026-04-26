@@ -224,9 +224,9 @@ const Auth = () => {
               <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                 <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso a todos os 16 módulos por 24h</li>
-                  <li>• Personalize tudo do seu jeito</li>
-                  <li>• Sem cartão de crédito necessário</li>
+                  <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
+                  <li>• Sem cartão de crédito · Cancele quando quiser</li>
+                  <li>• Dicas diárias por e-mail para você aproveitar ao máximo</li>
                 </ul>
               </div>
             </motion.div>

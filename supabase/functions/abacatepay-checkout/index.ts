@@ -92,6 +92,7 @@ serve(async (req) => {
 
     const RequestSchema = z.object({
       billing: z.enum(["monthly", "annual"]).default("monthly"),
+      coupon: z.string().optional(),
     });
     let rawBody: unknown;
     try {
@@ -104,7 +105,28 @@ serve(async (req) => {
       return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
     }
     const billingPeriod: BillingPeriod = parsed.data.billing;
+    const couponRaw = parsed.data.coupon?.trim().toUpperCase();
     const cfg = PRODUCT_CONFIG[billingPeriod];
+
+    // Validate coupon: WINBACK80 is annual-only and one-time per user
+    let couponValid = false;
+    if (couponRaw === "WINBACK80") {
+      if (billingPeriod !== "annual") {
+        logStep("Coupon WINBACK80 rejected: not annual");
+      } else {
+        const { data: existing } = await supabaseAdmin
+          .from("retention_offers_used")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("offer_type", "winback80")
+          .maybeSingle();
+        if (existing) {
+          logStep("Coupon WINBACK80 rejected: already used");
+        } else {
+          couponValid = true;
+        }
+      }
+    }
 
     // Load product id from app_config
     const { data: configRow, error: configErr } = await supabaseAdmin

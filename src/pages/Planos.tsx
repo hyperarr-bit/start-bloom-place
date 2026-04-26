@@ -20,86 +20,40 @@ const Planos = () => {
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
-  const allowExitRef = useRef(false);
-  const sentinelPushedRef = useRef(false);
-  const winbackRef = useRef(winback);
-  winbackRef.current = winback;
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
   }, []);
 
-  // Guard exit whenever the user is logged in and not yet a paying subscriber.
-  const shouldGuard = !!user && !isSubscribed;
+  const shouldOfferWinback = !!user && !isSubscribed;
 
-  // Safe exit: navigate back if there's history, otherwise go home.
-  const safeExit = useCallback(() => {
-    allowExitRef.current = true;
-    // Se já empurramos o sentinel, history.length tem +1; a entrada anterior
-    // ainda existe, então navigate(-1) volta para a tela de origem (ex.: trial).
+  // Sair de /planos: marca intent (a roleta abre na próxima rota via GlobalWinback)
+  // e volta direto para a tela anterior (ex.: trial expirado).
+  const exitToPrevious = useCallback(() => {
+    if (shouldOfferWinback) {
+      winback.markIntent();
+    }
     if (window.history.length > 1) {
       navigate(-1);
     } else {
       navigate("/", { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, shouldOfferWinback, winback]);
 
-  // Intercept browser back button (popstate). Push a sentinel once; when the
-  // user presses back, try to open the winback. If it opens, hold them on
-  // /planos until they close it. If it doesn't open, let the navigation through.
+  // Botão voltar do navegador / sistema.
   useEffect(() => {
-    if (!shouldGuard) return;
-    if (!sentinelPushedRef.current) {
-      window.history.pushState({ planosGuard: true }, "");
-      sentinelPushedRef.current = true;
-    }
-
-    const onPopState = async () => {
-      if (allowExitRef.current) return;
-      if (winbackRef.current.open) {
-        // Roleta aberta: re-empurra para manter na página enquanto a oferta exibe.
-        window.history.pushState({ planosGuard: true }, "");
-        return;
-      }
-      if (winbackRef.current.alreadyShown) {
-        // Já mostrou nesta sessão — sai sem segurar.
-        safeExit();
-        return;
-      }
-      const opened = await winbackRef.current.triggerNow("abandon_planos", { bypassCooldown: true });
-      if (opened) {
-        // Re-empurra o sentinel para o usuário continuar em /planos durante a oferta.
-        window.history.pushState({ planosGuard: true }, "");
-      } else {
-        // Não abriu — marca intent e libera a saída.
-        winbackRef.current.markIntent();
-        safeExit();
-      }
+    if (!shouldOfferWinback) return;
+    const onPopState = () => {
+      // Marca intent antes que a próxima rota monte o GlobalWinback.
+      winback.markIntent();
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, [shouldGuard, safeExit]);
+  }, [shouldOfferWinback, winback]);
 
-  // Intercept the in-page back button.
-  const handleBack = useCallback(async () => {
-    if (winback.open) return;
-    if (!shouldGuard || allowExitRef.current || winback.alreadyShown) {
-      safeExit();
-      return;
-    }
-    const opened = await winback.triggerNow("abandon_planos", { bypassCooldown: true });
-    if (!opened) {
-      winback.markIntent();
-      safeExit();
-    }
-  }, [shouldGuard, winback, safeExit]);
-
-  // After winback closes, leave the page immediately (no second click needed).
-  const handleWinbackClose = () => {
-    winback.close();
-    // Defer slightly so the modal can start its exit animation cleanly.
-    setTimeout(() => safeExit(), 50);
-  };
+  const handleBack = useCallback(() => {
+    exitToPrevious();
+  }, [exitToPrevious]);
 
   const plans = {
     monthly: { price: "19,90", period: "/mês" },
@@ -150,7 +104,7 @@ const Planos = () => {
   return (
     <div className="min-h-screen bg-background">
       <PaymentStatus />
-      <WinbackFlow open={winback.open} onClose={handleWinbackClose} attemptId={winback.attemptId} />
+      
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={handleBack} className="p-2 rounded-lg hover:bg-muted">

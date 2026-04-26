@@ -331,6 +331,7 @@ function PeriodStat({ label, period }: { label: string; period: { triggered: num
       <div className="text-[10px] text-emerald-400">R$ {period.revenue_recovered_brl.toFixed(0)}</div>
     </div>
   );
+}
 
 function OffersBreakdownTable({ rows }: { rows: OfferRow[] }) {
   const grouped = rows.reduce<Record<string, { rows: OfferRow[]; total: number; applied: number; failed: number }>>(

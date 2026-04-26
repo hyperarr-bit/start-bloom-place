@@ -184,8 +184,33 @@ serve(async (req) => {
         }
       };
 
+      const markWinbackConverted = async () => {
+        try {
+          const isWinback = metadata.coupon === "WINBACK80";
+          if (!isWinback) return;
+          const { data: attempt } = await supabaseClient
+            .from("winback_attempts")
+            .select("id")
+            .eq("user_id", resolvedUserId)
+            .is("converted_at", null)
+            .order("triggered_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (attempt) {
+            await supabaseClient
+              .from("winback_attempts")
+              .update({ converted_at: new Date().toISOString() })
+              .eq("id", attempt.id);
+            logStep("Winback marked converted", { attemptId: attempt.id });
+          }
+        } catch (e) {
+          logStep("Winback convert update failed", { msg: String(e) });
+        }
+      };
+
       if (updated && updated.length > 0) {
         await emitConversionEvent();
+        await markWinbackConverted();
         triggerDiscountApply();
         return;
       }
@@ -195,6 +220,7 @@ serve(async (req) => {
         logStep("Insert error", { message: insertError.message, userId: resolvedUserId });
       } else {
         await emitConversionEvent();
+        await markWinbackConverted();
         triggerDiscountApply();
       }
     }

@@ -157,11 +157,17 @@ serve(async (req) => {
       ? Math.round(cfg.basePriceCents * 0.20)
       : null;
 
-    const lineItem: Record<string, unknown> = { id: productId, quantity: 1 };
-    if (discountedUnitPrice !== null) {
-      // Override the line-item price so the customer sees and pays the promo amount
-      lineItem.price = discountedUnitPrice;
-    }
+    // When the coupon applies, send the item as an ad-hoc product (no `id`) so
+    // AbacatePay uses our promo price instead of the saved product price.
+    // Without coupon, reference the saved product by id (regular full price).
+    const lineItem: Record<string, unknown> = discountedUnitPrice !== null
+      ? {
+          name: billingPeriod === "annual" ? "CORE Pro Anual (Oferta 80% OFF)" : "CORE Pro Mensal (Oferta 80% OFF)",
+          description: "Oferta exclusiva WINBACK80 - 80% de desconto aplicado",
+          quantity: 1,
+          price: discountedUnitPrice,
+        }
+      : { id: productId, quantity: 1 };
 
     const checkoutBody: Record<string, unknown> = {
       frequency: "SUBSCRIPTION",

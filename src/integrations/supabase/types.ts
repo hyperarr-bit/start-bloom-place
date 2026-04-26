@@ -383,6 +383,21 @@ export type Database = {
           unique_users: number
         }[]
       }
+      admin_nudge_stats: {
+        Args: never
+        Returns: {
+          clicked: number
+          completed: number
+          completion_pct: number
+          conversion_pct: number
+          conversions_48h: number
+          ctr_pct: number
+          dismissed: number
+          nudge_key: string
+          shown: number
+          trial_day: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

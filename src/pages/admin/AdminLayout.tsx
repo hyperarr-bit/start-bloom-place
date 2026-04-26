@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
 import {
   LayoutDashboard, BarChart3, TrendingUp, TrendingDown,
-  Users, Filter, LogOut, Shield, Target, Mail
+  Users, Filter, LogOut, Shield, Target, Mail, Sparkles
 } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
@@ -15,6 +15,7 @@ const navItems = [
   { to: "/admin/analytics", label: "Analytics", Icon: BarChart3 },
   { to: "/admin/conversao", label: "Conversão", Icon: TrendingUp },
   { to: "/admin/ativacao", label: "Ativação", Icon: Target },
+  { to: "/admin/onboarding", label: "Onboarding", Icon: Sparkles },
   { to: "/admin/emails", label: "E-mails", Icon: Mail },
   { to: "/admin/churn", label: "Churn", Icon: TrendingDown },
   { to: "/admin/usuarios", label: "Usuários", Icon: Users },

@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_name: string
+          id: string
+          session_id: string | null
+          trial_day: number | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_name: string
+          id?: string
+          session_id?: string | null
+          trial_day?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_name?: string
+          id?: string
+          session_id?: string | null
+          trial_day?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       app_config: {
         Row: {
           key: string
@@ -167,6 +197,7 @@ export type Database = {
           sent_at: string | null
           status: string
           user_id: string
+          variant_key: string | null
         }
         Insert: {
           created_at?: string
@@ -176,6 +207,7 @@ export type Database = {
           sent_at?: string | null
           status?: string
           user_id: string
+          variant_key?: string | null
         }
         Update: {
           created_at?: string
@@ -184,6 +216,31 @@ export type Database = {
           send_at?: string
           sent_at?: string | null
           status?: string
+          user_id?: string
+          variant_key?: string | null
+        }
+        Relationships: []
+      }
+      user_activations: {
+        Row: {
+          action_key: string
+          completed_at: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          action_key: string
+          completed_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          action_key?: string
+          completed_at?: string
+          id?: string
+          metadata?: Json | null
           user_id?: string
         }
         Relationships: []
@@ -262,6 +319,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_activation_funnel: {
+        Args: never
+        Returns: {
+          action_key: string
+          completed_count: number
+          pct: number
+          total_users: number
+        }[]
+      }
       admin_at_risk_users: {
         Args: never
         Returns: {
@@ -270,6 +336,25 @@ export type Database = {
           last_session: string
           plan: string
           user_id: string
+        }[]
+      }
+      admin_conversion_by_trial_day: {
+        Args: never
+        Returns: {
+          conversions: number
+          trial_day: number
+        }[]
+      }
+      admin_email_variant_stats: {
+        Args: never
+        Returns: {
+          banner_clicks_after: number
+          conversion_pct: number
+          conversions_48h: number
+          ctr_pct: number
+          email_key: string
+          sent_count: number
+          variant_key: string
         }[]
       }
       admin_list_users: {

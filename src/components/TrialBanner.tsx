@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import { Clock, Lock, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
-import { GlobalWinback } from "@/components/retention/GlobalWinback";
 
 export const TrialBanner = () => {
   const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();

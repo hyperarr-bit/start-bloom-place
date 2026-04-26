@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
+import { WinbackFlow } from "@/components/retention/WinbackFlow";
+import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -17,6 +19,7 @@ const Planos = () => {
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const winback = useWinbackTrigger();
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });

@@ -101,7 +101,7 @@ const Planos = () => {
   return (
     <div className="min-h-screen bg-background">
       <PaymentStatus />
-      <WinbackFlow open={winback.open} onClose={winback.close} attemptId={winback.attemptId} />
+      <WinbackFlow open={winback.open} onClose={handleWinbackClose} attemptId={winback.attemptId} />
       <header className="border-b border-border bg-card">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-muted">

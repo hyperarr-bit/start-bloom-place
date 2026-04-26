@@ -1,8 +1,8 @@
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useBlocker } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,15 +15,42 @@ import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 const Planos = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isSubscribed } = useAuth();
+  const { isSubscribed, trialExpired, user } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
+  const allowExitRef = useRef(false);
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
   }, []);
+
+  // Block navigation away from /planos when user has expired trial and is not subscribed.
+  // On block, trigger the winback flow instead of leaving.
+  const shouldBlock = !!user && !isSubscribed && trialExpired && !winback.alreadyShown && !allowExitRef.current;
+  const blocker = useBlocker(shouldBlock);
+
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    (async () => {
+      const opened = await winback.triggerNow("abandon_planos");
+      if (!opened) {
+        // Cooldown active or other reason — let the user leave
+        allowExitRef.current = true;
+        blocker.proceed();
+      } else {
+        // Stay on page; user must interact with the wheel/offer.
+        blocker.reset();
+      }
+    })();
+  }, [blocker, winback]);
+
+  // After winback closes, allow leaving on the next attempt.
+  const handleWinbackClose = () => {
+    allowExitRef.current = true;
+    winback.close();
+  };
 
   const plans = {
     monthly: { price: "19,90", period: "/mês" },

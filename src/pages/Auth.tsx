@@ -106,7 +106,7 @@ const Auth = () => {
               Verifique sua caixa de entrada e clique no link para ativar sua conta.
             </p>
             <p className="text-xs text-muted-foreground">
-              Seu teste grátis de 24h começa assim que confirmar o e-mail.
+              Seu teste grátis de 7 dias começa assim que confirmar o e-mail.
             </p>
           </div>
 
@@ -135,7 +135,7 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta — 24h grátis"}
+            {isLogin ? "Entre na sua conta" : "Crie sua conta — 7 dias grátis"}
           </p>
         </div>
 
@@ -199,7 +199,7 @@ const Auth = () => {
             <p className="text-sm">
               <span className="text-muted-foreground">Não tem conta? </span>
               <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie agora — 24h grátis
+                Crie agora — 7 dias grátis
               </button>
             </p>
           ) : (

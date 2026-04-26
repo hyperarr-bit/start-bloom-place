@@ -23,11 +23,9 @@ serve(async (req) => {
     return new Response("Server misconfiguration", { status: 500 });
   }
 
-  const receivedSecret =
-    req.headers.get("x-webhook-secret") ||
-    new URL(req.url).searchParams.get("secret");
-
-  if (receivedSecret !== webhookSecret) {
+  // SECURITY: secret aceito APENAS via header (query string vaza em logs/proxies)
+  const receivedSecret = req.headers.get("x-webhook-secret");
+  if (!receivedSecret || receivedSecret !== webhookSecret) {
     logStep("Invalid webhook secret");
     return new Response("Unauthorized", { status: 401 });
   }
@@ -41,6 +39,24 @@ serve(async (req) => {
   try {
     const body = await req.json();
     logStep("Webhook received", { event: body.event, id: body.id });
+
+    // SECURITY: idempotência — descarta replay do mesmo evento
+    if (body.id) {
+      const { error: dupErr } = await supabaseClient
+        .from("webhook_events")
+        .insert({ id: String(body.id), source: "abacatepay", event: body.event ?? null });
+      if (dupErr) {
+        // Conflito de PK = evento já processado
+        if ((dupErr as { code?: string }).code === "23505") {
+          logStep("Duplicate event ignored", { id: body.id });
+          return new Response(JSON.stringify({ received: true, duplicate: true }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        logStep("Idempotency insert failed (continuing)", { message: dupErr.message });
+      }
+    }
 
     const event = body.event;
     const metadata = body.data?.metadata || {};

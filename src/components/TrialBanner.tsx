@@ -2,11 +2,9 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Clock, Lock, Sparkles, Zap, Gift } from "lucide-react";
+import { Clock, Lock, Sparkles, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
-
-const INTENT_KEY = "subscribe_intent_at";
 
 export const TrialBanner = () => {
   const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();
@@ -41,14 +39,6 @@ export const TrialBanner = () => {
 
   // Trial expired — blocking screen com oferta especial 80% OFF
   if (trialExpired) {
-    const claimWinback = () => {
-      try {
-        sessionStorage.setItem(INTENT_KEY, String(Date.now()));
-      } catch { /* noop */ }
-      trackEvent("trial_banner_click", { phase: "expired", trial_day: trialDay, cta: "winback80" }, { trialDay });
-      navigate("/planos?canceled=true&from=trial_expired");
-    };
-
     return (
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -60,26 +50,14 @@ export const TrialBanner = () => {
             <Lock className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Seu trial terminou</h2>
+            <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Mas temos uma oferta exclusiva pra você continuar de onde parou.
+              Continue de onde parou com acesso completo a todos os módulos.
+              Escolha o plano que combina com você.
             </p>
           </div>
-
-          <div className="rounded-2xl border-2 border-primary/40 bg-primary/5 p-5 space-y-3">
-            <div className="flex items-center justify-center gap-2 text-primary">
-              <Gift className="w-4 h-4" />
-              <span className="text-xs font-bold tracking-wide uppercase">Oferta especial</span>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground line-through">De R$ 19,90/mês</p>
-              <p className="text-3xl font-bold text-primary">R$ 3,98<span className="text-base font-medium text-muted-foreground">/mês</span></p>
-              <p className="text-xs text-muted-foreground">No plano anual · 80% OFF</p>
-            </div>
-          </div>
-
-          <Button className="w-full h-12 text-base font-semibold" onClick={claimWinback}>
-            Resgatar oferta agora
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>
+            Ver planos
           </Button>
         </div>
       </motion.div>

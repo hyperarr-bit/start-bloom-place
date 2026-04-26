@@ -1,99 +1,130 @@
-# Painel /admin isolado + seed de dados + métricas de conversão/churn
+## Objetivo
 
-## 1. Nova área `/admin` (separada do app principal)
+Mudar o trial de **24h** para **7 dias sem cartão**, criar uma jornada de **onboarding D1-D7** (e-mail + push web opcional) que incentiva ativação de módulos, e fazer o paywall aparecer só no D6/D7 — sem nunca tirar do usuário a opção de assinar antes.
 
-Criar diretório `src/pages/admin/` com:
+---
 
-- **`AdminLogin.tsx`** (rota `/admin`) — tela de login dedicada (visual diferente do app, fundo escuro). Faz `supabase.auth.signInWithPassword({ email, password })`. Após sucesso, valida:
-  1. `email === "jv20101958@gmail.com"` (constante)
-  2. `checkIsAdmin(user.id) === true` (consulta `user_roles`)
-  
-  Se qualquer check falhar → `signOut()` + mensagem "Acesso negado". Se passar → redireciona para `/admin/dashboard`.
+## 1. Trial: 24h → 7 dias (sem cartão)
 
-- **`AdminLayout.tsx`** — wrapper que re-valida email+role em toda navegação dentro de `/admin/*`. Possui sidebar com: Dashboard, Analytics, Conversão, Churn, Usuários, Funil. Botão "Sair do Admin".
+**Backend (`check-subscription/index.ts`)**
 
-- **`AdminDashboard.tsx`** (rota `/admin/dashboard`) — overview executivo: MRR estimado, total de usuários, ativos hoje/7d/30d, trial→pago %, churn 30d.
+- `checkTrialExpired`: trocar `hours > 24` por `days > 7`.
+- Retornar também `trial_day` (1–7) e `trial_hours_left` para o frontend renderizar prompts diferentes por dia.
 
-- **`AdminAnalyticsPage.tsx`** (rota `/admin/analytics`) — reutiliza a lógica atual de `AdminAnalytics.tsx` (módulos, abas, horários de pico, ranking).
+**Frontend (`TrialBanner.tsx` + `use-auth.tsx`)**
 
-- **`AdminConversion.tsx`** (rota `/admin/conversao`) — funil:
-  - Cadastros totais → ativos no trial (>1 sessão) → converteram para pago → ainda ativos
-  - Taxa de conversão trial→pago (% dos que assinaram dos que se cadastraram nos últimos 30d)
-  - Tempo médio até conversão
-  - Gráfico de cohort semanal
+- `useAuth` passa a expor `trialDay` e `trialHoursLeft`.
+- Banner muda de tom por fase:
+  - **D1-D3** (descoberta): banner discreto "Você está no seu teste grátis — explore à vontade. [Assinar agora]".
+  - **D4-D5** (engajamento): banner mostra progresso de ativação ("Você já usou X módulos. Faltam Y dias.") + CTA suave.
+  - **D6** (conversão): banner sticky no topo com countdown "Resta 1 dia. Garanta seu acesso." + CTA primário.
+  - **D7** (último dia): modal não-bloqueante ao abrir o app + banner urgente.
+  - **Pós-D7**: tela bloqueante atual (já existe), redireciona para `/planos`.
+- Botão **"Assinar agora"** sempre visível em todos os estados (mesmo D1) → garante a opção de pagar quando quiser.
 
-- **`AdminChurn.tsx`** (rota `/admin/churn`) — 
-  - Churn rate mensal (cancelados / ativos no início do período)
-  - Lista de cancelamentos recentes com último módulo usado
-  - Usuários "em risco" (ativos pagos sem sessão há ≥7 dias)
-  - Gráfico de churn por mês
+**Auth (`Auth.tsx` linha 229)**
 
-- **`AdminUsers.tsx`** (rota `/admin/usuarios`) — tabela com: email, plano, status, criado em, última sessão, total de sessões, módulo favorito.
+- Trocar copy "Sem cartão de crédito necessário" por "**7 dias grátis. Sem cartão. Cancele quando quiser.**"
 
-- **`AdminFunnel.tsx`** (rota `/admin/funil`) — funil de ativação por módulo: % de usuários que abriram cada módulo, % que voltaram ≥3x, módulos com baixa adesão (oportunidades).
+---
 
-Todas as rotas `/admin/*` são protegidas por `AdminLayout` com dupla validação (email + role).
+## 2. Sequência de onboarding D1-D7
 
-## 2. Remover acesso admin do app principal
+### Infraestrutura de e-mail
 
-- `src/components/home/ModuleDrawer.tsx`: remover o botão "Painel Analytics" (linhas 121-129) e a checagem `isAdminUser`. O admin agora acessa via URL direta `/admin`.
-- `src/App.tsx`: remover `import AdminAnalytics from "./pages/AdminAnalytics"` e a rota `/admin/analytics` antiga (linha 70). Adicionar as novas rotas `/admin/*` apontando para `AdminLayout` + páginas filhas.
-- Manter `src/pages/AdminAnalytics.tsx` apenas se for referenciado em outro lugar — caso contrário, deletar (a lógica migra para `AdminAnalyticsPage.tsx`).
+Usar **Lovable Emails** (built-in). Sequência:
 
-## 3. Segurança (RLS / backend)
+1. Configurar domínio de e-mail (vai aparecer botão de setup se ainda não tiver).
+2. Scaffold de transactional emails.
+3. Criar 7 templates React Email em `_shared/transactional-email-templates/`:
 
-A conta `jv20101958@gmail.com` (`2c896992-…`) já tem role `admin` no `user_roles`. Vamos reforçar:
 
-- **Nova migração SQL** com:
-  - Política `SELECT` em `public.subscriptions` para admins lerem todas: `CREATE POLICY "Admins read all subs" ON subscriptions FOR SELECT TO authenticated USING (has_role(auth.uid(),'admin'));`
-  - Política `SELECT` em `public.profiles` para admins lerem todos: `CREATE POLICY "Admins read all profiles" ON profiles FOR SELECT TO authenticated USING (has_role(auth.uid(),'admin'));`
-  - Função SECURITY DEFINER `public.admin_list_users()` que retorna `(user_id, email, created_at, last_sign_in_at)` lendo de `auth.users` JOIN `subscriptions` JOIN `profiles` — só executa se `has_role(auth.uid(),'admin')`. Usada em `AdminUsers.tsx` (porque o cliente não pode ler `auth.users` diretamente).
-  - Função SECURITY DEFINER `public.admin_metrics_overview()` retornando JSON com totais agregados (cadastros, ativos, conversões, churn, MRR estimado).
+| Dia         | Template                | Gatilho                            | Mensagem-chave                                                              |
+| ----------- | ----------------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| D0 (signup) | `trial-welcome`         | imediato após signup               | "Bem-vindo. Seus 7 dias começaram. Comece pelo módulo Rotina."              |
+| D1          | `trial-d1-first-action` | 24h após signup, se não criou nada | "Que tal registrar sua primeira tarefa?" (deep-link `/rotina`)              |
+| D2          | `trial-d2-finance`      | 48h                                | "Adicione 1 transação e veja seu primeiro insight financeiro."              |
+| D3          | `trial-d3-habit`        | 72h                                | "Crie 1 hábito. Estudo mostra: 3 dias = início de rotina."                  |
+| D4          | `trial-d4-progress`     | 96h                                | Recap personalizado: "Você usou X módulos esta semana."                     |
+| D5          | `trial-d5-value`        | 120h                               | "Veja seu painel de progresso. Faltam 2 dias do trial."                     |
+| **D6**      | `trial-d6-convert`      | 144h                               | **Primeiro CTA forte de pagamento** — "Garanta seu acesso por R$14,90/mês." |
+| **D7**      | `trial-d7-last-call`    | 168h                               | **Último dia** — desconto opcional / urgência.                              |
 
-- **Trava de email no servidor** (defesa extra): a função `admin_metrics_overview()` valida internamente `auth.jwt()->>'email' = 'jv20101958@gmail.com'` além do `has_role`. Assim, mesmo que outro usuário ganhe role admin por engano no futuro, não consegue ler dados sensíveis de outros usuários por essas funções.
 
-## 4. Seed de dados realistas (conta jv20101958)
+### Agendamento (cron)
 
-Via INSERT direto em `public.user_data` (todas chaves usam `user_id = 2c896992-6849-4ca6-9a66-5c2414bb9424`):
+- Tabela nova: `trial_email_schedule` (`user_id`, `email_key`, `send_at`, `sent_at`, `status`).
+- No signup (trigger DB ou edge function `schedule-trial-emails`): inserir 8 linhas (D0–D7) com `send_at` calculado a partir de `created_at`.
+- Cron job pg_cron a cada 15min: chamar edge function `dispatch-trial-emails` que:
+  1. Busca rows com `send_at <= now()` e `status='pending'`.
+  2. Para cada uma, checa se usuário ainda está em trial e não pagou; se sim, invoca `send-transactional-email`.
+  3. Marca como `sent` (ou `skipped` se já é assinante).
+- **Idempotência**: `idempotencyKey = "trial-${user_id}-${email_key}"`.
 
-- **rotina** — 30 dias de tarefas concluídas (acordar, treinar, ler, etc.) com streaks
-- **financas** — ~40 transações dos últimos 30 dias (salário, mercado, gasolina, restaurantes, assinaturas), categorias variadas
-- **treino** — 18 sessões (ABC), pesos progressivos
-- **dieta** — 30 dias de refeições + hidratação 2-3L/dia
-- **saude** — pressão, peso (75→73kg), humor
-- **biblioteca** — 4 livros (2 lidos, 1 lendo, 1 wishlist) com metadados
-- **estudos** — 2 cursos em andamento, sessões de pomodoro
-- **carreira** — metas trimestrais, networking
-- **hiperfoco** — 25 sessões de foco
-- **beleza** — skincare diário
-- **casa** — limpeza semanal, contas
-- **viagens** — 1 viagem planejada
-- **relacionamentos** — contatos importantes, datas
-- **pet** — vacinas, alimentação
-- **detox** — dias sem álcool/açúcar
-- **conquistas** — pontos acumulados (~2400 pts)
-- **module_analytics** — 80 sessões espalhadas em 30 dias para alimentar o painel
+### Dados dinâmicos por e-mail
 
-Tudo via tool de inserção SQL (não migração).
+Edge function de dispatch lê `module_analytics` e `user_data` do usuário para personalizar:
 
-## Detalhes técnicos
+- "Você ainda não criou nenhuma transação" vs. "Você já registrou 5 transações"
+- Lista os 3 módulos mais usados no D4.
 
-- Métricas de conversão usam `subscriptions.status` (`active`, `trialing`, `canceled`) + `created_at`.
-- MRR = soma de `subscriptions` ativas × preço do plano (ler de `app_config` se existir, senão hardcode R$19,90/mês).
-- Churn 30d = canceladas nos últimos 30d / ativas no início do período.
-- "Em risco" = subscription `active` cujo `user_id` não tem `module_analytics` nos últimos 7 dias.
-- Charts: reutilizar `recharts` já no projeto.
-- Validação dupla no client (email + role) é UX/defesa em profundidade; a segurança real está nas RLS + funções SECURITY DEFINER no Postgres.
+### Push notifications (web)
 
-## Ações manuais necessárias
+- **Opt-in suave**: na primeira sessão >2min, modal "Quer dicas para aproveitar seu trial? Ative as notificações."
+- Usar Web Push API + Service Worker (`public/sw.js` já existe? — verificar; se não, criar).
+- Mesma sequência D1-D7 reaproveitada (push só dispara se permissão concedida; e-mail é fallback universal).
+- Para começar simples: implementar apenas o opt-in + persistência da subscription no Supabase (`push_subscriptions` table). Disparo real de push pode ficar para iteração futura — **e-mail é o canal principal**.
 
-Nenhuma. O role admin já existe, e não precisa configurar nada no painel Supabase.
+---
 
-## Resumo do que muda
+## 3. Pagamento sempre disponível
 
-- ✅ Novo `/admin` com login próprio (mesma senha do Supabase, mas página separada)
-- ✅ Só `jv20101958@gmail.com` + role admin entram
-- ✅ Removido botão e link admin do app principal
-- ✅ RLS reforçada: admins leem `profiles`/`subscriptions`; funções SECURITY DEFINER com double-check de email
-- ✅ Conta populada com 30 dias de dados realistas em todos os 16 módulos
-- ✅ Painel com Conversão, Churn, Funil, Usuários, MRR, Em risco — além das métricas atuais
+- Botão "Assinar" persistente no `AccountDrawer` e no `TrialBanner` em **todos** os dias (D1-D7).
+- Página `/planos` acessível a qualquer momento via menu/conta.
+- Em todos os e-mails (mesmo D1-D5), incluir link discreto no rodapé: "Já quer assinar? [Garantir acesso]".
+
+---
+
+## 4. Mudanças no banco
+
+Migração nova (apenas schema, sem dados):
+
+1. `trial_email_schedule` (id, user_id, email_key, send_at, sent_at, status, created_at) com RLS.
+2. `push_subscriptions` (id, user_id, endpoint, p256dh, auth, created_at) com RLS.
+3. Trigger `on_auth_user_created`: além de criar profile, popular `trial_email_schedule` com 8 entradas.
+4. Cron pg_cron `dispatch-trial-emails` a cada 15min via pg_net.
+
+Funções `admin_metrics_overview` e similares: nada muda; passam a refletir naturalmente o trial de 7 dias.
+
+---
+
+## 5. Detalhes técnicos
+
+**Arquivos novos**
+
+- `supabase/functions/dispatch-trial-emails/index.ts`
+- `supabase/functions/_shared/transactional-email-templates/trial-welcome.tsx` (e D1-D7)
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` (atualizar)
+- `src/hooks/use-push-notifications.ts`
+- `src/components/PushOptInModal.tsx`
+- `public/sw.js` (se não existir)
+
+**Arquivos editados**
+
+- `supabase/functions/check-subscription/index.ts` — 24h → 7d, expor `trial_day`.
+- `src/hooks/use-auth.tsx` — expor `trialDay`, `trialHoursLeft`.
+- `src/components/TrialBanner.tsx` — UI por fase + CTA sempre visível.
+- `src/pages/Auth.tsx` — copy "7 dias sem cartão".
+- `src/components/home/AccountDrawer.tsx` — botão "Assinar" permanente.
+
+**Pré-requisito de e-mail**: Se o domínio ainda não estiver configurado, o setup vai aparecer como primeiro passo. Após configuração, a sequência é ativada automaticamente.
+
+---
+
+## Resultado esperado
+
+- Trial de 7 dias real, sem fricção de cartão na entrada.
+- 8 toques de e-mail bem-cronometrados aumentando ativação e empurrando conversão só quando faz sentido (D6/D7).
+- Push como canal complementar (opt-in).
+- Pagamento disponível a qualquer momento — usuário decidido converte no D2 se quiser.
+- Métricas do `/admin` continuam funcionando e agora ficam mais ricas (vão mostrar conversão por dia do trial).

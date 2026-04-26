@@ -59,11 +59,12 @@ export function useWinbackTrigger() {
 
       // Detect trigger
       const canceled = searchParams.get("canceled") === "true";
+      const fromTrialExpired = searchParams.get("from") === "trial_expired";
       let intentTs = 0;
       try { intentTs = Number(sessionStorage.getItem(INTENT_KEY) ?? 0); } catch { /* noop */ }
       const recentIntent = intentTs > 0 && Date.now() - intentTs < INTENT_WINDOW_MS;
 
-      if (!canceled && !recentIntent) return;
+      if (!canceled && !recentIntent && !fromTrialExpired) return;
 
       // Trigger! Insert attempt
       const { data: created, error } = await supabase
@@ -82,7 +83,8 @@ export function useWinbackTrigger() {
 
       setAttemptId(created.id);
       setOpen(true);
-      trackEvent("winback_triggered", { source: canceled ? "canceled_url" : "intent_timeout" });
+      const source = fromTrialExpired ? "trial_expired" : canceled ? "canceled_url" : "intent_timeout";
+      trackEvent("winback_triggered", { source });
     })();
   }, [searchParams, setSearchParams]);
 

@@ -238,9 +238,5 @@ const Planos = () => {
     </div>
   );
 };
-      </main>
-    </div>
-  );
-};
 
 export default Planos;

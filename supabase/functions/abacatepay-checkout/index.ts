@@ -152,23 +152,50 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    // Compute discounted unit price for the WINBACK80 coupon (80% off)
-    const discountedUnitPrice = couponValid
-      ? Math.round(cfg.basePriceCents * 0.20)
-      : null;
+    // When WINBACK80 is valid, use a SEPARATE promo product (R$ 47,76/year)
+    // pre-registered in AbacatePay so the API uses the discounted price natively.
+    // The webhook activates the subscription via metadata.user_id + billing_period,
+    // so the product used does not affect activation.
+    const PROMO_PRODUCT = {
+      configKey: "abacatepay_product_annual_winback80_id",
+      externalId: "core-pro-annual-winback80",
+      name: "CORE Pro Anual — Oferta Winback 80% OFF",
+      description: "Oferta exclusiva de retenção — 80% de desconto no primeiro ano",
+      price: 4776, // R$ 47,76
+    };
 
-    // When the coupon applies, send the item as an ad-hoc product (no `id`) so
-    // AbacatePay uses our promo price instead of the saved product price.
-    // Without coupon, reference the saved product by id (regular full price).
-    const lineItem: Record<string, unknown> = discountedUnitPrice !== null
-      ? {
-          id: productId,
-          name: billingPeriod === "annual" ? "CORE Pro Anual (Oferta 80% OFF)" : "CORE Pro Mensal (Oferta 80% OFF)",
-          description: "Oferta exclusiva WINBACK80 - 80% de desconto aplicado",
-          quantity: 1,
-          price: discountedUnitPrice,
-        }
-      : { id: productId, quantity: 1 };
+    async function getOrCreatePromoProductId(): Promise<string> {
+      const { data: row } = await supabaseAdmin
+        .from("app_config")
+        .select("value")
+        .eq("key", PROMO_PRODUCT.configKey)
+        .maybeSingle();
+      const existing = (row?.value as { id?: string } | null)?.id;
+      if (existing) return existing;
+
+      logStep("Creating promo product on AbacatePay", { externalId: PROMO_PRODUCT.externalId });
+      const resp = await abacateRequest("/products/create", apiKey, {
+        name: PROMO_PRODUCT.name,
+        description: PROMO_PRODUCT.description,
+        price: PROMO_PRODUCT.price,
+        currency: "BRL",
+        externalId: PROMO_PRODUCT.externalId,
+      });
+      const newId: string | undefined = resp?.data?.id || resp?.id;
+      if (!newId) throw new Error(`Failed to create promo product: ${JSON.stringify(resp)}`);
+
+      const { error: upErr } = await supabaseAdmin
+        .from("app_config")
+        .upsert({
+          key: PROMO_PRODUCT.configKey,
+          value: { id: newId, externalId: PROMO_PRODUCT.externalId, name: PROMO_PRODUCT.name },
+        });
+      if (upErr) logStep("Failed to save promo product to app_config", { err: upErr.message });
+      return newId;
+    }
+
+    const productIdToUse = couponValid ? await getOrCreatePromoProductId() : productId;
+    const lineItem: Record<string, unknown> = { id: productIdToUse, quantity: 1 };
 
     const checkoutBody: Record<string, unknown> = {
       frequency: "SUBSCRIPTION",
@@ -189,11 +216,7 @@ serve(async (req) => {
       },
     };
 
-    // Note: we intentionally do NOT send `coupons` to AbacatePay because the coupon
-    // code is not registered in their dashboard. The discount is fully applied via
-    // the `price` override on the line item above.
-
-    logStep("Creating checkout", { billingPeriod, productId, coupon: couponValid ? couponRaw : null, discountedUnitPrice });
+    logStep("Creating checkout", { billingPeriod, productIdToUse, coupon: couponValid ? couponRaw : null });
     const result = await abacateRequest("/checkouts/create", apiKey, checkoutBody);
 
     const checkoutUrl = result.data?.url || result.url;

@@ -40,7 +40,13 @@ const Auth = () => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
     
-    if (password.length < 6) {
+    // SECURITY: senha forte só no signup; no login mantém validação simples
+    if (!isLogin) {
+      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+        toast({ title: "Senha fraca", description: "Use no mínimo 8 caracteres, com letras e números.", variant: "destructive" });
+        return;
+      }
+    } else if (password.length < 6) {
       toast({ title: "Senha muito curta", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
       return;
     }

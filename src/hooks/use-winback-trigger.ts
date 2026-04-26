@@ -25,7 +25,9 @@ export function useWinbackTrigger() {
 
   const close = useCallback(() => {
     setOpen(false);
+    setAlreadyShown(false);
     triggeringRef.current = false;
+    checkedRef.current = false;
     if (attemptId) {
       supabase
         .from("winback_attempts")

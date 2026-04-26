@@ -40,15 +40,19 @@ export function useWinbackTrigger() {
    * Returns true if it opened, false otherwise.
    */
   const triggerNow = useCallback(async (source: Source): Promise<boolean> => {
-    // Synchronous lock — runs before any await to block reentrancy from
-    // rapid back/popstate races.
-    if (alreadyShown || open || triggeringRef.current) return false;
+    if (alreadyShown || open || triggeringRef.current) {
+      console.debug("[winback] skipped: already shown / open / locked", { alreadyShown, open });
+      return false;
+    }
     triggeringRef.current = true;
 
     let opened = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return false;
+      if (!user) {
+        console.debug("[winback] skipped: no user");
+        return false;
+      }
 
       const { data: subs } = await supabase
         .from("subscriptions")
@@ -56,7 +60,10 @@ export function useWinbackTrigger() {
         .eq("user_id", user.id)
         .in("status", ["active", "trialing"])
         .limit(1);
-      if (subs && subs.length > 0) return false;
+      if (subs && subs.length > 0) {
+        console.debug("[winback] skipped: active subscription");
+        return false;
+      }
 
       const cutoff = new Date(Date.now() - COOLDOWN_DAYS * 86400000).toISOString();
       const { data: prior } = await supabase
@@ -65,7 +72,10 @@ export function useWinbackTrigger() {
         .eq("user_id", user.id)
         .gte("triggered_at", cutoff)
         .limit(1);
-      if (prior && prior.length > 0) return false;
+      if (prior && prior.length > 0) {
+        console.debug("[winback] skipped: 30d cooldown active");
+        return false;
+      }
 
       const { data: created, error } = await supabase
         .from("winback_attempts")
@@ -73,7 +83,10 @@ export function useWinbackTrigger() {
         .select("id")
         .single();
 
-      if (error || !created) return false;
+      if (error || !created) {
+        console.debug("[winback] skipped: insert failed", error);
+        return false;
+      }
 
       try { sessionStorage.removeItem(INTENT_KEY); } catch { /* noop */ }
 

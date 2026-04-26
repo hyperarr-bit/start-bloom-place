@@ -28,7 +28,9 @@ const Planos = () => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
   }, []);
 
-  const shouldGuard = !!user && !isSubscribed && trialExpired;
+  // Guard exit whenever the user is logged in and not yet a paying subscriber.
+  // (Includes trial-active users — abandoning /planos always offers the win-back.)
+  const shouldGuard = !!user && !isSubscribed;
 
   // Intercept browser back button (popstate) when we should guard the exit.
   // We push a sentinel state on mount; on back, we re-push it and trigger winback.

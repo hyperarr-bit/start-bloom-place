@@ -24,6 +24,13 @@ const PRODUCTS = [
     description: "Assinatura anual do CORE Pro - acesso completo a todos os módulos",
     price: 17880,
   },
+  {
+    configKey: "abacatepay_product_annual_winback80_id",
+    externalId: "core-pro-annual-winback80",
+    name: "CORE Pro Anual — Oferta Winback 80% OFF",
+    description: "Oferta exclusiva de retenção — 80% de desconto no primeiro ano",
+    price: 4776,
+  },
 ];
 
 const log = (step: string, details?: unknown) => {

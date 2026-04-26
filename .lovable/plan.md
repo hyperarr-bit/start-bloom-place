@@ -1,120 +1,106 @@
-## Save Flow de Cancelamento (Anti-Churn)
+## 3 entregas: Auto-aplicação de descontos, Painel de Retention e Tracking de Trial
 
-### Problema atual
-Hoje em `Planos.tsx` existe apenas o texto "Para cancelar, entre em contato pelo email suporte@coreaplicativo.com". Não há fluxo in-app, nenhuma tentativa de retenção, nenhum dado sobre por que as pessoas cancelam.
+### 1. Auto-aplicar descontos pendentes no AbacatePay
 
-### Objetivo
-Quando o assinante clicar em **Cancelar assinatura**, abrir um fluxo guiado em 4 etapas que:
-1. Captura o motivo (insight de produto)
-2. Oferece a solução certa pro motivo
-3. Oferece desconto + pausar (último argumento)
-4. Confirma cancelamento se tudo falhar
+#### 1a. Migration — controle de aplicação
+Adicionar à `retention_offers_used`:
+- `status TEXT` (`active` | `applied` | `failed` | `expired` | `consumed`)
+- `applied_at TIMESTAMPTZ`
+- `apply_attempts INT DEFAULT 0`
+- `last_apply_error TEXT`
 
----
+Mais índice parcial em `(user_id, offer_type, status) WHERE status='active'` e RPC `pending_discount_for_user(uuid)`.
 
-### Fluxo proposto
+#### 1b. Edge function `apply-pending-discounts`
+Lógica:
+1. Busca ofertas `offer_type='discount' AND status='active' AND apply_attempts<5`
+2. Para cada oferta, pega `abacatepay_subscription_id` da `subscriptions` ativa do user
+3. Chama AbacatePay (com fallback): `POST /v2/subscriptions/{id}/discount` → se falhar, tenta `POST /v2/billings/{billingId}/discount`
+4. Sucesso → marca `status='applied'` + emite evento `retention_discount_applied`
+5. Falha → incrementa `apply_attempts`, salva `last_apply_error`; após 5 tentativas vira `status='failed'`
 
-```text
-[Botão "Cancelar assinatura" em /planos]
-        │
-        ▼
-┌─────────────────────────────┐
-│ Etapa 1: Por que cancelar?  │ ← captura motivo
-│ ○ Tá caro                   │
-│ ○ Não usei o suficiente     │
-│ ○ Faltou um recurso         │
-│ ○ Problema técnico          │
-│ ○ Outro motivo              │
-└─────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────┐
-│ Etapa 2: Resposta segmentada│
-│ - "caro" → pula pra Etapa 3 │
-│ - "não usei" → tour rápido  │
-│   + "experimente mais 1 mês │
-│   grátis"                   │
-│ - "faltou recurso" → form   │
-│   de feedback + "vou avisar │
-│   quando lançar"            │
-│ - "técnico" → link suporte  │
-│ - "outro" → pula pra Etapa 3│
-└─────────────────────────────┘
-        │
-        ▼
-┌─────────────────────────────┐
-│ Etapa 3: Ofertas (escolha)  │
-│ ┌─────────────────────────┐ │
-│ │ 🎁 50% off por 2 meses  │ │ ← cupom Stripe
-│ │ [Aceitar oferta]        │ │
-│ ├─────────────────────────┤ │
-│ │ ⏸  Pausar 1, 2 ou 3 mês │ │ ← pause Stripe
-│ │ [Pausar]                │ │
-│ ├─────────────────────────┤ │
-│ │ Cancelar mesmo assim    │ │
-│ └─────────────────────────┘ │
-└─────────────────────────────┘
-        │ (se "cancelar mesmo assim")
-        ▼
-┌─────────────────────────────┐
-│ Etapa 4: Confirmação final  │
-│ "Sua assinatura fica ativa  │
-│ até DD/MM. Tem certeza?"    │
-│ [Voltar] [Confirmar]        │
-└─────────────────────────────┘
+> Como a documentação pública do AbacatePay não confirma o nome exato dos endpoints de desconto, a function tenta dois caminhos comuns e loga a resposta. **Você pode precisar me passar a doc/endpoint correto do AbacatePay** (suporte deles) — aí ajusto numa segunda iteração.
+
+#### 1c. Hook no `abacatepay-webhook`
+Quando o evento for `subscription.charged` / `subscription.renewed` / `billing.created`, **antes de gravar** a próxima cobrança, dispara `apply-pending-discounts` com `{ userId, billingId }` (fire-and-forget, não bloqueia a resposta do webhook).
+
+#### 1d. Cron de segurança
+Job diário (3h da manhã) que chama `apply-pending-discounts` sem args para varrer ofertas que escaparam (caso webhook tenha falhado).
+
+```sql
+select cron.schedule(
+  'sweep-pending-discounts',
+  '0 3 * * *',
+  $$ select net.http_post(
+    url:='https://itoylenzvahbscgjgtqf.supabase.co/functions/v1/apply-pending-discounts',
+    headers:='{"Content-Type":"application/json","Authorization":"Bearer <ANON_KEY>"}'::jsonb,
+    body:='{}'::jsonb
+  ); $$
+);
 ```
 
-Limite: o desconto e a pausa podem ser usados **1x a cada 365 dias** por usuário (anti-abuso leve, ainda permissivo).
+---
+
+### 2. Painel admin `/admin/retention`
+
+#### Componentes
+- **`src/pages/admin/AdminRetention.tsx`**: chama `admin_retention_stats()` e `admin_retention_offers_breakdown()` (RPC nova, ver abaixo)
+- 4 cards no topo: Total tentativas (30d), Save rate %, Salvos por desconto, Salvos por pausa
+- Gráfico de pizza: motivos de cancelamento (recharts, já no projeto)
+- Tabela: funil opened → reason_given → offer_shown → saved/churned
+- Tabela: ofertas — desconto vs pausa, quantos aceitaram, status (active/applied/failed)
+
+#### RPC adicional `admin_retention_offers_breakdown()`
+Retorna por `offer_type` e `status`: `count`, `apply_success_rate`. Necessária pra mostrar quantos descontos foram **efetivamente aplicados** no AbacatePay (vs só aceitos pelo user).
+
+#### Nav update
+Adicionar `{ to: "/admin/retention", label: "Retention", Icon: ShieldCheck }` em `AdminLayout.tsx`.
 
 ---
 
-### Mudanças técnicas
+### 3. Tracking de trial — eventos faltantes
 
-#### 1. Banco (migração)
-Tabela `cancel_attempts` para registrar cada tentativa de cancelamento + motivo + outcome (saved-by-discount, saved-by-pause, saved-by-feedback, churned). RLS: usuário insere/lê os próprios; admin lê todos.
+| Evento | Onde dispara | Payload |
+|---|---|---|
+| `trial_started` | Trigger DB no `auth.users` insert (hoje só seeda emails) | `{ source }` |
+| `trial_day_X_active` | Cron diário que varre `auth.users` criados há 1-7 dias **com sessão na última 24h** | `{ trial_day }` |
+| `trial_converted` | `abacatepay-webhook` quando `status` muda pra `active` (renomeio o atual `subscription_started` → `trial_converted` e mantenho ambos por 30 dias pra compat) | `{ plan, billing_period, trial_day, days_to_convert }` |
+| `trial_canceled_reason` | `cancel-subscription-flow` → action `confirm_cancel` (já temos `cancel_confirmed`, adiciono este com `{ reason }` p/ análise por motivo) | `{ reason, trial_day, was_paying }` |
 
-Tabela `retention_offers_used` (`user_id`, `offer_type`, `used_at`) para enforcar limite 1x/ano por tipo (`discount` | `pause`).
+#### 3a. Trigger SQL
+Estender `handle_new_user()` para também inserir um row em `analytics_events`:
+```sql
+INSERT INTO public.analytics_events (user_id, event_name, event_data, trial_day)
+VALUES (NEW.id, 'trial_started', jsonb_build_object('source','signup'), 0);
+```
 
-#### 2. Edge Functions novas
-- **`cancel-subscription-flow`** — Recebe `{ action, reason?, offerAccepted? }`. Orquestra:
-  - `action: "log_reason"` → grava motivo em `cancel_attempts`
-  - `action: "apply_discount"` → cria/aplica cupom Stripe de 50% por 2 ciclos via `subscriptions.update` com `discounts: [{ coupon }]`, registra em `retention_offers_used`
-  - `action: "pause_subscription"` → usa `subscriptions.update` com `pause_collection: { behavior: "void", resumes_at }` por 1/2/3 meses
-  - `action: "confirm_cancel"` → cancela no fim do período (`cancel_at_period_end: true`), atualiza `cancel_attempts.outcome = 'churned'`
-  - Valida via Zod, idempotente, retorna estado atualizado
+#### 3b. Edge function `tick-trial-active-days`
+Roda 1x/dia (cron). Para cada user em `auth.users` com `created_at` entre 1-7 dias atrás:
+- Se teve `module_analytics` nas últimas 24h → emite `trial_day_X_active` (X = dia do trial)
+- Idempotente: checa se já existe esse evento hoje pra esse user
 
-- **`get-retention-eligibility`** — Retorna `{ canUseDiscount, canUsePause, currentPeriodEnd }` consultando `retention_offers_used`.
+#### 3c. Update `abacatepay-webhook`
+No `emitConversionEvent`, **acrescenta** evento `trial_converted` com `days_to_convert` calculado de `auth.users.created_at`. Mantém o `subscription_started` por compat.
 
-> Nota: hoje o app usa AbacatePay como gateway (webhook `abacatepay-webhook`), mas há `STRIPE_SECRET_KEY` configurado. **Preciso confirmar com você qual gateway as assinaturas estão de fato passando** antes de codar — ver "Pergunta antes de implementar" abaixo.
+#### 3d. Update `cancel-subscription-flow`
+No handler `confirm_cancel`, além do `cancel_confirmed`, emite `trial_canceled_reason` com `{ reason: attempt.reason, trial_day, was_paying: subStatus === 'active' }`.
 
-#### 3. Frontend
-- **`src/components/retention/CancelFlowDialog.tsx`** — Dialog stepper com as 4 etapas (shadcn `Dialog` + state machine simples com `useState<Step>`).
-- **`src/components/retention/steps/`** — `ReasonStep.tsx`, `SegmentedResponseStep.tsx`, `OffersStep.tsx`, `ConfirmStep.tsx`.
-- **`src/hooks/use-cancel-flow.ts`** — Hook que invoca as edge functions, gerencia loading, toasts.
-- **`src/pages/Planos.tsx`** — Substitui o texto atual por botão `Cancelar assinatura` que abre o `CancelFlowDialog`.
+---
 
-#### 4. Analytics
-Eventos novos em `analytics_events`:
-- `cancel_flow_opened`
-- `cancel_reason_selected` (com `reason`)
-- `retention_offer_shown` (com tipo)
-- `retention_offer_accepted` (com tipo)
-- `cancel_confirmed`
+### Arquivos
+**Novos:**
+- `supabase/functions/apply-pending-discounts/index.ts`
+- `supabase/functions/tick-trial-active-days/index.ts`
+- `src/pages/admin/AdminRetention.tsx`
+- 2 migrations (campos da `retention_offers_used` + RPC breakdown; trigger trial_started; cron jobs via insert tool por terem URL/anon)
 
-#### 5. Admin
-Nova página `src/pages/admin/AdminRetention.tsx` com:
-- Top motivos de cancelamento (últimos 30d)
-- Save rate: % de tentativas que aceitaram desconto/pausa
-- Funil: opened → reason_selected → offer_shown → offer_accepted | churned
-- RPC `admin_retention_stats()` agregando `cancel_attempts`
+**Editados:**
+- `supabase/functions/abacatepay-webhook/index.ts` (chamar apply-discounts + emitir `trial_converted`)
+- `supabase/functions/cancel-subscription-flow/index.ts` (emitir `trial_canceled_reason`)
+- `src/pages/admin/AdminLayout.tsx` (nav item)
+- `src/App.tsx` (rota `/admin/retention`)
 
 ---
 
 ### Pergunta antes de implementar
-Vejo que o webhook `abacatepay-webhook` é quem move status de assinatura hoje, mas a chave do Stripe também está nos secrets. **Preciso confirmar**: as assinaturas ativas hoje rodam no **AbacatePay** ou no **Stripe**? A resposta muda quais APIs eu chamo (Stripe tem `coupons` e `pause_collection` nativos; AbacatePay precisaria de uma alternativa — possivelmente cancelar e recriar com novo preço, ou contatar suporte deles para ver se suportam pause/coupon).
-
-Se for AbacatePay, sugiro alternativas:
-- **Desconto**: cancelar a assinatura atual e abrir um novo billing com 50% off por 2 meses, depois reverter para o preço cheio.
-- **Pausar**: cancelar a assinatura mantendo `current_period_end`, e enviar email de retorno antes do prazo.
-
-Confirma qual gateway está em produção pra eu finalizar o plano técnico?
+**A doc do AbacatePay** que você tem (ou suporte deles) confirma quais são os endpoints corretos de desconto/cupom? Vou implementar com os caminhos `/subscriptions/{id}/discount` e `/billings/{id}/discount` por padrão e logar qualquer 404 — mas se você já souber o caminho oficial, me passa pra eu acertar de primeira (evita rodar com falha logada).

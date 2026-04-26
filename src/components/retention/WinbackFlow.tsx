@@ -31,15 +31,15 @@ export function WinbackFlow({ open, onClose, attemptId }: Props) {
         <button
           onClick={onClose}
           aria-label="Fechar"
-          className="absolute top-3 right-3 z-50 w-8 h-8 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center text-muted-foreground"
+          className="absolute top-3 right-3 z-50 w-10 h-10 rounded-full bg-background border-2 border-border hover:bg-muted shadow-md flex items-center justify-center text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
 
         {step === "wheel" ? (
           <WinbackWheel attemptId={attemptId} onSpinComplete={() => setStep("offer")} />
         ) : (
-          <WinbackOffer attemptId={attemptId} />
+          <WinbackOffer attemptId={attemptId} onDismiss={onClose} />
         )}
       </DialogContent>
     </Dialog>

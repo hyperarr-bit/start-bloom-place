@@ -1,33 +1,36 @@
-Plano para corrigir o clique em “Ver planos”
+## Problem
 
-O problema é que o `TrialBanner` agora fica global no app. Quando o trial está expirado, ele renderiza uma tela bloqueante `fixed inset-0 z-50` em qualquer rota, inclusive em `/planos`. Então o clique até tenta navegar, mas a própria tela de trial expirada continua por cima e impede a página de planos de aparecer.
+Two issues in the win-back flow:
 
-O que vou alterar:
+1. **No close (X) button on the offer screen.** The X button only renders during the wheel step. After spinning, when the 80%-off offer appears, the user has no clear way to dismiss it. (Technically the X exists in `WinbackFlow`, but it's small/grey and easy to miss against the dense offer card.)
+2. **Checkout shows full price (~R$184) instead of the 80%-off price.** When the user clicks "GARANTIR 80% OFF AGORA", the AbacatePay checkout opens at full annual price. The discount is being sent as `discount: { type: "PERCENTAGE", value: 80 }`, which is not a recognized field on AbacatePay's `/checkouts/create` endpoint, so it's silently ignored.
 
-1. Ajustar `TrialBanner`
-   - Detectar a rota atual com `useLocation`.
-   - Não renderizar a tela/banners do trial dentro de `/planos`, para permitir que a página de planos fique acessível.
-   - Manter a tela bloqueante nas demais rotas quando o trial estiver expirado.
+## Fix
 
-2. Melhorar a navegação do botão
-   - Trocar `navigate("/planos")` por navegação com `replace` quando já estiver no fluxo de paywall, evitando histórico duplicado/travado.
-   - Preservar o tracking do clique em “Ver planos”.
+### 1. Make the close (X) button obvious on the offer screen
 
-3. Revisar conflitos com a roleta win-back
-   - Garantir que `GlobalWinback` continue podendo aparecer acima do trial expirado quando necessário.
-   - Manter `/planos` sem bloqueio do `TrialBanner`, mas sem remover a proteção de login (`ProtectedRoute`).
+In `src/components/retention/WinbackFlow.tsx`:
+- Keep the existing X button but make it larger, higher contrast, and clearly above the offer content (border, white background, shadow).
+- Add a secondary "Agora não, talvez depois" text link at the bottom of `WinbackOffer` so the dismiss action is also reachable without aiming at a small icon.
 
-Resultado esperado:
+In `src/components/retention/WinbackOffer.tsx`:
+- Add an `onDismiss` prop and render a subtle "Agora não" button below the main CTA that calls it.
+- Wire `WinbackFlow` to pass `onClose` as `onDismiss`.
 
-```text
-Trial expirado em / ou módulos
-  -> mostra tela bloqueante
-  -> clicar “Ver planos”
-  -> navega para /planos
-  -> TrialBanner não cobre /planos
-  -> usuário vê a página de planos normalmente
-```
+### 2. Send the 80% discount correctly to AbacatePay
 
-Arquivos previstos:
-- `src/components/TrialBanner.tsx`
-- possivelmente `src/App.tsx` apenas se for necessário ajustar a ordem dos overlays.
+In `supabase/functions/abacatepay-checkout/index.ts`:
+- AbacatePay's checkout API accepts coupons via a top-level `coupons: ["CODE"]` array (or `couponCode`), not a custom `discount` object. The current `discount: { type: "PERCENTAGE", value: 80 }` is dropped by the API.
+- Switch to the supported approach: when `couponValid === true`, create (idempotently) a coupon `WINBACK80` on AbacatePay with 80% off via `/coupons/create`, then attach it to the checkout body as `coupons: ["WINBACK80"]`. If the coupon already exists, we ignore the "duplicate" error and proceed.
+- Also send the discounted line-item price as a fallback: include `items: [{ id: productId, quantity: 1, price: Math.round(originalPrice * 0.20) }]` so even if the coupon attachment fails for any reason, the user is charged the promo price (R$ 47,76 for annual).
+- Keep all existing logic for recording `retention_offers_used` and updating `winback_attempts`.
+
+Net result: clicking "GARANTIR 80% OFF AGORA" lands the user on an AbacatePay checkout showing **R$ 47,76/ano** instead of R$ 178,80/ano.
+
+### Files to edit
+
+- `src/components/retention/WinbackFlow.tsx` — bigger, more visible X button; pass `onDismiss` to offer.
+- `src/components/retention/WinbackOffer.tsx` — accept `onDismiss`; render "Agora não" link below CTA.
+- `supabase/functions/abacatepay-checkout/index.ts` — send the discount via the supported `coupons` field + discounted item price fallback so the checkout shows R$ 47,76.
+
+No database migrations needed.

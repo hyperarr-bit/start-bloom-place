@@ -62,6 +62,39 @@ export type Database = {
         }
         Relationships: []
       }
+      cancel_attempts: {
+        Row: {
+          created_at: string
+          id: string
+          outcome: string
+          reason: string | null
+          reason_detail: string | null
+          subscription_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          outcome?: string
+          reason?: string | null
+          reason_detail?: string | null
+          subscription_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          outcome?: string
+          reason?: string | null
+          reason_detail?: string | null
+          subscription_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       module_analytics: {
         Row: {
           created_at: string
@@ -139,6 +172,30 @@ export type Database = {
           endpoint?: string
           id?: string
           p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      retention_offers_used: {
+        Row: {
+          id: string
+          metadata: Json | null
+          offer_type: string
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          offer_type: string
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          offer_type?: string
+          used_at?: string
           user_id?: string
         }
         Relationships: []
@@ -398,6 +455,7 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_retention_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

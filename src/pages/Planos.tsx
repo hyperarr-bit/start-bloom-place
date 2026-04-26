@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
+import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 
 const Planos = () => {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ const Planos = () => {
   const { isSubscribed } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   useEffect(() => {
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
@@ -83,11 +85,18 @@ const Planos = () => {
             <p className="text-sm font-medium text-green-600 dark:text-green-400">
               ✅ Você já é assinante CORE PRO!
             </p>
-            <p className="text-xs text-muted-foreground">
-              Para cancelar, entre em contato pelo email suporte@coreaplicativo.com
-            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCancelOpen(true)}
+              className="text-xs text-muted-foreground hover:text-destructive"
+            >
+              Cancelar assinatura
+            </Button>
           </div>
         )}
+
+        <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} />
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">

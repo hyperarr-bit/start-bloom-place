@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { WinbackWheel } from "./WinbackWheel";
 import { WinbackOffer } from "./WinbackOffer";
 import { X } from "lucide-react";
@@ -20,8 +20,14 @@ export function WinbackFlow({ open, onClose, attemptId }: Props) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="max-w-md w-[calc(100%-2rem)] max-h-[95vh] overflow-y-auto p-6 gap-0 [&>button]:hidden"
+        className="max-w-md w-[calc(100%-2rem)] max-h-[95vh] overflow-y-auto p-6 gap-0 [&>button]:hidden z-[200]"
+        onInteractOutside={(e) => e.preventDefault()}
       >
+        <DialogTitle className="sr-only">Sua oferta especial</DialogTitle>
+        <DialogDescription className="sr-only">
+          Gire a roleta e descubra o desconto exclusivo que reservamos para você.
+        </DialogDescription>
+
         <button
           onClick={onClose}
           aria-label="Fechar"

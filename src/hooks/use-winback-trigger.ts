@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 
@@ -12,9 +12,8 @@ type Source = "canceled_url" | "intent_timeout" | "abandon_planos";
 export function useWinbackTrigger() {
   const [open, setOpen] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [alreadyShown, setAlreadyShown] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  const checkedRef = useRef(false);
+  const location = useLocation();
   const triggeringRef = useRef(false);
 
   const markIntent = useCallback(() => {
@@ -25,9 +24,7 @@ export function useWinbackTrigger() {
 
   const close = useCallback(() => {
     setOpen(false);
-    setAlreadyShown(false);
     triggeringRef.current = false;
-    checkedRef.current = false;
     if (attemptId) {
       supabase
         .from("winback_attempts")
@@ -37,28 +34,17 @@ export function useWinbackTrigger() {
     }
   }, [attemptId]);
 
-  /**
-   * Tries to open the winback flow. Respects: auth, active sub, 30d cooldown,
-   * and not already shown in this session.
-   * Returns true if it opened, false otherwise.
-   */
   const triggerNow = useCallback(async (
     source: Source,
     opts?: { bypassCooldown?: boolean },
   ): Promise<boolean> => {
-    if (alreadyShown || open || triggeringRef.current) {
-      console.debug("[winback] skipped: already shown / open / locked", { alreadyShown, open });
-      return false;
-    }
+    if (open || triggeringRef.current) return false;
     triggeringRef.current = true;
 
     let opened = false;
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        console.debug("[winback] skipped: no user");
-        return false;
-      }
+      if (!user) return false;
 
       const { data: subs } = await supabase
         .from("subscriptions")
@@ -66,10 +52,7 @@ export function useWinbackTrigger() {
         .eq("user_id", user.id)
         .in("status", ["active", "trialing"])
         .limit(1);
-      if (subs && subs.length > 0) {
-        console.debug("[winback] skipped: active subscription");
-        return false;
-      }
+      if (subs && subs.length > 0) return false;
 
       if (!opts?.bypassCooldown) {
         const cutoff = new Date(Date.now() - COOLDOWN_DAYS * 86400000).toISOString();
@@ -79,10 +62,7 @@ export function useWinbackTrigger() {
           .eq("user_id", user.id)
           .gte("triggered_at", cutoff)
           .limit(1);
-        if (prior && prior.length > 0) {
-          console.debug("[winback] skipped: 30d cooldown active");
-          return false;
-        }
+        if (prior && prior.length > 0) return false;
       }
 
       const { data: created, error } = await supabase
@@ -91,30 +71,25 @@ export function useWinbackTrigger() {
         .select("id")
         .single();
 
-      if (error || !created) {
-        console.debug("[winback] skipped: insert failed", error);
-        return false;
-      }
+      if (error || !created) return false;
 
       try { sessionStorage.removeItem(INTENT_KEY); } catch { /* noop */ }
 
       setAttemptId(created.id);
       setOpen(true);
-      setAlreadyShown(true);
       trackEvent("winback_triggered", { source });
       opened = true;
       return true;
     } finally {
-      // Keep the lock engaged on success so concurrent callers can't open
-      // a second roulette before React state propagates.
       if (!opened) triggeringRef.current = false;
     }
-  }, [alreadyShown, open]);
+  }, [open]);
 
-  // Auto-detect on mount: ?canceled=true OR recent intent (came back from checkout)
+  // Re-check on every route change (and on first mount).
+  // This catches the "back from /planos" case immediately.
   useEffect(() => {
-    if (checkedRef.current) return;
-    checkedRef.current = true;
+    if (location.pathname === "/planos") return; // never auto-open while on planos
+    if (open || triggeringRef.current) return;
 
     const canceled = searchParams.get("canceled") === "true";
     let intentTs = 0;
@@ -133,7 +108,7 @@ export function useWinbackTrigger() {
         setSearchParams(searchParams, { replace: true });
       }
     })();
-  }, [searchParams, setSearchParams, triggerNow]);
+  }, [location.pathname, searchParams, setSearchParams, triggerNow, open]);
 
-  return { open, attemptId, close, markIntent, triggerNow, alreadyShown };
+  return { open, attemptId, close, markIntent, triggerNow };
 }

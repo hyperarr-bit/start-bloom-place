@@ -205,6 +205,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_at_risk_users: {
+        Args: never
+        Returns: {
+          days_inactive: number
+          email: string
+          last_session: string
+          plan: string
+          user_id: string
+        }[]
+      }
+      admin_list_users: {
+        Args: never
+        Returns: {
+          created_at: string
+          current_period_end: string
+          email: string
+          last_session: string
+          last_sign_in_at: string
+          plan: string
+          status: string
+          top_module: string
+          total_sessions: number
+          user_id: string
+        }[]
+      }
+      admin_metrics_overview: { Args: never; Returns: Json }
+      admin_module_funnel: {
+        Args: never
+        Returns: {
+          module_id: string
+          returning_users: number
+          total_seconds: number
+          total_sessions: number
+          unique_users: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

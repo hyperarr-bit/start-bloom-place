@@ -82,6 +82,21 @@ serve(async (req) => {
   try {
     log("Started");
 
+    // Feature flag: pause email sending without removing infra.
+    const { data: cfg } = await supabase
+      .from("app_config")
+      .select("value")
+      .eq("key", "trial_emails_enabled")
+      .maybeSingle();
+    const enabled = cfg?.value === true || cfg?.value === "true";
+    if (!enabled) {
+      log("Trial emails disabled via app_config flag");
+      return new Response(JSON.stringify({ paused: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     const { data: due, error: dueErr } = await supabase
       .from("trial_email_schedule")
       .select("id, user_id, email_key, send_at")

@@ -5,6 +5,7 @@ import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { OnboardingWizard } from "@/components/OnboardingWizard";
+import { DailyNudge } from "@/components/onboarding/DailyNudge";
 
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
@@ -119,6 +120,8 @@ const HomePage = () => {
       <AnimatePresence>
         {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
       </AnimatePresence>
+
+      {!showOnboarding && <DailyNudge />}
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-6">

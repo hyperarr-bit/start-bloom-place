@@ -1,32 +1,37 @@
-Vou ajustar a roleta para girar automaticamente, deixá-la mais bonita (estilo do vídeo) e fazê-la aparecer antes da tela de trial expirado.
+Plano para corrigir a roleta que não aparece
 
-## 1. Girar automaticamente
-- Remover o botão "GIRAR AGORA".
-- Iniciar o giro assim que a roleta abrir, com pequeno delay para a animação de entrada.
-- Mostrar título dinâmico: "Estamos girando para você..." → "Parabéns! Você ganhou".
-- Manter o resultado fixo em 80% OFF (mantendo a regra de negócio atual).
+1. Fazer o GlobalWinback reagir à troca de rota
+- Ajustar `use-winback-trigger.ts` para observar também a rota atual (`useLocation`).
+- Quando o usuário sair de `/planos` e voltar para a tela anterior, o hook vai re-checar o `sessionStorage` e abrir a roleta imediatamente.
+- Remover a trava que hoje faz a verificação acontecer só uma vez no ciclo do app.
 
-## 2. Visual mais polido (referência do vídeo)
-- Reescrever a roleta em SVG (ao invés de conic-gradient + divs).
-- Fatias com gradiente alternando claro/primário, separadores brancos finos.
-- Anel externo dourado/primário com leve glow ao redor.
-- Pontos decorativos no rim simulando lâmpadas.
-- Hub central com ícone Crown e sombra.
-- Ponteiro mais elegante (triângulo com base circular).
-- Brilho radial (shine) em cima das fatias para sensação 3D.
-- Texto da fatia vencedora em destaque (maior e em peso 800).
-- Animação de entrada suave (fade + scale) da roleta.
+2. Garantir que a roleta apareça por cima da tela de trial expirado
+- Aumentar a prioridade visual do modal da roleta para ficar acima do bloqueio de trial expirado.
+- Se necessário, reduzir o `z-index` da tela de trial expirado ou elevar o `DialogContent/overlay` do WinbackFlow.
 
-## 3. Aparecer antes da tela de trial
-Hoje o `GlobalWinback` é montado dentro do `TrialBanner`, então a roleta só aparece junto com a tela de trial. Vou:
-- Mover `GlobalWinback` para dentro do `App.tsx` (logo antes do `BrowserRouter` ou dentro do layout global), garantindo que o `Dialog` da roleta seja portalizado com z-index acima do TrialBanner full-screen.
-- Adicionar um pequeno fade-in atrasado no TrialBanner (~300ms) ou simplesmente deixar a roleta cobrir o trial via portal.
-- Remover o `GlobalWinback` de dentro do `TrialBanner.tsx` (todas as fases) para evitar montagem duplicada.
+3. Corrigir acessibilidade do Dialog
+- Adicionar `DialogTitle` e `DialogDescription` escondidos visualmente no `WinbackFlow`.
+- Isso remove os erros atuais do console: `DialogContent requires a DialogTitle` e `Missing Description`.
 
-## 4. Arquivos afetados
-- `src/components/retention/WinbackWheel.tsx` — reescrever com SVG, auto-spin, novo visual.
-- `src/components/TrialBanner.tsx` — remover `<GlobalWinback />` das 4 fases.
-- `src/App.tsx` — adicionar `<GlobalWinback />` no nível raiz, dentro do `BrowserRouter`, fora do `<AnimatedRoutes />`, para sempre estar montado.
+4. Preservar o fluxo desejado
+```text
+Trial expirado -> Ver planos -> /planos
+Usuário clica voltar -> volta para Trial expirado
+Roleta aparece por cima imediatamente
+Roleta gira automática
+Mostra oferta 80%
+Usuário fecha no X -> fica na tela de trial expirado
+Usuário clica Ver planos de novo -> pode repetir
+```
 
-## Resultado esperado
-- Usuário sai de `/planos` → roleta gira sozinha por cima da tela → revela 80% OFF → tela de oferta com X → ao fechar, fica no trial expirado.
+Arquivos a alterar
+- `src/hooks/use-winback-trigger.ts`
+- `src/components/retention/WinbackFlow.tsx`
+- Possivelmente `src/components/TrialBanner.tsx` se precisar ajustar o `z-index` do bloqueio de trial expirado
+
+Critério de sucesso
+- Ao clicar em voltar na tela de planos, a roleta aparece automaticamente por cima da tela de trial expirado.
+- A roleta gira sozinha.
+- A oferta de 80% aparece.
+- O X fecha a oferta e deixa o usuário na tela de trial expirado.
+- O fluxo pode ser repetido ao clicar em “Ver planos” novamente.

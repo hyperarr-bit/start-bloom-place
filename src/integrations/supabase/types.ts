@@ -178,23 +178,35 @@ export type Database = {
       }
       retention_offers_used: {
         Row: {
+          applied_at: string | null
+          apply_attempts: number
           id: string
+          last_apply_error: string | null
           metadata: Json | null
           offer_type: string
+          status: string
           used_at: string
           user_id: string
         }
         Insert: {
+          applied_at?: string | null
+          apply_attempts?: number
           id?: string
+          last_apply_error?: string | null
           metadata?: Json | null
           offer_type: string
+          status?: string
           used_at?: string
           user_id: string
         }
         Update: {
+          applied_at?: string | null
+          apply_attempts?: number
           id?: string
+          last_apply_error?: string | null
           metadata?: Json | null
           offer_type?: string
+          status?: string
           used_at?: string
           user_id?: string
         }
@@ -455,6 +467,15 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_retention_offers_breakdown: {
+        Args: never
+        Returns: {
+          count: number
+          offer_type: string
+          pct_of_type: number
+          status: string
+        }[]
+      }
       admin_retention_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
@@ -462,6 +483,16 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      pending_discount_for_user: {
+        Args: { _user_id: string }
+        Returns: {
+          apply_attempts: number
+          id: string
+          metadata: Json
+          offer_type: string
+          used_at: string
+        }[]
       }
     }
     Enums: {

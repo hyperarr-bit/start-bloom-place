@@ -281,11 +281,41 @@ serve(async (req) => {
         .update({ outcome: "churned", updated_at: new Date().toISOString() })
         .eq("id", attempt.id);
 
-      await admin.from("analytics_events").insert({
-        user_id: user.id,
-        event_name: "cancel_confirmed",
-        event_data: { attempt_id: attempt.id, subscription_id: sub?.id ?? null },
-      });
+      // Compute trial day for analytics
+      let trialDay: number | null = null;
+      try {
+        const { data: u } = await admin.auth.admin.getUserById(user.id);
+        if (u?.user?.created_at) {
+          const ms = Date.now() - new Date(u.user.created_at).getTime();
+          trialDay = Math.min(8, Math.max(1, Math.ceil(ms / 86400000)));
+        }
+      } catch (_) { /* non-fatal */ }
+
+      // Re-fetch reason from attempt (set in earlier log_reason step)
+      const { data: fullAttempt } = await admin
+        .from("cancel_attempts")
+        .select("reason")
+        .eq("id", attempt.id)
+        .maybeSingle();
+
+      await admin.from("analytics_events").insert([
+        {
+          user_id: user.id,
+          event_name: "cancel_confirmed",
+          event_data: { attempt_id: attempt.id, subscription_id: sub?.id ?? null },
+          trial_day: trialDay,
+        },
+        {
+          user_id: user.id,
+          event_name: "trial_canceled_reason",
+          event_data: {
+            attempt_id: attempt.id,
+            reason: fullAttempt?.reason ?? null,
+            was_paying: sub?.status === "active",
+          },
+          trial_day: trialDay,
+        },
+      ]);
 
       return jsonResponse({
         ok: true,

@@ -136,14 +136,29 @@ serve(async (req) => {
         try {
           const { data: u } = await supabaseClient.auth.admin.getUserById(resolvedUserId);
           let trialDay: number | null = null;
+          let daysToConvert: number | null = null;
           if (u?.user?.created_at) {
             const ms = Date.now() - new Date(u.user.created_at).getTime();
             trialDay = Math.min(8, Math.max(1, Math.ceil(ms / 86400000)));
+            daysToConvert = Math.round(ms / 86400000);
           }
+          // Legacy event name (kept for back-compat with existing dashboards)
           await supabaseClient.from("analytics_events").insert({
             user_id: resolvedUserId,
             event_name: "subscription_started",
             event_data: { plan: "core-pro", billing_period: billingPeriod, payment_method: paymentMethod },
+            trial_day: trialDay,
+          });
+          // New canonical event for trial → paid conversion
+          await supabaseClient.from("analytics_events").insert({
+            user_id: resolvedUserId,
+            event_name: "trial_converted",
+            event_data: {
+              plan: "core-pro",
+              billing_period: billingPeriod,
+              payment_method: paymentMethod,
+              days_to_convert: daysToConvert,
+            },
             trial_day: trialDay,
           });
         } catch (e) {
@@ -151,8 +166,27 @@ serve(async (req) => {
         }
       };
 
+      // Fire-and-forget: try to apply any pending retention discount
+      // against this billing/subscription. Doesn't block webhook response.
+      const triggerDiscountApply = () => {
+        try {
+          const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/apply-pending-discounts`;
+          fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ userId: resolvedUserId, billingId }),
+          }).catch((e) => logStep("apply_discounts_invoke_failed", { msg: String(e) }));
+        } catch (e) {
+          logStep("apply_discounts_setup_failed", { msg: String(e) });
+        }
+      };
+
       if (updated && updated.length > 0) {
         await emitConversionEvent();
+        triggerDiscountApply();
         return;
       }
 
@@ -161,6 +195,7 @@ serve(async (req) => {
         logStep("Insert error", { message: insertError.message, userId: resolvedUserId });
       } else {
         await emitConversionEvent();
+        triggerDiscountApply();
       }
     }
 

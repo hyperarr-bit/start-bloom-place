@@ -24,14 +24,9 @@ export function pickDailyNudge(
   trialExpired: boolean,
 ): DailyNudge | null {
   if (trialExpired) {
-    return {
-      key: "trial-expired",
-      title: "Seu trial terminou",
-      description: "Continue de onde parou com acesso completo a todos os módulos.",
-      ctaLabel: "Ver planos",
-      ctaRoute: "/planos",
-      tone: "urgent",
-    };
+    // Trial expirado é tratado pelo TrialBanner full-screen + WinbackFlow.
+    // Não mostrar drawer duplicado.
+    return null;
   }
 
   const has = (k: string) => activations.has(k);

@@ -61,24 +61,24 @@ const AnimatedRoutes = () => {
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
-        <Route path="/" element={<ProtectedRoute><PageTransition><><TrialBanner /><Home /></></PageTransition></ProtectedRoute>} />
-        <Route path="/financas" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="financas"><Index /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/rotina" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/desenvolvimento" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="desenvolvimento"><DesenvolvimentoPessoal /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/saude" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="saude"><Saude /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/casa" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="casa"><Casa /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/estudos" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="estudos"><Estudos /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/biblioteca" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="biblioteca"><Biblioteca /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/beleza" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="beleza"><Beleza /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/viagens" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="viagens"><Viagens /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/carreira" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="carreira"><Carreira /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/treino" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="treino"><Treino /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/dieta" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="dieta"><Dieta /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="hiperfoco"><Hiperfoco /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/relacionamentos" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="relacionamentos"><Relacionamentos /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/pet" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="pet"><PetPage /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/detox" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="detox"><Detox /></TrackedModule></></PageTransition></ProtectedRoute>} />
-        <Route path="/conquistas" element={<ProtectedRoute><PageTransition><><TrialBanner /><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></></PageTransition></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><PageTransition><Home /></PageTransition></ProtectedRoute>} />
+        <Route path="/financas" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="financas"><Index /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/rotina" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/desenvolvimento" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="desenvolvimento"><DesenvolvimentoPessoal /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/saude" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="saude"><Saude /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/casa" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="casa"><Casa /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/estudos" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="estudos"><Estudos /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/biblioteca" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="biblioteca"><Biblioteca /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/beleza" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="beleza"><Beleza /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/viagens" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="viagens"><Viagens /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/carreira" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="carreira"><Carreira /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/treino" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="treino"><Treino /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/dieta" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="dieta"><Dieta /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/hiperfoco" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="hiperfoco"><Hiperfoco /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/relacionamentos" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="relacionamentos"><Relacionamentos /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/pet" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="pet"><PetPage /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/detox" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="detox"><Detox /></TrackedModule></PageTransition></ProtectedRoute>} />
+        <Route path="/conquistas" element={<ProtectedRoute><PageTransition><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="dashboard" element={<AdminDashboard />} />
@@ -109,6 +109,7 @@ const App = () => (
           <OfflineBanner />
           <BrowserRouter>
             <AnimatedRoutes />
+            <TrialBanner />
             <GlobalWinback />
           </BrowserRouter>
         </TooltipProvider>

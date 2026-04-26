@@ -132,13 +132,35 @@ serve(async (req) => {
         logStep("Update error", { message: updateError.message, userId: resolvedUserId });
       }
 
+      const emitConversionEvent = async () => {
+        try {
+          const { data: u } = await supabaseClient.auth.admin.getUserById(resolvedUserId);
+          let trialDay: number | null = null;
+          if (u?.user?.created_at) {
+            const ms = Date.now() - new Date(u.user.created_at).getTime();
+            trialDay = Math.min(8, Math.max(1, Math.ceil(ms / 86400000)));
+          }
+          await supabaseClient.from("analytics_events").insert({
+            user_id: resolvedUserId,
+            event_name: "subscription_started",
+            event_data: { plan: "core-pro", billing_period: billingPeriod, payment_method: paymentMethod },
+            trial_day: trialDay,
+          });
+        } catch (e) {
+          logStep("Event emit failed", { message: (e as Error).message });
+        }
+      };
+
       if (updated && updated.length > 0) {
+        await emitConversionEvent();
         return;
       }
 
       const { error: insertError } = await supabaseClient.from("subscriptions").insert(payload);
       if (insertError) {
         logStep("Insert error", { message: insertError.message, userId: resolvedUserId });
+      } else {
+        await emitConversionEvent();
       }
     }
 

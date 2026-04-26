@@ -1,108 +1,99 @@
+# Painel /admin isolado + seed de dados + métricas de conversão/churn
 
-# 🛡️ Revisão de Row Level Security (RLS) — Relatório Final
+## 1. Nova área `/admin` (separada do app principal)
 
-Auditei **todas as 7 tabelas do schema `public`** + **storage.objects** (buckets `receipts` e `skin-photos`). Resultado: **o isolamento por usuário está correto e nenhuma política precisa ser alterada.** Detalhes abaixo.
+Criar diretório `src/pages/admin/` com:
 
----
+- **`AdminLogin.tsx`** (rota `/admin`) — tela de login dedicada (visual diferente do app, fundo escuro). Faz `supabase.auth.signInWithPassword({ email, password })`. Após sucesso, valida:
+  1. `email === "jv20101958@gmail.com"` (constante)
+  2. `checkIsAdmin(user.id) === true` (consulta `user_roles`)
+  
+  Se qualquer check falhar → `signOut()` + mensagem "Acesso negado". Se passar → redireciona para `/admin/dashboard`.
 
-## 1. Tabelas que armazenam dados do usuário
+- **`AdminLayout.tsx`** — wrapper que re-valida email+role em toda navegação dentro de `/admin/*`. Possui sidebar com: Dashboard, Analytics, Conversão, Churn, Usuários, Funil. Botão "Sair do Admin".
 
-> Observação importante sobre a sua pergunta: este app **não tem tabelas separadas** chamadas "tarefas diárias", "consumo de água" ou "pontuação". Esses módulos (rotina, saúde/hidratação, gamificação/score) **gravam todos no mesmo lugar**: `public.user_data`, usando uma estrutura chave-valor (`key`, `value jsonb`) escopada por `user_id`. Ou seja, basta a RLS de `user_data` estar correta — e está.
+- **`AdminDashboard.tsx`** (rota `/admin/dashboard`) — overview executivo: MRR estimado, total de usuários, ativos hoje/7d/30d, trial→pago %, churn 30d.
 
-### `user_data` (tarefas, hábitos, hidratação, gamificação, finanças, etc.)
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| SELECT | Users can read own data | `auth.uid() = user_id` | ✅ |
-| INSERT | Users can insert own data | WITH CHECK `auth.uid() = user_id` | ✅ |
-| UPDATE | Users can update own data | USING + WITH CHECK `auth.uid() = user_id` | ✅ |
-| DELETE | Users can delete own data | `auth.uid() = user_id` | ✅ |
+- **`AdminAnalyticsPage.tsx`** (rota `/admin/analytics`) — reutiliza a lógica atual de `AdminAnalytics.tsx` (módulos, abas, horários de pico, ranking).
 
-Cobertura completa nas 4 operações. Um usuário **não consegue** ler nem alterar dados de outro. RLS habilitada.
+- **`AdminConversion.tsx`** (rota `/admin/conversao`) — funil:
+  - Cadastros totais → ativos no trial (>1 sessão) → converteram para pago → ainda ativos
+  - Taxa de conversão trial→pago (% dos que assinaram dos que se cadastraram nos últimos 30d)
+  - Tempo médio até conversão
+  - Gráfico de cohort semanal
 
-### `profiles`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| SELECT | Users can read own profile | `auth.uid() = id` | ✅ |
-| UPDATE | Users can update own profile | USING + WITH CHECK `auth.uid() = id` | ✅ |
-| INSERT | — | (feito pelo trigger `handle_new_user` com `SECURITY DEFINER`) | ✅ |
-| DELETE | — | bloqueado (sem política, RLS nega por padrão) | ✅ |
+- **`AdminChurn.tsx`** (rota `/admin/churn`) — 
+  - Churn rate mensal (cancelados / ativos no início do período)
+  - Lista de cancelamentos recentes com último módulo usado
+  - Usuários "em risco" (ativos pagos sem sessão há ≥7 dias)
+  - Gráfico de churn por mês
 
-Correto: o INSERT é feito automaticamente no signup; bloquear DELETE pelo cliente é o comportamento desejado.
+- **`AdminUsers.tsx`** (rota `/admin/usuarios`) — tabela com: email, plano, status, criado em, última sessão, total de sessões, módulo favorito.
 
-### `subscriptions`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| SELECT | Users can read own subscriptions | `auth.uid() = user_id` | ✅ |
-| ALL (service_role) | Service role can manage subscriptions | apenas role `service_role` | ✅ |
+- **`AdminFunnel.tsx`** (rota `/admin/funil`) — funil de ativação por módulo: % de usuários que abriram cada módulo, % que voltaram ≥3x, módulos com baixa adesão (oportunidades).
 
-Usuário só lê a própria assinatura. Mutações ficam exclusivamente nas edge functions (`abacatepay-webhook`, `abacatepay-checkout`) usando service role — usuário **não** pode forjar plano "active" nem alterar período de cobrança a partir do client. ✅
+Todas as rotas `/admin/*` são protegidas por `AdminLayout` com dupla validação (email + role).
 
-### `user_roles`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| SELECT | Users read own roles | `auth.uid() = user_id` | ✅ |
-| INSERT/UPDATE/DELETE | — | bloqueados (sem política) | ✅ |
+## 2. Remover acesso admin do app principal
 
-Crítico para evitar **escalonamento de privilégios**: o usuário não consegue se auto-promover a `admin`. Promoção exige migration manual ou service role. ✅
+- `src/components/home/ModuleDrawer.tsx`: remover o botão "Painel Analytics" (linhas 121-129) e a checagem `isAdminUser`. O admin agora acessa via URL direta `/admin`.
+- `src/App.tsx`: remover `import AdminAnalytics from "./pages/AdminAnalytics"` e a rota `/admin/analytics` antiga (linha 70). Adicionar as novas rotas `/admin/*` apontando para `AdminLayout` + páginas filhas.
+- Manter `src/pages/AdminAnalytics.tsx` apenas se for referenciado em outro lugar — caso contrário, deletar (a lógica migra para `AdminAnalyticsPage.tsx`).
 
-### `module_analytics`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| INSERT | Users can insert own analytics | WITH CHECK `auth.uid() = user_id` | ✅ |
-| SELECT | Admins read all analytics | `has_role(auth.uid(), 'admin')` via SECURITY DEFINER | ✅ |
-| UPDATE/DELETE | — | bloqueados | ✅ |
+## 3. Segurança (RLS / backend)
 
-Usuário comum **não vê** os próprios analytics nem os de outros — só admins leem (intencional, é tabela de telemetria agregada). ✅
+A conta `jv20101958@gmail.com` (`2c896992-…`) já tem role `admin` no `user_roles`. Vamos reforçar:
 
-### `app_config`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| ALL | Service role full access | apenas `service_role` | ✅ |
+- **Nova migração SQL** com:
+  - Política `SELECT` em `public.subscriptions` para admins lerem todas: `CREATE POLICY "Admins read all subs" ON subscriptions FOR SELECT TO authenticated USING (has_role(auth.uid(),'admin'));`
+  - Política `SELECT` em `public.profiles` para admins lerem todos: `CREATE POLICY "Admins read all profiles" ON profiles FOR SELECT TO authenticated USING (has_role(auth.uid(),'admin'));`
+  - Função SECURITY DEFINER `public.admin_list_users()` que retorna `(user_id, email, created_at, last_sign_in_at)` lendo de `auth.users` JOIN `subscriptions` JOIN `profiles` — só executa se `has_role(auth.uid(),'admin')`. Usada em `AdminUsers.tsx` (porque o cliente não pode ler `auth.users` diretamente).
+  - Função SECURITY DEFINER `public.admin_metrics_overview()` retornando JSON com totais agregados (cadastros, ativos, conversões, churn, MRR estimado).
 
-Tabela com IDs de produtos AbacatePay e config sensível. Nenhum acesso para `anon` ou `authenticated` — só edge functions. ✅
+- **Trava de email no servidor** (defesa extra): a função `admin_metrics_overview()` valida internamente `auth.jwt()->>'email' = 'jv20101958@gmail.com'` além do `has_role`. Assim, mesmo que outro usuário ganhe role admin por engano no futuro, não consegue ler dados sensíveis de outros usuários por essas funções.
 
-### `webhook_events`
-| Operação | Política | Regra | Status |
-|---|---|---|---|
-| ALL | Service role full access webhook_events | apenas `service_role` | ✅
+## 4. Seed de dados realistas (conta jv20101958)
 
-Tabela de idempotência usada pelo webhook AbacatePay. Cliente não tem nenhum acesso. ✅
+Via INSERT direto em `public.user_data` (todas chaves usam `user_id = 2c896992-6849-4ca6-9a66-5c2414bb9424`):
 
----
+- **rotina** — 30 dias de tarefas concluídas (acordar, treinar, ler, etc.) com streaks
+- **financas** — ~40 transações dos últimos 30 dias (salário, mercado, gasolina, restaurantes, assinaturas), categorias variadas
+- **treino** — 18 sessões (ABC), pesos progressivos
+- **dieta** — 30 dias de refeições + hidratação 2-3L/dia
+- **saude** — pressão, peso (75→73kg), humor
+- **biblioteca** — 4 livros (2 lidos, 1 lendo, 1 wishlist) com metadados
+- **estudos** — 2 cursos em andamento, sessões de pomodoro
+- **carreira** — metas trimestrais, networking
+- **hiperfoco** — 25 sessões de foco
+- **beleza** — skincare diário
+- **casa** — limpeza semanal, contas
+- **viagens** — 1 viagem planejada
+- **relacionamentos** — contatos importantes, datas
+- **pet** — vacinas, alimentação
+- **detox** — dias sem álcool/açúcar
+- **conquistas** — pontos acumulados (~2400 pts)
+- **module_analytics** — 80 sessões espalhadas em 30 dias para alimentar o painel
 
-## 2. Storage (buckets)
+Tudo via tool de inserção SQL (não migração).
 
-| Bucket | Público? | SELECT | INSERT | DELETE |
-|---|---|---|---|---|
-| `receipts` | **false** ✅ | escopo `foldername[1] = auth.uid()` | escopo `foldername[1] = auth.uid()` | escopo `foldername[1] = auth.uid()` |
-| `skin-photos` | **false** ✅ | escopo `foldername[1] = auth.uid()` | escopo `foldername[1] = auth.uid()` | escopo `foldername[1] = auth.uid()` |
+## Detalhes técnicos
 
-Ambos privados; arquivos isolados por pasta `{user_id}/...`. Para exibir no app é usado `createSignedUrl()`. **Nenhum vazamento entre usuários.** ✅
+- Métricas de conversão usam `subscriptions.status` (`active`, `trialing`, `canceled`) + `created_at`.
+- MRR = soma de `subscriptions` ativas × preço do plano (ler de `app_config` se existir, senão hardcode R$19,90/mês).
+- Churn 30d = canceladas nos últimos 30d / ativas no início do período.
+- "Em risco" = subscription `active` cujo `user_id` não tem `module_analytics` nos últimos 7 dias.
+- Charts: reutilizar `recharts` já no projeto.
+- Validação dupla no client (email + role) é UX/defesa em profundidade; a segurança real está nas RLS + funções SECURITY DEFINER no Postgres.
 
----
+## Ações manuais necessárias
 
-## 3. Tabelas indevidamente públicas
+Nenhuma. O role admin já existe, e não precisa configurar nada no painel Supabase.
 
-**Nenhuma.** Não existe nenhuma tabela em `public` com policy aberta a `anon`, e não há policy com expressão `true` exposta a `authenticated`. Os únicos `USING true` são restritos ao role `service_role` (que só edge functions usam internamente).
+## Resumo do que muda
 
----
-
-## 4. RLS quebrando o app?
-
-Verifiquei o fluxo a partir do código que o app realmente usa:
-
-- `use-user-data.tsx` / `use-life-hub-data.ts` lêem e escrevem em `user_data` sempre passando `user_id = session.user.id` → bate com a policy ✅
-- `Auth.tsx` / signup → `handle_new_user` (SECURITY DEFINER) cria `profiles` automaticamente, contornando o INSERT bloqueado ✅
-- Checkout / webhook → usam service role, ignoram RLS ✅
-- Admin (`AdminAnalytics.tsx`) → `checkIsAdmin` consulta `user_roles` com a sessão do usuário, e a SELECT policy permite ler a própria role ✅
-- Upload de comprovante / foto → caminho `{auth.uid()}/arquivo.ext` casa com `foldername[1] = auth.uid()` ✅
-
-**Nenhuma policy está bloqueando funcionalidade legítima.**
-
----
-
-## ✅ Conclusão
-
-Os dados de cada usuário estão **totalmente isolados**. Todas as tabelas com dados pessoais (`user_data`, `profiles`, `subscriptions`) exigem `auth.uid() = user_id` em todas as operações permitidas; tabelas administrativas (`app_config`, `webhook_events`, mutações de `subscriptions`) só são acessíveis via service role; `user_roles` impede escalonamento de privilégios; e os buckets de storage estão privados com escopo por pasta de usuário.
-
-**Nenhuma alteração de RLS é necessária.** Como esta revisão não exige mudanças no código nem no banco, basta aprovar este plano para encerrar a tarefa — não haverá nenhuma migration aplicada.
+- ✅ Novo `/admin` com login próprio (mesma senha do Supabase, mas página separada)
+- ✅ Só `jv20101958@gmail.com` + role admin entram
+- ✅ Removido botão e link admin do app principal
+- ✅ RLS reforçada: admins leem `profiles`/`subscriptions`; funções SECURITY DEFINER com double-check de email
+- ✅ Conta populada com 30 dias de dados realistas em todos os 16 módulos
+- ✅ Painel com Conversão, Churn, Funil, Usuários, MRR, Em risco — além das métricas atuais

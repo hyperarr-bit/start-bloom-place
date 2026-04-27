@@ -418,7 +418,7 @@ const Estudos = () => {
                                 </div>
                               ) : (
                                 <div onClick={() => startEditCell(hour, day)}
-                                  className={`rounded px-1.5 py-1 text-[10px] min-h-[28px] cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors ${val ? "font-medium" : "text-muted-foreground/30"}`}>
+                                  className={`rounded px-1.5 py-1 text-[10px] min-h-[28px] cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-colors ${val ? "font-medium" : "text-muted-foreground/30"} dark:bg-amber-500/10`}>
                                   {val || ""}
                                 </div>
                               )}

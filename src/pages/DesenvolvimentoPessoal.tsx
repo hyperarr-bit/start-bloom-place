@@ -296,7 +296,7 @@ const DesenvolvimentoPessoal = () => {
           {activeTab === "diario" && <div className="space-y-4">
             <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-xl border border-indigo-200 dark:border-indigo-500/30 p-4">
               <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><PenTool className="w-4 h-4 text-indigo-500" /> DIÁRIO DE REFLEXÃO — {new Date().toLocaleDateString("pt-BR")}</h3>
-              <div className="bg-indigo-100/50 dark:bg-indigo-500/5 rounded-lg p-3 mb-3 border border-indigo-200/50">
+              <div className="bg-indigo-100/50 dark:bg-indigo-500/5 rounded-lg p-3 mb-3 border border-indigo-200/50 dark:border-indigo-500/20">
                 <p className="text-xs text-muted-foreground mb-1">💭 Prompt do dia:</p>
                 <p className="text-sm font-medium italic">{todayPrompt}</p>
               </div>
@@ -451,7 +451,7 @@ const DesenvolvimentoPessoal = () => {
               ) : canOpenLetter ? (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">📬 Sua carta está pronta para ser aberta!</p>
-                  <div className="bg-white dark:bg-background rounded-lg p-4 border border-rose-200">
+                  <div className="bg-white dark:bg-background rounded-lg p-4 border border-rose-200 dark:border-rose-500/20">
                     <p className="text-xs italic whitespace-pre-wrap">{futureLetter.text}</p>
                     <p className="text-[10px] text-muted-foreground mt-2">Escrita em: {new Date(futureLetter.written).toLocaleDateString("pt-BR")}</p>
                   </div>

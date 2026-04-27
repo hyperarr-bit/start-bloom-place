@@ -568,15 +568,15 @@ const Treino = () => {
           </div>
           <div className="flex items-center gap-2">
             {sessionStart && (
-              <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300">
+              <div className="flex items-center gap-1 bg-green-100 dark:bg-green-500/20 px-2 py-1 rounded-full border border-green-300 dark:border-green-500/20">
                 <Clock className="w-3 h-3 text-green-600" />
-                <span className="text-[10px] font-bold text-green-700 font-mono">{formatTime(sessionElapsed)}</span>
+                <span className="text-[10px] font-bold text-green-700 font-mono dark:text-green-300">{formatTime(sessionElapsed)}</span>
               </div>
             )}
             {streak > 0 && (
-              <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-500/20 px-2 py-1 rounded-full border border-orange-300">
+              <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-500/20 px-2 py-1 rounded-full border border-orange-300 dark:border-orange-500/20">
                 <Flame className="w-3 h-3 text-orange-500" />
-                <span className="text-[10px] font-bold text-orange-700">{streak}🔥</span>
+                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{streak}🔥</span>
               </div>
             )}
           </div>
@@ -671,7 +671,7 @@ const Treino = () => {
                       <div className="grid grid-cols-2 gap-2 pb-2">
                         {templates.map(t => (
                           <button key={t.name} onClick={() => applyTemplate(t)}
-                            className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+                            className="text-left p-3 rounded-lg border border-border hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all dark:bg-blue-500/10">
                             <p className="text-sm font-bold">{t.emoji} {t.name}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">
                               {Object.entries(t.plan).filter(([_, v]) => v.length > 0).map(([d, v]) => `${d.slice(0, 3)}: ${v.join("+")}`).join(" | ")}
@@ -713,7 +713,7 @@ const Treino = () => {
                           return (
                             <button key={m} onClick={() => toggleMuscleForDay(day, m)}
                               className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                                isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground"
+                                isSelected ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300 text-muted-foreground dark:border-blue-500/20"
                               }`}>
                               {muscleGroupIcons[m] || "💪"} {m}
                             </button>
@@ -733,7 +733,7 @@ const Treino = () => {
                   <span className="text-xs text-muted-foreground">Padrão:</span>
                   {[30, 45, 60, 90, 120].map(t => (
                     <button key={t} onClick={() => setRestTime(t)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${restTime === t ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300"}`}>{t}s</button>
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${restTime === t ? "bg-blue-500 text-white border-blue-500" : "border-border hover:border-blue-300"} dark:border-blue-500/20`}>{t}s</button>
                   ))}
                   <button onClick={() => setSoundEnabled(!soundEnabled)} className="ml-auto p-1.5 rounded border border-border">
                     {soundEnabled ? <Volume2 className="w-4 h-4 text-blue-500" /> : <VolumeX className="w-4 h-4 text-muted-foreground" />}
@@ -1013,9 +1013,9 @@ const Treino = () => {
 
           <div className="flex items-center gap-2">
             {restRunning && (
-              <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-full border border-blue-300 animate-pulse">
+              <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-500/20 px-2 py-1 rounded-full border border-blue-300 animate-pulse dark:border-blue-500/20">
                 <Timer className="w-3 h-3 text-blue-500" />
-                <span className="text-[10px] font-bold text-blue-700 font-mono">{restCountdown}s</span>
+                <span className="text-[10px] font-bold text-blue-700 font-mono dark:text-blue-300">{restCountdown}s</span>
               </div>
             )}
             {todayProgress > 0 && (

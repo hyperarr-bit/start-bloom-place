@@ -650,10 +650,10 @@ const Biblioteca = () => {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] border-green-300 text-green-700 hover:bg-green-50" onClick={() => setBooks(prev => prev.map(b => b.id === book.id ? { ...b, lentTo: "", lentDate: "", lentReturnDate: "" } : b))}>
+                          <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] border-green-300 text-green-700 hover:bg-green-50 dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20" onClick={() => setBooks(prev => prev.map(b => b.id === book.id ? { ...b, lentTo: "", lentDate: "", lentReturnDate: "" } : b))}>
                             ✅ Devolvido
                           </Button>
-                          <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] border-pink-300 text-pink-700 hover:bg-pink-50" onClick={() => sendWhatsApp(book)}>
+                          <Button size="sm" variant="outline" className="flex-1 h-8 text-[10px] border-pink-300 text-pink-700 hover:bg-pink-50 dark:bg-pink-500/10 dark:text-pink-300 dark:border-pink-500/20" onClick={() => sendWhatsApp(book)}>
                             <MessageCircle className="w-3 h-3 mr-1" /> Cobrar
                           </Button>
                         </div>

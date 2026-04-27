@@ -101,7 +101,7 @@ const PomodoroTimer = () => {
   const secs = timeLeft % 60;
   const progress = ((durations[mode] - timeLeft) / durations[mode]) * 100;
 
-  const modeColors = { focus: "from-red-500 to-orange-500", break: "from-green-400 to-emerald-500", longBreak: "from-blue-400 to-indigo-500" };
+  const modeColors = { focus: "from-red-500 to-orange-500 dark:from-red-700 dark:to-orange-700", break: "from-green-400 to-emerald-500 dark:from-green-700 dark:to-emerald-700", longBreak: "from-blue-400 to-indigo-500 dark:from-blue-700 dark:to-indigo-700" };
   const modeLabels = { focus: "FOCO", break: "PAUSA", longBreak: "PAUSA LONGA" };
 
   return (

@@ -609,7 +609,7 @@ const MonthlyPlanning = () => {
     <div className="space-y-4">
       {/* Calendar */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 px-4 py-3 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-teal-500 to-cyan-500 dark:from-teal-700 dark:to-cyan-700 px-4 py-3 flex items-center justify-between">
           <button onClick={prevMonth} className="text-white hover:bg-white/20 rounded p-1"><ChevronLeft className="w-4 h-4" /></button>
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-white" />

@@ -192,7 +192,7 @@ serve(async (req) => {
       await admin.from("retention_offers_used").insert({
         user_id: user.id,
         offer_type: "discount",
-        metadata: { percent_off: 50, cycles: 2, subscription_id: sub.id },
+        metadata: { percent_off: 50, cycles: 3, subscription_id: sub.id },
       });
 
       await admin
@@ -203,11 +203,11 @@ serve(async (req) => {
       await admin.from("analytics_events").insert({
         user_id: user.id,
         event_name: "retention_offer_accepted",
-        event_data: { type: "discount", percent_off: 50, attempt_id: attempt.id },
+        event_data: { type: "discount", percent_off: 50, cycles: 3, attempt_id: attempt.id },
       });
 
       logStep("discount_applied", { userId: user.id });
-      return jsonResponse({ ok: true, type: "discount", percentOff: 50, cycles: 2 });
+      return jsonResponse({ ok: true, type: "discount", percentOff: 50, cycles: 3 });
     }
 
     if (body.action === "pause_subscription") {

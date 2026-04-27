@@ -178,7 +178,7 @@ serve(async (req) => {
 
       const meta = offer.metadata ?? {};
       const percentOff = Number(meta.percent_off ?? 50);
-      const cycles = Number(meta.cycles ?? 2);
+      const cycles = Number(meta.cycles ?? 3);
 
       const r = await applyDiscountAtAbacate({
         apiKey,

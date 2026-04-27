@@ -382,7 +382,7 @@ const TodoList = () => {
 
         <div className="space-y-1.5 max-h-60 overflow-y-auto">
           {filtered.map(t => (
-            <div key={t.id} className={`flex items-center gap-2 p-2 rounded-md group transition-colors ${t.done ? "bg-muted/30" : "bg-background"}`}>
+            <div key={t.id} className={`flex items-center gap-2 p-2 rounded-md group transition-colors ${t.done ? "bg-muted/30 dark:bg-[hsl(var(--rt-card-2))]" : "bg-background dark:bg-[hsl(var(--rt-card))]"}`}>
               <div className={`w-2 h-2 rounded-full ${priorityDot[t.priority]}`} />
               <Checkbox checked={t.done} onCheckedChange={() => toggleTodo(t.id)} className="h-3.5 w-3.5" />
               <span className={`flex-1 text-xs ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.text}</span>

@@ -6,9 +6,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Gift, Pause, Heart, Wrench, MessageCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Gift, Pause, MessageCircle, Wrench, AlertTriangle } from "lucide-react";
 
-type Step = "reason" | "segmented" | "offers" | "confirm" | "done";
+type Step = "reason" | "offer" | "confirm" | "done";
 type Reason = "too_expensive" | "not_using" | "missing_feature" | "technical_issue" | "other";
 
 interface CancelFlowDialogProps {
@@ -24,6 +24,32 @@ const REASONS: { value: Reason; label: string; emoji: string }[] = [
   { value: "technical_issue", label: "Tive problema técnico", emoji: "🐞" },
   { value: "other", label: "Outro motivo", emoji: "💬" },
 ];
+
+const OFFER_HEADERS: Record<Reason, { title: string; description: string }> = {
+  not_using: {
+    title: "💡 Que tal um empurrãozinho?",
+    description:
+      "A maioria de quem usa por 7 dias seguidos vê resultado. Antes de ir, dá uma olhada no que reservei pra você:",
+  },
+  missing_feature: {
+    title: "🧩 Anotado! Mas antes de ir...",
+    description:
+      "Se cancelar, perde o histórico. Tenho uma oferta pra você continuar enquanto esse recurso não chega:",
+  },
+  technical_issue: {
+    title: "🐞 Vamos resolver isso",
+    description:
+      "Manda detalhes pro suporte que a gente resolve rápido. E pra compensar o trampo, olha essa oferta:",
+  },
+  too_expensive: {
+    title: "Entendi 💛 Tenho uma oferta pra você",
+    description: "Sei que aperta. Olha o que consigo fazer pra você continuar:",
+  },
+  other: {
+    title: "Entendi 💛 Antes de cancelar...",
+    description: "Tenho uma oferta especial pra você considerar:",
+  },
+};
 
 export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowDialogProps) {
   const { toast } = useToast();
@@ -58,7 +84,6 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
     return data as any;
   };
 
-  // Open attempt when dialog opens for the first time
   const ensureAttempt = async () => {
     if (attemptId) return attemptId;
     setLoading(true);
@@ -84,7 +109,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
         reason,
         reasonDetail: reasonDetail || undefined,
       });
-      setStep("segmented");
+      setStep("offer");
     } catch (e) {
       toast({ title: "Erro", description: "Tente novamente.", variant: "destructive" });
     } finally {
@@ -99,7 +124,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
       await invoke({ action: "apply_discount", attemptId });
       toast({
         title: "🎉 Desconto aplicado!",
-        description: "50% off nas próximas 2 cobranças. Bem-vindo de volta!",
+        description: "50% off nas próximas 3 cobranças. Bem-vindo de volta!",
       });
       handleOpenChange(false);
     } catch (e: any) {
@@ -169,10 +194,11 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
     }
   };
 
-  // Open attempt as soon as the dialog mounts
   if (open && !attemptId && !loading) {
     void ensureAttempt();
   }
+
+  const offerHeader = reason ? OFFER_HEADERS[reason] : OFFER_HEADERS.other;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -223,88 +249,42 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
           </>
         )}
 
-        {/* ============ STEP 2: SEGMENTED RESPONSE ============ */}
-        {step === "segmented" && (
+        {/* ============ STEP 2: OFFER (segmented header + offers unified) ============ */}
+        {step === "offer" && (
           <>
             <DialogHeader>
-              <DialogTitle>
-                {reason === "not_using" && "💡 Que tal um empurrãozinho?"}
-                {reason === "missing_feature" && "🧩 Anotado!"}
-                {reason === "technical_issue" && "🐞 Vamos resolver isso"}
-                {(reason === "too_expensive" || reason === "other") && "Entendi 💛"}
-              </DialogTitle>
-              <DialogDescription>
-                {reason === "not_using" &&
-                  "A maioria de quem usa por 7 dias seguidos vê resultado. Quer que eu te mostre por onde começar agora?"}
-                {reason === "missing_feature" &&
-                  "Se você cancelar, perde o histórico. Posso te avisar quando esse recurso chegar — quer ficar na minha lista?"}
-                {reason === "technical_issue" &&
-                  "Manda detalhes pro suporte que a gente resolve rápido — sem perder sua assinatura."}
-                {(reason === "too_expensive" || reason === "other") &&
-                  "Tenho duas opções pra te oferecer antes de cancelar."}
-              </DialogDescription>
+              <DialogTitle>{offerHeader.title}</DialogTitle>
+              <DialogDescription>{offerHeader.description}</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-2">
-              {reason === "not_using" && (
-                <Button
-                  className="w-full justify-start gap-3 h-auto py-3"
-                  variant="outline"
-                  onClick={() => {
-                    handleSaveFeedback();
-                  }}
-                >
-                  <Heart className="h-5 w-5 text-primary" />
-                  <span className="text-left">Quero tentar mais uma semana</span>
-                </Button>
-              )}
+            <div className="space-y-3">
+              {/* Contextual side action for missing_feature / technical_issue */}
               {reason === "missing_feature" && (
                 <Button
-                  className="w-full justify-start gap-3 h-auto py-3"
+                  className="w-full justify-start gap-3 h-auto py-2.5"
                   variant="outline"
+                  size="sm"
                   onClick={handleSaveFeedback}
                 >
-                  <MessageCircle className="h-5 w-5 text-primary" />
-                  <span className="text-left">Sim, quero ser avisado quando lançar</span>
+                  <MessageCircle className="h-4 w-4 text-primary" />
+                  <span className="text-left text-xs">Quero ser avisado quando lançar</span>
                 </Button>
               )}
               {reason === "technical_issue" && (
                 <Button
-                  className="w-full justify-start gap-3 h-auto py-3"
+                  className="w-full justify-start gap-3 h-auto py-2.5"
                   variant="outline"
+                  size="sm"
                   asChild
                 >
                   <a href="mailto:suporte@coreaplicativo.com" onClick={handleSaveFeedback}>
-                    <Wrench className="h-5 w-5 text-primary" />
-                    <span className="text-left">Falar com o suporte</span>
+                    <Wrench className="h-4 w-4 text-primary" />
+                    <span className="text-left text-xs">Falar com o suporte</span>
                   </a>
                 </Button>
               )}
-            </div>
 
-            <div className="flex gap-2 justify-between pt-2 border-t border-border">
-              <Button variant="ghost" size="sm" onClick={() => setStep("reason")}>
-                ← Voltar
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setStep("offers")}>
-                Ver ofertas →
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* ============ STEP 3: OFFERS ============ */}
-        {step === "offers" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Tenho duas ofertas pra você 🎁</DialogTitle>
-              <DialogDescription>
-                Escolha a que faz mais sentido — só pode usar uma por ano.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3">
-              {/* Discount card */}
+              {/* Discount card — primary */}
               <div
                 className={`rounded-xl border-2 p-4 space-y-3 ${
                   canUseDiscount ? "border-primary bg-primary/5" : "border-border bg-muted/30 opacity-60"
@@ -313,9 +293,9 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
                 <div className="flex items-start gap-3">
                   <Gift className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <p className="font-bold text-base">50% off por 2 meses</p>
+                    <p className="font-bold text-base">50% off por 3 meses</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Continue com tudo liberado pagando metade do preço nas próximas 2 cobranças.
+                      Continue com tudo liberado pagando metade do preço nas próximas 3 cobranças.
                     </p>
                   </div>
                 </div>
@@ -330,7 +310,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
                 </Button>
               </div>
 
-              {/* Pause card */}
+              {/* Pause card — secondary */}
               <div
                 className={`rounded-xl border-2 p-4 space-y-3 ${
                   canUsePause ? "border-border" : "border-border bg-muted/30 opacity-60"
@@ -376,7 +356,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
             </div>
 
             <div className="flex justify-between pt-2 border-t border-border">
-              <Button variant="ghost" size="sm" onClick={() => setStep("segmented")}>
+              <Button variant="ghost" size="sm" onClick={() => setStep("reason")}>
                 ← Voltar
               </Button>
               <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setStep("confirm")}>
@@ -386,7 +366,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
           </>
         )}
 
-        {/* ============ STEP 4: CONFIRM ============ */}
+        {/* ============ STEP 3: CONFIRM ============ */}
         {step === "confirm" && (
           <>
             <DialogHeader>
@@ -406,7 +386,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
             </div>
 
             <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setStep("offers")}>
+              <Button variant="ghost" onClick={() => setStep("offer")}>
                 Voltar
               </Button>
               <Button variant="destructive" onClick={handleConfirmCancel} disabled={loading}>

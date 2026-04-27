@@ -259,9 +259,9 @@
   }
 
   .dark {
-    --sk-mint: 150 80% 65%;
-    --sk-lavender: 245 58% 80%;
-    --sk-coral: 6 100% 69%;
+    --sk-mint: 150 50% 62%;
+    --sk-lavender: 245 38% 72%;
+    --sk-coral: 6 60% 64%;
   }
 
   .sk-card {
@@ -288,12 +288,12 @@
   }
 
   .dark {
-    --saude-green: 145 100% 50%;
-    --saude-blue: 186 100% 50%;
-    --saude-yellow: 50 100% 50%;
-    --saude-red: 0 100% 59%;
-    --saude-card: 0 0% 15%;
-    --saude-muted: 0 0% 60%;
+    --saude-green: 145 45% 55%;
+    --saude-blue: 200 50% 60%;
+    --saude-yellow: 45 65% 60%;
+    --saude-red: 0 55% 58%;
+    --saude-card: 220 10% 11%;
+    --saude-muted: 220 6% 58%;
   }
 
   .saude-card {
@@ -326,25 +326,25 @@
   }
 
   .dark {
-    --rt-surface: 222 14% 7%;           /* #0F1115 */
-    --rt-card: 222 13% 11%;             /* #171A21 */
-    --rt-card-2: 222 13% 13%;           /* #1C1F26 alt rows */
-    --rt-border: 222 10% 18%;           /* #23262F */
-    --rt-text: 220 8% 91%;              /* #E6E8EB */
-    --rt-text-soft: 220 6% 64%;         /* #9AA0AA */
+    --rt-surface: 220 10% 8%;
+    --rt-card: 220 10% 11%;
+    --rt-card-2: 220 9% 14%;
+    --rt-border: 220 9% 17%;
+    --rt-text: 220 8% 88%;
+    --rt-text-soft: 220 6% 58%;
 
-    --rt-accent: 142 71% 45%;           /* #22C55E */
-    --rt-accent-soft: 142 60% 16%;      /* #14532D-ish bg */
-    --rt-warning: 48 96% 53%;           /* #FACC15 */
-    --rt-warning-soft: 35 40% 10%;      /* #1F1A12 */
-    --rt-warning-text: 48 90% 70%;
-    --rt-danger: 0 75% 60%;
-    --rt-info: 210 90% 62%;
+    --rt-accent: 142 45% 55%;
+    --rt-accent-soft: 142 30% 16%;
+    --rt-warning: 45 70% 60%;
+    --rt-warning-soft: 35 25% 12%;
+    --rt-warning-text: 45 55% 75%;
+    --rt-danger: 0 55% 58%;
+    --rt-info: 210 55% 62%;
 
-    --rt-heat-0: 222 12% 18%;           /* #2A2E38 */
-    --rt-heat-1: 142 60% 22%;           /* #14532D */
-    --rt-heat-2: 142 71% 45%;           /* #22C55E */
-    --rt-heat-3: 142 76% 64%;           /* #4ADE80 */
+    --rt-heat-0: 220 9% 17%;
+    --rt-heat-1: 142 30% 22%;
+    --rt-heat-2: 142 45% 42%;
+    --rt-heat-3: 142 50% 58%;
   }
 
   .rt-card {

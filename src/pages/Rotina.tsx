@@ -821,7 +821,7 @@ const EnergyTracker = () => {
                   key={v}
                   onClick={() => setEnergy(pi, v)}
                   className={`flex-1 h-6 rounded-md text-[10px] font-bold transition-all ${v <= todayEnergy[pi] 
-                    ? v <= 2 ? "bg-red-400 dark:bg-red-600 text-white" : v <= 3 ? "bg-yellow-400 dark:bg-yellow-600 text-white" : "bg-green-400 dark:bg-green-600 text-white"
+                    ? v <= 2 ? "bg-red-400 dark:bg-[hsl(0,65%,45%)] text-white" : v <= 3 ? "bg-yellow-400 dark:bg-[hsl(45,80%,45%)] text-white" : "bg-green-500 dark:bg-[hsl(var(--rt-accent))] text-white"
                     : "bg-muted text-muted-foreground"
                   }`}
                 >

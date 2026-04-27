@@ -241,6 +241,63 @@
   .saude-card {
     @apply bg-card rounded-2xl p-4 border border-border shadow-sm;
   }
+
+  /* ===== Rotina Module — Premium Dark Palette =====
+     Light: keep existing colorful look.
+     Dark : controlled hierarchy (no pure black, no pure white). */
+  :root {
+    --rt-surface: 0 0% 100%;            /* page surface */
+    --rt-card: 0 0% 100%;               /* card surface */
+    --rt-card-2: 40 15% 97%;            /* alt row / nested surface */
+    --rt-border: 0 0% 90%;              /* hairline border */
+    --rt-text: 0 0% 15%;                /* primary text */
+    --rt-text-soft: 0 0% 45%;           /* secondary text */
+
+    --rt-accent: 142 70% 45%;           /* habit / success green */
+    --rt-accent-soft: 142 60% 92%;
+    --rt-warning: 45 95% 55%;           /* urgency yellow */
+    --rt-warning-soft: 48 100% 96%;
+    --rt-warning-text: 38 80% 30%;
+    --rt-danger: 0 75% 55%;
+    --rt-info: 210 90% 56%;
+
+    --rt-heat-0: 0 0% 92%;
+    --rt-heat-1: 142 60% 80%;
+    --rt-heat-2: 142 65% 55%;
+    --rt-heat-3: 142 70% 42%;
+  }
+
+  .dark {
+    --rt-surface: 222 14% 7%;           /* #0F1115 */
+    --rt-card: 222 13% 11%;             /* #171A21 */
+    --rt-card-2: 222 13% 13%;           /* #1C1F26 alt rows */
+    --rt-border: 222 10% 18%;           /* #23262F */
+    --rt-text: 220 8% 91%;              /* #E6E8EB */
+    --rt-text-soft: 220 6% 64%;         /* #9AA0AA */
+
+    --rt-accent: 142 71% 45%;           /* #22C55E */
+    --rt-accent-soft: 142 60% 16%;      /* #14532D-ish bg */
+    --rt-warning: 48 96% 53%;           /* #FACC15 */
+    --rt-warning-soft: 35 40% 10%;      /* #1F1A12 */
+    --rt-warning-text: 48 90% 70%;
+    --rt-danger: 0 75% 60%;
+    --rt-info: 210 90% 62%;
+
+    --rt-heat-0: 222 12% 18%;           /* #2A2E38 */
+    --rt-heat-1: 142 60% 22%;           /* #14532D */
+    --rt-heat-2: 142 71% 45%;           /* #22C55E */
+    --rt-heat-3: 142 76% 64%;           /* #4ADE80 */
+  }
+
+  .rt-card {
+    background: hsl(var(--rt-card));
+    border: 1px solid hsl(var(--rt-border));
+    @apply rounded-lg overflow-hidden;
+  }
+  .rt-card-2 { background: hsl(var(--rt-card-2)); }
+  .rt-border { border-color: hsl(var(--rt-border)); }
+  .rt-text { color: hsl(var(--rt-text)); }
+  .rt-text-soft { color: hsl(var(--rt-text-soft)); }
 }
 
 /* ============ iPhone CSS mockup ============ */

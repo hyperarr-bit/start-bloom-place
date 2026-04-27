@@ -263,7 +263,7 @@ const HealthTracker = () => {
           <Progress value={(waterToday / waterGoal) * 100} className="h-2" />
           <div className="flex flex-wrap gap-1">
             {[...Array(waterGoal)].map((_, i) => (
-              <div key={i} className={`w-6 h-8 rounded-md border flex items-center justify-center text-sm transition-colors ${i < waterToday ? "bg-blue-100 dark:bg-[hsl(210,60%,16%)] border-blue-300 dark:border-[hsl(210,60%,30%)] text-blue-600 dark:text-blue-300" : "bg-muted/30 border-border text-muted-foreground/30"} dark:bg-blue-500/10 dark:border-blue-500/20`}>
+              <div key={i} className={`w-6 h-8 rounded-md border flex items-center justify-center text-sm transition-colors ${i < waterToday ? "bg-blue-100 dark:bg-[hsl(210,60%,16%)] border-blue-300 dark:border-[hsl(210,60%,30%)] text-blue-600 dark:text-blue-300" : "bg-muted/30 border-border text-muted-foreground/30"}`}>
                 💧
               </div>
             ))}
@@ -322,9 +322,9 @@ const TodoList = () => {
   const removeTodo = (id: string) => setTodos(prev => prev.filter(t => t.id !== id));
 
   const priorityColors = {
-    alta: "bg-red-100 dark:bg-[hsl(0,55%,16%)] text-red-700 dark:text-red-300 border-red-200 dark:border-[hsl(0,50%,30%)] dark:bg-red-500/10 dark:border-red-500/20",
-    media: "bg-yellow-100 dark:bg-[hsl(45,55%,14%)] text-yellow-700 dark:text-yellow-200 border-yellow-200 dark:border-[hsl(45,55%,28%)] dark:bg-yellow-500/10 dark:border-yellow-500/20",
-    baixa: "bg-blue-100 dark:bg-[hsl(210,55%,16%)] text-blue-700 dark:text-blue-300 border-blue-200 dark:border-[hsl(210,55%,30%)] dark:bg-blue-500/10 dark:border-blue-500/20",
+    alta: "bg-red-100 dark:bg-[hsl(0,55%,16%)] text-red-700 dark:text-red-300 border-red-200 dark:border-[hsl(0,50%,30%)]",
+    media: "bg-yellow-100 dark:bg-[hsl(45,55%,14%)] text-yellow-700 dark:text-yellow-200 border-yellow-200 dark:border-[hsl(45,55%,28%)]",
+    baixa: "bg-blue-100 dark:bg-[hsl(210,55%,16%)] text-blue-700 dark:text-blue-300 border-blue-200 dark:border-[hsl(210,55%,30%)]",
   };
   const priorityDot = { alta: "bg-red-500", media: "bg-yellow-500", baixa: "bg-blue-500" };
 
@@ -447,7 +447,7 @@ const Rituals = () => {
         <div className="p-3 space-y-2">
           <Progress value={progress} className="h-1.5" />
           {items.map((item: any, i: number) => (
-            <div key={item.id} className={`flex items-center gap-2 p-2 rounded-md group transition-all ${todayChecked.includes(item.id) ? "bg-green-50 dark:bg-[hsl(var(--rt-accent-soft))]" : ""} dark:bg-green-500/10`}>
+            <div key={item.id} className={`flex items-center gap-2 p-2 rounded-md group transition-all ${todayChecked.includes(item.id) ? "bg-green-50 dark:bg-[hsl(var(--rt-accent-soft))]" : ""}`}>
               <span className="text-sm">{item.icon}</span>
               <Checkbox checked={todayChecked.includes(item.id)} onCheckedChange={() => toggleRitual(type, item.id)} className="h-3.5 w-3.5" />
               <span className={`flex-1 text-xs ${todayChecked.includes(item.id) ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
@@ -844,22 +844,22 @@ const EnergyTracker = () => {
 // ============= FOCUS ZONES (Time Blocking) =============
 const FocusZones = () => {
   const [blocks, setBlocks] = usePersistedState<{ id: string; label: string; start: string; end: string; color: string; category: string }[]>("focus-blocks", [
-    { id: "1", label: "Deep Work", start: "09:00", end: "12:00", color: "bg-red-100 dark:bg-[hsl(0,55%,14%)] border-red-300 dark:border-[hsl(0,55%,28%)] dark:bg-red-500/10 dark:border-red-500/20", category: "🧠 Foco Profundo" },
-    { id: "2", label: "Admin / E-mails", start: "13:00", end: "14:00", color: "bg-blue-100 dark:bg-[hsl(210,55%,14%)] border-blue-300 dark:border-[hsl(210,55%,28%)] dark:bg-blue-500/10 dark:border-blue-500/20", category: "📧 Admin" },
-    { id: "3", label: "Criativo", start: "14:00", end: "16:00", color: "bg-purple-100 dark:bg-[hsl(265,45%,16%)] border-purple-300 dark:border-[hsl(265,45%,30%)] dark:bg-purple-500/10 dark:border-purple-500/20", category: "🎨 Criativo" },
-    { id: "4", label: "Exercício", start: "17:00", end: "18:00", color: "bg-green-100 dark:bg-[hsl(var(--rt-accent-soft))] border-green-300 dark:border-[hsl(142,50%,28%)] dark:bg-green-500/10 dark:border-green-500/20", category: "💪 Saúde" },
+    { id: "1", label: "Deep Work", start: "09:00", end: "12:00", color: "bg-red-100 dark:bg-[hsl(0,55%,14%)] border-red-300 dark:border-[hsl(0,55%,28%)]", category: "🧠 Foco Profundo" },
+    { id: "2", label: "Admin / E-mails", start: "13:00", end: "14:00", color: "bg-blue-100 dark:bg-[hsl(210,55%,14%)] border-blue-300 dark:border-[hsl(210,55%,28%)]", category: "📧 Admin" },
+    { id: "3", label: "Criativo", start: "14:00", end: "16:00", color: "bg-purple-100 dark:bg-[hsl(265,45%,16%)] border-purple-300 dark:border-[hsl(265,45%,30%)]", category: "🎨 Criativo" },
+    { id: "4", label: "Exercício", start: "17:00", end: "18:00", color: "bg-green-100 dark:bg-[hsl(var(--rt-accent-soft))] border-green-300 dark:border-[hsl(142,50%,28%)]", category: "💪 Saúde" },
   ]);
   const [newLabel, setNewLabel] = useState("");
   const [newStart, setNewStart] = useState("");
   const [newEnd, setNewEnd] = useState("");
 
   const colors = [
-    "bg-red-100 dark:bg-[hsl(0,55%,14%)] border-red-300 dark:border-[hsl(0,55%,28%)] dark:bg-red-500/10 dark:border-red-500/20",
-    "bg-blue-100 dark:bg-[hsl(210,55%,14%)] border-blue-300 dark:border-[hsl(210,55%,28%)] dark:bg-blue-500/10 dark:border-blue-500/20",
-    "bg-purple-100 dark:bg-[hsl(265,45%,16%)] border-purple-300 dark:border-[hsl(265,45%,30%)] dark:bg-purple-500/10 dark:border-purple-500/20",
-    "bg-green-100 dark:bg-[hsl(var(--rt-accent-soft))] border-green-300 dark:border-[hsl(142,50%,28%)] dark:bg-green-500/10 dark:border-green-500/20",
-    "bg-yellow-100 dark:bg-[hsl(45,55%,14%)] border-yellow-300 dark:border-[hsl(45,55%,28%)] dark:bg-yellow-500/10 dark:border-yellow-500/20",
-    "bg-pink-100 dark:bg-[hsl(330,45%,16%)] border-pink-300 dark:border-[hsl(330,45%,30%)] dark:bg-pink-500/10 dark:border-pink-500/20",
+    "bg-red-100 dark:bg-[hsl(0,55%,14%)] border-red-300 dark:border-[hsl(0,55%,28%)]",
+    "bg-blue-100 dark:bg-[hsl(210,55%,14%)] border-blue-300 dark:border-[hsl(210,55%,28%)]",
+    "bg-purple-100 dark:bg-[hsl(265,45%,16%)] border-purple-300 dark:border-[hsl(265,45%,30%)]",
+    "bg-green-100 dark:bg-[hsl(var(--rt-accent-soft))] border-green-300 dark:border-[hsl(142,50%,28%)]",
+    "bg-yellow-100 dark:bg-[hsl(45,55%,14%)] border-yellow-300 dark:border-[hsl(45,55%,28%)]",
+    "bg-pink-100 dark:bg-[hsl(330,45%,16%)] border-pink-300 dark:border-[hsl(330,45%,30%)]",
   ];
 
   const addBlock = () => {
@@ -1104,18 +1104,18 @@ const Rotina = () => {
           <>
             {/* Hábitos Diários */}
             <div className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
-              <div className="bg-green-100 dark:bg-[hsl(var(--rt-card))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] px-4 py-3 flex items-center justify-between dark:bg-green-500/10 dark:border-green-500/20">
+              <div className="bg-green-100 dark:bg-[hsl(var(--rt-card))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))] dark:text-green-300">HÁBITOS DIÁRIOS</span>
+                  <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>
                   <span>✅</span>
                 </div>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))] dark:text-green-300" onClick={() => setShowAddHabit(!showAddHabit)}>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
                   <Plus className="w-3 h-3 mr-1" /> Hábito
                 </Button>
               </div>
 
               {showAddHabit && (
-                <div className="p-3 bg-green-50 dark:bg-[hsl(var(--rt-card-2))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] flex gap-2 dark:bg-green-500/10 dark:border-green-500/20">
+                <div className="p-3 bg-green-50 dark:bg-[hsl(var(--rt-card-2))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] flex gap-2">
                   <Input placeholder="Nome do hábito..." value={newHabit} onChange={(e) => setNewHabit(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addHabit()} className="h-8 text-xs flex-1" autoFocus />
                   <Button size="sm" onClick={addHabit} className="h-8 text-xs bg-green-600 hover:bg-green-700 dark:bg-[hsl(var(--rt-accent))] dark:hover:bg-[hsl(142,71%,40%)] text-white">Adicionar</Button>
                 </div>
@@ -1124,10 +1124,10 @@ const Rotina = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-green-50/50 dark:bg-[hsl(var(--rt-card-2))] dark:bg-green-500/10">
-                      <th className="text-left px-3 py-2 font-bold text-green-900 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] w-24 dark:text-green-300">DIA</th>
+                    <tr className="bg-green-50/50 dark:bg-[hsl(var(--rt-card-2))]">
+                      <th className="text-left px-3 py-2 font-bold text-green-900 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] w-24">DIA</th>
                       {habits.map((habit, i) => (
-                        <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] min-w-[100px] group dark:text-green-300">
+                        <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] min-w-[100px] group">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-center text-[11px]">{habit}</span>
                             <button onClick={() => removeHabit(i)} className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600">
@@ -1140,7 +1140,7 @@ const Rotina = () => {
                   </thead>
                   <tbody>
                     {days.map((day, di) => (
-                      <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""} dark:bg-green-500/10`}>
+                      <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""}`}>
                         <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
                         {habits.map((_, hi) => (
                           <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
@@ -1166,10 +1166,10 @@ const Rotina = () => {
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
                     <thead>
-                      <tr className="bg-pink-50 dark:bg-[hsl(var(--rt-card-2))] dark:bg-pink-500/10">
-                        <th className="text-left px-2 py-2 font-bold border-r border-pink-100 dark:border-[hsl(var(--rt-border))] w-16 text-pink-900 dark:text-[hsl(var(--rt-text-soft))] dark:text-pink-300">Horário</th>
+                      <tr className="bg-pink-50 dark:bg-[hsl(var(--rt-card-2))]">
+                        <th className="text-left px-2 py-2 font-bold border-r border-pink-100 dark:border-[hsl(var(--rt-border))] w-16 text-pink-900 dark:text-[hsl(var(--rt-text-soft))]">Horário</th>
                         {scheduleDays.map((day) => (
-                          <th key={day} className="px-2 py-2 font-medium text-pink-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-pink-100 dark:border-[hsl(var(--rt-border))] min-w-[90px] dark:text-pink-300">{day}</th>
+                          <th key={day} className="px-2 py-2 font-medium text-pink-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-pink-100 dark:border-[hsl(var(--rt-border))] min-w-[90px]">{day}</th>
                         ))}
                       </tr>
                     </thead>
@@ -1185,7 +1185,7 @@ const Rotina = () => {
                                 {isEditing ? (
                                   <Input value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveEditCell} onKeyDown={(e) => { if (e.key === "Enter") saveEditCell(); if (e.key === "Escape") setEditingCell(null); }} className="h-5 text-[10px] border-0 bg-background dark:bg-[hsl(var(--rt-surface))] shadow-sm px-1" autoFocus />
                                 ) : value ? (
-                                  <span className="inline-block w-full text-[10px] px-1.5 py-0.5 rounded-sm bg-pink-100 text-pink-900 dark:bg-[hsl(330,40%,22%)] dark:text-[hsl(330,55%,82%)] dark:bg-pink-500/10 dark:text-pink-300">{value}</span>
+                                  <span className="inline-block w-full text-[10px] px-1.5 py-0.5 rounded-sm bg-pink-100 text-pink-900 dark:bg-[hsl(330,40%,22%)] dark:text-[hsl(330,55%,82%)]">{value}</span>
                                 ) : (
                                   <span className="text-[10px] text-transparent">—</span>
                                 )}
@@ -1209,16 +1209,16 @@ const Rotina = () => {
                   }, [[]] as string[][]).map((line, i) => <span key={i}>{line.join(" ")}<br /></span>)}</p>
                 </div>
 
-                <div className="bg-yellow-50 dark:bg-[hsl(var(--rt-warning-soft))] rounded-lg border border-yellow-200 dark:border-[hsl(48,60%,28%)] overflow-hidden dark:bg-yellow-500/10 dark:border-yellow-500/20">
-                  <div className="bg-yellow-100 dark:bg-[hsl(35,45%,12%)] border-b border-yellow-200 dark:border-[hsl(48,60%,28%)] px-4 py-2 flex items-center justify-between dark:bg-yellow-500/10 dark:border-yellow-500/20">
-                    <span className="font-bold text-xs text-yellow-900 dark:text-[hsl(var(--rt-warning))] dark:text-yellow-200">URGÊNCIAS</span>
+                <div className="bg-yellow-50 dark:bg-[hsl(var(--rt-warning-soft))] rounded-lg border border-yellow-200 dark:border-[hsl(48,60%,28%)] overflow-hidden">
+                  <div className="bg-yellow-100 dark:bg-[hsl(35,45%,12%)] border-b border-yellow-200 dark:border-[hsl(48,60%,28%)] px-4 py-2 flex items-center justify-between">
+                    <span className="font-bold text-xs text-yellow-900 dark:text-[hsl(var(--rt-warning))]">URGÊNCIAS</span>
                     <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-[hsl(var(--rt-warning))]" />
                   </div>
                   <div className="p-3 space-y-2">
                     {urgencies.map((u) => (
                       <div key={u.id} className="flex items-center gap-2 group">
                         <Checkbox checked={u.done} onCheckedChange={() => toggleUrgency(u.id)} className="h-3.5 w-3.5" />
-                        <span className={`flex-1 text-xs ${u.done ? "line-through text-muted-foreground" : "text-yellow-900 dark:text-[hsl(var(--rt-warning-text))]"} dark:text-yellow-200`}>{u.text}</span>
+                        <span className={`flex-1 text-xs ${u.done ? "line-through text-muted-foreground" : "text-yellow-900 dark:text-[hsl(var(--rt-warning-text))]"}`}>{u.text}</span>
                         <button onClick={() => removeUrgency(u.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -1226,7 +1226,7 @@ const Rotina = () => {
                     ))}
                     <div className="flex items-center gap-2 pt-1">
                       <Checkbox disabled className="h-3.5 w-3.5 opacity-30" />
-                      <Input placeholder="Nova urgência..." value={newUrgency} onChange={(e) => setNewUrgency(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrgency()} className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-yellow-800 dark:text-[hsl(var(--rt-warning-text))] placeholder:text-yellow-400 dark:placeholder:text-[hsl(48,30%,40%)] dark:text-yellow-200" />
+                      <Input placeholder="Nova urgência..." value={newUrgency} onChange={(e) => setNewUrgency(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrgency()} className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-yellow-800 dark:text-[hsl(var(--rt-warning-text))] placeholder:text-yellow-400 dark:placeholder:text-[hsl(48,30%,40%)]" />
                     </div>
                   </div>
                 </div>

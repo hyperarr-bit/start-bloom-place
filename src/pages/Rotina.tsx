@@ -550,7 +550,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <span>Menos</span>
             <div className="w-3 h-3 rounded-sm bg-muted" />
-            <div className="w-3 h-3 rounded-sm bg-green-500" />
+            <div className="w-3 h-3 rounded-sm bg-green-500 dark:bg-green-600" />
             <span>Mais</span>
           </div>
           <div className="text-xs text-muted-foreground">Últimas 16 semanas</div>

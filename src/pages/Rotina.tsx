@@ -664,7 +664,7 @@ const MonthlyPlanning = () => {
 
       {/* Monthly Goals */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="bg-gradient-to-r from-amber-500 to-yellow-500 px-4 py-3 flex items-center gap-2">
+        <div className="bg-gradient-to-r from-amber-500 to-yellow-500 dark:from-amber-700 dark:to-yellow-700 px-4 py-3 flex items-center gap-2">
           <Star className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">METAS DO MÊS</span>
         </div>

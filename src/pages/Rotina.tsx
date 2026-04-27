@@ -518,11 +518,11 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
     else break;
   }
 
-  const getColor = (active: boolean) => active ? "bg-green-500" : "bg-muted";
+  const getColor = (active: boolean) => active ? "bg-green-500 dark:bg-green-600" : "bg-muted";
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-green-500 to-emerald-600 dark:from-green-700 dark:to-emerald-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Flame className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">CONSISTÊNCIA</span>

@@ -1147,31 +1147,31 @@ const Rotina = () => {
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
               <div className="bg-card rounded-lg border border-border overflow-hidden">
-                <div className="bg-gradient-to-r from-pink-300 to-pink-400 px-4 py-3 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-pink-300 to-pink-400 dark:from-pink-700 dark:to-pink-800 px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-sm text-white">ROTINA SEMANAL</span>
                   
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
                     <thead>
-                      <tr className="bg-pink-50">
-                        <th className="text-left px-2 py-2 font-bold border-r border-pink-100 w-16 text-pink-900">Horário</th>
+                      <tr className="bg-pink-50 dark:bg-pink-950/30">
+                        <th className="text-left px-2 py-2 font-bold border-r border-pink-100 dark:border-pink-900 w-16 text-pink-900 dark:text-pink-200">Horário</th>
                         {scheduleDays.map((day) => (
-                          <th key={day} className="px-2 py-2 font-medium text-pink-800 border-r border-pink-100 min-w-[90px]">{day}</th>
+                          <th key={day} className="px-2 py-2 font-medium text-pink-800 dark:text-pink-300 border-r border-pink-100 dark:border-pink-900 min-w-[90px]">{day}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {hours.map((hour) => (
                         <tr key={hour} className="border-t border-border/30 hover:bg-muted/20">
-                          <td className="px-2 py-1.5 font-mono font-bold text-muted-foreground border-r border-border/30 bg-pink-50/30">{hour}</td>
+                          <td className="px-2 py-1.5 font-mono font-bold text-muted-foreground border-r border-border/30 bg-pink-50/30 dark:bg-pink-950/10">{hour}</td>
                           {scheduleDays.map((day) => {
                             const isEditing = editingCell?.hour === hour && editingCell?.day === day;
                             const value = schedule[hour]?.[day] || "";
                             return (
-                              <td key={day} className="px-1 py-1 border-r border-border/20 cursor-pointer hover:bg-pink-50/50 transition-colors" onClick={() => !isEditing && startEditCell(hour, day)}>
+                              <td key={day} className="px-1 py-1 border-r border-border/20 cursor-pointer hover:bg-pink-50/50 dark:hover:bg-pink-950/20 transition-colors" onClick={() => !isEditing && startEditCell(hour, day)}>
                                 {isEditing ? (
-                                  <Input value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveEditCell} onKeyDown={(e) => { if (e.key === "Enter") saveEditCell(); if (e.key === "Escape") setEditingCell(null); }} className="h-5 text-[10px] border-0 bg-white shadow-sm px-1" autoFocus />
+                                  <Input value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveEditCell} onKeyDown={(e) => { if (e.key === "Enter") saveEditCell(); if (e.key === "Escape") setEditingCell(null); }} className="h-5 text-[10px] border-0 bg-background shadow-sm px-1" autoFocus />
                                 ) : (
                                   <span className={`text-[10px] ${value ? "text-foreground" : "text-transparent"}`}>{value || "—"}</span>
                                 )}

@@ -21,14 +21,14 @@ interface BillsDueCardsProps {
 }
 
 const colorPalette = [
-  { card: "bg-yellow-50 border-yellow-200", header: "bg-yellow-300 text-yellow-900" },
-  { card: "bg-slate-50 border-slate-200", header: "bg-slate-400 text-slate-50" },
-  { card: "bg-indigo-50 border-indigo-200", header: "bg-indigo-400 text-indigo-50" },
-  { card: "bg-emerald-50 border-emerald-200", header: "bg-emerald-400 text-emerald-50" },
-  { card: "bg-rose-50 border-rose-200", header: "bg-rose-400 text-rose-50" },
-  { card: "bg-cyan-50 border-cyan-200", header: "bg-cyan-400 text-cyan-50" },
-  { card: "bg-orange-50 border-orange-200", header: "bg-orange-400 text-orange-50" },
-  { card: "bg-purple-50 border-purple-200", header: "bg-purple-400 text-purple-50" },
+  { card: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-900/50", header: "bg-yellow-300 text-yellow-900 dark:bg-yellow-800/50 dark:text-yellow-100" },
+  { card: "bg-slate-50 border-slate-200 dark:bg-slate-900/40 dark:border-slate-800", header: "bg-slate-400 text-slate-50 dark:bg-slate-700/60 dark:text-slate-100" },
+  { card: "bg-indigo-50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-900/50", header: "bg-indigo-400 text-indigo-50 dark:bg-indigo-800/50 dark:text-indigo-100" },
+  { card: "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/50", header: "bg-emerald-400 text-emerald-50 dark:bg-emerald-800/50 dark:text-emerald-100" },
+  { card: "bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-900/50", header: "bg-rose-400 text-rose-50 dark:bg-rose-800/50 dark:text-rose-100" },
+  { card: "bg-cyan-50 border-cyan-200 dark:bg-cyan-950/30 dark:border-cyan-900/50", header: "bg-cyan-400 text-cyan-50 dark:bg-cyan-800/50 dark:text-cyan-100" },
+  { card: "bg-orange-50 border-orange-200 dark:bg-orange-950/30 dark:border-orange-900/50", header: "bg-orange-400 text-orange-50 dark:bg-orange-800/50 dark:text-orange-100" },
+  { card: "bg-purple-50 border-purple-200 dark:bg-purple-950/30 dark:border-purple-900/50", header: "bg-purple-400 text-purple-50 dark:bg-purple-800/50 dark:text-purple-100" },
 ];
 
 export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
@@ -135,7 +135,7 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
                   <span className="font-bold text-sm">Dia {dueDay.day}</span>
                 )}
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs opacity-75">{dueDay.bills.filter(b => b.paid).length}/{dueDay.bills.length}</span>
+                  <span className="text-xs opacity-80">{dueDay.bills.filter(b => b.paid).length}/{dueDay.bills.length}</span>
                   {editing && dueDays.length > 1 && (
                     <button onClick={() => removeDueDay(dueDay.day)} className="hover:opacity-80" title="Remover dia">
                       <Minus className="w-3 h-3 opacity-60" />
@@ -163,7 +163,7 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
                       value={newBills[dueDay.day] || ""}
                       onChange={(e) => setNewBills({ ...newBills, [dueDay.day]: e.target.value })}
                       onKeyDown={(e) => e.key === "Enter" && addBill(dueDay.day)}
-                      className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-muted-foreground"
+                      className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
                 )}

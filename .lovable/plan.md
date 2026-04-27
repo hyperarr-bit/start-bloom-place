@@ -1,84 +1,40 @@
-# Correção de Cores no Modo Escuro - Módulo Rotina
 
-## Problema Identificado
-O módulo Rotina utiliza dezenas de cores hardcoded que não se adaptam ao tema escuro, criando contrastes ruins e elementos difíceis de visualizar.
+## Problema
 
-## Lista de Correções Necessárias
+Na seção **Vencimentos das contas** (Finanças), no modo escuro:
+- Os cards ficam com fundo claro (`bg-yellow-50`, `bg-slate-50`, etc.) e o texto branco em cima fica ilegível.
+- Os cabeçalhos coloridos (amarelo/cinza claro) ficam estourados, criando contraste agressivo num tema escuro.
+- O input "Adicionar conta" e o nome das contas ficam quase invisíveis.
 
-### 1. Gradientes de Header Cards (12 componentes)
-Converter gradientes hardcoded para usar classes do Tailwind que respeitem o tema:
+A causa é que `BillsDueCards.tsx` usa uma `colorPalette` totalmente hardcoded só com tons claros, sem variantes `dark:`.
 
-| Componente | Gradiente Atual | Solução |
-|------------|-----------------|---------|
-| PomodoroTimer | `from-red-500 to-orange-500` etc. | Usar `bg-primary` com opacidade ou cores semânticas |
-| MoodTracker | `from-purple-400 to-pink-400` | Substituir por `bg-secondary` ou similar |
-| HealthTracker | `from-cyan-400 to-blue-500` | Usar tokens de cor do tema |
-| TodoList | `from-violet-500 to-purple-600` | Usar `bg-muted` ou similar |
-| Rituals (manhã) | `from-amber-400 to-orange-500` | Tema warm neutral |
-| Rituals (noite) | `from-indigo-500 to-purple-600` | Tema cool neutral |
-| HabitHeatmap | `from-green-500 to-emerald-600` | Usar `bg-success` |
-| MonthlyPlanning cal | `from-teal-500 to-cyan-500` | `bg-primary` |
-| MonthlyPlanning goals | `from-amber-500 to-yellow-500` | `bg-warning` |
-| MonthlyPlanning retro | `from-rose-500 to-pink-500` | `bg-accent` |
-| DailyJournal | `from-pink-400 to-rose-500` | `bg-accent` |
-| EnergyTracker | `from-yellow-400 to-orange-500` | `bg-warning` |
-| FocusZones | `from-slate-600 to-slate-800` | `bg-muted` |
-| WeeklyReview | `from-emerald-500 to-teal-600` | `bg-success` |
-| Rotina header | `bg-green-100` + `text-green-900` | `bg-muted` + `text-foreground` |
+## Solução
 
-### 2. Tabela de Hábitos Diários
-Substituir sistema de cores hardcoded por variáveis do tema:
-- `bg-green-100` → `bg-muted` ou `bg-secondary`
-- `bg-green-50` → `bg-muted/50`
-- `border-green-200` → `border-border`
-- `text-green-900` → `text-foreground`
-- `text-green-800` → `text-muted-foreground`
-- `border-green-100` → `border-border`
-- Checkbox: `border-blue-400` → `border-primary`
+Editar **apenas** `src/components/BillsDueCards.tsx` para que cada entrada da paleta tenha equivalente em dark mode, mantendo a "cor temática" do dia mas com:
 
-### 3. Priority Colors (TodoList)
-Converter para sistema que funcione em ambos os temas:
-- `bg-red-100 text-red-700 border-red-200` → usar `bg-destructive/10` etc.
-- `bg-yellow-100 text-yellow-700 border-yellow-200` → usar `bg-warning/10` etc.
-- `bg-blue-100 text-blue-700 border-blue-200` → usar `bg-primary/10` etc.
+- **Fundo do card**: tom escuro saturado e baixo (ex.: `dark:bg-yellow-950/30`) com **borda visível** mas sutil (`dark:border-yellow-900/50`).
+- **Header do dia**: tom mais escuro/profundo da mesma cor (ex.: `dark:bg-yellow-700/40`) com **texto claro** (`dark:text-yellow-100`) — sem amarelo neon.
+- **Texto das contas**: herdará `text-foreground` (já adapta), mas confirmar que itens pagos usem `text-muted-foreground` (já está).
+- **Input "Adicionar conta..."**: trocar `text-muted-foreground` fixo por classe que respeita o tema (já é, mas com placeholder `placeholder:text-muted-foreground` explícito para garantir).
+- **Contador "0/3"** no header: usar `opacity-80` em vez de `opacity-75` para legibilidade no dark.
 
-### 4. Health Tracker (Água)
-- `bg-blue-100 border-blue-300 text-blue-600` → `bg-primary/10 border-primary/20 text-primary`
+A estrutura, layout, ícones, lógica de edição, adição e remoção permanecem **intactos**. Nenhum outro arquivo é alterado.
 
-### 5. Focus Zones (Blocos de Cor)
-Cores hardcoded para diferentes tipos de blocos precisam de alternativa dark-friendly:
-- `bg-red-200 border-red-400` → `bg-destructive/20 border-destructive`
-- `bg-blue-200 border-blue-400` → `bg-primary/20 border-primary`
-- `bg-purple-200 border-purple-400` → `bg-accent/20 border-accent`
-- `bg-green-200 border-green-400` → `bg-success/20 border-success`
-- `bg-yellow-200 border-yellow-400` → `bg-warning/20 border-warning`
-- `bg-pink-200 border-pink-400` → `bg-accent/20 border-accent`
+## Paleta proposta (8 cores, light + dark)
 
-### 6. Energy Tracker
-Níveis de energia com cores fixas:
-- `bg-red-400`, `bg-yellow-400`, `bg-green-400` → manter mas adicionar classes dark apropriadas ou usar sistema de cor semântico
+| Cor       | Card (light)                  | Card (dark)                              | Header (light)                | Header (dark)                                  |
+|-----------|-------------------------------|------------------------------------------|-------------------------------|------------------------------------------------|
+| Amarelo   | `bg-yellow-50 border-yellow-200` | `dark:bg-yellow-950/30 dark:border-yellow-900/50` | `bg-yellow-300 text-yellow-900` | `dark:bg-yellow-800/50 dark:text-yellow-100`   |
+| Slate     | `bg-slate-50 border-slate-200`   | `dark:bg-slate-900/40 dark:border-slate-800`      | `bg-slate-400 text-slate-50`    | `dark:bg-slate-700/60 dark:text-slate-100`     |
+| Indigo    | `bg-indigo-50 border-indigo-200` | `dark:bg-indigo-950/30 dark:border-indigo-900/50` | `bg-indigo-400 text-indigo-50`  | `dark:bg-indigo-800/50 dark:text-indigo-100`   |
+| Esmeralda | `bg-emerald-50 border-emerald-200` | `dark:bg-emerald-950/30 dark:border-emerald-900/50` | `bg-emerald-400 text-emerald-50` | `dark:bg-emerald-800/50 dark:text-emerald-100` |
+| Rosa      | `bg-rose-50 border-rose-200`     | `dark:bg-rose-950/30 dark:border-rose-900/50`     | `bg-rose-400 text-rose-50`      | `dark:bg-rose-800/50 dark:text-rose-100`       |
+| Ciano     | `bg-cyan-50 border-cyan-200`     | `dark:bg-cyan-950/30 dark:border-cyan-900/50`     | `bg-cyan-400 text-cyan-50`      | `dark:bg-cyan-800/50 dark:text-cyan-100`       |
+| Laranja   | `bg-orange-50 border-orange-200` | `dark:bg-orange-950/30 dark:border-orange-900/50` | `bg-orange-400 text-orange-50`  | `dark:bg-orange-800/50 dark:text-orange-100`   |
+| Roxo      | `bg-purple-50 border-purple-200` | `dark:bg-purple-950/30 dark:border-purple-900/50` | `bg-purple-400 text-purple-50`  | `dark:bg-purple-800/50 dark:text-purple-100`   |
 
-### 7. Mood Emojis Background
-Cores hardcoded para cada humor:
-- `bg-green-400`, `bg-green-300`, `bg-yellow-300`, `bg-orange-300`, `bg-red-300` → usar opacidade ou sistema de tokens
+Resultado: cada dia mantém sua identidade visual (amarelo, rosa, verde…), mas no escuro vira um card escuro com **leve tinta** da cor + header mais saturado e texto claro — alinhado ao princípio "hierarquia + contraste controlado, nada de branco em branco".
 
-### 8. Habit Heatmap
-- `bg-green-500` para dias ativos → `bg-success` ou similar
+## Arquivos alterados
 
-## Abordagem Técnica
-
-### Opção A: CSS Variables + Tailwind (Recomendada)
-Aproveitar as variáveis já definidas em `index.css`:
-- `--primary`, `--secondary`, `--muted`, `--accent`, `--destructive`, `--success`, `--warning`
-
-### Opção B: Classes Dark Específicas
-Usar notação dark: para sobrescrever no modo escuro:
-```
-bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300
-```
-
-## Estrutura do Arquivo
-Arquivo alvo: `src/pages/Rotina.tsx` (~1265 linhas)
-
-## Resultado Esperado
-Módulo Rotina visualmente consistente com o resto da aplicação em ambos os temas claro e escuro.
+- `src/components/BillsDueCards.tsx` — atualizar `colorPalette` e ajustes mínimos de contraste no header/input.

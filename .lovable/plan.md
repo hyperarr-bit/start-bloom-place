@@ -1,112 +1,161 @@
+## Objetivo
+Transformar o dark mode em um sistema visual silencioso, premium e consistente entre todos os módulos — estilo Notion / Linear. A mudança é centralizada nos tokens HSL em `src/index.css`, então propaga automaticamente para todos os componentes que já usam `bg-card`, `bg-background`, `text-foreground`, `border-border`, `tint-*`, etc.
 
-## Diagnóstico
+---
 
-Após mapear o projeto, o problema de contraste no dark mode tem **3 causas distintas** — cada uma exige um tratamento diferente:
+## Princípios de design
 
-### 1. Cores Tailwind hardcoded sem variantes `dark:` (causa principal)
-Mais de **190 ocorrências** só nas 7 páginas principais (Rotina, Biblioteca, Estudos, Dieta, Carreira, Treino, Desenvolvimento Pessoal) usam trios do tipo:
+**Fundo (escala em camadas)**
+- Sem preto puro (#000). Base sempre num cinza-azulado muito escuro.
+- Camadas por luminância (∆ 2–4%):
+  - L0 background da página → mais escuro
+  - L1 cards → +3%
+  - L2 superfícies aninhadas (linhas alternadas, popovers, headers de tabela) → +5%
 
-```tsx
-className="bg-blue-100 text-blue-700 border-blue-200"
-```
+**Texto (sem branco puro)**
+- Título: cinza claro (~91%)
+- Texto padrão: cinza claro suave (~82%)
+- Secundário / muted: cinza médio (~58%)
+- Desabilitado: cinza apagado (~42%)
 
-No dark mode esses fundos claros + texto escuro saturado quebram (claro-em-claro ou texto ilegível). Componentes afetados em larga escala:
+**Bordas**
+- Hairline 1px num cinza apenas levemente mais claro que o card (~14–16%).
+- Sem sombras pesadas; substituir por borda + diferença de luminância.
 
-- **Páginas**: Rotina, Biblioteca, Estudos, Dieta, Carreira, Treino, DesenvolvimentoPessoal, Casa, Saúde, Beleza, Pet, Detox, Hiperfoco, Viagens, Relacionamentos.
-- **Componentes finanças** (parcial — alguns já têm `dark:`): ExpenseTable, FixedExpensesTable, InstallmentTracker, FinancialGoals, WishlistItems.
-- **Subcomponentes**: casa/*, saude/*, beleza/*, travel/*, pet/*, hiperfoco/*, relacionamentos/*, detox/*.
+**Cores de destaque dessaturadas**
+- Verde, azul, roxo, amarelo, rosa: saturação reduzida (~45–55%) e luminância controlada (~62–68%) — nada de neon.
+- Tints (`.tint-*`) já existem; serão recalibrados para opacidades menores.
 
-### 2. Uso de `bg-foreground` / `text-background` (inversão total)
-Padrão `.notion-tab-active` original — já corrigi na mensagem anterior, mas a busca encontrou casos parecidos a verificar (`table-header-dark`, alguns headers de seção).
+**Ícones**
+- Cor padrão = `text-muted-foreground`; só recebem tinta quando carregam significado.
 
-### 3. Fundos brancos puros e bordas claras demais nos cards
-Tokens já estão razoáveis (`--card: 220 10% 9%`, `--border: 220 8% 16%`), mas alguns componentes ignoram tokens e usam `bg-white`, `border-gray-200` direto.
+**Componentes interativos**
+- Estado ativo = preenchimento sutil (`bg-muted`) + borda; nunca cor saturada.
+- Hover = +2% de luminância, sem mudar matiz.
 
-## Estratégia
+---
 
-Em vez de fazer 190 edits frágeis (cada um com `dark:bg-X-950/30 dark:text-X-300 dark:border-X-900/50`), vou criar **utilitários semânticos centralizados** em `src/index.css` que encapsulam o conjunto fundo+borda+texto com light **e** dark equilibrados — e depois substituir os trios nos arquivos.
+## Mudanças técnicas
 
-### Etapa A — Criar paleta de "tinted surfaces" no `src/index.css`
+### 1) `src/index.css` — tokens `.dark` recalibrados
 
-Adicionar 12 classes utilitárias (uma por matiz comum), cada uma com contraste calibrado para os 2 temas:
+Substituir os valores HSL atuais por uma escala consistente:
 
 ```css
-@layer components {
-  /* fundo levemente tingido + borda + texto, ambos os temas */
-  .tint-blue    { @apply bg-blue-100/70 text-blue-800 border-blue-200
-                         dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20; }
-  .tint-green   { @apply bg-green-100/70 text-green-800 border-green-200
-                         dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20; }
-  .tint-emerald { ... }
-  .tint-red     { ... }
-  .tint-orange  { ... }
-  .tint-amber   { ... }
-  .tint-yellow  { ... }
-  .tint-purple  { ... }
-  .tint-pink    { ... }
-  .tint-rose    { ... }
-  .tint-indigo  { ... }
-  .tint-cyan    { ... }
-  .tint-slate   { ... }
+.dark {
+  /* Camadas de superfície (cinza-azulado neutro, sem preto puro) */
+  --background: 220 10% 8%;     /* L0 página  */
+  --card:       220 10% 11%;    /* L1 cards   */
+  --popover:    220 10% 12%;
+  --secondary:  220 9%  15%;    /* L2 nested  */
+  --muted:      220 9%  15%;
+
+  /* Texto sem branco puro */
+  --foreground:        220 8% 88%;   /* títulos / texto principal */
+  --card-foreground:   220 8% 88%;
+  --popover-foreground:220 8% 88%;
+  --muted-foreground:  220 6% 58%;   /* secundário */
+  --secondary-foreground: 220 8% 88%;
+
+  /* Bordas hairline */
+  --border: 220 9% 17%;
+  --input:  220 9% 17%;
+  --ring:   220 8% 70%;
+
+  /* Primary suave (botões neutros) */
+  --primary: 220 8% 86%;
+  --primary-foreground: 220 10% 10%;
+
+  /* Acentos dessaturados — nada de neon */
+  --accent:        330 45% 62%;
+  --destructive:   0   55% 55%;
+  --success:       142 40% 52%;
+  --warning:       38  70% 58%;
+
+  /* Cards financeiros (receitas/despesas/dívidas/investimentos)
+     reduzir saturação e aproximar luminância do card base */
+  --card-receitas:        45  18% 13%;
+  --card-receitas-border: 45  20% 22%;
+  --card-receitas-text:   45  45% 75%;
+  --card-despesas:        250 15% 13%;
+  --card-despesas-border: 250 18% 22%;
+  --card-despesas-text:   250 38% 78%;
+  --card-dividas:         330 15% 13%;
+  --card-dividas-border:  330 18% 22%;
+  --card-dividas-text:    330 38% 78%;
+  --card-investimentos:   142 15% 12%;
+  --card-investimentos-border: 142 18% 22%;
+  --card-investimentos-text:   142 35% 72%;
+
+  --income:  45  15% 12%;
+  --income-foreground:  45  40% 75%;
+  --expense: 330 15% 12%;
+  --expense-foreground: 330 38% 75%;
+
+  /* Sidebar alinhada ao mesmo padrão */
+  --sidebar-background: 220 10% 9%;
+  --sidebar-accent:     220 9%  15%;
+  --sidebar-border:     220 9%  17%;
+  --sidebar-foreground: 220 8%  88%;
+
+  /* Charts dessaturados */
+  --chart-1: 330 45% 62%;
+  --chart-2: 142 40% 55%;
+  --chart-3: 38  65% 60%;
+  --chart-4: 250 45% 65%;
+  --chart-5: 45  55% 60%;
 }
 ```
 
-Princípios aplicados:
-- **Light**: fundo `-100/70` (sutil), texto `-800` (legível, AA), borda `-200`.
-- **Dark**: fundo `cor/10` (tinta sobre o card escuro, sem virar bloco saturado), texto `-300` (claro mas não branco neon), borda `cor/20`.
+### 2) `src/index.css` — tints mais sutis
 
-Isso elimina o "branco demais" e o "amarelo neon demais" simultaneamente — segue o princípio "hierarquia + contraste controlado" da memória de design.
+Reduzir opacidade dos `.tint-*` no dark e suavizar texto (300 → 200/300 conforme matiz, opacidade do bg de `/10` → `/8`, borda `/20` → `/15`):
 
-### Etapa B — Substituir nos componentes de maior impacto
+```css
+.tint-blue    { @apply bg-blue-100/70 text-blue-800 border-blue-200
+                       dark:bg-blue-400/8 dark:text-blue-200/90 dark:border-blue-400/15; }
+/* mesmo padrão para sky/cyan/teal/green/emerald/lime/yellow/amber/orange/red/rose/pink/fuchsia/purple/violet/indigo */
+.tint-slate /gray/zinc/neutral/stone permanecem já neutras, só baixar opacidade. */
+```
 
-Substituir trios `bg-X-100 text-X-700 border-X-200` por `tint-X` nas seguintes ondas (ordem por impacto):
+### 3) Aba ativa (`.notion-tab-active`)
+Já está usando `bg-muted`. Confirmar que com o novo `--muted` (15%) ela fica visivelmente diferente do header (11%) sem virar branco.
 
-**Onda 1 — páginas com mais ofensores:**
-- `src/pages/Rotina.tsx` (61 fundos claros)
-- `src/pages/Estudos.tsx` (43)
-- `src/pages/Biblioteca.tsx` (39)
-- `src/pages/Carreira.tsx` (27)
-- `src/pages/DesenvolvimentoPessoal.tsx` (27)
-- `src/pages/Dieta.tsx` (25)
-- `src/pages/Treino.tsx` (22)
+### 4) Módulos com tokens próprios
 
-**Onda 2 — componentes de finanças sem dark:**
-- `ExpenseTable.tsx`, `FixedExpensesTable.tsx`, `InstallmentTracker.tsx`, `WishlistItems.tsx`, `FinancialGoals.tsx`, `CategoryBudgets.tsx` (revisar — já tem `dark:`, mas validar contraste).
+Alinhar ao mesmo padrão de luminância para não destoar:
 
-**Onda 3 — subcomponentes de módulos:**
-- `casa/*`, `saude/*`, `beleza/*`, `travel/*`, `pet/*`, `hiperfoco/*`, `relacionamentos/*`, `detox/*`.
+- **Rotina** (`--rt-*`): manter estrutura, ajustar `--rt-surface 220 10% 8%`, `--rt-card 220 10% 11%`, `--rt-card-2 220 9% 14%`, `--rt-text 220 8% 88%`, `--rt-text-soft 220 6% 58%`. Acentos: `--rt-accent 142 45% 55%`, `--rt-warning 45 70% 60%`.
+- **Saúde** (`--saude-*` no dark): trocar saturações 100% por ~50–60% e luminância para ~58–62%. `--saude-card` passa a usar a mesma escala (`220 10% 11%`).
+- **Skincare** (`--sk-*` no dark): reduzir luminância (65→62) e saturação (80→55).
 
-### Etapa C — Limpeza pontual de outros vazamentos
+### 5) Limpeza de cores hardcoded conflitantes
 
-- Trocar `bg-white` / `bg-black` / `text-white` / `text-black` hardcoded por tokens (`bg-card`, `text-foreground`).
-- Revisar cabeçalhos de tabela coloridos (`bg-yellow-300` etc.) que não têm variante dark.
-- Garantir que **placeholders** de inputs em todos os formulários usem `placeholder:text-muted-foreground`.
+Buscar e ajustar ocorrências em componentes principais que escapam dos tokens:
 
-### Etapa D — Verificação visual
+- `text-green-500`, `text-red-400`, `text-orange-400`, `text-purple-400` na barra de resumo (`src/pages/Index.tsx`) → trocar por variantes `-400/90` ou usar tokens semânticos (`text-success`, `text-destructive`) que já ficam dessaturados.
+- `bg-amber-600` no ícone do header de Finanças → manter (é único acento de marca).
+- Sweep com `rg` por `bg-white`, `text-white`, `bg-black`, `text-black`, `shadow-2xl`, `shadow-xl` em componentes de Finanças (`src/components/*.tsx`, `src/components/finance/*.tsx`) e substituir por `bg-card`/`text-foreground`/`shadow-sm`.
 
-- Após cada onda, abrir a página no preview em dark mode.
-- Validar: nenhum bloco branco/quase-branco; nenhum texto ilegível; transições entre cards e fundos suaves; cor temática preservada (azul ainda parece azul, etc.).
+### 6) Sombras
+Adicionar regra global no dark para neutralizar sombras pesadas:
 
-## Escopo desta iteração
+```css
+.dark .shadow-lg, .dark .shadow-xl, .dark .shadow-2xl {
+  box-shadow: 0 0 0 1px hsl(var(--border)), 0 1px 2px rgba(0,0,0,0.4);
+}
+```
 
-Por **tamanho real** desta refatoração (centenas de substituições + verificação visual), proponho dividir:
+---
 
-**Iteração atual (esta aprovação)** → Etapa A (criar utilitários) + Onda 1 (7 páginas mais críticas) + limpeza de `bg-white`/`bg-black` órfãos.
+## Arquivos editados
+- `src/index.css` (tokens `.dark`, tints, sombras, módulos rt/saude/sk)
+- `src/pages/Index.tsx` (cores da summary bar)
+- Sweep dirigido em `src/components/*.tsx` para remover `bg-white/black`, `text-white/black` e `shadow-xl/2xl` órfãos
 
-**Próximas iterações** (você pede quando quiser) → Onda 2 (finanças), Onda 3 (subcomponentes), validação final.
-
-Isso entrega o maior salto de qualidade visual possível em uma única passada, sem inflar uma única alteração gigante e arriscada.
-
-## Arquivos alterados nesta iteração
-
-- `src/index.css` — adicionar 13 classes `.tint-*`.
-- `src/pages/Rotina.tsx`
-- `src/pages/Estudos.tsx`
-- `src/pages/Biblioteca.tsx`
-- `src/pages/Carreira.tsx`
-- `src/pages/DesenvolvimentoPessoal.tsx`
-- `src/pages/Dieta.tsx`
-- `src/pages/Treino.tsx`
-- Ajustes pontuais onde houver `bg-white`/`text-white` hardcoded fora de gradientes.
-
-Nenhuma lógica/estrutura é alterada — apenas classes de cor.
+## Resultado esperado
+- Fundo preto suave uniforme com hierarquia perceptível por camadas.
+- Textos confortáveis, sem branco puro nem cinza ilegível.
+- Cards com bordas hairline, sem sombras pesadas.
+- Acentos coloridos discretos, sem competir entre si.
+- Mesma identidade visual em Finanças, Rotina, Saúde, Skincare e demais módulos.

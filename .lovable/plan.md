@@ -1,95 +1,52 @@
-## Problema
+## Objetivo
 
-A AbacatePay está ignorando o `price` override e cobrando R$ 178/ano (preço cheio do produto registrado). A solução é **criar um produto separado já com o preço promocional** e referenciá-lo no checkout quando o cupom WINBACK80 for válido.
+1. Aumentar a oferta de retenção de **50% off por 2 meses** → **50% off por 3 meses**.
+2. Encurtar o fluxo de cancelamento de 4 passos para 3, juntando o passo "como podemos ajudar" (segmented) com o passo "ofertas" em uma única tela.
 
-## Solução
+Novo fluxo:
+```text
+Passo 1: Motivo  →  Passo 2: Resposta segmentada + Ofertas (unificado)  →  Passo 3: Confirmação
+```
 
-### 1. Criar produto promo no AbacatePay
+---
 
-Adicionar um terceiro produto no `abacatepay-setup-products`:
+## Mudanças
 
-- **Nome**: "CORE Pro Anual — Oferta Winback 80% OFF"
-- **External ID**: `core-pro-annual-winback80`
-- **Preço**: 4776 centavos (R$ 47,76)
-- **Config key**: `abacatepay_product_annual_winback80_id`
+### 1. `supabase/functions/cancel-subscription-flow/index.ts`
+- Trocar `cycles: 2` → `cycles: 3` no `apply_discount`:
+  - `metadata: { percent_off: 50, cycles: 3, ... }`
+  - resposta `{ ok: true, type: "discount", percentOff: 50, cycles: 3 }`
+  - evento analytics permanece com `percent_off: 50` (adicionar `cycles: 3`)
 
-Salvo em `app_config` igual aos outros.
+### 2. `supabase/functions/apply-pending-discounts/index.ts`
+- Verificar se a aplicação do desconto na AbacatePay usa `cycles` do metadata; se sim, já passa a aplicar 3 ciclos automaticamente. Se estiver hardcoded como 2, atualizar para ler `metadata.cycles`.
 
-### 2. Atualizar checkout para usar o produto promo
+### 3. `src/components/retention/CancelFlowDialog.tsx` — unificar steps
+- Remover o step `"segmented"`. Tipo `Step` passa a ser: `"reason" | "offer" | "confirm" | "done"`.
+- Após `handleReasonNext`, ir direto para `setStep("offer")`.
+- Nova tela `"offer"` combina:
+  - **Header empático contextual** (mensagem segmentada por motivo — atual conteúdo do step 2):
+    - `not_using` → "Que tal um empurrãozinho?"
+    - `missing_feature` → "Anotado! Mas antes de ir..."
+    - `technical_issue` → "Vamos resolver isso"
+    - `too_expensive` / `other` → "Entendi 💛 Tenho uma oferta pra você"
+  - **Card principal de desconto** em destaque (50% off por 3 meses) — copy ajustada:
+    - "Continue com tudo liberado pagando metade do preço nas próximas **3 cobranças**."
+  - **Card secundário de pausa** (até 3 meses, sem cobranças).
+  - Para `missing_feature` / `technical_issue`, manter botão extra ("Avise-me quando lançar" / "Falar com suporte") acima dos cards, ainda permitindo ver as ofertas na mesma tela.
+- Footer: `← Voltar` (volta para `reason`) e `Cancelar mesmo assim` (vai para `confirm`).
+- Botão "Voltar" do step `confirm` deve apontar para `"offer"` (não mais `"offers"`).
+- Atualizar toast do `handleApplyDiscount`: "50% off nas próximas **3 cobranças**".
 
-Em `supabase/functions/abacatepay-checkout/index.ts`:
+### 4. Texto do card de desconto
+- "**50% off por 3 meses**" (era "por 2 meses")
+- Subcopy: "Continue com tudo liberado pagando metade do preço nas próximas 3 cobranças."
 
-- Quando `couponValid === true` (WINBACK80 + annual + nunca usado), buscar o `productId` do `abacatepay_product_annual_winback80_id` em vez do anual normal.
-- Enviar `items: [{ id: <promoProductId>, quantity: 1 }]` — sem override de preço, sem campos ad-hoc. AbacatePay usa o preço cadastrado do produto promo (R$ 47,76).
-- Manter `metadata.user_id`, `metadata.billing_period: "annual"` e `metadata.coupon: "WINBACK80"` para que o webhook ative a assinatura corretamente.
-
-### 3. Garantir que a assinatura funciona após pagamento
-
-O webhook `abacatepay-webhook` já está preparado:
-- Lê `metadata.user_id` → vincula ao usuário certo.
-- Lê `metadata.billing_period: "annual"` → calcula `current_period_end` = +1 ano.
-- Salva `plan: "core-pro"` e `status: "active"` em `subscriptions`.
-- Marca `winback_attempts.converted_at` quando vê `metadata.coupon === "WINBACK80"`.
-
-Nenhuma mudança necessária no webhook — funciona independente de qual produto foi comprado, porque o que importa é o metadata.
-
-### 4. Auto-provisionar o produto promo
-
-Para evitar passo manual: dentro do próprio `abacatepay-checkout`, se a config `abacatepay_product_annual_winback80_id` ainda não existir e o cupom for válido, criar o produto on-the-fly via `/products/create` e salvar em `app_config`. Da próxima vez ele já estará pronto.
-
-Isso elimina a necessidade de rodar `abacatepay-setup-products` de novo manualmente.
-
-## Arquivos modificados
-
-- `supabase/functions/abacatepay-checkout/index.ts` — usar produto promo quando cupom WINBACK80 ativo; auto-criar o produto na primeira execução.
-- `supabase/functions/abacatepay-setup-products/index.ts` — adicionar o produto promo à lista (para quem rodar o setup novamente).
+---
 
 ## Detalhes técnicos
 
-```ts
-// abacatepay-checkout/index.ts (trecho)
-const PROMO_PRODUCT = {
-  configKey: "abacatepay_product_annual_winback80_id",
-  externalId: "core-pro-annual-winback80",
-  name: "CORE Pro Anual — Oferta Winback 80% OFF",
-  description: "Oferta exclusiva de retenção — 80% de desconto no primeiro ano",
-  price: 4776, // R$ 47,76
-};
-
-async function getOrCreatePromoProductId(supabaseAdmin, apiKey) {
-  const { data: row } = await supabaseAdmin
-    .from("app_config").select("value").eq("key", PROMO_PRODUCT.configKey).maybeSingle();
-  const existing = (row?.value as { id?: string } | null)?.id;
-  if (existing) return existing;
-
-  const resp = await abacateRequest("/products/create", apiKey, {
-    name: PROMO_PRODUCT.name,
-    description: PROMO_PRODUCT.description,
-    price: PROMO_PRODUCT.price,
-    currency: "BRL",
-    externalId: PROMO_PRODUCT.externalId,
-  });
-  const newId = resp?.data?.id || resp?.id;
-  await supabaseAdmin.from("app_config").upsert({
-    key: PROMO_PRODUCT.configKey,
-    value: { id: newId, externalId: PROMO_PRODUCT.externalId, name: PROMO_PRODUCT.name },
-  });
-  return newId;
-}
-
-// dentro do handler, depois de validar o cupom:
-const productIdToUse = couponValid
-  ? await getOrCreatePromoProductId(supabaseAdmin, apiKey)
-  : productId;
-
-const lineItem = { id: productIdToUse, quantity: 1 };
-
-// metadata permanece igual — webhook ativa assinatura normalmente
-metadata: {
-  user_id: userId,
-  billing_period: "annual",
-  ...(couponValid ? { coupon: "WINBACK80", discount_pct: 80 } : {}),
-}
-```
-
-O webhook não precisa de alteração: ele lê `metadata.billing_period` e `metadata.user_id`, ativa a assinatura como `core-pro` anual, e o `markWinbackConverted` continua marcando o attempt como convertido pelo `metadata.coupon`.
+- O badge "só pode usar uma por ano" continua válido (regra de `retention_offers_used` não muda).
+- Nenhuma mudança de schema necessária — `metadata.cycles` já é jsonb livre.
+- Nenhum impacto em winback (fluxo separado).
+- Analytics: eventos `retention_offer_accepted` e `retention_discount_applied` continuam, agora refletindo `cycles: 3`.

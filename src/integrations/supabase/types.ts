@@ -66,6 +66,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          offers_shown: Json
           outcome: string
           reason: string | null
           reason_detail: string | null
@@ -76,6 +77,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          offers_shown?: Json
           outcome?: string
           reason?: string | null
           reason_detail?: string | null
@@ -86,6 +88,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          offers_shown?: Json
           outcome?: string
           reason?: string | null
           reason_detail?: string | null
@@ -252,6 +255,39 @@ export type Database = {
           id?: string
           payment_method?: string
           plan?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      support_tickets: {
+        Row: {
+          cancel_attempt_id: string | null
+          created_at: string
+          id: string
+          message: string
+          resolved_at: string | null
+          source: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cancel_attempt_id?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          resolved_at?: string | null
+          source?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cancel_attempt_id?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          resolved_at?: string | null
+          source?: string
           status?: string
           user_id?: string
         }

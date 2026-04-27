@@ -57,6 +57,20 @@ const BodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("eligibility"),
   }),
+  z.object({
+    action: z.literal("log_offers_shown"),
+    attemptId: z.string().uuid(),
+    offers: z.array(z.string()).max(10),
+  }),
+  z.object({
+    action: z.literal("extend_trial"),
+    attemptId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("submit_support_ticket"),
+    attemptId: z.string().uuid(),
+    message: z.string().min(3).max(4000),
+  }),
 ]);
 
 serve(async (req) => {

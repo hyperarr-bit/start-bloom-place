@@ -355,7 +355,7 @@ const TodoList = () => {
           <select
             value={newPriority}
             onChange={e => setNewPriority(e.target.value as "alta" | "media" | "baixa")}
-            className="h-8 text-xs border rounded-md px-2 bg-background"
+            className="h-8 text-xs border border-input rounded-md px-2 bg-background text-foreground"
           >
             <option value="alta">🔴 Alta</option>
             <option value="media">🟡 Média</option>

@@ -838,16 +838,16 @@ const EnergyTracker = () => {
 // ============= FOCUS ZONES (Time Blocking) =============
 const FocusZones = () => {
   const [blocks, setBlocks] = usePersistedState<{ id: string; label: string; start: string; end: string; color: string; category: string }[]>("focus-blocks", [
-    { id: "1", label: "Deep Work", start: "09:00", end: "12:00", color: "bg-red-200 border-red-400", category: "🧠 Foco Profundo" },
-    { id: "2", label: "Admin / E-mails", start: "13:00", end: "14:00", color: "bg-blue-200 border-blue-400", category: "📧 Admin" },
-    { id: "3", label: "Criativo", start: "14:00", end: "16:00", color: "bg-purple-200 border-purple-400", category: "🎨 Criativo" },
-    { id: "4", label: "Exercício", start: "17:00", end: "18:00", color: "bg-green-200 border-green-400", category: "💪 Saúde" },
+    { id: "1", label: "Deep Work", start: "09:00", end: "12:00", color: "bg-red-200 dark:bg-red-950/40 border-red-400 dark:border-red-700", category: "🧠 Foco Profundo" },
+    { id: "2", label: "Admin / E-mails", start: "13:00", end: "14:00", color: "bg-blue-200 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700", category: "📧 Admin" },
+    { id: "3", label: "Criativo", start: "14:00", end: "16:00", color: "bg-purple-200 dark:bg-purple-950/40 border-purple-400 dark:border-purple-700", category: "🎨 Criativo" },
+    { id: "4", label: "Exercício", start: "17:00", end: "18:00", color: "bg-green-200 dark:bg-green-950/40 border-green-400 dark:border-green-700", category: "💪 Saúde" },
   ]);
   const [newLabel, setNewLabel] = useState("");
   const [newStart, setNewStart] = useState("");
   const [newEnd, setNewEnd] = useState("");
 
-  const colors = ["bg-red-200 border-red-400", "bg-blue-200 border-blue-400", "bg-purple-200 border-purple-400", "bg-green-200 border-green-400", "bg-yellow-200 border-yellow-400", "bg-pink-200 border-pink-400"];
+  const colors = ["bg-red-200 dark:bg-red-950/40 border-red-400 dark:border-red-700", "bg-blue-200 dark:bg-blue-950/40 border-blue-400 dark:border-blue-700", "bg-purple-200 dark:bg-purple-950/40 border-purple-400 dark:border-purple-700", "bg-green-200 dark:bg-green-950/40 border-green-400 dark:border-green-700", "bg-yellow-200 dark:bg-yellow-950/40 border-yellow-400 dark:border-yellow-700", "bg-pink-200 dark:bg-pink-950/40 border-pink-400 dark:border-pink-700"];
 
   const addBlock = () => {
     if (!newLabel.trim() || !newStart || !newEnd) return;

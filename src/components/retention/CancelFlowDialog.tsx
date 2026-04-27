@@ -6,9 +6,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Gift, Pause, MessageCircle, Wrench, AlertTriangle } from "lucide-react";
+import { Loader2, Gift, Pause, MessageCircle, Wrench } from "lucide-react";
 
-type Step = "reason" | "offer" | "confirm" | "done";
+type Step = "reason" | "offer" | "done";
 type Reason = "too_expensive" | "not_using" | "missing_feature" | "technical_issue" | "other";
 
 interface CancelFlowDialogProps {
@@ -359,39 +359,15 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
               <Button variant="ghost" size="sm" onClick={() => setStep("reason")}>
                 ← Voltar
               </Button>
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setStep("confirm")}>
-                Cancelar mesmo assim
-              </Button>
-            </div>
-          </>
-        )}
-
-        {/* ============ STEP 3: CONFIRM ============ */}
-        {step === "confirm" && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                Tem certeza?
-              </DialogTitle>
-              <DialogDescription>
-                Você ainda terá acesso até o fim do período já pago. Depois disso, seus dados ficam guardados por 30 dias caso queira voltar.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="rounded-lg bg-muted p-3 text-xs text-muted-foreground space-y-1">
-              <p>• Sem mais cobranças após o cancelamento</p>
-              <p>• Acesso liberado até o fim do ciclo atual</p>
-              <p>• Você pode reativar a qualquer momento</p>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" onClick={() => setStep("offer")}>
-                Voltar
-              </Button>
-              <Button variant="destructive" onClick={handleConfirmCancel} disabled={loading}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={handleConfirmCancel}
+                disabled={loading}
+              >
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Confirmar cancelamento
+                Cancelar mesmo assim
               </Button>
             </div>
           </>

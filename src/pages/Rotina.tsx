@@ -1103,31 +1103,31 @@ const Rotina = () => {
         {activeTab === "semana" && (
           <>
             {/* Hábitos Diários */}
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="bg-green-100 dark:bg-green-950/40 border-b border-green-200 dark:border-green-800 px-4 py-3 flex items-center justify-between">
+            <div className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
+              <div className="bg-green-100 dark:bg-[hsl(var(--rt-card))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-green-900 dark:text-green-200">HÁBITOS DIÁRIOS</span>
+                  <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>
                   <span>✅</span>
                 </div>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-green-300" onClick={() => setShowAddHabit(!showAddHabit)}>
+                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
                   <Plus className="w-3 h-3 mr-1" /> Hábito
                 </Button>
               </div>
 
               {showAddHabit && (
-                <div className="p-3 bg-green-50 dark:bg-green-950/20 border-b border-green-200 dark:border-green-800 flex gap-2">
+                <div className="p-3 bg-green-50 dark:bg-[hsl(var(--rt-card-2))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] flex gap-2">
                   <Input placeholder="Nome do hábito..." value={newHabit} onChange={(e) => setNewHabit(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addHabit()} className="h-8 text-xs flex-1" autoFocus />
-                  <Button size="sm" onClick={addHabit} className="h-8 text-xs bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white">Adicionar</Button>
+                  <Button size="sm" onClick={addHabit} className="h-8 text-xs bg-green-600 hover:bg-green-700 dark:bg-[hsl(var(--rt-accent))] dark:hover:bg-[hsl(142,71%,40%)] text-white">Adicionar</Button>
                 </div>
               )}
 
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-green-50/50 dark:bg-green-950/20">
-                      <th className="text-left px-3 py-2 font-bold text-green-900 dark:text-green-200 border-r border-green-100 dark:border-green-900 w-24">DIA</th>
+                    <tr className="bg-green-50/50 dark:bg-[hsl(var(--rt-card-2))]">
+                      <th className="text-left px-3 py-2 font-bold text-green-900 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] w-24">DIA</th>
                       {habits.map((habit, i) => (
-                        <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-green-300 border-r border-green-100 dark:border-green-900 min-w-[100px] group">
+                        <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] min-w-[100px] group">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-center text-[11px]">{habit}</span>
                             <button onClick={() => removeHabit(i)} className="opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600">
@@ -1139,12 +1139,12 @@ const Rotina = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {days.map((day) => (
-                      <tr key={day} className="border-t border-green-100 dark:border-green-900 hover:bg-green-50/30 dark:hover:bg-green-950/10">
-                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-green-900 text-foreground">{day}</td>
+                    {days.map((day, di) => (
+                      <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""}`}>
+                        <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
                         {habits.map((_, hi) => (
-                          <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-green-900">
-                            <Checkbox checked={habitsChecked[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-blue-600 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500" />
+                          <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
+                            <Checkbox checked={habitsChecked[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />
                           </td>
                         ))}
                       </tr>

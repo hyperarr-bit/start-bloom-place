@@ -859,7 +859,7 @@ const FocusZones = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-slate-600 to-slate-800 px-4 py-3 flex items-center gap-2">
+      <div className="bg-gradient-to-r from-slate-600 to-slate-800 dark:from-slate-700 dark:to-slate-900 px-4 py-3 flex items-center gap-2">
         <Clock className="w-4 h-4 text-white" />
         <span className="font-bold text-sm text-white">BLOCOS DE FOCO</span>
       </div>

@@ -686,7 +686,7 @@ const MonthlyPlanning = () => {
 
       {/* Retrospective */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="bg-gradient-to-r from-rose-500 to-pink-500 px-4 py-3 flex items-center gap-2">
+        <div className="bg-gradient-to-r from-rose-500 to-pink-500 dark:from-rose-700 dark:to-pink-700 px-4 py-3 flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">RETROSPECTIVA DO MÊS</span>
         </div>

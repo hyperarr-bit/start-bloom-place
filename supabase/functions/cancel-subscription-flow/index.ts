@@ -112,6 +112,7 @@ serve(async (req) => {
     const usedTypes = new Set((offersUsed ?? []).map((o) => o.offer_type));
     const canUseDiscount = !usedTypes.has("discount");
     const canUsePause = !usedTypes.has("pause");
+    const canUseExtension = !usedTypes.has("extend_7d");
 
     const { data: sub } = await admin
       .from("subscriptions")
@@ -126,6 +127,7 @@ serve(async (req) => {
       return jsonResponse({
         canUseDiscount,
         canUsePause,
+        canUseExtension,
         subscription: sub ?? null,
       });
     }
@@ -147,6 +149,7 @@ serve(async (req) => {
         attemptId: attempt.id,
         canUseDiscount,
         canUsePause,
+        canUseExtension,
         subscription: sub ?? null,
       });
     }

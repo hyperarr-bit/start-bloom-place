@@ -321,7 +321,7 @@ const TodoList = () => {
   const toggleTodo = (id: string) => setTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
   const removeTodo = (id: string) => setTodos(prev => prev.filter(t => t.id !== id));
 
-  const priorityColors = { alta: "bg-red-100 text-red-700 border-red-200", media: "bg-yellow-100 text-yellow-700 border-yellow-200", baixa: "bg-blue-100 text-blue-700 border-blue-200" };
+  const priorityColors = { alta: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800", media: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800", baixa: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" };
   const priorityDot = { alta: "bg-red-500", media: "bg-yellow-500", baixa: "bg-blue-500" };
 
   const filtered = todos

@@ -248,7 +248,7 @@ const HealthTracker = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-3 flex items-center gap-2">
+      <div className="bg-gradient-to-r from-cyan-400 to-blue-500 dark:from-cyan-700 dark:to-blue-700 px-4 py-3 flex items-center gap-2">
         <Droplets className="w-4 h-4 text-white" />
         <span className="font-bold text-sm text-white">SAÚDE DIÁRIA</span>
       </div>

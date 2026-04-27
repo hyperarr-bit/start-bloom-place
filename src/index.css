@@ -81,53 +81,63 @@
   }
 
   .dark {
-    --background: 220 10% 6%;
-    --foreground: 0 0% 94%;
-    --card: 220 10% 9%;
-    --card-foreground: 0 0% 94%;
-    --popover: 220 10% 9%;
-    --popover-foreground: 0 0% 94%;
-    --primary: 0 0% 92%;
-    --primary-foreground: 220 10% 8%;
-    --secondary: 220 8% 14%;
-    --secondary-foreground: 0 0% 94%;
-    --muted: 220 8% 14%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 330 65% 58%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 55% 48%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 55%;
-    --warning-foreground: 0 0% 100%;
-    --card-receitas: 45 35% 14%;
-    --card-receitas-border: 45 40% 25%;
-    --card-receitas-text: 45 65% 72%;
-    --card-despesas: 250 25% 15%;
-    --card-despesas-border: 250 30% 28%;
-    --card-despesas-text: 250 55% 75%;
-    --card-dividas: 330 25% 15%;
-    --card-dividas-border: 330 30% 28%;
-    --card-dividas-text: 330 55% 75%;
-    --card-investimentos: 142 25% 13%;
-    --card-investimentos-border: 142 30% 24%;
-    --card-investimentos-text: 142 50% 68%;
-    --income: 45 25% 13%;
-    --income-foreground: 45 55% 72%;
-    --expense: 330 25% 13%;
-    --expense-foreground: 330 55% 72%;
-    --border: 220 8% 16%;
-    --input: 220 8% 16%;
-    --ring: 0 0% 80%;
-    --sidebar-background: 220 10% 7%;
-    --sidebar-foreground: 0 0% 92%;
-    --sidebar-primary: 224 76% 52%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 8% 14%;
-    --sidebar-accent-foreground: 0 0% 92%;
-    --sidebar-border: 220 8% 14%;
-    --sidebar-ring: 217 91% 60%;
+    /* Camadas de superfície (cinza-azulado neutro, sem preto puro) */
+    --background: 220 10% 8%;
+    --foreground: 220 8% 88%;
+    --card: 220 10% 11%;
+    --card-foreground: 220 8% 88%;
+    --popover: 220 10% 12%;
+    --popover-foreground: 220 8% 88%;
+    --primary: 220 8% 86%;
+    --primary-foreground: 220 10% 10%;
+    --secondary: 220 9% 15%;
+    --secondary-foreground: 220 8% 88%;
+    --muted: 220 9% 15%;
+    --muted-foreground: 220 6% 58%;
+    --accent: 330 45% 62%;
+    --accent-foreground: 220 10% 10%;
+    --destructive: 0 55% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 40% 52%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 70% 58%;
+    --warning-foreground: 220 10% 10%;
+    /* Cards financeiros — saturação reduzida, próximos do card base */
+    --card-receitas: 45 18% 13%;
+    --card-receitas-border: 45 20% 22%;
+    --card-receitas-text: 45 45% 75%;
+    --card-despesas: 250 15% 13%;
+    --card-despesas-border: 250 18% 22%;
+    --card-despesas-text: 250 38% 78%;
+    --card-dividas: 330 15% 13%;
+    --card-dividas-border: 330 18% 22%;
+    --card-dividas-text: 330 38% 78%;
+    --card-investimentos: 142 15% 12%;
+    --card-investimentos-border: 142 18% 22%;
+    --card-investimentos-text: 142 35% 72%;
+    --income: 45 15% 12%;
+    --income-foreground: 45 40% 75%;
+    --expense: 330 15% 12%;
+    --expense-foreground: 330 38% 75%;
+    /* Bordas hairline */
+    --border: 220 9% 17%;
+    --input: 220 9% 17%;
+    --ring: 220 8% 70%;
+    /* Charts dessaturados */
+    --chart-1: 330 45% 62%;
+    --chart-2: 142 40% 55%;
+    --chart-3: 38 65% 60%;
+    --chart-4: 250 45% 65%;
+    --chart-5: 45 55% 60%;
+    /* Sidebar alinhada */
+    --sidebar-background: 220 10% 9%;
+    --sidebar-foreground: 220 8% 88%;
+    --sidebar-primary: 220 8% 86%;
+    --sidebar-primary-foreground: 220 10% 10%;
+    --sidebar-accent: 220 9% 15%;
+    --sidebar-accent-foreground: 220 8% 88%;
+    --sidebar-border: 220 9% 17%;
+    --sidebar-ring: 220 8% 70%;
   }
 }
 
@@ -156,49 +166,49 @@
      Padrão: fundo levemente tingido, texto legível e borda sutil em ambos os temas.
      Use uma única classe em vez do trio bg-X-100 + text-X-700 + border-X-200. */
   .tint-blue    { @apply bg-blue-100/70 text-blue-800 border-blue-200
-                         dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20; }
+                         dark:bg-blue-400/[0.08] dark:text-blue-200/90 dark:border-blue-400/15; }
   .tint-sky     { @apply bg-sky-100/70 text-sky-800 border-sky-200
-                         dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20; }
+                         dark:bg-sky-400/[0.08] dark:text-sky-200/90 dark:border-sky-400/15; }
   .tint-cyan    { @apply bg-cyan-100/70 text-cyan-800 border-cyan-200
-                         dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20; }
+                         dark:bg-cyan-400/[0.08] dark:text-cyan-200/90 dark:border-cyan-400/15; }
   .tint-teal    { @apply bg-teal-100/70 text-teal-800 border-teal-200
-                         dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/20; }
+                         dark:bg-teal-400/[0.08] dark:text-teal-200/90 dark:border-teal-400/15; }
   .tint-green   { @apply bg-green-100/70 text-green-800 border-green-200
-                         dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20; }
+                         dark:bg-green-400/[0.08] dark:text-green-200/90 dark:border-green-400/15; }
   .tint-emerald { @apply bg-emerald-100/70 text-emerald-800 border-emerald-200
-                         dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20; }
+                         dark:bg-emerald-400/[0.08] dark:text-emerald-200/90 dark:border-emerald-400/15; }
   .tint-lime    { @apply bg-lime-100/70 text-lime-800 border-lime-200
-                         dark:bg-lime-500/10 dark:text-lime-300 dark:border-lime-500/20; }
+                         dark:bg-lime-400/[0.08] dark:text-lime-200/90 dark:border-lime-400/15; }
   .tint-yellow  { @apply bg-yellow-100/70 text-yellow-800 border-yellow-200
-                         dark:bg-yellow-500/10 dark:text-yellow-200 dark:border-yellow-500/20; }
+                         dark:bg-yellow-400/[0.08] dark:text-yellow-200/90 dark:border-yellow-400/15; }
   .tint-amber   { @apply bg-amber-100/70 text-amber-800 border-amber-200
-                         dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/20; }
+                         dark:bg-amber-400/[0.08] dark:text-amber-200/90 dark:border-amber-400/15; }
   .tint-orange  { @apply bg-orange-100/70 text-orange-800 border-orange-200
-                         dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/20; }
+                         dark:bg-orange-400/[0.08] dark:text-orange-200/90 dark:border-orange-400/15; }
   .tint-red     { @apply bg-red-100/70 text-red-800 border-red-200
-                         dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/20; }
+                         dark:bg-red-400/[0.08] dark:text-red-200/90 dark:border-red-400/15; }
   .tint-rose    { @apply bg-rose-100/70 text-rose-800 border-rose-200
-                         dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20; }
+                         dark:bg-rose-400/[0.08] dark:text-rose-200/90 dark:border-rose-400/15; }
   .tint-pink    { @apply bg-pink-100/70 text-pink-800 border-pink-200
-                         dark:bg-pink-500/10 dark:text-pink-300 dark:border-pink-500/20; }
+                         dark:bg-pink-400/[0.08] dark:text-pink-200/90 dark:border-pink-400/15; }
   .tint-fuchsia { @apply bg-fuchsia-100/70 text-fuchsia-800 border-fuchsia-200
-                         dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:border-fuchsia-500/20; }
+                         dark:bg-fuchsia-400/[0.08] dark:text-fuchsia-200/90 dark:border-fuchsia-400/15; }
   .tint-purple  { @apply bg-purple-100/70 text-purple-800 border-purple-200
-                         dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20; }
+                         dark:bg-purple-400/[0.08] dark:text-purple-200/90 dark:border-purple-400/15; }
   .tint-violet  { @apply bg-violet-100/70 text-violet-800 border-violet-200
-                         dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/20; }
+                         dark:bg-violet-400/[0.08] dark:text-violet-200/90 dark:border-violet-400/15; }
   .tint-indigo  { @apply bg-indigo-100/70 text-indigo-800 border-indigo-200
-                         dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20; }
+                         dark:bg-indigo-400/[0.08] dark:text-indigo-200/90 dark:border-indigo-400/15; }
   .tint-slate   { @apply bg-slate-100/70 text-slate-800 border-slate-200
-                         dark:bg-slate-500/15 dark:text-slate-200 dark:border-slate-500/25; }
+                         dark:bg-slate-400/10 dark:text-slate-200/90 dark:border-slate-400/15; }
   .tint-gray    { @apply bg-gray-100/70 text-gray-800 border-gray-200
-                         dark:bg-gray-500/15 dark:text-gray-200 dark:border-gray-500/25; }
+                         dark:bg-gray-400/10 dark:text-gray-200/90 dark:border-gray-400/15; }
   .tint-zinc    { @apply bg-zinc-100/70 text-zinc-800 border-zinc-200
-                         dark:bg-zinc-500/15 dark:text-zinc-200 dark:border-zinc-500/25; }
+                         dark:bg-zinc-400/10 dark:text-zinc-200/90 dark:border-zinc-400/15; }
   .tint-neutral { @apply bg-neutral-100/70 text-neutral-800 border-neutral-200
-                         dark:bg-neutral-500/15 dark:text-neutral-200 dark:border-neutral-500/25; }
+                         dark:bg-neutral-400/10 dark:text-neutral-200/90 dark:border-neutral-400/15; }
   .tint-stone   { @apply bg-stone-100/70 text-stone-800 border-stone-200
-                         dark:bg-stone-500/15 dark:text-stone-200 dark:border-stone-500/25; }
+                         dark:bg-stone-400/10 dark:text-stone-200/90 dark:border-stone-400/15; }
 
   .table-header-pink {
     @apply bg-accent text-accent-foreground font-semibold text-center py-2.5 text-xs uppercase tracking-widest;

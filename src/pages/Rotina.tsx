@@ -263,7 +263,7 @@ const HealthTracker = () => {
           <Progress value={(waterToday / waterGoal) * 100} className="h-2" />
           <div className="flex flex-wrap gap-1">
             {[...Array(waterGoal)].map((_, i) => (
-              <div key={i} className={`w-6 h-8 rounded-md border flex items-center justify-center text-sm transition-colors ${i < waterToday ? "bg-blue-100 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-300" : "bg-muted/30 border-border text-muted-foreground/30"}`}>
+              <div key={i} className={`w-6 h-8 rounded-md border flex items-center justify-center text-sm transition-colors ${i < waterToday ? "bg-blue-100 dark:bg-[hsl(210,60%,16%)] border-blue-300 dark:border-[hsl(210,60%,30%)] text-blue-600 dark:text-blue-300" : "bg-muted/30 border-border text-muted-foreground/30"}`}>
                 💧
               </div>
             ))}

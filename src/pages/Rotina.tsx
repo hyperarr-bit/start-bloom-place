@@ -181,7 +181,7 @@ const MoodTracker = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-purple-400 to-pink-400 px-4 py-3 flex items-center gap-2">
+      <div className="bg-gradient-to-r from-purple-400 to-pink-400 dark:from-purple-700 dark:to-pink-700 px-4 py-3 flex items-center gap-2">
         <Heart className="w-4 h-4 text-white" />
         <span className="font-bold text-sm text-white">COMO VOCÊ ESTÁ HOJE?</span>
       </div>

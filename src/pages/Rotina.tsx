@@ -336,7 +336,7 @@ const TodoList = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-violet-500 to-purple-600 dark:from-violet-700 dark:to-purple-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">TAREFAS</span>

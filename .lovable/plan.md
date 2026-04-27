@@ -1,40 +1,40 @@
 
 ## Problema
 
-Na seção **Vencimentos das contas** (Finanças), no modo escuro:
-- Os cards ficam com fundo claro (`bg-yellow-50`, `bg-slate-50`, etc.) e o texto branco em cima fica ilegível.
-- Os cabeçalhos coloridos (amarelo/cinza claro) ficam estourados, criando contraste agressivo num tema escuro.
-- O input "Adicionar conta" e o nome das contas ficam quase invisíveis.
+Quando o usuário toca em uma aba (em qualquer módulo: Finanças, Rotina, Saúde, etc.), o retângulo da aba ativa fica **totalmente branco** no modo escuro, contrastando feio com o fundo escuro do app.
 
-A causa é que `BillsDueCards.tsx` usa uma `colorPalette` totalmente hardcoded só com tons claros, sem variantes `dark:`.
+### Causa
+
+Em `src/index.css`, a classe `.notion-tab-active` usa:
+
+```css
+.notion-tab-active {
+  @apply bg-foreground text-background;
+}
+```
+
+No modo escuro, `--foreground` é branco e `--background` é escuro — então a aba ativa vira um bloco branco gritante. Funciona bem no light, mas quebra a hierarquia "escura premium" no dark.
 
 ## Solução
 
-Editar **apenas** `src/components/BillsDueCards.tsx` para que cada entrada da paleta tenha equivalente em dark mode, mantendo a "cor temática" do dia mas com:
+Manter o comportamento atual no **light mode** (aba ativa preta com texto branco — fica elegante) e, no **dark mode**, trocar por uma superfície escura sutilmente elevada com texto claro e borda visível — exatamente o padrão "card destacado" do tema escuro.
 
-- **Fundo do card**: tom escuro saturado e baixo (ex.: `dark:bg-yellow-950/30`) com **borda visível** mas sutil (`dark:border-yellow-900/50`).
-- **Header do dia**: tom mais escuro/profundo da mesma cor (ex.: `dark:bg-yellow-700/40`) com **texto claro** (`dark:text-yellow-100`) — sem amarelo neon.
-- **Texto das contas**: herdará `text-foreground` (já adapta), mas confirmar que itens pagos usem `text-muted-foreground` (já está).
-- **Input "Adicionar conta..."**: trocar `text-muted-foreground` fixo por classe que respeita o tema (já é, mas com placeholder `placeholder:text-muted-foreground` explícito para garantir).
-- **Contador "0/3"** no header: usar `opacity-80` em vez de `opacity-75` para legibilidade no dark.
+Editar **apenas** a regra `.notion-tab-active` em `src/index.css`:
 
-A estrutura, layout, ícones, lógica de edição, adição e remoção permanecem **intactos**. Nenhum outro arquivo é alterado.
+```css
+.notion-tab-active {
+  @apply bg-foreground text-background 
+         dark:bg-muted dark:text-foreground dark:border-border;
+}
+```
 
-## Paleta proposta (8 cores, light + dark)
+Resultado no dark:
+- Fundo: `hsl(var(--muted))` — cinza-escuro sutil, alinhado aos cards.
+- Texto: `hsl(var(--foreground))` — claro mas não branco puro.
+- Borda mantida (`border-border`) para reforçar que é a aba selecionada.
 
-| Cor       | Card (light)                  | Card (dark)                              | Header (light)                | Header (dark)                                  |
-|-----------|-------------------------------|------------------------------------------|-------------------------------|------------------------------------------------|
-| Amarelo   | `bg-yellow-50 border-yellow-200` | `dark:bg-yellow-950/30 dark:border-yellow-900/50` | `bg-yellow-300 text-yellow-900` | `dark:bg-yellow-800/50 dark:text-yellow-100`   |
-| Slate     | `bg-slate-50 border-slate-200`   | `dark:bg-slate-900/40 dark:border-slate-800`      | `bg-slate-400 text-slate-50`    | `dark:bg-slate-700/60 dark:text-slate-100`     |
-| Indigo    | `bg-indigo-50 border-indigo-200` | `dark:bg-indigo-950/30 dark:border-indigo-900/50` | `bg-indigo-400 text-indigo-50`  | `dark:bg-indigo-800/50 dark:text-indigo-100`   |
-| Esmeralda | `bg-emerald-50 border-emerald-200` | `dark:bg-emerald-950/30 dark:border-emerald-900/50` | `bg-emerald-400 text-emerald-50` | `dark:bg-emerald-800/50 dark:text-emerald-100` |
-| Rosa      | `bg-rose-50 border-rose-200`     | `dark:bg-rose-950/30 dark:border-rose-900/50`     | `bg-rose-400 text-rose-50`      | `dark:bg-rose-800/50 dark:text-rose-100`       |
-| Ciano     | `bg-cyan-50 border-cyan-200`     | `dark:bg-cyan-950/30 dark:border-cyan-900/50`     | `bg-cyan-400 text-cyan-50`      | `dark:bg-cyan-800/50 dark:text-cyan-100`       |
-| Laranja   | `bg-orange-50 border-orange-200` | `dark:bg-orange-950/30 dark:border-orange-900/50` | `bg-orange-400 text-orange-50`  | `dark:bg-orange-800/50 dark:text-orange-100`   |
-| Roxo      | `bg-purple-50 border-purple-200` | `dark:bg-purple-950/30 dark:border-purple-900/50` | `bg-purple-400 text-purple-50`  | `dark:bg-purple-800/50 dark:text-purple-100`   |
-
-Resultado: cada dia mantém sua identidade visual (amarelo, rosa, verde…), mas no escuro vira um card escuro com **leve tinta** da cor + header mais saturado e texto claro — alinhado ao princípio "hierarquia + contraste controlado, nada de branco em branco".
+Isso conserta a aparência **em todas as 17+ páginas** que usam `.notion-tab` (Finanças, Rotina, Casa, Saúde, Hiperfoco, Pet, Detox, Beleza, Treino, Dieta, Estudos, Carreira, Viagens, Relacionamentos, Biblioteca, Desenvolvimento Pessoal, Index) — em uma única alteração.
 
 ## Arquivos alterados
 
-- `src/components/BillsDueCards.tsx` — atualizar `colorPalette` e ajustes mínimos de contraste no header/input.
+- `src/index.css` — regra `.notion-tab-active` (3 linhas).

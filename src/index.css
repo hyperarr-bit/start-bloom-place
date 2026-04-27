@@ -173,7 +173,7 @@
   }
 
   .notion-tab-active {
-    @apply bg-foreground text-background;
+    @apply bg-foreground text-background dark:bg-muted dark:text-foreground dark:border-border;
   }
 
   .scrollbar-hide {

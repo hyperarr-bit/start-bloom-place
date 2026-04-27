@@ -798,7 +798,7 @@ const EnergyTracker = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-4 py-3 flex items-center gap-2">
+      <div className="bg-gradient-to-r from-yellow-400 to-orange-500 dark:from-yellow-700 dark:to-orange-700 px-4 py-3 flex items-center gap-2">
         <Zap className="w-4 h-4 text-white" />
         <span className="font-bold text-sm text-white">NÍVEL DE ENERGIA</span>
       </div>

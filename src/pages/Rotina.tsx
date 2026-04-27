@@ -522,7 +522,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
     else break;
   }
 
-  const getColor = (active: boolean) => active ? "bg-green-500 dark:bg-green-600" : "bg-muted";
+  const getColor = (active: boolean) => active ? "bg-[hsl(var(--rt-heat-2))] dark:bg-[hsl(var(--rt-heat-2))]" : "bg-[hsl(var(--rt-heat-0))] dark:bg-[hsl(var(--rt-heat-0))]";
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">

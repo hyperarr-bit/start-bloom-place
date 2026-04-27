@@ -1209,16 +1209,16 @@ const Rotina = () => {
                   }, [[]] as string[][]).map((line, i) => <span key={i}>{line.join(" ")}<br /></span>)}</p>
                 </div>
 
-                <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800 overflow-hidden">
-                  <div className="bg-yellow-100 dark:bg-yellow-950/40 border-b border-yellow-200 dark:border-yellow-800 px-4 py-2 flex items-center justify-between">
-                    <span className="font-bold text-xs text-yellow-900 dark:text-yellow-200">URGÊNCIAS</span>
-                    <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                <div className="bg-yellow-50 dark:bg-[hsl(var(--rt-warning-soft))] rounded-lg border border-yellow-200 dark:border-[hsl(48,60%,28%)] overflow-hidden">
+                  <div className="bg-yellow-100 dark:bg-[hsl(35,45%,12%)] border-b border-yellow-200 dark:border-[hsl(48,60%,28%)] px-4 py-2 flex items-center justify-between">
+                    <span className="font-bold text-xs text-yellow-900 dark:text-[hsl(var(--rt-warning))]">URGÊNCIAS</span>
+                    <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-[hsl(var(--rt-warning))]" />
                   </div>
                   <div className="p-3 space-y-2">
                     {urgencies.map((u) => (
                       <div key={u.id} className="flex items-center gap-2 group">
                         <Checkbox checked={u.done} onCheckedChange={() => toggleUrgency(u.id)} className="h-3.5 w-3.5" />
-                        <span className={`flex-1 text-xs ${u.done ? "line-through text-muted-foreground" : "text-yellow-900 dark:text-yellow-200"}`}>{u.text}</span>
+                        <span className={`flex-1 text-xs ${u.done ? "line-through text-muted-foreground" : "text-yellow-900 dark:text-[hsl(var(--rt-warning-text))]"}`}>{u.text}</span>
                         <button onClick={() => removeUrgency(u.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
                           <Trash2 className="w-3 h-3" />
                         </button>
@@ -1226,7 +1226,7 @@ const Rotina = () => {
                     ))}
                     <div className="flex items-center gap-2 pt-1">
                       <Checkbox disabled className="h-3.5 w-3.5 opacity-30" />
-                      <Input placeholder="Nova urgência..." value={newUrgency} onChange={(e) => setNewUrgency(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrgency()} className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-yellow-800 dark:text-yellow-200 placeholder:text-yellow-400 dark:placeholder:text-yellow-600" />
+                      <Input placeholder="Nova urgência..." value={newUrgency} onChange={(e) => setNewUrgency(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrgency()} className="h-6 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0 text-yellow-800 dark:text-[hsl(var(--rt-warning-text))] placeholder:text-yellow-400 dark:placeholder:text-[hsl(48,30%,40%)]" />
                     </div>
                   </div>
                 </div>

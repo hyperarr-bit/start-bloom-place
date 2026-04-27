@@ -57,6 +57,20 @@ const BodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("eligibility"),
   }),
+  z.object({
+    action: z.literal("log_offers_shown"),
+    attemptId: z.string().uuid(),
+    offers: z.array(z.string()).max(10),
+  }),
+  z.object({
+    action: z.literal("extend_trial"),
+    attemptId: z.string().uuid(),
+  }),
+  z.object({
+    action: z.literal("submit_support_ticket"),
+    attemptId: z.string().uuid(),
+    message: z.string().min(3).max(4000),
+  }),
 ]);
 
 serve(async (req) => {
@@ -98,6 +112,7 @@ serve(async (req) => {
     const usedTypes = new Set((offersUsed ?? []).map((o) => o.offer_type));
     const canUseDiscount = !usedTypes.has("discount");
     const canUsePause = !usedTypes.has("pause");
+    const canUseExtension = !usedTypes.has("extend_7d");
 
     const { data: sub } = await admin
       .from("subscriptions")
@@ -112,6 +127,7 @@ serve(async (req) => {
       return jsonResponse({
         canUseDiscount,
         canUsePause,
+        canUseExtension,
         subscription: sub ?? null,
       });
     }
@@ -133,6 +149,7 @@ serve(async (req) => {
         attemptId: attempt.id,
         canUseDiscount,
         canUsePause,
+        canUseExtension,
         subscription: sub ?? null,
       });
     }
@@ -165,6 +182,76 @@ serve(async (req) => {
       });
 
       return jsonResponse({ ok: true });
+    }
+
+    if (body.action === "log_offers_shown") {
+      await admin
+        .from("cancel_attempts")
+        .update({ offers_shown: body.offers, updated_at: new Date().toISOString() })
+        .eq("id", attempt.id);
+      await admin.from("analytics_events").insert({
+        user_id: user.id,
+        event_name: "retention_offers_shown",
+        event_data: { offers: body.offers, attempt_id: attempt.id },
+      });
+      return jsonResponse({ ok: true });
+    }
+
+    if (body.action === "submit_support_ticket") {
+      const { error: tErr } = await admin.from("support_tickets").insert({
+        user_id: user.id,
+        source: "cancel_flow",
+        message: body.message,
+        cancel_attempt_id: attempt.id,
+      });
+      if (tErr) throw tErr;
+      await admin
+        .from("cancel_attempts")
+        .update({ outcome: "saved_feedback", updated_at: new Date().toISOString() })
+        .eq("id", attempt.id);
+      await admin.from("analytics_events").insert({
+        user_id: user.id,
+        event_name: "support_ticket_created",
+        event_data: { source: "cancel_flow", attempt_id: attempt.id },
+      });
+      return jsonResponse({ ok: true });
+    }
+
+    if (body.action === "extend_trial") {
+      if (!canUseExtension) {
+        return jsonResponse({ error: "extension_already_used_this_year" }, 409);
+      }
+      if (!sub) return jsonResponse({ error: "no_active_subscription" }, 404);
+
+      const baseDate = sub.current_period_end
+        ? new Date(sub.current_period_end as string)
+        : new Date();
+      const newEnd = new Date(baseDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+      await admin
+        .from("subscriptions")
+        .update({ current_period_end: newEnd.toISOString() })
+        .eq("id", sub.id);
+
+      await admin.from("retention_offers_used").insert({
+        user_id: user.id,
+        offer_type: "extend_7d",
+        metadata: { days: 7, subscription_id: sub.id, new_end: newEnd.toISOString() },
+      });
+
+      await admin
+        .from("cancel_attempts")
+        .update({ outcome: "saved_extension", updated_at: new Date().toISOString() })
+        .eq("id", attempt.id);
+
+      await admin.from("analytics_events").insert({
+        user_id: user.id,
+        event_name: "retention_offer_accepted",
+        event_data: { type: "extend_7d", days: 7, attempt_id: attempt.id },
+      });
+
+      logStep("extended", { userId: user.id, days: 7 });
+      return jsonResponse({ ok: true, type: "extend_7d", days: 7, newEnd: newEnd.toISOString() });
     }
 
     if (body.action === "save_feedback") {

@@ -447,7 +447,7 @@ const Rituals = () => {
         <div className="p-3 space-y-2">
           <Progress value={progress} className="h-1.5" />
           {items.map((item: any, i: number) => (
-            <div key={item.id} className={`flex items-center gap-2 p-2 rounded-md group transition-all ${todayChecked.includes(item.id) ? "bg-green-50 dark:bg-green-950/30" : ""}`}>
+            <div key={item.id} className={`flex items-center gap-2 p-2 rounded-md group transition-all ${todayChecked.includes(item.id) ? "bg-green-50 dark:bg-[hsl(var(--rt-accent-soft))]" : ""}`}>
               <span className="text-sm">{item.icon}</span>
               <Checkbox checked={todayChecked.includes(item.id)} onCheckedChange={() => toggleRitual(type, item.id)} className="h-3.5 w-3.5" />
               <span className={`flex-1 text-xs ${todayChecked.includes(item.id) ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>

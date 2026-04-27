@@ -731,7 +731,7 @@ const DailyJournal = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-pink-400 to-rose-500 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-pink-400 to-rose-500 dark:from-pink-700 dark:to-rose-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">DIÁRIO DO DIA</span>

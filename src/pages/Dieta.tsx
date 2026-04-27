@@ -426,7 +426,7 @@ const Dieta = () => {
 
           {/* ========== JEJUM ========== */}
           {activeTab === "jejum" && <div className="space-y-4">
-            <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 rounded-xl border border-orange-200 p-4 text-center">
+            <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-500/10 dark:to-amber-500/10 rounded-xl border border-orange-200 p-4 text-center dark:border-orange-500/20">
               <h3 className="text-xs font-bold mb-3 flex items-center justify-center gap-2"><Clock className="w-4 h-4 text-orange-500" /> JEJUM INTERMITENTE</h3>
               <div className="flex justify-center gap-2 mb-4">
                 {[16, 18, 20, 24].map(h => (
@@ -436,7 +436,7 @@ const Dieta = () => {
                   </button>
                 ))}
               </div>
-              <div className="w-44 h-44 mx-auto rounded-full border-8 border-orange-200 flex items-center justify-center mb-4 relative">
+              <div className="w-44 h-44 mx-auto rounded-full border-8 border-orange-200 flex items-center justify-center mb-4 relative dark:border-orange-500/20">
                 {fastingStart && (
                   <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 176 176">
                     <circle cx="88" cy="88" r="80" fill="none" stroke="hsl(var(--primary))" strokeWidth="8" strokeDasharray={`${Math.min((fastingElapsed / (fastingGoal * 3600)) * 502, 502)} 502`} strokeLinecap="round" />
@@ -521,16 +521,16 @@ const Dieta = () => {
             {/* Recipe cards */}
             {(() => {
               const catColors: Record<string, { bg: string; border: string; darkBg: string; text: string }> = {
-                "Café": { bg: "bg-amber-50", border: "border-l-amber-400", darkBg: "dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400" },
-                "Almoço": { bg: "bg-green-50", border: "border-l-green-400", darkBg: "dark:bg-green-950/30", text: "text-green-700 dark:text-green-400" },
-                "Janta": { bg: "bg-blue-50", border: "border-l-blue-400", darkBg: "dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400" },
-                "Lanche": { bg: "bg-orange-50", border: "border-l-orange-400", darkBg: "dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400" },
-                "Doce Fit": { bg: "bg-pink-50", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
-                "Fitness": { bg: "bg-purple-50", border: "border-l-purple-400", darkBg: "dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400" },
-                "Salgado": { bg: "bg-red-50", border: "border-l-red-400", darkBg: "dark:bg-red-950/30", text: "text-red-700 dark:text-red-400" },
-                "Shake": { bg: "bg-cyan-50", border: "border-l-cyan-400", darkBg: "dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400" },
-                "Receita Rápida": { bg: "bg-emerald-50", border: "border-l-emerald-400", darkBg: "dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400" },
-                "Sobremesa": { bg: "bg-pink-50", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
+                "Café": { bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-l-amber-400", darkBg: "dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400" },
+                "Almoço": { bg: "bg-green-50 dark:bg-green-500/10", border: "border-l-green-400", darkBg: "dark:bg-green-950/30", text: "text-green-700 dark:text-green-400" },
+                "Janta": { bg: "bg-blue-50 dark:bg-blue-500/10", border: "border-l-blue-400", darkBg: "dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400" },
+                "Lanche": { bg: "bg-orange-50 dark:bg-orange-500/10", border: "border-l-orange-400", darkBg: "dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400" },
+                "Doce Fit": { bg: "bg-pink-50 dark:bg-pink-500/10", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
+                "Fitness": { bg: "bg-purple-50 dark:bg-purple-500/10", border: "border-l-purple-400", darkBg: "dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400" },
+                "Salgado": { bg: "bg-red-50 dark:bg-red-500/10", border: "border-l-red-400", darkBg: "dark:bg-red-950/30", text: "text-red-700 dark:text-red-400" },
+                "Shake": { bg: "bg-cyan-50 dark:bg-cyan-500/10", border: "border-l-cyan-400", darkBg: "dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400" },
+                "Receita Rápida": { bg: "bg-emerald-50 dark:bg-emerald-500/10", border: "border-l-emerald-400", darkBg: "dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400" },
+                "Sobremesa": { bg: "bg-pink-50 dark:bg-pink-500/10", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
               };
               const defaultColor = { bg: "bg-muted/30", border: "border-l-primary", darkBg: "", text: "text-primary" };
 
@@ -784,7 +784,7 @@ const Dieta = () => {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-bold text-muted-foreground">REFEIÇÕES PLANEJADAS ({dayName})</p>
-                        {allFollowed && <Badge className="text-[10px] bg-green-500/10 text-green-600 border-green-300">100% ✅</Badge>}
+                        {allFollowed && <Badge className="text-[10px] bg-green-500/10 text-green-600 border-green-300 dark:border-green-500/20">100% ✅</Badge>}
                       </div>
                       {plannedMeals.map(([meal, desc]) => {
                         const mealDiary = diary.meals[meal] || { followed: false, note: "" };
@@ -804,7 +804,7 @@ const Dieta = () => {
                                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
                                     mealDiary.followed
                                       ? "bg-green-100 dark:bg-green-500/20 border-green-400 text-green-600"
-                                      : "bg-muted/30 border-border text-muted-foreground hover:border-green-300"
+                                      : "bg-muted/30 border-border text-muted-foreground hover:border-green-300 dark:border-green-500/20"
                                   }`}
                                 >✅</button>
                                 <button
@@ -815,7 +815,7 @@ const Dieta = () => {
                                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
                                     !mealDiary.followed && diary.meals[meal]
                                       ? "bg-red-100 dark:bg-red-500/20 border-red-400 text-red-600"
-                                      : "bg-muted/30 border-border text-muted-foreground hover:border-red-300"
+                                      : "bg-muted/30 border-border text-muted-foreground hover:border-red-300 dark:border-red-500/20"
                                   }`}
                                 >❌</button>
                               </div>
@@ -887,8 +887,8 @@ const Dieta = () => {
                         return (
                           <div key={i} className="flex-1 text-center">
                             <div className={`w-full aspect-square rounded-lg flex items-center justify-center text-sm border ${
-                              allGood ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600" :
-                              anyMarked ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600" :
+                              allGood ? "bg-green-100 dark:bg-green-500/20 border-green-300 text-green-600 dark:border-green-500/20" :
+                              anyMarked ? "bg-red-100 dark:bg-red-500/20 border-red-300 text-red-600 dark:border-red-500/20" :
                               "bg-muted/30 border-border text-muted-foreground"
                             }`}>
                               {allGood ? "✅" : anyMarked ? "❌" : "—"}

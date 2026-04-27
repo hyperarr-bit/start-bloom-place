@@ -21,11 +21,11 @@ type Contact = { id: string; name: string; company: string; role: string; linked
 type Skill = { id: string; name: string; category: string; level: number; targetLevel: number; notes: string };
 
 const statusConfig: Record<string, { label: string; emoji: string; color: string }> = {
-  aplicado: { label: "Aplicado", emoji: "📤", color: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200" },
-  entrevista: { label: "Entrevista", emoji: "🎤", color: "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200" },
-  teste: { label: "Teste Técnico", emoji: "💻", color: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200" },
-  oferta: { label: "Oferta!", emoji: "🎉", color: "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200" },
-  rejeitado: { label: "Rejeitado", emoji: "❌", color: "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200" },
+  aplicado: { label: "Aplicado", emoji: "📤", color: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20" },
+  entrevista: { label: "Entrevista", emoji: "🎤", color: "bg-purple-100 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20" },
+  teste: { label: "Teste Técnico", emoji: "💻", color: "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/20" },
+  oferta: { label: "Oferta!", emoji: "🎉", color: "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-500/20" },
+  rejeitado: { label: "Rejeitado", emoji: "❌", color: "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/20" },
   desistiu: { label: "Desistiu", emoji: "🚪", color: "bg-muted text-muted-foreground border-border" },
 };
 

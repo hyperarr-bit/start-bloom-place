@@ -149,8 +149,56 @@
 
 @layer components {
   .table-header-dark {
-    @apply bg-foreground text-background font-semibold text-center py-2.5 text-xs uppercase tracking-widest;
+    @apply bg-foreground text-background dark:bg-muted dark:text-foreground font-semibold text-center py-2.5 text-xs uppercase tracking-widest;
   }
+
+  /* ===== Tinted surfaces — calibradas para light + dark =====
+     Padrão: fundo levemente tingido, texto legível e borda sutil em ambos os temas.
+     Use uma única classe em vez do trio bg-X-100 + text-X-700 + border-X-200. */
+  .tint-blue    { @apply bg-blue-100/70 text-blue-800 border-blue-200
+                         dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/20; }
+  .tint-sky     { @apply bg-sky-100/70 text-sky-800 border-sky-200
+                         dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20; }
+  .tint-cyan    { @apply bg-cyan-100/70 text-cyan-800 border-cyan-200
+                         dark:bg-cyan-500/10 dark:text-cyan-300 dark:border-cyan-500/20; }
+  .tint-teal    { @apply bg-teal-100/70 text-teal-800 border-teal-200
+                         dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/20; }
+  .tint-green   { @apply bg-green-100/70 text-green-800 border-green-200
+                         dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20; }
+  .tint-emerald { @apply bg-emerald-100/70 text-emerald-800 border-emerald-200
+                         dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20; }
+  .tint-lime    { @apply bg-lime-100/70 text-lime-800 border-lime-200
+                         dark:bg-lime-500/10 dark:text-lime-300 dark:border-lime-500/20; }
+  .tint-yellow  { @apply bg-yellow-100/70 text-yellow-800 border-yellow-200
+                         dark:bg-yellow-500/10 dark:text-yellow-200 dark:border-yellow-500/20; }
+  .tint-amber   { @apply bg-amber-100/70 text-amber-800 border-amber-200
+                         dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/20; }
+  .tint-orange  { @apply bg-orange-100/70 text-orange-800 border-orange-200
+                         dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/20; }
+  .tint-red     { @apply bg-red-100/70 text-red-800 border-red-200
+                         dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/20; }
+  .tint-rose    { @apply bg-rose-100/70 text-rose-800 border-rose-200
+                         dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20; }
+  .tint-pink    { @apply bg-pink-100/70 text-pink-800 border-pink-200
+                         dark:bg-pink-500/10 dark:text-pink-300 dark:border-pink-500/20; }
+  .tint-fuchsia { @apply bg-fuchsia-100/70 text-fuchsia-800 border-fuchsia-200
+                         dark:bg-fuchsia-500/10 dark:text-fuchsia-300 dark:border-fuchsia-500/20; }
+  .tint-purple  { @apply bg-purple-100/70 text-purple-800 border-purple-200
+                         dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20; }
+  .tint-violet  { @apply bg-violet-100/70 text-violet-800 border-violet-200
+                         dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/20; }
+  .tint-indigo  { @apply bg-indigo-100/70 text-indigo-800 border-indigo-200
+                         dark:bg-indigo-500/10 dark:text-indigo-300 dark:border-indigo-500/20; }
+  .tint-slate   { @apply bg-slate-100/70 text-slate-800 border-slate-200
+                         dark:bg-slate-500/15 dark:text-slate-200 dark:border-slate-500/25; }
+  .tint-gray    { @apply bg-gray-100/70 text-gray-800 border-gray-200
+                         dark:bg-gray-500/15 dark:text-gray-200 dark:border-gray-500/25; }
+  .tint-zinc    { @apply bg-zinc-100/70 text-zinc-800 border-zinc-200
+                         dark:bg-zinc-500/15 dark:text-zinc-200 dark:border-zinc-500/25; }
+  .tint-neutral { @apply bg-neutral-100/70 text-neutral-800 border-neutral-200
+                         dark:bg-neutral-500/15 dark:text-neutral-200 dark:border-neutral-500/25; }
+  .tint-stone   { @apply bg-stone-100/70 text-stone-800 border-stone-200
+                         dark:bg-stone-500/15 dark:text-stone-200 dark:border-stone-500/25; }
 
   .table-header-pink {
     @apply bg-accent text-accent-foreground font-semibold text-center py-2.5 text-xs uppercase tracking-widest;

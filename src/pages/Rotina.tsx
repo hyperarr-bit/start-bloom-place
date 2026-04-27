@@ -1176,12 +1176,12 @@ const Rotina = () => {
                     <tbody>
                       {hours.map((hour, ri) => (
                         <tr key={hour} className={`border-t border-border/30 dark:border-[hsl(var(--rt-border))] hover:bg-muted/20 dark:hover:bg-[hsl(var(--rt-card-2))] ${ri % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/40" : ""}`}>
-                          <td className="px-2 py-1.5 font-mono font-bold text-muted-foreground dark:text-[hsl(var(--rt-text-soft))] border-r border-border/30 dark:border-[hsl(var(--rt-border))] bg-pink-50/30 dark:bg-transparent">{hour}</td>
+                          <td className="px-2 py-1.5 font-mono font-bold text-muted-foreground dark:text-[hsl(var(--rt-text-soft))] border-r border-border/30 dark:border-[hsl(var(--rt-border))] bg-pink-50/30 dark:bg-transparent dark:bg-pink-500/10">{hour}</td>
                           {scheduleDays.map((day) => {
                             const isEditing = editingCell?.hour === hour && editingCell?.day === day;
                             const value = schedule[hour]?.[day] || "";
                             return (
-                              <td key={day} className="px-1 py-1 border-r border-border/20 dark:border-[hsl(var(--rt-border))] cursor-pointer hover:bg-pink-50/50 dark:hover:bg-[hsl(330,30%,18%)]/40 transition-colors" onClick={() => !isEditing && startEditCell(hour, day)}>
+                              <td key={day} className="px-1 py-1 border-r border-border/20 dark:border-[hsl(var(--rt-border))] cursor-pointer hover:bg-pink-50/50 dark:hover:bg-[hsl(330,30%,18%)]/40 transition-colors dark:bg-pink-500/10" onClick={() => !isEditing && startEditCell(hour, day)}>
                                 {isEditing ? (
                                   <Input value={editCellValue} onChange={(e) => setEditCellValue(e.target.value)} onBlur={saveEditCell} onKeyDown={(e) => { if (e.key === "Enter") saveEditCell(); if (e.key === "Escape") setEditingCell(null); }} className="h-5 text-[10px] border-0 bg-background dark:bg-[hsl(var(--rt-surface))] shadow-sm px-1" autoFocus />
                                 ) : value ? (

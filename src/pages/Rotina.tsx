@@ -916,7 +916,7 @@ const WeeklyReview = () => {
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center justify-between">
+      <div className="bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-700 dark:to-teal-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Star className="w-4 h-4 text-white" />
           <span className="font-bold text-sm text-white">REVISÃO DA SEMANA</span>

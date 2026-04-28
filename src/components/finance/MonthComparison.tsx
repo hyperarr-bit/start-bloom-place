@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { ArrowLeftRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { getMonthTotals, getFinanceStorageKeys } from "@/components/finance/storage-keys";
+import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
+import { useAuth } from "@/hooks/use-auth";
 
 const ALL_MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -36,17 +37,10 @@ interface CategoryData {
   monthB: number;
 }
 
-const getExpensesByCategory = (month: string): Record<string, number> => {
+const getExpensesByCategory = (month: string, userId: string | null): Record<string, number> => {
   const keys = getFinanceStorageKeys(month);
-  const parse = (k: string) => {
-    try {
-      const raw = localStorage.getItem(k);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  };
-
-  const expenses = parse(keys.expenses);
-  const fixed = parse(keys.fixed);
+  const expenses = readMonthData(userId, keys.expenses) || [];
+  const fixed = readMonthData(userId, keys.fixed) || [];
   const grouped: Record<string, number> = {};
 
   expenses.forEach((e: any) => {
@@ -64,18 +58,20 @@ const getExpensesByCategory = (month: string): Record<string, number> => {
 const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
 
 export const MonthComparison = () => {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const currentIdx = new Date().getMonth();
   const prevIdx = currentIdx === 0 ? 11 : currentIdx - 1;
 
   const [monthA, setMonthA] = useState(ALL_MONTHS[prevIdx]);
   const [monthB, setMonthB] = useState(ALL_MONTHS[currentIdx]);
 
-  const totalsA = useMemo(() => getMonthTotals(monthA), [monthA]);
-  const totalsB = useMemo(() => getMonthTotals(monthB), [monthB]);
+  const totalsA = useMemo(() => getMonthTotals(monthA, userId), [monthA, userId]);
+  const totalsB = useMemo(() => getMonthTotals(monthB, userId), [monthB, userId]);
 
   const categoryComparison = useMemo(() => {
-    const catsA = getExpensesByCategory(monthA);
-    const catsB = getExpensesByCategory(monthB);
+    const catsA = getExpensesByCategory(monthA, userId);
+    const catsB = getExpensesByCategory(monthB, userId);
     const allCats = new Set([...Object.keys(catsA), ...Object.keys(catsB)]);
 
     const data: CategoryData[] = [];
@@ -89,7 +85,7 @@ export const MonthComparison = () => {
     });
 
     return data.sort((a, b) => (b.monthA + b.monthB) - (a.monthA + a.monthB));
-  }, [monthA, monthB]);
+  }, [monthA, monthB, userId]);
 
   const maxCatValue = useMemo(() => {
     return Math.max(1, ...categoryComparison.map((c) => Math.max(c.monthA, c.monthB)));

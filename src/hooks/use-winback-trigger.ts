@@ -16,6 +16,7 @@ export function useWinbackTrigger() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const triggeringRef = useRef(false);
+  const { trialExpired } = useAuth();
 
   const markIntent = useCallback(() => {
     try {

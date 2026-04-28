@@ -1,83 +1,80 @@
-## O que aconteceu (diagnóstico)
+## Plano: Hardening de segurança + auditoria LGPD
 
-Reproduzi o bug lendo o código. Os dados do usuário antigo (`jv20101958`) "vazaram" para a nova conta (`store.street.brasil`) por causa de **três falhas combinadas** no `useUserData` + `useAuth`:
+### Parte 1 — Aplicar correções de segurança pendentes
 
-### Falha 1 — `signOut` não limpa o localStorage
-`src/hooks/use-auth.tsx` (linha ~95) só chama `supabase.auth.signOut()`. Não apaga nada do `localStorage`.
+**1.1 Migration SQL**
 
-### Falha 2 — `useUserData` espelha tudo no localStorage **sem prefixar por usuário**
-`src/hooks/use-user-data.tsx` (linhas 73 e 124):
-```ts
-localStorage.setItem(row.key, JSON.stringify(row.value));
+Adicionar políticas RLS explícitas que **negam** escrita em `user_roles` por usuários autenticados (defesa em profundidade contra escalonamento de privilégio):
+
+```sql
+-- Bloqueia INSERT/UPDATE/DELETE em user_roles para qualquer usuário logado.
+-- Apenas service_role (edge functions com SUPABASE_SERVICE_ROLE_KEY) pode escrever.
+CREATE POLICY "Deny insert user_roles to authenticated"
+  ON public.user_roles FOR INSERT TO authenticated
+  WITH CHECK (false);
+
+CREATE POLICY "Deny update user_roles to authenticated"
+  ON public.user_roles FOR UPDATE TO authenticated
+  USING (false) WITH CHECK (false);
+
+CREATE POLICY "Deny delete user_roles to authenticated"
+  ON public.user_roles FOR DELETE TO authenticated
+  USING (false);
 ```
-Salva chaves cruas (`finance-incomes`, `home-name`, etc.) — mesmas chaves para qualquer usuário.
 
-### Falha 3 — `get()` lê do localStorage como fallback antes do Supabase carregar
-`src/hooks/use-user-data.tsx` linha 113-118:
-```ts
-const get = (key, fallback) => {
-  if (key in store) return store[key];
-  const raw = localStorage.getItem(key);  // ← lê o lixo do usuário anterior
-  return raw ? JSON.parse(raw) : fallback;
-};
+Adicionar política `UPDATE` faltante no bucket `receipts` (escopo dono):
+
+```sql
+CREATE POLICY "Owners update own receipts"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'receipts' AND auth.uid() = owner)
+  WITH CHECK (bucket_id = 'receipts' AND auth.uid() = owner);
 ```
 
-### Sequência do bug
-1. Você logou no `jv20101958` → todos os dados (financeiro, nome, etc.) foram gravados em `localStorage` com chaves globais.
-2. Logout → `localStorage` permaneceu intacto.
-3. Login no `store.street.brasil` → antes do `useUserData` terminar de buscar do Supabase, todos os componentes chamaram `usePersistedState` / `get()`, que retornaram os valores do `jv20101958` do `localStorage`.
-4. Conforme você navegava, qualquer escrita (`set()`) gravava no Supabase **da conta nova** com os valores **da conta antiga** → contaminação permanente no banco.
+**1.2 Limpeza de ruído no scanner**
 
-Por isso o nome, finanças, etc. apareceram na conta nova — e provavelmente já foram persistidos no Supabase do `store.street.brasil`.
+Marcar como "ignored" os ~24 avisos `SECURITY DEFINER` (todas as funções `admin_*` já checam `has_role(auth.uid(), 'admin')` internamente) e o aviso de `app_config` (RLS ativo, sem policy = nada acessível por usuários).
 
 ---
 
-## Plano de correção
+### Parte 2 — Auditoria LGPD detalhada
 
-### 1. Prefixar todas as chaves do localStorage por `user_id`
-Em `src/hooks/use-user-data.tsx`, criar helper `lsKey(userId, key) => `u:${userId}:${key}`` e usar em **todas** as leituras/escritas locais. Sem `userId`, não lê nem escreve no localStorage (apenas memória).
+Após aplicar as correções acima, executarei uma análise sistemática focada em LGPD/vazamento de dados pessoais. Vou inspecionar:
 
-Resultado: dados de um usuário ficam fisicamente isolados dos de outro no navegador.
+**2.1 Banco de dados**
+- Listar todas as tabelas com colunas que contêm dados pessoais (email, telefone, CPF/`tax_id`, nome, fotos, financeiro, saúde, dieta, hábitos, relacionamentos).
+- Validar que **toda** tabela com dado pessoal tem RLS ativa + policy `auth.uid() = user_id` em SELECT/UPDATE/DELETE.
+- Validar que `INSERT` exige `user_id = auth.uid()` (sem cláusulas permissivas).
+- Conferir buckets de storage (`skin-photos`, `receipts`): privados + policies escopadas por owner em todas as operações.
+- Conferir funções `SECURITY DEFINER` que retornam dados de outros usuários — confirmar que todas exigem `has_role(_, 'admin')` antes de retornar linhas.
 
-### 2. Limpar localStorage no logout e na troca de usuário
-- No `signOut` (`use-auth.tsx`): remover todas as chaves `u:*` e chaves legadas conhecidas (`finance-*`, `home-*`, `core-welcome-done`, etc.). Manter só preferências neutras como tema.
-- No `onAuthStateChange`, quando o `user.id` mudar (de A para B, ou de logado para deslogado), limpar o `store` em memória do `UserDataProvider` e o cache local do usuário anterior.
+**2.2 Edge functions**
+- Inspecionar todas as funções em `supabase/functions/*` que usam `SUPABASE_SERVICE_ROLE_KEY` para garantir que filtram por `user_id` antes de retornar/mutar dados, e que validam o JWT do chamador (não confiam em `user_id` vindo do body).
+- Validar webhooks (`abacatepay-webhook`) — confirmar verificação de assinatura/segredo.
 
-### 3. Não usar localStorage como fallback antes do Supabase carregar
-Em `useUserData.get()`: se `loaded === false` e a chave não está no `store`, retornar o `fallback` direto (sem ler localStorage). Só ler localStorage quando ele já estiver corretamente prefixado pelo usuário atual.
+**2.3 Frontend**
+- Verificar se há logs de `console.log` com dados sensíveis (email, valores financeiros, CPF).
+- Confirmar que após correção do bug multi-conta, `localStorage` está 100% namespaceado por `user_id` e que não há leitura de chaves legadas sem prefixo.
+- Verificar `purgeUserLocalCache` no logout/troca de conta.
 
-`usePersistedState` já tem o flag `hydratedRef` — vai re-hidratar com os dados certos do Supabase quando `loaded` virar `true`.
+**2.4 Auth & e-mail**
+- Validar que o redirect do e-mail de confirmação aponta para domínio próprio (não Supabase default).
+- Confirmar que não há exposição de PII em URLs de redirect.
 
-### 4. Migração das chaves antigas (não-prefixadas) → descartar
-Na primeira vez que um usuário logar após o fix, apagar do localStorage todas as chaves não-prefixadas conhecidas (`finance-*`, `home-*`, `core-*`, etc.) — elas são lixo da conta anterior. O Supabase é a fonte da verdade, então nenhum dado real é perdido.
+**2.5 Dados residuais da contaminação anterior**
+- Re-auditar contas afetadas (`store.street.brasil`, `jv20101958@gmail.com`) no `user_data` para confirmar que não restou nenhuma chave cruzada.
 
-### 5. Limpeza dos dados contaminados no Supabase da conta `store.street.brasil`
-Esse fix **previne novos vazamentos**, mas o banco do `store.street.brasil` já recebeu dados do `jv`. Vou precisar:
-- Listar com você o que está contaminado (rodar um SELECT em `user_data` filtrando pelo `user_id` do `store.street.brasil`).
-- Você decide o que apagar (provavelmente quase tudo, já que a conta era nova).
-
-Faço isso depois do fix de código, num passo separado.
-
----
-
-## Detalhes técnicos
-
-**Arquivos alterados:**
-- `src/hooks/use-user-data.tsx` — prefixar chaves, não ler LS antes do load, limpar ao trocar de user
-- `src/hooks/use-auth.tsx` — limpar LS no `signOut`
-
-**Arquivos a auditar (usam localStorage cru, podem precisar de ajuste menor):**
-- `src/components/home/AccountDrawer.tsx`
-- `src/pages/Auth.tsx` (chave `core-welcome-done` — passar a ser por usuário)
-- `src/components/finance/storage-keys.ts` + `MonthComparison.tsx` + `MonthTurnover.tsx` (leem `finance-*` cru — vão precisar consultar via `useUserData` ou ler com prefixo)
-- `src/hooks/use-daily-nudge.ts`, `src/hooks/use-offline-queue.ts`, `src/components/MonthlyBudget.tsx`, `src/components/casa/HomeUtilities.tsx`
-
-**Sem mudança de schema** no Supabase. Apenas código cliente + uma limpeza pontual de dados.
+**2.6 Entrega**
+Relatório em chat com:
+- ✅ Itens conformes
+- ⚠️ Riscos médios (com correção sugerida)
+- 🔴 Vazamentos críticos (com migration/patch imediato)
+- Lista de chaves de `user_data` ainda contaminadas (se houver) + ação proposta (deletar).
 
 ---
 
-## Próximo passo
+### Arquivos/recursos que serão tocados na Parte 1
+- Nova migration SQL (`user_roles` deny policies + `receipts` update policy).
+- Atualizações no scanner de segurança (ignore tags) — não toca código.
 
-Se aprovar, eu:
-1. Implemento o fix completo (itens 1–4).
-2. Em seguida, rodo um SELECT no `user_data` da conta `store.street.brasil` e te mostro o que está lá pra você decidir o que apagar.
+A Parte 2 é apenas leitura/auditoria; qualquer correção encontrada vira um plano novo para sua aprovação antes de executar.

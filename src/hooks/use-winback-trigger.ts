@@ -40,6 +40,7 @@ export function useWinbackTrigger() {
     source: Source,
     opts?: { bypassCooldown?: boolean },
   ): Promise<boolean> => {
+    if (!trialExpired) return false; // só dispara após trial expirar
     if (open || triggeringRef.current) return false;
     triggeringRef.current = true;
 

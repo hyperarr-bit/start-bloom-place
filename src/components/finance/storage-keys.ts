@@ -1,7 +1,8 @@
-// Shared finance storage key utilities
-// Keys include the year to separate data across years.
-// Current month uses base keys (backward-compatible).
-// Other months use year-prefixed keys: finance-{year}-{monthkey}-{type}
+// Shared finance storage key utilities.
+//
+// IMPORTANT: All app data is stored in localStorage under a per-user prefix
+// (`u:{userId}:{key}`) to prevent cross-account leakage on shared browsers.
+// The helpers below accept a `userId` argument to build the right key.
 
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -18,6 +19,10 @@ export const isCurrentMonth = (month: string) => month === getCurrentMonthName()
 /**
  * Migrate old format keys (finance-month-{monthkey}-*) to year-prefixed format.
  * Runs once per session. Old keys are removed after migration.
+ *
+ * NOTE: This migration only touches non-prefixed legacy keys. Per-user
+ * namespaced keys (`u:...`) are written by the user-data hook and do not need
+ * to be migrated here.
  */
 const MIGRATION_FLAG = "finance-keys-migrated-v2";
 
@@ -27,9 +32,7 @@ export const migrateOldKeys = () => {
 
   const currentYear = getCurrentYear();
   const currentMonthIdx = new Date().getMonth();
-  const suffixes = ["incomes", "expenses", "fixed", "dueDays", "notes", "installments"];
 
-  // Find all old-format keys: finance-month-{monthkey}-{suffix}
   const oldKeyPattern = /^finance-month-([a-z]+)-(.+)$/;
   const keysToMigrate: { oldKey: string; newKey: string }[] = [];
 
@@ -42,25 +45,14 @@ export const migrateOldKeys = () => {
     const monthKey = match[1];
     const suffix = match[2];
 
-    // Find which month this corresponds to
     const monthIdx = monthNames.findIndex(m => getMonthKey(m) === monthKey);
     if (monthIdx === -1) continue;
 
-    // Determine which year this data belongs to.
-    // App launched in 2025. If month > current month index, it's likely from prev year.
-    // e.g., we're in April 2026 (idx 3), Sep/Nov/Dec (idx 8,10,11) → 2025
-    let year: number;
-    if (monthIdx > currentMonthIdx) {
-      year = currentYear - 1; // previous year
-    } else {
-      year = currentYear; // current year
-    }
-
+    const year = monthIdx > currentMonthIdx ? currentYear - 1 : currentYear;
     const newKey = `finance-${year}-${monthKey}-${suffix}`;
     keysToMigrate.push({ oldKey: key, newKey });
   }
 
-  // Perform migration
   for (const { oldKey, newKey } of keysToMigrate) {
     const value = localStorage.getItem(oldKey);
     if (value && !localStorage.getItem(newKey)) {
@@ -72,13 +64,13 @@ export const migrateOldKeys = () => {
   localStorage.setItem(MIGRATION_FLAG, "1");
 };
 
-// Run migration on load
 migrateOldKeys();
 
 /**
- * Returns the storage key prefix for a given month and year.
- * Current month of current year → uses base keys (backward-compatible)
- * Other months → uses year-prefixed keys: finance-{year}-{monthkey}-{type}
+ * Returns the LOGICAL storage key prefix for a given month and year.
+ * These are the keys used inside `useUserData` (Supabase) — they are NOT the
+ * physical localStorage keys. To read from localStorage directly, wrap each
+ * key with `userKeyOf(userId, key)`.
  */
 export const getFinanceStorageKeys = (month: string, year?: number) => {
   const targetYear = year ?? getCurrentYear();
@@ -107,21 +99,40 @@ export const getFinanceStorageKeys = (month: string, year?: number) => {
 };
 
 /**
- * Read month totals from localStorage
+ * Build the physical localStorage key for a given user + logical key.
+ * Returns null when no user is provided (caller should treat as "no data").
  */
-export const getMonthTotals = (month: string, year?: number) => {
-  const keys = getFinanceStorageKeys(month, year);
-  const parse = (k: string) => {
-    try {
-      const raw = localStorage.getItem(k);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
-  };
+export const userKeyOf = (userId: string | null | undefined, logicalKey: string): string | null => {
+  if (!userId) return null;
+  return `u:${userId}:${logicalKey}`;
+};
 
-  const incomes = parse(keys.incomes);
-  const expenses = parse(keys.expenses);
-  const fixed = parse(keys.fixed);
-  const installments = parse(keys.installments);
+const readJsonForUser = (userId: string | null | undefined, logicalKey: string): any => {
+  const k = userKeyOf(userId, logicalKey);
+  if (!k) return null;
+  try {
+    const raw = localStorage.getItem(k);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+};
+
+const writeJsonForUser = (userId: string | null | undefined, logicalKey: string, value: any) => {
+  const k = userKeyOf(userId, logicalKey);
+  if (!k) return;
+  try { localStorage.setItem(k, JSON.stringify(value)); } catch {}
+};
+
+/**
+ * Read month totals from localStorage for the given user.
+ * Returns zeros when no user / no data.
+ */
+export const getMonthTotals = (month: string, userId: string | null | undefined, year?: number) => {
+  const keys = getFinanceStorageKeys(month, year);
+
+  const incomes = readJsonForUser(userId, keys.incomes) || [];
+  const expenses = readJsonForUser(userId, keys.expenses) || [];
+  const fixed = readJsonForUser(userId, keys.fixed) || [];
+  const installments = readJsonForUser(userId, keys.installments) || [];
 
   return {
     receitas: incomes.reduce((s: number, i: any) => s + (i.value || 0), 0),
@@ -135,3 +146,9 @@ export const getMonthTotals = (month: string, year?: number) => {
     ),
   };
 };
+
+// Helpers re-exported for callers that need to read/write raw arrays.
+export const readMonthData = (userId: string | null | undefined, logicalKey: string) =>
+  readJsonForUser(userId, logicalKey);
+export const writeMonthData = (userId: string | null | undefined, logicalKey: string, value: any) =>
+  writeJsonForUser(userId, logicalKey, value);

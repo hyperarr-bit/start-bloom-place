@@ -34,6 +34,89 @@ const checkActivation = (key: string, value: any) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Per-user localStorage helpers.
+// All app data is namespaced under `u:{userId}:{key}` so that two accounts on
+// the same browser cannot read each other's cached values.
+//
+// Keys that are intentionally global (i.e. not user data) and should NOT be
+// purged on logout/user switch:
+//   - "core-welcome-done"        (one-time onboarding splash)
+//   - "theme"                    (light/dark preference)
+//   - "vite-ui-theme"            (theme persistence by ui lib)
+//   - "finance-keys-migrated-v2" (one-time legacy migration flag)
+// ---------------------------------------------------------------------------
+const GLOBAL_KEY_ALLOWLIST = new Set<string>([
+  "core-welcome-done",
+  "theme",
+  "vite-ui-theme",
+  "finance-keys-migrated-v2",
+]);
+
+const userKey = (userId: string, key: string) => `u:${userId}:${key}`;
+
+const safeGetItem = (k: string): string | null => {
+  try { return localStorage.getItem(k); } catch { return null; }
+};
+const safeSetItem = (k: string, v: string) => {
+  try { localStorage.setItem(k, v); } catch {}
+};
+const safeRemoveItem = (k: string) => {
+  try { localStorage.removeItem(k); } catch {}
+};
+
+/**
+ * Read a value from the current user's namespaced localStorage cache.
+ * Exported so non-React code (e.g. finance helpers) can stay in sync.
+ */
+export const readUserLocal = (userId: string | null | undefined, key: string): any => {
+  if (!userId) return null;
+  const raw = safeGetItem(userKey(userId, key));
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+};
+
+/**
+ * Write a value to the current user's namespaced localStorage cache.
+ * Used by helpers that mutate user data outside the React tree.
+ */
+export const writeUserLocal = (userId: string | null | undefined, key: string, value: any) => {
+  if (!userId) return;
+  safeSetItem(userKey(userId, key), JSON.stringify(value));
+};
+
+/**
+ * Purge every cached entry that belongs to a user namespace, plus any legacy
+ * non-prefixed app data keys left over from before the multi-user fix.
+ * Global preferences (see GLOBAL_KEY_ALLOWLIST) are preserved.
+ */
+export const purgeUserLocalCache = () => {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (GLOBAL_KEY_ALLOWLIST.has(k)) continue;
+      // Per-user namespace, OR legacy app keys (anything that looks like our
+      // historical data: finance-*, home-*, core-*, life-*, etc.).
+      if (
+        k.startsWith("u:") ||
+        k.startsWith("finance-") ||
+        k.startsWith("home-") ||
+        k.startsWith("core-") ||
+        k.startsWith("life-") ||
+        k.startsWith("module-") ||
+        k.startsWith("daily-") ||
+        k.startsWith("offline-") ||
+        k.startsWith("nudge-")
+      ) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(safeRemoveItem);
+  } catch {}
+};
+
 interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
   set: (key: string, value: any) => void;
@@ -51,26 +134,54 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const pendingWrites = useRef<Record<string, any>>({});
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userRef = useRef(user);
-  userRef.current = user;
+  const lastUserIdRef = useRef<string | null>(null);
 
-  // Load all data from Supabase on auth
+  // Keep the ref in sync AND react to user changes (login, logout, switch).
+  useEffect(() => {
+    const prevUserId = lastUserIdRef.current;
+    const nextUserId = user?.id ?? null;
+    userRef.current = user;
+
+    // First mount with a user: nothing to clear.
+    // User switched (incl. logout): wipe in-memory store and the previous
+    // user's local cache so nothing leaks into the next session.
+    if (prevUserId !== nextUserId) {
+      // Cancel any pending writes from the previous user — those would otherwise
+      // get re-attributed to the new one.
+      if (flushTimer.current) {
+        clearTimeout(flushTimer.current);
+        flushTimer.current = null;
+      }
+      pendingWrites.current = {};
+      setStore({});
+      setLoaded(false);
+      // Always purge to be safe (also clears legacy non-prefixed keys).
+      purgeUserLocalCache();
+      lastUserIdRef.current = nextUserId;
+    }
+  }, [user]);
+
+  // Load all data from Supabase whenever the active user changes.
   useEffect(() => {
     if (!user) {
       setLoaded(true);
       return;
     }
 
+    let cancelled = false;
     const loadFromSupabase = async () => {
       const { data, error } = await (supabase as any)
         .from("user_data")
         .select("key, value")
         .eq("user_id", user.id);
 
+      if (cancelled) return;
+
       if (!error && data) {
         const map: Record<string, any> = {};
         data.forEach((row: any) => {
           map[row.key] = row.value;
-          try { localStorage.setItem(row.key, JSON.stringify(row.value)); } catch {}
+          safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
         });
         setStore(map);
       } else if (error) {
@@ -80,17 +191,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadFromSupabase();
+    return () => { cancelled = true; };
   }, [user]);
 
   // Persist a single key (with retry on failure).
   const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0) => {
+    // Defensive: if the active user changed mid-flight, drop the write rather
+    // than attribute it to the new user.
+    if (userRef.current?.id !== userId) return;
     const { error } = await (supabase as any)
       .from("user_data")
       .upsert({ user_id: userId, key, value }, { onConflict: "user_id,key" });
     if (error) {
       console.error(`[user-data] upsert failed for "${key}" (attempt ${attempt + 1}):`, error);
       if (attempt < 2) {
-        // Re-queue with exponential backoff
         setTimeout(() => persistKey(userId, key, value, attempt + 1), 500 * Math.pow(2, attempt));
       }
     }
@@ -111,23 +225,24 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
   const get = useCallback(<T,>(key: string, fallback: T): T => {
     if (key in store) return store[key] as T;
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : fallback;
-    } catch {
-      return fallback;
-    }
-  }, [store]);
+    // Only fall back to localStorage when we have a user AND we've already
+    // loaded from Supabase at least once. Otherwise we risk returning stale
+    // data from a previous session/account before hydration completes.
+    const userId = userRef.current?.id;
+    if (!userId || !loaded) return fallback;
+    const raw = safeGetItem(userKey(userId, key));
+    if (!raw) return fallback;
+    try { return JSON.parse(raw) as T; } catch { return fallback; }
+  }, [store, loaded]);
 
   const set = useCallback((key: string, value: any) => {
     setStore(prev => ({ ...prev, [key]: value }));
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-
-    if (userRef.current) {
+    const userId = userRef.current?.id;
+    if (userId) {
+      safeSetItem(userKey(userId, key), JSON.stringify(value));
       pendingWrites.current[key] = value;
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, DEBOUNCE_MS);
-      // Fire-and-forget activation tracking
       checkActivation(key, value);
     }
   }, [flush]);

@@ -2,6 +2,34 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+// Purge cached user data on sign-out so nothing leaks across accounts on the
+// same browser. Kept inline (no import from use-user-data) to avoid a circular
+// hook dependency.
+const purgeLocalUserCache = () => {
+  try {
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2"]);
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || KEEP.has(k)) continue;
+      if (
+        k.startsWith("u:") ||
+        k.startsWith("finance-") ||
+        k.startsWith("home-") ||
+        k.startsWith("core-") ||
+        k.startsWith("life-") ||
+        k.startsWith("module-") ||
+        k.startsWith("daily-") ||
+        k.startsWith("offline-") ||
+        k.startsWith("nudge-")
+      ) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+  } catch {}
+};
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -96,6 +124,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    // Wipe per-user cached data BEFORE the auth state changes so the next
+    // account that signs in on this browser starts from a clean slate.
+    purgeLocalUserCache();
     await supabase.auth.signOut();
   };
 

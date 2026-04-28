@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { useAuth } from "@/hooks/use-auth";
 
 const INTENT_KEY = "subscribe_intent_at";
 const INTENT_WINDOW_MS = 10 * 60 * 1000; // 10 min

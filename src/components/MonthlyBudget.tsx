@@ -1,5 +1,6 @@
 import { FileText, ChevronRight } from "lucide-react";
-import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
+import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear, readMonthData } from "@/components/finance/storage-keys";
+import { useAuth } from "@/hooks/use-auth";
 
 interface MonthBudget {
   month: string;
@@ -15,17 +16,17 @@ interface MonthlyBudgetProps {
 
 const currentMonthIndex = new Date().getMonth();
 
-const hasMonthData = (month: string) => {
+const hasMonthData = (userId: string | null, month: string) => {
   const keys = getFinanceStorageKeys(month, getCurrentYear());
-  try {
-    const incomes = JSON.parse(localStorage.getItem(keys.incomes) || "[]");
-    const expenses = JSON.parse(localStorage.getItem(keys.expenses) || "[]");
-    const fixed = JSON.parse(localStorage.getItem(keys.fixed) || "[]");
-    return incomes.length > 0 || expenses.length > 0 || fixed.length > 0;
-  } catch { return false; }
+  const incomes = readMonthData(userId, keys.incomes) || [];
+  const expenses = readMonthData(userId, keys.expenses) || [];
+  const fixed = readMonthData(userId, keys.fixed) || [];
+  return incomes.length > 0 || expenses.length > 0 || fixed.length > 0;
 };
 
 export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudgetProps) => {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   return (
     <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in">
       <div className="bg-accent/20 border-b border-border px-4 py-2 flex items-center gap-2">
@@ -34,7 +35,7 @@ export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudge
       </div>
       <div className="divide-y divide-border/50">
         {budgets.map((b, i) => {
-          const hasData = hasMonthData(b.month);
+          const hasData = hasMonthData(userId, b.month);
           const isCurrent = i === currentMonthIndex;
           return (
             <button

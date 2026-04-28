@@ -1,37 +1,83 @@
-## Problema
+## O que aconteceu (diagnóstico)
 
-A roleta de winback está aparecendo cedo demais. Hoje, em `src/hooks/use-winback-trigger.ts`, o `useEffect` que dispara automaticamente abre a roleta sempre que:
+Reproduzi o bug lendo o código. Os dados do usuário antigo (`jv20101958`) "vazaram" para a nova conta (`store.street.brasil`) por causa de **três falhas combinadas** no `useUserData` + `useAuth`:
 
-- a URL contém `?canceled=true` (volta do checkout cancelado), **ou**
-- existe um "intent recente" salvo em `sessionStorage` (clicou em Assinar nos últimos 10 min)
+### Falha 1 — `signOut` não limpa o localStorage
+`src/hooks/use-auth.tsx` (linha ~95) só chama `supabase.auth.signOut()`. Não apaga nada do `localStorage`.
 
-Isso roda mesmo durante o trial ativo, então usuários que só clicaram em Assinar (ou voltaram do checkout) veem a roleta antes da hora.
+### Falha 2 — `useUserData` espelha tudo no localStorage **sem prefixar por usuário**
+`src/hooks/use-user-data.tsx` (linhas 73 e 124):
+```ts
+localStorage.setItem(row.key, JSON.stringify(row.value));
+```
+Salva chaves cruas (`finance-incomes`, `home-name`, etc.) — mesmas chaves para qualquer usuário.
 
-## Regra desejada
+### Falha 3 — `get()` lê do localStorage como fallback antes do Supabase carregar
+`src/hooks/use-user-data.tsx` linha 113-118:
+```ts
+const get = (key, fallback) => {
+  if (key in store) return store[key];
+  const raw = localStorage.getItem(key);  // ← lê o lixo do usuário anterior
+  return raw ? JSON.parse(raw) : fallback;
+};
+```
 
-A roleta só pode abrir quando o **trial realmente expirou** — ou seja, no mesmo momento em que o `TrialBanner` mostra a tela de "trial acabou". Antes disso, nunca.
+### Sequência do bug
+1. Você logou no `jv20101958` → todos os dados (financeiro, nome, etc.) foram gravados em `localStorage` com chaves globais.
+2. Logout → `localStorage` permaneceu intacto.
+3. Login no `store.street.brasil` → antes do `useUserData` terminar de buscar do Supabase, todos os componentes chamaram `usePersistedState` / `get()`, que retornaram os valores do `jv20101958` do `localStorage`.
+4. Conforme você navegava, qualquer escrita (`set()`) gravava no Supabase **da conta nova** com os valores **da conta antiga** → contaminação permanente no banco.
 
-O `useAuth()` já expõe a flag correta: `trialExpired: boolean` (vinda da edge function `check-subscription` via `data.trial_expired`). É essa a única fonte de verdade que devemos usar.
+Por isso o nome, finanças, etc. apareceram na conta nova — e provavelmente já foram persistidos no Supabase do `store.street.brasil`.
 
-## Mudança
+---
 
-Em `src/hooks/use-winback-trigger.ts`:
+## Plano de correção
 
-1. Importar `useAuth` e ler `trialExpired` (e `isSubscribed`, para sair cedo se já é assinante).
-2. No `useEffect` de auto-trigger, adicionar guard: **se `!trialExpired`, retornar sem fazer nada** (não abre, não consome `?canceled=true`, não toca em `sessionStorage`).
-3. Em `triggerNow`, adicionar a mesma guarda no início: se `!trialExpired`, retornar `false`. Isso protege qualquer chamada manual futura de também respeitar a regra.
-4. Manter intacto: cooldown de 30 dias, checagem de assinatura ativa, criação do registro em `winback_attempts`, limpeza do `sessionStorage` e do `?canceled=true` na URL — tudo isso continua, só passa a só rodar quando o trial expirou.
+### 1. Prefixar todas as chaves do localStorage por `user_id`
+Em `src/hooks/use-user-data.tsx`, criar helper `lsKey(userId, key) => `u:${userId}:${key}`` e usar em **todas** as leituras/escritas locais. Sem `userId`, não lê nem escreve no localStorage (apenas memória).
 
-`markIntent()` continua existindo (usado por `TrialBanner`/`Planos` para marcar a intenção quando o usuário clica em Assinar), mas só vira gatilho real depois do trial expirar.
+Resultado: dados de um usuário ficam fisicamente isolados dos de outro no navegador.
 
-## Resultado esperado
+### 2. Limpar localStorage no logout e na troca de usuário
+- No `signOut` (`use-auth.tsx`): remover todas as chaves `u:*` e chaves legadas conhecidas (`finance-*`, `home-*`, `core-welcome-done`, etc.). Manter só preferências neutras como tema.
+- No `onAuthStateChange`, quando o `user.id` mudar (de A para B, ou de logado para deslogado), limpar o `store` em memória do `UserDataProvider` e o cache local do usuário anterior.
 
-- Durante o trial (dia 1 a 7, com tempo restante): clicar em Assinar e voltar com `?canceled=true` **não** abre a roleta.
-- No momento em que `trialExpired === true` (a tela "seu trial acabou" do `TrialBanner` aparece): a roleta dispara conforme as regras de cooldown já existentes.
-- Assinantes ativos (`isSubscribed`) continuam nunca vendo a roleta (já garantido pela checagem de `subscriptions` dentro de `triggerNow`).
+### 3. Não usar localStorage como fallback antes do Supabase carregar
+Em `useUserData.get()`: se `loaded === false` e a chave não está no `store`, retornar o `fallback` direto (sem ler localStorage). Só ler localStorage quando ele já estiver corretamente prefixado pelo usuário atual.
 
-## Arquivos alterados
+`usePersistedState` já tem o flag `hydratedRef` — vai re-hidratar com os dados certos do Supabase quando `loaded` virar `true`.
 
-- `src/hooks/use-winback-trigger.ts` (única mudança)
+### 4. Migração das chaves antigas (não-prefixadas) → descartar
+Na primeira vez que um usuário logar após o fix, apagar do localStorage todas as chaves não-prefixadas conhecidas (`finance-*`, `home-*`, `core-*`, etc.) — elas são lixo da conta anterior. O Supabase é a fonte da verdade, então nenhum dado real é perdido.
 
-Nenhuma migração de banco, nenhuma edge function, nenhum outro componente precisa mudar. `GlobalWinback` e `WinbackFlow` continuam iguais.
+### 5. Limpeza dos dados contaminados no Supabase da conta `store.street.brasil`
+Esse fix **previne novos vazamentos**, mas o banco do `store.street.brasil` já recebeu dados do `jv`. Vou precisar:
+- Listar com você o que está contaminado (rodar um SELECT em `user_data` filtrando pelo `user_id` do `store.street.brasil`).
+- Você decide o que apagar (provavelmente quase tudo, já que a conta era nova).
+
+Faço isso depois do fix de código, num passo separado.
+
+---
+
+## Detalhes técnicos
+
+**Arquivos alterados:**
+- `src/hooks/use-user-data.tsx` — prefixar chaves, não ler LS antes do load, limpar ao trocar de user
+- `src/hooks/use-auth.tsx` — limpar LS no `signOut`
+
+**Arquivos a auditar (usam localStorage cru, podem precisar de ajuste menor):**
+- `src/components/home/AccountDrawer.tsx`
+- `src/pages/Auth.tsx` (chave `core-welcome-done` — passar a ser por usuário)
+- `src/components/finance/storage-keys.ts` + `MonthComparison.tsx` + `MonthTurnover.tsx` (leem `finance-*` cru — vão precisar consultar via `useUserData` ou ler com prefixo)
+- `src/hooks/use-daily-nudge.ts`, `src/hooks/use-offline-queue.ts`, `src/components/MonthlyBudget.tsx`, `src/components/casa/HomeUtilities.tsx`
+
+**Sem mudança de schema** no Supabase. Apenas código cliente + uma limpeza pontual de dados.
+
+---
+
+## Próximo passo
+
+Se aprovar, eu:
+1. Implemento o fix completo (itens 1–4).
+2. Em seguida, rodo um SELECT no `user_data` da conta `store.street.brasil` e te mostro o que está lá pra você decidir o que apagar.

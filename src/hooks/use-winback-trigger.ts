@@ -86,11 +86,12 @@ export function useWinbackTrigger() {
     } finally {
       if (!opened) triggeringRef.current = false;
     }
-  }, [open]);
+  }, [open, trialExpired]);
 
   // Re-check on every route change (and on first mount).
-  // This catches the "back from /planos" case immediately.
+  // Só roda quando o trial já expirou — antes disso a roleta nunca aparece.
   useEffect(() => {
+    if (!trialExpired) return;
     if (location.pathname === "/planos") return; // never auto-open while on planos
     if (open || triggeringRef.current) return;
 

@@ -164,7 +164,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const message = getMessage();
 
   const handleCopy = () => {
-    copyToMonth(prevMonth, currentMonth, {
+    copyToMonth(userId, prevMonth, currentMonth, {
       fixed: copyFixed,
       bills: copyBills,
       incomes: copyIncomes,

@@ -1,61 +1,63 @@
 import { useState, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useAuth } from "@/hooks/use-auth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar } from "lucide-react";
-import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getCurrentYear } from "@/components/finance/storage-keys";
+import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getCurrentYear, readMonthData, writeMonthData } from "@/components/finance/storage-keys";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-const readLocalKey = (key: string) => {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
-};
+const readLocalKey = (userId: string | null, logicalKey: string) =>
+  readMonthData(userId, logicalKey);
 
-const countItems = (key: string) => {
-  const data = readLocalKey(key);
+const countItems = (userId: string | null, logicalKey: string) => {
+  const data = readLocalKey(userId, logicalKey);
   return Array.isArray(data) ? data.length : 0;
 };
 
-const copyToMonth = (fromMonth: string, toMonth: string, options: {
-  fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
-}) => {
+const copyToMonth = (
+  userId: string | null,
+  fromMonth: string,
+  toMonth: string,
+  options: {
+    fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
+  }
+) => {
   const fromKeys = getFinanceStorageKeys(fromMonth);
   const toKeys = getFinanceStorageKeys(toMonth);
   const newId = () => Date.now().toString() + Math.random();
 
   if (options.fixed) {
-    const data = readLocalKey(fromKeys.fixed);
+    const data = readLocalKey(userId, fromKeys.fixed);
     if (data) {
       const items = data.map((i: any) => ({ ...i, id: newId() }));
-      localStorage.setItem(toKeys.fixed, JSON.stringify(items));
+      writeMonthData(userId, toKeys.fixed, items);
     }
   }
 
   if (options.bills) {
-    const data = readLocalKey(fromKeys.dueDays);
+    const data = readLocalKey(userId, fromKeys.dueDays);
     if (data) {
       const days = data.map((d: any) => ({
         ...d,
         bills: d.bills.map((b: any) => ({ ...b, id: newId(), paid: false })),
       }));
-      localStorage.setItem(toKeys.dueDays, JSON.stringify(days));
+      writeMonthData(userId, toKeys.dueDays, days);
     }
   }
 
   if (options.incomes) {
-    const data = readLocalKey(fromKeys.incomes);
+    const data = readLocalKey(userId, fromKeys.incomes);
     if (data) {
       const items = data.map((i: any) => ({
         ...i,
         id: newId(),
         date: new Date().toISOString().split("T")[0],
       }));
-      localStorage.setItem(toKeys.incomes, JSON.stringify(items));
+      writeMonthData(userId, toKeys.incomes, items);
     }
   }
 
@@ -67,17 +69,17 @@ const copyToMonth = (fromMonth: string, toMonth: string, options: {
     const toKey = isCurrentMonthCheck(toMonth)
       ? "finance-category-budgets"
       : `finance-${year}-${getMonthKey(toMonth)}-category-budgets`;
-    const baseBudgets = readLocalKey("finance-category-budgets");
-    const monthBudgets = readLocalKey(fromKey);
+    const baseBudgets = readLocalKey(userId, "finance-category-budgets");
+    const monthBudgets = readLocalKey(userId, fromKey);
     const data = monthBudgets || baseBudgets;
-    if (data) localStorage.setItem(toKey, JSON.stringify(data));
+    if (data) writeMonthData(userId, toKey, data);
   }
 
   if (options.notes) {
-    const data = readLocalKey(fromKeys.notes);
+    const data = readLocalKey(userId, fromKeys.notes);
     if (data) {
       const items = data.map((n: any) => ({ ...n, id: newId() }));
-      localStorage.setItem(toKeys.notes, JSON.stringify(items));
+      writeMonthData(userId, toKeys.notes, items);
     }
   }
 };
@@ -89,6 +91,8 @@ interface MonthTurnoverProps {
 }
 
 export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
   const [showRecap, setShowRecap] = useState(false);
   const [step, setStep] = useState<"recap" | "copy">("recap");
@@ -104,28 +108,28 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const prevMonthIdx = currentMonthIdx === 0 ? 11 : currentMonthIdx - 1;
   const prevMonth = months[prevMonthIdx];
 
-  const prevData = getMonthTotals(prevMonth);
+  const prevData = getMonthTotals(prevMonth, userId);
   const prevHasData = prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0;
 
   const prevKeys = getFinanceStorageKeys(prevMonth);
-  const prevFixedCount = countItems(prevKeys.fixed);
-  const prevIncomesCount = countItems(prevKeys.incomes);
-  const prevNotesCount = countItems(prevKeys.notes);
+  const prevFixedCount = countItems(userId, prevKeys.fixed);
+  const prevIncomesCount = countItems(userId, prevKeys.incomes);
+  const prevNotesCount = countItems(userId, prevKeys.notes);
 
   const prevBalance = prevData.receitas - prevData.custosFixos - prevData.custosVariaveis - prevData.dividas;
 
   const prevBillsInfo = (() => {
-    const data = readLocalKey(prevKeys.dueDays);
+    const data = readLocalKey(userId, prevKeys.dueDays);
     if (!data) return { total: 0, paid: 0 };
     const allBills = data.flatMap((d: any) => d.bills || []);
     return { total: allBills.length, paid: allBills.filter((b: any) => b.paid).length };
   })();
 
   const hasCategoryBudgets = (() => {
-    const base = readLocalKey("finance-category-budgets");
+    const base = readLocalKey(userId, "finance-category-budgets");
     const year = getCurrentYear();
     const monthKey = `finance-${year}-${getMonthKey(prevMonth)}-category-budgets`;
-    const month = readLocalKey(monthKey);
+    const month = readLocalKey(userId, monthKey);
     const data = month || base;
     return data && Object.keys(data).length > 0;
   })();
@@ -160,7 +164,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const message = getMessage();
 
   const handleCopy = () => {
-    copyToMonth(prevMonth, currentMonth, {
+    copyToMonth(userId, prevMonth, currentMonth, {
       fixed: copyFixed,
       bills: copyBills,
       incomes: copyIncomes,

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
+import { useAuth } from "@/hooks/use-auth";
 import { Progress } from "@/components/ui/progress";
 
 const ALL_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -125,15 +126,17 @@ export const Dashboard = ({
   incomes,
   onNavigate,
 }: DashboardProps) => {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const currentYear = getCurrentYear();
 
   // Compute annual data from actual monthly records (current year only)
   const annualData = useMemo(() => {
     return ALL_MONTHS.map((month) => {
-      const totals = getMonthTotals(month, currentYear);
+      const totals = getMonthTotals(month, userId, currentYear);
       return { month, ...totals };
     });
-  }, [currentYear]);
+  }, [currentYear, userId]);
 
   // Month progress data
   const monthProgress = useMemo(() => {

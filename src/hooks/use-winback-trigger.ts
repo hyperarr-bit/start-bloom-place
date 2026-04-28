@@ -112,7 +112,7 @@ export function useWinbackTrigger() {
         setSearchParams(searchParams, { replace: true });
       }
     })();
-  }, [location.pathname, searchParams, setSearchParams, triggerNow, open]);
+  }, [location.pathname, searchParams, setSearchParams, triggerNow, open, trialExpired]);
 
   return { open, attemptId, close, markIntent, triggerNow };
 }

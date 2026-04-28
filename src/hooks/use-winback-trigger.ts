@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { useAuth } from "@/hooks/use-auth";
 
 const INTENT_KEY = "subscribe_intent_at";
 const INTENT_WINDOW_MS = 10 * 60 * 1000; // 10 min
@@ -15,6 +16,7 @@ export function useWinbackTrigger() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const triggeringRef = useRef(false);
+  const { trialExpired } = useAuth();
 
   const markIntent = useCallback(() => {
     try {
@@ -38,6 +40,7 @@ export function useWinbackTrigger() {
     source: Source,
     opts?: { bypassCooldown?: boolean },
   ): Promise<boolean> => {
+    if (!trialExpired) return false; // só dispara após trial expirar
     if (open || triggeringRef.current) return false;
     triggeringRef.current = true;
 
@@ -83,11 +86,12 @@ export function useWinbackTrigger() {
     } finally {
       if (!opened) triggeringRef.current = false;
     }
-  }, [open]);
+  }, [open, trialExpired]);
 
   // Re-check on every route change (and on first mount).
-  // This catches the "back from /planos" case immediately.
+  // Só roda quando o trial já expirou — antes disso a roleta nunca aparece.
   useEffect(() => {
+    if (!trialExpired) return;
     if (location.pathname === "/planos") return; // never auto-open while on planos
     if (open || triggeringRef.current) return;
 
@@ -108,7 +112,7 @@ export function useWinbackTrigger() {
         setSearchParams(searchParams, { replace: true });
       }
     })();
-  }, [location.pathname, searchParams, setSearchParams, triggerNow, open]);
+  }, [location.pathname, searchParams, setSearchParams, triggerNow, open, trialExpired]);
 
   return { open, attemptId, close, markIntent, triggerNow };
 }

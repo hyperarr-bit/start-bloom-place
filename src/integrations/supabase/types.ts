@@ -560,7 +560,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      is_test_user: { Args: { _user_id: string }; Returns: boolean }
       pending_discount_for_user: {
         Args: { _user_id: string }
         Returns: {

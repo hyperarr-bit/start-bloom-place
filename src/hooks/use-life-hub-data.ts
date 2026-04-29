@@ -28,7 +28,16 @@ export interface LifeHubData {
   userName: string;
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+// Use LOCAL date (not UTC) — toISOString() shifts to UTC and breaks streak
+// counting in the evening for users in negative timezones (e.g. BR UTC-3 after 21h).
+const localDateStr = (d: Date = new Date()) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const todayStr = () => localDateStr();
 
 const weekDayMap: Record<number, string> = {
   0: "DOMINGO", 1: "SEGUNDA", 2: "TERÇA", 3: "QUARTA",
@@ -39,24 +48,31 @@ export function useLifeHubData(): LifeHubData {
   const { get, set, loaded } = useUserData();
   const streakHandled = useRef(false);
 
-  // Handle streak as a side-effect, only after data is loaded
+  // Handle streak as a side-effect — wait for Supabase to fully load (not just
+  // local cache hydration) so we don't overwrite a fresher server value.
   useEffect(() => {
     if (!loaded || streakHandled.current) return;
-    streakHandled.current = true;
+    // Defer one tick so the Supabase background refresh in useUserData has a
+    // chance to merge in before we read/write streak data.
+    const t = setTimeout(() => {
+      if (streakHandled.current) return;
+      streakHandled.current = true;
 
-    const tStr = todayStr();
-    const streakData = get<any>("core-hub-streak", { count: 0, lastDate: "" });
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+      const tStr = todayStr();
+      const streakData = get<any>("core-hub-streak", { count: 0, lastDate: "" });
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = localDateStr(yesterday);
 
-    if (streakData.lastDate === tStr) {
-      // already counted today
-    } else if (streakData.lastDate === yesterdayStr) {
-      set("core-hub-streak", { count: (streakData.count || 0) + 1, lastDate: tStr });
-    } else {
-      set("core-hub-streak", { count: 1, lastDate: tStr });
-    }
+      if (streakData.lastDate === tStr) {
+        // already counted today
+      } else if (streakData.lastDate === yesterdayStr) {
+        set("core-hub-streak", { count: (streakData.count || 0) + 1, lastDate: tStr });
+      } else {
+        set("core-hub-streak", { count: 1, lastDate: tStr });
+      }
+    }, 800);
+    return () => clearTimeout(t);
   }, [loaded, get, set]);
 
   return useMemo(() => {

@@ -99,9 +99,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           {/* iPhone CSS mockup */}
           <motion.div
             className="relative z-10 flex items-center justify-center shrink min-h-0"
-            initial={{ opacity: 0, y: 60, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.2 }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.28, ease: "easeOut" }}
           >
             <div
               className="iphone-frame relative"

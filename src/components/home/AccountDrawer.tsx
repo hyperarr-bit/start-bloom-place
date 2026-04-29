@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthRedirectUrl } from "@/lib/utils";
 import { NameEditDialog } from "./NameEditDialog";
 import { toast } from "sonner";
 
@@ -41,7 +42,7 @@ export const AccountDrawer = ({
   const handleResetPassword = async () => {
     if (!user?.email) return;
     const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: getAuthRedirectUrl("/update-password"),
     });
     if (error) {
       toast.error("Erro ao enviar email de redefinição");

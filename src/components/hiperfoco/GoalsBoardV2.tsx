@@ -1,8 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { uploadFromInput, isBase64Image, migrateBase64ToStorage } from "@/lib/image-upload";
+
+const DREAM_BUCKET = "dream-board";
 
 
 /* ─── Types ─── */

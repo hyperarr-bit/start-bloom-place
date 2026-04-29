@@ -125,22 +125,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const showLoader = false;
 
     return (
-      <motion.div
+      <div
         ref={ref}
         className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6 pt-10 pb-8"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
         <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 max-w-4xl w-full min-h-0">
           {/* iPhone CSS mockup */}
-          <motion.div
-            className="relative z-10 flex items-center justify-center shrink min-h-0"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.28, ease: "easeOut" }}
-          >
+          <div className="relative z-10 flex items-center justify-center shrink min-h-0">
             <div
               className="iphone-frame relative"
               style={{

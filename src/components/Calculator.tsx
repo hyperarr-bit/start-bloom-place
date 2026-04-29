@@ -73,7 +73,7 @@ export const Calculator = () => {
           { label: "·", action: inputDecimal, cls: btnNum },
           { label: "−", action: () => performOperation("-"), cls: btnOp },
           { label: "0", action: () => inputDigit("0"), cls: btnNum },
-          { label: "=", action: equals, cls: btnOp },
+          { label: "=", action: equals, cls: btnOp + " calc-key-action" },
           { label: "+", action: () => performOperation("+"), cls: btnOp },
         ].map((btn, i) => (
           <button key={i} onClick={btn.action} className={btn.cls}>{btn.label}</button>

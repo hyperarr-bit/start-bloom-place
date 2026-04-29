@@ -1,80 +1,87 @@
-## Plano: Hardening de segurança + auditoria LGPD
+# Dark Mode Premium — Aba Financeiro
 
-### Parte 1 — Aplicar correções de segurança pendentes
+## Objetivo
+Aplicar um dark mode sofisticado e sóbrio (estilo Notion/Linear/Stripe) na aba Financeiro, mantendo 100% da estrutura, hierarquia e funcionalidades. Apenas cores, contrastes, bordas e sombras mudam.
 
-**1.1 Migration SQL**
+## Escopo
+- **Light mode**: intocado.
+- **Identidade Receitas / Despesas / Dívidas / Investimentos**: mantida, apenas ajustada para tons profundos e dessaturados.
+- **Componentes afetados (visualmente)**: `FinancialSummary`, `ExpenseTable`, `IncomeTable`, `FixedExpensesTable`, `InstallmentTracker`, `InvestmentsTracker`, `BillsDueCards`, `Calculator`, `Notes`, `Dashboard` (cards/listas), tabelas em geral. Nenhuma alteração em props, JSX, lógica ou ordem dos elementos.
 
-Adicionar políticas RLS explícitas que **negam** escrita em `user_roles` por usuários autenticados (defesa em profundidade contra escalonamento de privilégio):
+## O que será alterado
 
-```sql
--- Bloqueia INSERT/UPDATE/DELETE em user_roles para qualquer usuário logado.
--- Apenas service_role (edge functions com SUPABASE_SERVICE_ROLE_KEY) pode escrever.
-CREATE POLICY "Deny insert user_roles to authenticated"
-  ON public.user_roles FOR INSERT TO authenticated
-  WITH CHECK (false);
+### 1. Tokens globais do tema escuro (`src/index.css`, bloco `.dark`)
+Substituir os HSL atuais pelos tons premium pedidos:
 
-CREATE POLICY "Deny update user_roles to authenticated"
-  ON public.user_roles FOR UPDATE TO authenticated
-  USING (false) WITH CHECK (false);
+| Token | Valor (HSL) | Hex aprox. |
+|---|---|---|
+| `--background` | `222 16% 7%` | #0F1115 |
+| `--card` | `222 14% 11%` | #161A22 |
+| `--popover` | `222 14% 11%` | #161A22 |
+| `--secondary` / `--muted` | `222 14% 14%` | #1B2030 |
+| `--foreground` / `--card-foreground` | `0 0% 100%` | #FFFFFF |
+| `--muted-foreground` | `220 8% 67%` | #A1A7B3 |
+| `--border` / `--input` | `222 12% 18%` | #2A3042 |
+| `--ring` | `220 8% 70%` | cinza claro |
 
-CREATE POLICY "Deny delete user_roles to authenticated"
-  ON public.user_roles FOR DELETE TO authenticated
-  USING (false);
-```
+Texto auxiliar (`#8A90A0`) fica disponível via `text-muted-foreground/80` quando necessário, sem novo token.
 
-Adicionar política `UPDATE` faltante no bucket `receipts` (escopo dono):
+### 2. Identidade financeira (cards de resumo)
+Reescrever as 4 famílias em `.dark` com tons profundos e baixa saturação:
 
-```sql
-CREATE POLICY "Owners update own receipts"
-  ON storage.objects FOR UPDATE TO authenticated
-  USING (bucket_id = 'receipts' AND auth.uid() = owner)
-  WITH CHECK (bucket_id = 'receipts' AND auth.uid() = owner);
-```
+| Card | Fundo | Borda (~20% opac) | Texto/ícone |
+|---|---|---|---|
+| Receitas (dourado escuro) | `38 35% 12%` | `38 55% 32%` | `42 75% 70%` |
+| Despesas (roxo profundo) | `258 22% 14%` | `258 35% 32%` | `258 60% 78%` |
+| Dívidas (vermelho vinho) | `350 28% 13%` | `350 40% 32%` | `350 70% 76%` |
+| Investimentos (verde petróleo) | `175 35% 11%` | `175 40% 28%` | `170 50% 70%` |
 
-**1.2 Limpeza de ruído no scanner**
+Também ajustar `--income` / `--expense` para acompanharem (mesma família, tom escuro).
 
-Marcar como "ignored" os ~24 avisos `SECURITY DEFINER` (todas as funções `admin_*` já checam `has_role(auth.uid(), 'admin')` internamente) e o aviso de `app_config` (RLS ativo, sem policy = nada acessível por usuários).
+### 3. Tabelas (`.table-cell`, `.table-header-dark`)
+- Linhas alternadas: criar utility nova `.dark .table-row-alt` baseada em `hsl(var(--card)/0.55)` para zebra discreto sem brancos.
+- Hover: `hover:bg-muted/60` (já presente em vários lugares — apenas garantir o token novo).
+- Bordas das células passam a usar o novo `--border` mais sutil (#2A3042).
+- Nenhuma mudança de markup nas tabelas; só os tokens já consumidos por elas.
 
----
+### 4. Calculadora (`Calculator.tsx`)
+Adicionar overrides via classes existentes (sem trocar JSX), através de novas regras CSS escopadas:
+- `.dark .calc-shell` → fundo `#0B0D12` (mais escuro que o app).
+- `.dark .calc-key` → relevo suave (gradiente sutil + sombra interna 1px).
+- `.dark .calc-key-action` (=, AC) → usar `--accent` em tom dourado escuro `38 70% 48%`.
+- `.dark .calc-display` → sombra interna `inset 0 2px 8px rgba(0,0,0,.5)`.
 
-### Parte 2 — Auditoria LGPD detalhada
+Se as classes acima ainda não existirem no Calculator, serão adicionadas em `className` apenas (sem alterar estrutura, props ou lógica).
 
-Após aplicar as correções acima, executarei uma análise sistemática focada em LGPD/vazamento de dados pessoais. Vou inspecionar:
+### 5. Notas (`Notes.tsx`)
+- `.dark .notes-shell` → fundo grafite com leve viés rosa: `340 12% 10%`.
+- Header/ícone permanecem com acento rosa em `--accent`, mas saturação reduzida no dark.
+- Remover qualquer rosa claro presente apenas no dark.
 
-**2.1 Banco de dados**
-- Listar todas as tabelas com colunas que contêm dados pessoais (email, telefone, CPF/`tax_id`, nome, fotos, financeiro, saúde, dieta, hábitos, relacionamentos).
-- Validar que **toda** tabela com dado pessoal tem RLS ativa + policy `auth.uid() = user_id` em SELECT/UPDATE/DELETE.
-- Validar que `INSERT` exige `user_id = auth.uid()` (sem cláusulas permissivas).
-- Conferir buckets de storage (`skin-photos`, `receipts`): privados + policies escopadas por owner em todas as operações.
-- Conferir funções `SECURITY DEFINER` que retornam dados de outros usuários — confirmar que todas exigem `has_role(_, 'admin')` antes de retornar linhas.
+### 6. Vencimentos (`BillsDueCards.tsx`)
+- Aplicar a mesma lógica dos cards de resumo: fundo escuro tingido + número do dia em `text-foreground` (branco) + textos secundários em `text-muted-foreground`.
+- Ajustes feitos via tokens já consumidos (`--card-*`), portanto não precisa tocar no componente.
 
-**2.2 Edge functions**
-- Inspecionar todas as funções em `supabase/functions/*` que usam `SUPABASE_SERVICE_ROLE_KEY` para garantir que filtram por `user_id` antes de retornar/mutar dados, e que validam o JWT do chamador (não confiam em `user_id` vindo do body).
-- Validar webhooks (`abacatepay-webhook`) — confirmar verificação de assinatura/segredo.
+### 7. Sombras e profundidade
+Adicionar utilities em `@layer components`:
+- `.shadow-premium` → `0 1px 0 hsl(0 0% 100% / 0.04) inset, 0 8px 24px -12px rgba(0,0,0,.6)`
+- Aplicar somente onde já existe `shadow-sm` em cards financeiros (substituição direta por `dark:shadow-premium`).
 
-**2.3 Frontend**
-- Verificar se há logs de `console.log` com dados sensíveis (email, valores financeiros, CPF).
-- Confirmar que após correção do bug multi-conta, `localStorage` está 100% namespaceado por `user_id` e que não há leitura de chaves legadas sem prefixo.
-- Verificar `purgeUserLocalCache` no logout/troca de conta.
+## O que NÃO será alterado
+- Layout, grids, posições, espaçamentos, fontes, ícones e textos.
+- Comportamento dos componentes, hooks, dados, queries e estado.
+- Light mode (todos os tokens light permanecem como estão).
+- Outras abas (Saúde, Rotina, Casa, etc.) — só herdam os ajustes globais de `--background`/`--card`/`--border`/`--foreground` no dark, que já melhoram a leitura sem mudar identidade.
 
-**2.4 Auth & e-mail**
-- Validar que o redirect do e-mail de confirmação aponta para domínio próprio (não Supabase default).
-- Confirmar que não há exposição de PII em URLs de redirect.
+## Detalhes técnicos
+- Tudo via CSS variables HSL já consumidas pelo Tailwind config — nenhum hex hardcoded em componentes.
+- Mudanças concentradas em: `src/index.css` (bloco `.dark` + novas utilities). Toques mínimos em `Calculator.tsx` e `Notes.tsx` somente para adicionar classes wrapper (`calc-shell`, `notes-shell`) caso ainda não existam.
+- Os 4 paletas alternativos (`midnight`, `ocean`, `rose`, `forest`) continuam sobrescrevendo tokens via `paletteVars` — para manter consistência, esta refatoração aplica-se à paleta `default` (a que o usuário usa). As outras paletas seguem como estão.
 
-**2.5 Dados residuais da contaminação anterior**
-- Re-auditar contas afetadas (`store.street.brasil`, `jv20101958@gmail.com`) no `user_data` para confirmar que não restou nenhuma chave cruzada.
-
-**2.6 Entrega**
-Relatório em chat com:
-- ✅ Itens conformes
-- ⚠️ Riscos médios (com correção sugerida)
-- 🔴 Vazamentos críticos (com migration/patch imediato)
-- Lista de chaves de `user_data` ainda contaminadas (se houver) + ação proposta (deletar).
-
----
-
-### Arquivos/recursos que serão tocados na Parte 1
-- Nova migration SQL (`user_roles` deny policies + `receipts` update policy).
-- Atualizações no scanner de segurança (ignore tags) — não toca código.
-
-A Parte 2 é apenas leitura/auditoria; qualquer correção encontrada vira um plano novo para sua aprovação antes de executar.
+## Resultado esperado
+- Background grafite confortável, sem preto puro nem brancos agressivos.
+- Cards financeiros com identidade preservada, porém escuros e elegantes.
+- Tabelas legíveis com zebra sutil e sem linhas brancas.
+- Calculadora com profundidade e teclas de ação destacadas.
+- Notas em tom escuro com acento rosa controlado.
+- Aparência de produto pago premium, alinhada a Notion/Linear/Stripe.

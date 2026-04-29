@@ -43,13 +43,13 @@ export const Calculator = () => {
     setWaitingForOperand(true);
   };
 
-  const btnNum = "w-10 h-9 rounded text-sm font-medium bg-card border border-border hover:bg-muted transition-colors";
-  const btnOp = "w-10 h-9 rounded text-sm font-medium bg-muted border border-border hover:bg-muted/80 transition-colors";
-  const btnClear = "w-10 h-9 rounded text-sm font-bold bg-foreground text-background border border-border hover:opacity-90 transition-colors";
+  const btnNum = "calc-key w-10 h-9 rounded text-sm font-medium bg-card border border-border hover:bg-muted transition-colors";
+  const btnOp = "calc-key w-10 h-9 rounded text-sm font-medium bg-muted border border-border hover:bg-muted/80 transition-colors";
+  const btnClear = "calc-key calc-key-action w-10 h-9 rounded text-sm font-bold bg-foreground text-background border border-border hover:opacity-90 transition-colors";
 
   return (
-    <div className="bg-card rounded-lg border border-border p-3 animate-fade-in w-full max-w-[280px] lg:w-fit">
-      <div className="bg-foreground text-background rounded px-3 py-2 mb-3 text-right">
+    <div className="calc-shell bg-card rounded-lg border border-border p-3 animate-fade-in w-full max-w-[280px] lg:w-fit">
+      <div className="calc-display bg-foreground text-background rounded px-3 py-2 mb-3 text-right">
         <span className="text-lg font-mono">{parseFloat(display).toLocaleString("pt-BR", { maximumFractionDigits: 8 })}</span>
       </div>
       <div className="grid grid-cols-4 gap-1.5">

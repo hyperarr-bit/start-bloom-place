@@ -106,17 +106,13 @@ export const GoalsBoardV2 = () => {
         [period]: { ...prev[period], items: prev[period].items.filter(i => i.id !== itemId) },
       }));
     };
-    const handleTimelineImage = (period: keyof TimelineData, e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setTimeline(prev => ({ ...prev, [period]: { ...prev[period], image: reader.result as string } }));
-      reader.readAsDataURL(file); e.target.value = "";
+    const handleTimelineImage = async (period: keyof TimelineData, e: React.ChangeEvent<HTMLInputElement>) => {
+      const url = await uploadFromInput(e, DREAM_BUCKET, `timeline/${period}`);
+      if (url) setTimeline(prev => ({ ...prev, [period]: { ...prev[period], image: url } }));
     };
-    const handleDreamImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setHomeData(prev => ({ ...prev, dreamBoard: [...prev.dreamBoard, reader.result as string] }));
-      reader.readAsDataURL(file); e.target.value = "";
+    const handleDreamImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const url = await uploadFromInput(e, DREAM_BUCKET, "dream-board");
+      if (url) setHomeData(prev => ({ ...prev, dreamBoard: [...prev.dreamBoard, url] }));
     };
     const addGoal = () => {
       if (!newGoalTitle.trim()) return;
@@ -228,15 +224,11 @@ export const GoalsBoardV2 = () => {
   if (!goal) return null;
 
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "hero" | "gallery") => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      if (type === "hero") updateGoal({ ...goal, heroImage: base64 });
-      else updateGoal({ ...goal, referenceImages: [...goal.referenceImages, base64] });
-    };
-    reader.readAsDataURL(file); e.target.value = "";
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: "hero" | "gallery") => {
+    const url = await uploadFromInput(e, DREAM_BUCKET, type === "hero" ? `hero/${goal.id}` : `gallery/${goal.id}`);
+    if (!url) return;
+    if (type === "hero") updateGoal({ ...goal, heroImage: url });
+    else updateGoal({ ...goal, referenceImages: [...goal.referenceImages, url] });
   };
   const toggleTask = (groupId: string, taskId: string) => {
     updateGoal({ ...goal, actionGroups: goal.actionGroups.map(g => g.id === groupId ? { ...g, tasks: g.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t) } : g) });

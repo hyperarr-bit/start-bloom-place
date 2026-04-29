@@ -356,6 +356,67 @@
   .rt-border { border-color: hsl(var(--rt-border)); }
   .rt-text { color: hsl(var(--rt-text)); }
   .rt-text-soft { color: hsl(var(--rt-text-soft)); }
+
+  /* ===== Premium dark utilities (Financeiro) ===== */
+  .shadow-premium {
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.04) inset,
+      0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Calculadora — fundo mais escuro, teclas com relevo, destaque em ações */
+  .dark .calc-shell {
+    background: hsl(222 18% 5%);
+    border-color: hsl(222 14% 14%);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.03) inset,
+      0 12px 28px -16px rgba(0, 0, 0, 0.7);
+  }
+  .dark .calc-display {
+    background: hsl(222 16% 4%);
+    color: hsl(0 0% 100%);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.55);
+    border: 1px solid hsl(222 14% 14%);
+  }
+  .dark .calc-key {
+    background: linear-gradient(180deg, hsl(222 14% 15%), hsl(222 14% 11%));
+    border-color: hsl(222 12% 20%);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.05) inset,
+      0 1px 2px rgba(0, 0, 0, 0.4);
+    color: hsl(0 0% 96%);
+  }
+  .dark .calc-key:hover {
+    background: linear-gradient(180deg, hsl(222 14% 18%), hsl(222 14% 13%));
+  }
+  .dark .calc-key-action {
+    background: linear-gradient(180deg, hsl(38 70% 52%), hsl(38 75% 42%));
+    color: hsl(38 40% 10%);
+    border-color: hsl(38 60% 30%);
+    box-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.18) inset,
+      0 2px 6px -2px hsl(38 70% 30% / 0.5);
+  }
+  .dark .calc-key-action:hover {
+    background: linear-gradient(180deg, hsl(38 75% 56%), hsl(38 80% 46%));
+  }
+
+  /* Notas — fundo grafite com leve viés rosa, sem rosa claro */
+  .dark .notes-shell {
+    background: hsl(340 14% 10%);
+    border-color: hsl(340 22% 22%);
+  }
+
+  /* Tabelas — zebra sutil em dark, sem brancos */
+  .dark .table-row-alt {
+    background: hsl(222 14% 13%);
+  }
+  .dark tbody tr:nth-child(even) > td {
+    background: hsl(222 14% 12%);
+  }
+  .dark tbody tr:hover > td {
+    background: hsl(222 14% 16%);
+  }
 }
 
 /* ============ iPhone CSS mockup ============ */

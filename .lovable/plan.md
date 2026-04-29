@@ -1,54 +1,58 @@
-## Excluir contas de teste das analíticas do admin
+# Corrigir redirect "localhost" após confirmar email — usar coreaplicativo.com.br
 
-### Contas a ignorar
-- `jv20101958@gmail.com`
-- `hyperarr@gmail.com`
-- `street.store.brasil@gmail.com`
+## Problema
+Quando o usuário cria conta e clica em "Confirmar" no email, o Safari abre `localhost` e mostra "não pôde se conectar ao servidor". A conta É criada e confirmada — só o redirect final está errado.
 
-### Abordagem
+## Causa
+`src/hooks/use-auth.tsx` envia `emailRedirectTo: window.location.origin` no `signUp`. Se a conta foi criada a partir do preview ou ambiente local, esse valor é gravado no link do email — e ao clicar, o Supabase volta para esse host (localhost).
 
-Criar uma função SQL helper `public.is_test_user(_user_id uuid)` que retorna `true` se o e-mail do usuário em `auth.users` estiver na lista de testes. Centralizar a lista num só lugar facilita adicionar/remover contas no futuro.
+Além disso, a **Site URL** no Supabase provavelmente está configurada como `http://localhost:3000`, então mesmo links sem `redirect_to` válido caem nela.
 
-Em seguida, atualizar todas as funções `admin_*` que agregam métricas para filtrar usuários de teste com `WHERE NOT public.is_test_user(user_id)`.
+## Domínio de produção (definitivo)
+`https://www.coreaplicativo.com.br`
 
-### Funções a atualizar
+## Correções
 
-1. **`admin_metrics_overview`** — total_users, active_24h/7d/30d, signups_30d, paid_active, trial_active, canceled_30d, conversion/churn rates, MRR.
-2. **`admin_list_users`** — esconder as 3 contas da listagem.
-3. **`admin_module_funnel`** — funil de uso por módulo.
-4. **`admin_at_risk_users`** — usuários em risco de churn.
-5. **`admin_conversion_by_trial_day`** — conversões por dia do trial.
-6. **`admin_activation_funnel`** — funil de ativação.
-7. **`admin_nudge_stats`** — estatísticas de nudges.
-8. **`admin_email_variant_stats`** — variantes de e-mail.
-9. **`admin_retention_stats`** — cancel attempts, save rate.
-10. **`admin_retention_offers_breakdown`** — ofertas de retenção.
-11. **`admin_winback_stats`** — winback (triggered, converted, etc).
+### 1. Forçar o domínio de produção no redirect (código)
+Criar helper `getAuthRedirectUrl(path?: string)` em `src/lib/utils.ts`:
+- Se `window.location.hostname` for `localhost`, `127.0.0.1`, contiver `id-preview--`, `lovableproject.com` ou `lovable.app` → usar `https://www.coreaplicativo.com.br` como base.
+- Caso contrário (já está no domínio real) → usar `window.location.origin`.
+- Concatena o `path` opcional (ex.: `/update-password`).
 
-Em todas, o filtro é o mesmo: `AND NOT public.is_test_user(<coluna user_id da tabela base>)`.
+Aplicar em:
+- `src/hooks/use-auth.tsx` → `signUp` usa `emailRedirectTo: getAuthRedirectUrl()`
+- `src/pages/ResetPassword.tsx` → `redirectTo: getAuthRedirectUrl('/update-password')`
+- `src/components/home/AccountDrawer.tsx` → mesmo do reset
 
-### Detalhes técnicos
+### 2. Configuração no Supabase (você precisa fazer manualmente)
+Painel Supabase → **Authentication → URL Configuration**:
 
-```sql
--- Helper centralizada
-CREATE OR REPLACE FUNCTION public.is_test_user(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM auth.users u
-    WHERE u.id = _user_id
-      AND lower(u.email) IN (
-        'jv20101958@gmail.com',
-        'hyperarr@gmail.com',
-        'street.store.brasil@gmail.com'
-      )
-  );
-$$;
-```
+- **Site URL:**
+  ```
+  https://www.coreaplicativo.com.br
+  ```
 
-A migração faz `CREATE OR REPLACE FUNCTION` em cada função admin, mantendo assinatura idêntica (mesmos parâmetros, mesmo retorno) — apenas adicionando os filtros. Nenhum frontend precisa mudar.
+- **Redirect URLs (adicionar todas):**
+  ```
+  https://www.coreaplicativo.com.br/**
+  https://coreaplicativo.com.br/**
+  https://coreaplicativo.lovable.app/**
+  https://id-preview--a6b9b632-5e9d-4f08-912f-dce2025b543a.lovable.app/**
+  http://localhost:8080/**
+  ```
 
-### Resultado
+Sem isso, mesmo que o código mande o redirect certo, o Supabase rejeita URLs fora da allow list e cai no fallback (Site URL).
 
-Dashboard, Conversão, Churn, Funil, Ativação, Retenção, Winback, Usuários, Onboarding e Emails do admin passam a ignorar essas 3 contas. As contas continuam funcionando normalmente no app — apenas não aparecem nas métricas.
+## Resultado esperado
+- Cadastros pelo site, preview ou local → email sempre leva para `https://www.coreaplicativo.com.br`.
+- Reset de senha → mesma lógica, abre `/update-password` no domínio certo.
+- Fim do erro "Safari não pôde se conectar ao servidor".
+
+## Arquivos a editar
+- `src/lib/utils.ts` (novo helper)
+- `src/hooks/use-auth.tsx`
+- `src/pages/ResetPassword.tsx`
+- `src/components/home/AccountDrawer.tsx`
+
+## Sua ação manual
+Atualizar Site URL + Redirect URLs no painel Supabase conforme item 2. Sem esse passo, o código sozinho não resolve.

@@ -158,15 +158,19 @@ const GroceryList = () => {
         const done = cat.items.filter(i => i.done).length;
         const total = cat.items.length;
         return (
-          <div key={cat.id} className="rounded-2xl border border-border overflow-hidden bg-card">
+          <div
+            key={cat.id}
+            data-color={cat.color}
+            className="grocery-card rounded-2xl border border-border overflow-hidden bg-card"
+          >
             {/* Colored Header */}
-            <div className={`${cat.color} px-4 py-3 flex items-center gap-3`}>
+            <div className={`grocery-header ${cat.color} px-4 py-3 flex items-center gap-3`}>
               <span className="text-xl">{cat.emoji}</span>
               <span className="text-sm font-black text-white flex-1">{cat.name}</span>
               <span className="text-xs font-bold text-white/80">{done}/{total}</span>
               <button
                 onClick={() => removeCategory(cat.id)}
-                className="opacity-60 hover:opacity-100 transition-opacity ml-1"
+                className="grocery-trash opacity-60 hover:opacity-100 transition-opacity ml-1"
                 title="Remover categoria"
               >
                 <Trash2 className="w-3.5 h-3.5 text-white" />
@@ -174,7 +178,7 @@ const GroceryList = () => {
             </div>
 
             {/* Items */}
-            <div className="p-4 space-y-1">
+            <div className="grocery-body p-4 space-y-1">
               {cat.items.map(item => (
                 <div key={item.id} className="flex items-center gap-3 py-1.5 group">
                   <Checkbox
@@ -200,13 +204,13 @@ const GroceryList = () => {
                   value={inputs[cat.id] || ""}
                   onChange={e => setInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
                   placeholder="Adicionar..."
-                  className="text-sm h-9 flex-1 rounded-lg"
+                  className="grocery-input text-sm h-9 flex-1 rounded-lg"
                   onKeyDown={e => e.key === "Enter" && addItem(cat.id)}
                 />
                 <Button
                   size="icon"
                   variant="secondary"
-                  className="h-9 w-9 shrink-0"
+                  className="grocery-add-btn h-9 w-9 shrink-0"
                   onClick={() => addItem(cat.id)}
                 >
                   <Plus className="w-4 h-4" />

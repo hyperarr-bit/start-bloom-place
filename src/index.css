@@ -417,6 +417,60 @@
   .dark tbody tr:hover > td {
     background: hsl(222 14% 16%);
   }
+
+  /* ===== Mercado (GroceryList) — Premium Dark =====
+     Light mode: classes Tailwind originais (bg-green-500 etc) seguem ativas.
+     Dark mode: cores fechadas, corpo escuro, linha sutil colorida. */
+  .dark .grocery-card {
+    background: hsl(222 14% 11%);
+    border-color: hsl(222 12% 18%);
+  }
+  .dark .grocery-body {
+    background: hsl(222 16% 8%);
+  }
+
+  /* Headers fechados + linha sutil de 1px na cor viva (~20% opacidade) */
+  .dark .grocery-card[data-color="bg-green-500"]  .grocery-header { background: hsl(142 45% 28%); }
+  .dark .grocery-card[data-color="bg-green-500"]  .grocery-header { border-bottom: 1px solid hsl(142 70% 50% / 0.20); }
+  .dark .grocery-card[data-color="bg-red-500"]    .grocery-header { background: hsl(0 50% 32%); border-bottom: 1px solid hsl(0 75% 55% / 0.20); }
+  .dark .grocery-card[data-color="bg-blue-600"]   .grocery-header { background: hsl(220 50% 32%); border-bottom: 1px solid hsl(220 80% 60% / 0.20); }
+  .dark .grocery-card[data-color="bg-purple-500"] .grocery-header { background: hsl(265 40% 32%); border-bottom: 1px solid hsl(265 70% 60% / 0.20); }
+  .dark .grocery-card[data-color="bg-orange-500"] .grocery-header { background: hsl(25 55% 30%);  border-bottom: 1px solid hsl(25 90% 55% / 0.22); }
+  .dark .grocery-card[data-color="bg-yellow-600"] .grocery-header { background: hsl(40 55% 28%);  border-bottom: 1px solid hsl(45 90% 55% / 0.22); }
+  .dark .grocery-card[data-color="bg-cyan-500"]   .grocery-header { background: hsl(190 50% 28%); border-bottom: 1px solid hsl(190 80% 55% / 0.20); }
+  .dark .grocery-card[data-color="bg-pink-500"]   .grocery-header { background: hsl(335 45% 32%); border-bottom: 1px solid hsl(335 75% 60% / 0.22); }
+  .dark .grocery-card[data-color="bg-indigo-600"] .grocery-header { background: hsl(240 40% 35%); border-bottom: 1px solid hsl(240 70% 60% / 0.20); }
+
+  /* Input "Adicionar..." — mais escuro que o card, placeholder cinza médio */
+  .dark .grocery-input {
+    background-color: hsl(222 18% 6%);
+    border-color: hsl(222 12% 16%);
+    color: hsl(0 0% 100%);
+  }
+  .dark .grocery-input::placeholder { color: hsl(222 8% 52%); }
+  .dark .grocery-input:focus-visible { border-color: hsl(222 12% 26%); }
+
+  /* Botão + neutro, brilho sutil na cor da categoria no hover */
+  .dark .grocery-add-btn {
+    background-color: hsl(222 14% 14%);
+    color: hsl(0 0% 96%);
+    border: 1px solid hsl(222 12% 18%);
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .dark .grocery-card[data-color="bg-green-500"]  .grocery-add-btn:hover { background: hsl(142 45% 22%); box-shadow: 0 0 0 1px hsl(142 70% 50% / 0.30); }
+  .dark .grocery-card[data-color="bg-red-500"]    .grocery-add-btn:hover { background: hsl(0 50% 24%);   box-shadow: 0 0 0 1px hsl(0 75% 55% / 0.30); }
+  .dark .grocery-card[data-color="bg-blue-600"]   .grocery-add-btn:hover { background: hsl(220 50% 24%); box-shadow: 0 0 0 1px hsl(220 80% 60% / 0.30); }
+  .dark .grocery-card[data-color="bg-purple-500"] .grocery-add-btn:hover { background: hsl(265 40% 24%); box-shadow: 0 0 0 1px hsl(265 70% 60% / 0.30); }
+  .dark .grocery-card[data-color="bg-orange-500"] .grocery-add-btn:hover { background: hsl(25 55% 22%);  box-shadow: 0 0 0 1px hsl(25 90% 55% / 0.30); }
+  .dark .grocery-card[data-color="bg-yellow-600"] .grocery-add-btn:hover { background: hsl(40 55% 20%);  box-shadow: 0 0 0 1px hsl(45 90% 55% / 0.30); }
+  .dark .grocery-card[data-color="bg-cyan-500"]   .grocery-add-btn:hover { background: hsl(190 50% 20%); box-shadow: 0 0 0 1px hsl(190 80% 55% / 0.30); }
+  .dark .grocery-card[data-color="bg-pink-500"]   .grocery-add-btn:hover { background: hsl(335 45% 24%); box-shadow: 0 0 0 1px hsl(335 75% 60% / 0.30); }
+  .dark .grocery-card[data-color="bg-indigo-600"] .grocery-add-btn:hover { background: hsl(240 40% 26%); box-shadow: 0 0 0 1px hsl(240 70% 60% / 0.30); }
+
+  /* Lixeira — neutra por padrão, vermelha apenas no hover */
+  .dark .grocery-trash { opacity: 0.45; }
+  .dark .grocery-trash:hover { opacity: 1; }
+  .dark .grocery-trash:hover svg { color: hsl(0 75% 62%); }
 }
 
 /* ============ iPhone CSS mockup ============ */

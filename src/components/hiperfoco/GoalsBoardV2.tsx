@@ -81,6 +81,70 @@ export const GoalsBoardV2 = () => {
 
   const goal = goals.find(g => g.id === selectedGoalId) || goals[0];
 
+  // One-shot migration: upload any legacy base64 images to Supabase Storage
+  // and replace them with signed URLs. Runs whenever data loads or changes.
+  const migrationRan = useRef(false);
+  useEffect(() => {
+    if (migrationRan.current) return;
+    const hasLegacy =
+      homeData.dreamBoard.some(isBase64Image) ||
+      Object.values(timeline).some(p => p.image && isBase64Image(p.image)) ||
+      goals.some(g =>
+        (g.heroImage && isBase64Image(g.heroImage)) ||
+        g.referenceImages.some(isBase64Image)
+      );
+    if (!hasLegacy) return;
+    migrationRan.current = true;
+
+    (async () => {
+      // Dream board
+      const newDream = await Promise.all(
+        homeData.dreamBoard.map(async img =>
+          isBase64Image(img) ? (await migrateBase64ToStorage(img, DREAM_BUCKET, "dream-board")) || img : img
+        )
+      );
+      if (newDream.some((v, i) => v !== homeData.dreamBoard[i])) {
+        setHomeData(prev => ({ ...prev, dreamBoard: newDream }));
+      }
+
+      // Timeline images
+      const newTimeline = { ...timeline };
+      let timelineChanged = false;
+      for (const k of Object.keys(newTimeline) as (keyof TimelineData)[]) {
+        const img = newTimeline[k].image;
+        if (img && isBase64Image(img)) {
+          const url = await migrateBase64ToStorage(img, DREAM_BUCKET, `timeline/${k}`);
+          if (url) {
+            newTimeline[k] = { ...newTimeline[k], image: url };
+            timelineChanged = true;
+          }
+        }
+      }
+      if (timelineChanged) setTimeline(newTimeline);
+
+      // Goals (hero + gallery)
+      const newGoals = await Promise.all(
+        goals.map(async g => {
+          const updates: Partial<GoalV2> = {};
+          if (g.heroImage && isBase64Image(g.heroImage)) {
+            const url = await migrateBase64ToStorage(g.heroImage, DREAM_BUCKET, `hero/${g.id}`);
+            if (url) updates.heroImage = url;
+          }
+          if (g.referenceImages.some(isBase64Image)) {
+            updates.referenceImages = await Promise.all(
+              g.referenceImages.map(async img =>
+                isBase64Image(img) ? (await migrateBase64ToStorage(img, DREAM_BUCKET, `gallery/${g.id}`)) || img : img
+              )
+            );
+          }
+          return Object.keys(updates).length ? { ...g, ...updates } : g;
+        })
+      );
+      if (newGoals.some((g, i) => g !== goals[i])) setGoals(newGoals);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals.length, homeData.dreamBoard.length]);
+
   const updateGoal = (updated: GoalV2) => setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
 
   const openGoal = (id: string) => { setSelectedGoalId(id); setView("detail"); };

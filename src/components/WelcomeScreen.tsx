@@ -197,7 +197,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
 
           {/* Title + CTA */}
           <div className="relative z-10 w-full max-w-sm flex flex-col items-center md:items-start gap-5 shrink-0">
@@ -221,7 +221,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
     );
   }
 );

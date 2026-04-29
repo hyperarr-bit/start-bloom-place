@@ -81,52 +81,62 @@
   }
 
   .dark {
-    --background: 220 10% 6%;
-    --foreground: 0 0% 94%;
-    --card: 220 10% 9%;
-    --card-foreground: 0 0% 94%;
-    --popover: 220 10% 9%;
-    --popover-foreground: 0 0% 94%;
-    --primary: 0 0% 92%;
-    --primary-foreground: 220 10% 8%;
-    --secondary: 220 8% 14%;
-    --secondary-foreground: 0 0% 94%;
-    --muted: 220 8% 14%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 330 65% 58%;
+    /* ===== Premium graphite base (Notion / Linear / Stripe inspired) ===== */
+    --background: 222 16% 7%;          /* #0F1115 */
+    --foreground: 0 0% 100%;           /* #FFFFFF */
+    --card: 222 14% 11%;               /* #161A22 */
+    --card-foreground: 0 0% 100%;
+    --popover: 222 14% 11%;            /* #161A22 */
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 222 16% 7%;
+    --secondary: 222 14% 14%;          /* #1B2030 */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 222 14% 14%;              /* #1B2030 */
+    --muted-foreground: 220 8% 67%;    /* #A1A7B3 */
+    --accent: 330 55% 58%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 50%;
+    --destructive: 0 65% 52%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 55% 48%;
+    --success: 170 45% 50%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 55%;
+    --warning: 38 75% 55%;
     --warning-foreground: 0 0% 100%;
-    --card-receitas: 45 35% 14%;
-    --card-receitas-border: 45 40% 25%;
-    --card-receitas-text: 45 65% 72%;
-    --card-despesas: 250 25% 15%;
-    --card-despesas-border: 250 30% 28%;
-    --card-despesas-text: 250 55% 75%;
-    --card-dividas: 330 25% 15%;
-    --card-dividas-border: 330 30% 28%;
-    --card-dividas-text: 330 55% 75%;
-    --card-investimentos: 142 25% 13%;
-    --card-investimentos-border: 142 30% 24%;
-    --card-investimentos-text: 142 50% 68%;
-    --income: 45 25% 13%;
-    --income-foreground: 45 55% 72%;
-    --expense: 330 25% 13%;
-    --expense-foreground: 330 55% 72%;
-    --border: 220 8% 16%;
-    --input: 220 8% 16%;
-    --ring: 0 0% 80%;
-    --sidebar-background: 220 10% 7%;
-    --sidebar-foreground: 0 0% 92%;
+
+    /* ===== Financial identity — deep, low-saturation tones ===== */
+    /* Receitas: dourado escuro / amarelo queimado */
+    --card-receitas: 38 35% 12%;
+    --card-receitas-border: 38 55% 32%;
+    --card-receitas-text: 42 75% 70%;
+    /* Despesas: roxo profundo */
+    --card-despesas: 258 22% 14%;
+    --card-despesas-border: 258 35% 32%;
+    --card-despesas-text: 258 60% 78%;
+    /* Dívidas: vermelho vinho */
+    --card-dividas: 350 28% 13%;
+    --card-dividas-border: 350 40% 32%;
+    --card-dividas-text: 350 70% 76%;
+    /* Investimentos: verde petróleo */
+    --card-investimentos: 175 35% 11%;
+    --card-investimentos-border: 175 40% 28%;
+    --card-investimentos-text: 170 50% 70%;
+
+    --income: 38 30% 12%;
+    --income-foreground: 42 75% 72%;
+    --expense: 258 22% 13%;
+    --expense-foreground: 258 60% 78%;
+
+    --border: 222 12% 18%;             /* #2A3042 */
+    --input: 222 12% 18%;
+    --ring: 220 8% 70%;
+
+    --sidebar-background: 222 16% 8%;
+    --sidebar-foreground: 0 0% 96%;
     --sidebar-primary: 224 76% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 8% 14%;
-    --sidebar-accent-foreground: 0 0% 92%;
-    --sidebar-border: 220 8% 14%;
+    --sidebar-accent: 222 14% 14%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 222 12% 18%;
     --sidebar-ring: 217 91% 60%;
   }
 }

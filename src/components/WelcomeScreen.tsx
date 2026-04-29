@@ -17,6 +17,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const attemptPlay = useCallback(() => {
       const video = videoRef.current;
       if (!video) return;
+      // Force muted before playing — autoplay only works guaranteed when muted.
+      try {
+        video.muted = true;
+        // @ts-ignore — Safari/iOS specific
+        video.defaultMuted = true;
+      } catch {}
       const playPromise = video.play();
       if (playPromise !== undefined) {
         playPromise
@@ -40,6 +46,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         }
       };
       const onPause = () => {
+        // Always try to resume — never let the video stay paused unless the user is gone.
         if (document.visibilityState === "visible" && !video.ended) {
           attemptPlay();
         }
@@ -57,7 +64,33 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       const onVisibility = () => {
         if (document.visibilityState === "visible" && video.paused) attemptPlay();
       };
+      const onFocus = () => {
+        if (video.paused) attemptPlay();
+      };
       document.addEventListener("visibilitychange", onVisibility);
+      window.addEventListener("focus", onFocus);
+      window.addEventListener("pageshow", onFocus);
+
+      // Watchdog: if the video gets paused by iOS Low Power Mode, energy saver,
+      // or Safari background tabs, retry every 1.5s while we're visible.
+      const watchdog = window.setInterval(() => {
+        if (
+          document.visibilityState === "visible" &&
+          video.paused &&
+          !video.ended &&
+          video.readyState >= 2
+        ) {
+          attemptPlay();
+        }
+      }, 1500);
+
+      // First-touch fallback: if autoplay was blocked, the very first tap/click
+      // anywhere on the document will start playback (counts as user gesture).
+      const onFirstGesture = () => {
+        if (video.paused) attemptPlay();
+      };
+      document.addEventListener("touchstart", onFirstGesture, { passive: true });
+      document.addEventListener("click", onFirstGesture);
 
       return () => {
         video.removeEventListener("loadedmetadata", onReady);
@@ -66,6 +99,11 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         video.removeEventListener("pause", onPause);
         video.removeEventListener("error", onError);
         document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("focus", onFocus);
+        window.removeEventListener("pageshow", onFocus);
+        document.removeEventListener("touchstart", onFirstGesture);
+        document.removeEventListener("click", onFirstGesture);
+        window.clearInterval(watchdog);
       };
     }, [attemptPlay]);
 

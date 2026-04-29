@@ -505,6 +505,18 @@
   border-radius: 15.5% / 7.3%;
   overflow: hidden;
   background: #000;
+  /* Force a new stacking context + GPU layer so the <video> element
+     (which is composited on its own layer in Safari/Chrome) actually
+     respects the rounded clip of this container. Without this, the
+     video's corners "bleed" past the rounded mask on desktop browsers. */
+  isolation: isolate;
+  transform: translateZ(0);
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+
+.iphone-screen > video,
+.iphone-screen > img {
+  border-radius: inherit;
 }
 
 /* Side buttons */

@@ -1,87 +1,117 @@
-# Dark Mode Premium — Aba Financeiro
+# Dark Mode Premium — Aba Mercado
 
 ## Objetivo
-Aplicar um dark mode sofisticado e sóbrio (estilo Notion/Linear/Stripe) na aba Financeiro, mantendo 100% da estrutura, hierarquia e funcionalidades. Apenas cores, contrastes, bordas e sombras mudam.
+Refinar o dark mode da aba **Mercado** (componente `GroceryList`) com aparência premium tipo Notion/Linear: cores das categorias preservadas mas em tons fechados, corpo do card sempre escuro, contraste confortável.
 
 ## Escopo
-- **Light mode**: intocado.
-- **Identidade Receitas / Despesas / Dívidas / Investimentos**: mantida, apenas ajustada para tons profundos e dessaturados.
-- **Componentes afetados (visualmente)**: `FinancialSummary`, `ExpenseTable`, `IncomeTable`, `FixedExpensesTable`, `InstallmentTracker`, `InvestmentsTracker`, `BillsDueCards`, `Calculator`, `Notes`, `Dashboard` (cards/listas), tabelas em geral. Nenhuma alteração em props, JSX, lógica ou ordem dos elementos.
+- **Componente único**: `src/components/casa/GroceryList.tsx`
+- **Estilos**: `src/index.css` (utilities novas, escopadas em `.dark`)
+- **Light mode**: 100% intocado (todas as classes `bg-green-500` etc continuam ativas no light).
+- **Estrutura, layout, espaçamentos, textos, ordem das categorias e funcionalidades**: nenhuma mudança.
 
 ## O que será alterado
 
-### 1. Tokens globais do tema escuro (`src/index.css`, bloco `.dark`)
-Substituir os HSL atuais pelos tons premium pedidos:
+### 1. `GroceryList.tsx` — adicionar classes wrapper (sem trocar JSX)
+Acrescentar marcadores semânticos para permitir overrides no dark, sem alterar comportamento:
 
-| Token | Valor (HSL) | Hex aprox. |
-|---|---|---|
-| `--background` | `222 16% 7%` | #0F1115 |
-| `--card` | `222 14% 11%` | #161A22 |
-| `--popover` | `222 14% 11%` | #161A22 |
-| `--secondary` / `--muted` | `222 14% 14%` | #1B2030 |
-| `--foreground` / `--card-foreground` | `0 0% 100%` | #FFFFFF |
-| `--muted-foreground` | `220 8% 67%` | #A1A7B3 |
-| `--border` / `--input` | `222 12% 18%` | #2A3042 |
-| `--ring` | `220 8% 70%` | cinza claro |
+- Card da categoria: `className="grocery-card …"` + `data-color={cat.color}`
+- Header colorido: `className="grocery-header bg-green-500 …"` (mantém a cor do light)
+- Corpo: `className="grocery-body …"`
+- Input "Adicionar...": `className="grocery-input …"`
+- Botão `+`: `className="grocery-add-btn …"`
+- Lixeira do header: `className="grocery-trash …"`
 
-Texto auxiliar (`#8A90A0`) fica disponível via `text-muted-foreground/80` quando necessário, sem novo token.
+Nenhuma mudança em props, hooks, dados, ordem de elementos ou texto.
 
-### 2. Identidade financeira (cards de resumo)
-Reescrever as 4 famílias em `.dark` com tons profundos e baixa saturação:
+### 2. `index.css` — bloco novo de utilities `.dark` para mercado
 
-| Card | Fundo | Borda (~20% opac) | Texto/ícone |
-|---|---|---|---|
-| Receitas (dourado escuro) | `38 35% 12%` | `38 55% 32%` | `42 75% 70%` |
-| Despesas (roxo profundo) | `258 22% 14%` | `258 35% 32%` | `258 60% 78%` |
-| Dívidas (vermelho vinho) | `350 28% 13%` | `350 40% 32%` | `350 70% 76%` |
-| Investimentos (verde petróleo) | `175 35% 11%` | `175 40% 28%` | `170 50% 70%` |
+**a) Headers de categoria — versões "fechadas" no dark**
+Para cada cor existente (`bg-green-500`, `bg-red-500`, `bg-blue-600`, `bg-purple-500`, `bg-orange-500`, `bg-yellow-600`, `bg-cyan-500`, `bg-pink-500`, `bg-indigo-600`), regra:
 
-Também ajustar `--income` / `--expense` para acompanharem (mesma família, tom escuro).
+```css
+.dark .grocery-card[data-color="bg-green-500"] .grocery-header {
+  background: hsl(142 45% 28%);
+}
+.dark .grocery-card[data-color="bg-green-500"] {
+  border-bottom: 1px solid hsl(142 70% 50% / 0.20);
+}
+```
 
-### 3. Tabelas (`.table-cell`, `.table-header-dark`)
-- Linhas alternadas: criar utility nova `.dark .table-row-alt` baseada em `hsl(var(--card)/0.55)` para zebra discreto sem brancos.
-- Hover: `hover:bg-muted/60` (já presente em vários lugares — apenas garantir o token novo).
-- Bordas das células passam a usar o novo `--border` mais sutil (#2A3042).
-- Nenhuma mudança de markup nas tabelas; só os tokens já consumidos por elas.
+Mapeamento das cores fechadas:
 
-### 4. Calculadora (`Calculator.tsx`)
-Adicionar overrides via classes existentes (sem trocar JSX), através de novas regras CSS escopadas:
-- `.dark .calc-shell` → fundo `#0B0D12` (mais escuro que o app).
-- `.dark .calc-key` → relevo suave (gradiente sutil + sombra interna 1px).
-- `.dark .calc-key-action` (=, AC) → usar `--accent` em tom dourado escuro `38 70% 48%`.
-- `.dark .calc-display` → sombra interna `inset 0 2px 8px rgba(0,0,0,.5)`.
+| Cor original | Header dark (HSL) |
+|---|---|
+| `bg-green-500` | `142 45% 28%` |
+| `bg-red-500` | `0 50% 32%` |
+| `bg-blue-600` | `220 50% 32%` |
+| `bg-purple-500` | `265 40% 32%` |
+| `bg-orange-500` | `25 55% 30%` |
+| `bg-yellow-600` | `40 55% 28%` |
+| `bg-cyan-500` | `190 50% 28%` |
+| `bg-pink-500` | `335 45% 32%` |
+| `bg-indigo-600` | `240 40% 35%` |
 
-Se as classes acima ainda não existirem no Calculator, serão adicionadas em `className` apenas (sem alterar estrutura, props ou lógica).
+Resultado: header colorido mas sóbrio, com linha sutil da cor viva (20% opacidade) separando do corpo.
 
-### 5. Notas (`Notes.tsx`)
-- `.dark .notes-shell` → fundo grafite com leve viés rosa: `340 12% 10%`.
-- Header/ícone permanecem com acento rosa em `--accent`, mas saturação reduzida no dark.
-- Remover qualquer rosa claro presente apenas no dark.
+**b) Corpo do card**
+```css
+.dark .grocery-card { background: hsl(222 14% 11%); border-color: hsl(222 12% 18%); }
+.dark .grocery-body { background: hsl(222 16% 8%); } /* ligeiramente mais escuro */
+```
 
-### 6. Vencimentos (`BillsDueCards.tsx`)
-- Aplicar a mesma lógica dos cards de resumo: fundo escuro tingido + número do dia em `text-foreground` (branco) + textos secundários em `text-muted-foreground`.
-- Ajustes feitos via tokens já consumidos (`--card-*`), portanto não precisa tocar no componente.
+**c) Input "Adicionar…"**
+```css
+.dark .grocery-input {
+  background: hsl(222 18% 6%);          /* mais escuro que o card */
+  border-color: hsl(222 12% 16%);
+  color: hsl(0 0% 100%);
+}
+.dark .grocery-input::placeholder { color: hsl(222 8% 52%); } /* #6F7688 */
+.dark .grocery-input:focus-visible { border-color: hsl(222 12% 24%); }
+```
 
-### 7. Sombras e profundidade
-Adicionar utilities em `@layer components`:
-- `.shadow-premium` → `0 1px 0 hsl(0 0% 100% / 0.04) inset, 0 8px 24px -12px rgba(0,0,0,.6)`
-- Aplicar somente onde já existe `shadow-sm` em cards financeiros (substituição direta por `dark:shadow-premium`).
+**d) Botão `+` com hover na cor da categoria**
+```css
+.dark .grocery-add-btn {
+  background: hsl(222 14% 14%);
+  color: hsl(0 0% 96%);
+  border: 1px solid hsl(222 12% 18%);
+}
+.dark .grocery-card[data-color="bg-green-500"] .grocery-add-btn:hover {
+  background: hsl(142 45% 22%);
+  box-shadow: 0 0 0 1px hsl(142 70% 50% / 0.3);
+}
+/* …repete para cada cor… */
+```
+
+**e) Lixeira do header — neutra por padrão, vermelha só no hover**
+```css
+.dark .grocery-trash { opacity: 0.45; }
+.dark .grocery-trash:hover { opacity: 1; }
+.dark .grocery-trash:hover svg { color: hsl(0 75% 62%); }
+```
+
+**f) Card "Adicionar Categoria" e header da seção**
+- O form usa `bg-card` e `border-border`, já herda os tokens premium aplicados no dark global anterior — **sem mudanças necessárias**.
+- O `ModuleTip` (card de dicas) já é tematizado por tokens — **sem mudanças necessárias**.
 
 ## O que NÃO será alterado
-- Layout, grids, posições, espaçamentos, fontes, ícones e textos.
-- Comportamento dos componentes, hooks, dados, queries e estado.
-- Light mode (todos os tokens light permanecem como estão).
-- Outras abas (Saúde, Rotina, Casa, etc.) — só herdam os ajustes globais de `--background`/`--card`/`--border`/`--foreground` no dark, que já melhoram a leitura sem mudar identidade.
+- Light mode da aba Mercado.
+- Cores das categorias no light (continuam vívidas).
+- Estrutura JSX, ordem dos elementos, espaçamentos, fontes, textos, emojis.
+- Lógica, hooks, persistência ou qualquer comportamento.
+- Outras abas de Casa (Cleaning, Pantry, etc.).
 
 ## Detalhes técnicos
-- Tudo via CSS variables HSL já consumidas pelo Tailwind config — nenhum hex hardcoded em componentes.
-- Mudanças concentradas em: `src/index.css` (bloco `.dark` + novas utilities). Toques mínimos em `Calculator.tsx` e `Notes.tsx` somente para adicionar classes wrapper (`calc-shell`, `notes-shell`) caso ainda não existam.
-- Os 4 paletas alternativos (`midnight`, `ocean`, `rose`, `forest`) continuam sobrescrevendo tokens via `paletteVars` — para manter consistência, esta refatoração aplica-se à paleta `default` (a que o usuário usa). As outras paletas seguem como estão.
+- Override por `data-color` evita duplicar classes no JSX e mantém o light mode usando as classes Tailwind brutas.
+- Nenhum hex hardcoded em componente — apenas em `index.css` como utilities encapsuladas.
+- Sem novas dependências.
 
 ## Resultado esperado
-- Background grafite confortável, sem preto puro nem brancos agressivos.
-- Cards financeiros com identidade preservada, porém escuros e elegantes.
-- Tabelas legíveis com zebra sutil e sem linhas brancas.
-- Calculadora com profundidade e teclas de ação destacadas.
-- Notas em tom escuro com acento rosa controlado.
-- Aparência de produto pago premium, alinhada a Notion/Linear/Stripe.
+- Background grafite (#0F1115 herdado), cards escuros (#161A22), corpo dos itens em #141824.
+- Headers de categoria com cores reconhecíveis mas em tons fechados — sem blocos vibrantes que cansam a vista.
+- Linha de 1px sutil na cor viva da categoria separando header do corpo.
+- Input mais escuro que o card, placeholder em cinza médio.
+- Botão `+` neutro, ganha brilho sutil na cor da categoria no hover.
+- Lixeira discreta, vermelha só no hover.
+- Sensação Notion/Linear: organizado, silencioso, premium.

@@ -26,9 +26,22 @@ const Auth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const { signUp, signIn } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const handleGoogleAuth = async () => {
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: getAuthRedirectUrl("/") },
+    });
+    if (error) {
+      toast({ title: "Erro ao entrar com Google", description: error.message, variant: "destructive" });
+      setGoogleLoading(false);
+    }
+  };
 
   // Show welcome screen only if user hasn't seen it before
   const [showWelcome, setShowWelcome] = useState(() => {

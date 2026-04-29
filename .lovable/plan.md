@@ -1,58 +1,42 @@
-# Corrigir redirect "localhost" após confirmar email — usar coreaplicativo.com.br
-
 ## Problema
-Quando o usuário cria conta e clica em "Confirmar" no email, o Safari abre `localhost` e mostra "não pôde se conectar ao servidor". A conta É criada e confirmada — só o redirect final está errado.
 
-## Causa
-`src/hooks/use-auth.tsx` envia `emailRedirectTo: window.location.origin` no `signUp`. Se a conta foi criada a partir do preview ou ambiente local, esse valor é gravado no link do email — e ao clicar, o Supabase volta para esse host (localhost).
+Hoje, quando você abre o app, o **score do dia**, **nome** e **dias consecutivos** mostram zerado/vazio por alguns segundos até o Supabase responder. Só depois eles "pulam" pro valor certo.
 
-Além disso, a **Site URL** no Supabase provavelmente está configurada como `http://localhost:3000`, então mesmo links sem `redirect_to` válido caem nela.
+### Por que acontece
 
-## Domínio de produção (definitivo)
-`https://www.coreaplicativo.com.br`
+No `useUserData` (hook que lê os dados), a lógica é:
 
-## Correções
+1. Ao logar, o `store` em memória começa vazio e `loaded = false`.
+2. Faz uma única query no Supabase pedindo TODOS os dados do usuário.
+3. Enquanto não responde, `useLifeHubData` retorna **defaults zerados** (score=0, streak=0, userName="").
+4. Quando a query termina (300ms a 2s dependendo da rede), tudo aparece de uma vez.
 
-### 1. Forçar o domínio de produção no redirect (código)
-Criar helper `getAuthRedirectUrl(path?: string)` em `src/lib/utils.ts`:
-- Se `window.location.hostname` for `localhost`, `127.0.0.1`, contiver `id-preview--`, `lovableproject.com` ou `lovable.app` → usar `https://www.coreaplicativo.com.br` como base.
-- Caso contrário (já está no domínio real) → usar `window.location.origin`.
-- Concatena o `path` opcional (ex.: `/update-password`).
+O cache local (`localStorage`) **já existe** e é populado, mas ele é **ignorado durante o carregamento** — a função `get()` só lê do localStorage *depois* que `loaded === true`. Ou seja, o cache não está sendo usado para evitar o flash de tela vazia.
 
-Aplicar em:
-- `src/hooks/use-auth.tsx` → `signUp` usa `emailRedirectTo: getAuthRedirectUrl()`
-- `src/pages/ResetPassword.tsx` → `redirectTo: getAuthRedirectUrl('/update-password')`
-- `src/components/home/AccountDrawer.tsx` → mesmo do reset
+## Solução
 
-### 2. Configuração no Supabase (você precisa fazer manualmente)
-Painel Supabase → **Authentication → URL Configuration**:
+Hidratar o `store` em memória **imediatamente do localStorage** assim que o usuário é conhecido, antes da query do Supabase terminar. Quando o Supabase responder, sobrescreve com os dados frescos (mas, na maioria das vezes, já vai estar igual).
 
-- **Site URL:**
-  ```
-  https://www.coreaplicativo.com.br
-  ```
+Resultado: score, nome e streak aparecem **instantaneamente** com o último valor conhecido, e só atualizam se o servidor tiver mudança.
 
-- **Redirect URLs (adicionar todas):**
-  ```
-  https://www.coreaplicativo.com.br/**
-  https://coreaplicativo.com.br/**
-  https://coreaplicativo.lovable.app/**
-  https://id-preview--a6b9b632-5e9d-4f08-912f-dce2025b543a.lovable.app/**
-  http://localhost:8080/**
-  ```
+## Mudanças
 
-Sem isso, mesmo que o código mande o redirect certo, o Supabase rejeita URLs fora da allow list e cai no fallback (Site URL).
+### `src/hooks/use-user-data.tsx`
 
-## Resultado esperado
-- Cadastros pelo site, preview ou local → email sempre leva para `https://www.coreaplicativo.com.br`.
-- Reset de senha → mesma lógica, abre `/update-password` no domínio certo.
-- Fim do erro "Safari não pôde se conectar ao servidor".
+1. Adicionar uma função `hydrateFromLocal(userId)` que varre o `localStorage` procurando chaves `u:{userId}:*` e monta um `store` inicial.
+2. No `useEffect` que dispara quando o `user` muda:
+   - Antes do `loadFromSupabase()`, chamar `hydrateFromLocal(user.id)` e setar `store` + `loaded = true` imediatamente.
+   - Manter `loadFromSupabase()` rodando em background. Quando responder, faz merge (dados do servidor sobrescrevem o cache).
+3. Ajustar a lógica de "trocou de usuário" pra continuar limpando o cache antigo (segurança multi-conta não muda).
 
-## Arquivos a editar
-- `src/lib/utils.ts` (novo helper)
-- `src/hooks/use-auth.tsx`
-- `src/pages/ResetPassword.tsx`
-- `src/components/home/AccountDrawer.tsx`
+### Comportamento resultante
 
-## Sua ação manual
-Atualizar Site URL + Redirect URLs no painel Supabase conforme item 2. Sem esse passo, o código sozinho não resolve.
+- **1ª vez logando** (cache vazio): mesmo comportamento de hoje, mostra defaults até o Supabase responder. Sem regressão.
+- **2ª vez em diante** (cache cheio): score, nome e streak aparecem **na hora**, sem flash.
+- **Trocou de conta**: cache da conta anterior é apagado (já funciona assim).
+
+## Arquivos modificados
+
+- `src/hooks/use-user-data.tsx` (único arquivo)
+
+Sem mudanças no Supabase, sem mudanças no schema, sem novas dependências.

@@ -83,7 +83,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     const isPosterVisible = videoState !== "playing";
     const showPlayButton = videoState === "blocked" || videoState === "error";
-    const showLoader = videoState === "loading";
+    // Don't show a loader on first paint — the poster image already fills the screen.
+    const showLoader = false;
 
     return (
       <motion.div

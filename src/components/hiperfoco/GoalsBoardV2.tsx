@@ -1,8 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { uploadFromInput, isBase64Image, migrateBase64ToStorage } from "@/lib/image-upload";
+
+const DREAM_BUCKET = "dream-board";
 
 
 /* ─── Types ─── */
@@ -78,6 +81,70 @@ export const GoalsBoardV2 = () => {
 
   const goal = goals.find(g => g.id === selectedGoalId) || goals[0];
 
+  // One-shot migration: upload any legacy base64 images to Supabase Storage
+  // and replace them with signed URLs. Runs whenever data loads or changes.
+  const migrationRan = useRef(false);
+  useEffect(() => {
+    if (migrationRan.current) return;
+    const hasLegacy =
+      homeData.dreamBoard.some(isBase64Image) ||
+      Object.values(timeline).some(p => p.image && isBase64Image(p.image)) ||
+      goals.some(g =>
+        (g.heroImage && isBase64Image(g.heroImage)) ||
+        g.referenceImages.some(isBase64Image)
+      );
+    if (!hasLegacy) return;
+    migrationRan.current = true;
+
+    (async () => {
+      // Dream board
+      const newDream = await Promise.all(
+        homeData.dreamBoard.map(async img =>
+          isBase64Image(img) ? (await migrateBase64ToStorage(img, DREAM_BUCKET, "dream-board")) || img : img
+        )
+      );
+      if (newDream.some((v, i) => v !== homeData.dreamBoard[i])) {
+        setHomeData(prev => ({ ...prev, dreamBoard: newDream }));
+      }
+
+      // Timeline images
+      const newTimeline = { ...timeline };
+      let timelineChanged = false;
+      for (const k of Object.keys(newTimeline) as (keyof TimelineData)[]) {
+        const img = newTimeline[k].image;
+        if (img && isBase64Image(img)) {
+          const url = await migrateBase64ToStorage(img, DREAM_BUCKET, `timeline/${k}`);
+          if (url) {
+            newTimeline[k] = { ...newTimeline[k], image: url };
+            timelineChanged = true;
+          }
+        }
+      }
+      if (timelineChanged) setTimeline(newTimeline);
+
+      // Goals (hero + gallery)
+      const newGoals = await Promise.all(
+        goals.map(async g => {
+          const updates: Partial<GoalV2> = {};
+          if (g.heroImage && isBase64Image(g.heroImage)) {
+            const url = await migrateBase64ToStorage(g.heroImage, DREAM_BUCKET, `hero/${g.id}`);
+            if (url) updates.heroImage = url;
+          }
+          if (g.referenceImages.some(isBase64Image)) {
+            updates.referenceImages = await Promise.all(
+              g.referenceImages.map(async img =>
+                isBase64Image(img) ? (await migrateBase64ToStorage(img, DREAM_BUCKET, `gallery/${g.id}`)) || img : img
+              )
+            );
+          }
+          return Object.keys(updates).length ? { ...g, ...updates } : g;
+        })
+      );
+      if (newGoals.some((g, i) => g !== goals[i])) setGoals(newGoals);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goals.length, homeData.dreamBoard.length]);
+
   const updateGoal = (updated: GoalV2) => setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
 
   const openGoal = (id: string) => { setSelectedGoalId(id); setView("detail"); };
@@ -103,17 +170,13 @@ export const GoalsBoardV2 = () => {
         [period]: { ...prev[period], items: prev[period].items.filter(i => i.id !== itemId) },
       }));
     };
-    const handleTimelineImage = (period: keyof TimelineData, e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setTimeline(prev => ({ ...prev, [period]: { ...prev[period], image: reader.result as string } }));
-      reader.readAsDataURL(file); e.target.value = "";
+    const handleTimelineImage = async (period: keyof TimelineData, e: React.ChangeEvent<HTMLInputElement>) => {
+      const url = await uploadFromInput(e, DREAM_BUCKET, `timeline/${period}`);
+      if (url) setTimeline(prev => ({ ...prev, [period]: { ...prev[period], image: url } }));
     };
-    const handleDreamImage = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => setHomeData(prev => ({ ...prev, dreamBoard: [...prev.dreamBoard, reader.result as string] }));
-      reader.readAsDataURL(file); e.target.value = "";
+    const handleDreamImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const url = await uploadFromInput(e, DREAM_BUCKET, "dream-board");
+      if (url) setHomeData(prev => ({ ...prev, dreamBoard: [...prev.dreamBoard, url] }));
     };
     const addGoal = () => {
       if (!newGoalTitle.trim()) return;
@@ -225,15 +288,11 @@ export const GoalsBoardV2 = () => {
   if (!goal) return null;
 
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "hero" | "gallery") => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      if (type === "hero") updateGoal({ ...goal, heroImage: base64 });
-      else updateGoal({ ...goal, referenceImages: [...goal.referenceImages, base64] });
-    };
-    reader.readAsDataURL(file); e.target.value = "";
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: "hero" | "gallery") => {
+    const url = await uploadFromInput(e, DREAM_BUCKET, type === "hero" ? `hero/${goal.id}` : `gallery/${goal.id}`);
+    if (!url) return;
+    if (type === "hero") updateGoal({ ...goal, heroImage: url });
+    else updateGoal({ ...goal, referenceImages: [...goal.referenceImages, url] });
   };
   const toggleTask = (groupId: string, taskId: string) => {
     updateGoal({ ...goal, actionGroups: goal.actionGroups.map(g => g.id === groupId ? { ...g, tasks: g.tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t) } : g) });

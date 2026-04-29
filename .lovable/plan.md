@@ -1,47 +1,54 @@
-## Diagnóstico
+## Excluir contas de teste das analíticas do admin
 
-O "bug" que você vê ao abrir/recarregar é um **FOUC (Flash of Unstyled Content)** — mais especificamente um flash do tema claro antes do dark mode ser aplicado.
+### Contas a ignorar
+- `jv20101958@gmail.com`
+- `hyperarr@gmail.com`
+- `street.store.brasil@gmail.com`
 
-### Por que acontece
+### Abordagem
 
-1. O HTML (`index.html`) carrega com a tag `<html>` **sem** a classe `dark` e sem nenhuma cor de fundo definida.
-2. O navegador renderiza um instante com o background padrão do CSS (claro).
-3. Só depois o React monta, o `ThemeProvider` roda o `useEffect` lendo `localStorage.getItem("core-theme-mode")` e adiciona `classList.add("dark")` no `<html>`.
-4. Resultado: um "piscar" branco/claro de ~100–300 ms antes do dark mode aparecer. Também acontece flash da paleta (rose/midnight/etc.) porque as variáveis CSS só são aplicadas via `useEffect`.
+Criar uma função SQL helper `public.is_test_user(_user_id uuid)` que retorna `true` se o e-mail do usuário em `auth.users` estiver na lista de testes. Centralizar a lista num só lugar facilita adicionar/remover contas no futuro.
 
-Isso é um problema clássico de SPA com tema persistido — não tem nada a ver com Supabase, dados ou o dark mode novo do Mercado/Finanças.
+Em seguida, atualizar todas as funções `admin_*` que agregam métricas para filtrar usuários de teste com `WHERE NOT public.is_test_user(user_id)`.
 
-## Solução
+### Funções a atualizar
 
-Aplicar o tema **antes** do React montar, via um pequeno script inline no `<head>` do `index.html` (executa síncrono, antes do primeiro paint).
+1. **`admin_metrics_overview`** — total_users, active_24h/7d/30d, signups_30d, paid_active, trial_active, canceled_30d, conversion/churn rates, MRR.
+2. **`admin_list_users`** — esconder as 3 contas da listagem.
+3. **`admin_module_funnel`** — funil de uso por módulo.
+4. **`admin_at_risk_users`** — usuários em risco de churn.
+5. **`admin_conversion_by_trial_day`** — conversões por dia do trial.
+6. **`admin_activation_funnel`** — funil de ativação.
+7. **`admin_nudge_stats`** — estatísticas de nudges.
+8. **`admin_email_variant_stats`** — variantes de e-mail.
+9. **`admin_retention_stats`** — cancel attempts, save rate.
+10. **`admin_retention_offers_breakdown`** — ofertas de retenção.
+11. **`admin_winback_stats`** — winback (triggered, converted, etc).
 
-### Mudanças
-
-**1. `index.html`** — adicionar script inline no `<head>`, antes do `<script type="module">`:
-
-- Lê `core-theme-mode` do localStorage e adiciona a classe `dark` em `<html>` se necessário.
-- Lê `core-theme-palette` e aplica as variáveis CSS da paleta correspondente direto no `documentElement.style`.
-- Define um `background-color` inicial no `<html>` correspondente ao tema, para zero flash mesmo antes do CSS principal carregar.
-- Adicionar também `<meta name="color-scheme" content="light dark">` para o navegador respeitar o tema do scrollbar e form controls desde o primeiro frame.
-
-**2. `src/hooks/use-theme.tsx`** — pequeno ajuste:
-
-- Manter a lógica atual (ela continua sincronizando), mas garantir que o estado inicial do `useState` espelhe exatamente o que o script inline já aplicou (já espelha hoje, só validar).
-- Sem mudanças funcionais — apenas garantir que o `useEffect` não cause re-aplicação visível.
+Em todas, o filtro é o mesmo: `AND NOT public.is_test_user(<coluna user_id da tabela base>)`.
 
 ### Detalhes técnicos
 
-O script inline será minificado, ~600 bytes, contendo um objeto com as paletas (mesmas chaves de `paletteVars` do hook). Para evitar duplicação, podemos extrair as paletas para um arquivo JSON consumido tanto pelo hook quanto pelo script (via build) — porém, dado o tamanho, **manter um snippet inline compacto no `index.html`** é a abordagem mais simples e zero-overhead. Documentaremos no topo do `use-theme.tsx` que qualquer mudança nas paletas precisa ser refletida no `index.html`.
-
-```text
-index.html (head)
-  └── <script>aplica dark + paleta antes do React</script>
-       └── <html class="dark" style="--background:...; background:hsl(...)">
-            └── React monta já no tema correto → sem flash
+```sql
+-- Helper centralizada
+CREATE OR REPLACE FUNCTION public.is_test_user(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM auth.users u
+    WHERE u.id = _user_id
+      AND lower(u.email) IN (
+        'jv20101958@gmail.com',
+        'hyperarr@gmail.com',
+        'street.store.brasil@gmail.com'
+      )
+  );
+$$;
 ```
 
-## Resultado esperado
+A migração faz `CREATE OR REPLACE FUNCTION` em cada função admin, mantendo assinatura idêntica (mesmos parâmetros, mesmo retorno) — apenas adicionando os filtros. Nenhum frontend precisa mudar.
 
-- Recarregar a página em qualquer tema/paleta: sem flash, sem piscar branco.
-- Primeira visita (sem preferência salva): renderiza direto no tema claro padrão (sem flash também).
-- Nenhuma mudança de comportamento, layout ou funcionalidade.
+### Resultado
+
+Dashboard, Conversão, Churn, Funil, Ativação, Retenção, Winback, Usuários, Onboarding e Emails do admin passam a ignorar essas 3 contas. As contas continuam funcionando normalmente no app — apenas não aparecem nas métricas.

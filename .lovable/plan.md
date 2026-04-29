@@ -1,58 +1,54 @@
-## Problema observado no vídeo
+## Excluir contas de teste das analíticas do admin
 
-No iPhone real (430×697), ao abrir/recarregar a tela inicial:
-1. **Bug do texto solto no topo**: por uma fração de segundo, o texto "Organize sua vida em um só lugar" + os botões aparecem encostados no topo da tela, sem o iPhone, antes do layout finalizar.
-2. **iPhone ficou menor e com borda mais grossa** do que estava antes da última alteração.
+### Contas a ignorar
+- `jv20101958@gmail.com`
+- `hyperarr@gmail.com`
+- `street.store.brasil@gmail.com`
 
-## Causa
+### Abordagem
 
-Na última edição introduzimos no mobile:
-- `max-width: min(78vw, 250px)` no `.iphone-frame` (antes era `78vw` sem cap → ~335px no iPhone Pro). Isso encolheu o mockup e visualmente "engrossou" a borda relativa.
-- Grid `grid-rows-[minmax(0,1fr)_auto]` com a célula do iPhone usando `h-full` + `clamp(300px, 54svh, 600px)`. Combinado com a regra `!important` no CSS de `height: min(54svh, 430px)`, em alguns frames iniciais (antes do `svh` resolver / video poster carregar) a célula colapsa e o texto sobe.
-- A regra `@media (max-width: 767px) .iphone-frame { ... !important }` está sobrescrevendo o estilo inline do componente, criando inconsistência entre o que o JSX pede e o que renderiza.
+Criar uma função SQL helper `public.is_test_user(_user_id uuid)` que retorna `true` se o e-mail do usuário em `auth.users` estiver na lista de testes. Centralizar a lista num só lugar facilita adicionar/remover contas no futuro.
 
-## O que vou fazer
+Em seguida, atualizar todas as funções `admin_*` que agregam métricas para filtrar usuários de teste com `WHERE NOT public.is_test_user(user_id)`.
 
-### 1. `src/index.css` — remover overrides agressivos do iPhone
+### Funções a atualizar
 
-Remover o bloco de media query que encolhe o frame e o cap de 250px:
+1. **`admin_metrics_overview`** — total_users, active_24h/7d/30d, signups_30d, paid_active, trial_active, canceled_30d, conversion/churn rates, MRR.
+2. **`admin_list_users`** — esconder as 3 contas da listagem.
+3. **`admin_module_funnel`** — funil de uso por módulo.
+4. **`admin_at_risk_users`** — usuários em risco de churn.
+5. **`admin_conversion_by_trial_day`** — conversões por dia do trial.
+6. **`admin_activation_funnel`** — funil de ativação.
+7. **`admin_nudge_stats`** — estatísticas de nudges.
+8. **`admin_email_variant_stats`** — variantes de e-mail.
+9. **`admin_retention_stats`** — cancel attempts, save rate.
+10. **`admin_retention_offers_breakdown`** — ofertas de retenção.
+11. **`admin_winback_stats`** — winback (triggered, converted, etc).
 
-```text
-remover:
-@media (max-width: 767px) {
-  .iphone-frame {
-    height: min(54svh, 430px) !important;
-    max-width: min(78vw, 250px) !important;
-  }
-}
+Em todas, o filtro é o mesmo: `AND NOT public.is_test_user(<coluna user_id da tabela base>)`.
+
+### Detalhes técnicos
+
+```sql
+-- Helper centralizada
+CREATE OR REPLACE FUNCTION public.is_test_user(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM auth.users u
+    WHERE u.id = _user_id
+      AND lower(u.email) IN (
+        'jv20101958@gmail.com',
+        'hyperarr@gmail.com',
+        'street.store.brasil@gmail.com'
+      )
+  );
+$$;
 ```
 
-Manter as melhorias de clipping (`contain: paint`, `isolation`, `mask-image`, `border-radius: inherit` no video/img) que resolvem o "branco na borda" no PC.
+A migração faz `CREATE OR REPLACE FUNCTION` em cada função admin, mantendo assinatura idêntica (mesmos parâmetros, mesmo retorno) — apenas adicionando os filtros. Nenhum frontend precisa mudar.
 
-### 2. `src/components/WelcomeScreen.tsx` — voltar dimensões originais do iPhone
+### Resultado
 
-Reverter os valores inline para os de antes:
-
-```text
-height:  "min(60vh, 600px)"   (antes era 60vh, não 54svh)
-maxWidth: "78vw"              (sem cap de 360px)
-```
-
-### 3. Corrigir o "texto pulando para o topo" sem reintroduzir o bug do iPhone sumido
-
-Causa real do flash: o container externo é `justify-between` num `flex flex-col`, então enquanto o filho intermediário (grid com iPhone) ainda não tem altura medida, o segundo bloco sobe.
-
-Solução:
-- Trocar `justify-between` por `justify-center` no wrapper externo (`fixed inset-0 ... flex flex-col`), já que só há um filho de conteúdo.
-- Garantir que o grid mobile reserve espaço para o iPhone com `grid-rows-[1fr_auto]` (sem `minmax(0,1fr)` que permite colapso a 0) e a célula do iPhone com `min-height: 0` mas `align-self: stretch`.
-- Manter `initial={false}` nas animações (já está) para que tudo apareça junto no primeiro frame, sem fade-in escalonado que acentua o "pulo".
-
-### 4. Validação
-
-- Testar em 430×697 (iPhone Pro Max) e 375×812 (iPhone padrão): iPhone deve aparecer no mesmo tamanho de antes (mais largo, borda relativa fina), texto e botões abaixo, sem flash do texto no topo.
-- Confirmar que o clipping arredondado do vídeo continua perfeito no desktop (sem branco nas bordas).
-
-## Arquivos alterados
-
-- `src/components/WelcomeScreen.tsx`
-- `src/index.css`
+Dashboard, Conversão, Churn, Funil, Ativação, Retenção, Winback, Usuários, Onboarding e Emails do admin passam a ignorar essas 3 contas. As contas continuam funcionando normalmente no app — apenas não aparecem nas métricas.

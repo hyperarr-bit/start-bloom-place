@@ -88,16 +88,16 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <motion.div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6 pt-10 pb-8"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6 pt-10 pb-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, transition: { duration: 0.4 } }}
         onClick={handleScreenTap}
       >
-        <div className="flex-1 grid grid-rows-[minmax(0,1fr)_auto] md:grid-rows-1 md:grid-cols-[minmax(0,0.9fr)_minmax(320px,0.8fr)] items-center justify-items-center gap-5 md:gap-16 max-w-4xl w-full min-h-0">
+        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 max-w-4xl w-full min-h-0">
           {/* iPhone CSS mockup */}
           <motion.div
-            className="relative z-10 flex items-center justify-center w-full h-full min-h-0"
+            className="relative z-10 flex items-center justify-center shrink min-h-0"
             initial={false}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
@@ -106,8 +106,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               className="iphone-frame relative"
               style={{
                 aspectRatio: "9 / 19.5",
-                height: "clamp(300px, 54svh, 600px)",
-                maxWidth: "min(78vw, 360px)",
+                height: "min(60vh, 600px)",
+                maxWidth: "78vw",
               }}
             >
               {/* Side buttons */}

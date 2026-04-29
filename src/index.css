@@ -522,13 +522,6 @@
   border-radius: inherit;
 }
 
-@media (max-width: 767px) {
-  .iphone-frame {
-    height: min(54svh, 430px) !important;
-    max-width: min(78vw, 250px) !important;
-  }
-}
-
 /* Side buttons */
 .iphone-btn {
   position: absolute;

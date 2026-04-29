@@ -35,16 +35,12 @@ const checkActivation = (key: string, value: any) => {
 };
 
 // ---------------------------------------------------------------------------
-// Per-user localStorage helpers.
-// All app data is namespaced under `u:{userId}:{key}` so that two accounts on
-// the same browser cannot read each other's cached values.
+// Per-user localStorage cache (instant hydration on app open). We KEEP this
+// as a fast cache layer — Supabase remains the source of truth, but reading
+// from localStorage first means UI is interactive immediately on reload.
 //
 // Keys that are intentionally global (i.e. not user data) and should NOT be
 // purged on logout/user switch:
-//   - "core-welcome-done"        (one-time onboarding splash)
-//   - "theme"                    (light/dark preference)
-//   - "vite-ui-theme"            (theme persistence by ui lib)
-//   - "finance-keys-migrated-v2" (one-time legacy migration flag)
 // ---------------------------------------------------------------------------
 const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "core-welcome-done",
@@ -65,10 +61,6 @@ const safeRemoveItem = (k: string) => {
   try { localStorage.removeItem(k); } catch {}
 };
 
-/**
- * Read a value from the current user's namespaced localStorage cache.
- * Exported so non-React code (e.g. finance helpers) can stay in sync.
- */
 export const readUserLocal = (userId: string | null | undefined, key: string): any => {
   if (!userId) return null;
   const raw = safeGetItem(userKey(userId, key));
@@ -76,20 +68,11 @@ export const readUserLocal = (userId: string | null | undefined, key: string): a
   try { return JSON.parse(raw); } catch { return null; }
 };
 
-/**
- * Write a value to the current user's namespaced localStorage cache.
- * Used by helpers that mutate user data outside the React tree.
- */
 export const writeUserLocal = (userId: string | null | undefined, key: string, value: any) => {
   if (!userId) return;
   safeSetItem(userKey(userId, key), JSON.stringify(value));
 };
 
-/**
- * Purge every cached entry that belongs to a user namespace, plus any legacy
- * non-prefixed app data keys left over from before the multi-user fix.
- * Global preferences (see GLOBAL_KEY_ALLOWLIST) are preserved.
- */
 export const purgeUserLocalCache = () => {
   try {
     const toRemove: string[] = [];
@@ -97,8 +80,6 @@ export const purgeUserLocalCache = () => {
       const k = localStorage.key(i);
       if (!k) continue;
       if (GLOBAL_KEY_ALLOWLIST.has(k)) continue;
-      // Per-user namespace, OR legacy app keys (anything that looks like our
-      // historical data: finance-*, home-*, core-*, life-*, etc.).
       if (
         k.startsWith("u:") ||
         k.startsWith("finance-") ||
@@ -121,11 +102,20 @@ interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
   set: (key: string, value: any) => void;
   loaded: boolean;
+  /** Lazy fetch a single heavy key from Supabase on demand. */
+  fetchKey: <T>(key: string) => Promise<T | null>;
 }
 
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
 
 const DEBOUNCE_MS = 250;
+// Keys above this size (in serialized JSON bytes) are NOT loaded in the
+// initial bulk fetch — they're loaded lazily by the modules that need them.
+// 50 KB is a sweet spot: it keeps all "normal" app state in the warm path
+// while sparing the home/launch from waiting on bloated entries.
+const HEAVY_KEY_BYTES = 50_000;
+// Anything bigger than this is logged as a warning when written.
+const WRITE_WARN_BYTES = 100_000;
 
 export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
@@ -135,35 +125,30 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const userRef = useRef(user);
   const lastUserIdRef = useRef<string | null>(null);
+  const inFlightFetches = useRef<Map<string, Promise<any>>>(new Map());
 
-  // Keep the ref in sync AND react to user changes (login, logout, switch).
+  // Sync ref + react to user changes (login/logout/switch).
   useEffect(() => {
     const prevUserId = lastUserIdRef.current;
     const nextUserId = user?.id ?? null;
     userRef.current = user;
 
-    // First mount with a user: nothing to clear.
-    // User switched (incl. logout): wipe in-memory store and the previous
-    // user's local cache so nothing leaks into the next session.
     if (prevUserId !== nextUserId) {
-      // Cancel any pending writes from the previous user — those would otherwise
-      // get re-attributed to the new one.
       if (flushTimer.current) {
         clearTimeout(flushTimer.current);
         flushTimer.current = null;
       }
       pendingWrites.current = {};
+      inFlightFetches.current.clear();
       setStore({});
       setLoaded(false);
-      // Always purge to be safe (also clears legacy non-prefixed keys).
       purgeUserLocalCache();
       lastUserIdRef.current = nextUserId;
     }
   }, [user]);
 
-  // Load all data from Supabase whenever the active user changes.
-  // Hydrate from localStorage FIRST (instant) so UI shows last-known values
-  // immediately, then refresh from Supabase in the background.
+  // Load user_data: instant from localStorage cache, then refresh light keys
+  // from Supabase. Heavy keys are loaded on demand via fetchKey().
   useEffect(() => {
     if (!user) {
       setLoaded(true);
@@ -184,19 +169,24 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       }
       if (Object.keys(cached).length > 0) {
         setStore(cached);
-        setLoaded(true); // unblock UI immediately with cached values
+        setLoaded(true);
       }
     } catch {}
 
-    // 2) Background refresh from Supabase — overwrites cache with fresh data.
-    let cancelled = false;
+    // 2) Background refresh from Supabase — only "light" keys to keep payload tiny.
+    const ac = new AbortController();
     const loadFromSupabase = async () => {
       const { data, error } = await (supabase as any)
         .from("user_data")
         .select("key, value")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .filter("value", "not.is", null)
+        // Only fetch keys whose serialized JSON is under HEAVY_KEY_BYTES.
+        // Heavy ones (e.g. dream board base64) are loaded lazily by their owners.
+        .lt("length(value::text)", HEAVY_KEY_BYTES)
+        .abortSignal(ac.signal);
 
-      if (cancelled) return;
+      if (ac.signal.aborted) return;
 
       if (!error && data) {
         const map: Record<string, any> = {};
@@ -204,23 +194,79 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           map[row.key] = row.value;
           safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
         });
-        // Merge: server values win, but keep any local-only keys (e.g. pending
-        // writes that haven't been flushed yet).
+        // Server values win for light keys; preserve heavy keys already in cache.
         setStore(prev => ({ ...prev, ...map }));
-      } else if (error) {
-        console.error("[user-data] failed to load:", error);
+      } else if (error && error.message && !error.message.includes("aborted")) {
+        // PostgREST may not support length() filter on jsonb directly — fall back
+        // to a plain select if so.
+        if (String(error.message).toLowerCase().includes("length")) {
+          const { data: full, error: fullErr } = await (supabase as any)
+            .from("user_data")
+            .select("key, value")
+            .eq("user_id", user.id)
+            .abortSignal(ac.signal);
+          if (ac.signal.aborted) return;
+          if (!fullErr && full) {
+            const map: Record<string, any> = {};
+            full.forEach((row: any) => {
+              const size = JSON.stringify(row.value || "").length;
+              if (size < HEAVY_KEY_BYTES) {
+                map[row.key] = row.value;
+                safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
+              }
+            });
+            setStore(prev => ({ ...prev, ...map }));
+          }
+        } else {
+          console.error("[user-data] failed to load:", error);
+        }
       }
       setLoaded(true);
     };
 
     loadFromSupabase();
-    return () => { cancelled = true; };
+    return () => { ac.abort(); };
   }, [user]);
 
-  // Persist a single key (with retry on failure).
+  // Lazy fetch a single key (used for heavy entries like dream board).
+  const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
+    const userId = userRef.current?.id;
+    if (!userId) return null;
+
+    // Already in store? return it.
+    if (key in store) return store[key] as T;
+
+    // Coalesce concurrent fetches for the same key.
+    const cached = inFlightFetches.current.get(key);
+    if (cached) return cached as Promise<T | null>;
+
+    const p = (async () => {
+      const { data, error } = await (supabase as any)
+        .from("user_data")
+        .select("value")
+        .eq("user_id", userId)
+        .eq("key", key)
+        .maybeSingle();
+
+      if (error) {
+        console.error(`[user-data] fetchKey "${key}" failed:`, error);
+        inFlightFetches.current.delete(key);
+        return null;
+      }
+      const value = data?.value ?? null;
+      if (value !== null && userRef.current?.id === userId) {
+        setStore(prev => ({ ...prev, [key]: value }));
+        safeSetItem(userKey(userId, key), JSON.stringify(value));
+      }
+      inFlightFetches.current.delete(key);
+      return value;
+    })();
+
+    inFlightFetches.current.set(key, p);
+    return p;
+  }, [store]);
+
   const persistKey = useCallback(async (userId: string, key: string, value: any, attempt = 0) => {
-    // Defensive: if the active user changed mid-flight, drop the write rather
-    // than attribute it to the new user.
     if (userRef.current?.id !== userId) return;
     const { error } = await (supabase as any)
       .from("user_data")
@@ -233,24 +279,16 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Flush all pending writes to Supabase.
   const flush = useCallback(() => {
     const userId = userRef.current?.id;
     if (!userId) return;
     const writes = { ...pendingWrites.current };
     pendingWrites.current = {};
-    const entries = Object.entries(writes);
-    if (entries.length === 0) return;
-    entries.forEach(([key, value]) => {
-      persistKey(userId, key, value);
-    });
+    Object.entries(writes).forEach(([key, value]) => persistKey(userId, key, value));
   }, [persistKey]);
 
   const get = useCallback(<T,>(key: string, fallback: T): T => {
     if (key in store) return store[key] as T;
-    // Only fall back to localStorage when we have a user AND we've already
-    // loaded from Supabase at least once. Otherwise we risk returning stale
-    // data from a previous session/account before hydration completes.
     const userId = userRef.current?.id;
     if (!userId || !loaded) return fallback;
     const raw = safeGetItem(userKey(userId, key));
@@ -259,6 +297,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, [store, loaded]);
 
   const set = useCallback((key: string, value: any) => {
+    // Size guard — warn if a write would create an oversized entry.
+    if (process.env.NODE_ENV !== "production") {
+      try {
+        const size = JSON.stringify(value ?? "").length;
+        if (size > WRITE_WARN_BYTES) {
+          console.warn(
+            `[user-data] key "${key}" is ${(size / 1024).toFixed(0)} KB — ` +
+            `consider uploading binary data to Supabase Storage instead of inlining base64.`
+          );
+        }
+      } catch {}
+    }
+
     setStore(prev => ({ ...prev, [key]: value }));
     const userId = userRef.current?.id;
     if (userId) {
@@ -270,7 +321,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [flush]);
 
-  // Force flush on tab hide / page unload (mobile-safe).
+  // Force flush on tab hide / unload.
   useEffect(() => {
     const forceFlush = () => {
       if (flushTimer.current) {
@@ -294,7 +345,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, [flush]);
 
   return (
-    <UserDataContext.Provider value={{ get, set, loaded }}>
+    <UserDataContext.Provider value={{ get, set, loaded, fetchKey }}>
       {children}
     </UserDataContext.Provider>
   );

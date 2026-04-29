@@ -162,12 +162,33 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   // Load all data from Supabase whenever the active user changes.
+  // Hydrate from localStorage FIRST (instant) so UI shows last-known values
+  // immediately, then refresh from Supabase in the background.
   useEffect(() => {
     if (!user) {
       setLoaded(true);
       return;
     }
 
+    // 1) Instant hydration from per-user localStorage cache.
+    try {
+      const prefix = `u:${user.id}:`;
+      const cached: Record<string, any> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k || !k.startsWith(prefix)) continue;
+        const realKey = k.slice(prefix.length);
+        const raw = safeGetItem(k);
+        if (!raw) continue;
+        try { cached[realKey] = JSON.parse(raw); } catch {}
+      }
+      if (Object.keys(cached).length > 0) {
+        setStore(cached);
+        setLoaded(true); // unblock UI immediately with cached values
+      }
+    } catch {}
+
+    // 2) Background refresh from Supabase — overwrites cache with fresh data.
     let cancelled = false;
     const loadFromSupabase = async () => {
       const { data, error } = await (supabase as any)
@@ -183,7 +204,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
           map[row.key] = row.value;
           safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
         });
-        setStore(map);
+        // Merge: server values win, but keep any local-only keys (e.g. pending
+        // writes that haven't been flushed yet).
+        setStore(prev => ({ ...prev, ...map }));
       } else if (error) {
         console.error("[user-data] failed to load:", error);
       }

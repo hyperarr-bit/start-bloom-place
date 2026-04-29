@@ -1,42 +1,17 @@
-## Problema
+## Correção do streak (dias consecutivos)
 
-Hoje, quando você abre o app, o **score do dia**, **nome** e **dias consecutivos** mostram zerado/vazio por alguns segundos até o Supabase responder. Só depois eles "pulam" pro valor certo.
+### Bug 1: data em UTC
+`todayStr()` usa `toISOString()`, que retorna UTC. No Brasil (UTC-3), depois das 21h o app já acha que é "amanhã" — o streak quebra ou pula um dia sem motivo.
 
-### Por que acontece
+**Fix:** trocar por `localDateStr()` baseado em `getFullYear/Month/Date` (horário local). Aplicar tanto no `tStr` quanto no `yesterdayStr` para os dois usarem o mesmo fuso.
 
-No `useUserData` (hook que lê os dados), a lógica é:
+### Bug 2: race com a hidratação do cache
+Depois da última mudança, o `useEffect` do streak roda assim que `loaded === true` — ou seja, **com dados do cache local**. Se o servidor tiver um `lastDate` mais recente (ex: você usou em outro dispositivo), o cálculo é feito errado e o `set()` sobrescreve o valor correto que o Supabase ainda nem entregou.
 
-1. Ao logar, o `store` em memória começa vazio e `loaded = false`.
-2. Faz uma única query no Supabase pedindo TODOS os dados do usuário.
-3. Enquanto não responde, `useLifeHubData` retorna **defaults zerados** (score=0, streak=0, userName="").
-4. Quando a query termina (300ms a 2s dependendo da rede), tudo aparece de uma vez.
+**Fix:** atrasar o cálculo do streak em ~800ms via `setTimeout` dentro do `useEffect`, dando tempo do refresh em background do Supabase chegar antes.
 
-O cache local (`localStorage`) **já existe** e é populado, mas ele é **ignorado durante o carregamento** — a função `get()` só lê do localStorage *depois* que `loaded === true`. Ou seja, o cache não está sendo usado para evitar o flash de tela vazia.
+### Arquivo modificado
 
-## Solução
+- `src/hooks/use-life-hub-data.ts` — substituir `todayStr` pela versão local e envolver a lógica do streak em `setTimeout(..., 800)`.
 
-Hidratar o `store` em memória **imediatamente do localStorage** assim que o usuário é conhecido, antes da query do Supabase terminar. Quando o Supabase responder, sobrescreve com os dados frescos (mas, na maioria das vezes, já vai estar igual).
-
-Resultado: score, nome e streak aparecem **instantaneamente** com o último valor conhecido, e só atualizam se o servidor tiver mudança.
-
-## Mudanças
-
-### `src/hooks/use-user-data.tsx`
-
-1. Adicionar uma função `hydrateFromLocal(userId)` que varre o `localStorage` procurando chaves `u:{userId}:*` e monta um `store` inicial.
-2. No `useEffect` que dispara quando o `user` muda:
-   - Antes do `loadFromSupabase()`, chamar `hydrateFromLocal(user.id)` e setar `store` + `loaded = true` imediatamente.
-   - Manter `loadFromSupabase()` rodando em background. Quando responder, faz merge (dados do servidor sobrescrevem o cache).
-3. Ajustar a lógica de "trocou de usuário" pra continuar limpando o cache antigo (segurança multi-conta não muda).
-
-### Comportamento resultante
-
-- **1ª vez logando** (cache vazio): mesmo comportamento de hoje, mostra defaults até o Supabase responder. Sem regressão.
-- **2ª vez em diante** (cache cheio): score, nome e streak aparecem **na hora**, sem flash.
-- **Trocou de conta**: cache da conta anterior é apagado (já funciona assim).
-
-## Arquivos modificados
-
-- `src/hooks/use-user-data.tsx` (único arquivo)
-
-Sem mudanças no Supabase, sem mudanças no schema, sem novas dependências.
+Sem mudanças no schema, sem novas dependências.

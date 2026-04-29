@@ -1,54 +1,25 @@
-## Excluir contas de teste das analíticas do admin
+Entendi o bug: no primeiro carregamento/reload, a tela de boas-vindas aparece antes do mockup do iPhone ficar pronto, então por alguns instantes sobra só o texto/CTA lá em cima/fora do lugar. Pelo código, isso vem da combinação de animações do `WelcomeScreen`, vídeo/poster carregando e layout flex que renderiza texto e iPhone em momentos diferentes.
 
-### Contas a ignorar
-- `jv20101958@gmail.com`
-- `hyperarr@gmail.com`
-- `street.store.brasil@gmail.com`
+Plano de correção:
 
-### Abordagem
+1. Corrigir a tela de boas-vindas para renderizar como um bloco estável desde o primeiro frame
+   - Ajustar o container principal do `WelcomeScreen` para não depender do vídeo carregar para reservar espaço do iPhone.
+   - Definir altura/largura do mockup de forma mais previsível em mobile usando CSS/clamp, evitando que o texto “suba” antes do iPhone aparecer.
 
-Criar uma função SQL helper `public.is_test_user(_user_id uuid)` que retorna `true` se o e-mail do usuário em `auth.users` estiver na lista de testes. Centralizar a lista num só lugar facilita adicionar/remover contas no futuro.
+2. Evitar que o texto apareça antes do iPhone
+   - Remover ou reduzir o delay da animação do iPhone.
+   - Sincronizar a entrada do texto com o mockup, ou deixar ambos visíveis sem esse salto inicial.
+   - Manter o texto abaixo do iPhone no celular e ao lado no desktop.
 
-Em seguida, atualizar todas as funções `admin_*` que agregam métricas para filtrar usuários de teste com `WHERE NOT public.is_test_user(user_id)`.
+3. Melhorar o carregamento do vídeo/poster
+   - Garantir que o poster esteja visível imediatamente dentro da tela do iPhone enquanto o vídeo carrega.
+   - Manter o botão/loader dentro do mockup, sem causar mudança de layout.
+   - Preservar autoplay/loop/muted/playsInline para iPhone real.
 
-### Funções a atualizar
+4. Ajustar a rota usada no teste
+   - A rota `/index` cai no 404 porque o app usa `/` para Home e `/financas` para o antigo `Index`. Não vou criar uma rota nova sem necessidade, mas vou testar em `/auth`, que é onde a tela do iPhone realmente aparece.
 
-1. **`admin_metrics_overview`** — total_users, active_24h/7d/30d, signups_30d, paid_active, trial_active, canceled_30d, conversion/churn rates, MRR.
-2. **`admin_list_users`** — esconder as 3 contas da listagem.
-3. **`admin_module_funnel`** — funil de uso por módulo.
-4. **`admin_at_risk_users`** — usuários em risco de churn.
-5. **`admin_conversion_by_trial_day`** — conversões por dia do trial.
-6. **`admin_activation_funnel`** — funil de ativação.
-7. **`admin_nudge_stats`** — estatísticas de nudges.
-8. **`admin_email_variant_stats`** — variantes de e-mail.
-9. **`admin_retention_stats`** — cancel attempts, save rate.
-10. **`admin_retention_offers_breakdown`** — ofertas de retenção.
-11. **`admin_winback_stats`** — winback (triggered, converted, etc).
-
-Em todas, o filtro é o mesmo: `AND NOT public.is_test_user(<coluna user_id da tabela base>)`.
-
-### Detalhes técnicos
-
-```sql
--- Helper centralizada
-CREATE OR REPLACE FUNCTION public.is_test_user(_user_id uuid)
-RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM auth.users u
-    WHERE u.id = _user_id
-      AND lower(u.email) IN (
-        'jv20101958@gmail.com',
-        'hyperarr@gmail.com',
-        'street.store.brasil@gmail.com'
-      )
-  );
-$$;
-```
-
-A migração faz `CREATE OR REPLACE FUNCTION` em cada função admin, mantendo assinatura idêntica (mesmos parâmetros, mesmo retorno) — apenas adicionando os filtros. Nenhum frontend precisa mudar.
-
-### Resultado
-
-Dashboard, Conversão, Churn, Funil, Ativação, Retenção, Winback, Usuários, Onboarding e Emails do admin passam a ignorar essas 3 contas. As contas continuam funcionando normalmente no app — apenas não aparecem nas métricas.
+5. Validação visual
+   - Testar em viewport mobile próximo ao seu caso: 430x697.
+   - Testar também em iPhone menor, desktop e reload inicial.
+   - Confirmar que o iPhone aparece de primeira, sem flash só do texto e sem vídeo vazando da borda arredondada.

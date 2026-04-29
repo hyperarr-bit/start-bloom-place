@@ -476,6 +476,7 @@
 /* ============ iPhone CSS mockup ============ */
 .iphone-frame {
   /* Outer titanium frame — thin, very rounded */
+  flex: 0 0 auto;
   border-radius: 18% / 8.5%;
   padding: 1.2%;
   background:
@@ -502,6 +503,7 @@
   position: relative;
   width: 100%;
   height: 100%;
+  contain: paint;
   border-radius: 15.5% / 7.3%;
   overflow: hidden;
   background: #000;
@@ -516,7 +518,15 @@
 
 .iphone-screen > video,
 .iphone-screen > img {
+  display: block;
   border-radius: inherit;
+}
+
+@media (max-width: 767px) {
+  .iphone-frame {
+    height: min(54svh, 430px) !important;
+    max-width: min(78vw, 250px) !important;
+  }
 }
 
 /* Side buttons */

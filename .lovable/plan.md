@@ -1,17 +1,15 @@
-## Correção do streak (dias consecutivos)
+## Fix: emojis quebrados em notebooks/PCs
 
-### Bug 1: data em UTC
-`todayStr()` usa `toISOString()`, que retorna UTC. No Brasil (UTC-3), depois das 21h o app já acha que é "amanhã" — o streak quebra ou pula um dia sem motivo.
+**Problema:** font-family global não inclui fallback para fontes de emoji coloridas. Em Windows/navegadores sem Segoe UI Emoji ativa, emojis das tabs (📅 📝 ⭐ 🎯 💳 ❤️ ✈️ 🛒) viram quadrados ou glifos mono.
 
-**Fix:** trocar por `localDateStr()` baseado em `getFullYear/Month/Date` (horário local). Aplicar tanto no `tStr` quanto no `yesterdayStr` para os dois usarem o mesmo fuso.
+**Solução:** adicionar fallbacks de emoji no `font-family` em `src/index.css` (linhas 151 e 156).
 
-### Bug 2: race com a hidratação do cache
-Depois da última mudança, o `useEffect` do streak roda assim que `loaded === true` — ou seja, **com dados do cache local**. Se o servidor tiver um `lastDate` mais recente (ex: você usou em outro dispositivo), o cálculo é feito errado e o `set()` sobrescreve o valor correto que o Supabase ainda nem entregou.
+```css
+font-family: 'Inter', -apple-system, BlinkMacSystemFont,
+  'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji',
+  'Twemoji Mozilla', 'Segoe UI Symbol', sans-serif;
+```
 
-**Fix:** atrasar o cálculo do streak em ~800ms via `setTimeout` dentro do `useEffect`, dando tempo do refresh em background do Supabase chegar antes.
+Cobre Windows 8.1+, macOS, iOS, Android, Linux e Firefox. Não muda conteúdo, não adiciona requests.
 
-### Arquivo modificado
-
-- `src/hooks/use-life-hub-data.ts` — substituir `todayStr` pela versão local e envolver a lógica do streak em `setTimeout(..., 800)`.
-
-Sem mudanças no schema, sem novas dependências.
+**Arquivo:** `src/index.css` (apenas as 2 linhas de font-family).

@@ -1,27 +1,63 @@
-## Bug identificado
+## Diagnóstico confirmado
 
-Olhando frame a frame do vídeo em câmera lenta:
+O problema não está mais no revert do código: ele está nos dados salvos no Supabase e no cache local do navegador.
 
-- **Frames 1–6**: tela completamente vazia (cor creme), só a barra de URL embaixo.
-- **Frames 7–17**: o título "em um só lugar" e o **topo** do iPhone aparecem **bem no alto** e vão **deslizando de cima para baixo**.
-- **Frame 21+**: tudo finalmente chega na posição correta.
+Encontrei três pontos principais:
 
-Ou seja, a tela `/auth` (que renderiza o `WelcomeScreen`) está envolvida pelo `PageTransition` no `App.tsx`, que aplica `initial={{ opacity: 0, y: 12 }}`. Em condições normais isso é um slide curto e sutil de 300ms, mas combinado com:
-1. O fundo creme já pintado pelo `index.html` antes do React montar
-2. O delay até o JS processar e renderizar o componente
+1. A conta autenticada `jv20101958@gmail.com` continua correta no Supabase Auth: o metadata mostra `João Victor`.
+2. O dado que o app usa para o nome está em `public.user_data` e hoje está assim: `core-user-name = "Lucas"`.
+3. Os dados inseridos junto com o Lucas foram gravados todos no mesmo minuto (`2026-05-02 01:58`) e alguns estão em formato incompatível com o app. Exemplo: `finance-dueDays` veio com `dueDay/isPaid`, mas o app espera `day` e `bills[].paid`. Isso explica o erro atual: `undefined is not an object (evaluating 'z.paid')`.
 
-…cria a sensação de que a tela "carrega vazia e depois desce do topo".
+Por isso você reverteu e mesmo assim continuou aparecendo Lucas: o histórico do Lovable voltou o código, mas não limpou o `user_data` nem o cache local antigo.
 
-## Correção
+## Plano de correção
 
-**`src/App.tsx`** — não envolver a rota `/auth` no `PageTransition`. Renderizar `<Auth />` direto, sem o wrapper de slide. As outras rotas continuam com o efeito normal.
+### 1. Restaurar os dados da conta para João Victor
 
-```tsx
-// antes
-<Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
+Vou aplicar uma correção no banco para o usuário `jv20101958@gmail.com`:
 
-// depois
-<Route path="/auth" element={<Auth />} />
-```
+- Trocar `core-user-name` de `Lucas` para `João Victor`.
+- Restaurar as chaves financeiras para o formato correto usado pelo app:
+  - `finance-incomes`
+  - `finance-expenses`
+  - `finance-fixed-expenses`
+  - `finance-dueDays`
+  - `finance-installments`
+  - `finance-investments`
+  - `finance-goals`
+  - meses históricos de janeiro, fevereiro, março e abril.
+- Manter o usuário como admin/premium como já estava.
+- Não mexer em senha, auth, assinatura, roles, storage ou configuração do `/admin`.
 
-Resultado: o `WelcomeScreen` aparece de uma vez, sem nenhum slide nem fade. A tela creme inicial continua existindo (é normal — é o tempo do React montar), mas não vai mais "descer". Posso aplicar?
+Antes de sobrescrever, vou guardar uma cópia de segurança dos dados atuais em uma tabela privada de backup, para termos como recuperar se precisar.
+
+### 2. Corrigir o cache para não ficar preso no “Lucas”
+
+Vou ajustar `useUserData` para o Supabase sempre vencer o cache local quando o app abre.
+
+Hoje o app lê o localStorage primeiro e marca como “carregado” cedo demais. Se o localStorage tiver `Lucas`, alguns módulos podem hidratar esse valor antigo antes do banco responder.
+
+Vou mudar para:
+
+- usar o localStorage só como pré-carregamento visual;
+- só considerar os dados oficialmente carregados depois da resposta do Supabase;
+- sobrescrever o localStorage com os valores corretos vindos do banco;
+- remover a query inválida `length(value::text)` que está gerando erro 400 no Supabase.
+
+### 3. Evitar que dados em formato errado quebrem a tela
+
+Vou adicionar uma normalização/defesa para `finance-dueDays` e pontos onde o app faz `.bills.filter(...)`.
+
+Assim, mesmo que algum dado antigo venha no formato errado, o app não quebra com erro `paid`; ele converte/ignora com segurança e continua renderizando.
+
+### 4. Verificação final
+
+Depois da correção, vou conferir:
+
+- nome exibido como `João Victor`;
+- módulos voltando a mostrar informações;
+- módulo financeiro sem erro de `paid`;
+- console sem o erro `undefined is not an object (evaluating 'z.paid')`;
+- requisições de `user_data` sem o 400 causado por `length(value::text)`.
+
+Resultado esperado: a conta `jv20101958@gmail.com` volta a aparecer como João/João Victor, com dados compatíveis com os módulos, sem o bug causado pelo seed do Lucas.

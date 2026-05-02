@@ -146,7 +146,7 @@ export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, t
     const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
     const dailyVariableRate = day > 0 ? variableSpent / day : 0;
     const projectedVariableRemaining = dailyVariableRate * remainingDays;
-    const unpaidBillsCount = dueDays.reduce((sum: number, d: any) => sum + d.bills.filter((b: any) => !b.paid).length, 0);
+    const unpaidBillsCount = dueDays.reduce((sum: number, d: any) => sum + (Array.isArray(d?.bills) ? d.bills.filter((b: any) => !b?.paid).length : 0), 0);
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
     const projectedBalance = monthlyBudget - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;

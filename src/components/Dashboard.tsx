@@ -296,7 +296,7 @@ export const Dashboard = ({
 
     // Unpaid bills: these are future obligations NOT yet in totalExpenses
     // Count unpaid bills and estimate their value from avg fixed cost
-    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + (Array.isArray(d?.bills) ? d.bills.filter(b => !b?.paid).length : 0), 0);
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
 
@@ -322,7 +322,7 @@ export const Dashboard = ({
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
     // Unpaid bills: future obligations not yet recorded
-    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + d.bills.filter(b => !b.paid).length, 0);
+    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + (Array.isArray(d?.bills) ? d.bills.filter(b => !b?.paid).length : 0), 0);
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
     const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
 

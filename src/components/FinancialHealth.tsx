@@ -99,8 +99,8 @@ export const FinancialHealth = ({
   const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
   // Bills payment rate
-  const allBills = dueDays.flatMap(d => d.bills);
-  const paidBills = allBills.filter(b => b.paid).length;
+  const allBills = dueDays.flatMap(d => Array.isArray((d as any)?.bills) ? (d as any).bills : []);
+  const paidBills = allBills.filter((b: any) => b?.paid).length;
   const billsPaymentRate = allBills.length > 0 ? (paidBills / allBills.length) * 100 : 100;
 
   // Goals progress

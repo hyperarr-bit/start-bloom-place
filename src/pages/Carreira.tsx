@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -548,6 +549,7 @@ const Carreira = () => {
   const reportTab = useTabReporter();
 
   const [activeTab, setActiveTab] = useState("jobs");
+  useScrollActiveTabIntoView(activeTab);
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);

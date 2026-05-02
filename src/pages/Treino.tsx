@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
@@ -159,6 +160,7 @@ function estimate1RM(weight: number, reps: number): number {
 const Treino = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];

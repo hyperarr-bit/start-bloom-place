@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
@@ -23,6 +24,7 @@ const tabs = [
 const Saude = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
+  useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
@@ -41,7 +43,7 @@ const Saude = () => {
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => (
             <button
-              key={tab.id}
+              key={tab.id} data-active={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

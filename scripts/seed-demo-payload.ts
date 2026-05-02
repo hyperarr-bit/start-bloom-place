@@ -845,7 +845,10 @@ put("detox-diary", [
 ]);
 
 // ============================================================================
-// END — print payload
+// END — dedupe (last write wins) + print payload
 // ============================================================================
-console.log(JSON.stringify(entries, null, 0));
+const seen = new Map<string, any>();
+for (const e of entries) seen.set(e.key, e.value);
+const finalEntries = Array.from(seen.entries()).map(([key, value]) => ({ key, value }));
+console.log(JSON.stringify(finalEntries, null, 0));
 console.error(`Generated ${entries.length} entries.`);

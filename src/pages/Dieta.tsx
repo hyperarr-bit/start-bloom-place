@@ -110,12 +110,19 @@ const Dieta = () => {
     return weekDays[dayIndex];
   };
 
-  const getDayDiary = (dateStr: string) => diaryData[dateStr] || { meals: {}, extraFood: { had: false, description: "" } };
+  const normalizeDiary = (d: any) => ({
+    meals: (d && typeof d.meals === "object" && d.meals) ? d.meals : {},
+    extraFood: {
+      had: !!d?.extraFood?.had,
+      description: d?.extraFood?.description ?? "",
+    },
+  });
+  const getDayDiary = (dateStr: string) => normalizeDiary(diaryData[dateStr]);
 
   const updateDayDiary = (dateStr: string, updater: (prev: { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }) => typeof prev extends never ? never : any) => {
     setDiaryData(prev => ({
       ...prev,
-      [dateStr]: updater(prev[dateStr] || { meals: {}, extraFood: { had: false, description: "" } })
+      [dateStr]: updater(normalizeDiary(prev[dateStr]))
     }));
   };
 

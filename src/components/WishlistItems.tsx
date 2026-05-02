@@ -78,7 +78,13 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; image: 
   );
 };
 
-export const WishlistItems = ({ items, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [] }: WishlistItemsProps) => {
+export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalExpenses, totalDebts, monthlyInstallments, fixedExpenses = [], dueDays = [] }: WishlistItemsProps) => {
+  // Defensive: normalize items so missing/invalid price/savedAmount don't crash the UI
+  const items: WishlistItem[] = (Array.isArray(rawItems) ? rawItems : []).map((i: any) => ({
+    ...i,
+    price: Number(i?.price) || 0,
+    savedAmount: Number(i?.savedAmount) || 0,
+  }));
   const [showForm, setShowForm] = useState(false);
   const [newItem, setNewItem] = useState<Partial<WishlistItem>>({
     priority: "media",

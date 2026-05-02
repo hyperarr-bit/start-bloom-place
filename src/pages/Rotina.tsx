@@ -490,7 +490,7 @@ const Rituals = () => {
 
 // ============= HABIT HEATMAP (GitHub Style) =============
 const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[] }) => {
-  const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean>>("heatmap-log", {});
+  const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
   
   // Calculate if today has any habits done
   const today = new Date();
@@ -505,10 +505,16 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
   }, [todayHabitsDone]);
 
   // Last 16 weeks (112 days)
-  const weeks: { date: Date; key: string; active: boolean }[][] = [];
+  const weeks: { date: Date; key: string; level: number }[][] = [];
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - 111);
-  
+
+  const getLevel = (raw: boolean | number | undefined): number => {
+    if (raw === true) return 2;
+    if (typeof raw === "number") return Math.max(0, Math.min(3, Math.round(raw)));
+    return 0;
+  };
+
   let currentWeek: typeof weeks[0] = [];
   for (let i = 0; i < 112; i++) {
     const d = new Date(startDate);
@@ -518,20 +524,25 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
       weeks.push(currentWeek);
       currentWeek = [];
     }
-    currentWeek.push({ date: d, key, active: !!streakLog[key] });
+    currentWeek.push({ date: d, key, level: getLevel(streakLog[key]) });
   }
   if (currentWeek.length > 0) weeks.push(currentWeek);
 
-  // Calculate streak
+  // Calculate streak (any non-zero level counts)
   let streak = 0;
   const checkDate = new Date();
   while (true) {
     const key = getDateKey(checkDate);
-    if (streakLog[key]) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+    if (getLevel(streakLog[key]) > 0) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
     else break;
   }
 
-  const getColor = (active: boolean) => active ? "bg-[hsl(var(--rt-heat-2))] dark:bg-[hsl(var(--rt-heat-2))]" : "bg-[hsl(var(--rt-heat-0))] dark:bg-[hsl(var(--rt-heat-0))]";
+  const getColor = (level: number) => {
+    if (level >= 3) return "bg-[hsl(var(--rt-heat-3))]";
+    if (level === 2) return "bg-[hsl(var(--rt-heat-2))]";
+    if (level === 1) return "bg-[hsl(var(--rt-heat-1))]";
+    return "bg-[hsl(var(--rt-heat-0))]";
+  };
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -552,8 +563,8 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
               {week.map(day => (
                 <div
                   key={day.key}
-                  className={`w-3 h-3 rounded-sm ${getColor(day.active)} transition-colors`}
-                  title={`${day.key}: ${day.active ? "✅" : "—"}`}
+                  className={`w-3 h-3 rounded-sm ${getColor(day.level)} transition-colors`}
+                  title={`${day.key}: ${day.level > 0 ? "✅" : "—"}`}
                 />
               ))}
             </div>

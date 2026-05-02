@@ -1,27 +1,35 @@
-## Bug identificado
+## Problema
 
-Olhando frame a frame do vídeo em câmera lenta:
+Pediu um "estado de carregamento mínimo no WelcomeScreen". Mas a tela vazia que aparece nos primeiros frames acontece **antes** do React montar — quando só existe `<div id="root"></div>` no HTML. Qualquer loader dentro do componente `WelcomeScreen` (React) só renderiza depois do bundle baixar/parsear/montar, então não resolve a janela em branco.
 
-- **Frames 1–6**: tela completamente vazia (cor creme), só a barra de URL embaixo.
-- **Frames 7–17**: o título "em um só lugar" e o **topo** do iPhone aparecem **bem no alto** e vão **deslizando de cima para baixo**.
-- **Frame 21+**: tudo finalmente chega na posição correta.
+A solução correta é colocar um placeholder estático **dentro do `#root` no `index.html`**, que é pintado instantaneamente pelo navegador no primeiro frame. Quando o React monta, ele substitui esse conteúdo pelo `WelcomeScreen` real.
 
-Ou seja, a tela `/auth` (que renderiza o `WelcomeScreen`) está envolvida pelo `PageTransition` no `App.tsx`, que aplica `initial={{ opacity: 0, y: 12 }}`. Em condições normais isso é um slide curto e sutil de 300ms, mas combinado com:
-1. O fundo creme já pintado pelo `index.html` antes do React montar
-2. O delay até o JS processar e renderizar o componente
+## Mudanças
 
-…cria a sensação de que a tela "carrega vazia e depois desce do topo".
+### 1. `index.html`
+Colocar dentro de `<div id="root">` um placeholder mínimo que combine com o visual do WelcomeScreen:
+- Fundo já está pintado (`--background` aplicado no `<html>` pelo script inline existente).
+- Adicionar um spinner/loader centralizado discreto (CSS puro, sem JS), ou apenas o título "CORE" com fade sutil.
+- Recomendo: pequeno spinner CSS centralizado + opacidade 60% para não competir visualmente com o WelcomeScreen quando ele aparecer.
 
-## Correção
-
-**`src/App.tsx`** — não envolver a rota `/auth` no `PageTransition`. Renderizar `<Auth />` direto, sem o wrapper de slide. As outras rotas continuam com o efeito normal.
-
-```tsx
-// antes
-<Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
-
-// depois
-<Route path="/auth" element={<Auth />} />
+```html
+<div id="root">
+  <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;">
+    <div style="width:24px;height:24px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;opacity:.3;animation:core-spin .8s linear infinite;"></div>
+  </div>
+</div>
+<style>@keyframes core-spin{to{transform:rotate(360deg)}}</style>
 ```
 
-Resultado: o `WelcomeScreen` aparece de uma vez, sem nenhum slide nem fade. A tela creme inicial continua existindo (é normal — é o tempo do React montar), mas não vai mais "descer". Posso aplicar?
+O React faz `createRoot(...).render(...)` que substitui completamente o conteúdo do `#root`, então o placeholder some automaticamente sem flicker quando o `WelcomeScreen` monta.
+
+### 2. `src/components/ProtectedRoute.tsx` (opcional, mesma lógica)
+Já tem placeholder vazio quando `loading=true`. Posso adicionar o mesmo mini-spinner para consistência, mas não é estritamente necessário porque o caminho do usuário não-logado redireciona pra `/auth` que mostra o WelcomeScreen.
+
+## Resultado
+
+- Frame 1: navegador pinta fundo creme + spinner discreto centralizado (instantâneo).
+- Frame N (quando React monta, ~100-300ms): WelcomeScreen aparece estático, substituindo o spinner.
+- Sem tela completamente vazia em momento algum.
+
+Posso aplicar?

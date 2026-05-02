@@ -155,7 +155,10 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // 1) Instant hydration from per-user localStorage cache.
+    // 1) Instant hydration from per-user localStorage cache (visual only).
+    //    NOTE: do NOT mark `loaded=true` here — Supabase is the source of truth
+    //    and must overwrite the cache before the rest of the app reads values,
+    //    otherwise stale data (e.g. a previous user name) sticks around.
     try {
       const prefix = `u:${user.id}:`;
       const cached: Record<string, any> = {};
@@ -169,21 +172,19 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       }
       if (Object.keys(cached).length > 0) {
         setStore(cached);
-        setLoaded(true);
       }
     } catch {}
 
-    // 2) Background refresh from Supabase — only "light" keys to keep payload tiny.
+    // 2) Refresh from Supabase. We fetch ALL light keys and let server values
+    //    overwrite the cache. Heavy keys (>HEAVY_KEY_BYTES) are filtered
+    //    client-side to keep memory low while still letting modules lazy-load
+    //    them via fetchKey().
     const ac = new AbortController();
     const loadFromSupabase = async () => {
       const { data, error } = await (supabase as any)
         .from("user_data")
         .select("key, value")
         .eq("user_id", user.id)
-        .filter("value", "not.is", null)
-        // Only fetch keys whose serialized JSON is under HEAVY_KEY_BYTES.
-        // Heavy ones (e.g. dream board base64) are loaded lazily by their owners.
-        .lt("length(value::text)", HEAVY_KEY_BYTES)
         .abortSignal(ac.signal);
 
       if (ac.signal.aborted) return;
@@ -191,35 +192,31 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (!error && data) {
         const map: Record<string, any> = {};
         data.forEach((row: any) => {
+          if (row.value === null || row.value === undefined) return;
+          const size = JSON.stringify(row.value).length;
+          if (size >= HEAVY_KEY_BYTES) return; // lazy-load heavy keys via fetchKey
           map[row.key] = row.value;
           safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
         });
-        // Server values win for light keys; preserve heavy keys already in cache.
-        setStore(prev => ({ ...prev, ...map }));
-      } else if (error && error.message && !error.message.includes("aborted")) {
-        // PostgREST may not support length() filter on jsonb directly — fall back
-        // to a plain select if so.
-        if (String(error.message).toLowerCase().includes("length")) {
-          const { data: full, error: fullErr } = await (supabase as any)
-            .from("user_data")
-            .select("key, value")
-            .eq("user_id", user.id)
-            .abortSignal(ac.signal);
-          if (ac.signal.aborted) return;
-          if (!fullErr && full) {
-            const map: Record<string, any> = {};
-            full.forEach((row: any) => {
-              const size = JSON.stringify(row.value || "").length;
-              if (size < HEAVY_KEY_BYTES) {
-                map[row.key] = row.value;
-                safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
+        // Server wins: also drop any cached keys that no longer exist server-side.
+        setStore(prev => {
+          const next = { ...prev };
+          // overwrite/insert server values
+          Object.assign(next, map);
+          // remove client-only stale keys that the server doesn't have
+          for (const k of Object.keys(prev)) {
+            if (!(k in map)) {
+              const prevSize = JSON.stringify(prev[k] ?? "").length;
+              if (prevSize < HEAVY_KEY_BYTES) {
+                delete next[k];
+                safeRemoveItem(userKey(user.id, k));
               }
-            });
-            setStore(prev => ({ ...prev, ...map }));
+            }
           }
-        } else {
-          console.error("[user-data] failed to load:", error);
-        }
+          return next;
+        });
+      } else if (error && error.message && !error.message.includes("aborted")) {
+        console.error("[user-data] failed to load:", error);
       }
       setLoaded(true);
     };

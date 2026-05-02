@@ -377,6 +377,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_data_backup_lucas_seed: {
+        Row: {
+          backed_up_at: string
+          id: string
+          key: string
+          original_created_at: string | null
+          original_updated_at: string | null
+          user_id: string
+          value: Json | null
+        }
+        Insert: {
+          backed_up_at?: string
+          id?: string
+          key: string
+          original_created_at?: string | null
+          original_updated_at?: string | null
+          user_id: string
+          value?: Json | null
+        }
+        Update: {
+          backed_up_at?: string
+          id?: string
+          key?: string
+          original_created_at?: string | null
+          original_updated_at?: string | null
+          user_id?: string
+          value?: Json | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

@@ -13,6 +13,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";

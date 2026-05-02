@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import {
@@ -44,6 +45,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 const Dieta = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("cardapio");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
 

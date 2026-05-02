@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Leaf } from "lucide-react";
 import { DetoxTracker } from "@/components/detox/DetoxTracker";
@@ -18,6 +19,7 @@ const tabs = [
 const Detox = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("rastreador");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
   const handleTabChange = (tabId: string) => {

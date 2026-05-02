@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Sparkles, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ const tabs = [
 const Beleza = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("routine");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
   const handleTabChange = (tabId: string) => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Brain } from "lucide-react";
 import { ThoughtCapture } from "@/components/hiperfoco/ThoughtCapture";
@@ -24,6 +25,7 @@ const tabs = [
 const Hiperfoco = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dia");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
   const handleTabChange = (tabId: string) => {

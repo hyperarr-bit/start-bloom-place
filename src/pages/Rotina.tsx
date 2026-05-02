@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -995,6 +996,7 @@ const WeeklyReview = () => {
 const Rotina = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
 
   // Habits state
@@ -1098,7 +1100,7 @@ const Rotina = () => {
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
-              key={tab.id}
+              key={tab.id} data-active={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

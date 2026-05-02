@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, Home } from "lucide-react";
@@ -29,6 +30,7 @@ const tabs = [
 const Casa = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("comodos");
+  useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
 
   const handleTabChange = (tabId: string) => {

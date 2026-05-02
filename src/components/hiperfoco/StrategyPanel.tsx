@@ -19,7 +19,14 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export const StrategyPanel = () => {
-  const [strategies, setStrategies] = usePersistedState<Strategy[]>("hiperfoco-strategies", []);
+  const [rawStrategies, setStrategies] = usePersistedState<Strategy[]>("hiperfoco-strategies", []);
+  const strategies: Strategy[] = (Array.isArray(rawStrategies) ? rawStrategies : []).map((s: any) => ({
+    id: s?.id ?? crypto.randomUUID(),
+    title: s?.title ?? "",
+    description: s?.description ?? "",
+    actions: Array.isArray(s?.actions) ? s.actions : [],
+    status: s?.status ?? "planejando",
+  }));
   const [newTitle, setNewTitle] = useState("");
   const [newAction, setNewAction] = useState<Record<string, string>>({});
 

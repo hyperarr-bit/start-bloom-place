@@ -1,38 +1,54 @@
-## O que aconteceu
+## Por que está bugado
 
-Eu populei a sua conta com dados de demo, mas em algumas chaves botei o **formato errado** (objeto onde o app espera array). Isso causou os crashes:
+Quando eu populei sua conta com dados de demo (119 chaves), em várias eu **inventei o formato** em vez de ler o componente que consome. O app abre a aba, faz `goal.actionGroups.map(...)`, mas no banco está `goal.actions` → crash / tela branca / aba quebrada.
 
-- `saude-workout-log` → era pra ser `["2026-04-30", "2026-05-01", ...]`, eu botei `{ "2026-04-30": {done, duration}, ... }` → crash no Home (já corrigido na última migration).
-- `dieta-meals-config` → era pra ser `["Café da Manhã", "Almoço", ...]`, eu botei `{ calorieGoal, proteinGoal, ... }` → crash atual no Dieta.
-- Possivelmente outras chaves estão no formato errado também.
+### Exemplo confirmado: aba **Metas** (Desenvolvimento Pessoal)
 
-**Nenhum arquivo .ts/.tsx foi alterado.** Só dados.
+`GoalsBoardV2` espera cada meta assim:
+```
+{ id, title, heroImage, actionGroups[], referenceLinks[], referenceImages[],
+  vision: { meta, objetivo, tempo }, problems[] }
+```
+
+Mas no banco está:
+```
+{ id, title, category, deadline, priority, status, actions[], references[], problems[] }
+```
+
+→ `goal.actionGroups` é `undefined` → `.map` quebra → aba não renderiza.
+
+Esse mesmo erro de "shape inventado" está espalhado por outras chaves seeded. Os crashes anteriores (`saude-workout-log`, `dieta-meals-config`, `core-rotina-habits` virando array de objetos) eram a mesma causa raiz. Eu corrigi pontualmente, mas nunca fiz a auditoria completa.
 
 ## O que vou fazer
 
-1. **Auditar todas as 119 chaves que inseri**: pra cada uma, ler rapidamente o componente que consome ela e checar se o `jsonb_typeof` bate com o que o código espera (`array` vs `object` vs `string` vs `number`).
-2. **Corrigir em uma única migration de UPDATE**: pra cada chave com formato errado, sobrescrever com o shape correto (mantendo dados realistas — salário, hábitos, treinos, etc.).
-3. **Chaves que não consigo arrumar com confiança serão removidas** (DELETE) pra deixar o app cair no fallback default em vez de crashar.
-4. **Não mexer em nenhum arquivo de código.**
+1. **Auditoria completa**: para cada uma das 119 chaves seeded, abrir o componente que consome (`usePersistedState("chave", ...)`) e comparar o tipo TypeScript esperado com o `jsonb` salvo.
 
-## Chaves suspeitas que já identifiquei e como vão ficar
+2. **Migration única de correção** (UPDATE em `user_data`) que para cada chave faz uma de três coisas:
+   - **Corrige o shape** mantendo dados realistas (caso fácil — ex: renomear `actions`→`actionGroups`, adicionar `vision`).
+   - **Substitui por seed novo no shape correto** (caso o shape esteja muito divergente).
+   - **DELETA a chave** se eu não tiver certeza do shape exato (volta pro default vazio do componente — sem dado de demo, mas sem crash).
 
-| Chave | Formato esperado | Ação |
+3. **Nenhuma alteração em código `.ts/.tsx`**. O bug é nos dados, não no app.
+
+4. **Não mexo em**: `auth`, `subscriptions`, `profiles`, `user_roles`, configs, secrets, storage.
+
+## Chaves que já sei que estão erradas (vão na migration)
+
+| Chave | Problema | Ação |
 |---|---|---|
-| `dieta-meals-config` | `string[]` | Vira `["Café da Manhã","Almoço","Lanche","Janta"]` |
-| `saude-workout-log` | `string[]` (datas) | Já corrigido na última migration |
-| `core-rotina-habits` | `array de objetos {id,name,...}` | Confirmar formato |
-| Outras | A verificar | Auditar antes de aplicar |
-
-## O que NÃO vou fazer
-
-- Não vou editar nenhum componente React.
-- Não vou criar tabela nova.
-- Não vou mexer em auth, subscription, profile.
-- Se em alguma chave eu não tiver certeza do shape, **deleto a chave** (volta pro estado vazio, sem dado de demo, mas sem crash) em vez de chutar.
+| `goals-board-v2` | `actions` em vez de `actionGroups`, falta `vision` | Reescrever no shape correto, mantendo as 2 metas |
+| Outras a confirmar na auditoria | — | Conforme regra acima |
 
 ## Resultado esperado
 
-App abre em todos os módulos sem erro, com os dados de demo realistas que você queria pra gravar o criativo. Se algum módulo voltar vazio, é porque eu preferi deletar a chave a arriscar quebrar de novo — você me avisa e eu preencho aquele módulo específico depois com cuidado.
+- Aba **Metas** abre e mostra "Lançar curso" e "Inglês fluente" com as tarefas marcadas.
+- Todas as outras abas de todos os módulos abrem sem crash.
+- Onde eu deletar a chave (não tive 100% de certeza), o módulo abre vazio com o estado default — você me avisa qual e eu preencho aquele específico com cuidado depois.
+
+## O que NÃO vou fazer
+
+- Não vou editar componente nenhum (`.tsx`).
+- Não vou criar tabela.
+- Não vou "chutar" um shape — se não tiver certeza, deleto a chave.
 
 Posso aplicar?

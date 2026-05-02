@@ -237,7 +237,8 @@ export const Dashboard = ({
     const today = new Date().getDate();
 
     dueDays.forEach((d) => {
-      const unpaidBills = d.bills.filter((b) => !b.paid);
+      const billsArr = Array.isArray(d?.bills) ? d.bills : [];
+      const unpaidBills = billsArr.filter((b) => !b?.paid);
       const daysUntilDue = d.day >= today ? d.day - today : 30 - today + d.day;
       if (unpaidBills.length > 0 && daysUntilDue <= 5 && daysUntilDue >= 0) {
         list.push({

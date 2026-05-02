@@ -51,7 +51,11 @@ const SECTION_COLORS = [
 ];
 
 const CleaningRoutine = () => {
-  const [sections, setSections] = usePersistedState<CleaningSection[]>("casa-cleaning-routine", DEFAULT_SECTIONS);
+  const [rawSections, setSections] = usePersistedState<CleaningSection[]>("casa-cleaning-routine", DEFAULT_SECTIONS);
+  const sections: CleaningSection[] = (Array.isArray(rawSections) ? rawSections : []).map((s: any) => ({
+    ...s,
+    items: Array.isArray(s?.items) ? s.items : [],
+  }));
   const [reminders, setReminders] = usePersistedState<Reminder[]>("casa-cleaning-reminders", []);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [newReminder, setNewReminder] = useState("");

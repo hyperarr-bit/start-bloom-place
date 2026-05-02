@@ -431,7 +431,7 @@ const DesenvolvimentoPessoal = () => {
               {Object.entries(gratitudeEntries).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14).map(([date, items]) => (
                 <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
                   <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
-                  {items.filter(Boolean).map((item, i) => <p key={i} className="text-xs text-muted-foreground">• {item}</p>)}
+                  {(Array.isArray(items) ? items : []).filter(Boolean).map((item, i) => <p key={i} className="text-xs text-muted-foreground">• {item}</p>)}
                 </div>
               ))}
             </div>

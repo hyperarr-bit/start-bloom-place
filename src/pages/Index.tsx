@@ -90,8 +90,8 @@ const Index = () => {
   const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
 
   // Bills paid rate
-  const allBills = dueDays.flatMap((d: any) => d.bills);
-  const billsPaidRate = allBills.length > 0 ? (allBills.filter((b: any) => b.paid).length / allBills.length) * 100 : 100;
+  const allBills = dueDays.flatMap((d: any) => Array.isArray(d?.bills) ? d.bills : []).filter(Boolean);
+  const billsPaidRate = allBills.length > 0 ? (allBills.filter((b: any) => b?.paid).length / allBills.length) * 100 : 100;
 
   // Goals progress
   const goalsProgress = goals.length > 0

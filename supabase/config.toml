@@ -2,7 +2,3 @@ project_id = "itoylenzvahbscgjgtqf"
 
 [functions.dispatch-trial-emails]
 verify_jwt = false
-
-[functions.seed-demo-user]
-verify_jwt = false
-

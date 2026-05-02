@@ -48,6 +48,15 @@ const moodEmojis = [
   { emoji: "😞", label: "Ruim", color: "bg-red-300", value: 1 },
 ];
 
+const getHabitName = (habit: unknown) => {
+  if (typeof habit === "string") return habit;
+  if (habit && typeof habit === "object" && "name" in habit) {
+    const name = (habit as { name?: unknown }).name;
+    if (typeof name === "string" && name.trim()) return name;
+  }
+  return "Hábito";
+};
+
 const defaultMorningRitual: { id: string; text: string; icon: string }[] = [];
 
 const defaultNightRitual: { id: string; text: string; icon: string }[] = [];
@@ -979,6 +988,7 @@ const Rotina = () => {
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);
+  const habitNames = Array.isArray(habits) ? habits.map(getHabitName) : [];
   const [habitsChecked, setHabitsChecked] = usePersistedState<Record<string, boolean[]>>(
     "rotina-habits-checked",
     Object.fromEntries(days.map(d => [d, defaultHabits.map(() => false)]))
@@ -1001,7 +1011,7 @@ const Rotina = () => {
 
   const toggleHabit = (day: string, habitIndex: number) => {
     const newChecked = { ...habitsChecked };
-    if (!newChecked[day]) newChecked[day] = habits.map(() => false);
+    if (!newChecked[day]) newChecked[day] = habitNames.map(() => false);
     newChecked[day] = [...newChecked[day]];
     newChecked[day][habitIndex] = !newChecked[day][habitIndex];
     setHabitsChecked(newChecked);
@@ -1009,10 +1019,10 @@ const Rotina = () => {
 
   const addHabit = () => {
     if (!newHabit.trim()) return;
-    setHabits([...habits, newHabit.trim()]);
+    setHabits([...habitNames, newHabit.trim()]);
     const newChecked = { ...habitsChecked };
     days.forEach(d => {
-      if (!newChecked[d]) newChecked[d] = habits.map(() => false);
+      if (!newChecked[d]) newChecked[d] = habitNames.map(() => false);
       newChecked[d] = [...newChecked[d], false];
     });
     setHabitsChecked(newChecked);
@@ -1021,7 +1031,7 @@ const Rotina = () => {
   };
 
   const removeHabit = (index: number) => {
-    const newHabits = habits.filter((_, i) => i !== index);
+    const newHabits = habitNames.filter((_, i) => i !== index);
     setHabits(newHabits);
     const newChecked = { ...habitsChecked };
     days.forEach(d => { if (newChecked[d]) newChecked[d] = newChecked[d].filter((_, i) => i !== index); });
@@ -1126,7 +1136,7 @@ const Rotina = () => {
                   <thead>
                     <tr className="bg-green-50/50 dark:bg-[hsl(var(--rt-card-2))]">
                       <th className="text-left px-3 py-2 font-bold text-green-900 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] w-24">DIA</th>
-                      {habits.map((habit, i) => (
+                      {habitNames.map((habit, i) => (
                         <th key={i} className="px-2 py-2 font-medium text-green-800 dark:text-[hsl(var(--rt-text-soft))] border-r border-green-100 dark:border-[hsl(var(--rt-border))] min-w-[100px] group">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-center text-[11px]">{habit}</span>
@@ -1142,7 +1152,7 @@ const Rotina = () => {
                     {days.map((day, di) => (
                       <tr key={day} className={`border-t border-green-100 dark:border-[hsl(var(--rt-border))] hover:bg-green-50/30 dark:hover:bg-[hsl(var(--rt-card-2))] ${di % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/50" : ""}`}>
                         <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
-                        {habits.map((_, hi) => (
+                        {habitNames.map((_, hi) => (
                           <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
                             <Checkbox checked={habitsChecked[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />
                           </td>
@@ -1155,7 +1165,7 @@ const Rotina = () => {
             </div>
 
             {/* Heatmap */}
-            <HabitHeatmap habitsChecked={habitsChecked} habits={habits} days={days} />
+            <HabitHeatmap habitsChecked={habitsChecked} habits={habitNames} days={days} />
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -1268,7 +1278,7 @@ const Rotina = () => {
         {activeTab === "revisao" && (
           <div className="space-y-5">
             <WeeklyReview />
-            <HabitHeatmap habitsChecked={habitsChecked} habits={habits} days={days} />
+            <HabitHeatmap habitsChecked={habitsChecked} habits={habitNames} days={days} />
           </div>
         )}
       </main>

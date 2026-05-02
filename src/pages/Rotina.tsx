@@ -490,7 +490,7 @@ const Rituals = () => {
 
 // ============= HABIT HEATMAP (GitHub Style) =============
 const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[] }) => {
-  const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean>>("heatmap-log", {});
+  const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
   
   // Calculate if today has any habits done
   const today = new Date();

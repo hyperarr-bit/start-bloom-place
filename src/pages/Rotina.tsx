@@ -563,8 +563,8 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
               {week.map(day => (
                 <div
                   key={day.key}
-                  className={`w-3 h-3 rounded-sm ${getColor(day.active)} transition-colors`}
-                  title={`${day.key}: ${day.active ? "✅" : "—"}`}
+                  className={`w-3 h-3 rounded-sm ${getColor(day.level)} transition-colors`}
+                  title={`${day.key}: ${day.level > 0 ? "✅" : "—"}`}
                 />
               ))}
             </div>

@@ -274,12 +274,42 @@ serve(async (req) => {
       return null;
     }
 
+    // Helper: busca a billing/checkout direto na API da AbacatePay como último recurso
+    // (útil se o payload v1 vier sem metadata/customer/externalId)
+    async function fetchBillingFromApi(id: string): Promise<{ externalId?: string; email?: string } | null> {
+      try {
+        const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
+        if (!apiKey || !id) return null;
+        const res = await fetch(`https://api.abacatepay.com/v2/checkouts/${id}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          logStep("API fallback failed", { status: res.status, id });
+          return null;
+        }
+        const j = await res.json();
+        const d = j?.data || j || {};
+        return {
+          externalId: d.externalId || d.metadata?.user_id,
+          email: d.customer?.email,
+        };
+      } catch (e) {
+        logStep("API fallback exception", { msg: String(e) });
+        return null;
+      }
+    }
+
     const paidEvents = new Set([
+      // v1
       "billing.paid",
       "subscription.paid",
       "subscription.charged",
       "subscription.created",
       "subscription.renewed",
+      // v2
+      "checkout.completed",
+      "transparent.completed",
+      "subscription.completed",
     ]);
     const cancelEvents = new Set([
       "subscription.cancelled",
@@ -294,10 +324,30 @@ serve(async (req) => {
 
     if (paidEvents.has(event)) {
       userId = await resolveUserId();
+
+      // Last resort: query AbacatePay API directly for the billing record
+      if (!userId && billingId) {
+        logStep("Trying API fallback to recover user", { billingId });
+        const apiData = await fetchBillingFromApi(billingId);
+        if (apiData?.externalId) {
+          userId = apiData.externalId;
+          logStep("Recovered userId from API externalId", { userId });
+        } else if (apiData?.email) {
+          const { data: usersData } = await supabaseClient.auth.admin.listUsers();
+          const matched = usersData?.users.find(
+            (u: { email?: string }) => u.email?.toLowerCase() === apiData.email!.toLowerCase()
+          );
+          if (matched) {
+            userId = matched.id;
+            logStep("Recovered userId from API customer email", { userId });
+          }
+        }
+      }
+
       logStep("Payment received", { event, userId, billingId, email: customerEmail });
 
       if (!userId) {
-        logStep("Cannot associate payment - no user found");
+        logStep("Cannot associate payment - no user found", { event, billingId, customerEmail });
         return jsonResponse({ received: true, warning: "no_user_found" });
       }
 

@@ -152,7 +152,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                         : { pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }
                     }
                     tabIndex={isInAppWebView ? 0 : -1}
-                    aria-hidden={isInAppWebView ? undefined : "aria-hidden"}
+                    aria-hidden={isInAppWebView ? undefined : true}
                   />
 
                   {/* Em browsers normais: bloqueamos gestos por cima do vídeo

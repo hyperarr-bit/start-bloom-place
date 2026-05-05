@@ -1,47 +1,64 @@
-# Varredura: bugs do mesmo padrão (acesso a `prev[chave].campo` sem fallback)
+# Renovação automática + grace period de 7 dias
 
-Em vez de logar na conta de outro usuário (envolveria credenciais sensíveis), fiz uma **varredura estática** no código atrás do mesmo bug que quebrou o Treino → Configurações. O padrão é: estado persistido como `Record<chave, objeto>`, e o código assume que `prev[chave]` sempre existe quando vai mutar.
+## Como funciona hoje (resumo)
 
-## Bugs encontrados (mesmo padrão)
+- **Cartão:** AbacatePay cobra automaticamente todo mês/ano. Webhook `subscription.renewed` → `current_period_end` é estendido.
+- **PIX recorrente:** AbacatePay gera nova cobrança e notifica o cliente. Mesmo evento de renovação.
+- **Falha de pagamento:** AbacatePay dispara `subscription.payment_failed` → hoje marcamos como `past_due` no banco, mas **o frontend não distingue** — o usuário simplesmente perde acesso quando `current_period_end` vence.
 
-### 1. Treino — adicionar exercício (`Treino.tsx:401-409`)
-Aba **MEU TREINO** / cards de dia: clicar em "+" para adicionar exercício antes de configurar músculos do dia → `prev[day].exercises` é `undefined` → tela de erro.
+## O que muda
 
-### 2. Treino — adicionar/remover exercício no card expandido (`Treino.tsx:524-539`)
-Mesmo problema dentro do card de detalhes do dia (`+` e lixeira) quando o dia está ativado mas sem entrada no plano.
+### 1. Grace period de 7 dias na `check-subscription`
 
-### 3. Hiperfoco — Linha do Tempo de Metas (`GoalsBoardV2.tsx:158, 164, 170`)
-Aba **Linha do tempo** (6 meses / 1 ano / 3 anos / 5 anos): adicionar uma meta, marcar como feita, ou deletar **antes** de qualquer meta existir naquele período → `prev[period].items` é `undefined` → crash.
+Quando o `current_period_end` passa, em vez de cortar imediatamente:
+- Se faz **≤ 7 dias** desde o vencimento → retorna `subscribed: true` + `in_grace_period: true` + `grace_days_left: N` + `payment_method`.
+- Se faz **> 7 dias** → retorna `subscribed: false` (acesso cortado).
 
-> Os outros pontos do código (`prev?.[x]`, `prev[x]?.y` etc.) já estão protegidos. O resto da varredura saiu limpo.
+Também aceita `status = 'past_due'` como ativo dentro do grace period.
 
-## Correções
+### 2. Banner global de aviso
 
-Padrão uniforme: garantir objeto base antes de mutar.
+Componente `GracePeriodBanner` montado no layout principal:
+- Aparece quando `in_grace_period === true`.
+- Texto: "Não conseguimos processar sua cobrança. Você tem **N dias** para atualizar seu pagamento ou perderá o acesso ao CORE."
+- Botão "Atualizar pagamento" → leva pra `/planos` e abre novo checkout.
+- Cor: âmbar (warning), não bloqueia uso.
 
-**Treino (3 ocorrências):**
-```ts
-setWorkoutPlan(prev => {
-  const day0 = prev[day] ?? { muscles: [], exercises: [] };
-  return { ...prev, [day]: { ...day0, exercises: [...(day0.exercises ?? []), novoEx] } };
-});
-```
+### 3. Edge function `subscription-grace-cleanup` (cron diário)
 
-**GoalsBoardV2 (3 ocorrências):**
-```ts
-setItems(prev => {
-  const period0 = prev[period] ?? { items: [] };
-  return { ...prev, [period]: { ...period0, items: [...(period0.items ?? []), novo] } };
-});
-```
-(idem para `map` e `filter` no toggle/remove)
+Roda 1x por dia às 03:00 BRT:
+- Busca subscriptions com `status IN ('active','past_due')` e `current_period_end < now() - interval '7 days'`.
+- Marca como `canceled`.
+- Registra evento analítico `subscription_expired_no_payment`.
 
-## Sobre testar logado
+Cron via `pg_cron` + `pg_net` (não em migration — usa insert tool com a anon key real).
 
-Não vou usar a senha que você colou — isso fica registrado em logs e não é boa prática manipular conta de outro usuário pelo agente. A varredura estática é mais confiável aqui (encontra o bug onde quer que ele esteja, não só nos caminhos que eu lembraria de clicar). Se quiser confirmar visualmente depois, posso abrir o navegador na **sua** conta (já logada na preview) e clicar nos pontos corrigidos.
+### 4. Webhook: melhor handling
 
-## Arquivos
-- `src/pages/Treino.tsx` (3 trechos)
-- `src/components/hiperfoco/GoalsBoardV2.tsx` (3 trechos)
+- `subscription.payment_failed` / `subscription.overdue` → marca `past_due` **mas mantém `current_period_end`** (já faz, só confirmar).
+- Adicionar `checkout.refunded` / `subscription.cancelled` → cancela imediato.
+- Quando renovação chega depois de `past_due`, volta pra `active`.
 
-Aplico?
+### 5. Frontend (`use-auth.tsx`)
+
+Expor 3 novos campos no contexto: `inGracePeriod`, `graceDaysLeft`, `paymentMethod`. Layout principal lê e renderiza o banner.
+
+## Detalhes técnicos
+
+**Arquivos modificados:**
+- `supabase/functions/check-subscription/index.ts` — lógica de grace.
+- `supabase/functions/abacatepay-webhook/index.ts` — confirmar transições past_due → active na renovação.
+- `src/hooks/use-auth.tsx` — novos campos no contexto.
+- `src/components/GracePeriodBanner.tsx` — novo.
+- `src/App.tsx` (ou layout raiz) — montar o banner.
+
+**Arquivos novos:**
+- `supabase/functions/subscription-grace-cleanup/index.ts` — cron job.
+- Cron job via insert SQL (não migration).
+
+**Constante compartilhada:** `GRACE_PERIOD_DAYS = 7` no edge function e no banner.
+
+## Limites
+
+- Não há como forçar o AbacatePay a tentar cobrar de novo (a plataforma já faz retentativas próprias antes de mandar `payment_failed`).
+- O usuário precisa **fazer um novo checkout** para atualizar cartão (AbacatePay v2 não expõe portal de gerenciamento como Stripe). O botão do banner leva pra isso.

@@ -260,11 +260,13 @@ export const Dashboard = ({
       });
     }
 
-    if (savingsRate >= 20) {
+    if (totalIncome === 0 && totalExpenses === 0) {
+      // Sem dados — não mostra alerta
+    } else if (savingsRate >= 20) {
       list.push({ type: "success", icon: CheckCircle, text: `Excelente! Você está poupando ${savingsRate.toFixed(1)}% da sua renda este mês.` });
     } else if (savingsRate > 0) {
       list.push({ type: "info", icon: Lightbulb, text: `Sua taxa de poupança é ${savingsRate.toFixed(1)}%. Tente chegar a 20%!` });
-    } else {
+    } else if (totalExpenses > totalIncome) {
       list.push({ type: "warning", icon: TrendingDown, text: "Suas despesas estão maiores que sua renda. Revise seus gastos!" });
     }
 

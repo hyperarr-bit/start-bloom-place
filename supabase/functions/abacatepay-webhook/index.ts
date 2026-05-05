@@ -59,12 +59,36 @@ serve(async (req) => {
     }
 
     const event = body.event;
-    const metadata = body.data?.metadata || {};
-    let userId = metadata.user_id || null;
-    const billingPeriod = metadata.billing_period || "monthly";
-    const customerEmail = body.data?.customer?.email || null;
-    const billingId = body.data?.id || null;
-    const subscriptionId = body.data?.subscriptionId || body.data?.subscription_id || billingId;
+    const data = body.data || {};
+
+    // Suporta payloads v1 (data.* direto) e v2 (data.subscription, data.checkout, data.payment, data.customer)
+    const sub = data.subscription || {};
+    const checkout = data.checkout || data.billing || {};
+    const payment = data.payment || {};
+    const customer = data.customer || checkout.customer || {};
+
+    const metadata =
+      data.metadata ||
+      checkout.metadata ||
+      sub.metadata ||
+      payment.metadata ||
+      {};
+
+    let userId: string | null =
+      metadata.user_id ||
+      data.externalId ||
+      checkout.externalId ||
+      sub.externalId ||
+      payment.externalId ||
+      null;
+
+    const billingPeriod =
+      metadata.billing_period ||
+      (sub.frequency === "ANNUAL" ? "annual" : sub.frequency === "MONTHLY" ? "monthly" : "monthly");
+
+    const customerEmail = customer.email || data.customer?.email || null;
+    const billingId = checkout.id || data.id || null;
+    const subscriptionId = sub.id || data.subscriptionId || data.subscription_id || billingId;
 
     const now = new Date();
 
@@ -97,12 +121,15 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      // Detect payment method from payload (PIX or CARD)
+      // Detect payment method from payload (PIX or CARD) — supports v1 e v2
       const rawMethod =
-        body.data?.paymentMethod ||
-        body.data?.payment_method ||
-        body.data?.method ||
-        body.data?.billing?.paymentMethod ||
+        sub.method ||
+        payment.methods?.[0] ||
+        checkout.methods?.[0] ||
+        data.paymentMethod ||
+        data.payment_method ||
+        data.method ||
+        data.billing?.paymentMethod ||
         null;
       const paymentMethod =
         typeof rawMethod === "string" && rawMethod.toUpperCase().includes("PIX")
@@ -247,12 +274,42 @@ serve(async (req) => {
       return null;
     }
 
+    // Helper: busca a billing/checkout direto na API da AbacatePay como último recurso
+    // (útil se o payload v1 vier sem metadata/customer/externalId)
+    async function fetchBillingFromApi(id: string): Promise<{ externalId?: string; email?: string } | null> {
+      try {
+        const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
+        if (!apiKey || !id) return null;
+        const res = await fetch(`https://api.abacatepay.com/v2/checkouts/${id}`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) {
+          logStep("API fallback failed", { status: res.status, id });
+          return null;
+        }
+        const j = await res.json();
+        const d = j?.data || j || {};
+        return {
+          externalId: d.externalId || d.metadata?.user_id,
+          email: d.customer?.email,
+        };
+      } catch (e) {
+        logStep("API fallback exception", { msg: String(e) });
+        return null;
+      }
+    }
+
     const paidEvents = new Set([
+      // v1
       "billing.paid",
       "subscription.paid",
       "subscription.charged",
       "subscription.created",
       "subscription.renewed",
+      // v2
+      "checkout.completed",
+      "transparent.completed",
+      "subscription.completed",
     ]);
     const cancelEvents = new Set([
       "subscription.cancelled",
@@ -267,10 +324,30 @@ serve(async (req) => {
 
     if (paidEvents.has(event)) {
       userId = await resolveUserId();
+
+      // Last resort: query AbacatePay API directly for the billing record
+      if (!userId && billingId) {
+        logStep("Trying API fallback to recover user", { billingId });
+        const apiData = await fetchBillingFromApi(billingId);
+        if (apiData?.externalId) {
+          userId = apiData.externalId;
+          logStep("Recovered userId from API externalId", { userId });
+        } else if (apiData?.email) {
+          const { data: usersData } = await supabaseClient.auth.admin.listUsers();
+          const matched = usersData?.users.find(
+            (u: { email?: string }) => u.email?.toLowerCase() === apiData.email!.toLowerCase()
+          );
+          if (matched) {
+            userId = matched.id;
+            logStep("Recovered userId from API customer email", { userId });
+          }
+        }
+      }
+
       logStep("Payment received", { event, userId, billingId, email: customerEmail });
 
       if (!userId) {
-        logStep("Cannot associate payment - no user found");
+        logStep("Cannot associate payment - no user found", { event, billingId, customerEmail });
         return jsonResponse({ received: true, warning: "no_user_found" });
       }
 

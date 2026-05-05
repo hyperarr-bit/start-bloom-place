@@ -201,6 +201,9 @@ serve(async (req) => {
       frequency: "SUBSCRIPTION",
       methods: ["PIX", "CARD"],
       items: [lineItem],
+      // externalId é ecoado de volta no webhook em qualquer formato (v1/v2),
+      // garantindo associação user_id mesmo se metadata vier vazio.
+      externalId: userId,
       returnUrl: `${baseUrl}/planos?canceled=true`,
       completionUrl: `${baseUrl}/planos?success=true`,
       customer: {

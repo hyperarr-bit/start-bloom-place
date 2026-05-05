@@ -2,3 +2,6 @@ project_id = "itoylenzvahbscgjgtqf"
 
 [functions.dispatch-trial-emails]
 verify_jwt = false
+
+[functions.subscription-grace-cleanup]
+verify_jwt = false

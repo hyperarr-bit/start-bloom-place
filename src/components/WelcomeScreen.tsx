@@ -1,13 +1,61 @@
-import { forwardRef } from "react";
-import { AnimatedAppMockup } from "./welcome/AnimatedAppMockup";
+import { forwardRef, useEffect, useRef, useState } from "react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
   onLogin: () => void;
 }
 
+const isTikTokWebView = () => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /BytedanceWebview|TikTok|musical_ly|Bytedance/i.test(ua);
+};
+
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [isTikTok, setIsTikTok] = useState(false);
+
+    useEffect(() => {
+      setIsTikTok(isTikTokWebView());
+    }, []);
+
+    useEffect(() => {
+      if (isTikTok) return;
+      const v = videoRef.current;
+      if (!v) return;
+
+      v.muted = true;
+      v.defaultMuted = true;
+      v.playsInline = true;
+      v.setAttribute("muted", "");
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "true");
+
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      };
+
+      const abortNative = () => {
+        try { (v as unknown as { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.(); } catch {}
+        try { v.pause(); tryPlay(); } catch {}
+      };
+      v.addEventListener("webkitbeginfullscreen", abortNative);
+
+      const onVisibility = () => {
+        if (document.visibilityState === "visible") tryPlay();
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+
+      tryPlay();
+
+      return () => {
+        v.removeEventListener("webkitbeginfullscreen", abortNative);
+        document.removeEventListener("visibilitychange", onVisibility);
+      };
+    }, [isTikTok]);
+
     return (
       <div
         ref={ref}
@@ -34,8 +82,46 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               <span className="iphone-btn iphone-btn-power" />
 
               <div className="iphone-bezel">
-                <div className="iphone-screen relative overflow-hidden bg-background">
-                  <AnimatedAppMockup />
+                <div className="iphone-screen relative overflow-hidden bg-black">
+                  {isTikTok ? (
+                    <img
+                      src="/videos/app-preview-poster.jpg"
+                      alt="Prévia do app CORE"
+                      className="absolute inset-0 w-full h-full select-none"
+                      style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
+                      draggable={false}
+                    />
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        src="/videos/app-preview.mp4"
+                        poster="/videos/app-preview-poster.jpg"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="auto"
+                        disablePictureInPicture
+                        disableRemotePlayback
+                        controls={false}
+                        x-webkit-airplay="deny"
+                        {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+                        aria-hidden
+                        tabIndex={-1}
+                        className="absolute inset-0 w-full h-full select-none"
+                        style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
+                      />
+                      <div
+                        className="absolute inset-0"
+                        style={{ pointerEvents: "auto", touchAction: "none" }}
+                        onPointerDown={(e) => e.preventDefault()}
+                        onTouchStart={(e) => e.preventDefault()}
+                        onClick={(e) => e.preventDefault()}
+                        aria-hidden
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             </div>

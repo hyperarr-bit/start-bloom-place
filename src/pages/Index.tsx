@@ -120,7 +120,10 @@ const Index = () => {
     <div className="min-h-screen bg-background overflow-x-hidden">
       <SpotlightOverlay
         moduleKey="financas"
-        instruction="Adiciona teu primeiro gasto. Pode ser o café de hoje."
+        steps={[
+          { selector: '[data-spotlight="financeiro"]', label: 'Toque em "Meu Financeiro" pra começar.' },
+          { selector: '[data-spotlight="add-expense"]', label: 'Adiciona teu primeiro gasto. Pode ser o café de hoje.' },
+        ]}
         activationActions={["first_transaction"]}
       />
       {/* Header */}

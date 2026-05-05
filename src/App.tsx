@@ -18,6 +18,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
+import Inicio from "./pages/Inicio";
 import Planos from "./pages/Planos";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -60,6 +61,7 @@ const AnimatedRoutes = () => {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/inicio" element={<PageTransition><Inicio /></PageTransition>} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />

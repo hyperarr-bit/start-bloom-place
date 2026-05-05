@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
-import { Play } from "lucide-react";
+
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -180,18 +180,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     }`}
                   />
 
-                  {showPlayButton && (
-                    <button
-                      type="button"
-                      onClick={handleManualPlay}
-                      aria-label="Reproduzir vídeo"
-                      className="absolute inset-0 flex items-center justify-center bg-black/20"
-                    >
-                      <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                        <Play className="w-7 h-7 text-black ml-0.5" fill="currentColor" />
-                      </span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

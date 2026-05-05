@@ -55,13 +55,13 @@ const OPTIONS: Array<{
 
 export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) => {
   const [step, setStep] = useState<0 | 1>(0);
-  const { setData } = useUserData();
+  const { set } = useUserData();
   const navigate = useNavigate();
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
-    setData("quickstart-target-module", opt.key);
+    set("quickstart-target-module", opt.key);
     trackEvent("quickstart_module_chosen", { module: opt.key });
-    setData("core-onboarding-done", "true");
+    set("core-onboarding-done", "true");
     onComplete();
     // small delay so the parent unmounts before navigation transition
     setTimeout(() => navigate(opt.route), 50);

@@ -713,7 +713,7 @@ const Treino = () => {
                       <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
                       <div className="flex flex-wrap gap-1 ml-1">
                         {muscleGroups.map(m => {
-                          const isSelected = workoutPlan[day]?.muscles.includes(m);
+                          const isSelected = workoutPlan[day]?.muscles?.includes(m) ?? false;
                           return (
                             <button key={m} onClick={() => toggleMuscleForDay(day, m)}
                               className={`px-2 py-1 rounded text-[10px] border transition-all ${

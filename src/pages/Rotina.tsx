@@ -281,7 +281,7 @@ const HealthTracker = () => {
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={removeWater} className="h-7 text-xs flex-1">−</Button>
-            <Button size="sm" onClick={addWater} className="h-7 text-xs flex-1 bg-blue-500 hover:bg-blue-600">+ Copo</Button>
+            <Button size="sm" onClick={addWater} data-spotlight="add-water" className="h-7 text-xs flex-1 bg-blue-500 hover:bg-blue-600">+ Copo</Button>
           </div>
         </div>
 

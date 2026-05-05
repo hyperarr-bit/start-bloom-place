@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { normalizeForKey } from "@/lib/data-normalizers";
 
 /**
  * Persisted state hook backed by useUserData (Supabase + localStorage).

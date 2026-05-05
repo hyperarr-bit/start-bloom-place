@@ -1,0 +1,159 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight } from "lucide-react";
+import { useUserData } from "@/hooks/use-user-data";
+import { trackEvent } from "@/lib/analytics";
+
+interface QuickStartOnboardingProps {
+  onComplete: () => void;
+}
+
+type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
+
+const OPTIONS: Array<{
+  key: ModuleKey;
+  route: string;
+  label: string;
+  benefit: string;
+  Icon: typeof Wallet;
+  tone: string; // tailwind classes for icon bg
+}> = [
+  {
+    key: "financas",
+    route: "/financas",
+    label: "Finanças",
+    benefit: "Saiba pra onde teu dinheiro vai",
+    Icon: Wallet,
+    tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]",
+  },
+  {
+    key: "rotina",
+    route: "/rotina",
+    label: "Hábitos",
+    benefit: "Construa rotina sem culpa",
+    Icon: CheckCircle2,
+    tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]",
+  },
+  {
+    key: "dieta",
+    route: "/dieta",
+    label: "Dieta",
+    benefit: "Coma sem se perder",
+    Icon: Apple,
+    tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]",
+  },
+  {
+    key: "treino",
+    route: "/treino",
+    label: "Treino",
+    benefit: "Não falte mais",
+    Icon: Dumbbell,
+    tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]",
+  },
+];
+
+export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) => {
+  const [step, setStep] = useState<0 | 1>(0);
+  const { setData } = useUserData();
+  const navigate = useNavigate();
+
+  const handlePick = (opt: (typeof OPTIONS)[number]) => {
+    setData("quickstart-target-module", opt.key);
+    trackEvent("quickstart_module_chosen", { module: opt.key });
+    setData("core-onboarding-done", "true");
+    onComplete();
+    // small delay so the parent unmounts before navigation transition
+    setTimeout(() => navigate(opt.route), 50);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] bg-background flex items-center justify-center p-5"
+      style={{
+        paddingTop: "max(1.25rem, env(safe-area-inset-top))",
+        paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="w-full max-w-md flex flex-col">
+        <AnimatePresence mode="wait">
+          {step === 0 ? (
+            <motion.div
+              key="promise"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col items-center text-center gap-6 py-12"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <span className="text-3xl">⚡</span>
+              </div>
+              <div className="space-y-3">
+                <h1 className="text-2xl font-bold leading-tight text-foreground">
+                  Tu não precisa de mais 1 app.
+                  <br />
+                  Precisa parar o caos.
+                </h1>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                  Em 60 segundos tu vai sair daqui com a primeira coisa da tua vida no lugar.
+                </p>
+              </div>
+              <button
+                onClick={() => setStep(1)}
+                className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                Bora <ArrowRight className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="choice"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.25 }}
+              className="flex flex-col gap-4 py-6"
+            >
+              <div className="space-y-1.5 text-center mb-2">
+                <h2 className="text-xl font-bold text-foreground">
+                  Por onde tu quer começar?
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Escolhe 1. Os outros ficam aqui esperando.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                {OPTIONS.map((opt, i) => (
+                  <motion.button
+                    key={opt.key}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06 }}
+                    onClick={() => handlePick(opt)}
+                    className="group flex items-center gap-3.5 p-3.5 rounded-xl bg-card border border-border hover:border-foreground/30 active:scale-[0.99] transition-all text-left"
+                  >
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${opt.tone}`}>
+                      <opt.Icon className="w-5 h-5" strokeWidth={2.2} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                        {opt.benefit}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+};

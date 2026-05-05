@@ -39,6 +39,9 @@ interface AuthContextType {
   isSubscribed: boolean;
   trialDay: number;
   trialHoursLeft: number;
+  inGracePeriod: boolean;
+  graceDaysLeft: number | null;
+  paymentMethod: string | null;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -54,6 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [trialDay, setTrialDay] = useState(1);
   const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
+  const [inGracePeriod, setInGracePeriod] = useState(false);
+  const [graceDaysLeft, setGraceDaysLeft] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -103,6 +109,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
+      setInGracePeriod(data?.in_grace_period ?? false);
+      setGraceDaysLeft(typeof data?.grace_days_left === "number" ? data.grace_days_left : null);
+      setPaymentMethod(data?.payment_method ?? null);
       if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
       if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
     } catch (err) {
@@ -132,7 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, trialDay, trialHoursLeft, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

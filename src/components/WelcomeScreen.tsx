@@ -120,6 +120,20 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   />
+                  {!isVideoPlaying && (
+                    <button
+                      type="button"
+                      aria-label="Reproduzir prévia do aplicativo"
+                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                      className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
+                    >
+                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
+                        <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

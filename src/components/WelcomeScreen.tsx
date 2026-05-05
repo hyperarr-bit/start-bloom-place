@@ -18,41 +18,23 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "true");
 
-      const tryPlay = () => {
+      let played = false;
+      const tryPlayOnce = () => {
+        if (played) return;
         const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => {});
-      };
-
-      tryPlay();
-      const onLoaded = () => tryPlay();
-      const onCanPlay = () => tryPlay();
-      const onVisible = () => { if (!document.hidden) tryPlay(); };
-      const onFirstGesture = (event?: Event) => {
-        const target = event?.target as HTMLElement | null;
-        if (target?.closest?.("[data-video-gesture-guard]")) {
-          event?.preventDefault();
-          event?.stopPropagation();
+        if (p && typeof p.then === "function") {
+          p.then(() => { played = true; }).catch(() => {});
+        } else {
+          played = true;
         }
-        tryPlay();
       };
 
-      v.addEventListener("loadedmetadata", onLoaded);
+      tryPlayOnce();
+      const onCanPlay = () => tryPlayOnce();
       v.addEventListener("canplay", onCanPlay);
-      document.addEventListener("visibilitychange", onVisible);
-      document.addEventListener("touchstart", onFirstGesture, { once: true, passive: false });
-      document.addEventListener("click", onFirstGesture, { once: true });
-
-      const interval = window.setInterval(() => {
-        if (v.paused && !document.hidden) tryPlay();
-      }, 1000);
 
       return () => {
-        v.removeEventListener("loadedmetadata", onLoaded);
         v.removeEventListener("canplay", onCanPlay);
-        document.removeEventListener("visibilitychange", onVisible);
-        document.removeEventListener("touchstart", onFirstGesture);
-        document.removeEventListener("click", onFirstGesture);
-        window.clearInterval(interval);
       };
     }, []);
 
@@ -110,9 +92,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     className="absolute inset-0 z-30 cursor-default touch-none select-none"
                     aria-hidden="true"
                     onContextMenu={(e) => e.preventDefault()}
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
-                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   />
                 </div>
               </div>

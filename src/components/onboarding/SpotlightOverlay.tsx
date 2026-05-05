@@ -26,7 +26,7 @@ interface Rect { top: number; left: number; width: number; height: number }
 
 const PADDING = 8;
 
-export const SpotlightOverlay = ({ moduleKey, steps, activationActions }: SpotlightOverlayProps) => {
+export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
   const { get, set } = useUserData();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);

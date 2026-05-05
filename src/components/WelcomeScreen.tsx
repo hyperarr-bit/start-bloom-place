@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
+import { Play } from "lucide-react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -8,6 +9,16 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+
+    const playPreviewVideo = () => {
+      const v = videoRef.current;
+      if (!v) return;
+      v.muted = true;
+      v.defaultMuted = true;
+      const p = v.play();
+      if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
+    };
 
     useEffect(() => {
       const v = videoRef.current;
@@ -21,14 +32,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       const tryPlay = () => {
         if (!v.paused) return;
         const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => {});
+        if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
       };
+
+      const syncPlayingState = () => setIsVideoPlaying(!v.paused && !v.ended);
 
       tryPlay();
       const onCanPlay = () => tryPlay();
       const onLoadedData = () => tryPlay();
       const onFirstTouch = () => tryPlay();
 
+      v.addEventListener("play", syncPlayingState);
+      v.addEventListener("pause", syncPlayingState);
+      v.addEventListener("ended", syncPlayingState);
       v.addEventListener("canplay", onCanPlay);
       v.addEventListener("loadeddata", onLoadedData);
       // Some WebViews só liberam autoplay após 1º toque na página (não no vídeo).
@@ -36,6 +52,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       document.addEventListener("click", onFirstTouch, { once: true });
 
       return () => {
+        v.removeEventListener("play", syncPlayingState);
+        v.removeEventListener("pause", syncPlayingState);
+        v.removeEventListener("ended", syncPlayingState);
         v.removeEventListener("canplay", onCanPlay);
         v.removeEventListener("loadeddata", onLoadedData);
         document.removeEventListener("touchstart", onFirstTouch);
@@ -101,6 +120,20 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                     onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   />
+                  {!isVideoPlaying && (
+                    <button
+                      type="button"
+                      aria-label="Reproduzir prévia do aplicativo"
+                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                      className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
+                    >
+                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
+                        <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

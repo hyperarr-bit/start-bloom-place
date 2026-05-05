@@ -91,8 +91,14 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions }: Spotli
       if (!target) return;
       if (target.contains(e.target as Node)) {
         if (step.advanceOnClick !== false) {
-          // small delay to let any tab-switch render first
-          setTimeout(() => setStepIdx(i => Math.min(i + 1, steps.length - 1)), 200);
+          // last step → finish; otherwise advance
+          setTimeout(() => {
+            if (stepIdx >= steps.length - 1) {
+              finish("completed");
+            } else {
+              setStepIdx(i => i + 1);
+            }
+          }, 250);
         }
       }
     };

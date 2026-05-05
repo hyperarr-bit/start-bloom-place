@@ -16,17 +16,31 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const attemptPlay = useCallback(() => {
       const video = videoRef.current;
       if (!video) return;
-      // Force muted before playing — autoplay only works guaranteed when muted.
       try {
         video.muted = true;
+        video.volume = 0;
         // @ts-ignore — Safari/iOS specific
         video.defaultMuted = true;
+        video.setAttribute("muted", "");
+        video.setAttribute("playsinline", "");
+        video.setAttribute("webkit-playsinline", "true");
       } catch {}
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => setVideoState("playing"))
-          .catch(() => setVideoState("blocked"));
+      try {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => setVideoState("playing"))
+            .catch(() => {
+              // Retry once after forcing load
+              try { video.load(); } catch {}
+              const p2 = video.play();
+              if (p2 !== undefined) {
+                p2.then(() => setVideoState("playing")).catch(() => setVideoState("blocked"));
+              }
+            });
+        }
+      } catch {
+        setVideoState("blocked");
       }
     }, []);
 

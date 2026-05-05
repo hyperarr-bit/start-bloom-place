@@ -109,7 +109,7 @@ export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
               />
             </td>
             <td className="px-3 py-2">
-              <button onClick={addIncome} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={addIncome} data-spotlight="add-income" className="text-muted-foreground hover:text-foreground transition-colors">
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </td>

@@ -1,5 +1,4 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
-import { Play } from "lucide-react";
+import { forwardRef, useEffect, useRef } from "react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -9,78 +8,81 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-    // Quando o usuário fecha o player nativo (iOS WebView/TikTok), NÃO tentamos
-    // mais dar play automaticamente — senão o player nativo fica reabrindo sozinho.
-    const userDismissedRef = useRef(false);
-
-    const playPreviewVideo = () => {
-      const v = videoRef.current;
-      if (!v) return;
-      userDismissedRef.current = false;
-      v.muted = true;
-      v.defaultMuted = true;
-      const p = v.play();
-      if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
-    };
+    const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
       const v = videoRef.current;
-      if (!v) return;
+      const c = canvasRef.current;
+      if (!v || !c) return;
+
+      // Configurações que permitem decodificação inline em iOS sem abrir player nativo
       v.muted = true;
       v.defaultMuted = true;
+      v.loop = true;
+      v.playsInline = true;
       v.setAttribute("muted", "");
       v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "true");
+      v.setAttribute("preload", "auto");
 
-      const syncPlayingState = () => setIsVideoPlaying(!v.paused && !v.ended);
+      const ctx = c.getContext("2d");
+      if (!ctx) return;
 
-      // iOS dispara este evento quando o usuário SAI do player nativo fullscreen
-      const onExitFullscreen = () => {
-        userDismissedRef.current = true;
-        try { v.pause(); } catch {}
-        setIsVideoPlaying(false);
+      let rafId = 0;
+      let stopped = false;
+
+      const resize = () => {
+        const w = v.videoWidth;
+        const h = v.videoHeight;
+        if (w && h && (c.width !== w || c.height !== h)) {
+          c.width = w;
+          c.height = h;
+        }
       };
-      const onFullscreenChange = () => {
-        if (!document.fullscreenElement) onExitFullscreen();
+
+      const draw = () => {
+        if (stopped) return;
+        if (v.readyState >= 2 && v.videoWidth) {
+          resize();
+          try { ctx.drawImage(v, 0, 0, c.width, c.height); } catch {}
+        }
+        rafId = requestAnimationFrame(draw);
       };
-      // Se o WebView tentar abrir o player nativo sozinho, abortamos.
-      const onBeginFullscreen = () => {
-        try { v.pause(); } catch {}
-        // tentar sair do fullscreen nativo do iOS
+
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      };
+
+      const onLoaded = () => { resize(); tryPlay(); };
+      v.addEventListener("loadedmetadata", onLoaded);
+      v.addEventListener("loadeddata", onLoaded);
+      v.addEventListener("canplay", tryPlay);
+
+      // Se o WebView (TikTok) tentar abrir player nativo, abortamos imediatamente.
+      const abortNative = () => {
         const anyV = v as unknown as { webkitExitFullscreen?: () => void };
         try { anyV.webkitExitFullscreen?.(); } catch {}
       };
+      v.addEventListener("webkitbeginfullscreen", abortNative);
 
-      v.addEventListener("play", syncPlayingState);
-      v.addEventListener("pause", syncPlayingState);
-      v.addEventListener("ended", syncPlayingState);
-      v.addEventListener("webkitendfullscreen", onExitFullscreen);
-      v.addEventListener("fullscreenchange", onFullscreenChange);
-      v.addEventListener("webkitbeginfullscreen", onBeginFullscreen);
-
-      const tryPlay = () => {
-        if (userDismissedRef.current) return;
-        if (!v.paused) return;
-        const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
+      // Retomar quando a aba volta a ficar visível
+      const onVisibility = () => {
+        if (document.visibilityState === "visible") tryPlay();
       };
-      const onCanPlay = () => tryPlay();
-      const onLoadedData = () => tryPlay();
+      document.addEventListener("visibilitychange", onVisibility);
 
       tryPlay();
-      v.addEventListener("canplay", onCanPlay);
-      v.addEventListener("loadeddata", onLoadedData);
+      rafId = requestAnimationFrame(draw);
 
       return () => {
-        v.removeEventListener("play", syncPlayingState);
-        v.removeEventListener("pause", syncPlayingState);
-        v.removeEventListener("ended", syncPlayingState);
-        v.removeEventListener("canplay", onCanPlay);
-        v.removeEventListener("loadeddata", onLoadedData);
-        v.removeEventListener("webkitendfullscreen", onExitFullscreen);
-        v.removeEventListener("fullscreenchange", onFullscreenChange);
-        v.removeEventListener("webkitbeginfullscreen", onBeginFullscreen);
+        stopped = true;
+        cancelAnimationFrame(rafId);
+        v.removeEventListener("loadedmetadata", onLoaded);
+        v.removeEventListener("loadeddata", onLoaded);
+        v.removeEventListener("canplay", tryPlay);
+        v.removeEventListener("webkitbeginfullscreen", abortNative);
+        document.removeEventListener("visibilitychange", onVisibility);
       };
     }, []);
 
@@ -110,12 +112,11 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               <span className="iphone-btn iphone-btn-power" />
 
               <div className="iphone-bezel">
-                <div className="iphone-screen relative overflow-hidden">
+                <div className="iphone-screen relative overflow-hidden bg-black">
+                  {/* <video> fonte: invisível mas presente no DOM (necessário para iOS decodificar inline) */}
                   <video
                     ref={videoRef}
                     src="/videos/app-preview.mp4"
-                    poster="/videos/app-preview-poster.jpg"
-                    autoPlay
                     muted
                     loop
                     playsInline
@@ -124,40 +125,32 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     disableRemotePlayback
                     controls={false}
                     x-webkit-airplay="deny"
-                    controlsList="nodownload nofullscreen noremoteplayback"
                     {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-                    draggable={false}
-                    className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-                    style={{ pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }}
-                    tabIndex={-1}
                     aria-hidden
+                    tabIndex={-1}
+                    style={{
+                      position: "absolute",
+                      width: 1,
+                      height: 1,
+                      opacity: 0,
+                      pointerEvents: "none",
+                      left: -9999,
+                      top: -9999,
+                    }}
                   />
-
-                  {/* Overlay bloqueia gestos pra evitar que o WebView (TikTok)
-                      abra o player nativo ao tocar no vídeo. */}
-                  <div
-                    data-video-gesture-guard
-                    className="absolute inset-0 z-30 cursor-default touch-none select-none"
-                    aria-hidden="true"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  {/* Canvas: o que o usuário enxerga. WebView nenhum sequestra canvas. */}
+                  <canvas
+                    ref={canvasRef}
+                    aria-hidden
+                    className="absolute inset-0 w-full h-full select-none"
+                    style={{
+                      objectFit: "cover",
+                      WebkitUserSelect: "none",
+                      userSelect: "none",
+                      pointerEvents: "none",
+                      display: "block",
+                    }}
                   />
-                  {!isVideoPlaying && (
-                    <button
-                      type="button"
-                      aria-label="Reproduzir prévia do aplicativo"
-                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
-                    >
-                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
-                        <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
-                      </span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

@@ -94,12 +94,12 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
               </div>
               <div className="space-y-3">
                 <h1 className="text-2xl font-bold leading-tight text-foreground">
-                  Tu não precisa de mais 1 app.
+                  Organize sua vida
                   <br />
-                  Precisa parar o caos.
+                  em um só lugar.
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Em 60 segundos tu vai sair daqui com a primeira coisa da tua vida no lugar.
+                  Em 60 segundos você vai sair daqui com a primeira parte da sua vida no lugar.
                 </p>
               </div>
               <button

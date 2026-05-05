@@ -208,8 +208,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
         </div>
       </div>
 
-      {/* Budget compatibility alert */}
-      {canAffordWithoutDebt ? (
+      {/* Budget compatibility alert — only when user has financial data */}
+      {(monthlyBudget === 0 && totalExpenses === 0) ? null : canAffordWithoutDebt ? (
         <div className="rounded-xl p-3 border bg-emerald-500/10 border-emerald-500/30">
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />

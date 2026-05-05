@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef } from "react";
+import { forwardRef } from "react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -7,85 +7,6 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-
-    useEffect(() => {
-      const v = videoRef.current;
-      const c = canvasRef.current;
-      if (!v || !c) return;
-
-      // Configurações que permitem decodificação inline em iOS sem abrir player nativo
-      v.muted = true;
-      v.defaultMuted = true;
-      v.loop = true;
-      v.playsInline = true;
-      v.setAttribute("muted", "");
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "true");
-      v.setAttribute("preload", "auto");
-
-      const ctx = c.getContext("2d");
-      if (!ctx) return;
-
-      let rafId = 0;
-      let stopped = false;
-
-      const resize = () => {
-        const w = v.videoWidth;
-        const h = v.videoHeight;
-        if (w && h && (c.width !== w || c.height !== h)) {
-          c.width = w;
-          c.height = h;
-        }
-      };
-
-      const draw = () => {
-        if (stopped) return;
-        if (v.readyState >= 2 && v.videoWidth) {
-          resize();
-          try { ctx.drawImage(v, 0, 0, c.width, c.height); } catch {}
-        }
-        rafId = requestAnimationFrame(draw);
-      };
-
-      const tryPlay = () => {
-        const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => {});
-      };
-
-      const onLoaded = () => { resize(); tryPlay(); };
-      v.addEventListener("loadedmetadata", onLoaded);
-      v.addEventListener("loadeddata", onLoaded);
-      v.addEventListener("canplay", tryPlay);
-
-      // Se o WebView (TikTok) tentar abrir player nativo, abortamos imediatamente.
-      const abortNative = () => {
-        const anyV = v as unknown as { webkitExitFullscreen?: () => void };
-        try { anyV.webkitExitFullscreen?.(); } catch {}
-      };
-      v.addEventListener("webkitbeginfullscreen", abortNative);
-
-      // Retomar quando a aba volta a ficar visível
-      const onVisibility = () => {
-        if (document.visibilityState === "visible") tryPlay();
-      };
-      document.addEventListener("visibilitychange", onVisibility);
-
-      tryPlay();
-      rafId = requestAnimationFrame(draw);
-
-      return () => {
-        stopped = true;
-        cancelAnimationFrame(rafId);
-        v.removeEventListener("loadedmetadata", onLoaded);
-        v.removeEventListener("loadeddata", onLoaded);
-        v.removeEventListener("canplay", tryPlay);
-        v.removeEventListener("webkitbeginfullscreen", abortNative);
-        document.removeEventListener("visibilitychange", onVisibility);
-      };
-    }, []);
-
     return (
       <div
         ref={ref}
@@ -113,53 +34,21 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="iphone-bezel">
                 <div className="iphone-screen relative overflow-hidden bg-black">
-                  {/* Fallback visível: WebP animado (funciona em qualquer WebView, sem player) */}
                   <img
                     src="/videos/app-preview-animated.webp"
                     alt="Prévia do app CORE"
                     className="absolute inset-0 w-full h-full select-none"
-                    style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
-                    draggable={false}
-                  />
-                  {/* <video> fonte: invisível (cobre tela com opacidade mínima para iOS aceitar decodificar) */}
-                  <video
-                    ref={videoRef}
-                    src="/videos/app-preview.mp4"
-                    poster="/videos/app-preview-poster.jpg"
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    disablePictureInPicture
-                    disableRemotePlayback
-                    controls={false}
-                    x-webkit-airplay="deny"
-                    {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-                    aria-hidden
-                    tabIndex={-1}
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      opacity: 0.01,
-                      pointerEvents: "none",
-                    }}
-                  />
-                  {/* Canvas: por cima do webp quando o vídeo conseguir tocar */}
-                  <canvas
-                    ref={canvasRef}
-                    aria-hidden
-                    className="absolute inset-0 w-full h-full select-none"
                     style={{
                       objectFit: "cover",
-                      WebkitUserSelect: "none",
-                      userSelect: "none",
                       pointerEvents: "none",
                       display: "block",
-                      background: "transparent",
+                      // dica para o compositor manter em camada própria (GPU)
+                      transform: "translateZ(0)",
+                      willChange: "transform",
                     }}
+                    draggable={false}
+                    decoding="async"
+                    fetchPriority="high"
                   />
                 </div>
               </div>

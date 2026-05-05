@@ -109,6 +109,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
+      setInGracePeriod(data?.in_grace_period ?? false);
+      setGraceDaysLeft(typeof data?.grace_days_left === "number" ? data.grace_days_left : null);
+      setPaymentMethod(data?.payment_method ?? null);
       if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
       if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
     } catch (err) {

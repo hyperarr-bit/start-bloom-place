@@ -27,12 +27,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       const onLoaded = () => tryPlay();
       const onCanPlay = () => tryPlay();
       const onVisible = () => { if (!document.hidden) tryPlay(); };
-      const onFirstGesture = () => tryPlay();
+      const onFirstGesture = (event?: Event) => {
+        const target = event?.target as HTMLElement | null;
+        if (target?.closest?.("[data-video-gesture-guard]")) {
+          event?.preventDefault();
+          event?.stopPropagation();
+        }
+        tryPlay();
+      };
 
       v.addEventListener("loadedmetadata", onLoaded);
       v.addEventListener("canplay", onCanPlay);
       document.addEventListener("visibilitychange", onVisible);
-      document.addEventListener("touchstart", onFirstGesture, { once: true, passive: true });
+      document.addEventListener("touchstart", onFirstGesture, { once: true, passive: false });
       document.addEventListener("click", onFirstGesture, { once: true });
 
       const interval = window.setInterval(() => {
@@ -89,16 +96,23 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     disableRemotePlayback
                     controls={false}
                     x-webkit-airplay="deny"
+                    controlsList="nodownload nofullscreen noremoteplayback"
                     {...({ "webkit-playsinline": "true" } as Record<string, string>)}
                     draggable={false}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    style={{ pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
                   />
-                  {/* Gesture capture: previne abrir player nativo ao tocar */}
+                  {/* Camada acima do vídeo: o toque nunca chega no player nativo do WebView/TikTok */}
                   <div
-                    className="absolute inset-0 z-10"
+                    data-video-gesture-guard
+                    className="absolute inset-0 z-30 cursor-default touch-none select-none"
                     aria-hidden="true"
-                    onClick={(e) => { e.preventDefault(); videoRef.current?.play().catch(() => {}); }}
-                    onTouchStart={(e) => { e.preventDefault(); videoRef.current?.play().catch(() => {}); }}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
+                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
                   />
                 </div>
               </div>

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { Textarea } from "@/components/ui/textarea";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
@@ -1089,6 +1090,11 @@ const Rotina = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SpotlightOverlay
+        moduleKey="rotina"
+        instruction="Cria 1 hábito. Pode ser 'beber água'."
+        activationActions={["first_habit", "first_task"]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">

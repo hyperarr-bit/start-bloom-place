@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -563,6 +564,11 @@ const Treino = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <SpotlightOverlay
+        moduleKey="treino"
+        instruction="Cria teu primeiro treino. Pode ser 'Push 1'."
+        activationActions={["first_workout"]}
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">

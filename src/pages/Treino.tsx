@@ -208,6 +208,7 @@ const Treino = () => {
 
   const toggleDay = (day: string) => {
     setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+    setWorkoutPlan(prev => prev[day] ? prev : { ...prev, [day]: { muscles: [], exercises: [] } });
   };
 
   const toggleMuscleForDay = (day: string, muscle: string) => {

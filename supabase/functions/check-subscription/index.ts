@@ -12,6 +12,9 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[CHECK-SUBSCRIPTION] ${step}${d}`);
 };
 
+const GRACE_PERIOD_DAYS = 7;
+const TRIAL_DAYS = 7;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,44 +39,70 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated");
     logStep("User authenticated", { email: user.email });
 
-    // Check profile created_at for trial
     const { data: profile } = await supabaseClient
       .from("profiles")
       .select("created_at")
       .eq("id", user.id)
       .single();
 
-    // Check local subscriptions table
+    // Pega a assinatura mais recente que ainda pode dar acesso
+    // (active, past_due ou canceled recente para checar grace)
     const { data: localSub } = await supabaseClient
       .from("subscriptions")
-      .select("status, current_period_end, plan, billing_period")
+      .select("status, current_period_end, plan, billing_period, payment_method")
       .eq("user_id", user.id)
-      .eq("status", "active")
+      .in("status", ["active", "past_due"])
       .order("current_period_end", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
 
     if (localSub) {
-      // Check if subscription is still valid
       const endDate = localSub.current_period_end
         ? new Date(localSub.current_period_end)
         : null;
-      const isActive = !endDate || endDate > new Date();
+      const now = new Date();
 
-      if (isActive) {
+      // Sem data de fim ou ainda dentro do período → ativo normal
+      if (!endDate || endDate > now) {
         logStep("Active subscription found", { end: localSub.current_period_end });
         return new Response(
           JSON.stringify({
             subscribed: true,
             trial_expired: false,
+            in_grace_period: false,
+            grace_days_left: null,
+            payment_method: localSub.payment_method ?? null,
             subscription_end: localSub.current_period_end,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
         );
       }
+
+      // Vencido: checa se ainda está no grace period (7 dias)
+      const msSinceExpiry = now.getTime() - endDate.getTime();
+      const daysSinceExpiry = msSinceExpiry / (1000 * 60 * 60 * 24);
+
+      if (daysSinceExpiry <= GRACE_PERIOD_DAYS) {
+        const graceDaysLeft = Math.max(0, Math.ceil(GRACE_PERIOD_DAYS - daysSinceExpiry));
+        logStep("In grace period", { daysSinceExpiry, graceDaysLeft });
+        return new Response(
+          JSON.stringify({
+            subscribed: true,
+            trial_expired: false,
+            in_grace_period: true,
+            grace_days_left: graceDaysLeft,
+            payment_method: localSub.payment_method ?? null,
+            subscription_end: localSub.current_period_end,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+
+      // Passou do grace → considera não-assinante (cleanup cron marca como canceled)
+      logStep("Grace period expired", { daysSinceExpiry });
     }
 
-    // No active subscription — compute trial state (7-day trial, no card)
+    // Sem assinatura ativa — calcula trial
     const trialState = computeTrialState(profile?.created_at);
     logStep("No active subscription", trialState);
 
@@ -83,6 +112,9 @@ serve(async (req) => {
         trial_expired: trialState.expired,
         trial_day: trialState.day,
         trial_hours_left: trialState.hoursLeft,
+        in_grace_period: false,
+        grace_days_left: null,
+        payment_method: null,
         subscription_end: null,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -97,7 +129,6 @@ serve(async (req) => {
   }
 });
 
-const TRIAL_DAYS = 7;
 function computeTrialState(createdAt: string | null | undefined) {
   if (!createdAt) return { expired: false, day: 1, hoursLeft: TRIAL_DAYS * 24 };
   const ms = Date.now() - new Date(createdAt).getTime();

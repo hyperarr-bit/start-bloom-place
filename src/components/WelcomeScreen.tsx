@@ -89,8 +89,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     disableRemotePlayback
                     controls={false}
                     x-webkit-airplay="deny"
-                    // @ts-expect-error iOS-specific attribute
-                    webkit-playsinline="true"
+                    {...({ "webkit-playsinline": "true" } as Record<string, string>)}
                     draggable={false}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
                   />

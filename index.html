@@ -71,33 +71,7 @@
 </head>
 
   <body>
-    <div id="root">
-      <!--
-        Splash estático para /inicio: evita o "flash bege" entre o paint do
-        HTML e a montagem do React. É substituído assim que o React renderiza
-        a WelcomeScreen. NÃO mexe no autoplay/toque do vídeo (o <video> só
-        aparece depois, dentro do componente React).
-      -->
-      <script>
-        (function () {
-          try {
-            if (location.pathname !== "/inicio") return;
-            var root = document.getElementById("root");
-            if (!root) return;
-            root.innerHTML =
-              '<div id="initial-splash" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:hsl(var(--background));padding:24px;">' +
-                '<div style="position:relative;aspect-ratio:9/19.5;height:min(62dvh,620px);max-width:82vw;border-radius:18%/8.5%;padding:1.2%;background:linear-gradient(135deg,#d8d8db 0%,#f4f4f6 18%,#b9b9bd 38%,#e9e9ec 58%,#a8a8ac 82%,#cfcfd3 100%);box-shadow:0 30px 60px -20px rgba(0,0,0,.45),0 12px 24px -10px rgba(0,0,0,.25);">' +
-                  '<div style="position:relative;width:100%;height:100%;border-radius:16.5%/7.8%;background:#050507;padding:1.4%;">' +
-                    '<div style="position:relative;width:100%;height:100%;border-radius:15.5%/7.3%;overflow:hidden;background:#000;">' +
-                      '<img src="/videos/app-preview-poster.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit;" draggable="false" />' +
-                    '</div>' +
-                  '</div>' +
-                '</div>' +
-              '</div>';
-          } catch (e) {}
-        })();
-      </script>
-    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

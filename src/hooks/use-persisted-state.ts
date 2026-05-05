@@ -16,7 +16,7 @@ import { normalizeForKey } from "@/lib/data-normalizers";
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
   const { get, set: setData, loaded } = useUserData();
 
-  const [state, setState] = useState<T>(() => get(key, initial));
+  const [state, setState] = useState<T>(() => normalizeForKey(key, get(key, initial)));
   const lastWrittenJson = useRef<string>(JSON.stringify(state));
   const hydratedRef = useRef(false);
 
@@ -24,7 +24,7 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
   useEffect(() => {
     if (!loaded || hydratedRef.current) return;
     hydratedRef.current = true;
-    const latest = get(key, initial);
+    const latest = normalizeForKey(key, get(key, initial));
     const latestJson = JSON.stringify(latest);
     if (latestJson !== lastWrittenJson.current) {
       lastWrittenJson.current = latestJson;

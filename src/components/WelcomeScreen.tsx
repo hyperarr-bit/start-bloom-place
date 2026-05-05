@@ -130,12 +130,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     tabIndex={-1}
                     style={{
                       position: "absolute",
-                      width: 1,
-                      height: 1,
-                      opacity: 0,
+                      inset: 0,
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      opacity: 0.01,
                       pointerEvents: "none",
-                      left: -9999,
-                      top: -9999,
                     }}
                   />
                   {/* Canvas: o que o usuário enxerga. WebView nenhum sequestra canvas. */}

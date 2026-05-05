@@ -377,7 +377,7 @@ const TodoList = () => {
             <option value="media">🟡 Média</option>
             <option value="baixa">🔵 Baixa</option>
           </select>
-          <Button size="sm" onClick={addTodo} className="h-8 text-xs">+</Button>
+          <Button size="sm" onClick={addTodo} data-spotlight="add-todo" className="h-8 text-xs">+</Button>
         </div>
 
         <div className="flex gap-1">

@@ -92,9 +92,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     className="absolute inset-0 z-30 cursor-default touch-none select-none"
                     aria-hidden="true"
                     onContextMenu={(e) => e.preventDefault()}
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
-                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); videoRef.current?.play().catch(() => {}); }}
+                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
                   />
                 </div>
               </div>

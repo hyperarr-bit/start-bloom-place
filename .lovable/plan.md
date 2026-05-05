@@ -1,26 +1,37 @@
-Vou corrigir o autoplay atacando a causa mais provável: o overlay/poster está ficando por cima do vídeo e o estado só muda para “playing” quando o evento `playing` dispara. Se o vídeo estiver tocando, mas o poster continuar visível por causa de timing/evento, parece que autoplay falhou.
+Você tem razão. O erro foi tentar tratar TikTok como Safari normal e ainda colocar camada/botão por cima do vídeo. No TikTok o player é controlado pelo WebView/app, então não dá para forçar a mesma experiência inline do Safari sem brigar com o player nativo.
 
-Plano de implementação:
+Plano para corrigir:
 
-1. Ajustar `src/components/WelcomeScreen.tsx`
-   - Trocar o estado inicial para um fluxo mais confiável: `loading` → `playing` quando o vídeo realmente avançar.
-   - Considerar autoplay bem-sucedido também quando `play()` resolver e/ou quando o evento `timeupdate` indicar `currentTime > 0`.
-   - Esconder o poster assim que o vídeo começar a tocar de verdade, em vez de depender só de um evento.
-   - Chamar `attemptPlay()` imediatamente no mount, não só quando `readyState >= 2` ou `canplay` disparar.
-   - Remover a chamada `video.load()` dentro do retry automático, porque ela pode reiniciar o carregamento e atrapalhar o autoplay em alguns navegadores.
-   - Manter `muted`, `defaultMuted`, `playsInline`, `autoPlay`, `loop`, `preload="auto"`, `disablePictureInPicture`, `disableRemotePlayback` e atributos iOS.
+1. Detectar ambiente corretamente
+   - Criar uma detecção simples de navegador:
+     - Safari/iOS normal: pode usar vídeo inline com autoplay mudo dentro do mockup.
+     - TikTok/in-app WebView: mantém o vídeo, mas deixa o player nativo do TikTok/iOS cuidar da abertura.
 
-2. Corrigir a camada invisível sobre o iPhone
-   - Manter uma camada invisível para impedir que clique no vídeo abra o player/aba nativa.
-   - Essa camada não deve bloquear ou interferir no autoplay inicial.
-   - Em toque/clique, ela apenas chama `attemptPlay()` como fallback, sem abrir o vídeo.
+2. Separar o comportamento do vídeo
+   - No Safari/browser normal:
+     - manter `autoPlay`, `muted`, `loop`, `playsInline` e o vídeo tocando dentro do iPhone.
+     - manter uma UI mínima só se o autoplay falhar.
+   - No TikTok:
+     - remover autoplay programático (`v.play()` automático, `canplay`, `loadeddata`).
+     - remover a camada invisível por cima (`gesture guard`).
+     - remover o botão custom por cima do vídeo.
+     - deixar o próprio `<video>` receber o clique/toque do usuário e abrir o player nativo uma única vez.
 
-3. Restaurar o botão de play somente como fallback
-   - O botão de play deve aparecer apenas quando o autoplay for realmente bloqueado/der erro.
-   - Ele não aparece no carregamento normal.
-   - Ele serve como plano B para Safari/iOS em modo economia de energia, onde o navegador pode bloquear autoplay mesmo com vídeo mudo.
+3. Corrigir o loop de reabertura
+   - Quando o usuário sair do player nativo (`webkitendfullscreen`), pausar o vídeo e marcar que ele foi fechado.
+   - No TikTok, depois disso, não tentar reproduzir de novo automaticamente em nenhum evento de carregamento/estado.
+   - Só tocar de novo se o usuário tocar diretamente no vídeo.
 
-4. Atualizar `.lovable/plan.md`
-   - Registrar que a correção correta é: autoplay agressivo + detecção real de reprodução + poster não ficar preso por cima do vídeo + botão apenas fallback.
+4. Ajustar atributos por ambiente
+   - Safari: vídeo inline com `playsInline` e sem controles visíveis.
+   - TikTok: permitir interação direta com o vídeo, sem overlay customizado por cima e sem autoplay JS.
 
-Observação importante: não existe como garantir 100% autoplay em todos os navegadores/dispositivos, porque iOS/Safari, modo economia de bateria, política de dados ou configuração do usuário podem bloquear reprodução automática. Mas com vídeo mudo, inline, preload, tentativa imediata e fallback visual, deixamos no máximo que o navegador permite.
+Resultado esperado:
+- No Safari: continua com vídeo bonito/inline no mockup.
+- No TikTok: ao tocar no vídeo, abre o player nativo como o TikTok quer; ao sair, ele não fica abrindo sozinho; se quiser ver de novo, o usuário toca no vídeo novamente.
+
+Arquivos a alterar:
+- `src/components/WelcomeScreen.tsx`
+
+Observação técnica:
+- O problema atual está em `WelcomeScreen.tsx`: o componente ainda chama `v.play()` automaticamente no mount e também nos eventos `canplay`/`loadeddata`. Em WebViews como TikTok isso pode reabrir o player nativo depois que o usuário acabou de sair. Além disso, a camada `data-video-gesture-guard` e o botão customizado competem com o player nativo no TikTok.

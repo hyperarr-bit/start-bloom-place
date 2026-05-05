@@ -320,8 +320,8 @@ const Dieta = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {weekDays.map(day => (
-                <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
+              {weekDays.map((day, dayIdx) => (
+                <div key={day} data-spotlight={dayIdx === 0 ? "first-day" : undefined} className="bg-card rounded-xl border border-border overflow-hidden">
                   <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center flex items-center justify-between`}>
                     <div className="flex gap-1">
                       <button

@@ -9,8 +9,8 @@ interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";
   /** Instruction shown to the user. Short and action-oriented. */
   instruction: string;
-  /** activation flag key written in user_data once the action completes */
-  activationKey: string;
+  /** activation action(s) that should dismiss the spotlight when fired */
+  activationActions: string[];
 }
 
 /**

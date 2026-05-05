@@ -566,7 +566,9 @@ const Treino = () => {
     <div className="min-h-screen bg-background pb-24">
       <SpotlightOverlay
         moduleKey="treino"
-        instruction="Cria teu primeiro treino. Pode ser 'Push 1'."
+        steps={[
+          { selector: '[data-spotlight="add-exercise"]', label: "Adiciona teu primeiro exercício do dia." },
+        ]}
         activationActions={["first_workout"]}
       />
       {/* Header */}

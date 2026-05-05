@@ -153,26 +153,29 @@ export const GoalsBoardV2 = () => {
   if (view === "home") {
     const addTimelineItem = (period: keyof TimelineData, text: string) => {
       if (!text.trim()) return;
-      setTimeline(prev => ({
-        ...prev,
-        [period]: { ...prev[period], items: [...prev[period].items, { id: Date.now().toString(), text: text.trim(), done: false }] },
-      }));
+      setTimeline(prev => {
+        const p0 = prev[period] ?? { items: [] };
+        return { ...prev, [period]: { ...p0, items: [...(p0.items ?? []), { id: Date.now().toString(), text: text.trim(), done: false }] } };
+      });
     };
     const toggleTimelineItem = (period: keyof TimelineData, itemId: string) => {
-      setTimeline(prev => ({
-        ...prev,
-        [period]: { ...prev[period], items: prev[period].items.map(i => i.id === itemId ? { ...i, done: !i.done } : i) },
-      }));
+      setTimeline(prev => {
+        const p0 = prev[period] ?? { items: [] };
+        return { ...prev, [period]: { ...p0, items: (p0.items ?? []).map(i => i.id === itemId ? { ...i, done: !i.done } : i) } };
+      });
     };
     const removeTimelineItem = (period: keyof TimelineData, itemId: string) => {
-      setTimeline(prev => ({
-        ...prev,
-        [period]: { ...prev[period], items: prev[period].items.filter(i => i.id !== itemId) },
-      }));
+      setTimeline(prev => {
+        const p0 = prev[period] ?? { items: [] };
+        return { ...prev, [period]: { ...p0, items: (p0.items ?? []).filter(i => i.id !== itemId) } };
+      });
     };
     const handleTimelineImage = async (period: keyof TimelineData, e: React.ChangeEvent<HTMLInputElement>) => {
       const url = await uploadFromInput(e, DREAM_BUCKET, `timeline/${period}`);
-      if (url) setTimeline(prev => ({ ...prev, [period]: { ...prev[period], image: url } }));
+      if (url) setTimeline(prev => {
+        const p0 = prev[period] ?? { items: [] };
+        return { ...prev, [period]: { ...p0, image: url } };
+      });
     };
     const handleDreamImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const url = await uploadFromInput(e, DREAM_BUCKET, "dream-board");

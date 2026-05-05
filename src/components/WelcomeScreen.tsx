@@ -127,18 +127,23 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     return (
       <div
         ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6 pt-10 pb-8"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6"
+        style={{
+          minHeight: "100dvh",
+          paddingTop: "max(2.5rem, env(safe-area-inset-top))",
+          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+        }}
         onClick={handleScreenTap}
       >
-        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 max-w-4xl w-full min-h-0">
+        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 max-w-4xl w-full min-h-0">
           {/* iPhone CSS mockup */}
           <div className="relative z-10 flex items-center justify-center shrink min-h-0">
             <div
               className="iphone-frame relative"
               style={{
                 aspectRatio: "9 / 19.5",
-                height: "min(60vh, 600px)",
-                maxWidth: "78vw",
+                height: "min(62dvh, 620px)",
+                maxWidth: "82vw",
               }}
             >
               {/* Side buttons */}

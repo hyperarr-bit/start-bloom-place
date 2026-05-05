@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -7,6 +7,48 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+      const v = videoRef.current;
+      if (!v) return;
+      v.muted = true;
+      v.defaultMuted = true;
+      v.setAttribute("muted", "");
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "true");
+
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      };
+
+      tryPlay();
+      const onLoaded = () => tryPlay();
+      const onCanPlay = () => tryPlay();
+      const onVisible = () => { if (!document.hidden) tryPlay(); };
+      const onFirstGesture = () => tryPlay();
+
+      v.addEventListener("loadedmetadata", onLoaded);
+      v.addEventListener("canplay", onCanPlay);
+      document.addEventListener("visibilitychange", onVisible);
+      document.addEventListener("touchstart", onFirstGesture, { once: true, passive: true });
+      document.addEventListener("click", onFirstGesture, { once: true });
+
+      const interval = window.setInterval(() => {
+        if (v.paused && !document.hidden) tryPlay();
+      }, 1000);
+
+      return () => {
+        v.removeEventListener("loadedmetadata", onLoaded);
+        v.removeEventListener("canplay", onCanPlay);
+        document.removeEventListener("visibilitychange", onVisible);
+        document.removeEventListener("touchstart", onFirstGesture);
+        document.removeEventListener("click", onFirstGesture);
+        window.clearInterval(interval);
+      };
+    }, []);
+
     return (
       <div
         ref={ref}
@@ -33,12 +75,30 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               <span className="iphone-btn iphone-btn-power" />
 
               <div className="iphone-bezel">
-                <div className="iphone-screen">
-                  <img
-                    src="/videos/app-preview-animated.webp"
-                    alt="Prévia animada do aplicativo Core"
+                <div className="iphone-screen relative overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    src="/videos/app-preview.mp4"
+                    poster="/videos/app-preview-poster.jpg"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    controls={false}
+                    x-webkit-airplay="deny"
+                    {...({ "webkit-playsinline": "true" } as Record<string, string>)}
                     draggable={false}
                     className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+                  />
+                  {/* Gesture capture: previne abrir player nativo ao tocar */}
+                  <div
+                    className="absolute inset-0 z-10"
+                    aria-hidden="true"
+                    onClick={(e) => { e.preventDefault(); videoRef.current?.play().catch(() => {}); }}
+                    onTouchStart={(e) => { e.preventDefault(); videoRef.current?.play().catch(() => {}); }}
                   />
                 </div>
               </div>

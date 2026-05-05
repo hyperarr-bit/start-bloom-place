@@ -28,6 +28,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     };
 
     useEffect(() => {
+      if (isInAppWebView) return; // não inicializa vídeo em WebViews que sequestram media
       const v = videoRef.current;
       if (!v) return;
       v.muted = true;
@@ -54,7 +55,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       v.addEventListener("ended", syncPlayingState);
       v.addEventListener("canplay", onCanPlay);
       v.addEventListener("loadeddata", onLoadedData);
-      // Some WebViews só liberam autoplay após 1º toque na página (não no vídeo).
       document.addEventListener("touchstart", onFirstTouch, { once: true, passive: true });
       document.addEventListener("click", onFirstTouch, { once: true });
 
@@ -67,7 +67,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         document.removeEventListener("touchstart", onFirstTouch);
         document.removeEventListener("click", onFirstTouch);
       };
-    }, []);
+    }, [isInAppWebView]);
 
     return (
       <div

@@ -204,6 +204,22 @@ export const FinancialHealth = ({
     ? trips.reduce((s, t) => s + (t.savedAmount / t.budget) * 100, 0) / trips.length
     : 0;
 
+  const hasAnyData = totalIncome > 0 || totalExpenses > 0 || totalDebts > 0 || investments.length > 0 || totalFixedExpenses > 0;
+
+  if (!hasAnyData) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-card rounded-lg border border-dashed border-border p-8 text-center">
+          <Target className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+          <h3 className="text-sm font-bold mb-1">Sem dados financeiros ainda</h3>
+          <p className="text-xs text-muted-foreground">
+            Cadastre suas receitas, despesas e investimentos nas abas <strong>Meu Financeiro</strong> e <strong>Investimentos</strong> para ver seu score.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Score Card */}

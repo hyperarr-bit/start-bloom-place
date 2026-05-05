@@ -1,64 +1,57 @@
-# Renovação automática + grace period de 7 dias
+# QA completo do app — bugs encontrados e plano de correção
 
-## Como funciona hoje (resumo)
+Testei manualmente o módulo **Finanças** (todas as 7 abas) e a entrada do módulo **Treino** com a conta `store.street.brasil@gmail.com`. Encontrei 6 bugs. Tem mais 13 módulos pra varrer (Dieta, Rotina, Dev. Pessoal, Saúde, Casa, Estudos, Biblioteca, Beleza, Viagens, Carreira, Mente, Relações, Pet, Detox).
 
-- **Cartão:** AbacatePay cobra automaticamente todo mês/ano. Webhook `subscription.renewed` → `current_period_end` é estendido.
-- **PIX recorrente:** AbacatePay gera nova cobrança e notifica o cliente. Mesmo evento de renovação.
-- **Falha de pagamento:** AbacatePay dispara `subscription.payment_failed` → hoje marcamos como `past_due` no banco, mas **o frontend não distingue** — o usuário simplesmente perde acesso quando `current_period_end` vence.
+## Bugs já identificados
 
-## O que muda
+### BUG #1 — Alerta falso "despesas > renda" (Finanças/Dashboard)
+`src/components/Dashboard.tsx:268` — quando `totalIncome === 0` e `totalExpenses === 0`, `savingsRate = 0` cai no `else` e mostra warning falso.
+**Fix:** condicionar o alerta a `totalExpenses > totalIncome` e ocultar quando ambos forem zero.
 
-### 1. Grace period de 7 dias na `check-subscription`
+### BUG #2 — Labels em inglês (Finanças/Meu Financeiro)
+Tabelas de Receitas/Despesas/Dívidas/Investimentos mostram **"+ New"** e placeholder de data **"mm/dd/yyyy"** em vez de PT-BR.
+**Fix:** localizar o componente de tabela editável e trocar para "+ Novo" e formato `dd/mm/aaaa` (input type="date" com `lang="pt-BR"` ou máscara).
 
-Quando o `current_period_end` passa, em vez de cortar imediatamente:
-- Se faz **≤ 7 dias** desde o vencimento → retorna `subscribed: true` + `in_grace_period: true` + `grace_days_left: N` + `payment_method`.
-- Se faz **> 7 dias** → retorna `subscribed: false` (acesso cortado).
+### BUG #3 — Alerta falso "saldo negativo" (Finanças/Desejos)
+Mesmo padrão do bug #1: alerta "Previsão aponta saldo negativo no fim do mês" aparece com tudo zerado.
+**Fix:** suprimir o alerta quando o usuário não tem nenhuma receita/despesa cadastrada.
 
-Também aceita `status = 'past_due'` como ativo dentro do grace period.
+### BUG #4 — Datas em formato inglês (Finanças/Viagem)
+DATA DE IDA / DATA DE VOLTA mostram "mm/dd/yyyy".
+**Fix:** mesma correção do #2.
 
-### 2. Banner global de aviso
+### BUG #5 — Score Financeiro 25/100 com conta vazia (Finanças/Saúde Financeira)
+Usuário novo sem dado nenhum recebe score 25/100 + "Precisa Melhorar" — desmotivante e enganoso.
+**Fix:** quando `totalIncome === 0 && totalExpenses === 0 && totalInvestments === 0 && totalDebts === 0`, mostrar estado vazio "Cadastre seus dados financeiros para ver seu score" em vez de calcular.
 
-Componente `GracePeriodBanner` montado no layout principal:
-- Aparece quando `in_grace_period === true`.
-- Texto: "Não conseguimos processar sua cobrança. Você tem **N dias** para atualizar seu pagamento ou perderá o acesso ao CORE."
-- Botão "Atualizar pagamento" → leva pra `/planos` e abre novo checkout.
-- Cor: âmbar (warning), não bloqueia uso.
+### BUG #6 — Dia da semana errado (Treino/Hoje)
+Hoje é terça (5/maio/2026) mas o card mostra "SEGUNDA ⬅️ HOJE".
+**Fix:** verificar lógica de cálculo do dia atual no componente (provavelmente off-by-one no índice do array de dias ou timezone errado).
 
-### 3. Edge function `subscription-grace-cleanup` (cron diário)
+## Plano de execução
 
-Roda 1x por dia às 03:00 BRT:
-- Busca subscriptions com `status IN ('active','past_due')` e `current_period_end < now() - interval '7 days'`.
-- Marca como `canceled`.
-- Registra evento analítico `subscription_expired_no_payment`.
+### Etapa 1 — Corrigir os 6 bugs já identificados
+Editar os arquivos:
+- `src/components/Dashboard.tsx` — bugs #1 e #5 (lógica de alertas/score com dados vazios).
+- Componente de Desejos em `src/components/financas/` (a localizar) — bug #3.
+- Componente de tabela editável em finanças — bugs #2 e #4 (i18n PT-BR).
+- Componente "Hoje" do Treino — bug #6 (cálculo do dia).
 
-Cron via `pg_cron` + `pg_net` (não em migration — usa insert tool com a anon key real).
+### Etapa 2 — Varrer os 13 módulos restantes
+Pra cada módulo, testar 3 coisas mínimas:
+1. Carrega sem crash com conta zerada.
+2. Cada aba do módulo abre.
+3. Botão principal de cada aba (adicionar/criar) funciona ou abre form.
 
-### 4. Webhook: melhor handling
+Documentar cada bug encontrado e corrigir na mesma rodada. Foco em padrões já vistos:
+- Strings em inglês esquecidas
+- Alertas/scores falsos com dados vazios
+- Datas/dias da semana incorretos
+- Valores hardcoded em vez de tokens de cor
 
-- `subscription.payment_failed` / `subscription.overdue` → marca `past_due` **mas mantém `current_period_end`** (já faz, só confirmar).
-- Adicionar `checkout.refunded` / `subscription.cancelled` → cancela imediato.
-- Quando renovação chega depois de `past_due`, volta pra `active`.
+### Etapa 3 — Re-teste rápido pós-fix
+Voltar nos 6 bugs corrigidos pra confirmar que ficaram OK, e nos novos bugs achados na etapa 2.
 
-### 5. Frontend (`use-auth.tsx`)
+## Observação
 
-Expor 3 novos campos no contexto: `inGracePeriod`, `graceDaysLeft`, `paymentMethod`. Layout principal lê e renderiza o banner.
-
-## Detalhes técnicos
-
-**Arquivos modificados:**
-- `supabase/functions/check-subscription/index.ts` — lógica de grace.
-- `supabase/functions/abacatepay-webhook/index.ts` — confirmar transições past_due → active na renovação.
-- `src/hooks/use-auth.tsx` — novos campos no contexto.
-- `src/components/GracePeriodBanner.tsx` — novo.
-- `src/App.tsx` (ou layout raiz) — montar o banner.
-
-**Arquivos novos:**
-- `supabase/functions/subscription-grace-cleanup/index.ts` — cron job.
-- Cron job via insert SQL (não migration).
-
-**Constante compartilhada:** `GRACE_PERIOD_DAYS = 7` no edge function e no banner.
-
-## Limites
-
-- Não há como forçar o AbacatePay a tentar cobrar de novo (a plataforma já faz retentativas próprias antes de mandar `payment_failed`).
-- O usuário precisa **fazer um novo checkout** para atualizar cartão (AbacatePay v2 não expõe portal de gerenciamento como Stripe). O botão do banner leva pra isso.
+Esse trabalho é grande (talvez ~30+ bugs no total considerando o padrão visto em Finanças). Recomendo aprovar o plano para eu **entrar em modo build, corrigir os 6 bugs já mapeados e seguir varrendo módulo a módulo na sequência**, anotando e consertando tudo numa rodada só, em vez de pingar entre planos.

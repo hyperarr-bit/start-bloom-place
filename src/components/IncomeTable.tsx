@@ -85,7 +85,7 @@ export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
           <tr className="bg-muted/20">
             <td className="px-3 py-2">
               <Input
-                placeholder="+ New"
+                placeholder="+ Nova receita"
                 value={newIncome.description}
                 onChange={(e) => setNewIncome({ ...newIncome, description: e.target.value })}
                 className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0"

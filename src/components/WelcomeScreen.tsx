@@ -6,9 +6,19 @@ interface WelcomeScreenProps {
   onLogin: () => void;
 }
 
+// In-app WebViews (TikTok, Instagram, Facebook, etc.) sequestram o <video>
+// e abrem o player nativo. Nesses casos não devemos forçar autoplay nem
+// colocar overlays por cima — deixamos o usuário controlar pelo próprio vídeo.
+const detectInAppWebView = () => {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  return /(TikTok|musical_ly|BytedanceWebview|Instagram|FBAN|FBAV|FB_IAB|Snapchat|LinkedInApp|Line|KAKAOTALK|Twitter)/i.test(ua);
+};
+
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const [isInAppWebView] = useState(detectInAppWebView);
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     // Quando o usuário fecha o player nativo (iOS WebView/TikTok), NÃO tentamos
     // mais dar play automaticamente — senão o player nativo fica reabrindo sozinho.
@@ -17,7 +27,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const playPreviewVideo = () => {
       const v = videoRef.current;
       if (!v) return;
-      userDismissedRef.current = false; // usuário pediu pra tocar de novo
+      userDismissedRef.current = false;
       v.muted = true;
       v.defaultMuted = true;
       const p = v.play();
@@ -33,13 +43,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "true");
 
-      const tryPlay = () => {
-        if (userDismissedRef.current) return; // respeita o "sair" do usuário
-        if (!v.paused) return;
-        const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
-      };
-
       const syncPlayingState = () => setIsVideoPlaying(!v.paused && !v.ended);
 
       // iOS dispara este evento quando o usuário SAI do player nativo fullscreen
@@ -48,30 +51,52 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         try { v.pause(); } catch {}
         setIsVideoPlaying(false);
       };
-
-      tryPlay();
-      const onCanPlay = () => tryPlay();
-      const onLoadedData = () => tryPlay();
+      const onFullscreenChange = () => {
+        if (!document.fullscreenElement) onExitFullscreen();
+      };
 
       v.addEventListener("play", syncPlayingState);
       v.addEventListener("pause", syncPlayingState);
       v.addEventListener("ended", syncPlayingState);
-      v.addEventListener("canplay", onCanPlay);
-      v.addEventListener("loadeddata", onLoadedData);
       v.addEventListener("webkitendfullscreen", onExitFullscreen);
-      v.addEventListener("fullscreenchange", () => {
-        if (!document.fullscreenElement) onExitFullscreen();
-      });
+      v.addEventListener("fullscreenchange", onFullscreenChange);
+
+      // Autoplay inline SÓ em browsers normais (Safari/Chrome).
+      // Em WebViews de apps (TikTok/Instagram/etc.), qualquer play() programático
+      // pode reabrir o player nativo depois que o usuário fechou.
+      if (!isInAppWebView) {
+        const tryPlay = () => {
+          if (userDismissedRef.current) return;
+          if (!v.paused) return;
+          const p = v.play();
+          if (p && typeof p.catch === "function") p.catch(() => setIsVideoPlaying(false));
+        };
+        const onCanPlay = () => tryPlay();
+        const onLoadedData = () => tryPlay();
+
+        tryPlay();
+        v.addEventListener("canplay", onCanPlay);
+        v.addEventListener("loadeddata", onLoadedData);
+
+        return () => {
+          v.removeEventListener("play", syncPlayingState);
+          v.removeEventListener("pause", syncPlayingState);
+          v.removeEventListener("ended", syncPlayingState);
+          v.removeEventListener("canplay", onCanPlay);
+          v.removeEventListener("loadeddata", onLoadedData);
+          v.removeEventListener("webkitendfullscreen", onExitFullscreen);
+          v.removeEventListener("fullscreenchange", onFullscreenChange);
+        };
+      }
 
       return () => {
         v.removeEventListener("play", syncPlayingState);
         v.removeEventListener("pause", syncPlayingState);
         v.removeEventListener("ended", syncPlayingState);
-        v.removeEventListener("canplay", onCanPlay);
-        v.removeEventListener("loadeddata", onLoadedData);
         v.removeEventListener("webkitendfullscreen", onExitFullscreen);
+        v.removeEventListener("fullscreenchange", onFullscreenChange);
       };
-    }, []);
+    }, [isInAppWebView]);
 
     return (
       <div
@@ -104,9 +129,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     ref={videoRef}
                     src="/videos/app-preview.mp4"
                     poster="/videos/app-preview-poster.jpg"
-                    autoPlay
+                    autoPlay={!isInAppWebView}
                     muted
-                    loop
+                    loop={!isInAppWebView}
                     playsInline
                     preload="auto"
                     disablePictureInPicture
@@ -116,33 +141,49 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     controlsList="nodownload nofullscreen noremoteplayback"
                     {...({ "webkit-playsinline": "true" } as Record<string, string>)}
                     draggable={false}
-                    tabIndex={-1}
-                    aria-hidden="true"
-                    style={{ pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }}
-                    className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+                    className={
+                      isInAppWebView
+                        ? "absolute inset-0 w-full h-full object-cover"
+                        : "absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+                    }
+                    style={
+                      isInAppWebView
+                        ? undefined
+                        : { pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }
+                    }
+                    tabIndex={isInAppWebView ? 0 : -1}
+                    aria-hidden={isInAppWebView ? undefined : "aria-hidden"}
                   />
-                  <div
-                    data-video-gesture-guard
-                    className="absolute inset-0 z-30 cursor-default touch-none select-none"
-                    aria-hidden="true"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  />
-                  {!isVideoPlaying && (
-                    <button
-                      type="button"
-                      aria-label="Reproduzir prévia do aplicativo"
-                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
-                    >
-                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
-                        <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
-                      </span>
-                    </button>
+
+                  {/* Em browsers normais: bloqueamos gestos por cima do vídeo
+                      e mostramos botão custom. Em TikTok/Instagram, deixamos
+                      o vídeo nativo receber o toque diretamente. */}
+                  {!isInAppWebView && (
+                    <>
+                      <div
+                        data-video-gesture-guard
+                        className="absolute inset-0 z-30 cursor-default touch-none select-none"
+                        aria-hidden="true"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      />
+                      {!isVideoPlaying && (
+                        <button
+                          type="button"
+                          aria-label="Reproduzir prévia do aplicativo"
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
+                        >
+                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
+                            <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
+                          </span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

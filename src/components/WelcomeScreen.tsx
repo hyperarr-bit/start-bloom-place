@@ -18,23 +18,28 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       v.setAttribute("playsinline", "");
       v.setAttribute("webkit-playsinline", "true");
 
-      let played = false;
-      const tryPlayOnce = () => {
-        if (played) return;
+      const tryPlay = () => {
+        if (!v.paused) return;
         const p = v.play();
-        if (p && typeof p.then === "function") {
-          p.then(() => { played = true; }).catch(() => {});
-        } else {
-          played = true;
-        }
+        if (p && typeof p.catch === "function") p.catch(() => {});
       };
 
-      tryPlayOnce();
-      const onCanPlay = () => tryPlayOnce();
+      tryPlay();
+      const onCanPlay = () => tryPlay();
+      const onLoadedData = () => tryPlay();
+      const onFirstTouch = () => tryPlay();
+
       v.addEventListener("canplay", onCanPlay);
+      v.addEventListener("loadeddata", onLoadedData);
+      // Some WebViews só liberam autoplay após 1º toque na página (não no vídeo).
+      document.addEventListener("touchstart", onFirstTouch, { once: true, passive: true });
+      document.addEventListener("click", onFirstTouch, { once: true });
 
       return () => {
         v.removeEventListener("canplay", onCanPlay);
+        v.removeEventListener("loadeddata", onLoadedData);
+        document.removeEventListener("touchstart", onFirstTouch);
+        document.removeEventListener("click", onFirstTouch);
       };
     }, []);
 

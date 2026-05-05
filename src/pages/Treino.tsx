@@ -523,19 +523,19 @@ const Treino = () => {
             <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-6 flex-1 bg-transparent" />
             <Button size="sm" className="h-6 px-2" onClick={() => {
               if (newExName.trim()) {
-                setWorkoutPlan(prev => ({
-                  ...prev,
-                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] }
-                }));
+                setWorkoutPlan(prev => {
+                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
+                  return { ...prev, [day]: { ...day0, exercises: [...(day0.exercises ?? []), { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] } };
+                });
                 setNewExName("");
               }
             }}><Plus className="w-3 h-3" /></Button>
             {workout.exercises.length > 0 && (
               <Button size="sm" variant="ghost" className="h-6 px-2 text-red-400" onClick={() => {
-                setWorkoutPlan(prev => ({
-                  ...prev,
-                  [day]: { ...prev[day], exercises: prev[day].exercises.slice(0, -1) }
-                }));
+                setWorkoutPlan(prev => {
+                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
+                  return { ...prev, [day]: { ...day0, exercises: (day0.exercises ?? []).slice(0, -1) } };
+                });
               }}><Trash2 className="w-3 h-3" /></Button>
             )}
           </div>

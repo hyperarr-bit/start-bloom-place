@@ -19,12 +19,10 @@ interface SpotlightOverlayProps {
  * when the related activation flag is set in user_data (i.e. the user
  * completed the first meaningful action) or when the user dismisses it.
  */
-export const SpotlightOverlay = ({ moduleKey, instruction, activationKey }: SpotlightOverlayProps) => {
+export const SpotlightOverlay = ({ moduleKey, instruction, activationActions }: SpotlightOverlayProps) => {
   const { get, set } = useUserData();
   const [visible, setVisible] = useState(false);
 
-  // initial check: only show if quickstart-target-module === moduleKey AND
-  // not yet completed AND not dismissed
   useEffect(() => {
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
@@ -34,20 +32,20 @@ export const SpotlightOverlay = ({ moduleKey, instruction, activationKey }: Spot
     }
   }, [moduleKey, get]);
 
-  // poll for activation completion (cheap — only while visible)
   useEffect(() => {
     if (!visible) return;
-    const tick = setInterval(() => {
-      const flag = get<unknown>(activationKey, null);
-      if (flag) {
+    const onActivation = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { action?: string } | undefined;
+      if (detail?.action && activationActions.includes(detail.action)) {
         set(`spotlight-done-${moduleKey}`, "true");
         set("quickstart-target-module", "");
         trackEvent("quickstart_completed", { module: moduleKey });
         setVisible(false);
       }
-    }, 600);
-    return () => clearInterval(tick);
-  }, [visible, get, set, activationKey, moduleKey]);
+    };
+    window.addEventListener("core:activation", onActivation);
+    return () => window.removeEventListener("core:activation", onActivation);
+  }, [visible, set, activationActions, moduleKey]);
 
   const dismiss = () => {
     set(`spotlight-done-${moduleKey}`, "true");

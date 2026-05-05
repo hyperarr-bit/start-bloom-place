@@ -65,16 +65,18 @@ const HomePage = () => {
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded } = useUserData();
+  const { user } = useAuth();
+  const forceOnboarding = !!user?.email && ALWAYS_ONBOARD_EMAILS.includes(user.email.toLowerCase());
 
-  const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
+  const [showOnboarding, setShowOnboarding] = useState(() => forceOnboarding || !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
     if (!loaded) return;
-    setShowOnboarding(!get<string>("core-onboarding-done", ""));
-  }, [loaded, get]);
+    setShowOnboarding(forceOnboarding || !get<string>("core-onboarding-done", ""));
+  }, [loaded, get, forceOnboarding]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {

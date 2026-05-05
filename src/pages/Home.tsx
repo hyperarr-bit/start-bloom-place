@@ -118,7 +118,7 @@ const HomePage = () => {
     <>
 
       <AnimatePresence>
-        {showOnboarding && <OnboardingWizard onComplete={handleOnboardingComplete} />}
+        {showOnboarding && <QuickStartOnboarding onComplete={handleOnboardingComplete} />}
       </AnimatePresence>
 
       {!showOnboarding && <DailyNudge />}

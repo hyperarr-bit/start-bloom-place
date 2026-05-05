@@ -212,11 +212,12 @@ const Treino = () => {
 
   const toggleMuscleForDay = (day: string, muscle: string) => {
     setWorkoutPlan(prev => {
-      const current = prev[day].muscles;
+      const day0 = prev[day] ?? { muscles: [], exercises: [] };
+      const current = day0.muscles ?? [];
       const newMuscles = current.includes(muscle)
         ? current.filter(m => m !== muscle)
         : [...current, muscle];
-      return { ...prev, [day]: { ...prev[day], muscles: newMuscles } };
+      return { ...prev, [day]: { ...day0, muscles: newMuscles } };
     });
   };
 

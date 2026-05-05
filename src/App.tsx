@@ -60,8 +60,6 @@ const AnimatedRoutes = () => {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/inicio" element={<Inicio />} />
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
@@ -113,7 +111,11 @@ const App = () => (
           <OfflineBanner />
           <BrowserRouter>
             <GracePeriodBanner />
-            <AnimatedRoutes />
+            <Routes>
+              <Route path="/inicio" element={<Inicio />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="*" element={<AnimatedRoutes />} />
+            </Routes>
             <TrialBanner />
             <GlobalWinback />
           </BrowserRouter>

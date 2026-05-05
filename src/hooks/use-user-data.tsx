@@ -26,6 +26,8 @@ const isMeaningful = (value: any): boolean => {
 
 const checkActivation = (key: string, value: any) => {
   if (!isMeaningful(value)) return;
+  // Skip meta/onboarding keys to avoid false-positive activations + loops.
+  if (key.startsWith("spotlight-") || key.startsWith("quickstart-") || key.startsWith("core-")) return;
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
       markActivation(rule.action, { source_key: key });

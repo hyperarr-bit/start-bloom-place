@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
-import { motion } from "framer-motion";
-import { Play, Loader2 } from "lucide-react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -175,30 +173,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   <img
                     src="/videos/app-preview-poster.jpg"
                     alt=""
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                    className={`absolute inset-0 w-full h-full object-cover ${
                       isPosterVisible ? "opacity-100" : "opacity-0 pointer-events-none"
                     }`}
                   />
-
-                  {/* Overlay: play / loader */}
-                  {(showPlayButton || showLoader) && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center">
-                      {showPlayButton ? (
-                        <button
-                          type="button"
-                          onClick={handleManualPlay}
-                          aria-label="Tocar vídeo"
-                          className="w-14 h-14 rounded-full bg-background/80 backdrop-blur border border-border shadow-lg flex items-center justify-center text-foreground hover:scale-105 active:scale-95 transition-transform"
-                        >
-                          <Play className="w-6 h-6 ml-0.5" fill="currentColor" />
-                        </button>
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-background/70 backdrop-blur flex items-center justify-center">
-                          <Loader2 className="w-5 h-5 animate-spin text-foreground" />
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

@@ -400,10 +400,10 @@ const Treino = () => {
             <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-7 flex-1 bg-transparent" />
             <Button size="sm" className="h-7 px-2" onClick={() => {
               if (newExName.trim()) {
-                setWorkoutPlan(prev => ({
-                  ...prev,
-                  [day]: { ...prev[day], exercises: [...prev[day].exercises, { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] }
-                }));
+                setWorkoutPlan(prev => {
+                  const day0 = prev[day] ?? { muscles: [], exercises: [] };
+                  return { ...prev, [day]: { ...day0, exercises: [...(day0.exercises ?? []), { name: newExName.trim(), sets: "", reps: "", carga: "", done: false, obs: "" }] } };
+                });
                 setNewExName("");
               }
             }}><Plus className="w-3 h-3" /></Button>

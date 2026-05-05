@@ -121,12 +121,15 @@ serve(async (req) => {
         periodEnd.setMonth(periodEnd.getMonth() + 1);
       }
 
-      // Detect payment method from payload (PIX or CARD)
+      // Detect payment method from payload (PIX or CARD) — supports v1 e v2
       const rawMethod =
-        body.data?.paymentMethod ||
-        body.data?.payment_method ||
-        body.data?.method ||
-        body.data?.billing?.paymentMethod ||
+        sub.method ||
+        payment.methods?.[0] ||
+        checkout.methods?.[0] ||
+        data.paymentMethod ||
+        data.payment_method ||
+        data.method ||
+        data.billing?.paymentMethod ||
         null;
       const paymentMethod =
         typeof rawMethod === "string" && rawMethod.toUpperCase().includes("PIX")

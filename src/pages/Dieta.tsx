@@ -202,7 +202,9 @@ const Dieta = () => {
     <div className="min-h-screen bg-background pb-20">
       <SpotlightOverlay
         moduleKey="dieta"
-        instruction="Registra a próxima refeição que tu vai fazer."
+        steps={[
+          { selector: '[data-spotlight="first-day"]', label: "Toque num dia da semana e adiciona uma refeição." },
+        ]}
         activationActions={["first_meal"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

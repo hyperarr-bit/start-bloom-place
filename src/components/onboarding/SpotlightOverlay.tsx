@@ -11,13 +11,15 @@ export interface SpotlightStep {
   label: string;
   /** When true, the step auto-advances on click of the target. Default: true */
   advanceOnClick?: boolean;
+  /** Activation action that, when fired, auto-advances this step (or finishes the tour if last). */
+  advanceOnAction?: string;
 }
 
 interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";
   steps: SpotlightStep[];
-  /** activation actions that dismiss the spotlight when fired */
-  activationActions: string[];
+  /** [legacy] activation actions that dismiss the entire spotlight when fired. Prefer advanceOnAction per step. */
+  activationActions?: string[];
 }
 
 interface Rect { top: number; left: number; width: number; height: number }

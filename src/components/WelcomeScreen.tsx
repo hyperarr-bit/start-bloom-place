@@ -113,10 +113,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="iphone-bezel">
                 <div className="iphone-screen relative overflow-hidden bg-black">
-                  {/* <video> fonte: invisível mas presente no DOM (necessário para iOS decodificar inline) */}
+                  {/* Fallback visível: WebP animado (funciona em qualquer WebView, sem player) */}
+                  <img
+                    src="/videos/app-preview-animated.webp"
+                    alt="Prévia do app CORE"
+                    className="absolute inset-0 w-full h-full select-none"
+                    style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
+                    draggable={false}
+                  />
+                  {/* <video> fonte: invisível (cobre tela com opacidade mínima para iOS aceitar decodificar) */}
                   <video
                     ref={videoRef}
                     src="/videos/app-preview.mp4"
+                    poster="/videos/app-preview-poster.jpg"
                     muted
                     loop
                     playsInline
@@ -138,7 +147,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                       pointerEvents: "none",
                     }}
                   />
-                  {/* Canvas: o que o usuário enxerga. WebView nenhum sequestra canvas. */}
+                  {/* Canvas: por cima do webp quando o vídeo conseguir tocar */}
                   <canvas
                     ref={canvasRef}
                     aria-hidden
@@ -149,6 +158,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                       userSelect: "none",
                       pointerEvents: "none",
                       display: "block",
+                      background: "transparent",
                     }}
                   />
                 </div>

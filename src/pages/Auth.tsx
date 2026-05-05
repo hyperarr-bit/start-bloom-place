@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 
@@ -20,7 +19,8 @@ const GoogleIcon = () => (
 );
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [searchParams] = useSearchParams();
+  const [isLogin, setIsLogin] = useState(() => searchParams.get("signup") !== "1");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -94,13 +94,6 @@ const Auth = () => {
     }
     setLoading(false);
   };
-
-  // Welcome screen (before auth)
-  if (showWelcome) {
-    return (
-      <WelcomeScreen onComplete={handleWelcomeComplete} onLogin={handleWelcomeLogin} />
-    );
-  }
 
   if (confirmationSent) {
     return (

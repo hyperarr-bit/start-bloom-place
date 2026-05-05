@@ -1,37 +1,26 @@
-Você tem razão. O erro foi tentar tratar TikTok como Safari normal e ainda colocar camada/botão por cima do vídeo. No TikTok o player é controlado pelo WebView/app, então não dá para forçar a mesma experiência inline do Safari sem brigar com o player nativo.
+## Problema
 
-Plano para corrigir:
+No TikTok WebView o vídeo não aparece (só o poster) e, quando aparece e o usuário fecha o player nativo, ele reabre sozinho.
 
-1. Detectar ambiente corretamente
-   - Criar uma detecção simples de navegador:
-     - Safari/iOS normal: pode usar vídeo inline com autoplay mudo dentro do mockup.
-     - TikTok/in-app WebView: mantém o vídeo, mas deixa o player nativo do TikTok/iOS cuidar da abertura.
+Causa: hoje em WebView desligamos `autoPlay` e qualquer `play()` programático, então o vídeo nunca começa. E quando o usuário toca, o WebView do TikTok intercepta e abre o player nativo fullscreen — ao fechar, qualquer evento residual reabre.
 
-2. Separar o comportamento do vídeo
-   - No Safari/browser normal:
-     - manter `autoPlay`, `muted`, `loop`, `playsInline` e o vídeo tocando dentro do iPhone.
-     - manter uma UI mínima só se o autoplay falhar.
-   - No TikTok:
-     - remover autoplay programático (`v.play()` automático, `canplay`, `loadeddata`).
-     - remover a camada invisível por cima (`gesture guard`).
-     - remover o botão custom por cima do vídeo.
-     - deixar o próprio `<video>` receber o clique/toque do usuário e abrir o player nativo uma única vez.
+## Solução em `src/components/WelcomeScreen.tsx`
 
-3. Corrigir o loop de reabertura
-   - Quando o usuário sair do player nativo (`webkitendfullscreen`), pausar o vídeo e marcar que ele foi fechado.
-   - No TikTok, depois disso, não tentar reproduzir de novo automaticamente em nenhum evento de carregamento/estado.
-   - Só tocar de novo se o usuário tocar diretamente no vídeo.
+1. **Voltar a tocar o vídeo inline também no TikTok**, mas de forma segura:
+   - Manter `autoPlay`, `muted`, `playsInline`, `loop`, `preload="auto"` para todos os ambientes.
+   - Manter o overlay `data-video-gesture-guard` (touch-none, pointer-events bloqueados) por cima do vídeo em TODOS os ambientes — isso impede que o toque chegue no `<video>` e dispare o player nativo do TikTok.
+   - Remover a branch `isInAppWebView` que tirava `pointer-events` e o overlay.
 
-4. Ajustar atributos por ambiente
-   - Safari: vídeo inline com `playsInline` e sem controles visíveis.
-   - TikTok: permitir interação direta com o vídeo, sem overlay customizado por cima e sem autoplay JS.
+2. **Blindar contra reabertura do player nativo** (caso o WebView ainda assim consiga abrir):
+   - Manter `userDismissedRef` + listeners `webkitendfullscreen` / `fullscreenchange` / `webkitbeginfullscreen`.
+   - Quando detectar saída do fullscreen: setar `userDismissedRef = true`, pausar, e a partir daí qualquer `tryPlay()` é ignorado (já está implementado, só estender pra rodar também em WebView).
+   - Adicionar listener `webkitbeginfullscreen`: se disparar sem o usuário ter clicado no botão custom, chamar `v.pause()` imediatamente para abortar o player nativo.
 
-Resultado esperado:
-- No Safari: continua com vídeo bonito/inline no mockup.
-- No TikTok: ao tocar no vídeo, abre o player nativo como o TikTok quer; ao sair, ele não fica abrindo sozinho; se quiser ver de novo, o usuário toca no vídeo novamente.
+3. **Botão de play custom** continua visível em todos os ambientes quando `!isVideoPlaying`, com os mesmos handlers que chamam `playPreviewVideo()` (que reseta `userDismissedRef`).
 
-Arquivos a alterar:
-- `src/components/WelcomeScreen.tsx`
+4. **Detecção `detectInAppWebView`**: mantida apenas como flag informativa, mas não usada mais para mudar o DOM/atributos do vídeo. O comportamento passa a ser único.
 
-Observação técnica:
-- O problema atual está em `WelcomeScreen.tsx`: o componente ainda chama `v.play()` automaticamente no mount e também nos eventos `canplay`/`loadeddata`. Em WebViews como TikTok isso pode reabrir o player nativo depois que o usuário acabou de sair. Além disso, a camada `data-video-gesture-guard` e o botão customizado competem com o player nativo no TikTok.
+## Resultado esperado
+
+- TikTok/Instagram: vídeo toca inline mutado em loop dentro do mockup, gestos bloqueados, player nativo não abre. Se em algum device específico ele tentar abrir, é abortado via `webkitbeginfullscreen` + pause.
+- Safari/Chrome: continua igual, sem regressão.

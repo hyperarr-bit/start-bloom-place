@@ -49,18 +49,25 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     setActive(false);
   }, [set, moduleKey]);
 
-  // listen for activation events to auto-finish
+  // listen for activation events to auto-advance / finish
   useEffect(() => {
     if (!active) return;
     const onActivation = (e: Event) => {
       const detail = (e as CustomEvent).detail as { action?: string } | undefined;
-      if (detail?.action && activationActions.includes(detail.action)) {
+      if (!detail?.action) return;
+      const currentStep = steps[stepIdx];
+      if (currentStep?.advanceOnAction === detail.action) {
+        if (stepIdx >= steps.length - 1) finish("completed");
+        else setStepIdx(i => i + 1);
+        return;
+      }
+      if (activationActions.includes(detail.action)) {
         finish("completed");
       }
     };
     window.addEventListener("core:activation", onActivation);
     return () => window.removeEventListener("core:activation", onActivation);
-  }, [active, activationActions, finish]);
+  }, [active, activationActions, finish, steps, stepIdx]);
 
   // measure the current target & re-measure on resize / scroll / mutations
   useEffect(() => {

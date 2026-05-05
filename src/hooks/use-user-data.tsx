@@ -29,6 +29,9 @@ const checkActivation = (key: string, value: any) => {
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
       markActivation(rule.action, { source_key: key });
+      try {
+        window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: rule.action, key } }));
+      } catch {}
       break;
     }
   }

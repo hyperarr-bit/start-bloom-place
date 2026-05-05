@@ -1138,7 +1138,7 @@ const Rotina = () => {
                   <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>
                   <span>✅</span>
                 </div>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
+                <Button size="sm" variant="ghost" data-spotlight="add-habit" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
                   <Plus className="w-3 h-3 mr-1" /> Hábito
                 </Button>
               </div>

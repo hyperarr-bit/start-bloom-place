@@ -564,6 +564,11 @@ const Treino = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      <SpotlightOverlay
+        moduleKey="treino"
+        instruction="Cria teu primeiro treino. Pode ser 'Push 1'."
+        activationActions={["first_workout"]}
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">

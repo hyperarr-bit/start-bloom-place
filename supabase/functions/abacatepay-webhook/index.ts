@@ -59,12 +59,36 @@ serve(async (req) => {
     }
 
     const event = body.event;
-    const metadata = body.data?.metadata || {};
-    let userId = metadata.user_id || null;
-    const billingPeriod = metadata.billing_period || "monthly";
-    const customerEmail = body.data?.customer?.email || null;
-    const billingId = body.data?.id || null;
-    const subscriptionId = body.data?.subscriptionId || body.data?.subscription_id || billingId;
+    const data = body.data || {};
+
+    // Suporta payloads v1 (data.* direto) e v2 (data.subscription, data.checkout, data.payment, data.customer)
+    const sub = data.subscription || {};
+    const checkout = data.checkout || data.billing || {};
+    const payment = data.payment || {};
+    const customer = data.customer || checkout.customer || {};
+
+    const metadata =
+      data.metadata ||
+      checkout.metadata ||
+      sub.metadata ||
+      payment.metadata ||
+      {};
+
+    let userId: string | null =
+      metadata.user_id ||
+      data.externalId ||
+      checkout.externalId ||
+      sub.externalId ||
+      payment.externalId ||
+      null;
+
+    const billingPeriod =
+      metadata.billing_period ||
+      (sub.frequency === "ANNUAL" ? "annual" : sub.frequency === "MONTHLY" ? "monthly" : "monthly");
+
+    const customerEmail = customer.email || data.customer?.email || null;
+    const billingId = checkout.id || data.id || null;
+    const subscriptionId = sub.id || data.subscriptionId || data.subscription_id || billingId;
 
     const now = new Date();
 

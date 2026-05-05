@@ -118,6 +118,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <SpotlightOverlay
+        moduleKey="financas"
+        instruction="Adiciona teu primeiro gasto. Pode ser o café de hoje."
+        activationActions={["first_transaction"]}
+      />
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">

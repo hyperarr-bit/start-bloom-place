@@ -57,6 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [trialDay, setTrialDay] = useState(1);
   const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
+  const [inGracePeriod, setInGracePeriod] = useState(false);
+  const [graceDaysLeft, setGraceDaysLeft] = useState<number | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {

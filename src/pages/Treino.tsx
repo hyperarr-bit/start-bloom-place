@@ -397,7 +397,7 @@ const Treino = () => {
           <p className="text-xs text-muted-foreground text-center mb-3">
             {muscleLabel ? `Adicione exercícios de ${muscleLabel}` : "Configure os músculos na aba ⚙️ CONFIG"}
           </p>
-          <div className="flex gap-1">
+          <div className="flex gap-1" data-spotlight={day === todayDayName ? "add-exercise" : undefined}>
             <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-7 flex-1 bg-transparent" />
             <Button size="sm" className="h-7 px-2" onClick={() => {
               if (newExName.trim()) {
@@ -566,7 +566,9 @@ const Treino = () => {
     <div className="min-h-screen bg-background pb-24">
       <SpotlightOverlay
         moduleKey="treino"
-        instruction="Cria teu primeiro treino. Pode ser 'Push 1'."
+        steps={[
+          { selector: '[data-spotlight="add-exercise"]', label: "Adiciona teu primeiro exercício do dia." },
+        ]}
         activationActions={["first_workout"]}
       />
       {/* Header */}

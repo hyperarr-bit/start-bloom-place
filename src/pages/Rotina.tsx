@@ -1092,7 +1092,9 @@ const Rotina = () => {
     <div className="min-h-screen bg-background">
       <SpotlightOverlay
         moduleKey="rotina"
-        instruction="Cria 1 hábito. Pode ser 'beber água'."
+        steps={[
+          { selector: '[data-spotlight="add-habit"]', label: "Cria 1 hábito. Pode ser 'beber água'." },
+        ]}
         activationActions={["first_habit", "first_task"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -1138,7 +1140,7 @@ const Rotina = () => {
                   <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>
                   <span>✅</span>
                 </div>
-                <Button size="sm" variant="ghost" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
+                <Button size="sm" variant="ghost" data-spotlight="add-habit" className="h-7 text-xs text-green-700 dark:text-[hsl(var(--rt-accent))]" onClick={() => setShowAddHabit(!showAddHabit)}>
                   <Plus className="w-3 h-3 mr-1" /> Hábito
                 </Button>
               </div>

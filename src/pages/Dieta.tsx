@@ -202,7 +202,9 @@ const Dieta = () => {
     <div className="min-h-screen bg-background pb-20">
       <SpotlightOverlay
         moduleKey="dieta"
-        instruction="Registra a próxima refeição que tu vai fazer."
+        steps={[
+          { selector: '[data-spotlight="first-day"]', label: "Toque num dia da semana e adiciona uma refeição." },
+        ]}
         activationActions={["first_meal"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -320,8 +322,8 @@ const Dieta = () => {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {weekDays.map(day => (
-                <div key={day} className="bg-card rounded-xl border border-border overflow-hidden">
+              {weekDays.map((day, dayIdx) => (
+                <div key={day} data-spotlight={dayIdx === 0 ? "first-day" : undefined} className="bg-card rounded-xl border border-border overflow-hidden">
                   <div className={`${dayColors[day]} text-white p-3 font-bold text-sm text-center flex items-center justify-between`}>
                     <div className="flex gap-1">
                       <button

@@ -10,6 +10,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+    // WebViews in-app (TikTok, Instagram, Facebook, Snapchat, LinkedIn) sequestram
+    // qualquer <video> e abrem o player nativo. Detectamos e mostramos só o poster.
+    const [isInAppWebView] = useState(() => {
+      if (typeof navigator === "undefined") return false;
+      const ua = navigator.userAgent || "";
+      return /(TikTok|musical_ly|BytedanceWebview|Instagram|FBAN|FBAV|FB_IAB|Snapchat|LinkedInApp|Line\/|KAKAOTALK|Twitter)/i.test(ua);
+    });
 
     const playPreviewVideo = () => {
       const v = videoRef.current;

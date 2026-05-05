@@ -110,6 +110,7 @@ const App = () => (
           <Sonner />
           <OfflineBanner />
           <BrowserRouter>
+            <GracePeriodBanner />
             <AnimatedRoutes />
             <TrialBanner />
             <GlobalWinback />

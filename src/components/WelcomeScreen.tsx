@@ -34,55 +34,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="iphone-bezel">
                 <div className="iphone-screen">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="auto"
-                    poster="/videos/app-preview-poster.jpg"
-                    className="absolute inset-0 w-full h-full object-cover bg-black pointer-events-none select-none"
-                    // @ts-ignore
-                    webkit-playsinline="true"
-                    // @ts-ignore
-                    x5-playsinline="true"
-                    disablePictureInPicture
-                    disableRemotePlayback
-                    controls={false}
-                    onContextMenu={(e) => e.preventDefault()}
-                  >
-                    <source src="/videos/app-preview.mp4" type="video/mp4" />
-                  </video>
-
                   <img
-                    src="/videos/app-preview-poster.jpg"
-                    alt=""
+                    src="/videos/app-preview-animated.webp"
+                    alt="Prévia animada do aplicativo Core"
                     draggable={false}
-                    className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-300 ${
-                      isPosterVisible ? "opacity-100" : "opacity-0"
-                    }`}
+                    className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
                   />
-
-                  {/* Tap layer — captures gesture without ever opening the native player */}
-                  <div
-                    className="absolute inset-0"
-                    onClick={(e) => { e.stopPropagation(); attemptPlay(); }}
-                    onContextMenu={(e) => e.preventDefault()}
-                  />
-
-                  {showPlayButton && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); attemptPlay(); }}
-                      aria-label="Reproduzir vídeo"
-                      className="absolute inset-0 flex items-center justify-center bg-black/20"
-                    >
-                      <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
-                        <Play className="w-7 h-7 text-black ml-0.5" fill="currentColor" />
-                      </span>
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

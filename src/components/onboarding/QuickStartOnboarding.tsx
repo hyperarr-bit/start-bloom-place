@@ -96,17 +96,17 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
                 <h1 className="text-2xl font-bold leading-tight text-foreground">
                   Organize sua vida
                   <br />
-                  em um só lugar.
+                  em 1 só lugar
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Em 60 segundos você vai sair daqui com a primeira parte da sua vida no lugar.
+                  Em poucos minutos, configuramos tudo para você começar a evoluir hoje.
                 </p>
               </div>
               <button
                 onClick={() => setStep(1)}
                 className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                Bora <ArrowRight className="w-4 h-4" />
+                Quero começar <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
           ) : (

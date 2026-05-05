@@ -96,50 +96,60 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="iphone-bezel">
                 <div className="iphone-screen relative overflow-hidden">
-                  <video
-                    ref={videoRef}
-                    src="/videos/app-preview.mp4"
-                    poster="/videos/app-preview-poster.jpg"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="auto"
-                    disablePictureInPicture
-                    disableRemotePlayback
-                    controls={false}
-                    x-webkit-airplay="deny"
-                    controlsList="nodownload nofullscreen noremoteplayback"
-                    {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-                    draggable={false}
-                    tabIndex={-1}
-                    aria-hidden="true"
-                    style={{ pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }}
-                    className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
-                  />
-                  {/* Camada acima do vídeo: o toque nunca chega no player nativo do WebView/TikTok */}
-                  <div
-                    data-video-gesture-guard
-                    className="absolute inset-0 z-30 cursor-default touch-none select-none"
-                    aria-hidden="true"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                  />
-                  {!isVideoPlaying && (
-                    <button
-                      type="button"
-                      aria-label="Reproduzir prévia do aplicativo"
-                      onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
-                      className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
-                    >
-                      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
-                        <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
-                      </span>
-                    </button>
+                  {isInAppWebView ? (
+                    <img
+                      src="/videos/app-preview-poster.jpg"
+                      alt="Prévia do aplicativo Core"
+                      draggable={false}
+                      className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
+                    />
+                  ) : (
+                    <>
+                      <video
+                        ref={videoRef}
+                        src="/videos/app-preview.mp4"
+                        poster="/videos/app-preview-poster.jpg"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="auto"
+                        disablePictureInPicture
+                        disableRemotePlayback
+                        controls={false}
+                        x-webkit-airplay="deny"
+                        controlsList="nodownload nofullscreen noremoteplayback"
+                        {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+                        draggable={false}
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        style={{ pointerEvents: "none", WebkitUserSelect: "none", userSelect: "none" }}
+                        className="absolute inset-0 w-full h-full object-cover pointer-events-none select-none"
+                      />
+                      <div
+                        data-video-gesture-guard
+                        className="absolute inset-0 z-30 cursor-default touch-none select-none"
+                        aria-hidden="true"
+                        onContextMenu={(e) => e.preventDefault()}
+                        onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                      />
+                      {!isVideoPlaying && (
+                        <button
+                          type="button"
+                          aria-label="Reproduzir prévia do aplicativo"
+                          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); playPreviewVideo(); }}
+                          className="absolute inset-0 z-40 flex items-center justify-center bg-background/20 text-foreground backdrop-blur-[1px]"
+                        >
+                          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-background/85 shadow-lg">
+                            <Play className="h-7 w-7 fill-current pl-0.5" aria-hidden="true" />
+                          </span>
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useEffect, useRef } from "react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -7,6 +7,44 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, ref) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+      const v = videoRef.current;
+      if (!v) return;
+
+      v.muted = true;
+      v.defaultMuted = true;
+      v.playsInline = true;
+      v.setAttribute("muted", "");
+      v.setAttribute("playsinline", "");
+      v.setAttribute("webkit-playsinline", "true");
+
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      };
+
+      // Bloqueia o player nativo do iOS de sequestrar o vídeo
+      const abortNative = () => {
+        try { (v as unknown as { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.(); } catch {}
+        try { v.pause(); tryPlay(); } catch {}
+      };
+      v.addEventListener("webkitbeginfullscreen", abortNative);
+
+      const onVisibility = () => {
+        if (document.visibilityState === "visible") tryPlay();
+      };
+      document.addEventListener("visibilitychange", onVisibility);
+
+      tryPlay();
+
+      return () => {
+        v.removeEventListener("webkitbeginfullscreen", abortNative);
+        document.removeEventListener("visibilitychange", onVisibility);
+      };
+    }, []);
+
     return (
       <div
         ref={ref}
@@ -34,21 +72,37 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="iphone-bezel">
                 <div className="iphone-screen relative overflow-hidden bg-black">
-                  <img
-                    src="/videos/app-preview-animated.webp"
-                    alt="Prévia do app CORE"
+                  <video
+                    ref={videoRef}
+                    src="/videos/app-preview.mp4"
+                    poster="/videos/app-preview-poster.jpg"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="auto"
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    controls={false}
+                    x-webkit-airplay="deny"
+                    {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+                    aria-hidden
+                    tabIndex={-1}
                     className="absolute inset-0 w-full h-full select-none"
                     style={{
                       objectFit: "cover",
                       pointerEvents: "none",
                       display: "block",
-                      // dica para o compositor manter em camada própria (GPU)
-                      transform: "translateZ(0)",
-                      willChange: "transform",
                     }}
-                    draggable={false}
-                    decoding="async"
-                    fetchPriority="high"
+                  />
+                  {/* overlay bloqueia toques que o WebView poderia interpretar como gesto de mídia */}
+                  <div
+                    className="absolute inset-0"
+                    style={{ pointerEvents: "auto", touchAction: "none" }}
+                    onPointerDown={(e) => e.preventDefault()}
+                    onTouchStart={(e) => e.preventDefault()}
+                    onClick={(e) => e.preventDefault()}
+                    aria-hidden
                   />
                 </div>
               </div>

@@ -39,6 +39,9 @@ interface AuthContextType {
   isSubscribed: boolean;
   trialDay: number;
   trialHoursLeft: number;
+  inGracePeriod: boolean;
+  graceDaysLeft: number | null;
+  paymentMethod: string | null;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;

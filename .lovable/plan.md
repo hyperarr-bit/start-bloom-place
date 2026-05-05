@@ -1,41 +1,57 @@
-## Causa do flash bege
+## Problema
 
-Ao navegar para `/inicio`:
-1. `AnimatePresence mode="wait"` em `src/App.tsx` aguarda a página anterior terminar a animação de exit do `PageTransition` (~250–300ms).
-2. Durante essa espera, nada está montado no slot da rota — só aparece o `bg-background` (bege) do body.
-3. Quando o exit termina, o `WelcomeScreen` monta instantaneamente, dando a sensação de "tela bege e depois volta ao normal".
+No `/inicio`:
+1. O vídeo do mockup do iPhone não inicia automaticamente.
+2. Quando o autoplay é bloqueado (Safari/iOS, Low Power Mode), nenhum botão de play aparece — o usuário fica preso no poster estático.
 
-Fatores secundários que pioram:
-- O poster `/videos/app-preview-poster.jpg` não está pré-carregado, então o mockup também aparece em branco por mais alguns ms.
+Causa: na última iteração eu forcei `showLoader = false` e removi o overlay de play button do JSX. Restou apenas o `<img>` do poster. Mesmo quando `videoState === "blocked"`, não há UI para o usuário disparar o play manualmente. Além disso, o `onClick` no container raiz pode não estar disparando o `play()` em alguns navegadores porque o `<video>` tem `pointer-events-none` e o clique no poster acaba sendo absorvido sem gesto "direto" no elemento de vídeo.
 
 ## Plano
 
-### 1. Tirar `/inicio` (e `/auth`) do `AnimatePresence` em `src/App.tsx`
-Renderizar essas rotas públicas fora do `AnimatedRoutes`, em um bloco de `<Routes>` separado, sem `AnimatePresence`. Assim não há espera de exit nem flash.
+Editar apenas `src/components/WelcomeScreen.tsx`:
 
-Estrutura nova:
-```text
-<BrowserRouter>
-  <Routes>
-    <Route path="/inicio" element={<Inicio />} />
-    <Route path="/auth" element={<Auth />} />
-    <Route path="*" element={<AnimatedRoutes />} />  // resto continua animando
-  </Routes>
-</BrowserRouter>
+1. **Re-adicionar overlay de Play button** sobre a tela do iPhone quando `videoState === "blocked"` ou `"error"`:
+   - Botão circular semi-transparente centralizado com ícone `Play` do `lucide-react`.
+   - `onClick` chama `attemptPlay()` e `stopPropagation`.
+   - Aparece imediatamente, sem animação (estático, conforme preferência do usuário).
+
+2. **Garantir gesto de play no primeiro toque**:
+   - Manter listeners globais `touchstart`/`click` que já existem.
+   - Adicionar `onClick` direto no container do iPhone (sem `pointer-events-none` no poster `<img>`) chamando `attemptPlay()`.
+
+3. **Forçar tentativa de play imediata no mount**:
+   - Chamar `attemptPlay()` uma vez logo após o mount (antes de esperar `canplay`), pois com `preload="auto"` + `<source>` já presente, em muitos browsers o vídeo já está pronto.
+   - Manter o watchdog de 1.5s.
+
+4. **Indicador sutil de "carregando"** (opcional, leve): se quiser, pequeno spinner só quando `videoState === "loading"` por mais de ~800ms. Posso pular se preferir 100% estático — recomendo pular para manter a regra "sem animação".
+
+## Detalhes Técnicos
+
+```tsx
+// Snippet conceitual dentro de .iphone-screen
+<video ref={videoRef} ... className="absolute inset-0 w-full h-full object-cover" />
+<img src="/videos/app-preview-poster.jpg" alt=""
+     className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
+       isPosterVisible ? "opacity-100" : "opacity-0"
+     }`} />
+{showPlayButton && (
+  <button
+    onClick={handleManualPlay}
+    aria-label="Reproduzir vídeo"
+    className="absolute inset-0 flex items-center justify-center bg-black/20"
+  >
+    <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
+      <Play className="w-7 h-7 text-black ml-0.5" fill="currentColor" />
+    </span>
+  </button>
+)}
 ```
 
-### 2. Preload do poster do mockup
-Em `index.html`, adicionar:
-```html
-<link rel="preload" as="image" href="/videos/app-preview-poster.jpg" />
-```
-Garante que o mockup já apareça pintado na primeira frame.
+- Remover `pointer-events-none` do `<video>` para que o clique direto sobre ele conte como gesto do usuário.
+- Re-importar `Play` de `lucide-react`.
 
-### 3. Pintar o background imediatamente
-No `WelcomeScreen.tsx`, manter `bg-background` mas garantir que o container raiz não dependa de nenhum estado assíncrono para renderizar (já está ok — só confirmar que nenhum `useEffect` esconde conteúdo).
+## Arquivos modificados
 
-## Arquivos afetados
-- `src/App.tsx` — separar rotas públicas do `AnimatePresence`
-- `index.html` — adicionar preload do poster
+- `src/components/WelcomeScreen.tsx`
 
-Sem mudanças visuais — apenas remove o flash de transição.
+Sem alterações em rotas, CSS global ou outros componentes.

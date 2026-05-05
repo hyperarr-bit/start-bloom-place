@@ -1092,7 +1092,9 @@ const Rotina = () => {
     <div className="min-h-screen bg-background">
       <SpotlightOverlay
         moduleKey="rotina"
-        instruction="Cria 1 hábito. Pode ser 'beber água'."
+        steps={[
+          { selector: '[data-spotlight="add-habit"]', label: "Cria 1 hábito. Pode ser 'beber água'." },
+        ]}
         activationActions={["first_habit", "first_task"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

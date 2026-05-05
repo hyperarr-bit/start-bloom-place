@@ -162,12 +162,16 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     playsInline
                     preload="auto"
                     poster="/videos/app-preview-poster.jpg"
-                    className="absolute inset-0 w-full h-full object-cover bg-black"
+                    className="absolute inset-0 w-full h-full object-cover bg-black pointer-events-none select-none"
                     // @ts-ignore
                     webkit-playsinline="true"
+                    // @ts-ignore
+                    x5-playsinline="true"
                     disablePictureInPicture
+                    disableRemotePlayback
+                    controls={false}
+                    onContextMenu={(e) => e.preventDefault()}
                     onPlaying={() => setVideoState("playing")}
-                    onClick={handleManualPlay}
                   >
                     <source src="/videos/app-preview.mp4" type="video/mp4" />
                   </video>
@@ -175,9 +179,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   <img
                     src="/videos/app-preview-poster.jpg"
                     alt=""
-                    className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
+                    draggable={false}
+                    className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none ${
                       isPosterVisible ? "opacity-100" : "opacity-0"
                     }`}
+                  />
+
+                  {/* Invisible tap layer — captures user gesture to start playback without ever opening the video */}
+                  <div
+                    className="absolute inset-0"
+                    onClick={(e) => { e.stopPropagation(); attemptPlay(); }}
+                    onContextMenu={(e) => e.preventDefault()}
                   />
 
                 </div>

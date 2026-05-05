@@ -308,6 +308,7 @@ const HealthTracker = () => {
             placeholder="Horas dormidas"
             value={sleepInput}
             onChange={e => { setSleepInput(e.target.value); saveSleep(e.target.value); }}
+            data-spotlight="add-sleep"
             className="h-7 text-xs"
           />
         </div>

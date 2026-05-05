@@ -1,57 +1,26 @@
-## Problema
+Vou corrigir o autoplay atacando a causa mais provável: o overlay/poster está ficando por cima do vídeo e o estado só muda para “playing” quando o evento `playing` dispara. Se o vídeo estiver tocando, mas o poster continuar visível por causa de timing/evento, parece que autoplay falhou.
 
-No `/inicio`:
-1. O vídeo do mockup do iPhone não inicia automaticamente.
-2. Quando o autoplay é bloqueado (Safari/iOS, Low Power Mode), nenhum botão de play aparece — o usuário fica preso no poster estático.
+Plano de implementação:
 
-Causa: na última iteração eu forcei `showLoader = false` e removi o overlay de play button do JSX. Restou apenas o `<img>` do poster. Mesmo quando `videoState === "blocked"`, não há UI para o usuário disparar o play manualmente. Além disso, o `onClick` no container raiz pode não estar disparando o `play()` em alguns navegadores porque o `<video>` tem `pointer-events-none` e o clique no poster acaba sendo absorvido sem gesto "direto" no elemento de vídeo.
+1. Ajustar `src/components/WelcomeScreen.tsx`
+   - Trocar o estado inicial para um fluxo mais confiável: `loading` → `playing` quando o vídeo realmente avançar.
+   - Considerar autoplay bem-sucedido também quando `play()` resolver e/ou quando o evento `timeupdate` indicar `currentTime > 0`.
+   - Esconder o poster assim que o vídeo começar a tocar de verdade, em vez de depender só de um evento.
+   - Chamar `attemptPlay()` imediatamente no mount, não só quando `readyState >= 2` ou `canplay` disparar.
+   - Remover a chamada `video.load()` dentro do retry automático, porque ela pode reiniciar o carregamento e atrapalhar o autoplay em alguns navegadores.
+   - Manter `muted`, `defaultMuted`, `playsInline`, `autoPlay`, `loop`, `preload="auto"`, `disablePictureInPicture`, `disableRemotePlayback` e atributos iOS.
 
-## Plano
+2. Corrigir a camada invisível sobre o iPhone
+   - Manter uma camada invisível para impedir que clique no vídeo abra o player/aba nativa.
+   - Essa camada não deve bloquear ou interferir no autoplay inicial.
+   - Em toque/clique, ela apenas chama `attemptPlay()` como fallback, sem abrir o vídeo.
 
-Editar apenas `src/components/WelcomeScreen.tsx`:
+3. Restaurar o botão de play somente como fallback
+   - O botão de play deve aparecer apenas quando o autoplay for realmente bloqueado/der erro.
+   - Ele não aparece no carregamento normal.
+   - Ele serve como plano B para Safari/iOS em modo economia de energia, onde o navegador pode bloquear autoplay mesmo com vídeo mudo.
 
-1. **Re-adicionar overlay de Play button** sobre a tela do iPhone quando `videoState === "blocked"` ou `"error"`:
-   - Botão circular semi-transparente centralizado com ícone `Play` do `lucide-react`.
-   - `onClick` chama `attemptPlay()` e `stopPropagation`.
-   - Aparece imediatamente, sem animação (estático, conforme preferência do usuário).
+4. Atualizar `.lovable/plan.md`
+   - Registrar que a correção correta é: autoplay agressivo + detecção real de reprodução + poster não ficar preso por cima do vídeo + botão apenas fallback.
 
-2. **Garantir gesto de play no primeiro toque**:
-   - Manter listeners globais `touchstart`/`click` que já existem.
-   - Adicionar `onClick` direto no container do iPhone (sem `pointer-events-none` no poster `<img>`) chamando `attemptPlay()`.
-
-3. **Forçar tentativa de play imediata no mount**:
-   - Chamar `attemptPlay()` uma vez logo após o mount (antes de esperar `canplay`), pois com `preload="auto"` + `<source>` já presente, em muitos browsers o vídeo já está pronto.
-   - Manter o watchdog de 1.5s.
-
-4. **Indicador sutil de "carregando"** (opcional, leve): se quiser, pequeno spinner só quando `videoState === "loading"` por mais de ~800ms. Posso pular se preferir 100% estático — recomendo pular para manter a regra "sem animação".
-
-## Detalhes Técnicos
-
-```tsx
-// Snippet conceitual dentro de .iphone-screen
-<video ref={videoRef} ... className="absolute inset-0 w-full h-full object-cover" />
-<img src="/videos/app-preview-poster.jpg" alt=""
-     className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
-       isPosterVisible ? "opacity-100" : "opacity-0"
-     }`} />
-{showPlayButton && (
-  <button
-    onClick={handleManualPlay}
-    aria-label="Reproduzir vídeo"
-    className="absolute inset-0 flex items-center justify-center bg-black/20"
-  >
-    <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
-      <Play className="w-7 h-7 text-black ml-0.5" fill="currentColor" />
-    </span>
-  </button>
-)}
-```
-
-- Remover `pointer-events-none` do `<video>` para que o clique direto sobre ele conte como gesto do usuário.
-- Re-importar `Play` de `lucide-react`.
-
-## Arquivos modificados
-
-- `src/components/WelcomeScreen.tsx`
-
-Sem alterações em rotas, CSS global ou outros componentes.
+Observação importante: não existe como garantir 100% autoplay em todos os navegadores/dispositivos, porque iOS/Safari, modo economia de bateria, política de dados ou configuração do usuário podem bloquear reprodução automática. Mas com vídeo mudo, inline, preload, tentativa imediata e fallback visual, deixamos no máximo que o navegador permite.

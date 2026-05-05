@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, forwardRef } from "react";
-
+import { Play } from "lucide-react";
 
 interface WelcomeScreenProps {
   onComplete: () => void;
@@ -19,25 +19,18 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       try {
         video.muted = true;
         video.volume = 0;
-        // @ts-ignore — Safari/iOS specific
+        // @ts-ignore
         video.defaultMuted = true;
         video.setAttribute("muted", "");
         video.setAttribute("playsinline", "");
         video.setAttribute("webkit-playsinline", "true");
       } catch {}
       try {
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => setVideoState("playing"))
-            .catch(() => {
-              // Retry once after forcing load
-              try { video.load(); } catch {}
-              const p2 = video.play();
-              if (p2 !== undefined) {
-                p2.then(() => setVideoState("playing")).catch(() => setVideoState("blocked"));
-              }
-            });
+        const p = video.play();
+        if (p !== undefined) {
+          p.then(() => setVideoState("playing")).catch(() => {
+            setVideoState((prev) => (prev === "playing" ? prev : "blocked"));
+          });
         }
       } catch {
         setVideoState("blocked");
@@ -48,66 +41,60 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       const video = videoRef.current;
       if (!video) return;
 
-      const onReady = () => attemptPlay();
+      // Try immediately on mount — preload="auto" + preload <link> mean
+      // the asset is usually ready when we get here.
+      attemptPlay();
+
+      const onCanPlay = () => attemptPlay();
+      const onPlaying = () => setVideoState("playing");
+      const onTimeUpdate = () => {
+        if (video.currentTime > 0 && !video.paused) setVideoState("playing");
+      };
       const onEnded = () => {
         try {
           video.currentTime = 0;
           const p = video.play();
-          if (p !== undefined) p.catch(() => setVideoState("blocked"));
-        } catch {
-          setVideoState("blocked");
-        }
+          if (p !== undefined) p.catch(() => {});
+        } catch {}
       };
       const onPause = () => {
-        // Always try to resume — never let the video stay paused unless the user is gone.
-        if (document.visibilityState === "visible" && !video.ended) {
-          attemptPlay();
-        }
+        if (document.visibilityState === "visible" && !video.ended) attemptPlay();
       };
       const onError = () => setVideoState("error");
 
-      video.addEventListener("loadedmetadata", onReady, { once: true });
-      video.addEventListener("canplay", onReady, { once: true });
+      video.addEventListener("canplay", onCanPlay);
+      video.addEventListener("playing", onPlaying);
+      video.addEventListener("timeupdate", onTimeUpdate);
       video.addEventListener("ended", onEnded);
       video.addEventListener("pause", onPause);
       video.addEventListener("error", onError);
 
-      if (video.readyState >= 2) attemptPlay();
-
       const onVisibility = () => {
         if (document.visibilityState === "visible" && video.paused) attemptPlay();
       };
-      const onFocus = () => {
-        if (video.paused) attemptPlay();
-      };
+      const onFocus = () => { if (video.paused) attemptPlay(); };
       document.addEventListener("visibilitychange", onVisibility);
       window.addEventListener("focus", onFocus);
       window.addEventListener("pageshow", onFocus);
 
-      // Watchdog: if the video gets paused by iOS Low Power Mode, energy saver,
-      // or Safari background tabs, retry every 1.5s while we're visible.
       const watchdog = window.setInterval(() => {
         if (
           document.visibilityState === "visible" &&
           video.paused &&
-          !video.ended &&
-          video.readyState >= 2
+          !video.ended
         ) {
           attemptPlay();
         }
       }, 1500);
 
-      // First-touch fallback: if autoplay was blocked, the very first tap/click
-      // anywhere on the document will start playback (counts as user gesture).
-      const onFirstGesture = () => {
-        if (video.paused) attemptPlay();
-      };
+      const onFirstGesture = () => { if (video.paused) attemptPlay(); };
       document.addEventListener("touchstart", onFirstGesture, { passive: true });
       document.addEventListener("click", onFirstGesture);
 
       return () => {
-        video.removeEventListener("loadedmetadata", onReady);
-        video.removeEventListener("canplay", onReady);
+        video.removeEventListener("canplay", onCanPlay);
+        video.removeEventListener("playing", onPlaying);
+        video.removeEventListener("timeupdate", onTimeUpdate);
         video.removeEventListener("ended", onEnded);
         video.removeEventListener("pause", onPause);
         video.removeEventListener("error", onError);
@@ -120,22 +107,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
     }, [attemptPlay]);
 
-    const handleScreenTap = useCallback(() => {
-      if (videoState === "blocked" || videoState === "loading") attemptPlay();
-    }, [videoState, attemptPlay]);
-
-    const handleManualPlay = useCallback(
-      (e: React.MouseEvent) => {
-        e.stopPropagation();
-        attemptPlay();
-      },
-      [attemptPlay]
-    );
-
     const isPosterVisible = videoState !== "playing";
     const showPlayButton = videoState === "blocked" || videoState === "error";
-    // Don't show a loader on first paint — the poster image already fills the screen.
-    const showLoader = false;
 
     return (
       <div
@@ -146,10 +119,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           paddingTop: "max(2.5rem, env(safe-area-inset-top))",
           paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
         }}
-        onClick={handleScreenTap}
       >
         <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 max-w-4xl w-full min-h-0">
-          {/* iPhone CSS mockup */}
           <div className="relative z-10 flex items-center justify-center shrink min-h-0">
             <div
               className="iphone-frame relative"
@@ -159,13 +130,11 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 maxWidth: "82vw",
               }}
             >
-              {/* Side buttons */}
               <span className="iphone-btn iphone-btn-silent" />
               <span className="iphone-btn iphone-btn-volup" />
               <span className="iphone-btn iphone-btn-voldown" />
               <span className="iphone-btn iphone-btn-power" />
 
-              {/* Inner bezel + screen */}
               <div className="iphone-bezel">
                 <div className="iphone-screen">
                   <video
@@ -185,7 +154,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     disableRemotePlayback
                     controls={false}
                     onContextMenu={(e) => e.preventDefault()}
-                    onPlaying={() => setVideoState("playing")}
                   >
                     <source src="/videos/app-preview.mp4" type="video/mp4" />
                   </video>
@@ -194,24 +162,35 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                     src="/videos/app-preview-poster.jpg"
                     alt=""
                     draggable={false}
-                    className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none ${
+                    className={`absolute inset-0 w-full h-full object-cover pointer-events-none select-none transition-opacity duration-300 ${
                       isPosterVisible ? "opacity-100" : "opacity-0"
                     }`}
                   />
 
-                  {/* Invisible tap layer — captures user gesture to start playback without ever opening the video */}
+                  {/* Tap layer — captures gesture without ever opening the native player */}
                   <div
                     className="absolute inset-0"
                     onClick={(e) => { e.stopPropagation(); attemptPlay(); }}
                     onContextMenu={(e) => e.preventDefault()}
                   />
 
+                  {showPlayButton && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); attemptPlay(); }}
+                      aria-label="Reproduzir vídeo"
+                      className="absolute inset-0 flex items-center justify-center bg-black/20"
+                    >
+                      <span className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center">
+                        <Play className="w-7 h-7 text-black ml-0.5" fill="currentColor" />
+                      </span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Title + CTA */}
           <div className="relative z-10 w-full max-w-sm flex flex-col items-center md:items-start gap-5 shrink-0">
             <h1 className="text-2xl md:text-4xl font-bold text-foreground text-center md:text-left leading-tight">
               Organize sua vida<br />em um só lugar

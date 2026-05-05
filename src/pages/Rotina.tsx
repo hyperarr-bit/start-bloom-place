@@ -281,7 +281,7 @@ const HealthTracker = () => {
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={removeWater} className="h-7 text-xs flex-1">−</Button>
-            <Button size="sm" onClick={addWater} className="h-7 text-xs flex-1 bg-blue-500 hover:bg-blue-600">+ Copo</Button>
+            <Button size="sm" onClick={addWater} data-spotlight="add-water" className="h-7 text-xs flex-1 bg-blue-500 hover:bg-blue-600">+ Copo</Button>
           </div>
         </div>
 
@@ -308,6 +308,7 @@ const HealthTracker = () => {
             placeholder="Horas dormidas"
             value={sleepInput}
             onChange={e => { setSleepInput(e.target.value); saveSleep(e.target.value); }}
+            data-spotlight="add-sleep"
             className="h-7 text-xs"
           />
         </div>
@@ -376,7 +377,7 @@ const TodoList = () => {
             <option value="media">🟡 Média</option>
             <option value="baixa">🔵 Baixa</option>
           </select>
-          <Button size="sm" onClick={addTodo} className="h-8 text-xs">+</Button>
+          <Button size="sm" onClick={addTodo} data-spotlight="add-todo" className="h-8 text-xs">+</Button>
         </div>
 
         <div className="flex gap-1">
@@ -1093,9 +1094,11 @@ const Rotina = () => {
       <SpotlightOverlay
         moduleKey="rotina"
         steps={[
-          { selector: '[data-spotlight="add-habit"]', label: "Cria 1 hábito. Pode ser 'beber água'." },
+          { selector: '[data-spotlight="add-habit"]', label: "Passo 1: cria 1 hábito (ex: 'beber água').", advanceOnAction: "first_habit" },
+          { selector: '[data-spotlight="add-todo"]', label: "Passo 2: anota 1 tarefa pra hoje.", advanceOnAction: "first_task" },
+          { selector: '[data-spotlight="add-water"]', label: "Passo 3: registra 1 copo d'água.", advanceOnAction: "first_water_log" },
+          { selector: '[data-spotlight="add-sleep"]', label: "Passo 4: anota quantas horas dormiu.", advanceOnAction: "first_sleep_log" },
         ]}
-        activationActions={["first_habit", "first_task"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">

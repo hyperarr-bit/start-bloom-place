@@ -6,12 +6,19 @@ import { markActivation } from "@/lib/analytics";
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
 const ACTIVATION_RULES: Array<{ match: RegExp; action: string }> = [
+  { match: /finance-incomes/i, action: "first_income" },
+  { match: /finance-fixed-expenses/i, action: "first_fixed_expense" },
+  { match: /finance-expenses/i, action: "first_transaction" },
+  { match: /finance-installments/i, action: "first_installment" },
   { match: /transac|financ/i, action: "first_transaction" },
-  { match: /habit/i, action: "first_habit" },
-  { match: /workout|treino/i, action: "first_workout" },
-  { match: /meal|dieta/i, action: "first_meal" },
+  { match: /rotina-habits|^habit/i, action: "first_habit" },
+  { match: /todo-list/i, action: "first_task" },
+  { match: /water-log|hidrat/i, action: "first_water_log" },
+  { match: /sleep-log/i, action: "first_sleep_log" },
+  { match: /workout|treino|exercise/i, action: "first_workout" },
+  { match: /saude-meals|dieta-diary|dieta-recipes|meal/i, action: "first_meal" },
+  { match: /dieta-smart-list/i, action: "first_grocery" },
   { match: /task|rotina/i, action: "first_task" },
-  { match: /water|hidrat/i, action: "first_water_log" },
   { match: /note/i, action: "first_note" },
 ];
 

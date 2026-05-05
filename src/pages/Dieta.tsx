@@ -203,9 +203,9 @@ const Dieta = () => {
       <SpotlightOverlay
         moduleKey="dieta"
         steps={[
-          { selector: '[data-spotlight="first-day"]', label: "Toque num dia da semana e adiciona uma refeição." },
+          { selector: '[data-spotlight="first-day"]', label: "Passo 1: toque num dia e adiciona uma refeição.", advanceOnAction: "first_meal" },
+          { selector: '[data-spotlight="grocery-input"]', label: "Passo 2: adiciona 1 item à lista de compras.", advanceOnAction: "first_grocery" },
         ]}
-        activationActions={["first_meal"]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">

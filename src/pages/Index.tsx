@@ -122,9 +122,10 @@ const Index = () => {
         moduleKey="financas"
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Toque em "Meu Financeiro" pra começar.' },
-          { selector: '[data-spotlight="add-expense"]', label: 'Adiciona teu primeiro gasto. Pode ser o café de hoje.' },
+          { selector: '[data-spotlight="add-income"]', label: 'Passo 1: adiciona tua receita (salário, freelas...).', advanceOnAction: "first_income" },
+          { selector: '[data-spotlight="add-fixed"]', label: 'Passo 2: cadastra um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense" },
+          { selector: '[data-spotlight="add-expense"]', label: 'Passo 3: registra um gasto variável (café, mercado...).', advanceOnAction: "first_transaction" },
         ]}
-        activationActions={["first_transaction"]}
       />
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">

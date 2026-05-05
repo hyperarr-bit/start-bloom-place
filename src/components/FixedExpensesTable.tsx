@@ -180,7 +180,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
                 )}
               </td>
               <td className="px-3 py-2">
-                <button onClick={addExpense} className="text-muted-foreground hover:text-foreground transition-colors">
+                <button onClick={addExpense} data-spotlight="add-fixed" className="text-muted-foreground hover:text-foreground transition-colors">
                   <Plus className="w-3.5 h-3.5" />
                 </button>
               </td>

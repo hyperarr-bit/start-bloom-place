@@ -17,6 +17,9 @@ import { SortableWidget } from "@/components/home/SortableWidget";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useHomeWidgets, WidgetId, ActiveWidget } from "@/hooks/use-home-widgets";
 import { useLongPress } from "@/hooks/use-long-press";
+import { useAuth } from "@/hooks/use-auth";
+
+const ALWAYS_ONBOARD_EMAILS = ["hyperarr@gmail.com"];
 
 // Widget components
 import { FinancesWidget } from "@/components/home/widgets/FinancesWidget";

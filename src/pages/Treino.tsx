@@ -208,15 +208,17 @@ const Treino = () => {
 
   const toggleDay = (day: string) => {
     setActiveDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+    setWorkoutPlan(prev => prev[day] ? prev : { ...prev, [day]: { muscles: [], exercises: [] } });
   };
 
   const toggleMuscleForDay = (day: string, muscle: string) => {
     setWorkoutPlan(prev => {
-      const current = prev[day].muscles;
+      const day0 = prev[day] ?? { muscles: [], exercises: [] };
+      const current = day0.muscles ?? [];
       const newMuscles = current.includes(muscle)
         ? current.filter(m => m !== muscle)
         : [...current, muscle];
-      return { ...prev, [day]: { ...prev[day], muscles: newMuscles } };
+      return { ...prev, [day]: { ...day0, muscles: newMuscles } };
     });
   };
 
@@ -711,7 +713,7 @@ const Treino = () => {
                       <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
                       <div className="flex flex-wrap gap-1 ml-1">
                         {muscleGroups.map(m => {
-                          const isSelected = workoutPlan[day]?.muscles.includes(m);
+                          const isSelected = workoutPlan[day]?.muscles?.includes(m) ?? false;
                           return (
                             <button key={m} onClick={() => toggleMuscleForDay(day, m)}
                               className={`px-2 py-1 rounded text-[10px] border transition-all ${

@@ -49,19 +49,26 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     setActive(false);
   }, [set, moduleKey]);
 
-  // listen for activation events to auto-advance / finish
+  // listen for activation events to auto-advance / finish.
+  // Debounced per step: a single user action (e.g. addHabit) may write to
+  // multiple keys that match the same activation rule, firing the event
+  // several times in the same tick. We must only advance ONCE per step.
   useEffect(() => {
     if (!active) return;
+    let advanced = false;
     const onActivation = (e: Event) => {
+      if (advanced) return;
       const detail = (e as CustomEvent).detail as { action?: string } | undefined;
       if (!detail?.action) return;
       const currentStep = steps[stepIdx];
       if (currentStep?.advanceOnAction === detail.action) {
+        advanced = true;
         if (stepIdx >= steps.length - 1) finish("completed");
         else setStepIdx(i => i + 1);
         return;
       }
       if (activationActions.includes(detail.action)) {
+        advanced = true;
         finish("completed");
       }
     };

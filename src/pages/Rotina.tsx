@@ -1112,6 +1112,7 @@ const Rotina = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id} data-active={activeTab === tab.id}
+              data-spotlight={tab.id === "mes" ? "tab-mes" : undefined}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

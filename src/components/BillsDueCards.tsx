@@ -86,7 +86,7 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
   const sortedDays = [...dueDays].sort((a, b) => a.day - b.day);
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in" data-spotlight="add-bill">
       <div className="table-header-dark rounded-t-lg flex items-center justify-between px-4">
         <span>VENCIMENTOS DAS CONTAS</span>
         <div className="flex gap-2 items-center">

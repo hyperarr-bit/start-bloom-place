@@ -105,6 +105,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       const target = document.querySelector(step.selector);
       if (!target) return;
       if (target.contains(e.target as Node)) {
+        // If step waits for an explicit activation action, never advance on click.
+        if (step.advanceOnAction) return;
         if (step.advanceOnClick !== false) {
           // last step → finish; otherwise advance
           setTimeout(() => {

@@ -8,6 +8,8 @@ import { markActivation } from "@/lib/analytics";
 const ACTIVATION_RULES: Array<{ match: RegExp; action: string }> = [
   { match: /finance-incomes/i, action: "first_income" },
   { match: /finance-fixed-expenses/i, action: "first_fixed_expense" },
+  { match: /finance-dueDays/i, action: "first_bill" },
+  { match: /finance-notes/i, action: "first_note" },
   { match: /finance-expenses/i, action: "first_transaction" },
   { match: /finance-installments/i, action: "first_installment" },
   { match: /transac|financ/i, action: "first_transaction" },

@@ -25,7 +25,7 @@ export const Notes = ({ notes, setNotes }: NotesProps) => {
   const deleteNote = (id: string) => setNotes(notes.filter((n) => n.id !== id));
 
   return (
-    <div className="notes-shell bg-card-dividas rounded-lg border border-card-dividas-border overflow-hidden animate-fade-in">
+    <div data-spotlight="add-note" className="notes-shell bg-card-dividas rounded-lg border border-card-dividas-border overflow-hidden animate-fade-in">
       <div className="bg-accent text-accent-foreground px-4 py-2 flex items-center gap-2">
         <span className="font-bold text-xs tracking-wide">ANOTAÇÕES</span>
         <span>📝</span>

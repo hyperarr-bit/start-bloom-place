@@ -143,6 +143,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
   const labelBelow = rect ? rect.top < 110 : true;
 
+  // Detect when target is off-screen (above or below viewport) so we can
+  // show an always-visible "scroll here" banner that takes the user to it.
+  const offScreen: "above" | "below" | null = !rect
+    ? null
+    : rect.top + rect.height < 60
+      ? "above"
+      : rect.top > viewportH - 60
+        ? "below"
+        : null;
+
+  const scrollToTarget = useCallback(() => {
+    const el = document.querySelector(step.selector) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [step.selector]);
+
   // Dim the screen only on navigation steps (no advanceOnAction).
   // Action steps keep the screen normal so user can interact freely.
   const dim = !step.advanceOnAction;

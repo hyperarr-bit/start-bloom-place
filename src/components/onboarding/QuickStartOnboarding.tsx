@@ -76,14 +76,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               className="flex flex-col items-center text-center gap-6 py-12"
             >
               <img
-                src={coreLogo}
-                alt="CORE"
-                className="w-20 h-20 object-contain dark:hidden"
-              />
-              <img
                 src={coreLogoBlack}
                 alt="CORE"
-                className="w-20 h-20 object-contain hidden dark:block"
+                className="w-28 h-16 object-contain dark:hidden"
+              />
+              <img
+                src={coreLogo}
+                alt="CORE"
+                className="w-28 h-16 object-contain hidden dark:block"
               />
               <div className="space-y-3">
                 <h1 className="text-2xl font-bold leading-tight text-foreground">

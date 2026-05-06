@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import coreLogo from "@/assets/core-logo.png";
+import coreLogoBlack from "@/assets/core-logo-black.png";
 
 export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
 

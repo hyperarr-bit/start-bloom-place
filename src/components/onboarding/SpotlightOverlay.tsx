@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
@@ -143,6 +143,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
   const labelBelow = rect ? rect.top < 110 : true;
 
+  // Detect when target is off-screen (above or below viewport) so we can
+  // show an always-visible "scroll here" banner that takes the user to it.
+  const offScreen: "above" | "below" | null = !rect
+    ? null
+    : rect.top + rect.height < 60
+      ? "above"
+      : rect.top > viewportH - 60
+        ? "below"
+        : null;
+
+  const scrollToTarget = useCallback(() => {
+    const el = document.querySelector(step.selector) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [step.selector]);
+
   // Dim the screen only on navigation steps (no advanceOnAction).
   // Action steps keep the screen normal so user can interact freely.
   const dim = !step.advanceOnAction;
@@ -246,6 +261,35 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
               )}
             </div>
           </motion.div>
+        )}
+        {/* Off-screen banner — always visible, taps to scroll to target */}
+        {offScreen && (
+          <motion.button
+            key={`offscreen-${offScreen}`}
+            initial={{ opacity: 0, y: offScreen === "below" ? 20 : -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            onClick={scrollToTarget}
+            className={`fixed left-1/2 -translate-x-1/2 pointer-events-auto bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 text-xs font-bold z-[210] ${
+              offScreen === "below" ? "bottom-6" : "top-6"
+            }`}
+          >
+            {offScreen === "below" ? (
+              <>
+                <motion.span animate={{ y: [0, 3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <ArrowDown className="w-4 h-4" strokeWidth={3} />
+                </motion.span>
+                Role pra baixo
+              </>
+            ) : (
+              <>
+                <motion.span animate={{ y: [0, -3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <ArrowUp className="w-4 h-4" strokeWidth={3} />
+                </motion.span>
+                Role pra cima
+              </>
+            )}
+          </motion.button>
         )}
       </motion.div>
     </AnimatePresence>

@@ -604,6 +604,7 @@ const Treino = () => {
           ].map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={tab.id === "hoje" ? "tab-hoje" : undefined}
               onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

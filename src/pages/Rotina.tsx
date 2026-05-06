@@ -1194,7 +1194,7 @@ const Rotina = () => {
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
-              <div className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
+              <div data-spotlight="weekly-schedule" className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
                 <div className="bg-gradient-to-r from-pink-300 to-pink-400 dark:from-[hsl(330,40%,22%)] dark:to-[hsl(330,40%,28%)] px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-sm text-white">ROTINA SEMANAL</span>
                 </div>

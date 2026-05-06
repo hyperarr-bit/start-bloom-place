@@ -133,9 +133,15 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     };
   }, [active, stepIdx, steps]);
 
-  if (!active) return null;
-  const step = steps[stepIdx];
-  if (!step) return null;
+  const step = active ? steps[stepIdx] : null;
+
+  const scrollToTarget = useCallback(() => {
+    if (!step) return;
+    const el = document.querySelector(step.selector) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [step]);
+
+  if (!active || !step) return null;
 
   // Compute label position. Default: above the target (so it never covers
   // forms/menus that open below the target). Fall back to below when the
@@ -152,11 +158,6 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       : rect.top > viewportH - 60
         ? "below"
         : null;
-
-  const scrollToTarget = useCallback(() => {
-    const el = document.querySelector(step.selector) as HTMLElement | null;
-    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [step.selector]);
 
   // Dim the screen only on navigation steps (no advanceOnAction).
   // Action steps keep the screen normal so user can interact freely.

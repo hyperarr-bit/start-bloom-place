@@ -67,7 +67,6 @@ const HomePage = () => {
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded } = useUserData();
   const { user } = useAuth();
-  const forceOnboarding = !!user?.email && ALWAYS_ONBOARD_EMAILS.includes(user.email.toLowerCase());
 
   const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino"];
 
@@ -75,34 +74,34 @@ const HomePage = () => {
     ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));
 
   const [pendingModules, setPendingModules] = useState<ModuleKey[]>(computePending);
-  const [showOnboarding, setShowOnboarding] = useState(() => forceOnboarding || !get<string>("core-onboarding-done", ""));
+  const [showOnboarding, setShowOnboarding] = useState(() => !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
     if (!loaded) return;
-    if (forceOnboarding) {
-      // Test account: always replay the full onboarding + spotlight tour
+
+    // One-time reset: replay onboarding once after we bump ONBOARDING_RESET_KEY
+    const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
+    if (!alreadyReset) {
       setData("core-onboarding-done", "");
       setData("spotlight-done-financas", "");
       setData("spotlight-done-rotina", "");
       setData("spotlight-done-dieta", "");
       setData("spotlight-done-treino", "");
       setData("core-all-modules-celebrated", "");
+      setData(ONBOARDING_RESET_KEY, "true");
     }
-    const pending = forceOnboarding ? ALL_MODULES : computePending();
+
+    const pending = computePending();
     setPendingModules(pending);
 
     const onboardingDone = !!get<string>("core-onboarding-done", "");
     const celebrated = !!get<string>("core-all-modules-celebrated", "");
-    // Show flow when:
-    //  • first time (no core-onboarding-done) OR
-    //  • there are still pending modules OR
-    //  • all modules are done but the celebration screen wasn't shown yet
-    const shouldShow = forceOnboarding || !onboardingDone || pending.length > 0 || !celebrated;
+    const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
     setShowOnboarding(shouldShow);
-  }, [loaded, get, forceOnboarding, setData]);
+  }, [loaded, get, setData]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {

@@ -262,6 +262,35 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
             </div>
           </motion.div>
         )}
+        {/* Off-screen banner — always visible, taps to scroll to target */}
+        {offScreen && (
+          <motion.button
+            key={`offscreen-${offScreen}`}
+            initial={{ opacity: 0, y: offScreen === "below" ? 20 : -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            onClick={scrollToTarget}
+            className={`fixed left-1/2 -translate-x-1/2 pointer-events-auto bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 text-xs font-bold z-[210] ${
+              offScreen === "below" ? "bottom-6" : "top-6"
+            }`}
+          >
+            {offScreen === "below" ? (
+              <>
+                <motion.span animate={{ y: [0, 3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <ArrowDown className="w-4 h-4" strokeWidth={3} />
+                </motion.span>
+                Role pra baixo
+              </>
+            ) : (
+              <>
+                <motion.span animate={{ y: [0, -3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
+                  <ArrowUp className="w-4 h-4" strokeWidth={3} />
+                </motion.span>
+                Role pra cima
+              </>
+            )}
+          </motion.button>
+        )}
       </motion.div>
     </AnimatePresence>
   );

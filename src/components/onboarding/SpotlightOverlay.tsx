@@ -49,19 +49,26 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     setActive(false);
   }, [set, moduleKey]);
 
-  // listen for activation events to auto-advance / finish
+  // listen for activation events to auto-advance / finish.
+  // Debounced per step: a single user action (e.g. addHabit) may write to
+  // multiple keys that match the same activation rule, firing the event
+  // several times in the same tick. We must only advance ONCE per step.
   useEffect(() => {
     if (!active) return;
+    let advanced = false;
     const onActivation = (e: Event) => {
+      if (advanced) return;
       const detail = (e as CustomEvent).detail as { action?: string } | undefined;
       if (!detail?.action) return;
       const currentStep = steps[stepIdx];
       if (currentStep?.advanceOnAction === detail.action) {
+        advanced = true;
         if (stepIdx >= steps.length - 1) finish("completed");
         else setStepIdx(i => i + 1);
         return;
       }
       if (activationActions.includes(detail.action)) {
+        advanced = true;
         finish("completed");
       }
     };
@@ -134,9 +141,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const step = steps[stepIdx];
   if (!step) return null;
 
-  // Compute label position (prefer below the target, fall back to above if no room)
+  // Compute label position. Default: above the target (so it never covers
+  // forms/menus that open below the target). Fall back to below when the
+  // target is too close to the top of the viewport.
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
-  const labelBelow = rect ? rect.top + rect.height + 70 < viewportH : true;
+  const labelBelow = rect ? rect.top < 110 : true;
 
   // Dim the screen only on navigation steps (no advanceOnAction).
   // Action steps keep the screen normal so user can interact freely.

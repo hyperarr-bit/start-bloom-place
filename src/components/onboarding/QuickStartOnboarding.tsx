@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import coreLogo from "@/assets/core-logo.png";
+import coreLogoBlack from "@/assets/core-logo-black.png";
 
 export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
 
@@ -73,9 +75,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               transition={{ duration: 0.25 }}
               className="flex flex-col items-center text-center gap-6 py-12"
             >
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <span className="text-3xl">⚡</span>
-              </div>
+              <img
+                src={coreLogo}
+                alt="CORE"
+                className="w-20 h-20 object-contain dark:hidden"
+              />
+              <img
+                src={coreLogoBlack}
+                alt="CORE"
+                className="w-20 h-20 object-contain hidden dark:block"
+              />
               <div className="space-y-3">
                 <h1 className="text-2xl font-bold leading-tight text-foreground">
                   Organize sua vida

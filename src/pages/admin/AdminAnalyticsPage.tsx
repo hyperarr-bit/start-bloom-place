@@ -26,7 +26,8 @@ const Stat = ({ icon: Icon, value, label, color }: any) => (
 export default function AdminAnalyticsPage() {
   const [data, setData] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<"7d" | "30d" | "all">("30d");
+  const [period, setPeriod] = useState<"today" | "day" | "7d" | "30d" | "all">("30d");
+  const [dayDate, setDayDate] = useState<string>(() => new Date().toISOString().slice(0,10));
   const [selected, setSelected] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,12 +35,17 @@ export default function AdminAnalyticsPage() {
     let q = (supabase as any).from("module_analytics")
       .select("module_id, duration_seconds, entered_at, user_id, tab_id")
       .order("entered_at", { ascending: false });
-    if (period !== "all") {
+    if (period === "today" || period === "day") {
+      const base = period === "today" ? new Date().toISOString().slice(0,10) : dayDate;
+      const start = new Date(base + "T00:00:00");
+      const end = new Date(start.getTime() + 24*60*60*1000);
+      q = q.gte("entered_at", start.toISOString()).lt("entered_at", end.toISOString());
+    } else if (period !== "all") {
       const d = new Date(); d.setDate(d.getDate() - (period === "7d" ? 7 : 30));
       q = q.gte("entered_at", d.toISOString());
     }
     q.limit(5000).then(({ data }: any) => { setData(data || []); setLoading(false); });
-  }, [period]);
+  }, [period, dayDate]);
 
   const stats = useMemo(() => {
     if (!data.length) return null;

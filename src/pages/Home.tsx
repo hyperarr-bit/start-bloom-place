@@ -19,7 +19,8 @@ import { useHomeWidgets, WidgetId, ActiveWidget } from "@/hooks/use-home-widgets
 import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 
-const ALWAYS_ONBOARD_EMAILS = ["hyperarr@gmail.com"];
+// One-time reset key — bump version to replay onboarding for everyone
+const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
 
 // Widget components
 import { FinancesWidget } from "@/components/home/widgets/FinancesWidget";

@@ -698,7 +698,7 @@ const MonthlyPlanning = () => {
           <span className="font-bold text-sm text-white">METAS DO MÊS</span>
         </div>
         <div className="p-3 space-y-2">
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-spotlight="add-month-goal">
             <Input placeholder="Nova meta..." value={newGoal} onChange={e => setNewGoal(e.target.value)} onKeyDown={e => e.key === "Enter" && addGoal()} className="h-8 text-xs flex-1" />
             <Button size="sm" onClick={addGoal} className="h-8 text-xs">+</Button>
           </div>
@@ -1095,9 +1095,9 @@ const Rotina = () => {
         moduleKey="rotina"
         steps={[
           { selector: '[data-spotlight="add-habit"]', label: "Passo 1: cria 1 hábito (ex: 'beber água').", advanceOnAction: "first_habit" },
-          { selector: '[data-spotlight="add-todo"]', label: "Passo 2: anota 1 tarefa pra hoje.", advanceOnAction: "first_task" },
-          { selector: '[data-spotlight="add-water"]', label: "Passo 3: registra 1 copo d'água.", advanceOnAction: "first_water_log" },
-          { selector: '[data-spotlight="add-sleep"]', label: "Passo 4: anota quantas horas dormiu.", advanceOnAction: "first_sleep_log" },
+          { selector: '[data-spotlight="weekly-schedule"]', label: "Passo 2: toque numa célula da rotina semanal e escreva algo.", advanceOnAction: "first_schedule" },
+          { selector: '[data-spotlight="tab-mes"]', label: 'Passo 3: agora abre a aba "Meu Mês".' },
+          { selector: '[data-spotlight="add-month-goal"]', label: "Passo 4: cadastra 1 meta do mês.", advanceOnAction: "first_month_goal" },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
@@ -1112,6 +1112,7 @@ const Rotina = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id} data-active={activeTab === tab.id}
+              data-spotlight={tab.id === "mes" ? "tab-mes" : undefined}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
@@ -1193,7 +1194,7 @@ const Rotina = () => {
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
-              <div className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
+              <div data-spotlight="weekly-schedule" className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
                 <div className="bg-gradient-to-r from-pink-300 to-pink-400 dark:from-[hsl(330,40%,22%)] dark:to-[hsl(330,40%,28%)] px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-sm text-white">ROTINA SEMANAL</span>
                 </div>

@@ -121,10 +121,10 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               </motion.div>
               <div className="space-y-3">
                 <h1 className="text-2xl font-bold leading-tight text-foreground">
-                  Tu liberou tudo! 🎉
+                  Parabéns! 🎉
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Os 4 módulos tão configurados. Agora é só usar o app no teu ritmo — finanças, hábitos, dieta e treino, todos prontos.
+                  Você concluiu o tutorial e liberou todos os 16 módulos.
                 </p>
               </div>
               <button

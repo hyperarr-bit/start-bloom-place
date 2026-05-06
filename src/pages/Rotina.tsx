@@ -698,7 +698,7 @@ const MonthlyPlanning = () => {
           <span className="font-bold text-sm text-white">METAS DO MÊS</span>
         </div>
         <div className="p-3 space-y-2">
-          <div className="flex gap-2">
+          <div className="flex gap-2" data-spotlight="add-month-goal">
             <Input placeholder="Nova meta..." value={newGoal} onChange={e => setNewGoal(e.target.value)} onKeyDown={e => e.key === "Enter" && addGoal()} className="h-8 text-xs flex-1" />
             <Button size="sm" onClick={addGoal} className="h-8 text-xs">+</Button>
           </div>

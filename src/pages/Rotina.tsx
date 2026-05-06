@@ -1013,11 +1013,7 @@ const Rotina = () => {
   const [schedule, setSchedule] = usePersistedState<Record<string, Record<string, string>>>("rotina-schedule", defaultSchedule);
 
   // Urgencies
-  const [urgencies, setUrgencies] = usePersistedState<{ id: string; text: string; done: boolean }[]>("rotina-urgencies", [
-    { id: "1", text: "Ir na costureira pro vestido", done: false },
-    { id: "2", text: "Resolver o problema chip celular", done: false },
-    { id: "3", text: "Revisão projeto faculdade", done: false },
-  ]);
+  const [urgencies, setUrgencies] = usePersistedState<{ id: string; text: string; done: boolean }[]>("rotina-urgencies", []);
   const [newUrgency, setNewUrgency] = useState("");
   const [newHabit, setNewHabit] = useState("");
   const [showAddHabit, setShowAddHabit] = useState(false);

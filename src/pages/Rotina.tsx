@@ -1090,7 +1090,7 @@ const Rotina = () => {
       <SpotlightOverlay
         moduleKey="rotina"
         steps={[
-          { selector: '[data-spotlight="add-habit"]', label: "Passo 1: cria 1 hábito (ex: 'beber água').", advanceOnAction: "first_habit" },
+          { selector: '[data-spotlight="add-habit"]', label: "Passo 1: cria 1 hábito (ex: 'estudar').", advanceOnAction: "first_habit" },
           { selector: '[data-spotlight="weekly-schedule"]', label: "Passo 2: toque numa célula da rotina semanal e escreva algo.", advanceOnAction: "first_schedule" },
           { selector: '[data-spotlight="tab-mes"]', label: 'Passo 3: agora abre a aba "Meu Mês".' },
           { selector: '[data-spotlight="add-month-goal"]', label: "Passo 4: cadastra 1 meta do mês.", advanceOnAction: "first_month_goal" },

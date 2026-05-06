@@ -567,9 +567,9 @@ const Treino = () => {
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
-          { selector: '[data-spotlight="add-exercise"]', label: "Adiciona teu primeiro exercício do dia." },
+          { selector: '[data-spotlight="tab-hoje"]', label: 'Toque na aba "Hoje" pra montar o treino do dia.' },
+          { selector: '[data-spotlight="add-exercise"]', label: "Passo 2: digita o nome do exercício e toque no +.", advanceOnAction: "first_workout" },
         ]}
-        activationActions={["first_workout"]}
       />
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
@@ -604,6 +604,7 @@ const Treino = () => {
           ].map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={tab.id === "hoje" ? "tab-hoje" : undefined}
               onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

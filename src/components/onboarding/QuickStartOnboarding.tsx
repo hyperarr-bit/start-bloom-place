@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight } from "lucide-react";
+import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
+export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
+
 interface QuickStartOnboardingProps {
   onComplete: () => void;
+  /** Modules still pending. If undefined, all 4 are considered pending (first-time flow). */
+  pendingModules?: ModuleKey[];
+  /** Skip the welcome step and go straight to module choice / celebration. */
+  skipWelcome?: boolean;
 }
-
-type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
 
 const OPTIONS: Array<{
   key: ModuleKey;
@@ -17,44 +21,20 @@ const OPTIONS: Array<{
   label: string;
   benefit: string;
   Icon: typeof Wallet;
-  tone: string; // tailwind classes for icon bg
+  tone: string;
 }> = [
-  {
-    key: "financas",
-    route: "/financas",
-    label: "Finanças",
-    benefit: "Saiba pra onde teu dinheiro vai",
-    Icon: Wallet,
-    tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]",
-  },
-  {
-    key: "rotina",
-    route: "/rotina",
-    label: "Hábitos",
-    benefit: "Construa rotina sem culpa",
-    Icon: CheckCircle2,
-    tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]",
-  },
-  {
-    key: "dieta",
-    route: "/dieta",
-    label: "Dieta",
-    benefit: "Coma sem se perder",
-    Icon: Apple,
-    tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]",
-  },
-  {
-    key: "treino",
-    route: "/treino",
-    label: "Treino",
-    benefit: "Não falte mais",
-    Icon: Dumbbell,
-    tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]",
-  },
+  { key: "financas", route: "/financas", label: "Finanças", benefit: "Saiba pra onde teu dinheiro vai", Icon: Wallet, tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
+  { key: "rotina", route: "/rotina", label: "Hábitos", benefit: "Construa rotina sem culpa", Icon: CheckCircle2, tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
+  { key: "dieta", route: "/dieta", label: "Dieta", benefit: "Coma sem se perder", Icon: Apple, tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
+  { key: "treino", route: "/treino", label: "Treino", benefit: "Não falte mais", Icon: Dumbbell, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
 ];
 
-export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) => {
-  const [step, setStep] = useState<0 | 1>(0);
+export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }: QuickStartOnboardingProps) => {
+  const pending = pendingModules ?? OPTIONS.map(o => o.key);
+  const allDone = pending.length === 0;
+  const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
+
+  const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
   const { set } = useUserData();
   const navigate = useNavigate();
 
@@ -63,8 +43,12 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
     trackEvent("quickstart_module_chosen", { module: opt.key });
     set("core-onboarding-done", "true");
     onComplete();
-    // small delay so the parent unmounts before navigation transition
     setTimeout(() => navigate(opt.route), 50);
+  };
+
+  const handleCelebrationDone = () => {
+    set("core-all-modules-celebrated", "true");
+    onComplete();
   };
 
   return (
@@ -80,7 +64,7 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
     >
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
-          {step === 0 ? (
+          {step === 0 && !allDone ? (
             <motion.div
               key="promise"
               initial={{ opacity: 0, y: 16 }}
@@ -109,6 +93,38 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
                 Quero começar <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
+          ) : allDone ? (
+            <motion.div
+              key="celebration"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35 }}
+              className="flex flex-col items-center text-center gap-6 py-12"
+            >
+              <motion.div
+                initial={{ rotate: -10, scale: 0.8 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 200 }}
+                className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center"
+              >
+                <Sparkles className="w-10 h-10 text-primary" />
+              </motion.div>
+              <div className="space-y-3">
+                <h1 className="text-2xl font-bold leading-tight text-foreground">
+                  Tu liberou tudo! 🎉
+                </h1>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                  Os 4 módulos tão configurados. Agora é só usar o app no teu ritmo — finanças, hábitos, dieta e treino, todos prontos.
+                </p>
+              </div>
+              <button
+                onClick={handleCelebrationDone}
+                className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+              >
+                Bora usar <ArrowRight className="w-4 h-4" />
+              </button>
+            </motion.div>
           ) : (
             <motion.div
               key="choice"
@@ -120,15 +136,19 @@ export const QuickStartOnboarding = ({ onComplete }: QuickStartOnboardingProps) 
             >
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
-                  Por onde tu quer começar?
+                  {visibleOptions.length === OPTIONS.length
+                    ? "Por onde tu quer começar?"
+                    : "Falta configurar:"}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Escolhe 1. Os outros ficam aqui esperando.
+                  {visibleOptions.length === OPTIONS.length
+                    ? "Escolhe 1. Os outros ficam aqui esperando."
+                    : `Escolhe o próximo. Faltam ${visibleOptions.length} de ${OPTIONS.length}.`}
                 </p>
               </div>
 
               <div className="flex flex-col gap-2.5">
-                {OPTIONS.map((opt, i) => (
+                {visibleOptions.map((opt, i) => (
                   <motion.button
                     key={opt.key}
                     initial={{ opacity: 0, x: -12 }}

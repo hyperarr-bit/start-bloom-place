@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-import { QuickStartOnboarding } from "@/components/onboarding/QuickStartOnboarding";
+import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 
 import { GreetingHeader } from "@/components/home/GreetingHeader";
@@ -68,6 +68,12 @@ const HomePage = () => {
   const { user } = useAuth();
   const forceOnboarding = !!user?.email && ALWAYS_ONBOARD_EMAILS.includes(user.email.toLowerCase());
 
+  const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino"];
+
+  const computePending = (): ModuleKey[] =>
+    ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));
+
+  const [pendingModules, setPendingModules] = useState<ModuleKey[]>(computePending);
   const [showOnboarding, setShowOnboarding] = useState(() => forceOnboarding || !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
@@ -82,8 +88,19 @@ const HomePage = () => {
       setData("spotlight-done-rotina", "");
       setData("spotlight-done-dieta", "");
       setData("spotlight-done-treino", "");
+      setData("core-all-modules-celebrated", "");
     }
-    setShowOnboarding(forceOnboarding || !get<string>("core-onboarding-done", ""));
+    const pending = forceOnboarding ? ALL_MODULES : computePending();
+    setPendingModules(pending);
+
+    const onboardingDone = !!get<string>("core-onboarding-done", "");
+    const celebrated = !!get<string>("core-all-modules-celebrated", "");
+    // Show flow when:
+    //  • first time (no core-onboarding-done) OR
+    //  • there are still pending modules OR
+    //  • all modules are done but the celebration screen wasn't shown yet
+    const shouldShow = forceOnboarding || !onboardingDone || pending.length > 0 || !celebrated;
+    setShowOnboarding(shouldShow);
   }, [loaded, get, forceOnboarding, setData]);
 
   // Auto check-in on app open (only after data loaded)
@@ -131,7 +148,13 @@ const HomePage = () => {
     <>
 
       <AnimatePresence>
-        {showOnboarding && <QuickStartOnboarding onComplete={handleOnboardingComplete} />}
+        {showOnboarding && (
+          <QuickStartOnboarding
+            onComplete={handleOnboardingComplete}
+            pendingModules={pendingModules}
+            skipWelcome={!!get<string>("core-onboarding-done", "")}
+          />
+        )}
       </AnimatePresence>
 
       {!showOnboarding && <DailyNudge />}

@@ -1095,9 +1095,9 @@ const Rotina = () => {
         moduleKey="rotina"
         steps={[
           { selector: '[data-spotlight="add-habit"]', label: "Passo 1: cria 1 hábito (ex: 'beber água').", advanceOnAction: "first_habit" },
-          { selector: '[data-spotlight="add-todo"]', label: "Passo 2: anota 1 tarefa pra hoje.", advanceOnAction: "first_task" },
-          { selector: '[data-spotlight="add-water"]', label: "Passo 3: registra 1 copo d'água.", advanceOnAction: "first_water_log" },
-          { selector: '[data-spotlight="add-sleep"]', label: "Passo 4: anota quantas horas dormiu.", advanceOnAction: "first_sleep_log" },
+          { selector: '[data-spotlight="weekly-schedule"]', label: "Passo 2: toque numa célula da rotina semanal e escreva algo.", advanceOnAction: "first_schedule" },
+          { selector: '[data-spotlight="tab-mes"]', label: 'Passo 3: agora abre a aba "Meu Mês".' },
+          { selector: '[data-spotlight="add-month-goal"]', label: "Passo 4: cadastra 1 meta do mês.", advanceOnAction: "first_month_goal" },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

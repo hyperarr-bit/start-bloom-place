@@ -99,15 +99,26 @@ export default function AdminAnalyticsPage() {
         <p className="text-xs text-zinc-500 mt-1">Uso por módulo, abas e horários</p>
       </div>
 
-      <div className="flex gap-1.5">
-        {(["7d","30d","all"] as const).map(p => (
+      <div className="flex flex-wrap gap-1.5 items-center">
+        {([
+          ["today","Hoje"],
+          ["7d","7 dias"],
+          ["30d","30 dias"],
+          ["all","Tudo"],
+          ["day","Dia…"],
+        ] as const).map(([p,label]) => (
           <button key={p} onClick={() => { setPeriod(p); setSelected(null); }}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
               period===p ? "bg-emerald-500 text-zinc-950" : "bg-zinc-900 text-zinc-400"
             }`}>
-            {p==="7d"?"7 dias":p==="30d"?"30 dias":"Tudo"}
+            {label}
           </button>
         ))}
+        {period === "day" && (
+          <input type="date" value={dayDate} max={new Date().toISOString().slice(0,10)}
+            onChange={e => setDayDate(e.target.value)}
+            className="px-2 py-1 rounded-lg text-xs bg-zinc-900 border border-zinc-800 text-zinc-200" />
+        )}
       </div>
 
       {loading ? <div className="text-sm text-zinc-500 py-8 text-center">Carregando…</div>

@@ -203,8 +203,7 @@ const Dieta = () => {
       <SpotlightOverlay
         moduleKey="dieta"
         steps={[
-          { selector: '[data-spotlight="first-day"]', label: "Passo 1: toque num dia e adiciona uma refeição.", advanceOnAction: "first_meal" },
-          { selector: '[data-spotlight="grocery-input"]', label: "Passo 2: adiciona 1 item à lista de compras.", advanceOnAction: "first_grocery" },
+          { selector: '[data-spotlight="first-day"]', label: "Toque num dia e adiciona uma refeição.", advanceOnAction: "first_meal" },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

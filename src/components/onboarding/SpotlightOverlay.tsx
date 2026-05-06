@@ -88,6 +88,12 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
+    // Bring the new target into view when changing step
+    requestAnimationFrame(() => {
+      const t = document.querySelector(step.selector) as HTMLElement | null;
+      if (t) t.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+
     measure();
     const interval = setInterval(measure, 250); // robust to lazy-rendered elements
     window.addEventListener("resize", measure);

@@ -73,9 +73,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               transition={{ duration: 0.25 }}
               className="flex flex-col items-center text-center gap-6 py-12"
             >
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <span className="text-3xl">⚡</span>
-              </div>
+              <img
+                src="/src/assets/core-logo.png"
+                alt="CORE"
+                className="w-20 h-20 object-contain dark:hidden"
+              />
+              <img
+                src="/src/assets/core-logo-black.png"
+                alt="CORE"
+                className="w-20 h-20 object-contain hidden dark:block"
+              />
               <div className="space-y-3">
                 <h1 className="text-2xl font-bold leading-tight text-foreground">
                   Organize sua vida

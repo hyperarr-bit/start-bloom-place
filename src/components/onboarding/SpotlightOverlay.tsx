@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, X } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
@@ -88,6 +88,12 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
+    // Bring the new target into view when changing step
+    requestAnimationFrame(() => {
+      const t = document.querySelector(step.selector) as HTMLElement | null;
+      if (t) t.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+
     measure();
     const interval = setInterval(measure, 250); // robust to lazy-rendered elements
     window.addEventListener("resize", measure);
@@ -130,6 +136,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
   const labelBelow = rect ? rect.top + rect.height + 70 < viewportH : true;
 
+  // Dim the screen only on navigation steps (no advanceOnAction).
+  // Action steps keep the screen normal so user can interact freely.
+  const dim = !step.advanceOnAction;
+
   return (
     <AnimatePresence>
       <motion.div
@@ -140,9 +150,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
         transition={{ duration: 0.25 }}
         className="fixed inset-0 z-[200] pointer-events-none"
       >
-        {/* Dim layer using SVG mask so the target stays bright and clickable.
-            pointer-events: none so clicks pass straight through. */}
-        {rect ? (
+        {dim && (rect ? (
           <svg
             className="absolute inset-0 w-full h-full"
             xmlns="http://www.w3.org/2000/svg"
@@ -169,7 +177,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
           </svg>
         ) : (
           <div className="absolute inset-0 bg-black/60" />
-        )}
+        ))}
 
         {/* Pulsing ring around the target */}
         {rect && (
@@ -213,17 +221,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
                 </motion.div>
               )}
               <div className="bg-card border border-primary/40 rounded-xl shadow-2xl p-3 relative">
-                <button
-                  onClick={() => finish("dismissed")}
-                  aria-label="Pular tutorial"
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
                 <p className="text-[10px] uppercase tracking-wider font-bold text-primary mb-1">
                   Passo {stepIdx + 1} de {steps.length}
                 </p>
-                <p className="text-sm font-semibold text-foreground leading-snug pr-5">
+                <p className="text-sm font-semibold text-foreground leading-snug">
                   {step.label}
                 </p>
               </div>

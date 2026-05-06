@@ -75,8 +75,16 @@ const HomePage = () => {
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
     if (!loaded) return;
+    if (forceOnboarding) {
+      // Test account: always replay the full onboarding + spotlight tour
+      setData("core-onboarding-done", "");
+      setData("spotlight-done-financas", "");
+      setData("spotlight-done-rotina", "");
+      setData("spotlight-done-dieta", "");
+      setData("spotlight-done-treino", "");
+    }
     setShowOnboarding(forceOnboarding || !get<string>("core-onboarding-done", ""));
-  }, [loaded, get, forceOnboarding]);
+  }, [loaded, get, forceOnboarding, setData]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {

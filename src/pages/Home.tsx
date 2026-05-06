@@ -148,7 +148,13 @@ const HomePage = () => {
     <>
 
       <AnimatePresence>
-        {showOnboarding && <QuickStartOnboarding onComplete={handleOnboardingComplete} />}
+        {showOnboarding && (
+          <QuickStartOnboarding
+            onComplete={handleOnboardingComplete}
+            pendingModules={pendingModules}
+            skipWelcome={!!get<string>("core-onboarding-done", "")}
+          />
+        )}
       </AnimatePresence>
 
       {!showOnboarding && <DailyNudge />}

@@ -582,6 +582,7 @@ export type Database = {
         }[]
       }
       admin_retention_stats: { Args: never; Returns: Json }
+      admin_tutorial_compare: { Args: { _cutoff?: string }; Returns: Json }
       admin_winback_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

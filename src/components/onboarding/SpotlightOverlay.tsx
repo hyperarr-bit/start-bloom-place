@@ -141,9 +141,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const step = steps[stepIdx];
   if (!step) return null;
 
-  // Compute label position (prefer below the target, fall back to above if no room)
+  // Compute label position. Default: above the target (so it never covers
+  // forms/menus that open below the target). Fall back to below when the
+  // target is too close to the top of the viewport.
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
-  const labelBelow = rect ? rect.top + rect.height + 70 < viewportH : true;
+  const labelBelow = rect ? rect.top < 110 : true;
 
   // Dim the screen only on navigation steps (no advanceOnAction).
   // Action steps keep the screen normal so user can interact freely.

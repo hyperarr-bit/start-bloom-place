@@ -14,6 +14,8 @@ const ACTIVATION_RULES: Array<{ match: RegExp; action: string }> = [
   { match: /finance-installments/i, action: "first_installment" },
   { match: /transac|financ/i, action: "first_transaction" },
   { match: /rotina-habits|^habit/i, action: "first_habit" },
+  { match: /rotina-schedule/i, action: "first_schedule" },
+  { match: /month-goals/i, action: "first_month_goal" },
   { match: /todo-list/i, action: "first_task" },
   { match: /water-log|hidrat/i, action: "first_water_log" },
   { match: /sleep-log/i, action: "first_sleep_log" },

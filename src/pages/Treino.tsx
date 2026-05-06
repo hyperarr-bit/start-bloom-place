@@ -567,8 +567,7 @@ const Treino = () => {
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
-          { selector: '[data-spotlight="tab-hoje"]', label: 'Toque na aba "Hoje" pra montar o treino do dia.' },
-          { selector: '[data-spotlight="add-exercise"]', label: "Passo 2: digita o nome do exercício e toque no +.", advanceOnAction: "first_workout" },
+          { selector: '[data-spotlight="add-exercise"]', label: "Digita o nome do exercício e toque no + pra adicionar o treino de hoje.", advanceOnAction: "first_workout" },
         ]}
       />
       {/* Header */}

@@ -1,86 +1,68 @@
-## Por que mudar (resumo das métricas)
+# Inverter ordem: tutorial como convidado → criar conta no final
 
-- 47% dos confirmados nunca abriram um módulo de verdade
-- Sessão média dos "exploradores" = 69s (pessoa não chegou ao valor)
-- Onboarding atual fala MUITO ("16 módulos", "tudo em branco", "decida você") e pede ZERO ação → resultado = pessoa pula e some
-- Princípio aplicado: **Hooked (Nir Eyal)** + **Lean Startup** — onboarding bom não educa, força o aha moment.
+## Objetivo
+Quando alguém abre o app pela primeira vez (sem conta):
+1. **Não mostrar mais** a `WelcomeScreen` com iPhone + botões "Começar / Entrar".
+2. Cair direto no `QuickStartOnboarding` (a tela "Organize sua vida em 1 só lugar" → escolha de módulo → tutoriais dos módulos).
+3. Quando concluir os 4 módulos e aparecer a tela "🎉 Parabéns! Você liberou os 16 módulos", o botão **"Bora usar"** vira **"Criar conta para salvar"** e leva para `/auth?signup=1`.
+4. Tudo que o convidado preencheu durante o tutorial (nome, primeira despesa, primeiro hábito, primeira refeição, primeiro treino, widgets, etc.) é **preservado** e migrado para a conta nova após signup.
 
-## O que vai ser feito
+Quem já tem conta continua conseguindo entrar (link "Já tenho conta" no topo do onboarding).
 
-Substituir completamente o `OnboardingWizard.tsx` atual por um novo fluxo `QuickStartOnboarding.tsx` com **3 telas** (não 4) focadas em ação, não explicação.
+## Como funciona o "modo convidado"
 
-### Tela 1 — Promessa curta (5 segundos de leitura)
+Hoje o app exige login (`ProtectedRoute` redireciona para `/auth`) e o `useUserData` só lê/grava no Supabase quando há `user`. Vamos adicionar um modo guest:
 
-Headline: **"Tu não precisa de mais 1 app. Precisa parar o caos."**
-Subtext: "Em 60 segundos tu vai sair daqui com a primeira coisa da tua vida no lugar."
-CTA único: **"Bora"** (sem "Pular")
+- **Storage convidado**: quando não há `user`, `useUserData` lê e grava em `localStorage` sob o prefixo `guest:<key>` (em vez de `u:<id>:<key>`). Mesma API `get/set/loaded`, sem Supabase.
+- **Roteamento**: `/` deixa de exigir login. `ProtectedRoute` passa a permitir convidado em `/` (Home) e nos 4 módulos do tutorial (`/financas`, `/rotina`, `/dieta`, `/treino`). Rotas pagas/avançadas continuam exigindo login (redirecionam para `/auth`).
+- **Trial banner / winback / grace**: ocultos para convidado (sem `user`).
+- **Inicio (`/inicio`)**: rota mantida apenas como link público antigo, mas removida do fluxo padrão. `WelcomeScreen` continua existindo só para quem acessar `/inicio` direto (não quebra links externos).
 
-Sem grid de 16 ícones, sem "bem-vindo ao CORE". Headline direto na dor.
-
-### Tela 2 — A escolha (single-select, 4 opções grandes)
-
-Pergunta: **"Por onde tu quer começar a se organizar?"**
-Sub: "Escolhe 1. Os outros ficam aqui esperando."
-
-4 cards grandes, full-width, cada um com ícone + label + 1 frase de benefício:
+## Fluxo completo (convidado)
 
 ```text
-[💰] FINANÇAS         Saiba pra onde teu dinheiro vai
-[✅] HÁBITOS          Construa rotina sem culpa
-[🥗] DIETA            Coma sem se perder
-[💪] TREINO           Não falte mais
+abre app (/) 
+  → Home renderiza
+  → QuickStartOnboarding aparece (step 0: "Quero começar")
+  → escolhe módulo → vai pro tutorial do módulo (spotlight)
+  → volta pra Home → escolhe próximo módulo
+  → ... 4 módulos concluídos ...
+  → tela "Parabéns! 16 módulos liberados"
+  → botão "Criar conta para salvar meu progresso"
+  → /auth?signup=1 (mostra aviso "seus dados do tutorial serão salvos")
+  → após signup confirmado e login:
+       useUserData detecta guest data → faz upsert em massa no user_data → limpa guest:*
 ```
 
-Tap = avança automático (sem botão "Próximo"). Cores dos ícones seguem `--chart-1..5`.
+## Migração guest → conta
 
-### Tela 3 — Spotlight + ação obrigatória
+No `UserDataProvider`, quando `user` aparece (login/signup) e existe pelo menos uma chave `guest:*` no localStorage:
+1. Lê todas as chaves `guest:*`.
+2. Para cada uma, faz `upsert` em `user_data` com `{ user_id, key, value }`.
+3. Em caso de sucesso, remove as chaves `guest:*` e popula o cache `u:<id>:<key>`.
+4. Em caso de conflito (chave já existe na conta — ex.: usuário antigo logando em browser onde alguém testou guest), **a conta vence** e descartamos o guest, exceto para chaves de tutorial (`spotlight-done-*`, `core-onboarding-done`, `core-all-modules-celebrated`) onde guest vence (para não obrigar a refazer o tutorial).
 
-Fecha o modal e leva pro módulo escolhido. Aplica overlay escuro (`bg-black/70 backdrop-blur-sm`) cobrindo TUDO menos:
-- O título da seção principal (ex: "Adicionar transação")
-- O botão **+ / Adicionar** que executa a primeira ação
+Estratégia técnica: select das chaves existentes do user_data primeiro, decidir conflito por chave, depois upsert em lote.
 
-Bubble de texto com seta apontando pro botão:
-- Finanças: **"Adiciona teu primeiro gasto. Pode ser o café de hoje."**
-- Hábitos: **"Cria 1 hábito. Pode ser 'beber água'."**
-- Dieta: **"Registra a próxima refeição que tu vai fazer."**
-- Treino: **"Cria teu primeiro treino. Pode ser 'Push 1'."**
+## Arquivos
 
-Sem botão "pular" no spotlight. Só fecha quando a ação é completada (detectado via evento `markActivation` que já existe).
+**Editar:**
+- `src/hooks/use-user-data.tsx` — adicionar branch guest (ler/escrever `guest:*` quando `!user`); adicionar efeito de migração quando user passa de null → definido.
+- `src/components/ProtectedRoute.tsx` — aceitar `allowGuest` prop; sem prop continua exigindo login.
+- `src/App.tsx` — `/`, `/financas`, `/rotina`, `/dieta`, `/treino` ganham `allowGuest`. Demais rotas seguem como estão.
+- `src/pages/Home.tsx` — remover dependência de `user` para inicializar onboarding (já usa `loaded` do useUserData, então funciona com guest).
+- `src/components/onboarding/QuickStartOnboarding.tsx` — quando guest e celebração concluída, botão muda para "Criar conta para salvar" e navega para `/auth?signup=1`. Adicionar link discreto "Já tenho conta" no step 0.
+- `src/pages/Auth.tsx` — banner topo "Seu progresso do tutorial será salvo na sua conta" quando há `guest:*` no localStorage. Após signup com confirmação por email, instruir usuário; após login a migração roda automática.
+- `src/components/TrialBanner.tsx`, `GracePeriodBanner.tsx`, `GlobalWinback.tsx` — early return se `!user` (provavelmente já fazem; confirmar).
+- `src/hooks/use-auth.tsx` — `purgeLocalUserCache` em signOut **não pode** apagar `guest:*` (já preserva por allowlist; só garantir que o prefixo `guest:` não cai nos `startsWith` de purga).
 
-Após completar → toast/celebração curta ("Pronto. Tá salvo.") + libera a Home normal.
+**Não mexer:**
+- `src/components/WelcomeScreen.tsx` e `src/pages/Inicio.tsx` ficam como estão (rota `/inicio` continua acessível mas não é mais o ponto de entrada).
+- Tabelas Supabase: nenhuma migração necessária.
 
-### Mapeamento módulo → rota → activation key
+## Detalhes técnicos importantes
 
-| Escolha | Rota | Activation key (já existe) |
-|---|---|---|
-| Finanças | `/financas` | `first_transaction` |
-| Hábitos | `/rotina` | `first_habit` |
-| Dieta | `/dieta` | `first_meal` |
-| Treino | `/treino` | `first_workout` |
-
-### Detalhes técnicos
-
-- Novo arquivo: `src/components/onboarding/QuickStartOnboarding.tsx` (substitui o uso do `OnboardingWizard`)
-- Novo arquivo: `src/components/onboarding/SpotlightOverlay.tsx` — componente reutilizável que recebe um `targetSelector` (CSS selector) e renderiza um overlay com "buraco" sobre o elemento + bubble de texto
-- Atualizar `src/pages/Home.tsx`:
-  - Trocar `import { OnboardingWizard }` por `import { QuickStartOnboarding }`
-  - Trocar `<OnboardingWizard />` por `<QuickStartOnboarding />`
-  - `onComplete` continua salvando `core-onboarding-done = true`
-- Persistir escolha em `user_data` key `quickstart-target-module` para que, ao chegar no módulo, o `SpotlightOverlay` saiba que precisa mostrar
-- Spotlight é montado dentro de cada uma das 4 páginas (`Index.tsx` finanças, `Rotina.tsx`, `Dieta.tsx`, `Treino.tsx`) lendo essa key
-- Spotlight some sozinho quando o `markActivation(action_key)` correspondente for chamado (já é chamado nesses 4 fluxos)
-- Adicionar `data-onboarding="add-button"` nos botões "+" das 4 páginas para o spotlight ancorar
-- Manter `OnboardingWizard.tsx` no projeto (não deletar) caso queiramos reverter, mas removê-lo do fluxo
-- Tracking: `trackEvent("quickstart_module_chosen", { module })` e `trackEvent("quickstart_completed", { module })`
-
-### O que NÃO vai ser feito agora (deixar pra próxima iteração)
-
-- Tour dos outros 3 módulos depois de completar (mantemos simples no v1, medimos primeiro)
-- A/B test da copy
-- Versão pra quem já é usuário antigo (eles continuam com o flag `core-onboarding-done` true e não vêem nada)
-
-## Resultado esperado (apostas)
-
-- "Abriu 1 módulo" sobe de 73% → 90%+
-- `first_transaction` (ou equivalente) dobra
-- Sessão D0 média sobe de 69s → 3min+
+- **Heavy keys**: durante guest tudo fica em localStorage (limite ~5MB). Como o tutorial só preenche entradas pequenas (nome, 1 despesa, 1 hábito, etc.) não há risco prático. A regra "imagens vão pro Storage" continua valendo — guests não podem subir pro Storage sem auth, então o `PhotoPicker` deve detectar guest e mostrar "Crie conta para adicionar foto" (fora do escopo dessa task se nenhum widget de tutorial pede foto; verificar e tratar se aparecer).
+- **Analytics**: `trackEvent` e `markActivation` exigem `user_id`. Para guest, fazem no-op silencioso (já é o comportamento atual quando user é null).
+- **Reset onboarding (`ONBOARDING_RESET_KEY`)**: continua funcionando em guest porque usa `useUserData` que agora tem branch guest.
+- **Race condition signup → migração**: o efeito de migração escuta a transição `prevUserId === null && nextUserId !== null` no `UserDataProvider` e roda **antes** de marcar `loaded=true`, para que o primeiro render pós-login já veja os dados migrados.

@@ -37,7 +37,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
-  const { set } = useUserData();
+  const { set, isGuest } = useUserData();
   const navigate = useNavigate();
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
@@ -51,7 +51,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
     onComplete();
+    if (isGuest) {
+      // Send guest to signup — guest data is migrated automatically on login.
+      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
+    }
   };
+
 
   return (
     <motion.div

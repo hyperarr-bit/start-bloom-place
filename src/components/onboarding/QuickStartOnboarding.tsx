@@ -25,7 +25,7 @@ const OPTIONS: Array<{
   Icon: typeof Wallet;
   tone: string;
 }> = [
-  { key: "financas", route: "/financas", label: "Finanças", benefit: "Saiba pra onde teu dinheiro vai", Icon: Wallet, tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
+  { key: "financas", route: "/financas", label: "Finanças", benefit: "Saiba pra onde seu dinheiro vai", Icon: Wallet, tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
   { key: "rotina", route: "/rotina", label: "Hábitos", benefit: "Construa rotina sem culpa", Icon: CheckCircle2, tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
   { key: "dieta", route: "/dieta", label: "Dieta", benefit: "Coma sem se perder", Icon: Apple, tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
   { key: "treino", route: "/treino", label: "Treino", benefit: "Não falte mais", Icon: Dumbbell, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
@@ -161,7 +161,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
                   {visibleOptions.length === OPTIONS.length
-                    ? "Por onde tu quer começar?"
+                    ? "Por onde você quer começar?"
                     : "Falta configurar:"}
                 </h2>
                 <p className="text-xs text-muted-foreground">

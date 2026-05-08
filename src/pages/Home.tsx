@@ -65,7 +65,7 @@ const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
-  const { get, set: setData, loaded } = useUserData();
+  const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
 
   const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino"];

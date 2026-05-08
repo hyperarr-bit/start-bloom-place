@@ -37,7 +37,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
-  const { set } = useUserData();
+  const { set, isGuest } = useUserData();
   const navigate = useNavigate();
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
@@ -51,7 +51,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
     onComplete();
+    if (isGuest) {
+      // Send guest to signup — guest data is migrated automatically on login.
+      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
+    }
   };
+
 
   return (
     <motion.div
@@ -101,6 +106,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               >
                 Quero começar <ArrowRight className="w-4 h-4" />
               </button>
+              {isGuest && (
+                <button
+                  onClick={() => navigate("/auth")}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Já tem conta? <span className="font-medium text-foreground">Entrar</span>
+                </button>
+              )}
             </motion.div>
           ) : allDone ? (
             <motion.div
@@ -124,14 +137,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                   Parabéns! 🎉
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  Você concluiu o tutorial e liberou todos os 16 módulos.
+                  {isGuest
+                    ? "Você liberou todos os 16 módulos. Crie sua conta agora pra salvar tudo que você configurou."
+                    : "Você concluiu o tutorial e liberou todos os 16 módulos."}
                 </p>
               </div>
               <button
                 onClick={handleCelebrationDone}
                 className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                Bora usar <ArrowRight className="w-4 h-4" />
+                {isGuest ? "Criar conta para salvar" : "Bora usar"} <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
           ) : (

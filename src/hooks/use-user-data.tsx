@@ -37,7 +37,6 @@ const isMeaningful = (value: any): boolean => {
 
 const checkActivation = (key: string, value: any) => {
   if (!isMeaningful(value)) return;
-  // Skip meta/onboarding keys to avoid false-positive activations + loops.
   if (key.startsWith("spotlight-") || key.startsWith("quickstart-") || key.startsWith("core-")) return;
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
@@ -50,14 +49,6 @@ const checkActivation = (key: string, value: any) => {
   }
 };
 
-// ---------------------------------------------------------------------------
-// Per-user localStorage cache (instant hydration on app open). We KEEP this
-// as a fast cache layer — Supabase remains the source of truth, but reading
-// from localStorage first means UI is interactive immediately on reload.
-//
-// Keys that are intentionally global (i.e. not user data) and should NOT be
-// purged on logout/user switch:
-// ---------------------------------------------------------------------------
 const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "core-welcome-done",
   "theme",
@@ -66,6 +57,19 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;
+// Guest (pre-signup) keys — survive across reloads, migrated on signup/login.
+const GUEST_PREFIX = "guest:";
+const guestKey = (key: string) => `${GUEST_PREFIX}${key}`;
+// Tutorial-related keys where the guest flow should win over an existing
+// account value (so a user that signs in mid-tutorial doesn't have to redo it).
+const GUEST_WINS_KEYS = new Set<string>([
+  "core-onboarding-done",
+  "core-all-modules-celebrated",
+  "spotlight-done-financas",
+  "spotlight-done-rotina",
+  "spotlight-done-dieta",
+  "spotlight-done-treino",
+]);
 
 const safeGetItem = (k: string): string | null => {
   try { return localStorage.getItem(k); } catch { return null; }
@@ -75,6 +79,32 @@ const safeSetItem = (k: string, v: string) => {
 };
 const safeRemoveItem = (k: string) => {
   try { localStorage.removeItem(k); } catch {}
+};
+
+const readAllGuestData = (): Record<string, any> => {
+  const out: Record<string, any> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(GUEST_PREFIX)) continue;
+      const real = k.slice(GUEST_PREFIX.length);
+      const raw = safeGetItem(k);
+      if (!raw) continue;
+      try { out[real] = JSON.parse(raw); } catch {}
+    }
+  } catch {}
+  return out;
+};
+
+const clearAllGuestData = () => {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(GUEST_PREFIX)) toRemove.push(k);
+    }
+    toRemove.forEach(safeRemoveItem);
+  } catch {}
 };
 
 export const readUserLocal = (userId: string | null | undefined, key: string): any => {
@@ -96,6 +126,8 @@ export const purgeUserLocalCache = () => {
       const k = localStorage.key(i);
       if (!k) continue;
       if (GLOBAL_KEY_ALLOWLIST.has(k)) continue;
+      // Never purge guest data here — it belongs to a separate, pre-signup session.
+      if (k.startsWith(GUEST_PREFIX)) continue;
       if (
         k.startsWith("u:") ||
         k.startsWith("finance-") ||
@@ -118,6 +150,8 @@ interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
   set: (key: string, value: any) => void;
   loaded: boolean;
+  /** True when running without an authenticated user (data is local-only). */
+  isGuest: boolean;
   /** Lazy fetch a single heavy key from Supabase on demand. */
   fetchKey: <T>(key: string) => Promise<T | null>;
 }
@@ -125,16 +159,11 @@ interface UserDataContextType {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
 
 const DEBOUNCE_MS = 250;
-// Keys above this size (in serialized JSON bytes) are NOT loaded in the
-// initial bulk fetch — they're loaded lazily by the modules that need them.
-// 50 KB is a sweet spot: it keeps all "normal" app state in the warm path
-// while sparing the home/launch from waiting on bloated entries.
 const HEAVY_KEY_BYTES = 50_000;
-// Anything bigger than this is logged as a warning when written.
 const WRITE_WARN_BYTES = 100_000;
 
 export const UserDataProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [store, setStore] = useState<Record<string, any>>({});
   const [loaded, setLoaded] = useState(false);
   const pendingWrites = useRef<Record<string, any>>({});
@@ -158,45 +187,78 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       inFlightFetches.current.clear();
       setStore({});
       setLoaded(false);
+      // On switch/logout we wipe per-user cache, but NOT guest data.
       purgeUserLocalCache();
       lastUserIdRef.current = nextUserId;
     }
   }, [user]);
 
-  // Load user_data: instant from localStorage cache, then refresh light keys
-  // from Supabase. Heavy keys are loaded on demand via fetchKey().
+  // Hydration effect — runs whenever auth state finishes resolving.
   useEffect(() => {
+    if (authLoading) return;
+
+    // -------- GUEST MODE --------
     if (!user) {
+      const guestData = readAllGuestData();
+      setStore(guestData);
       setLoaded(true);
       return;
     }
 
-    // 1) Instant hydration from per-user localStorage cache (visual only).
-    //    NOTE: do NOT mark `loaded=true` here — Supabase is the source of truth
-    //    and must overwrite the cache before the rest of the app reads values,
-    //    otherwise stale data (e.g. a previous user name) sticks around.
-    try {
-      const prefix = `u:${user.id}:`;
-      const cached: Record<string, any> = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (!k || !k.startsWith(prefix)) continue;
-        const realKey = k.slice(prefix.length);
-        const raw = safeGetItem(k);
-        if (!raw) continue;
-        try { cached[realKey] = JSON.parse(raw); } catch {}
-      }
-      if (Object.keys(cached).length > 0) {
-        setStore(cached);
-      }
-    } catch {}
-
-    // 2) Refresh from Supabase. We fetch ALL light keys and let server values
-    //    overwrite the cache. Heavy keys (>HEAVY_KEY_BYTES) are filtered
-    //    client-side to keep memory low while still letting modules lazy-load
-    //    them via fetchKey().
+    // -------- AUTHENTICATED --------
     const ac = new AbortController();
-    const loadFromSupabase = async () => {
+
+    const run = async () => {
+      // Step 0: migrate any guest data into this account before we hydrate.
+      const guestData = readAllGuestData();
+      const guestKeys = Object.keys(guestData);
+      if (guestKeys.length > 0) {
+        try {
+          const { data: existing } = await (supabase as any)
+            .from("user_data")
+            .select("key")
+            .eq("user_id", user.id)
+            .in("key", guestKeys);
+          const existingSet = new Set<string>((existing ?? []).map((r: any) => r.key));
+
+          const toUpsert = guestKeys
+            .filter(k => !existingSet.has(k) || GUEST_WINS_KEYS.has(k))
+            .map(k => ({ user_id: user.id, key: k, value: guestData[k] }));
+
+          if (toUpsert.length > 0) {
+            // Chunk to avoid huge payloads.
+            const CHUNK = 50;
+            for (let i = 0; i < toUpsert.length; i += CHUNK) {
+              await (supabase as any)
+                .from("user_data")
+                .upsert(toUpsert.slice(i, i + CHUNK), { onConflict: "user_id,key" });
+            }
+          }
+        } catch (e) {
+          console.error("[user-data] guest→account migration failed:", e);
+        } finally {
+          clearAllGuestData();
+        }
+      }
+
+      // Step 1: instant hydration from per-user localStorage cache.
+      try {
+        const prefix = `u:${user.id}:`;
+        const cached: Record<string, any> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !k.startsWith(prefix)) continue;
+          const realKey = k.slice(prefix.length);
+          const raw = safeGetItem(k);
+          if (!raw) continue;
+          try { cached[realKey] = JSON.parse(raw); } catch {}
+        }
+        if (Object.keys(cached).length > 0) {
+          setStore(cached);
+        }
+      } catch {}
+
+      // Step 2: refresh from Supabase (server wins for non-heavy keys).
       const { data, error } = await (supabase as any)
         .from("user_data")
         .select("key, value")
@@ -210,16 +272,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
         data.forEach((row: any) => {
           if (row.value === null || row.value === undefined) return;
           const size = JSON.stringify(row.value).length;
-          if (size >= HEAVY_KEY_BYTES) return; // lazy-load heavy keys via fetchKey
+          if (size >= HEAVY_KEY_BYTES) return;
           map[row.key] = row.value;
           safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
         });
-        // Server wins: also drop any cached keys that no longer exist server-side.
         setStore(prev => {
           const next = { ...prev };
-          // overwrite/insert server values
           Object.assign(next, map);
-          // remove client-only stale keys that the server doesn't have
           for (const k of Object.keys(prev)) {
             if (!(k in map)) {
               const prevSize = JSON.stringify(prev[k] ?? "").length;
@@ -237,19 +296,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       setLoaded(true);
     };
 
-    loadFromSupabase();
+    run();
     return () => { ac.abort(); };
-  }, [user]);
+  }, [user, authLoading]);
 
   // Lazy fetch a single key (used for heavy entries like dream board).
   const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
     const userId = userRef.current?.id;
-    if (!userId) return null;
+    if (!userId) {
+      // Guest: just return whatever is in store (no remote storage).
+      return (store[key] ?? null) as T | null;
+    }
 
-    // Already in store? return it.
     if (key in store) return store[key] as T;
 
-    // Coalesce concurrent fetches for the same key.
     const cached = inFlightFetches.current.get(key);
     if (cached) return cached as Promise<T | null>;
 
@@ -294,7 +354,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
   const flush = useCallback(() => {
     const userId = userRef.current?.id;
-    if (!userId) return;
+    if (!userId) return; // guest writes are sync to localStorage, nothing to flush
     const writes = { ...pendingWrites.current };
     pendingWrites.current = {};
     Object.entries(writes).forEach(([key, value]) => persistKey(userId, key, value));
@@ -302,15 +362,20 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
 
   const get = useCallback(<T,>(key: string, fallback: T): T => {
     if (key in store) return store[key] as T;
+    if (!loaded) return fallback;
     const userId = userRef.current?.id;
-    if (!userId || !loaded) return fallback;
-    const raw = safeGetItem(userKey(userId, key));
+    if (userId) {
+      const raw = safeGetItem(userKey(userId, key));
+      if (!raw) return fallback;
+      try { return JSON.parse(raw) as T; } catch { return fallback; }
+    }
+    // guest
+    const raw = safeGetItem(guestKey(key));
     if (!raw) return fallback;
     try { return JSON.parse(raw) as T; } catch { return fallback; }
   }, [store, loaded]);
 
   const set = useCallback((key: string, value: any) => {
-    // Size guard — warn if a write would create an oversized entry.
     if (process.env.NODE_ENV !== "production") {
       try {
         const size = JSON.stringify(value ?? "").length;
@@ -331,6 +396,9 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, DEBOUNCE_MS);
       checkActivation(key, value);
+    } else {
+      // Guest: persist to guest:* — survives reload, migrated on signup/login.
+      safeSetItem(guestKey(key), JSON.stringify(value));
     }
   }, [flush]);
 
@@ -358,7 +426,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
   }, [flush]);
 
   return (
-    <UserDataContext.Provider value={{ get, set, loaded, fetchKey }}>
+    <UserDataContext.Provider value={{ get, set, loaded, fetchKey, isGuest: !user }}>
       {children}
     </UserDataContext.Provider>
   );

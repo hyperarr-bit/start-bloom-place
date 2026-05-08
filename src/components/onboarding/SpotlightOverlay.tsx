@@ -27,20 +27,21 @@ interface Rect { top: number; left: number; width: number; height: number }
 const PADDING = 8;
 
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
-  const { get, set } = useUserData();
+  const { get, set, isGuest } = useUserData();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
 
-  // decide whether to show on mount
+  // decide whether to show on mount — spotlight tutorial only for guests
   useEffect(() => {
+    if (!isGuest) return;
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     if (target === moduleKey && !done) {
       setActive(true);
       trackEvent("spotlight_shown", { module: moduleKey });
     }
-  }, [moduleKey, get]);
+  }, [moduleKey, get, isGuest]);
 
   const finish = useCallback((reason: "completed" | "dismissed") => {
     set(`spotlight-done-${moduleKey}`, "true");

@@ -85,10 +85,13 @@ const Auth = () => {
         navigate("/");
       }
     } else {
-      const { error } = await signUp(email, password);
+      const { error, data } = await signUp(email, password);
       if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+      } else if (data?.session) {
+        navigate("/");
       } else {
+        // Fallback: confirmação ainda exigida no Supabase
         setConfirmationSent(true);
       }
     }
@@ -152,7 +155,7 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta — 7 dias grátis"}
+            {isLogin ? "Entre na sua conta" : "Crie sua conta grátis"}
           </p>
         </div>
 

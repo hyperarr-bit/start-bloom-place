@@ -263,7 +263,7 @@ const Auth = () => {
             <p className="text-sm">
               <span className="text-muted-foreground">Não tem conta? </span>
               <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie agora — 7 dias grátis
+                Criar conta grátis
               </button>
             </p>
           ) : (
@@ -276,26 +276,6 @@ const Auth = () => {
           )}
         </div>
 
-        {/* Trial info */}
-        <AnimatePresence>
-          {!isLogin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
-                  <li>• Sem cartão de crédito · Cancele quando quiser</li>
-                  <li>• Dicas diárias por e-mail para você aproveitar ao máximo</li>
-                </ul>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
     </div>
   );

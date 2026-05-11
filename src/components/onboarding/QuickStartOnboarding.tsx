@@ -45,6 +45,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const navigate = useNavigate();
 
   const [showSignup, setShowSignup] = useState(false);
+  const [signupStep, setSignupStep] = useState<0 | 1 | 2>(0); // 0=name, 1=email, 2=password
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,18 +61,44 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   };
 
   const handleCelebrationDone = () => {
-    set("core-all-modules-celebrated", "true");
     if (isGuest) {
+      // IMPORTANT: do NOT mark "core-all-modules-celebrated" here — Home.tsx
+      // would unmount the overlay before the signup form can render. Mark it
+      // only after the signup completes (or for non-guest users).
       setShowSignup(true);
     } else {
+      set("core-all-modules-celebrated", "true");
       onComplete();
+    }
+  };
+
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  const isStrongPassword = (v: string) =>
+    v.length >= 8 && /[A-Za-z]/.test(v) && /\d/.test(v);
+
+  const handleNextStep = () => {
+    if (signupStep === 0) {
+      if (!name.trim()) {
+        toast({ title: "Digite seu nome", variant: "destructive" });
+        return;
+      }
+      setSignupStep(1);
+    } else if (signupStep === 1) {
+      if (!isValidEmail(email)) {
+        toast({ title: "E-mail inválido", description: "Confira o endereço.", variant: "destructive" });
+        return;
+      }
+      setSignupStep(2);
     }
   };
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) return;
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    if (signupStep !== 2) {
+      handleNextStep();
+      return;
+    }
+    if (!isStrongPassword(password)) {
       toast({ title: "Senha fraca", description: "Mínimo 8 caracteres, com letras e números.", variant: "destructive" });
       return;
     }
@@ -83,6 +110,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       return;
     }
     set("core-user-name", name.trim());
+    set("core-all-modules-celebrated", "true");
     trackEvent("signup_completed_after_tutorial", {});
     if (data?.session) {
       onComplete();
@@ -159,7 +187,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -16 }}
               transition={{ duration: 0.25 }}
-              className="flex flex-col gap-5 py-8"
+              className="flex flex-col gap-6 py-8"
             >
               <div className="text-center space-y-2">
                 <div className="text-4xl">🎉</div>
@@ -171,64 +199,142 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2.5">
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Seu nome"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="given-name"
-                    required
-                    className="w-full h-11 pl-10 pr-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+              {/* Progress dots */}
+              <div className="flex items-center justify-center gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      i === signupStep ? "w-6 bg-foreground" : i < signupStep ? "w-1.5 bg-foreground/60" : "w-1.5 bg-border"
+                    }`}
                   />
-                </div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="email"
-                    placeholder="Seu e-mail"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    required
-                    className="w-full h-11 pl-10 pr-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                  />
-                </div>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Crie uma senha"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    className="w-full h-11 pl-10 pr-10 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground px-1">
-                  Mínimo 8 caracteres, com letras e números.
-                </p>
+                ))}
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full h-12 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
-              >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : (<>Criar conta e começar <ArrowRight className="w-4 h-4" /></>)}
-              </button>
+              <AnimatePresence mode="wait">
+                {signupStep === 0 && (
+                  <motion.div
+                    key="step-name"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-3"
+                  >
+                    <label className="block text-sm font-semibold text-foreground px-1">
+                      Como você se chama?
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="text"
+                        placeholder="Seu nome ou apelido"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        autoComplete="given-name"
+                        autoFocus
+                        maxLength={40}
+                        className="w-full h-12 pl-10 pr-3 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {signupStep === 1 && (
+                  <motion.div
+                    key="step-email"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-3"
+                  >
+                    <label className="block text-sm font-semibold text-foreground px-1">
+                      Prazer, {name.trim().split(" ")[0]}! Qual seu e-mail?
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type="email"
+                        placeholder="seu@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                        autoFocus
+                        className="w-full h-12 pl-10 pr-3 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground px-1">
+                      Vamos usar pra você entrar de novo depois.
+                    </p>
+                  </motion.div>
+                )}
+
+                {signupStep === 2 && (
+                  <motion.div
+                    key="step-password"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
+                    className="space-y-3"
+                  >
+                    <label className="block text-sm font-semibold text-foreground px-1">
+                      Agora crie uma senha
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Mínimo 8 caracteres"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                        autoFocus
+                        minLength={8}
+                        className="w-full h-12 pl-10 pr-10 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground px-1">
+                      Use letras e números. Mínimo 8 caracteres.
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-center gap-2">
+                {signupStep > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSignupStep((s) => (s - 1) as 0 | 1 | 2)}
+                    disabled={submitting}
+                    className="h-12 px-5 rounded-xl bg-card border border-border text-sm font-medium text-foreground active:scale-[0.98] transition-transform disabled:opacity-60"
+                  >
+                    Voltar
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 h-12 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
+                >
+                  {submitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : signupStep === 2 ? (
+                    <>Criar conta e começar <ArrowRight className="w-4 h-4" /></>
+                  ) : (
+                    <>Continuar <ArrowRight className="w-4 h-4" /></>
+                  )}
+                </button>
+              </div>
             </motion.form>
           ) : allDone ? (
             <motion.div

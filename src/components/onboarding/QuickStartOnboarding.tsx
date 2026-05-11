@@ -112,13 +112,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     set("core-user-name", name.trim());
     set("core-all-modules-celebrated", "true");
     trackEvent("signup_completed_after_tutorial", {});
-    if (data?.session) {
-      onComplete();
-      setTimeout(() => navigate("/"), 50);
-    } else {
-      onComplete();
-      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
-    }
+    onComplete();
+    setTimeout(() => navigate("/"), 50);
   };
 
 

@@ -147,7 +147,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   if (!active || !step) return null;
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
-  const labelBelow = rect ? rect.top < 110 : true;
+  // Always show the bubble ABOVE the target so it never covers the card content.
+  // Only flip below if there's truly no room above (target glued to the top).
+  const labelBelow = rect ? rect.top < 90 : false;
 
   const offScreen: "above" | "below" | null = !rect
     ? null

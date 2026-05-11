@@ -159,8 +159,13 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
         ? "below"
         : null;
 
-  // Dim only on navigation steps
-  const dim = !step.advanceOnAction;
+  const BUBBLE_W = 260;
+  const bubbleLeft = rect
+    ? Math.max(12, Math.min(rect.left + rect.width / 2 - BUBBLE_W / 2, window.innerWidth - BUBBLE_W - 12))
+    : 0;
+  const targetCenterX = rect ? rect.left + rect.width / 2 : 0;
+  // Arrow X relative to bubble's left edge, clamped inside bubble
+  const arrowX = rect ? Math.max(16, Math.min(targetCenterX - bubbleLeft, BUBBLE_W - 16)) : BUBBLE_W / 2;
 
   return (
     <AnimatePresence>
@@ -172,43 +177,6 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
         transition={{ duration: 0.25 }}
         className="fixed inset-0 z-[200] pointer-events-none"
       >
-        {dim && (rect ? (
-          <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <mask id={`spot-mask-${moduleKey}`}>
-                <rect width="100%" height="100%" fill="white" />
-                <rect
-                  x={rect.left - PADDING}
-                  y={rect.top - PADDING}
-                  width={rect.width + PADDING * 2}
-                  height={rect.height + PADDING * 2}
-                  rx={10}
-                  fill="black"
-                />
-              </mask>
-            </defs>
-            <rect width="100%" height="100%" fill="rgba(0,0,0,0.65)" mask={`url(#spot-mask-${moduleKey})`} />
-          </svg>
-        ) : (
-          <div className="absolute inset-0 bg-black/60" />
-        ))}
-
-        {rect && (
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: [1, 1.06, 1], opacity: 1 }}
-            transition={{ scale: { duration: 1.4, repeat: Infinity, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
-            className="absolute rounded-[12px] border-2 border-primary"
-            style={{
-              top: rect.top - PADDING,
-              left: rect.left - PADDING,
-              width: rect.width + PADDING * 2,
-              height: rect.height + PADDING * 2,
-              boxShadow: "0 0 0 4px hsl(var(--primary) / 0.25), 0 0 30px hsl(var(--primary) / 0.45)",
-            }}
-          />
-        )}
-
         {rect && (
           <motion.div
             key={`bubble-${stepIdx}`}
@@ -217,23 +185,24 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-auto"
             style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 8 : Math.max(8, rect.top - 90),
-              left: Math.max(12, Math.min(rect.left + rect.width / 2 - 130, window.innerWidth - 272)),
-              width: 260,
+              top: labelBelow ? rect.top + rect.height + PADDING + 14 : Math.max(8, rect.top - 100),
+              left: bubbleLeft,
+              width: BUBBLE_W,
             }}
           >
             <div className="relative">
               {labelBelow && (
                 <motion.div
-                  animate={{ y: [0, -6, 0] }}
+                  animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-6 left-1/2 -translate-x-1/2"
+                  className="absolute -top-5"
+                  style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
-                  <ArrowDown className="w-6 h-6 text-primary rotate-180" strokeWidth={3} />
+                  <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
                 </motion.div>
               )}
-              <div className="bg-card border border-primary/40 rounded-xl shadow-2xl p-3 relative">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-primary mb-1">
+              <div className="bg-card border border-border rounded-xl shadow-xl p-3">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
                   Passo {stepIdx + 1} de {steps.length}
                 </p>
                 <p className="text-sm font-semibold text-foreground leading-snug">
@@ -242,11 +211,12 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
               </div>
               {!labelBelow && (
                 <motion.div
-                  animate={{ y: [0, 6, 0] }}
+                  animate={{ y: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+                  className="absolute -bottom-5"
+                  style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
-                  <ArrowDown className="w-6 h-6 text-primary" strokeWidth={3} />
+                  <ArrowDown className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
                 </motion.div>
               )}
             </div>

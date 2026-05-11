@@ -40,7 +40,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
   const { set, isGuest } = useUserData();
+  const { signUp } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
+
+  const [showSignup, setShowSignup] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     set("quickstart-target-module", opt.key);
@@ -52,9 +61,34 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
-    onComplete();
     if (isGuest) {
-      // Send guest to signup — guest data is migrated automatically on login.
+      setShowSignup(true);
+    } else {
+      onComplete();
+    }
+  };
+
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || !password.trim()) return;
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      toast({ title: "Senha fraca", description: "Mínimo 8 caracteres, com letras e números.", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    const { error, data } = await signUp(email.trim(), password);
+    if (error) {
+      toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+      setSubmitting(false);
+      return;
+    }
+    set("core-user-name", name.trim());
+    trackEvent("signup_completed_after_tutorial", {});
+    if (data?.session) {
+      onComplete();
+      setTimeout(() => navigate("/"), 50);
+    } else {
+      onComplete();
       setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
     }
   };

@@ -125,9 +125,6 @@ const Auth = () => {
               Enviamos um link de confirmação para <strong className="text-foreground">{email}</strong>. 
               Verifique sua caixa de entrada e clique no link para ativar sua conta.
             </p>
-            <p className="text-xs text-muted-foreground">
-              Seu teste grátis de 7 dias começa assim que confirmar o e-mail.
-            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4 text-center">

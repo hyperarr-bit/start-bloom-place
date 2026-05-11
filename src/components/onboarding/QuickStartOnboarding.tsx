@@ -45,6 +45,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const navigate = useNavigate();
 
   const [showSignup, setShowSignup] = useState(false);
+  const [signupStep, setSignupStep] = useState<0 | 1 | 2>(0); // 0=name, 1=email, 2=password
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,18 +61,44 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   };
 
   const handleCelebrationDone = () => {
-    set("core-all-modules-celebrated", "true");
     if (isGuest) {
+      // IMPORTANT: do NOT mark "core-all-modules-celebrated" here — Home.tsx
+      // would unmount the overlay before the signup form can render. Mark it
+      // only after the signup completes (or for non-guest users).
       setShowSignup(true);
     } else {
+      set("core-all-modules-celebrated", "true");
       onComplete();
+    }
+  };
+
+  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  const isStrongPassword = (v: string) =>
+    v.length >= 8 && /[A-Za-z]/.test(v) && /\d/.test(v);
+
+  const handleNextStep = () => {
+    if (signupStep === 0) {
+      if (!name.trim()) {
+        toast({ title: "Digite seu nome", variant: "destructive" });
+        return;
+      }
+      setSignupStep(1);
+    } else if (signupStep === 1) {
+      if (!isValidEmail(email)) {
+        toast({ title: "E-mail inválido", description: "Confira o endereço.", variant: "destructive" });
+        return;
+      }
+      setSignupStep(2);
     }
   };
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password.trim()) return;
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    if (signupStep !== 2) {
+      handleNextStep();
+      return;
+    }
+    if (!isStrongPassword(password)) {
       toast({ title: "Senha fraca", description: "Mínimo 8 caracteres, com letras e números.", variant: "destructive" });
       return;
     }
@@ -83,6 +110,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       return;
     }
     set("core-user-name", name.trim());
+    set("core-all-modules-celebrated", "true");
     trackEvent("signup_completed_after_tutorial", {});
     if (data?.session) {
       onComplete();

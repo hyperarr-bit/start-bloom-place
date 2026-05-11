@@ -96,7 +96,31 @@ export const BillsDueCards = ({ dueDays, setDueDays }: BillsDueCardsProps) => {
             </button>
           )}
           <button
-            onClick={() => { setEditing(!editing); setEditingDay(null); }}
+            onClick={() => {
+              if (editing) {
+                // Flush pending typed bills + day rename before exiting edit mode
+                let next = dueDays;
+                if (editingDay !== null) {
+                  const newDay = parseInt(editDayValue);
+                  if (!isNaN(newDay) && newDay >= 1 && newDay <= 31 && (newDay === editingDay || !next.some(d => d.day === newDay))) {
+                    next = next.map(d => d.day === editingDay ? { ...d, day: newDay } : d);
+                  }
+                }
+                const pending = Object.entries(newBills).filter(([, v]) => v && v.trim());
+                if (pending.length) {
+                  let stamp = Date.now();
+                  next = next.map(d => {
+                    const entry = pending.find(([day]) => parseInt(day) === d.day);
+                    if (!entry) return d;
+                    return { ...d, bills: [...d.bills, { id: (stamp++).toString(), name: entry[1].trim(), paid: false }] };
+                  });
+                }
+                if (next !== dueDays) setDueDays(next);
+                setNewBills({});
+                setEditingDay(null);
+              }
+              setEditing(!editing);
+            }}
             className="text-xs font-medium hover:opacity-80 transition-opacity"
           >
             {editing ? "Concluído" : "Editar"}

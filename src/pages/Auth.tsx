@@ -3,7 +3,7 @@ import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -85,10 +85,13 @@ const Auth = () => {
         navigate("/");
       }
     } else {
-      const { error } = await signUp(email, password);
+      const { error, data } = await signUp(email, password);
       if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
+      } else if (data?.session) {
+        navigate("/");
       } else {
+        // Fallback: confirmação ainda exigida no Supabase
         setConfirmationSent(true);
       }
     }
@@ -122,9 +125,6 @@ const Auth = () => {
               Enviamos um link de confirmação para <strong className="text-foreground">{email}</strong>. 
               Verifique sua caixa de entrada e clique no link para ativar sua conta.
             </p>
-            <p className="text-xs text-muted-foreground">
-              Seu teste grátis de 7 dias começa assim que confirmar o e-mail.
-            </p>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4 text-center">
@@ -152,7 +152,7 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta — 7 dias grátis"}
+            {isLogin ? "Entre na sua conta" : "Crie sua conta grátis"}
           </p>
         </div>
 
@@ -260,7 +260,7 @@ const Auth = () => {
             <p className="text-sm">
               <span className="text-muted-foreground">Não tem conta? </span>
               <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie agora — 7 dias grátis
+                Criar conta grátis
               </button>
             </p>
           ) : (
@@ -273,26 +273,6 @@ const Auth = () => {
           )}
         </div>
 
-        {/* Trial info */}
-        <AnimatePresence>
-          {!isLogin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
-                  <li>• Sem cartão de crédito · Cancele quando quiser</li>
-                  <li>• Dicas diárias por e-mail para você aproveitar ao máximo</li>
-                </ul>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
     </div>
   );

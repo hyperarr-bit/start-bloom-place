@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
+import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles, Loader2, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";

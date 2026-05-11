@@ -395,11 +395,13 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       pendingWrites.current[key] = value;
       if (flushTimer.current) clearTimeout(flushTimer.current);
       flushTimer.current = setTimeout(flush, DEBOUNCE_MS);
-      checkActivation(key, value);
     } else {
       // Guest: persist to guest:* — survives reload, migrated on signup/login.
       safeSetItem(guestKey(key), JSON.stringify(value));
     }
+    // Activation events fire for both guests and authed users so the
+    // spotlight tutorial can advance during the pre-signup flow.
+    checkActivation(key, value);
   }, [flush]);
 
   // Force flush on tab hide / unload.

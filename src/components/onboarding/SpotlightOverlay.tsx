@@ -1,30 +1,27 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronRight, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
 export interface SpotlightStep {
-  /** CSS selector of the element to highlight (e.g. `[data-spotlight="financeiro"]`) */
   selector: string;
-  /** Caption shown next to the highlight */
   label: string;
-  /** When true, the step auto-advances on click of the target. Default: true */
   advanceOnClick?: boolean;
-  /** Activation action that, when fired, auto-advances this step (or finishes the tour if last). */
   advanceOnAction?: string;
+  /** Optional: storage key to inspect; if it already has data on mount, auto-advance. */
+  checkKey?: string;
 }
 
 interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";
   steps: SpotlightStep[];
-  /** [legacy] activation actions that dismiss the entire spotlight when fired. Prefer advanceOnAction per step. */
   activationActions?: string[];
 }
 
 interface Rect { top: number; left: number; width: number; height: number }
 
-const PADDING = 8;
+const PADDING = 6;
 
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
   const { get, set, isGuest } = useUserData();
@@ -32,7 +29,13 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
 
-  // decide whether to show on mount — spotlight tutorial only for guests
+  // Refs so the activation listener stays attached across step changes
+  // and never misses events fired in the same tick the step advances.
+  const stepIdxRef = useRef(0);
+  const stepsRef = useRef(steps);
+  stepIdxRef.current = stepIdx;
+  stepsRef.current = steps;
+
   useEffect(() => {
     if (!isGuest) return;
     const target = get<string>("quickstart-target-module", "");
@@ -50,89 +53,90 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     setActive(false);
   }, [set, moduleKey]);
 
-  // listen for activation events to auto-advance / finish.
-  // Debounced per step: a single user action (e.g. addHabit) may write to
-  // multiple keys that match the same activation rule, firing the event
-  // several times in the same tick. We must only advance ONCE per step.
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
+  const advance = useCallback(() => {
+    const idx = stepIdxRef.current;
+    const total = stepsRef.current.length;
+    if (idx >= total - 1) finishRef.current("completed");
+    else setStepIdx(idx + 1);
+  }, []);
+
+  // Single, stable activation listener (attached once when active).
   useEffect(() => {
     if (!active) return;
-    let advanced = false;
     const onActivation = (e: Event) => {
-      if (advanced) return;
       const detail = (e as CustomEvent).detail as { action?: string } | undefined;
-      if (!detail?.action) return;
-      const currentStep = steps[stepIdx];
-      if (currentStep?.advanceOnAction === detail.action) {
-        advanced = true;
-        if (stepIdx >= steps.length - 1) finish("completed");
-        else setStepIdx(i => i + 1);
-        return;
-      }
-      if (activationActions.includes(detail.action)) {
-        advanced = true;
-        finish("completed");
+      const action = detail?.action;
+      if (!action) return;
+      const idx = stepIdxRef.current;
+      const cur = stepsRef.current[idx];
+      if (cur?.advanceOnAction === action) {
+        advance();
+      } else if (activationActions.includes(action)) {
+        finishRef.current("completed");
       }
     };
     window.addEventListener("core:activation", onActivation);
     return () => window.removeEventListener("core:activation", onActivation);
-  }, [active, activationActions, finish, steps, stepIdx]);
+  }, [active, advance, activationActions]);
 
-  // measure the current target & re-measure on resize / scroll / mutations
+  // Fallback: when entering a step, if the underlying data already exists,
+  // skip ahead. Prevents getting stuck if activation event was missed.
+  useEffect(() => {
+    if (!active) return;
+    const cur = steps[stepIdx];
+    if (!cur?.checkKey) return;
+    const v = get<any>(cur.checkKey, null);
+    const has =
+      v != null &&
+      ((Array.isArray(v) && v.length > 0) ||
+        (typeof v === "object" && Object.keys(v).length > 0) ||
+        (typeof v === "string" && v.trim().length > 0));
+    if (has) {
+      const t = setTimeout(() => advance(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [active, stepIdx, steps, get, advance]);
+
+  // Measure target & re-measure on resize/scroll
   useEffect(() => {
     if (!active) return;
     const step = steps[stepIdx];
     if (!step) return;
 
-    let el: Element | null = null;
-    let advanceHandler: (() => void) | null = null;
-
     const measure = () => {
-      el = document.querySelector(step.selector);
-      if (!el) {
-        setRect(null);
-        return;
-      }
+      const el = document.querySelector(step.selector);
+      if (!el) { setRect(null); return; }
       const r = el.getBoundingClientRect();
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
-    // Don't auto-scroll — let the user navigate to the target themselves.
-
     measure();
-    const interval = setInterval(measure, 250); // robust to lazy-rendered elements
+    const interval = setInterval(measure, 250);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
 
-    // attach click forwarder so the user's click on the highlight area still
-    // hits the underlying element AND advances the step
     const onPageClick = (e: MouseEvent) => {
       const target = document.querySelector(step.selector);
       if (!target) return;
       if (target.contains(e.target as Node)) {
-        // If step waits for an explicit activation action, never advance on click.
         if (step.advanceOnAction) return;
         if (step.advanceOnClick !== false) {
-          // last step → finish; otherwise advance
-          setTimeout(() => {
-            if (stepIdx >= steps.length - 1) {
-              finish("completed");
-            } else {
-              setStepIdx(i => i + 1);
-            }
-          }, 250);
+          setTimeout(() => advance(), 250);
         }
       }
     };
     document.addEventListener("click", onPageClick, true);
-    advanceHandler = () => document.removeEventListener("click", onPageClick, true);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
-      advanceHandler?.();
+      document.removeEventListener("click", onPageClick, true);
     };
-  }, [active, stepIdx, steps]);
+  }, [active, stepIdx, steps, advance]);
 
   const step = active ? steps[stepIdx] : null;
 
@@ -144,25 +148,16 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
 
   if (!active || !step) return null;
 
-  // Compute label position. Default: above the target (so it never covers
-  // forms/menus that open below the target). Fall back to below when the
-  // target is too close to the top of the viewport.
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
-  const labelBelow = rect ? rect.top < 110 : true;
-
-  // Detect when target is off-screen (above or below viewport) so we can
-  // show an always-visible "scroll here" banner that takes the user to it.
+  // Bottom panel reserves ~96px; consider target offscreen if hidden behind it.
+  const PANEL_H = 96;
   const offScreen: "above" | "below" | null = !rect
     ? null
     : rect.top + rect.height < 60
       ? "above"
-      : rect.top > viewportH - 60
+      : rect.top > viewportH - PANEL_H - 20
         ? "below"
         : null;
-
-  // Dim the screen only on navigation steps (no advanceOnAction).
-  // Action steps keep the screen normal so user can interact freely.
-  const dim = !step.advanceOnAction;
 
   return (
     <AnimatePresence>
@@ -171,128 +166,105 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.25 }}
+        transition={{ duration: 0.2 }}
         className="fixed inset-0 z-[200] pointer-events-none"
       >
-        {dim && (rect ? (
-          <svg
-            className="absolute inset-0 w-full h-full"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <mask id={`spot-mask-${moduleKey}`}>
-                <rect width="100%" height="100%" fill="white" />
-                <rect
-                  x={rect.left - PADDING}
-                  y={rect.top - PADDING}
-                  width={rect.width + PADDING * 2}
-                  height={rect.height + PADDING * 2}
-                  rx={10}
-                  fill="black"
-                />
-              </mask>
-            </defs>
-            <rect
-              width="100%"
-              height="100%"
-              fill="rgba(0,0,0,0.65)"
-              mask={`url(#spot-mask-${moduleKey})`}
-            />
-          </svg>
-        ) : (
-          <div className="absolute inset-0 bg-black/60" />
-        ))}
-
-        {/* Pulsing ring around the target */}
+        {/* Soft ring around the target — no heavy backdrop, never covers content */}
         {rect && (
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: [1, 1.06, 1], opacity: 1 }}
-            transition={{ scale: { duration: 1.4, repeat: Infinity, ease: "easeInOut" }, opacity: { duration: 0.3 } }}
-            className="absolute rounded-[12px] border-2 border-primary"
-            style={{
-              top: rect.top - PADDING,
-              left: rect.left - PADDING,
-              width: rect.width + PADDING * 2,
-              height: rect.height + PADDING * 2,
-              boxShadow: "0 0 0 4px hsl(var(--primary) / 0.25), 0 0 30px hsl(var(--primary) / 0.45)",
-            }}
-          />
+          <>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="absolute rounded-full"
+              style={{
+                top: rect.top + rect.height / 2 - (Math.max(rect.width, rect.height) + 24) / 2,
+                left: rect.left + rect.width / 2 - (Math.max(rect.width, rect.height) + 24) / 2,
+                width: Math.max(rect.width, rect.height) + 24,
+                height: Math.max(rect.width, rect.height) + 24,
+                background: "radial-gradient(circle, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0) 70%)",
+              }}
+            />
+            <motion.div
+              animate={{ scale: [1, 1.08, 1], opacity: [0.9, 0.5, 0.9] }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute rounded-[10px] border-2 border-primary/80"
+              style={{
+                top: rect.top - PADDING,
+                left: rect.left - PADDING,
+                width: rect.width + PADDING * 2,
+                height: rect.height + PADDING * 2,
+                boxShadow: "0 0 0 3px hsl(var(--primary) / 0.18)",
+              }}
+            />
+          </>
         )}
 
-        {/* Animated arrow + label bubble */}
-        {rect && (
-          <motion.div
-            key={`bubble-${stepIdx}`}
-            initial={{ opacity: 0, y: labelBelow ? -8 : 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.25 }}
-            className="absolute pointer-events-auto"
-            style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 8 : Math.max(8, rect.top - 90),
-              left: Math.max(12, Math.min(rect.left + rect.width / 2 - 130, window.innerWidth - 272)),
-              width: 260,
-            }}
-          >
-            <div className="relative">
-              {labelBelow && (
-                <motion.div
-                  animate={{ y: [0, -6, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-6 left-1/2 -translate-x-1/2"
-                >
-                  <ArrowDown className="w-6 h-6 text-primary rotate-180" strokeWidth={3} />
-                </motion.div>
-              )}
-              <div className="bg-card border border-primary/40 rounded-xl shadow-2xl p-3 relative">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-primary mb-1">
+        {/* Bottom panel — fixed, never covers fields, always visible */}
+        <motion.div
+          key={`panel-${stepIdx}`}
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.25 }}
+          className="pointer-events-auto fixed left-0 right-0 z-[210]"
+          style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <div className="mx-auto max-w-md px-3">
+            <div className="bg-card/95 backdrop-blur border border-border shadow-2xl rounded-2xl p-3 flex items-center gap-3">
+              <div className="flex items-center gap-1.5 shrink-0">
+                {steps.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${
+                      i < stepIdx
+                        ? "w-3 bg-primary/60"
+                        : i === stepIdx
+                          ? "w-5 bg-primary"
+                          : "w-3 bg-muted"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-primary leading-tight">
                   Passo {stepIdx + 1} de {steps.length}
                 </p>
-                <p className="text-sm font-semibold text-foreground leading-snug">
+                <p className="text-xs font-medium text-foreground leading-snug mt-0.5 truncate">
                   {step.label}
                 </p>
               </div>
-              {!labelBelow && (
-                <motion.div
-                  animate={{ y: [0, 6, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -bottom-6 left-1/2 -translate-x-1/2"
+              {offScreen ? (
+                <button
+                  onClick={scrollToTarget}
+                  className="shrink-0 h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1 active:scale-95 transition-transform"
                 >
-                  <ArrowDown className="w-6 h-6 text-primary" strokeWidth={3} />
-                </motion.div>
-              )}
+                  {offScreen === "below" ? <ArrowDown className="w-3.5 h-3.5" strokeWidth={3} /> : <ArrowUp className="w-3.5 h-3.5" strokeWidth={3} />}
+                  Ver
+                </button>
+              ) : !step.advanceOnAction ? (
+                <button
+                  onClick={advance}
+                  className="shrink-0 h-9 px-3 rounded-xl bg-foreground text-background text-xs font-semibold flex items-center gap-1 active:scale-95 transition-transform"
+                >
+                  {stepIdx >= steps.length - 1 ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5" strokeWidth={3} />}
+                </button>
+              ) : null}
+              <button
+                onClick={() => finish("dismissed")}
+                aria-label="Pular tutorial"
+                className="shrink-0 h-7 w-7 rounded-full hover:bg-muted text-muted-foreground flex items-center justify-center"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
-          </motion.div>
-        )}
-        {/* Off-screen banner — always visible, taps to scroll to target */}
-        {offScreen && (
-          <motion.button
-            key={`offscreen-${offScreen}`}
-            initial={{ opacity: 0, y: offScreen === "below" ? 20 : -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            onClick={scrollToTarget}
-            className={`fixed left-1/2 -translate-x-1/2 pointer-events-auto bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 text-xs font-bold z-[210] ${
-              offScreen === "below" ? "bottom-6" : "top-6"
-            }`}
-          >
-            {offScreen === "below" ? (
-              <>
-                <motion.span animate={{ y: [0, 3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
-                  <ArrowDown className="w-4 h-4" strokeWidth={3} />
-                </motion.span>
-                Role pra baixo
-              </>
-            ) : (
-              <>
-                <motion.span animate={{ y: [0, -3, 0] }} transition={{ duration: 1, repeat: Infinity }}>
-                  <ArrowUp className="w-4 h-4" strokeWidth={3} />
-                </motion.span>
-                Role pra cima
-              </>
-            )}
-          </motion.button>
-        )}
+            <button
+              onClick={() => finish("dismissed")}
+              className="block mx-auto mt-1.5 text-[10px] text-muted-foreground/70 hover:text-muted-foreground"
+            >
+              Pular tutorial
+            </button>
+          </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

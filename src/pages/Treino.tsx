@@ -567,7 +567,7 @@ const Treino = () => {
       <SpotlightOverlay
         moduleKey="treino"
         steps={[
-          { selector: '[data-spotlight="add-exercise"]', label: "Digita o nome do exercício e toque no + pra adicionar o treino de hoje.", advanceOnAction: "first_workout" },
+          { selector: '[data-spotlight="add-exercise"]', label: "Digite o exercício e toque no + para adicionar o treino de hoje.", advanceOnAction: "first_workout" },
         ]}
       />
       {/* Header */}

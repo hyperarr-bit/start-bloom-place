@@ -121,11 +121,11 @@ const Index = () => {
       <SpotlightOverlay
         moduleKey="financas"
         steps={[
-          { selector: '[data-spotlight="financeiro"]', label: 'Toque em "Meu Financeiro" pra começar.' },
-          { selector: '[data-spotlight="add-income"]', label: 'Passo 1: adiciona tua receita (salário, freelas...).', advanceOnAction: "first_income" },
-          { selector: '[data-spotlight="add-fixed"]', label: 'Passo 2: cadastra um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense" },
-          { selector: '[data-spotlight="add-bill"]', label: 'Passo 3: clica em "Editar" e adiciona 1 conta no vencimento.', advanceOnAction: "first_bill" },
-          { selector: '[data-spotlight="add-note"]', label: 'Passo 4: escreve uma anotação financeira.', advanceOnAction: "first_note" },
+          { selector: '[data-spotlight="financeiro"]', label: 'Abra "Meu Financeiro".' },
+          { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes" },
+          { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses" },
+          { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays" },
+          { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes" },
         ]}
       />
       {/* Header */}

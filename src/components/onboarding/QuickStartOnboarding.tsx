@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles, Loader2, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
-import { useAuth } from "@/hooks/use-auth";
-import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
@@ -40,17 +38,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
   const { set, isGuest } = useUserData();
-  const { signUp } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
-
-  const [showSignup, setShowSignup] = useState(false);
-  const [signupStep, setSignupStep] = useState<0 | 1 | 2>(0); // 0=name, 1=email, 2=password
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     set("quickstart-target-module", opt.key);
@@ -61,59 +49,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   };
 
   const handleCelebrationDone = () => {
-    if (isGuest) {
-      // IMPORTANT: do NOT mark "core-all-modules-celebrated" here — Home.tsx
-      // would unmount the overlay before the signup form can render. Mark it
-      // only after the signup completes (or for non-guest users).
-      setShowSignup(true);
-    } else {
-      set("core-all-modules-celebrated", "true");
-      onComplete();
-    }
-  };
-
-  const isValidEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-  const isStrongPassword = (v: string) =>
-    v.length >= 8 && /[A-Za-z]/.test(v) && /\d/.test(v);
-
-  const handleNextStep = () => {
-    if (signupStep === 0) {
-      if (!name.trim()) {
-        toast({ title: "Digite seu nome", variant: "destructive" });
-        return;
-      }
-      setSignupStep(1);
-    } else if (signupStep === 1) {
-      if (!isValidEmail(email)) {
-        toast({ title: "E-mail inválido", description: "Confira o endereço.", variant: "destructive" });
-        return;
-      }
-      setSignupStep(2);
-    }
-  };
-
-  const handleSignupSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (signupStep !== 2) {
-      handleNextStep();
-      return;
-    }
-    if (!isStrongPassword(password)) {
-      toast({ title: "Senha fraca", description: "Mínimo 8 caracteres, com letras e números.", variant: "destructive" });
-      return;
-    }
-    setSubmitting(true);
-    const { error, data } = await signUp(email.trim(), password);
-    if (error) {
-      toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
-      setSubmitting(false);
-      return;
-    }
-    set("core-user-name", name.trim());
     set("core-all-modules-celebrated", "true");
-    trackEvent("signup_completed_after_tutorial", {});
     onComplete();
-    setTimeout(() => navigate("/"), 50);
+    if (isGuest) {
+      // Send guest to signup — guest data is migrated automatically on login.
+      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
+    }
   };
 
 
@@ -174,163 +115,6 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </button>
               )}
             </motion.div>
-          ) : allDone && showSignup ? (
-            <motion.form
-              key="signup"
-              onSubmit={handleSignupSubmit}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.25 }}
-              className="flex flex-col gap-6 py-8"
-            >
-              <div className="text-center space-y-2">
-                <div className="text-4xl">🎉</div>
-                <h1 className="text-xl font-bold leading-tight text-foreground">
-                  Vamos terminar de configurar sua conta
-                </h1>
-                <p className="text-xs text-muted-foreground">
-                  Tudo que você fez no tutorial será salvo automaticamente.
-                </p>
-              </div>
-
-              {/* Progress dots */}
-              <div className="flex items-center justify-center gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      i === signupStep ? "w-6 bg-foreground" : i < signupStep ? "w-1.5 bg-foreground/60" : "w-1.5 bg-border"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              <AnimatePresence mode="wait">
-                {signupStep === 0 && (
-                  <motion.div
-                    key="step-name"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-3"
-                  >
-                    <label className="block text-sm font-semibold text-foreground px-1">
-                      Como você se chama?
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="text"
-                        placeholder="Seu nome ou apelido"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        autoComplete="given-name"
-                        autoFocus
-                        maxLength={40}
-                        className="w-full h-12 pl-10 pr-3 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-
-                {signupStep === 1 && (
-                  <motion.div
-                    key="step-email"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-3"
-                  >
-                    <label className="block text-sm font-semibold text-foreground px-1">
-                      Prazer, {name.trim().split(" ")[0]}! Qual seu e-mail?
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type="email"
-                        placeholder="seu@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        autoComplete="email"
-                        autoFocus
-                        className="w-full h-12 pl-10 pr-3 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                      />
-                    </div>
-                    <p className="text-[11px] text-muted-foreground px-1">
-                      Vamos usar pra você entrar de novo depois.
-                    </p>
-                  </motion.div>
-                )}
-
-                {signupStep === 2 && (
-                  <motion.div
-                    key="step-password"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="space-y-3"
-                  >
-                    <label className="block text-sm font-semibold text-foreground px-1">
-                      Agora crie uma senha
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Mínimo 8 caracteres"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="new-password"
-                        autoFocus
-                        minLength={8}
-                        className="w-full h-12 pl-10 pr-10 rounded-xl bg-card border border-border text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((s) => !s)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground px-1">
-                      Use letras e números. Mínimo 8 caracteres.
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <div className="flex items-center gap-2">
-                {signupStep > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSignupStep((s) => (s - 1) as 0 | 1 | 2)}
-                    disabled={submitting}
-                    className="h-12 px-5 rounded-xl bg-card border border-border text-sm font-medium text-foreground active:scale-[0.98] transition-transform disabled:opacity-60"
-                  >
-                    Voltar
-                  </button>
-                )}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="flex-1 h-12 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform disabled:opacity-60"
-                >
-                  {submitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : signupStep === 2 ? (
-                    <>Criar conta e começar <ArrowRight className="w-4 h-4" /></>
-                  ) : (
-                    <>Continuar <ArrowRight className="w-4 h-4" /></>
-                  )}
-                </button>
-              </div>
-            </motion.form>
           ) : allDone ? (
             <motion.div
               key="celebration"
@@ -354,7 +138,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </h1>
                 <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
                   {isGuest
-                    ? "Você terminou o tutorial e liberou todos os 16 módulos."
+                    ? "Você liberou todos os 16 módulos. Crie sua conta agora pra salvar tudo que você configurou."
                     : "Você concluiu o tutorial e liberou todos os 16 módulos."}
                 </p>
               </div>
@@ -362,7 +146,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 onClick={handleCelebrationDone}
                 className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
-                {isGuest ? "Configurar minha conta" : "Bora usar"} <ArrowRight className="w-4 h-4" />
+                {isGuest ? "Criar conta para salvar" : "Bora usar"} <ArrowRight className="w-4 h-4" />
               </button>
             </motion.div>
           ) : (

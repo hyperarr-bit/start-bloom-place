@@ -9,8 +9,11 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { TrialBanner } from "@/components/TrialBanner";
+import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
+import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 import Home from "./pages/Home";
@@ -109,11 +112,14 @@ const App = () => (
           <Sonner />
           <OfflineBanner />
           <BrowserRouter>
+            <GracePeriodBanner />
             <Routes>
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="*" element={<AnimatedRoutes />} />
             </Routes>
+            <TrialBanner />
+            <GlobalWinback />
           </BrowserRouter>
         </TooltipProvider>
         </UserDataProvider>

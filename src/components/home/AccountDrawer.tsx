@@ -75,6 +75,11 @@ export const AccountDrawer = ({
       onClick: () => { onOpenChange(false); navigate("/conquistas"); },
     },
     {
+      icon: CreditCard,
+      label: "Gerenciar assinatura",
+      onClick: handleManageSubscription,
+    },
+    {
       icon: KeyRound,
       label: "Alterar senha",
       onClick: handleResetPassword,

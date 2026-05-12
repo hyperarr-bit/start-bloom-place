@@ -27,6 +27,7 @@ const PADDING = 8;
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
   const { get, set, isGuest } = useUserData();
   const [active, setActive] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
 

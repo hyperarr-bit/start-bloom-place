@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpLeft, CheckCircle2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import { Button } from "@/components/ui/button";
 
 export interface SpotlightStep {
   selector: string;

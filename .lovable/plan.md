@@ -1,29 +1,24 @@
-## Problema
+## O que adicionar
 
-No modo PWA (instalado), o conteúdo fica embaixo do Dynamic Island/notch porque o `index.html` usa `apple-mobile-web-app-status-bar-style = black-translucent` — isso diz ao iOS para deixar a webview ocupar a tela inteira, sem reservar espaço. No navegador (web) o iOS já reserva o espaço da barra, por isso fica certo.
+Ao terminar o tutorial guiado de qualquer módulo (Finanças, Rotina, Dieta, Treino), exibir um card de conclusão por cima da tela explicando que o usuário deve clicar na seta de voltar (no topo da página) para escolher outro módulo.
 
-A correção é fazer o app respeitar a área segura (`env(safe-area-inset-*)`) para que os headers fixos (sticky) e o topo da página não fiquem cobertos pela ilha dinâmica.
+## Comportamento
 
-## Mudanças
+1. Quando o último passo do `SpotlightOverlay` for concluído (caminho `completed`, não `dismissed`), em vez de simplesmente sumir, mostrar um card centralizado com:
+   - Ícone de check / celebração
+   - Título: "Tutorial concluído! 🎉"
+   - Texto curto: "Agora toque na seta ← no canto superior esquerdo para voltar ao início e explorar outro módulo."
+   - Uma seta animada apontando para o canto superior esquerdo (onde fica o botão de voltar das páginas de módulo).
+   - Botão "Entendi" que fecha o card.
+2. O flag `spotlight-done-{module}` continua sendo gravado imediatamente (o tutorial não reaparece). Só a UI do card permanece visível até o usuário fechar.
+3. Fechar também ao clicar no backdrop semi-transparente.
 
-1. **`index.html`**
-   - Trocar `apple-mobile-web-app-status-bar-style` de `black-translucent` para `default` — assim, mesmo em PWA, o iOS reserva o espaço da status bar / Dynamic Island (igual ao web).
-   - Manter `viewport-fit=cover` (já está).
+## Onde mexer
 
-2. **`src/index.css`** (fallback global)
-   - Adicionar padding de safe-area no `body` (top/left/right/bottom) usando `env(safe-area-inset-*)` para garantir que nada fique sob a ilha mesmo se o iOS interpretar diferente.
-   - Como alternativa mais segura: aplicar `padding-top: env(safe-area-inset-top)` apenas em headers `sticky top-0` via uma utilitária `.safe-top`, sem alterar o body (evita quebrar layouts internos).
+- `src/components/onboarding/SpotlightOverlay.tsx`
+  - Novo estado `showCompletion`.
+  - No `finish("completed")`: gravar flags como hoje, mas em vez de `setActive(false)` direto, ativar `showCompletion` e esconder o spotlight (rect/bubble).
+  - Renderizar overlay de conclusão (card + seta animada apontando para o topo-esquerdo) usando os mesmos tokens do design system (`bg-card`, `border-border`, `text-primary`, etc.).
+  - `dismissed` (caso futuro) continua fechando direto.
 
-3. **Headers fixos (`sticky top-0`)** — Index.tsx (Finanças) e demais páginas
-   - Adicionar a classe `safe-top` no header sticky para que a barra colorida desça abaixo da ilha dinâmica no PWA. Aplicar nos headers de páginas principais que usam `sticky top-0` (Finanças, Home, etc.).
-
-## Resultado esperado
-
-- No PWA instalado, o header e o conteúdo iniciam abaixo do Dynamic Island/notch (mesmo comportamento da imagem 2 — versão web).
-- Sem mudança visível no navegador comum.
-
-## Arquivos a modificar
-
-- `index.html` — meta tag status-bar-style
-- `src/index.css` — utility `.safe-top` (e opcional safe-area no body)
-- `src/pages/Index.tsx` (Finanças) + outras páginas com `sticky top-0` no header — adicionar classe `safe-top`
+Sem mudanças em `Home.tsx`, `Index.tsx`, `Rotina.tsx`, `Dieta.tsx`, `Treino.tsx` — todos já usam o componente `SpotlightOverlay` e herdam o novo comportamento automaticamente.

@@ -35,7 +35,7 @@ const Auth = () => {
     setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: getAuthRedirectUrl("/") },
+      options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
     });
     if (error) {
       toast({ title: "Erro ao entrar com Google", description: error.message, variant: "destructive" });

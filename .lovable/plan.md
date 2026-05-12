@@ -1,43 +1,47 @@
 ## Objetivo
+Quando o usuário clicar no link de confirmação enviado por e-mail, ele deve cair direto na **Home (`/`)** já logado — nunca mais na tela de "Criar conta" / "Confirme seu e-mail".
 
-Deixar o tutorial igual ao print enviado: balão branco discreto acima do card/botão alvo, com uma setinha apontando pra baixo em direção ao alvo. Sem fundo escuro e sem o quadrado/anel azul piscando em volta do `+` ou do card.
+## Causa do problema
+Hoje o `emailRedirectTo` aponta para `/`, mas:
+1. A **Site URL** no painel do Supabase pode estar apontando para `/auth` ou `/inicio`, e o Supabase usa a Site URL como fallback quando o `redirect_to` não está na allow-list.
+2. Mesmo quando cai em `/`, o app não tem um handler explícito para os tokens de confirmação que vêm no hash da URL (`#access_token=...&type=signup`), então em alguns casos o `AuthProvider` ainda não terminou de processar a sessão antes de qualquer outro redirect.
 
-## Mudanças em `src/components/onboarding/SpotlightOverlay.tsx`
+## Mudanças
 
-1. **Remover o dim/escurecimento da tela**
-   - Apagar todo o bloco SVG com máscara (`spot-mask-...`) e o fallback `bg-black/60`.
-   - Remover a variável `dim` — o overlay nunca escurece nada.
+### 1. Criar rota dedicada `/auth/callback`
+Novo arquivo `src/pages/AuthCallback.tsx`:
+- Lê os tokens do `window.location.hash` (`access_token`, `refresh_token`, `type`).
+- Chama `supabase.auth.setSession({ access_token, refresh_token })` para garantir que a sessão fique persistida antes de navegar.
+- Mostra um loader curto ("Confirmando sua conta...").
+- Após sucesso → `navigate("/", { replace: true })`.
+- Em erro → `navigate("/auth", { replace: true })` com toast.
 
-2. **Remover o anel/quadrado destacando o alvo**
-   - Apagar o `motion.div` com `border-2 border-primary`, `boxShadow` e animação de `scale` que desenha o retângulo arredondado em volta do elemento.
-   - Sem highlight visual no alvo. O alvo permanece visível normalmente, sem moldura.
+Registrar a rota em `src/App.tsx` como pública (fora do `ProtectedRoute`).
 
-3. **Posicionar o balão sempre acima do card alvo**
-   - Manter a lógica de medir o `rect` do alvo.
-   - Forçar `labelBelow = false` quando há espaço acima (≥ 90px); só usar abaixo se realmente colado no topo.
-   - Centralizar o balão horizontalmente em cima do alvo (mesma lógica de clamp já existente para não sair da tela).
+### 2. Apontar o `emailRedirectTo` para o callback
+Em `src/hooks/use-auth.tsx`, no `signUp`:
+```ts
+options: { emailRedirectTo: getAuthRedirectUrl("/auth/callback") }
+```
 
-4. **Setinha apontando pro card**
-   - Manter apenas a seta `ArrowDown` embaixo do balão (entre o balão e o alvo), com leve animação de "bounce" pra baixo.
-   - Quando o balão estiver abaixo (caso raro), usar `ArrowUp` no topo do balão.
-   - Garantir que a seta fique alinhada com o centro do alvo (não com o centro do balão), pra ela realmente apontar pro card mesmo quando o balão está deslocado pelo clamp da borda da tela.
+### 3. Mesmo tratamento para Google OAuth (consistência)
+Em `src/pages/Auth.tsx`, no `signInWithOAuth({ provider: "google" })`, trocar o `redirectTo` para `getAuthRedirectUrl("/auth/callback")` — o callback já joga em `/`.
 
-5. **Estilo do balão (igual ao print)**
-   - Card branco/`bg-card`, borda fina, sombra suave, cantos arredondados.
-   - Cabeçalho pequeno "PASSO X DE Y" em cinza/secundário.
-   - Texto principal curto e em negrito.
-   - Sem botão extra dentro do balão.
+### 4. Garantir que `/` aceite usuário recém-confirmado
+A rota `/` já usa `ProtectedRoute allowGuest`, então não precisa mudar — assim que a sessão for setada no callback, o `AuthProvider` atualiza e a Home renderiza normalmente.
 
-6. **Manter funcionalidades existentes**
-   - Listener `core:activation` para avançar passos.
-   - Auto-advance via `checkKey`.
-   - Botão "Role pra baixo / pra cima" quando o alvo está fora da viewport (mantém como está).
-   - Click-through no alvo continua funcionando (sem overlay bloqueando).
+## Ação manual necessária pelo usuário (fora do código)
+No painel do Supabase → **Authentication → URL Configuration**:
+- **Site URL**: `https://www.coreaplicativo.com.br`
+- **Redirect URLs** (allow-list): adicionar
+  - `https://www.coreaplicativo.com.br/auth/callback`
+  - `https://www.coreaplicativo.com.br/`
+  - `https://coreaplicativo.lovable.app/auth/callback` (preview publicado)
+
+Sem isso, o Supabase ignora o `emailRedirectTo` e usa a Site URL.
 
 ## Arquivos afetados
-
-- `src/components/onboarding/SpotlightOverlay.tsx` (única alteração)
-
-## Resultado esperado
-
-Tela normal, sem escurecimento, sem moldura no `+` ou no card. Apenas um balão branco flutuante acima do alvo com uma seta pequena apontando pra baixo em direção ao card — exatamente como na imagem enviada.
+- `src/pages/AuthCallback.tsx` (novo)
+- `src/App.tsx` (nova rota pública)
+- `src/hooks/use-auth.tsx` (signUp redirect)
+- `src/pages/Auth.tsx` (Google OAuth redirect)

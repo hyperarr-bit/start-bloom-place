@@ -18,6 +18,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
 import Inicio from "./pages/Inicio";
 import Planos from "./pages/Planos";
 import ResetPassword from "./pages/ResetPassword";
@@ -116,6 +117,7 @@ const App = () => (
             <Routes>
               <Route path="/inicio" element={<Inicio />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="*" element={<AnimatedRoutes />} />
             </Routes>
             <TrialBanner />

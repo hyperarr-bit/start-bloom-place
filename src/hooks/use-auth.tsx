@@ -123,7 +123,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: getAuthRedirectUrl() },
+      options: { emailRedirectTo: getAuthRedirectUrl("/auth/callback") },
     });
     return { error };
   };

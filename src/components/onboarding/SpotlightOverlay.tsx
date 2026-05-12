@@ -52,7 +52,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     set(`spotlight-done-${moduleKey}`, "true");
     if (reason === "completed") set("quickstart-target-module", "");
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
-    setActive(false);
+    if (reason === "completed") {
+      setShowCompletion(true);
+    } else {
+      setActive(false);
+    }
   }, [set, moduleKey]);
 
   const finishRef = useRef(finish);

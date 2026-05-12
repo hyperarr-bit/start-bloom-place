@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpLeft, CheckCircle2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import { Button } from "@/components/ui/button";
 
 export interface SpotlightStep {
   selector: string;
@@ -26,6 +27,7 @@ const PADDING = 8;
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
   const { get, set, isGuest } = useUserData();
   const [active, setActive] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
 
@@ -50,7 +52,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     set(`spotlight-done-${moduleKey}`, "true");
     if (reason === "completed") set("quickstart-target-module", "");
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
-    setActive(false);
+    if (reason === "completed") {
+      setShowCompletion(true);
+    } else {
+      setActive(false);
+    }
   }, [set, moduleKey]);
 
   const finishRef = useRef(finish);
@@ -143,6 +149,46 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     const el = document.querySelector(step.selector) as HTMLElement | null;
     if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [step]);
+
+  if (showCompletion) {
+    return (
+      <AnimatePresence>
+        <motion.div
+          key="completion-root"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[200] bg-background/70 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => { setShowCompletion(false); setActive(false); }}
+        >
+          <motion.div
+            animate={{ x: [0, -6, 0], y: [0, -6, 0] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            className="fixed top-3 left-3 text-primary"
+          >
+            <ArrowUpLeft className="w-10 h-10" strokeWidth={2.5} />
+          </motion.div>
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-6 text-center"
+          >
+            <div className="flex justify-center mb-3">
+              <CheckCircle2 className="w-12 h-12 text-primary" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">Tutorial concluído! 🎉</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-5">
+              Agora toque na seta <span className="font-semibold text-foreground">←</span> no canto superior esquerdo para voltar ao início e explorar outro módulo.
+            </p>
+            <Button size="sm" className="w-full" onClick={() => { setShowCompletion(false); setActive(false); }}>
+              Entendi
+            </Button>
+          </motion.div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   if (!active || !step) return null;
 

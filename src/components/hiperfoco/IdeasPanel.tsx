@@ -46,7 +46,7 @@ export const IdeasPanel = () => {
       tags: ["ideia"],
       hour,
     };
-    setAllDaysWrite(prev => {
+    setAllDays(prev => {
       const dayData = prev[dateKey] || {};
       const hourThoughts = dayData[hour] || [];
       return { ...prev, [dateKey]: { ...dayData, [hour]: [...hourThoughts, thought] } };
@@ -55,7 +55,7 @@ export const IdeasPanel = () => {
   };
 
   const removeIdea = (id: string, date: string, hour: number) => {
-    setAllDaysWrite(prev => {
+    setAllDays(prev => {
       const dayData = { ...prev[date] };
       dayData[hour] = (dayData[hour] || []).filter(t => t.id !== id);
       return { ...prev, [date]: dayData };

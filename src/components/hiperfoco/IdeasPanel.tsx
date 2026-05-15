@@ -17,9 +17,8 @@ interface DayData {
 }
 
 export const IdeasPanel = () => {
-  const [allDays] = usePersistedState<Record<string, DayData>>("hiperfoco-thoughts", {});
+  const [allDays, setAllDays] = usePersistedState<Record<string, DayData>>("hiperfoco-thoughts", {});
   const [newIdea, setNewIdea] = useState("");
-  const [, setAllDaysWrite] = usePersistedState<Record<string, DayData>>("hiperfoco-thoughts", {});
 
   // Flatten all ideas across all days, sorted by date desc
   const ideas = useMemo(() => {

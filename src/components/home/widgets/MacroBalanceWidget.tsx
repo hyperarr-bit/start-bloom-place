@@ -3,7 +3,8 @@ import { useUserData } from "@/hooks/use-user-data";
 
 export const MacroBalanceWidget = () => {
   const { get } = useUserData();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const todayLog = get<any>("core-dieta-log", {});
   const meals = todayLog[todayStr] || {};
 

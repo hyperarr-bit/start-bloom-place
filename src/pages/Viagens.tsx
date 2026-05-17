@@ -5,6 +5,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { TripCountdown } from "@/components/travel/TripCountdown";
 import { DailyTimeline } from "@/components/travel/DailyTimeline";
 import { PackingChecklist } from "@/components/travel/PackingChecklist";

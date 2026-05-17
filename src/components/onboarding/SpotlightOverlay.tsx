@@ -144,6 +144,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     };
   }, [active, stepIdx, steps, advance]);
 
+  // Fallback card timer: if target stays missing >800ms, show a centered hint.
+  useEffect(() => {
+    if (!active) return;
+    if (rect) { setShowFallback(false); return; }
+    const t = setTimeout(() => {
+      setShowFallback(true);
+      trackEvent("spotlight_target_missing", {
+        module: moduleKey,
+        step: stepIdx,
+        selector: steps[stepIdx]?.selector ?? "",
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [active, rect, stepIdx, steps, moduleKey]);
+
   const step = active ? steps[stepIdx] : null;
 
   const scrollToTarget = useCallback(() => {

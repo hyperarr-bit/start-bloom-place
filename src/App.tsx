@@ -134,6 +134,7 @@ const App = () => (
             </BrowserRouter>
           </div>
           <div className="app-safe-top-guard" aria-hidden="true" />
+        </AppShell>
         </TooltipProvider>
         </UserDataProvider>
       </AuthProvider>

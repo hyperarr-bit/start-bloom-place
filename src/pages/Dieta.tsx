@@ -49,6 +49,7 @@ const Dieta = () => {
   const [activeTab, setActiveTab] = useState("cardapio");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const today = new Date().toISOString().split("T")[0];
 
   // Configurable meals

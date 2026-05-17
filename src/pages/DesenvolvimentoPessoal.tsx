@@ -53,6 +53,7 @@ const DesenvolvimentoPessoal = () => {
   const [activeTab, setActiveTab] = useState("sobre");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);

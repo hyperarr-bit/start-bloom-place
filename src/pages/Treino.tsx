@@ -608,6 +608,8 @@ const Treino = () => {
                 <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{streak}🔥</span>
               </div>
             )}
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

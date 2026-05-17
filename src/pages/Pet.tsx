@@ -24,6 +24,7 @@ const Pet = () => {
   const [activeTab, setActiveTab] = useState("pets");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);

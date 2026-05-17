@@ -29,6 +29,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
 
   // Refs keep the activation listener stable across step changes,
   // so events fired in the same tick aren't lost.

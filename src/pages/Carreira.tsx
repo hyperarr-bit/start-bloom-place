@@ -548,6 +548,7 @@ const InterviewPrep = () => {
 const Carreira = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const [activeTab, setActiveTab] = useState("jobs");
   useScrollActiveTabIntoView(activeTab);

@@ -577,27 +577,17 @@ label {
 
 /* ============================================================
    Safe-area (notch / Dynamic Island / status bar / home-indicator)
-   - Em modo PWA standalone: body recebe padding em todos os lados
-     pra páginas sem header (Home, Auth, Inicio) também ficarem ok.
-   - Headers sticky cancelam o padding-top do body via margin negativa
-     e cobrem o notch eles mesmos (glassmorphism).
+   - O body recebe padding nas 4 bordas pra nunca renderizar
+     conteúdo atrás do notch/horário/bateria nem do home-indicator.
+   - Vale para web (iPhone Safari em landscape, etc.) e PWA
+     (standalone/fullscreen) em iOS e Android.
    ============================================================ */
 @supports (padding: env(safe-area-inset-top)) {
   body {
+    padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
-  }
-  /* O header já consome o safe-area-inset-top. Pra páginas sem header
-     (Home wrapper, Auth, Inicio), o body cobre o notch via padding-top. */
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
-  /* Onde existe header, ele já tem seu próprio padding-top de safe-area;
-     puxamos o body de volta pra não duplicar o espaço. */
-  body:has(> #root header.sticky.top-0:first-of-type),
-  body:has(#root > div > header.sticky.top-0) {
-    padding-top: 0;
   }
   .fixed.bottom-0,
   nav.fixed.bottom-0 {
@@ -606,13 +596,10 @@ label {
 }
 
 /* ============================================================
-   Module header — não-fixo
-   - Headers rolam junto com a página (sem sticky, sem collapse)
-   - Mantém padding-top = safe-area-inset-top pra cobrir o notch
+   Module header — rola junto com a página (sem sticky, sem collapse)
    ============================================================ */
 header.sticky.top-0 {
   position: static !important;
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 

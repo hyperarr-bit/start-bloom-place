@@ -611,6 +611,7 @@ body {
 .app-safe-shell {
   min-height: 100vh;
   min-height: 100dvh;
+  padding-top: var(--app-safe-top);
   padding-left: var(--app-safe-left);
   padding-right: var(--app-safe-right);
   background-color: hsl(var(--background));

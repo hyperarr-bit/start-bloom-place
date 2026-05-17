@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";

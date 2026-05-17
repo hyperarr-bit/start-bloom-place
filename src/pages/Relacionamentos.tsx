@@ -9,6 +9,7 @@ import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "pessoas", label: "PESSOAS", icon: "💜" },

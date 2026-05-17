@@ -15,7 +15,6 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
-import { useScrollDirection } from "@/hooks/use-scroll-direction";
 import ScrollToTop from "@/components/ScrollToTop";
 
 
@@ -107,7 +106,6 @@ const AnimatedRoutes = () => {
 };
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
-  useScrollDirection();
   return <>{children}</>;
 };
 

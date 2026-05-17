@@ -9,6 +9,7 @@ import { SkincareRoutine } from "@/components/beleza/SkincareRoutine";
 import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "routine", label: "Rotina", icon: "✨" },

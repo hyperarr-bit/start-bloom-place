@@ -577,11 +577,16 @@ label {
 
 /* ============================================================
    Safe-area (notch / Dynamic Island / status bar / home-indicator)
-   - O body recebe padding nas 4 bordas pra nunca renderizar
-     conteúdo atrás do notch/horário/bateria nem do home-indicator.
-   - Vale para web (iPhone Safari em landscape, etc.) e PWA
-     (standalone/fullscreen) em iOS e Android.
+   - html + body recebem o bg do tema pra cobrir o notch e overscroll.
+   - body recebe padding nas 4 bordas pra nunca renderizar conteúdo
+     atrás do notch/horário/bateria nem do home-indicator.
+   - Vale para web (iPhone Safari landscape), PWA standalone e Android.
    ============================================================ */
+html,
+body {
+  background-color: hsl(var(--background));
+}
+
 @supports (padding: env(safe-area-inset-top)) {
   body {
     padding-top: env(safe-area-inset-top);

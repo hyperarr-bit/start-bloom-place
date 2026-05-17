@@ -1001,6 +1001,7 @@ const Rotina = () => {
   const [activeTab, setActiveTab] = useState("semana");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);

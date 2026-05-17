@@ -1,52 +1,86 @@
-## Por que "buga" e não aparece
+## Objetivo
 
-O `SpotlightOverlay` só renderiza a bolha quando consegue achar o elemento `[data-spotlight=...]` no DOM via `querySelector`. Quando o elemento não está presente, o overlay fica **ativo mas invisível** — exatamente o que dá a impressão de "tutorial bugado".
+Padronizar o cabeçalho de todos os módulos (Finanças, Rotina, Casa, Saúde, Treino, Dieta, Beleza, Detox, Pet, Estudos, Biblioteca, Carreira, Viagens, Relacionamentos, Hiperfoco, DesenvolvimentoPessoal, Conquistas) com:
 
-No Treino especificamente o alvo `[data-spotlight="add-exercise"]` só existe quando **todas** essas condições são verdadeiras ao mesmo tempo:
+1. **Safe area garantida** — fundo do header cobre o notch/status bar (`env(safe-area-inset-top)`), conteúdo nunca passa por baixo do horário/bateria.
+2. **Scroll dinâmico** — ao descer, a faixa do título (ícone + nome do módulo + ações) recolhe e some; ao subir qualquer pouco, volta imediatamente.
+3. **Abas pinned** — a linha de tabs nunca some, fica sempre encostada logo abaixo da safe area.
+4. **Glassmorphism** — fundo do header com `backdrop-blur` + cor semi-transparente (token semântico), criando o efeito de vidro fosco sobre o conteúdo que passa por baixo.
 
-1. A aba ativa é **"hoje"** (o usuário pode entrar em outra aba e o alvo some).
-2. O card do dia renderizado é o **dia de hoje** (`day === todayDayName`).
-3. O dia de hoje **não é dia de descanso** (`isActive && totalCount === 0`) — se for descanso, renderiza outro branch sem `data-spotlight`.
-4. O dia de hoje ainda **não tem nenhum exercício** — se já tem, vai pro branch da linha 416 que também não tem `data-spotlight`.
+## Componente novo
 
-Mesmo problema potencial em Dieta/Rotina/Finanças quando o usuário não está na aba/seção esperada.
+Criar `src/components/layout/ModuleHeader.tsx` reutilizável:
 
-Além disso, não há **plano B** visual: se o alvo não aparece, o usuário simplesmente não vê nada.
-
-## Correções
-
-### 1. Fallback visual em `SpotlightOverlay` (resolve qualquer módulo)
-
-Quando o spotlight estiver ativo e o `rect` continuar `null` por mais de ~800ms, mostrar um card flutuante **centralizado embaixo** (não cobre o conteúdo principal) com:
-
-- "Passo X de N"
-- O `step.label` atual
-- Texto curto: "Não estou encontrando este item na tela. Navegue até ele ou toque em Pular."
-- Botão "Pular tutorial" → chama `finish("dismissed")`
-
-Assim que o alvo aparecer no DOM (usuário muda de aba/scrolla), o fallback some e a bolha ancorada volta a ser usada. Resultado: **nunca mais "tela em branco"**.
-
-### 2. Garantir aba correta no Treino
-
-Em `src/pages/Treino.tsx`, quando o spotlight for ativar (guest + `quickstart-target-module === "treino"` + `spotlight-done-treino` vazio), forçar `setActiveTab("hoje")` no mount. Pequeno `useEffect` no topo do componente.
-
-### 3. Fallback do alvo no Treino quando hoje é dia de descanso
-
-Para o caso em que `todayDayName` cai num dia sem treino (sem alvo no DOM), adicionar `data-spotlight="add-exercise"` também no input do **primeiro dia ativo da semana** como segundo seletor candidato. Implementação simples: mudar o seletor do step para uma lista CSS:
-
-```ts
-selector: '[data-spotlight="add-exercise"]'
+```text
+┌─────────────────────────────┐ ← env(safe-area-inset-top) (fundo blur)
+│  ← [Icon] TÍTULO    ações   │ ← Título: colapsa no scroll-down
+├─────────────────────────────┤
+│  [tab] [tab] [tab] [tab]    │ ← Pinned, sempre visível
+└─────────────────────────────┘
 ```
 
-continua igual; basta no `Treino.tsx` aplicar `data-spotlight="add-exercise"` no input do primeiro dia ativo quando o dia de hoje é descanso. O overlay já pega o primeiro match via `querySelector`.
+Props:
+- `title: string`
+- `icon: LucideIcon`
+- `iconClassName?: string` (cor por módulo, ex: `text-amber-600`)
+- `onBack?: () => void` (default: `navigate("/")`)
+- `rightSlot?: ReactNode` (ex: ThemeToggle, mês atual)
+- `tabs: { id: string; label: string; icon?: string; spotlight?: string }[]`
+- `activeTab: string`
+- `onTabChange: (id: string) => void`
 
-### 4. (Opcional, baixo custo) Log de diagnóstico
+Comportamento interno:
+- Hook `useCollapsibleHeader()` que escuta `window.scroll`:
+  - guarda `lastY`; se `currentY > lastY + 4` e `currentY > 24` → `collapsed = true`
+  - se `currentY < lastY - 4` → `collapsed = false`
+  - sempre `collapsed = false` quando `currentY < 24`
+  - usa `requestAnimationFrame` para throttle, `passive: true` listener
+- Faixa do título: `transition-[max-height,opacity,transform]`, recolhe com `max-h-0 opacity-0 -translate-y-2 overflow-hidden` quando colapsado.
+- Wrapper externo: `sticky top-0 z-50` com `padding-top: env(safe-area-inset-top)`, `background: hsl(var(--card) / 0.75)`, `backdrop-filter: blur(16px) saturate(180%)`, `border-b border-border/60`.
+- Linha de tabs: sempre renderizada, scroll horizontal preservado, `useScrollActiveTabIntoView(activeTab)` movido pra dentro do componente.
 
-Em `SpotlightOverlay`, quando o spotlight fica ativo por >2s sem `rect`, chamar `trackEvent("spotlight_target_missing", { module: moduleKey, step: stepIdx, selector: step.selector })`. Útil pra a gente ver no painel se o problema reaparece em outro módulo.
+## Ajustes globais
 
-## Arquivos
+**`src/index.css`:**
+- Remover o `padding-top: env(safe-area-inset-top)` aplicado no `body` (criado na correção anterior). Agora cada header cuida do seu próprio safe area, então o body precisa começar em `0` para o blur do header cobrir o notch corretamente.
+- Manter `padding-bottom: env(safe-area-inset-bottom)` no body.
+- Garantir que o token `--card` tenha versão semi-transparente utilizável pelo header (usar `hsl(var(--card) / 0.75)` direto, sem novo token).
 
-- `src/components/onboarding/SpotlightOverlay.tsx` — adicionar estado `rectMissing`, timer 800ms, JSX do card fallback centralizado, evento de telemetria.
-- `src/pages/Treino.tsx` — `useEffect` que força `activeTab="hoje"` quando o tutorial vai aparecer, e atributo `data-spotlight="add-exercise"` no input do primeiro dia ativo quando hoje é descanso.
+**`index.html`:**
+- Manter `apple-mobile-web-app-status-bar-style="black-translucent"` (já está) — necessário para o conteúdo poder começar atrás do notch enquanto o blur do header o cobre.
 
-Sem alterações em Dieta/Rotina/Finanças — o fallback do item 1 já cobre os mesmos cenários nesses módulos.
+## Migração página por página
+
+Substituir o bloco `<header>...</header>` atual de cada página por:
+
+```tsx
+<ModuleHeader
+  title="FINANÇAS"
+  icon={DollarSign}
+  iconClassName="text-amber-600"
+  rightSlot={<><span>{currentMonth}</span><ThemeToggle/></>}
+  tabs={tabs}
+  activeTab={activeTab}
+  onTabChange={setActiveTab}
+/>
+```
+
+Páginas a migrar (17): `Index.tsx` (Finanças), `Rotina.tsx`, `Casa.tsx`, `Saude.tsx`, `Treino.tsx`, `Dieta.tsx`, `Beleza.tsx`, `Detox.tsx`, `Pet.tsx`, `Estudos.tsx`, `Biblioteca.tsx`, `Carreira.tsx`, `Viagens.tsx`, `Relacionamentos.tsx`, `Hiperfoco.tsx`, `DesenvolvimentoPessoal.tsx`, `Conquistas.tsx`.
+
+Em cada uma:
+- Remover `<header className="border-b ... sticky top-0 z-50">...</header>` inteiro.
+- Remover `useScrollActiveTabIntoView(activeTab)` (vai pra dentro do componente).
+- Manter o `data-spotlight` no Financeiro passando via `tabs[i].spotlight`.
+
+## Notas técnicas
+
+- **Acessibilidade**: respeitar `prefers-reduced-motion` — desabilitar a transição de colapso (manter sempre expandido).
+- **Performance**: um único listener global de scroll por página (no `ModuleHeader`), usando `rAF`.
+- **Banners acima do header** (TrialBanner, OfflineBanner, GracePeriodBanner) — não tocar; eles ficam fora do `ModuleHeader` no layout pai e permanecem como estão.
+- **AchievementsPage** e outros com header customizado: avaliar caso a caso, mas o padrão é migrar.
+
+## Não inclui
+
+- Não mexer no conteúdo/lógica das páginas.
+- Não mexer na bottom nav.
+- Não adicionar libs novas (sem Framer Motion específico pro header — CSS transitions bastam).

@@ -576,9 +576,11 @@ label {
 }
 
 /* ============================================================
-   Safe-area + Header padrão (notch / Dynamic Island / status bar)
-   O header cobre a área do notch com glassmorphism, e o conteúdo
-   nunca renderiza atrás do horário/bateria.
+   Safe-area (notch / Dynamic Island / status bar / home-indicator)
+   - Em modo PWA standalone: body recebe padding em todos os lados
+     pra páginas sem header (Home, Auth, Inicio) também ficarem ok.
+   - Headers sticky cancelam o padding-top do body via margin negativa
+     e cobrem o notch eles mesmos (glassmorphism).
    ============================================================ */
 @supports (padding: env(safe-area-inset-top)) {
   body {
@@ -586,7 +588,15 @@ label {
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
   }
-  /* Bottom navs/tab bars fixos respeitam o home-indicator */
+  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    body {
+      padding-top: env(safe-area-inset-top);
+    }
+    /* Header puxa pra cima pra cobrir a área do notch ele mesmo */
+    header.sticky.top-0 {
+      margin-top: calc(-1 * env(safe-area-inset-top));
+    }
+  }
   .fixed.bottom-0,
   nav.fixed.bottom-0 {
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));

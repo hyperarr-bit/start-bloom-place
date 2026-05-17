@@ -4,6 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   ArrowLeft, Plus, X, Trash2, Star, Target, Heart, Shield, Brain,
   Lightbulb, BookOpen, Award, Eye, Sparkles, Edit3, Check, ChevronRight,

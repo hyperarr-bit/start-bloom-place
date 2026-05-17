@@ -22,6 +22,7 @@ const Detox = () => {
   const [activeTab, setActiveTab] = useState("rastreador");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);

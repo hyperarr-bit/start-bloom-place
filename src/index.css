@@ -576,36 +576,56 @@ label {
 }
 
 /* ============================================================
-   Safe-area (notch / Dynamic Island / status bar / home-indicator)
-   - html + body recebem o bg do tema pra cobrir o notch e overscroll.
-   - body recebe padding nas 4 bordas pra nunca renderizar conteúdo
-     atrás do notch/horário/bateria nem do home-indicator.
-   - Vale para web (iPhone Safari landscape), PWA standalone e Android.
+   Safe-area global (notch / horário / bateria)
+   O conteúdo rola normalmente; só existe um respiro permanente no
+   topo da raiz para nada começar atrás da status bar.
    ============================================================ */
+:root {
+  --app-safe-top: max(env(safe-area-inset-top, 0px), 24px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-left: env(safe-area-inset-left, 0px);
+  --app-safe-right: env(safe-area-inset-right, 0px);
+}
+
 html,
-body {
+body,
+#root {
+  min-height: 100%;
   background-color: hsl(var(--background));
 }
 
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-    padding-bottom: env(safe-area-inset-bottom);
+body {
+  margin: 0;
+}
+
+.app-safe-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: var(--app-safe-top);
+  padding-left: var(--app-safe-left);
+  padding-right: var(--app-safe-right);
+  background-color: hsl(var(--background));
+}
+
+.app-safe-top-guard {
+  position: fixed;
+  z-index: 2147483647;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-safe-top);
+  pointer-events: none;
+  background-color: hsl(var(--background));
+}
+
+@supports (padding: env(safe-area-inset-bottom)) {
+  .app-safe-shell {
+    padding-bottom: var(--app-safe-bottom);
   }
-  /* Em PWA standalone garantimos um piso mínimo equivalente à altura
-     do status bar pra cobrir notch/Dynamic Island/horário/bateria mesmo
-     quando o WebView retorna 0 em env() (PWAs antigos do iOS). */
-  @media (display-mode: standalone), (display-mode: fullscreen) {
-    body {
-      padding-top: max(env(safe-area-inset-top), 50px);
-      padding-bottom: max(env(safe-area-inset-bottom), 16px);
-    }
-  }
+
   .fixed.bottom-0,
   nav.fixed.bottom-0 {
-    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    padding-bottom: max(0.5rem, var(--app-safe-bottom));
   }
 }
 

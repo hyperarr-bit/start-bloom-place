@@ -71,6 +71,7 @@ const TABS = [
 const Estudos = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // CURSOS
   const [cursosAndamento, setCursosAndamento] = usePersistedState<Course[]>("estudos-cursos-andamento", []);

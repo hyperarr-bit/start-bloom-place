@@ -165,6 +165,7 @@ const Treino = () => {
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 

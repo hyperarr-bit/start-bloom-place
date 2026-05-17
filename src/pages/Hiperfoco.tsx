@@ -11,6 +11,7 @@ import { TimelinePanel } from "@/components/hiperfoco/TimelinePanel";
 import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 import { IdeasPanel } from "@/components/hiperfoco/IdeasPanel";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "dia", label: "DIA", icon: "💭" },

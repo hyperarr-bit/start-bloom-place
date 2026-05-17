@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { Textarea } from "@/components/ui/textarea";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const defaultHabits: string[] = [];
@@ -1000,6 +1001,7 @@ const Rotina = () => {
   const [activeTab, setActiveTab] = useState("semana");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);
@@ -1103,6 +1105,10 @@ const Rotina = () => {
           </button>
           <Calendar className="w-5 h-5 text-emerald-600" />
           <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

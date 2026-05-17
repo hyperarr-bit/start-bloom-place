@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, Home } from "lucide-react";
 import SmartPantry from "@/components/casa/SmartPantry";
 import MealPlanner from "@/components/casa/MealPlanner";
@@ -32,6 +33,7 @@ const Casa = () => {
   const [activeTab, setActiveTab] = useState("comodos");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -47,6 +49,10 @@ const Casa = () => {
           </button>
           <Home className="w-5 h-5 text-cyan-600" />
           <h1 className="text-base font-bold tracking-tight">CASA</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

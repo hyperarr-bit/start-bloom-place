@@ -4,6 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   ArrowLeft, Plus, X, Trash2, Star, Target, Heart, Shield, Brain,
   Lightbulb, BookOpen, Award, Eye, Sparkles, Edit3, Check, ChevronRight,
@@ -52,6 +53,7 @@ const DesenvolvimentoPessoal = () => {
   const [activeTab, setActiveTab] = useState("sobre");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);
@@ -189,9 +191,10 @@ const DesenvolvimentoPessoal = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
-            <p className="text-[11px] text-muted-foreground">Conheça-se, evolua, conquiste</p>
+          <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

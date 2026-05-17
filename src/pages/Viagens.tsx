@@ -5,6 +5,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { TripCountdown } from "@/components/travel/TripCountdown";
 import { DailyTimeline } from "@/components/travel/DailyTimeline";
 import { PackingChecklist } from "@/components/travel/PackingChecklist";
@@ -34,6 +35,7 @@ const Viagens = () => {
   const [activeTab, setActiveTab] = useState("destinos");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -48,9 +50,10 @@ const Viagens = () => {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Plane className="w-5 h-5 text-teal-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">VIAGENS</h1>
-            <p className="text-[11px] text-muted-foreground">Planeje, viva e eternize suas viagens</p>
+          <h1 className="text-base font-bold tracking-tight">VIAGENS</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

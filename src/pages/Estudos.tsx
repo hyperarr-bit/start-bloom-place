@@ -4,6 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   ArrowLeft, Plus, X, Trash2, Check, GraduationCap, BookOpen,
   Clock, ArrowRight, FileText, ExternalLink
@@ -70,6 +71,7 @@ const TABS = [
 const Estudos = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // CURSOS
   const [cursosAndamento, setCursosAndamento] = usePersistedState<Course[]>("estudos-cursos-andamento", []);
@@ -149,9 +151,10 @@ const Estudos = () => {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <GraduationCap className="w-5 h-5 text-indigo-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
-            <p className="text-[11px] text-muted-foreground">Cursos, grade, provas, tarefas e caderno</p>
+          <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

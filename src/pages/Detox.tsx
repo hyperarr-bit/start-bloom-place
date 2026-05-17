@@ -8,6 +8,7 @@ import { DetoxDiary } from "@/components/detox/DetoxDiary";
 import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "rastreador", label: "RASTREADOR", icon: "🌿" },
@@ -21,6 +22,7 @@ const Detox = () => {
   const [activeTab, setActiveTab] = useState("rastreador");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -36,6 +38,10 @@ const Detox = () => {
           </button>
           <Leaf className="w-5 h-5 text-lime-600" />
           <h1 className="text-base font-bold tracking-tight">DETOX</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

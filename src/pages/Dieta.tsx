@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { Switch } from "@/components/ui/switch";
 
@@ -48,6 +49,7 @@ const Dieta = () => {
   const [activeTab, setActiveTab] = useState("cardapio");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const today = new Date().toISOString().split("T")[0];
 
   // Configurable meals
@@ -210,9 +212,10 @@ const Dieta = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <Apple className="w-5 h-5 text-green-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">DIETA</h1>
-            <p className="text-[11px] text-muted-foreground">Cardápio, jejum, receitas e diário</p>
+          <h1 className="text-base font-bold tracking-tight">DIETA</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

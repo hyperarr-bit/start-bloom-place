@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
@@ -164,6 +165,7 @@ const Treino = () => {
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
@@ -606,6 +608,8 @@ const Treino = () => {
                 <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{streak}🔥</span>
               </div>
             )}
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

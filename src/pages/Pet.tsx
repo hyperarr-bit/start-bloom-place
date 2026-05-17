@@ -9,6 +9,7 @@ import { PetRoutine } from "@/components/pet/PetRoutine";
 import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "pets", label: "PETS", icon: "🐾" },
@@ -23,6 +24,7 @@ const Pet = () => {
   const [activeTab, setActiveTab] = useState("pets");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -38,6 +40,10 @@ const Pet = () => {
           </button>
           <PawPrint className="w-5 h-5 text-amber-500" />
           <h1 className="text-base font-bold tracking-tight">PET</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

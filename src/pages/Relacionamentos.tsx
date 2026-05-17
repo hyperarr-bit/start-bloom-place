@@ -9,6 +9,7 @@ import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "pessoas", label: "PESSOAS", icon: "💜" },
@@ -23,6 +24,7 @@ const Relacionamentos = () => {
   const [activeTab, setActiveTab] = useState("pessoas");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -38,6 +40,10 @@ const Relacionamentos = () => {
           </button>
           <Users className="w-5 h-5 text-rose-600" />
           <h1 className="text-base font-bold tracking-tight">RELAÇÕES</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
+          </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
           {tabs.map((tab) => (

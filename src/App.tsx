@@ -106,7 +106,6 @@ const AnimatedRoutes = () => {
 };
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
-  useScrollDirection();
   return <>{children}</>;
 };
 

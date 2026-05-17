@@ -8,6 +8,7 @@ import { DetoxDiary } from "@/components/detox/DetoxDiary";
 import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
 import { ModuleTip } from "@/components/ModuleTip";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const tabs = [
   { id: "rastreador", label: "RASTREADOR", icon: "🌿" },

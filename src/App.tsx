@@ -112,18 +112,21 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <OfflineBanner />
-          <BrowserRouter>
-            <GracePeriodBanner />
-            <Routes>
-              <Route path="/inicio" element={<Inicio />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="*" element={<AnimatedRoutes />} />
-            </Routes>
-            <TrialBanner />
-            <GlobalWinback />
-          </BrowserRouter>
+          <div className="app-safe-shell">
+            <OfflineBanner />
+            <BrowserRouter>
+              <GracePeriodBanner />
+              <Routes>
+                <Route path="/inicio" element={<Inicio />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="*" element={<AnimatedRoutes />} />
+              </Routes>
+              <TrialBanner />
+              <GlobalWinback />
+            </BrowserRouter>
+          </div>
+          <div className="app-safe-top-guard" aria-hidden="true" />
         </TooltipProvider>
         </UserDataProvider>
       </AuthProvider>

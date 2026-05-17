@@ -106,6 +106,7 @@ const Biblioteca = () => {
   const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);
   const [tab, setTab] = useState("lendo");
   useSetTrackedTab(tab);
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // ── Form State ──
   const [showForm, setShowForm] = useState(false);

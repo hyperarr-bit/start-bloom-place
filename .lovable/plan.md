@@ -1,86 +1,50 @@
 ## Objetivo
 
-Padronizar o cabeçalho de todos os módulos (Finanças, Rotina, Casa, Saúde, Treino, Dieta, Beleza, Detox, Pet, Estudos, Biblioteca, Carreira, Viagens, Relacionamentos, Hiperfoco, DesenvolvimentoPessoal, Conquistas) com:
+Estender o comportamento padronizado de header (safe-area do notch + glassmorphism + scroll dinâmico) para:
 
-1. **Safe area garantida** — fundo do header cobre o notch/status bar (`env(safe-area-inset-top)`), conteúdo nunca passa por baixo do horário/bateria.
-2. **Scroll dinâmico** — ao descer, a faixa do título (ícone + nome do módulo + ações) recolhe e some; ao subir qualquer pouco, volta imediatamente.
-3. **Abas pinned** — a linha de tabs nunca some, fica sempre encostada logo abaixo da safe area.
-4. **Glassmorphism** — fundo do header com `backdrop-blur` + cor semi-transparente (token semântico), criando o efeito de vidro fosco sobre o conteúdo que passa por baixo.
+1. **Página Home** (`src/pages/Home.tsx`) — hoje não tem `<header sticky>`, então não pega o tratamento global.
+2. **PWA standalone (iOS/Android instalado)** — validar que o notch fica coberto e o scroll dinâmico funciona.
 
-## Componente novo
+## Mudanças
 
-Criar `src/components/layout/ModuleHeader.tsx` reutilizável:
+### 1. `src/pages/Home.tsx`
 
-```text
-┌─────────────────────────────┐ ← env(safe-area-inset-top) (fundo blur)
-│  ← [Icon] TÍTULO    ações   │ ← Título: colapsa no scroll-down
-├─────────────────────────────┤
-│  [tab] [tab] [tab] [tab]    │ ← Pinned, sempre visível
-└─────────────────────────────┘
-```
+Envolver o `GreetingHeader` (linha 178) num `<header className="sticky top-0 z-40">` para automaticamente herdar:
+- Padding-top de safe-area (cobre o notch)
+- Fundo glassmorphism (`bg-card/78` + blur)
+- Comportamento de scroll dinâmico (título colapsa ao descer)
 
-Props:
-- `title: string`
-- `icon: LucideIcon`
-- `iconClassName?: string` (cor por módulo, ex: `text-amber-600`)
-- `onBack?: () => void` (default: `navigate("/")`)
-- `rightSlot?: ReactNode` (ex: ThemeToggle, mês atual)
-- `tabs: { id: string; label: string; icon?: string; spotlight?: string }[]`
-- `activeTab: string`
-- `onTabChange: (id: string) => void`
-
-Comportamento interno:
-- Hook `useCollapsibleHeader()` que escuta `window.scroll`:
-  - guarda `lastY`; se `currentY > lastY + 4` e `currentY > 24` → `collapsed = true`
-  - se `currentY < lastY - 4` → `collapsed = false`
-  - sempre `collapsed = false` quando `currentY < 24`
-  - usa `requestAnimationFrame` para throttle, `passive: true` listener
-- Faixa do título: `transition-[max-height,opacity,transform]`, recolhe com `max-h-0 opacity-0 -translate-y-2 overflow-hidden` quando colapsado.
-- Wrapper externo: `sticky top-0 z-50` com `padding-top: env(safe-area-inset-top)`, `background: hsl(var(--card) / 0.75)`, `backdrop-filter: blur(16px) saturate(180%)`, `border-b border-border/60`.
-- Linha de tabs: sempre renderizada, scroll horizontal preservado, `useScrollActiveTabIntoView(activeTab)` movido pra dentro do componente.
-
-## Ajustes globais
-
-**`src/index.css`:**
-- Remover o `padding-top: env(safe-area-inset-top)` aplicado no `body` (criado na correção anterior). Agora cada header cuida do seu próprio safe area, então o body precisa começar em `0` para o blur do header cobrir o notch corretamente.
-- Manter `padding-bottom: env(safe-area-inset-bottom)` no body.
-- Garantir que o token `--card` tenha versão semi-transparente utilizável pelo header (usar `hsl(var(--card) / 0.75)` direto, sem novo token).
-
-**`index.html`:**
-- Manter `apple-mobile-web-app-status-bar-style="black-translucent"` (já está) — necessário para o conteúdo poder começar atrás do notch enquanto o blur do header o cobre.
-
-## Migração página por página
-
-Substituir o bloco `<header>...</header>` atual de cada página por:
-
+Estrutura:
 ```tsx
-<ModuleHeader
-  title="FINANÇAS"
-  icon={DollarSign}
-  iconClassName="text-amber-600"
-  rightSlot={<><span>{currentMonth}</span><ThemeToggle/></>}
-  tabs={tabs}
-  activeTab={activeTab}
-  onTabChange={setActiveTab}
-/>
+<header className="border-b border-border bg-card sticky top-0 z-40">
+  <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
+    <GreetingHeader ... />
+  </div>
+  {/* sem 2º filho (sem abas) → CSS não impacta */}
+</header>
 ```
 
-Páginas a migrar (17): `Index.tsx` (Finanças), `Rotina.tsx`, `Casa.tsx`, `Saude.tsx`, `Treino.tsx`, `Dieta.tsx`, `Beleza.tsx`, `Detox.tsx`, `Pet.tsx`, `Estudos.tsx`, `Biblioteca.tsx`, `Carreira.tsx`, `Viagens.tsx`, `Relacionamentos.tsx`, `Hiperfoco.tsx`, `DesenvolvimentoPessoal.tsx`, `Conquistas.tsx`.
+Ajustar o container externo (`max-w-lg ... py-5`) para remover o `py-5` superior (o header agora tem seu próprio padding) — manter só `pt-4` no conteúdo abaixo.
 
-Em cada uma:
-- Remover `<header className="border-b ... sticky top-0 z-50">...</header>` inteiro.
-- Remover `useScrollActiveTabIntoView(activeTab)` (vai pra dentro do componente).
-- Manter o `data-spotlight` no Financeiro passando via `tabs[i].spotlight`.
+### 2. `src/index.css`
 
-## Notas técnicas
+Garantir que o seletor cobre headers sem segundo filho (tabs). Já cobre — o CSS atual age sobre `> div:first-child` e isso vai colapsar o GreetingHeader inteiro ao descer. Isso é o comportamento desejado pelo usuário: "Título some, [Abas se houver] ficam, e tudo volta no Scroll Up".
 
-- **Acessibilidade**: respeitar `prefers-reduced-motion` — desabilitar a transição de colapso (manter sempre expandido).
-- **Performance**: um único listener global de scroll por página (no `ModuleHeader`), usando `rAF`.
-- **Banners acima do header** (TrialBanner, OfflineBanner, GracePeriodBanner) — não tocar; eles ficam fora do `ModuleHeader` no layout pai e permanecem como estão.
-- **AchievementsPage** e outros com header customizado: avaliar caso a caso, mas o padrão é migrar.
+Ajuste pequeno: aumentar `max-height` do primeiro filho de `4rem` para `6rem`, porque o GreetingHeader tem 2 linhas (saudação + mensagem contextual). Sem isso o título da Home apareceria cortado.
+
+### 3. Validação PWA
+
+Já foi adicionado:
+- `body { padding-top: env(safe-area-inset-top) }` em standalone mode.
+- `header.sticky.top-0 { margin-top: calc(-1 * env(safe-area-inset-top)) }` para puxar o header pra cima e cobrir o notch.
+- `apple-mobile-web-app-status-bar-style="black-translucent"` no `index.html`.
+
+Verificar visualmente:
+- Abrir Preview em viewport mobile.
+- Confirmar Home + um módulo (Finanças) com header coberto pelo blur ao scroll.
 
 ## Não inclui
 
-- Não mexer no conteúdo/lógica das páginas.
-- Não mexer na bottom nav.
-- Não adicionar libs novas (sem Framer Motion específico pro header — CSS transitions bastam).
+- Não mexer nas demais 16 páginas (já funcionam pelo CSS global).
+- Não adicionar libs novas.
+- Não tocar em conteúdo/lógica da Home.

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Timer, Play, Pause, RotateCcw,
@@ -165,6 +166,15 @@ const Treino = () => {
   const reportTab = useTabReporter();
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+
+  // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
+  const { get: getUserData, isGuest } = useUserData();
+  useEffect(() => {
+    if (!isGuest) return;
+    const target = getUserData<string>("quickstart-target-module", "");
+    const done = getUserData<string>("spotlight-done-treino", "");
+    if (target === "treino" && !done) setActiveTab("hoje");
+  }, [isGuest, getUserData]);
 
   const [rawPlan, setRawPlan] = usePersistedState("saude-workouts-v2", defaultWorkoutPlan);
   const workoutPlan = useMemo(() => migratePlan(rawPlan), [rawPlan]);
@@ -366,6 +376,12 @@ const Treino = () => {
     { name: "Dedicação", desc: "Treinou 200+ dias", unlocked: workoutLog.length >= 200, icon: "👑" },
   ];
 
+  // Dia que ancora o tutorial: hoje, ou (se hoje é descanso) o primeiro dia ativo vazio.
+  const spotlightDay = useMemo(() => {
+    if (activeDays.includes(todayDayName)) return todayDayName;
+    return weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0) ?? todayDayName;
+  }, [activeDays, todayDayName, workoutPlan]);
+
   const renderWorkoutDay = (day: string, compact = false) => {
     const workout = workoutPlan[day];
     const isActive = activeDays.includes(day);
@@ -397,7 +413,7 @@ const Treino = () => {
           <p className="text-xs text-muted-foreground text-center mb-3">
             {muscleLabel ? `Adicione exercícios de ${muscleLabel}` : "Configure os músculos na aba ⚙️ CONFIG"}
           </p>
-          <div className="flex gap-1" data-spotlight={day === todayDayName ? "add-exercise" : undefined}>
+          <div className="flex gap-1" data-spotlight={day === spotlightDay ? "add-exercise" : undefined}>
             <Input value={day === expandedDay ? newExName : ""} onChange={e => { setExpandedDay(day); setNewExName(e.target.value); }} placeholder="+ Novo exercício..." className="text-xs h-7 flex-1 bg-transparent" />
             <Button size="sm" className="h-7 px-2" onClick={() => {
               if (newExName.trim()) {
@@ -626,10 +642,27 @@ const Treino = () => {
 
 
           {/* ========== HOJE — só o treino do dia ========== */}
-          {activeTab === "hoje" && <div className="space-y-4">
-            {/* Workout card — protagonist, nothing else */}
-            <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
-          </div>}
+          {activeTab === "hoje" && (() => {
+            // Se hoje é descanso, o tutorial não tem onde se ancorar.
+            // Mostra também o primeiro dia ativo vazio para o usuário conseguir adicionar.
+            const todayIsRest = !activeDays.includes(todayDayName);
+            const fallbackDay = todayIsRest
+              ? weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0)
+              : null;
+            return (
+              <div className="space-y-4">
+                <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
+                {fallbackDay && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground px-1">
+                      Hoje é dia de descanso — adicione um exercício no próximo dia de treino:
+                    </p>
+                    {renderWorkoutDay(fallbackDay)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ========== SEMANA — visão clara ========== */}
           {activeTab === "semana" && <div className="space-y-4">

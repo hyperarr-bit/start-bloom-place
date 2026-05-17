@@ -29,6 +29,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  const [showFallback, setShowFallback] = useState(false);
 
   // Refs keep the activation listener stable across step changes,
   // so events fired in the same tick aren't lost.
@@ -142,6 +143,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       document.removeEventListener("click", onPageClick, true);
     };
   }, [active, stepIdx, steps, advance]);
+
+  // Fallback card timer: if target stays missing >800ms, show a centered hint.
+  useEffect(() => {
+    if (!active) return;
+    if (rect) { setShowFallback(false); return; }
+    const t = setTimeout(() => {
+      setShowFallback(true);
+      trackEvent("spotlight_target_missing", {
+        module: moduleKey,
+        step: stepIdx,
+        selector: steps[stepIdx]?.selector ?? "",
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [active, rect, stepIdx, steps, moduleKey]);
 
   const step = active ? steps[stepIdx] : null;
 
@@ -257,6 +273,35 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
               </>
             )}
           </motion.button>
+        )}
+
+        {!rect && showFallback && (
+          <motion.div
+            key="fallback-card"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="fixed left-1/2 -translate-x-1/2 bottom-6 pointer-events-auto bg-card border border-border rounded-xl shadow-2xl p-3 z-[210]"
+            style={{ width: "min(320px, calc(100vw - 24px))" }}
+          >
+            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+              Passo {stepIdx + 1} de {steps.length}
+            </p>
+            <p className="text-sm font-semibold text-foreground leading-snug mb-2">
+              {step.label}
+            </p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Não estou encontrando este item na tela. Navegue até ele ou toque em Pular.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => finish("dismissed")}
+                className="text-xs font-bold text-muted-foreground hover:text-foreground px-2 py-1"
+              >
+                Pular tutorial
+              </button>
+            </div>
+          </motion.div>
         )}
       </motion.div>
     </AnimatePresence>

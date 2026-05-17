@@ -575,16 +575,31 @@ label {
   touch-action: manipulation;
 }
 
-/* PWA safe-area: respeita Dynamic Island/notch quando instalado como app */
+/* PWA safe-area: respeita Dynamic Island/notch/home-indicator quando instalado como app nativo */
 @supports (padding: env(safe-area-inset-top)) {
-  @media (display-mode: standalone) {
-    header.sticky.top-0 {
-      padding-top: calc(env(safe-area-inset-top) + 0.75rem);
-    }
+  @media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
     body {
+      padding-top: env(safe-area-inset-top);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
       padding-bottom: env(safe-area-inset-bottom);
     }
+    /* Headers sticky já ficam corretos pois body recebe o padding-top.
+       Mantém um respiro extra abaixo da Dynamic Island em headers fixos. */
+    header.sticky.top-0 {
+      padding-top: 0.75rem;
+    }
+    /* Bottom navs/tab bars fixos devem respeitar o home-indicator */
+    .fixed.bottom-0,
+    nav.fixed.bottom-0 {
+      padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* iOS Safari (mobile web fora do standalone) também precisa do top em viewport-fit=cover */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
   }
 }

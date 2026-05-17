@@ -123,6 +123,7 @@ const App = () => (
           <div className="app-safe-shell">
             <OfflineBanner />
             <BrowserRouter>
+              <ScrollToTop />
               <GracePeriodBanner />
               <Routes>
                 <Route path="/inicio" element={<Inicio />} />

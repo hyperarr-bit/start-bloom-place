@@ -167,6 +167,15 @@ const Treino = () => {
   const today = new Date().toISOString().split("T")[0];
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
+  // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
+  const { get: getUserData, isGuest } = useUserData();
+  useEffect(() => {
+    if (!isGuest) return;
+    const target = getUserData<string>("quickstart-target-module", "");
+    const done = getUserData<string>("spotlight-done-treino", "");
+    if (target === "treino" && !done) setActiveTab("hoje");
+  }, [isGuest, getUserData]);
+
   const [rawPlan, setRawPlan] = usePersistedState("saude-workouts-v2", defaultWorkoutPlan);
   const workoutPlan = useMemo(() => migratePlan(rawPlan), [rawPlan]);
   const setWorkoutPlan = (p: WorkoutPlan | ((prev: WorkoutPlan) => WorkoutPlan)) => {

@@ -623,7 +623,7 @@ header.sticky.top-0 {
 header.sticky.top-0 > div:first-child {
   overflow: hidden;
   transition: max-height 0.28s ease, opacity 0.2s ease, transform 0.28s ease, padding 0.28s ease;
-  max-height: 4rem;
+  max-height: 6rem;
   transform-origin: top;
 }
 

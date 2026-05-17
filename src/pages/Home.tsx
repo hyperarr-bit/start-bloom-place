@@ -174,8 +174,12 @@ const HomePage = () => {
       {!showOnboarding && <DailyNudge />}
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
-        <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-5 space-y-6">
-          <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+        <header className="sticky top-0 z-40 border-b border-border bg-card">
+          <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
+            <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+          </div>
+        </header>
+        <div className="max-w-lg md:max-w-4xl mx-auto px-4 pt-4 pb-5 space-y-6">
 
           <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
             <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />

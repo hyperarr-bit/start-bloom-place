@@ -642,28 +642,15 @@ body {
 }
 
 /* ============================================================
-   Header colapsável global
-   - Sticky logo abaixo da safe-area do topo.
-   - Ao rolar para baixo: translada para cima e some.
-   - Ao rolar para cima (ou no topo): reaparece suavemente.
+   Header fixo global
+   Sticky logo abaixo da safe-area do topo, sempre visível.
    ============================================================ */
 header.sticky.top-0 {
   position: sticky;
   top: var(--app-safe-top);
   z-index: 40;
-  will-change: transform;
-  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-body[data-scroll-dir="down"] header.sticky.top-0 {
-  transform: translateY(calc(-100% - var(--app-safe-top) - 4px));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  header.sticky.top-0 {
-    transition: none;
-  }
-}
 
 
 

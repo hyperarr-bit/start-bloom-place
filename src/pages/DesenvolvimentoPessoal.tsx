@@ -191,9 +191,10 @@ const DesenvolvimentoPessoal = () => {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
-            <p className="text-[11px] text-muted-foreground">Conheça-se, evolua, conquiste</p>
+          <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

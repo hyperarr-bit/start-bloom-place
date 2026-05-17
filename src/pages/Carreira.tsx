@@ -574,9 +574,10 @@ const Carreira = () => {
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Briefcase className="w-5 h-5 text-slate-600" />
-          <div>
-            <h1 className="text-base font-bold tracking-tight">CARREIRA</h1>
-            <p className="text-[11px] text-muted-foreground">Vagas, portfolio, networking e skills</p>
+          <h1 className="text-base font-bold tracking-tight">CARREIRA</h1>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <ThemeToggle />
           </div>
         </div>
         <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">

@@ -376,6 +376,12 @@ const Treino = () => {
     { name: "Dedicação", desc: "Treinou 200+ dias", unlocked: workoutLog.length >= 200, icon: "👑" },
   ];
 
+  // Dia que ancora o tutorial: hoje, ou (se hoje é descanso) o primeiro dia ativo vazio.
+  const spotlightDay = useMemo(() => {
+    if (activeDays.includes(todayDayName)) return todayDayName;
+    return weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0) ?? todayDayName;
+  }, [activeDays, todayDayName, workoutPlan]);
+
   const renderWorkoutDay = (day: string, compact = false) => {
     const workout = workoutPlan[day];
     const isActive = activeDays.includes(day);

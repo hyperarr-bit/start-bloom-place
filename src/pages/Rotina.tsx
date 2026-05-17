@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { Textarea } from "@/components/ui/textarea";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const defaultHabits: string[] = [];

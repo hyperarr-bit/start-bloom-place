@@ -636,10 +636,27 @@ const Treino = () => {
 
 
           {/* ========== HOJE — só o treino do dia ========== */}
-          {activeTab === "hoje" && <div className="space-y-4">
-            {/* Workout card — protagonist, nothing else */}
-            <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
-          </div>}
+          {activeTab === "hoje" && (() => {
+            // Se hoje é descanso, o tutorial não tem onde se ancorar.
+            // Mostra também o primeiro dia ativo vazio para o usuário conseguir adicionar.
+            const todayIsRest = !activeDays.includes(todayDayName);
+            const fallbackDay = todayIsRest
+              ? weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0)
+              : null;
+            return (
+              <div className="space-y-4">
+                <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
+                {fallbackDay && (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground px-1">
+                      Hoje é dia de descanso — adicione um exercício no próximo dia de treino:
+                    </p>
+                    {renderWorkoutDay(fallbackDay)}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* ========== SEMANA — visão clara ========== */}
           {activeTab === "semana" && <div className="space-y-4">

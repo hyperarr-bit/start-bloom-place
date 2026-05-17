@@ -597,9 +597,5 @@ label {
   }
 }
 
-/* iOS Safari (mobile web fora do standalone) também precisa do top em viewport-fit=cover */
-@supports (padding: env(safe-area-inset-top)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-  }
-}
+
+

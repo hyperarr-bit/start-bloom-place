@@ -15,6 +15,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
 
 import Home from "./pages/Home";
@@ -104,12 +105,18 @@ const AnimatedRoutes = () => {
   );
 };
 
+const AppShell = ({ children }: { children: React.ReactNode }) => {
+  useScrollDirection();
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
         <UserDataProvider>
         <TooltipProvider>
+        <AppShell>
           <Toaster />
           <Sonner />
           <div className="app-safe-shell">
@@ -127,6 +134,7 @@ const App = () => (
             </BrowserRouter>
           </div>
           <div className="app-safe-top-guard" aria-hidden="true" />
+        </AppShell>
         </TooltipProvider>
         </UserDataProvider>
       </AuthProvider>

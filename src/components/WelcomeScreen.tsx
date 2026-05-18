@@ -1,8 +1,9 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 interface WelcomeScreenProps {
-  onComplete: () => void;
-  onLogin: () => void;
+  onComplete?: () => void;
+  onLogin?: () => void;
 }
 
 const isTikTokWebView = () => {
@@ -133,18 +134,20 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             </h1>
 
             <div className="w-full flex flex-col items-center md:items-start gap-2">
-              <button
+              <Link
+                to="/auth?signup=1"
                 onClick={onComplete}
-                className="w-full py-3.5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg"
+                className="w-full py-3.5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg text-center"
               >
                 Começar
-              </button>
-              <button
+              </Link>
+              <Link
+                to="/auth"
                 onClick={onLogin}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
               >
                 Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
-              </button>
+              </Link>
             </div>
           </div>
         </div>

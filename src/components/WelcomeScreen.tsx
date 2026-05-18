@@ -2,8 +2,8 @@ import { forwardRef, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 interface WelcomeScreenProps {
-  onComplete: () => void;
-  onLogin: () => void;
+  onComplete?: () => void;
+  onLogin?: () => void;
 }
 
 const isTikTokWebView = () => {

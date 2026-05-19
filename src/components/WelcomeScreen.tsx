@@ -3,7 +3,9 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { PreSignupTutorial } from "@/components/welcome/PreSignupTutorial";
-import coreLogo from "/core-logo.png";
+import coreLogo from "@/assets/core-logo.png";
+import coreLogoBlack from "@/assets/core-logo-black.png";
+import { useTheme } from "@/hooks/use-theme";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;

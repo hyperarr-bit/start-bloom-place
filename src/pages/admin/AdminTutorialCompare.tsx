@@ -153,6 +153,62 @@ export default function AdminTutorialCompare() {
         />
       </div>
 
+      {/* Drop-off por etapa de cada módulo */}
+      {dropoff && dropoff.modules.length > 0 && (
+        <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <TrendingDown className="w-4 h-4 text-orange-400" />
+            <h3 className="text-sm font-bold text-zinc-100">Onde os usuários abandonam o tutorial</h3>
+          </div>
+          <p className="text-[11px] text-zinc-500 mb-4">Últimos 30 dias · etapa por etapa em cada módulo</p>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {dropoff.modules.map(mod => {
+              const startedFromSteps = mod.steps[0]?.reached ?? mod.started;
+              const base = Math.max(mod.started, startedFromSteps, 1);
+              return (
+                <div key={mod.module_id} className="bg-zinc-950/50 border border-zinc-800 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-zinc-100 capitalize">{mod.module_id}</span>
+                    <span className="text-[10px] text-zinc-500">
+                      {mod.completed}/{base} concluíram ({pct(mod.completed, base)})
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {mod.steps.map((s, i) => {
+                      const prev = i === 0 ? base : (mod.steps[i - 1]?.reached ?? base);
+                      const dropFromPrev = Math.max(0, prev - s.reached);
+                      const pctReached = base > 0 ? (s.reached / base) * 100 : 0;
+                      return (
+                        <div key={s.step}>
+                          <div className="flex items-center justify-between text-[11px] mb-0.5">
+                            <span className="text-zinc-300 truncate pr-2 max-w-[60%]" title={s.label}>
+                              {s.step + 1}. {s.label || "—"}
+                            </span>
+                            <span className="text-zinc-500 shrink-0">
+                              {s.reached} {dropFromPrev > 0 && <span className="text-orange-400">−{dropFromPrev}</span>}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-500 to-orange-500 rounded-full"
+                              style={{ width: `${pctReached}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {mod.steps.length === 0 && (
+                      <p className="text-[11px] text-zinc-600">Sem dados ainda — usuários precisam passar pelo tutorial.</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Lista real de usuários por etapa */}
       <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">

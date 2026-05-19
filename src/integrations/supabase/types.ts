@@ -519,6 +519,7 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_dashboard_v2: { Args: never; Returns: Json }
       admin_email_variant_stats: {
         Args: never
         Returns: {
@@ -531,6 +532,7 @@ export type Database = {
           variant_key: string
         }[]
       }
+      admin_landing_funnel: { Args: { _days?: number }; Returns: Json }
       admin_list_users: {
         Args: never
         Returns: {
@@ -583,6 +585,15 @@ export type Database = {
       }
       admin_retention_stats: { Args: never; Returns: Json }
       admin_tutorial_compare: { Args: { _cutoff?: string }; Returns: Json }
+      admin_tutorial_users: {
+        Args: { _action_key?: string }
+        Returns: {
+          action_key: string
+          completed_at: string
+          email: string
+          user_id: string
+        }[]
+      }
       admin_winback_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

@@ -15,6 +15,8 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const [showTutorial, setShowTutorial] = useState(false);
+    const { mode } = useTheme();
+    const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
     useEffect(() => {
       // Captura UTM e registra a visita do anúncio/landing

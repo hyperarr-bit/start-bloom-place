@@ -8,6 +8,7 @@ import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucid
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -82,6 +83,7 @@ const Auth = () => {
       if (error) {
         toast({ title: "Erro ao entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message, variant: "destructive" });
       } else {
+        trackEvent("login_completed", { method: "password" });
         navigate("/");
       }
     } else {
@@ -89,6 +91,7 @@ const Auth = () => {
       if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
       } else {
+        trackEvent("signup_completed", { method: "password" });
         setConfirmationSent(true);
       }
     }

@@ -1,156 +1,105 @@
-import { forwardRef, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { trackEvent, captureLandingMeta } from "@/lib/analytics";
+import { PreSignupTutorial } from "@/components/welcome/PreSignupTutorial";
+import coreLogo from "@/assets/core-logo.png";
+import coreLogoBlack from "@/assets/core-logo-black.png";
+import { useTheme } from "@/hooks/use-theme";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;
   onLogin?: () => void;
 }
 
-const isTikTokWebView = () => {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /BytedanceWebview|TikTok|musical_ly|Bytedance/i.test(ua);
-};
-
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
-  ({ onComplete, onLogin }, ref) => {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const [isTikTok, setIsTikTok] = useState(false);
+  ({ onComplete, onLogin }, _ref) => {
+    const [showTutorial, setShowTutorial] = useState(false);
+    const { mode } = useTheme();
+    const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
     useEffect(() => {
-      setIsTikTok(isTikTokWebView());
+      // Captura UTM e registra a visita do anúncio/landing
+      captureLandingMeta();
+      trackEvent("landing_view", {});
     }, []);
 
-    useEffect(() => {
-      if (isTikTok) return;
-      const v = videoRef.current;
-      if (!v) return;
+    const handleStart = () => {
+      trackEvent("start_clicked", { destination: "pre_signup_tutorial" });
+      onComplete?.();
+      setShowTutorial(true);
+    };
 
-      v.muted = true;
-      v.defaultMuted = true;
-      v.playsInline = true;
-      v.setAttribute("muted", "");
-      v.setAttribute("playsinline", "");
-      v.setAttribute("webkit-playsinline", "true");
+    const handleLogin = () => {
+      trackEvent("login_clicked", {});
+      onLogin?.();
+    };
 
-      const tryPlay = () => {
-        const p = v.play();
-        if (p && typeof p.catch === "function") p.catch(() => {});
-      };
-
-      const abortNative = () => {
-        try { (v as unknown as { webkitExitFullscreen?: () => void }).webkitExitFullscreen?.(); } catch {}
-        try { v.pause(); tryPlay(); } catch {}
-      };
-      v.addEventListener("webkitbeginfullscreen", abortNative);
-
-      const onVisibility = () => {
-        if (document.visibilityState === "visible") tryPlay();
-      };
-      document.addEventListener("visibilitychange", onVisibility);
-
-      tryPlay();
-
-      return () => {
-        v.removeEventListener("webkitbeginfullscreen", abortNative);
-        document.removeEventListener("visibilitychange", onVisibility);
-      };
-    }, [isTikTok]);
+    if (showTutorial) {
+      return <PreSignupTutorial onClose={() => setShowTutorial(false)} />;
+    }
 
     return (
       <div
-        ref={ref}
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(2.5rem, env(safe-area-inset-top))",
-          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+          paddingTop: "max(3rem, env(safe-area-inset-top))",
+          paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-16 max-w-4xl w-full min-h-0">
-          <div className="relative z-10 flex items-center justify-center shrink min-h-0">
-            <div
-              className="iphone-frame relative"
-              style={{
-                aspectRatio: "9 / 19.5",
-                height: "min(62dvh, 620px)",
-                maxWidth: "82vw",
-              }}
-            >
-              <span className="iphone-btn iphone-btn-silent" />
-              <span className="iphone-btn iphone-btn-volup" />
-              <span className="iphone-btn iphone-btn-voldown" />
-              <span className="iphone-btn iphone-btn-power" />
+        {/* spacer */}
+        <div />
 
-              <div className="iphone-bezel">
-                <div className="iphone-screen relative overflow-hidden bg-black">
-                  {isTikTok ? (
-                    <img
-                      src="/videos/app-preview-poster.jpg"
-                      alt="Prévia do app CORE"
-                      className="absolute inset-0 w-full h-full select-none"
-                      style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
-                      draggable={false}
-                    />
-                  ) : (
-                    <>
-                      <video
-                        ref={videoRef}
-                        src="/videos/app-preview.mp4"
-                        poster="/videos/app-preview-poster.jpg"
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        preload="auto"
-                        disablePictureInPicture
-                        disableRemotePlayback
-                        controls={false}
-                        x-webkit-airplay="deny"
-                        {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-                        aria-hidden
-                        tabIndex={-1}
-                        className="absolute inset-0 w-full h-full select-none"
-                        style={{ objectFit: "cover", pointerEvents: "none", display: "block" }}
-                      />
-                      <div
-                        className="absolute inset-0"
-                        style={{ pointerEvents: "auto", touchAction: "none" }}
-                        onPointerDown={(e) => e.preventDefault()}
-                        onTouchStart={(e) => e.preventDefault()}
-                        onClick={(e) => e.preventDefault()}
-                        aria-hidden
-                      />
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Logo + tagline */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: "easeOut" }}
+          className="flex flex-col items-center gap-6 text-center"
+        >
+          <div className="relative">
+            <div className="absolute inset-0 blur-3xl bg-foreground/5 rounded-full" aria-hidden />
+            <img
+              src={logoSrc}
+              alt="CORE"
+              className="relative w-32 h-32 md:w-40 md:h-40 object-contain select-none"
+              draggable={false}
+            />
           </div>
 
-          <div className="relative z-10 w-full max-w-sm flex flex-col items-center md:items-start gap-5 shrink-0">
-            <h1 className="text-2xl md:text-4xl font-bold text-foreground text-center md:text-left leading-tight">
-              Organize sua vida<br />em um só lugar
+          <div className="space-y-2 max-w-sm">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+              Bem-vindo ao CORE
             </h1>
-
-            <div className="w-full flex flex-col items-center md:items-start gap-2">
-              <Link
-                to="/auth?signup=1"
-                onClick={onComplete}
-                className="w-full py-3.5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg text-center"
-              >
-                Começar
-              </Link>
-              <Link
-                to="/auth"
-                onClick={onLogin}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
-              >
-                Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
-              </Link>
-            </div>
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
+              Organize sua vida — finanças, treino, dieta e rotina — em um só lugar.
+            </p>
           </div>
-        </div>
+        </motion.div>
+
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: "easeOut", delay: 0.12 }}
+          className="w-full max-w-sm flex flex-col items-stretch gap-3"
+        >
+          <button
+            onClick={handleStart}
+            className="w-full py-3.5 rounded-xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+          >
+            Quero começar
+          </button>
+
+          <Link
+            to="/auth"
+            onClick={handleLogin}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-2"
+          >
+            Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
+          </Link>
+        </motion.div>
       </div>
     );
   }

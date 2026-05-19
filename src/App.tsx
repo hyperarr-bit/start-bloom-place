@@ -55,6 +55,7 @@ import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
 import AdminOnboarding from "./pages/admin/AdminOnboarding";
 import AdminRetention from "./pages/admin/AdminRetention";
 import AdminTutorialCompare from "./pages/admin/AdminTutorialCompare";
+import AdminLandingFunnel from "./pages/admin/AdminLandingFunnel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

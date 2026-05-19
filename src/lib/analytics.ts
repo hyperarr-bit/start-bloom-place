@@ -2,6 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Persistent session id for the tab
 const SESSION_KEY = "core_session_id";
+const UTM_KEY = "core_utm";
+
 const getSessionId = (): string => {
   if (typeof window === "undefined") return "ssr";
   let id = sessionStorage.getItem(SESSION_KEY);
@@ -12,12 +14,46 @@ const getSessionId = (): string => {
   return id;
 };
 
+/** Captura UTM params da URL atual e persiste pra ficarem disponíveis durante toda a sessão (mesmo após o cadastro). */
+export const captureLandingMeta = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utm = {
+      utm_source: params.get("utm_source") || "",
+      utm_medium: params.get("utm_medium") || "",
+      utm_campaign: params.get("utm_campaign") || "",
+      utm_content: params.get("utm_content") || "",
+      referrer: document.referrer || "",
+      path: window.location.pathname,
+    };
+    // Só persiste se vier algo de novo (não sobrescreve UTM original com vazio)
+    const existing = localStorage.getItem(UTM_KEY);
+    if (!existing || utm.utm_source) {
+      localStorage.setItem(UTM_KEY, JSON.stringify(utm));
+    }
+    return utm;
+  } catch {
+    return {};
+  }
+};
+
+const getStoredMeta = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+
 interface TrackOptions {
   trialDay?: number;
 }
 
 /**
  * Fire-and-forget event tracking. Never blocks UI.
+ * Funciona pra usuários logados E anônimos (visitantes pré-cadastro).
  */
 export const trackEvent = (
   eventName: string,
@@ -25,6 +61,9 @@ export const trackEvent = (
   opts: TrackOptions = {},
 ) => {
   try {
+    const meta = getStoredMeta();
+    const payload = { ...meta, ...data };
+
     supabase.auth.getUser().then(({ data: u }) => {
       const userId = u?.user?.id ?? null;
       (supabase as any)
@@ -32,7 +71,7 @@ export const trackEvent = (
         .insert({
           user_id: userId,
           event_name: eventName,
-          event_data: data,
+          event_data: payload,
           trial_day: opts.trialDay ?? null,
           session_id: getSessionId(),
         })

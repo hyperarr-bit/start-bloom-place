@@ -585,6 +585,7 @@ export type Database = {
       }
       admin_retention_stats: { Args: never; Returns: Json }
       admin_tutorial_compare: { Args: { _cutoff?: string }; Returns: Json }
+      admin_tutorial_dropoff: { Args: { _days?: number }; Returns: Json }
       admin_tutorial_users: {
         Args: { _action_key?: string }
         Returns: {

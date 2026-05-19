@@ -61,7 +61,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <div className="relative">
             <div className="absolute inset-0 blur-3xl bg-foreground/5 rounded-full" aria-hidden />
             <img
-              src={coreLogo}
+              src={logoSrc}
               alt="CORE"
               className="relative w-32 h-32 md:w-40 md:h-40 object-contain select-none"
               draggable={false}

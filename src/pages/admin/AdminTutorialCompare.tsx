@@ -76,6 +76,7 @@ const Stat = ({ icon, label, value }: { icon: React.ReactNode; label: string; va
 export default function AdminTutorialCompare() {
   const [data, setData] = useState<CompareResult | null>(null);
   const [users, setUsers] = useState<TutorialUser[]>([]);
+  const [dropoff, setDropoff] = useState<DropoffResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -84,13 +85,15 @@ export default function AdminTutorialCompare() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
-    const [cmp, usr] = await Promise.all([
+    const [cmp, usr, drp] = await Promise.all([
       (supabase as any).rpc("admin_tutorial_compare"),
       (supabase as any).rpc("admin_tutorial_users"),
+      (supabase as any).rpc("admin_tutorial_dropoff", { _days: 30 }),
     ]);
     if (cmp.error) setErr(cmp.error.message);
     else setData(cmp.data as CompareResult);
     setUsers((usr.data as TutorialUser[]) || []);
+    setDropoff((drp.data as DropoffResult) || null);
     setLoading(false);
     setRefreshing(false);
     setLastUpdate(new Date());

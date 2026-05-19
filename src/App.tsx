@@ -99,6 +99,7 @@ const AnimatedRoutes = () => {
           <Route path="onboarding" element={<AdminOnboarding />} />
           <Route path="retention" element={<AdminRetention />} />
           <Route path="tutorial-compare" element={<AdminTutorialCompare />} />
+          <Route path="aquisicao" element={<AdminLandingFunnel />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

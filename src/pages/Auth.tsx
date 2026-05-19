@@ -83,6 +83,7 @@ const Auth = () => {
       if (error) {
         toast({ title: "Erro ao entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message, variant: "destructive" });
       } else {
+        trackEvent("login_completed", { method: "password" });
         navigate("/");
       }
     } else {
@@ -90,6 +91,7 @@ const Auth = () => {
       if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
       } else {
+        trackEvent("signup_completed", { method: "password" });
         setConfirmationSent(true);
       }
     }

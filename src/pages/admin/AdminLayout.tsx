@@ -5,13 +5,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
 import {
   LayoutDashboard, BarChart3, TrendingUp, TrendingDown,
-  Users, Filter, LogOut, Shield, Target, Mail, Sparkles, ShieldCheck, GitCompare
+  Users, Filter, LogOut, Shield, Target, Mail, Sparkles, ShieldCheck, GitCompare, Megaphone
 } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
 
 const navItems = [
   { to: "/admin/dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { to: "/admin/aquisicao", label: "Aquisição", Icon: Megaphone },
+  { to: "/admin/usuarios", label: "Usuários", Icon: Users },
+  { to: "/admin/tutorial-compare", label: "Tutorial", Icon: GitCompare },
   { to: "/admin/analytics", label: "Analytics", Icon: BarChart3 },
   { to: "/admin/conversao", label: "Conversão", Icon: TrendingUp },
   { to: "/admin/ativacao", label: "Ativação", Icon: Target },
@@ -19,9 +22,7 @@ const navItems = [
   { to: "/admin/emails", label: "E-mails", Icon: Mail },
   { to: "/admin/churn", label: "Churn", Icon: TrendingDown },
   { to: "/admin/retention", label: "Retention", Icon: ShieldCheck },
-  { to: "/admin/usuarios", label: "Usuários", Icon: Users },
-  { to: "/admin/funil", label: "Funil", Icon: Filter },
-  { to: "/admin/tutorial-compare", label: "Tutorial A/B", Icon: GitCompare },
+  { to: "/admin/funil", label: "Funil módulos", Icon: Filter },
 ];
 
 export default function AdminLayout() {

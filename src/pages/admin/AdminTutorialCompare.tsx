@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Sparkles, CheckCircle2, Activity, Clock, RefreshCw, Users as UsersIcon } from "lucide-react";
+import { Sparkles, CheckCircle2, Activity, Clock, RefreshCw, Users as UsersIcon, TrendingDown } from "lucide-react";
+
+interface DropoffStep { step: number; label: string; total: number; reached: number }
+interface DropoffModule { module_id: string; started: number; completed: number; steps: DropoffStep[] }
+interface DropoffResult { days: number; modules: DropoffModule[]; generated_at: string }
+
 
 interface ModuleStat { module_id: string; users: number; total_seconds: number }
 interface CohortStat {

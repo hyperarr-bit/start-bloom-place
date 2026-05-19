@@ -8,6 +8,7 @@ import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucid
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">

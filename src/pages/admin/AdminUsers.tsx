@@ -19,6 +19,7 @@ export default function AdminUsers() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [drawer, setDrawer] = useState<{ id: string; email: string } | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);

@@ -92,6 +92,7 @@ export default function AdminLandingFunnel() {
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
             Atualizar
           </button>
+          <ResetAnalyticsButton onDone={() => load()} />
         </div>
       </div>
 

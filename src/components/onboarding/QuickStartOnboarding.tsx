@@ -39,10 +39,31 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
   const { set, isGuest } = useUserData();
   const navigate = useNavigate();
+  const startedRef = useRef(false);
+  const completedRef = useRef(false);
+
+  // Funil pré-cadastro: captura UTM e dispara landing_view + tutorial_started
+  // assim que o convidado vê a tela de boas-vindas/escolha (que é o tutorial real).
+  useEffect(() => {
+    if (!isGuest || startedRef.current) return;
+    startedRef.current = true;
+    captureLandingMeta();
+    trackEvent("landing_view", { source: "quickstart" });
+    trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length });
+  }, [isGuest]);
+
+  const handleStartClick = () => {
+    if (isGuest) trackEvent("start_clicked", { destination: "module_choice" });
+    setStep(1);
+  };
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     set("quickstart-target-module", opt.key);
     trackEvent("quickstart_module_chosen", { module: opt.key });
+    if (isGuest && !completedRef.current) {
+      completedRef.current = true;
+      trackEvent("pre_signup_tutorial_completed", { module: opt.key });
+    }
     set("core-onboarding-done", "true");
     onComplete();
     setTimeout(() => navigate(opt.route), 50);

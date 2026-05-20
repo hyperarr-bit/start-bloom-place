@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
 
@@ -39,10 +39,31 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
   const { set, isGuest } = useUserData();
   const navigate = useNavigate();
+  const startedRef = useRef(false);
+  const completedRef = useRef(false);
+
+  // Funil pré-cadastro: captura UTM e dispara landing_view + tutorial_started
+  // assim que o convidado vê a tela de boas-vindas/escolha (que é o tutorial real).
+  useEffect(() => {
+    if (!isGuest || startedRef.current) return;
+    startedRef.current = true;
+    captureLandingMeta();
+    trackEvent("landing_view", { source: "quickstart" });
+    trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length });
+  }, [isGuest]);
+
+  const handleStartClick = () => {
+    if (isGuest) trackEvent("start_clicked", { destination: "module_choice" });
+    setStep(1);
+  };
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     set("quickstart-target-module", opt.key);
     trackEvent("quickstart_module_chosen", { module: opt.key });
+    if (isGuest && !completedRef.current) {
+      completedRef.current = true;
+      trackEvent("pre_signup_tutorial_completed", { module: opt.key });
+    }
     set("core-onboarding-done", "true");
     onComplete();
     setTimeout(() => navigate(opt.route), 50);
@@ -101,7 +122,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </p>
               </div>
               <button
-                onClick={() => setStep(1)}
+                onClick={handleStartClick}
                 className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
                 Quero começar <ArrowRight className="w-4 h-4" />

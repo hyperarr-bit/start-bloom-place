@@ -169,6 +169,47 @@ export default function AdminLandingFunnel() {
         <KPI label="Cadastros do período" value={data.signups.toString()} />
         <KPI label="Pagantes do período" value={data.paid.toString()} />
       </div>
+
+      {/* Recent anonymous visitors */}
+      <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
+        <h3 className="text-sm font-bold text-zinc-100 mb-1">Visitantes recentes (anônimos)</h3>
+        <p className="text-[11px] text-zinc-500 mb-4">Clique numa sessão pra ver o caminho que ela seguiu.</p>
+        {visitors.length === 0 ? (
+          <p className="text-xs text-zinc-600">Nenhuma sessão anônima no período.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {visitors.map((v) => (
+              <button
+                key={v.session_id}
+                onClick={() => setDrawer({ session: v.session_id, label: `Visitante · ${v.utm_source}` })}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-zinc-900/50 hover:bg-zinc-800/50 border border-zinc-800 text-left"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-200 truncate">
+                    <span className="text-zinc-500">{new Date(v.last_seen).toLocaleString("pt-BR")}</span>
+                    {" · "}
+                    <span className="font-medium">{v.events} evt</span>
+                    {" · "}
+                    <span className="text-cyan-400">{v.utm_source}</span>
+                  </p>
+                  <p className="text-[11px] text-zinc-500 truncate">
+                    Último: {v.last_event}{v.last_module ? ` (${v.last_module})` : ""}{v.last_step ? ` — ${v.last_step}` : ""}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {drawer && (
+        <UserJourneyDrawer
+          sessionId={drawer.session}
+          label={drawer.label}
+          onClose={() => setDrawer(null)}
+        />
+      )}
     </div>
   );
 }

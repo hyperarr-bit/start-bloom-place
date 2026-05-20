@@ -90,7 +90,7 @@ export default function AdminTutorialCompare() {
     const [cmp, usr, drp] = await Promise.all([
       (supabase as any).rpc("admin_tutorial_compare"),
       (supabase as any).rpc("admin_tutorial_users"),
-      (supabase as any).rpc("admin_tutorial_dropoff", { _days: 30 }),
+      (supabase as any).rpc("admin_tutorial_dropoff", { _days: dropoffDays }),
     ]);
     if (cmp.error) setErr(cmp.error.message);
     else setData(cmp.data as CompareResult);

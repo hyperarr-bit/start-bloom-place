@@ -39,10 +39,14 @@ export default function AdminLandingFunnel() {
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
-    const { data: res, error } = await (supabase as any).rpc("admin_landing_funnel", { _days: days });
+    const [{ data: res, error }, { data: v }] = await Promise.all([
+      (supabase as any).rpc("admin_landing_funnel", { _days: days }),
+      (supabase as any).rpc("admin_recent_visitors", { _limit: 50 }),
+    ]);
     if (error) setErr(error.message);
     else {
       setData(res as Funnel);
+      setVisitors(v || []);
       setLastUpdate(new Date());
       setErr(null);
     }

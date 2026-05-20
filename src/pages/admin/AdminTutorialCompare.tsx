@@ -83,6 +83,7 @@ export default function AdminTutorialCompare() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [err, setErr] = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState<string>("all");
+  const [dropoffDays, setDropoffDays] = useState<number>(1);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);

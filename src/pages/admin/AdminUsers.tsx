@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, ChevronRight } from "lucide-react";
+import UserJourneyDrawer from "@/components/admin/UserJourneyDrawer";
 
 interface UserRow {
   user_id: string; email: string; created_at: string;
@@ -18,6 +19,7 @@ export default function AdminUsers() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [drawer, setDrawer] = useState<{ id: string; email: string } | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -112,14 +114,19 @@ export default function AdminUsers() {
                   <th className="text-right px-3 py-2">Sessões</th>
                   <th className="text-left px-3 py-2">Última atividade</th>
                   <th className="text-left px-3 py-2">Top módulo</th>
+                  <th className="px-3 py-2"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={7} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
                 )}
                 {filtered.map(r => (
-                  <tr key={r.user_id} className="border-t border-zinc-800/50 hover:bg-zinc-800/30">
+                  <tr
+                    key={r.user_id}
+                    onClick={() => setDrawer({ id: r.user_id, email: r.email })}
+                    className="border-t border-zinc-800/50 hover:bg-zinc-800/30 cursor-pointer"
+                  >
                     <td className="px-3 py-2 text-zinc-100 truncate max-w-[200px]">{r.email}</td>
                     <td className="px-3 py-2 text-zinc-400">{fmtDate(r.created_at)}</td>
                     <td className="px-3 py-2 text-zinc-400">{r.plan || "—"}</td>
@@ -134,12 +141,20 @@ export default function AdminUsers() {
                     <td className="px-3 py-2 text-right text-zinc-100 font-bold">{r.total_sessions}</td>
                     <td className="px-3 py-2 text-zinc-400">{fmtDateTime(r.last_session)}</td>
                     <td className="px-3 py-2 text-zinc-400">{r.top_module || "—"}</td>
+                    <td className="px-2 py-2 text-zinc-500"><ChevronRight className="w-4 h-4" /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+      {drawer && (
+        <UserJourneyDrawer
+          userId={drawer.id}
+          label={drawer.email}
+          onClose={() => setDrawer(null)}
+        />
       )}
     </div>
   );

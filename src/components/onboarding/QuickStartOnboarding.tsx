@@ -42,32 +42,32 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const startedRef = useRef(false);
   const completedRef = useRef(false);
 
-  // Funil pré-cadastro: captura UTM e dispara landing_view + tutorial_started
-  // assim que o convidado vê a tela de boas-vindas/escolha (que é o tutorial real).
+  // Funil: dispara para todos (logado ou não) — admin filtra por flag se quiser.
   useEffect(() => {
-    if (!isGuest || startedRef.current) return;
+    if (startedRef.current) return;
     startedRef.current = true;
     captureLandingMeta();
-    trackEvent("landing_view", { source: "quickstart" });
-    trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length });
+    trackEvent("landing_view", { source: "quickstart", is_guest: isGuest });
+    trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length, is_guest: isGuest });
   }, [isGuest]);
 
   const handleStartClick = () => {
-    if (isGuest) trackEvent("start_clicked", { destination: "module_choice" });
+    trackEvent("start_clicked", { destination: "module_choice", is_guest: isGuest });
     setStep(1);
   };
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     set("quickstart-target-module", opt.key);
-    trackEvent("quickstart_module_chosen", { module: opt.key });
-    if (isGuest && !completedRef.current) {
+    trackEvent("quickstart_module_chosen", { module: opt.key, is_guest: isGuest });
+    if (!completedRef.current) {
       completedRef.current = true;
-      trackEvent("pre_signup_tutorial_completed", { module: opt.key });
+      trackEvent("pre_signup_tutorial_completed", { module: opt.key, is_guest: isGuest });
     }
     set("core-onboarding-done", "true");
     onComplete();
     setTimeout(() => navigate(opt.route), 50);
   };
+
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");

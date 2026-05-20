@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sparkles, CheckCircle2, Activity, Clock, RefreshCw, Users as UsersIcon, TrendingDown } from "lucide-react";
+import ResetAnalyticsButton from "@/components/admin/ResetAnalyticsButton";
 
 interface DropoffStep { step: number; label: string; total: number; reached: number }
 interface DropoffModule { module_id: string; started: number; completed: number; steps: DropoffStep[] }
@@ -128,14 +129,17 @@ export default function AdminTutorialCompare() {
             Comparação A/B + usuários por etapa · atualizado {lastUpdate.toLocaleTimeString("pt-BR")}
           </p>
         </div>
-        <button
-          onClick={() => load()}
-          disabled={refreshing}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-          Atualizar
-        </button>
+        <div className="flex gap-2 items-center">
+          <button
+            onClick={() => load()}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            Atualizar
+          </button>
+          <ResetAnalyticsButton onDone={() => load()} />
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">

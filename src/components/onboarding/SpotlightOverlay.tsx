@@ -39,14 +39,14 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   stepsRef.current = steps;
 
   useEffect(() => {
-    if (!isGuest) return;
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     if (target === moduleKey && !done) {
       setActive(true);
-      trackEvent("spotlight_shown", { module: moduleKey });
+      trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
     }
   }, [moduleKey, get, isGuest]);
+
 
   // Track step views (drop-off analytics)
   useEffect(() => {

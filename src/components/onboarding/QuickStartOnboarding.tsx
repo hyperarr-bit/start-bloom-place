@@ -122,7 +122,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </p>
               </div>
               <button
-                onClick={() => setStep(1)}
+                onClick={handleStartClick}
                 className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
                 Quero começar <ArrowRight className="w-4 h-4" />

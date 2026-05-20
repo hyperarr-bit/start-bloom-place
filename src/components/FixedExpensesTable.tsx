@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -65,6 +65,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", paymentMethod: "", cardName: "",
   });
+  const [showMore, setShowMore] = useState(false);
 
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {
@@ -80,6 +81,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         },
       ]);
       setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "" });
+      setShowMore(false);
     }
   };
 
@@ -101,100 +103,105 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         <span className="font-bold text-sm text-income-foreground tracking-wide">CUSTOS FIXOS</span>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[600px]">
-          <thead>
-            <tr className="border-b border-border bg-muted/30">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground text-xs">Descrição</th>
-              <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Categoria</th>
-              <th className="px-3 py-2 text-right font-medium text-muted-foreground text-xs">Valor</th>
-              <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Pagamento</th>
-              <th className="px-3 py-2 text-center font-medium text-muted-foreground text-xs">Cartão</th>
-              <th className="px-3 py-2 w-8"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-3 py-6 text-center">
-                  <p className="text-xs text-muted-foreground">Nenhum custo fixo cadastrado</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Adicione aluguel, contas, assinaturas, academia...</p>
-                </td>
-              </tr>
+      {/* Form sempre visível */}
+      <div className="p-3 border-b border-border bg-muted/20 space-y-2">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="+ Novo custo fixo"
+            value={newExpense.description}
+            onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })}
+            className="h-9 text-xs flex-1"
+          />
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder="0"
+            value={newExpense.value}
+            onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })}
+            className="h-9 text-xs w-20 text-right"
+          />
+          <button
+            onClick={addExpense}
+            data-spotlight="add-fixed"
+            aria-label="Adicionar custo fixo"
+            className="h-9 w-9 flex-shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <button
+          onClick={() => setShowMore((s) => !s)}
+          className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+        >
+          <ChevronDown className={`w-3 h-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
+          {showMore ? "Menos opções" : "Mais opções (categoria, pagamento)"}
+        </button>
+
+        {showMore && (
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Select value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Categoria" /></SelectTrigger>
+              <SelectContent>{categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={newExpense.paymentMethod} onValueChange={(v) => setNewExpense({ ...newExpense, paymentMethod: v, cardName: isCardPayment(v) ? newExpense.cardName : "" })}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pagamento" /></SelectTrigger>
+              <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+            </Select>
+            {isCardPayment(newExpense.paymentMethod) && (
+              <Select value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })}>
+                <SelectTrigger className="h-8 text-xs col-span-2"><SelectValue placeholder="Cartão" /></SelectTrigger>
+                <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+              </Select>
             )}
-            {expenses.map((expense) => (
-              <tr key={expense.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                <td className="px-3 py-2">{expense.description}</td>
-                <td className="px-3 py-2 text-center">
-                  <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
-                    {getCategoryLabel(expense.category)}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</td>
-                <td className="px-3 py-2 text-center">
-                  <span className="text-xs text-muted-foreground">{getPaymentLabel(expense.paymentMethod)}</span>
-                </td>
-                <td className="px-3 py-2 text-center">
-                  {expense.cardName ? (
-                    <span className={`category-badge ${getCardStyle(expense.cardName)}`}>
-                      {getCardLabel(expense.cardName)}
+          </div>
+        )}
+      </div>
+
+      {/* Lista */}
+      <div>
+        {expenses.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs text-muted-foreground">Nenhum custo fixo cadastrado</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Adicione aluguel, contas, assinaturas, academia...</p>
+          </div>
+        ) : (
+          expenses.map((expense) => (
+            <div key={expense.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm truncate">{expense.description}</span>
+                    <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
+                      {getCategoryLabel(expense.category)}
                     </span>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            <tr className="bg-muted/20">
-              <td className="px-3 py-2">
-                <Input placeholder="+ Novo custo fixo" value={newExpense.description} onChange={(e) => setNewExpense({ ...newExpense, description: e.target.value })} className="h-7 text-xs border-0 bg-transparent shadow-none px-0 focus-visible:ring-0" />
-              </td>
-              <td className="px-3 py-2">
-                <Select value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })}>
-                  <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                  <SelectContent>{categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </td>
-              <td className="px-3 py-2">
-                <Input type="number" placeholder="0" value={newExpense.value} onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })} className="h-7 text-xs border-0 bg-transparent shadow-none px-0 text-right focus-visible:ring-0" />
-              </td>
-              <td className="px-3 py-2">
-                <Select value={newExpense.paymentMethod} onValueChange={(v) => setNewExpense({ ...newExpense, paymentMethod: v, cardName: isCardPayment(v) ? newExpense.cardName : "" })}>
-                  <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none"><SelectValue placeholder="Forma" /></SelectTrigger>
-                  <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
-                </Select>
-              </td>
-              <td className="px-3 py-2">
-                {isCardPayment(newExpense.paymentMethod) ? (
-                  <Select value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })}>
-                    <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                    <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
-              </td>
-              <td className="px-3 py-2">
-                <button onClick={addExpense} data-spotlight="add-fixed" className="text-muted-foreground hover:text-foreground transition-colors">
-                  <Plus className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                    <span>{getPaymentLabel(expense.paymentMethod)}</span>
+                    {expense.cardName && (
+                      <>
+                        <span>·</span>
+                        <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <span className="text-sm tabular-nums font-medium whitespace-nowrap">
+                  R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </span>
+                <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
-              </td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border">
-              <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={2}>TOTAL</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={4}>
-                R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Total */}
+      <div className="px-3 py-2 border-t border-border flex items-center justify-between">
+        <span className="text-xs text-muted-foreground">TOTAL</span>
+        <span className="text-sm font-bold tabular-nums">R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
       </div>
     </div>
   );

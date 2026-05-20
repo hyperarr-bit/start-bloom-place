@@ -149,6 +149,13 @@ export default function AdminUsers() {
           </div>
         </div>
       )}
+      {drawer && (
+        <UserJourneyDrawer
+          userId={drawer.id}
+          label={drawer.email}
+          onClose={() => setDrawer(null)}
+        />
+      )}
     </div>
   );
 }

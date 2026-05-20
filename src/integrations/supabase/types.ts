@@ -574,6 +574,20 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_recent_visitors: {
+        Args: { _limit?: number }
+        Returns: {
+          events: number
+          first_seen: string
+          last_event: string
+          last_module: string
+          last_seen: string
+          last_step: string
+          session_id: string
+          utm_source: string
+        }[]
+      }
+      admin_reset_analytics: { Args: never; Returns: string }
       admin_retention_offers_breakdown: {
         Args: never
         Returns: {
@@ -593,6 +607,15 @@ export type Database = {
           completed_at: string
           email: string
           user_id: string
+        }[]
+      }
+      admin_user_journey: {
+        Args: { _limit?: number; _session_id?: string; _user_id?: string }
+        Returns: {
+          created_at: string
+          event_data: Json
+          event_name: string
+          session_id: string
         }[]
       }
       admin_winback_stats: { Args: never; Returns: Json }

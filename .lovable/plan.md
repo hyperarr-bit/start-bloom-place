@@ -1,34 +1,46 @@
-## Problema
+# Reset analytics + fix tracking + jornada por usuário
 
-Na tela `/inicio` (`WelcomeScreen`), os botões **"Começar"** e **"Entrar"** só funcionam após recarregar a página. Isso acontece principalmente quando o app é aberto pelo navegador interno do Instagram (visível no print: `Instagram` no topo). In-app webviews engolem o primeiro `onClick` que dispara `navigate()` programático do React Router, especialmente quando há um `<video autoPlay>` competindo pela atenção do gesture handler.
+## 1. Zerar contagens a partir de agora
 
-## Causa raiz
+Adicionar uma "linha do tempo" para o admin: tudo gravado antes do reset some das telas (sem apagar dados crus).
 
-1. Os botões usam `onClick={() => navigate("/auth")}` — navegação puramente programática. Webviews do Instagram/TikTok costumam ignorar o primeiro gesto se o JS ainda está hidratando ou se outro elemento (o `<video>`) acabou de receber foco.
-2. Há uma camada `absolute inset-0` sobre o vídeo com `pointerEvents: "auto"` e `touchAction: "none"` que captura todos os pointer events da área do iPhone — não cobre os botões diretamente, mas indica que a página luta contra o WebView por controle de toque.
-3. Não há `type="button"` nos `<button>` (não crítico aqui, mas boa prática).
+- Gravar em `app_config` a chave `analytics_reset_at` = `now()` ao clicar num botão "Zerar contadores" no admin.
+- Atualizar `admin_landing_funnel`, `admin_tutorial_dropoff` e `admin_dashboard_v2` para considerar `GREATEST(cutoff_por_dias, analytics_reset_at)` ao filtrar eventos.
+- Botão "Zerar contadores agora" no topo da página Aquisição/Tutorial (com confirmação).
 
-## Plano
+## 2. Por que "Quero começar" e "Concluiu tutorial" estão em 0
 
-**Arquivo:** `src/components/WelcomeScreen.tsx`
+Os eventos `start_clicked` e `pre_signup_tutorial_completed` só disparam quando o visitante é convidado (`isGuest`). Como você está testando logado, nada conta. Mesma coisa para o passo-a-passo dos módulos: o admin filtra por sessão de convidado.
 
-1. Trocar o `<button>` "Começar" e o `<button>` "Já tem uma conta? Entrar" por componentes `<Link>` do `react-router-dom` (renderizam `<a href>` real). Isso faz o WebView tratar como navegação nativa de link, que funciona no primeiro toque.
-   - "Começar" → `<Link to="/auth?signup=1">`
-   - "Entrar" → `<Link to="/auth">`
-2. Manter exatamente as mesmas classes/estilos visuais.
-3. Remover as props `onComplete` e `onLogin` do `WelcomeScreen` (ou mantê-las opcionais para não quebrar outros usos — verificar `Inicio.tsx`).
+Correções em `QuickStartOnboarding.tsx`:
+- Disparar `start_clicked`, `pre_signup_tutorial_started` e `pre_signup_tutorial_completed` para todos os usuários (com flag `is_guest` no payload).
+- Disparar `landing_view` também para logados (com `source: "quickstart"`).
 
-**Arquivo:** `src/pages/Inicio.tsx`
+Em `SpotlightOverlay.tsx`:
+- Manter `spotlight_shown` e `spotlight_step_view` para todos (hoje só rola pra guest).
 
-4. Simplificar para apenas `<WelcomeScreen />` já que a navegação passa a ser feita via `<Link>` interno.
+## 3. Jornada do usuário (drill-down)
+
+Nova RPC `admin_user_journey(_user_id uuid, _session_id text)` retornando lista cronológica de eventos do usuário (ou sessão pré-cadastro):
+- timestamp, event_name, módulo, passo, label, página.
+
+Na página **Usuários** do admin: cada linha ganha uma seta `>` que expande mostrando:
+- Linha do tempo vertical: "Visitou → Clicou 'Quero começar' → Escolheu Finanças → Passo 1 Vencimentos → Passo 2 Cartões → **abandonou aqui**".
+- Indica o último passo visto e em qual módulo + label parou.
+
+Para visitantes anônimos (sem user_id), agrupar por `session_id` numa aba separada "Visitantes" mostrando a mesma timeline.
 
 ## Detalhes técnicos
 
-- `<Link>` do React Router intercepta o clique e chama `navigate` internamente, mas como o elemento subjacente é `<a href>`, o WebView reconhece o gesto e a navegação acontece no primeiro toque mesmo se o JS estiver ocupado.
-- Nenhuma alteração em rotas, auth ou lógica de negócio.
-- Nenhum impacto visual.
+**Migração SQL:**
+- `INSERT INTO app_config (key, value) VALUES ('analytics_reset_at', jsonb_build_object('at', now())) ON CONFLICT (key) DO UPDATE ...` (chamado pelo botão via RPC `admin_reset_analytics()`).
+- Atualizar 3 RPCs existentes para ler `analytics_reset_at` e usar como piso do `cutoff`.
+- Nova RPC `admin_user_journey(_user_id, _session_id)`.
+- Nova RPC `admin_recent_visitors(_limit)` listando sessões anônimas dos últimos N dias com último evento + último passo.
 
-## Fora do escopo
-
-- Não vou mexer no vídeo, no autoplay, nem no overlay do iPhone mockup.
-- Não vou alterar `/auth` nem o fluxo de signup/login.
+**Frontend:**
+- `QuickStartOnboarding.tsx`: remover guards `if (isGuest)` dos trackings (manter só na lógica de navegação).
+- `SpotlightOverlay.tsx`: remover guard `if (!isGuest) return;` do `useEffect` que ativa o tutorial — ou ao menos do tracking.
+- `AdminLandingFunnel.tsx` / `AdminTutorialCompare.tsx`: botão "Zerar contadores".
+- `AdminUsers.tsx`: coluna com seta expansível + timeline.
+- Nova `AdminVisitors.tsx` (aba) para sessões anônimas.

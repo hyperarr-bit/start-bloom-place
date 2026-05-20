@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, ChevronRight } from "lucide-react";
+import UserJourneyDrawer from "@/components/admin/UserJourneyDrawer";
 
 interface UserRow {
   user_id: string; email: string; created_at: string;

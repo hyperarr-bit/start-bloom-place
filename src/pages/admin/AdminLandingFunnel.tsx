@@ -30,10 +30,12 @@ const STEPS = [
 
 export default function AdminLandingFunnel() {
   const [data, setData] = useState<Funnel | null>(null);
+  const [visitors, setVisitors] = useState<any[]>([]);
   const [days, setDays] = useState(30);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [err, setErr] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<{ session: string; label: string } | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);

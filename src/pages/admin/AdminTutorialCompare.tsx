@@ -83,13 +83,14 @@ export default function AdminTutorialCompare() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [err, setErr] = useState<string | null>(null);
   const [filterKey, setFilterKey] = useState<string>("all");
+  const [dropoffDays, setDropoffDays] = useState<number>(1);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
     const [cmp, usr, drp] = await Promise.all([
       (supabase as any).rpc("admin_tutorial_compare"),
       (supabase as any).rpc("admin_tutorial_users"),
-      (supabase as any).rpc("admin_tutorial_dropoff", { _days: 30 }),
+      (supabase as any).rpc("admin_tutorial_dropoff", { _days: dropoffDays }),
     ]);
     if (cmp.error) setErr(cmp.error.message);
     else setData(cmp.data as CompareResult);
@@ -160,11 +161,27 @@ export default function AdminTutorialCompare() {
       {/* Drop-off por etapa de cada módulo */}
       {dropoff && dropoff.modules.length > 0 && (
         <div className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingDown className="w-4 h-4 text-orange-400" />
-            <h3 className="text-sm font-bold text-zinc-100">Onde os usuários abandonam o tutorial</h3>
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-orange-400" />
+              <h3 className="text-sm font-bold text-zinc-100">Onde os usuários abandonam o tutorial</h3>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { d: 1, label: "Diário" },
+                { d: 7, label: "7 dias" },
+                { d: 30, label: "30 dias" },
+                { d: 90, label: "90 dias" },
+              ].map(opt => (
+                <FilterBtn key={opt.d} active={dropoffDays === opt.d} onClick={() => setDropoffDays(opt.d)}>
+                  {opt.label}
+                </FilterBtn>
+              ))}
+            </div>
           </div>
-          <p className="text-[11px] text-zinc-500 mb-4">Últimos 30 dias · etapa por etapa em cada módulo</p>
+          <p className="text-[11px] text-zinc-500 mb-4">
+            {dropoffDays === 1 ? "Últimas 24 horas" : `Últimos ${dropoffDays} dias`} · etapa por etapa em cada módulo
+          </p>
 
           <div className="grid md:grid-cols-2 gap-4">
             {dropoff.modules.map(mod => {

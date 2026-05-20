@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Eye, MousePointerClick, BookOpen, CheckCircle2, UserPlus, Activity, CreditCard, RefreshCw } from "lucide-react";
+import { Eye, MousePointerClick, BookOpen, CheckCircle2, UserPlus, Activity, CreditCard, RefreshCw, ChevronRight } from "lucide-react";
+import ResetAnalyticsButton from "@/components/admin/ResetAnalyticsButton";
+import UserJourneyDrawer from "@/components/admin/UserJourneyDrawer";
 
 interface Funnel {
   days: number;

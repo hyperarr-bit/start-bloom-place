@@ -38,7 +38,10 @@ export const Simulators = () => {
   const calculateFinancing = () => {
     const principal = financing.price - financing.downPayment;
     const monthlyRate = financing.rate / 100;
-    const pmt = principal * (monthlyRate * Math.pow(1 + monthlyRate, financing.installments)) / 
+    if (principal <= 0 || financing.installments <= 0 || monthlyRate <= 0) {
+      return { pmt: 0, totalPaid: 0, interest: 0 };
+    }
+    const pmt = principal * (monthlyRate * Math.pow(1 + monthlyRate, financing.installments)) /
                 (Math.pow(1 + monthlyRate, financing.installments) - 1);
     const totalPaid = financing.downPayment + pmt * financing.installments;
     const interest = totalPaid - financing.price;

@@ -5,10 +5,10 @@ import { markActivation } from "@/lib/analytics";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
-const ACTIVATION_RULES: Array<{ match: RegExp; action: string }> = [
+const ACTIVATION_RULES: Array<{ match: RegExp; action: string; meaningful?: (v: any) => boolean }> = [
   { match: /finance-incomes/i, action: "first_income" },
   { match: /finance-fixed-expenses/i, action: "first_fixed_expense" },
-  { match: /finance-dueDays/i, action: "first_bill" },
+  { match: /finance-dueDays/i, action: "first_bill", meaningful: (v) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0) },
   { match: /finance-notes/i, action: "first_note" },
   { match: /finance-expenses/i, action: "first_transaction" },
   { match: /finance-installments/i, action: "first_installment" },

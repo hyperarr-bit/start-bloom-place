@@ -40,6 +40,7 @@ const checkActivation = (key: string, value: any) => {
   if (key.startsWith("spotlight-") || key.startsWith("quickstart-") || key.startsWith("core-")) return;
   for (const rule of ACTIVATION_RULES) {
     if (rule.match.test(key)) {
+      if (rule.meaningful && !rule.meaningful(value)) return;
       markActivation(rule.action, { source_key: key });
       try {
         window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: rule.action, key } }));

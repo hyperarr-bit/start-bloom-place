@@ -1,24 +1,22 @@
-# Corrigir contagens do tutorial no admin
+# Garantir que os 4 módulos apareçam no "Onde os usuários abandonam o tutorial"
 
-## Problema encontrado
+## Problema
+O card só mostra `dieta` e `rotina` porque, desde o último reset de analytics, ninguém ainda chegou a abrir o tutorial de `financas` e `treino`. A função `admin_tutorial_dropoff` monta a lista de módulos a partir dos eventos existentes (`spotlight_step_view`), então módulos sem eventos simplesmente somem.
 
-Na página `/admin/tutorial`, o filtro de período (Diário / 7d / 30d / 90d) **não funciona de verdade**. Os números mostrados são sempre dos últimos 1 dia, mesmo clicando em 7/30/90.
+A captação de eventos em si (clicar em "Quero começar" → escolher módulo → cada passo do spotlight) já está correta no código:
+- `QuickStartOnboarding` dispara `start_clicked` e `quickstart_module_chosen`
+- `SpotlightOverlay` dispara `spotlight_shown` ao montar e `spotlight_step_view` em cada passo, e `quickstart_completed` no fim
+Todos já carregam `module: "<key>"`. Não há bug de tracking — o problema é só de apresentação no SQL.
 
-### Causa técnica
+## Mudança
 
-Em `src/pages/admin/AdminTutorialCompare.tsx` a função `load` é criada com `useCallback(..., [])` — array de dependências vazio. Ela lê `dropoffDays` por closure, então o valor fica congelado em `1` (valor inicial). Trocar de aba não dispara refetch, e mesmo o auto-refresh a cada 30s continua chamando com `_days: 1`.
+Atualizar a função `admin_tutorial_dropoff` para sempre retornar os 4 módulos fixos (`financas`, `rotina`, `dieta`, `treino`), mesmo com 0 iniciados/0 completados/sem passos ainda capturados. Módulos sem dados aparecem com `started: 0`, `completed: 0`, `steps: []`.
 
-Por isso o "Diário" parece o único que bate, e os outros ficam errados/parados.
+### Detalhes técnicos
+- Adicionar CTE `all_modules` com lista fixa dos 4 keys.
+- Trocar o `FROM (SELECT DISTINCT module_id FROM steps_agg…)` por `FROM all_modules` + `LEFT JOIN` em `starts_agg`, `completes` e `steps_agg`.
+- Manter o filtro pelo `analytics_reset_at` (contagens só a partir do reset).
+- Sem mudança de tracking no frontend — os eventos já cobrem cada passo de cada módulo.
 
-## O que será feito
-
-1. **Corrigir o refetch por período** — adicionar `dropoffDays` nas deps do `useCallback`, para que mudar a aba realmente re-consulte o banco com o intervalo certo.
-2. **Zerar contadores a partir de agora** — chamar `admin_reset_analytics` automaticamente ao salvar essa correção (uma única vez), pra começar a contagem do zero com o fix em produção. A RPC já existe e move o `analytics_reset_at` no `app_config`, fazendo todas as funções de admin (`admin_tutorial_dropoff`, `admin_landing_funnel`, etc.) ignorarem eventos antigos.
-   - Alternativa: deixar você apertar o botão "Zerar contadores" que já existe no topo da página depois do deploy. Me diz qual prefere.
-
-## Detalhes técnicos
-
-- Arquivo único alterado: `src/pages/admin/AdminTutorialCompare.tsx`
-- Mudança: `useCallback(async (silent) => {...}, [])` → `useCallback(async (silent) => {...}, [dropoffDays])`
-- Sem migration nova. Sem mudança de schema.
-- Eventos de tutorial (`spotlight_shown`, `spotlight_step_view`, `quickstart_completed`) continuam sendo emitidos do jeito que já estão — eles estão corretos, só a leitura no admin que estava bugada.
+### Validação
+Após aplicar a migração, o card "Onde os usuários abandonam o tutorial" passa a listar os 4 módulos. `financas` e `treino` aparecem com `0 iniciados` até alguém abrir o tutorial deles, e a partir daí cada passo é contado corretamente.

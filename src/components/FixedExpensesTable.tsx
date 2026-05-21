@@ -81,7 +81,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         },
       ]);
       setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "" });
-      setShowMore(false);
+      
     }
   };
 

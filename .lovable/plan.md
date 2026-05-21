@@ -1,30 +1,27 @@
-# UX dos cards de Custos Fixos e Variáveis
+# Ajustes nos cards de Custos (Fixos e Variáveis)
 
-## Problema
-Hoje as tabelas de Custos Fixos e Custos Variáveis usam `overflow-x-auto` com `min-w-[600/650px]`. No mobile, o botão "+" e várias colunas ficam escondidos à direita — o usuário não percebe que precisa rolar para o lado para adicionar um gasto.
+## 1. Tutorial / Spotlight do botão "+"
 
-## Solução
-Replicar o padrão de Receitas: tudo visível "de cara", sem scroll horizontal, e o botão de adicionar sempre alcançável.
+O atributo `data-spotlight="add-expense"` e `add-fixed` continua no botão `+` no novo layout, então o `SpotlightOverlay` já segue o elemento. Vou apenas validar visualmente para garantir que a seta aponta corretamente para a nova posição (canto superior direito do card, ao lado do campo de valor) e ajustar offset se necessário.
 
-### Form de adicionar (sempre visível, no topo da lista)
-- Extrair o input/selects da última linha da tabela para um bloco dedicado de "Adicionar gasto" logo abaixo do header (CUSTOS FIXOS / CUSTOS VARIÁVEIS).
-- Layout em 2 linhas compactas no mobile:
-  - Linha 1: input de Descrição (flex-1) + input de Valor (w-24) + botão "+" (w-9, primário, sempre visível).
-  - Linha 2 (collapse / expansível "mais opções"): selects de Categoria, Data (só variável), Forma de pagamento e Cartão (condicional).
-- No desktop (≥sm) tudo cabe numa linha só.
+## 2. "Mais opções" aberto por padrão
 
-### Lista de gastos cadastrados (substitui a tabela)
-- Trocar `<table>` por uma lista de cards/linhas responsivos — sem `min-w` e sem `overflow-x-auto`.
-- Cada item mostra: descrição, badge de categoria, valor à direita, e abaixo metadados em texto pequeno (data · pagamento · cartão). Botão de lixeira à direita.
-- Mantém o mesmo visual minimal Notion-like (bordas, hover, tabular-nums).
+- `showMore` passa a iniciar como `true` em `ExpenseTable.tsx` e `FixedExpensesTable.tsx`.
+- Ao adicionar um item, **não** fechar mais o bloco (remover o `setShowMore(false)` do `addExpense`).
+- Usuário só recolhe se clicar manualmente em "Menos opções".
 
-### Rodapé TOTAL
-- Linha simples full-width com "TOTAL" à esquerda e valor à direita.
+## 3. Bug do campo de data (Custos Variáveis)
 
-## Arquivos a editar
-- `src/components/ExpenseTable.tsx` — refatorar para form + lista de cards.
-- `src/components/FixedExpensesTable.tsx` — mesma refatoração (sem coluna Data).
+No print, o input `type="date"` aparece em branco (sem o texto "Data") e estoura para fora do card. Causa: em mobile o input `date` tem largura intrínseca maior que a célula do grid e não tem placeholder.
 
-## Não muda
-- Estrutura de dados, storage keys, spotlight tags (`data-spotlight="add-expense"` / `add-fixed`), categorias, cores, totais.
-- IncomeTable (Receitas) permanece como referência visual.
+Correções em `ExpenseTable.tsx`:
+- Adicionar `w-full min-w-0 block` no input de data para respeitar a coluna do grid.
+- Garantir que o grid `grid-cols-2` aplique `min-w-0` nos filhos (wrap em um `div className="min-w-0"` ou aplicar direto).
+- Adicionar um label visível acima ou um prefixo "Data:" para que o campo nunca fique "vazio" visualmente quando não há valor.
+
+## Arquivos
+
+- `src/components/ExpenseTable.tsx`
+- `src/components/FixedExpensesTable.tsx`
+
+Nenhuma mudança em storage, dados, categorias ou IncomeTable.

@@ -99,7 +99,7 @@ export default function AdminTutorialCompare() {
     setLoading(false);
     setRefreshing(false);
     setLastUpdate(new Date());
-  }, []);
+  }, [dropoffDays]);
 
   useEffect(() => {
     load();

@@ -1,27 +1,29 @@
-# Ajustes nos cards de Custos (Fixos e Variáveis)
+# Tutorial de Finanças — incluir Custos Variáveis e reordenar
 
-## 1. Tutorial / Spotlight do botão "+"
+## Nova ordem dos passos
 
-O atributo `data-spotlight="add-expense"` e `add-fixed` continua no botão `+` no novo layout, então o `SpotlightOverlay` já segue o elemento. Vou apenas validar visualmente para garantir que a seta aponta corretamente para a nova posição (canto superior direito do card, ao lado do campo de valor) e ajustar offset se necessário.
+1. Abra "Meu Financeiro" (`financeiro`)
+2. Adicione sua receita (`add-income`)
+3. Cadastre um custo fixo (`add-fixed`)
+4. Cadastre um custo variável (`add-expense`) — **novo passo**
+5. Escreva uma anotação financeira (`add-note`)
+6. Adicione 1 conta no vencimento (`add-bill`)
 
-## 2. "Mais opções" aberto por padrão
+Hoje o tutorial tem 5 passos e nunca chega em "custos variáveis", além de mostrar vencimentos antes das anotações. A mudança insere o passo de custo variável e troca a ordem entre anotações e vencimentos, conforme pedido.
 
-- `showMore` passa a iniciar como `true` em `ExpenseTable.tsx` e `FixedExpensesTable.tsx`.
-- Ao adicionar um item, **não** fechar mais o bloco (remover o `setShowMore(false)` do `addExpense`).
-- Usuário só recolhe se clicar manualmente em "Menos opções".
+## Implementação
 
-## 3. Bug do campo de data (Custos Variáveis)
+Arquivo: `src/pages/Index.tsx` — array `steps` do `SpotlightOverlay`.
 
-No print, o input `type="date"` aparece em branco (sem o texto "Data") e estoura para fora do card. Causa: em mobile o input `date` tem largura intrínseca maior que a célula do grid e não tem placeholder.
+- Inserir entre `add-fixed` e `add-note`:
+  ```
+  { selector: '[data-spotlight="add-expense"]',
+    label: 'Cadastre um custo variável (mercado, lazer...).',
+    advanceOnAction: 'first_expense',
+    checkKey: 'finance-expenses' }
+  ```
+- Mover o passo `add-note` para antes do `add-bill`.
 
-Correções em `ExpenseTable.tsx`:
-- Adicionar `w-full min-w-0 block` no input de data para respeitar a coluna do grid.
-- Garantir que o grid `grid-cols-2` aplique `min-w-0` nos filhos (wrap em um `div className="min-w-0"` ou aplicar direto).
-- Adicionar um label visível acima ou um prefixo "Data:" para que o campo nunca fique "vazio" visualmente quando não há valor.
+Verificar em `src/components/ExpenseTable.tsx` se o evento de ativação disparado ao adicionar despesa variável é `first_expense` e a chave de storage é `finance-expenses`. Se forem outros nomes, ajustar o `advanceOnAction`/`checkKey` para os reais (sem mudar o componente).
 
-## Arquivos
-
-- `src/components/ExpenseTable.tsx`
-- `src/components/FixedExpensesTable.tsx`
-
-Nenhuma mudança em storage, dados, categorias ou IncomeTable.
+Nenhuma outra alteração de UI/lógica.

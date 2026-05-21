@@ -87,7 +87,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
         },
       ]);
       setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
-      setShowMore(false);
+      
     }
   };
 

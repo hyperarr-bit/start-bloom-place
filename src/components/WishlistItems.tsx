@@ -310,8 +310,9 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
           {/* Image preview / upload */}
           <div className="flex items-center gap-3">
             {newItem.imageUrl ? (
-              <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                <img src={newItem.imageUrl} alt="" className="w-full h-full object-cover" />
+              <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted flex items-center justify-center">
+                <img src={newItem.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
+
                 <button
                   onClick={() => setNewItem({ ...newItem, imageUrl: undefined })}
                   className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"

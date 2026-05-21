@@ -124,7 +124,7 @@ const Index = () => {
           { selector: '[data-spotlight="financeiro"]', label: 'Abra "Meu Financeiro".' },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes" },
           { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses" },
-          { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays" },
+          { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0) },
           { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes" },
         ]}
       />

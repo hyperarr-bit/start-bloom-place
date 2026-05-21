@@ -65,7 +65,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", paymentMethod: "", cardName: "",
   });
-  const [showMore, setShowMore] = useState(true);
+  const [showMore, setShowMore] = useState(expenses.length === 0);
 
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {

@@ -238,9 +238,11 @@ export const Simulators = () => {
               <span>Custo dos juros:</span>
               <span className="text-red-400">+R$ {financeResult.interest.toLocaleString("pt-BR")}</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
-              💡 Você pagará {((financeResult.totalPaid / financing.price - 1) * 100).toFixed(1)}% a mais financiando
-            </p>
+            {financing.price > 0 && financeResult.totalPaid > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                💡 Você pagará {((financeResult.totalPaid / financing.price - 1) * 100).toFixed(1)}% a mais financiando
+              </p>
+            )}
           </div>
         </div>
 

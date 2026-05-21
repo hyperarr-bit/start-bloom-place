@@ -12,6 +12,8 @@ export interface SpotlightStep {
   advanceOnAction?: string;
   /** Optional: storage key to inspect; if it already has data on mount, auto-advance. */
   checkKey?: string;
+  /** Optional: custom predicate to determine whether the data at checkKey counts as "done". */
+  checkValue?: (v: any) => boolean;
 }
 
 interface SpotlightOverlayProps {

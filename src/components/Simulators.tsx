@@ -34,11 +34,14 @@ export const Simulators = () => {
   const timeResult = calculateTimeToSave();
 
   // Finance vs Cash Calculator
-  const [financing, setFinancing] = useState({ price: 50000, downPayment: 10000, installments: 48, rate: 1.5 });
+  const [financing, setFinancing] = useState({ price: 0, downPayment: 0, installments: 0, rate: 0 });
   const calculateFinancing = () => {
     const principal = financing.price - financing.downPayment;
     const monthlyRate = financing.rate / 100;
-    const pmt = principal * (monthlyRate * Math.pow(1 + monthlyRate, financing.installments)) / 
+    if (principal <= 0 || financing.installments <= 0 || monthlyRate <= 0) {
+      return { pmt: 0, totalPaid: 0, interest: 0 };
+    }
+    const pmt = principal * (monthlyRate * Math.pow(1 + monthlyRate, financing.installments)) /
                 (Math.pow(1 + monthlyRate, financing.installments) - 1);
     const totalPaid = financing.downPayment + pmt * financing.installments;
     const interest = totalPaid - financing.price;
@@ -235,9 +238,11 @@ export const Simulators = () => {
               <span>Custo dos juros:</span>
               <span className="text-red-400">+R$ {financeResult.interest.toLocaleString("pt-BR")}</span>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-2">
-              💡 Você pagará {((financeResult.totalPaid / financing.price - 1) * 100).toFixed(1)}% a mais financiando
-            </p>
+            {financing.price > 0 && financeResult.totalPaid > 0 && (
+              <p className="text-[10px] text-muted-foreground mt-2">
+                💡 Você pagará {((financeResult.totalPaid / financing.price - 1) * 100).toFixed(1)}% a mais financiando
+              </p>
+            )}
           </div>
         </div>
 

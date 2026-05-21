@@ -181,14 +181,10 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
             >
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
-                  {visibleOptions.length === OPTIONS.length
-                    ? "Por onde você quer começar?"
-                    : "Falta configurar:"}
+                  Por onde você quer começar?
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {visibleOptions.length === OPTIONS.length
-                    ? "Escolhe 1. Os outros ficam aqui esperando."
-                    : `Escolhe o próximo. Faltam ${visibleOptions.length} de ${OPTIONS.length}.`}
+                  Escolhe 1. Os outros ficam aqui esperando.
                 </p>
               </div>
 

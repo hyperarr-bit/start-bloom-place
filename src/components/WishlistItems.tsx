@@ -346,19 +346,16 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <select value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} className="h-8 text-xs rounded-md border border-input bg-background px-2">
               {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
-            <div className="relative">
-              <Input
-                type="date"
-                value={newItem.targetDate || ""}
-                onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
-                className="h-8 text-xs"
-              />
-              {!newItem.targetDate && (
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                  Data alvo
-                </span>
-              )}
-            </div>
+            <Input
+              type={newItem.targetDate ? "date" : "text"}
+              placeholder="Data alvo"
+              value={newItem.targetDate || ""}
+              onFocus={(e) => { e.currentTarget.type = "date"; }}
+              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
+              onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
+              className="h-8 text-xs"
+            />
+
             <Input type="number" placeholder="Já guardei (R$)" value={newItem.savedAmount || ""} onChange={(e) => setNewItem({ ...newItem, savedAmount: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
           </div>
 

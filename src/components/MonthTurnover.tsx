@@ -135,8 +135,12 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   })();
 
   useEffect(() => {
-    const currentKey = `${currentMonth}-${new Date().getFullYear()}`;
-    if (lastSeenMonth && lastSeenMonth !== currentKey && prevHasData) {
+    const year = new Date().getFullYear();
+    const currentKey = `${currentMonth}-${year}`;
+    const prevKey = `${prevMonth}-${prevMonthIdx === 11 ? year - 1 : year}`;
+    // Só dispara o recap automático quando o usuário estava ativo no mês anterior
+    // (lastSeenMonth === prevKey). Evita pop-up ao editar meses passados retroativamente.
+    if (lastSeenMonth === prevKey && prevHasData) {
       setShowRecap(true);
     }
     if (!lastSeenMonth || lastSeenMonth !== currentKey) {

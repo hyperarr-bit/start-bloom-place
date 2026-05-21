@@ -115,7 +115,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
           <Input
             type="number"
             inputMode="decimal"
-            placeholder="0"
+            placeholder="Valor"
             value={newExpense.value}
             onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })}
             className="h-9 text-xs w-20 text-right"

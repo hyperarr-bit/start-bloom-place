@@ -34,7 +34,7 @@ export const Simulators = () => {
   const timeResult = calculateTimeToSave();
 
   // Finance vs Cash Calculator
-  const [financing, setFinancing] = useState({ price: 50000, downPayment: 10000, installments: 48, rate: 1.5 });
+  const [financing, setFinancing] = useState({ price: 0, downPayment: 0, installments: 0, rate: 0 });
   const calculateFinancing = () => {
     const principal = financing.price - financing.downPayment;
     const monthlyRate = financing.rate / 100;

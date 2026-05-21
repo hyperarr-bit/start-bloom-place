@@ -94,6 +94,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
+  const [turnoverAck, setTurnoverAck] = usePersistedState<string>("finance-turnover-ack", "");
   const [showRecap, setShowRecap] = useState(false);
   const [step, setStep] = useState<"recap" | "copy">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
@@ -107,6 +108,10 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const currentMonthIdx = months.indexOf(currentMonth);
   const prevMonthIdx = currentMonthIdx === 0 ? 11 : currentMonthIdx - 1;
   const prevMonth = months[prevMonthIdx];
+
+  const year = new Date().getFullYear();
+  const currentKey = `${currentMonth}-${year}`;
+  const prevKey = `${prevMonth}-${prevMonthIdx === 11 ? year - 1 : year}`;
 
   const prevData = getMonthTotals(prevMonth, userId);
   const prevHasData = prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0;
@@ -127,26 +132,31 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
 
   const hasCategoryBudgets = (() => {
     const base = readLocalKey(userId, "finance-category-budgets");
-    const year = getCurrentYear();
-    const monthKey = `finance-${year}-${getMonthKey(prevMonth)}-category-budgets`;
+    const yr = getCurrentYear();
+    const monthKey = `finance-${yr}-${getMonthKey(prevMonth)}-category-budgets`;
     const month = readLocalKey(userId, monthKey);
     const data = month || base;
     return data && Object.keys(data).length > 0;
   })();
 
+  // Janela de virada: só mostra o card/recap nos primeiros 7 dias do mês,
+  // se o usuário estava ativo no mês anterior e ainda não confirmou a virada.
+  const dayOfMonth = new Date().getDate();
+  const isTurnoverWindow =
+    dayOfMonth <= 7 &&
+    prevHasData &&
+    lastSeenMonth === prevKey &&
+    turnoverAck !== currentKey;
+
   useEffect(() => {
-    const year = new Date().getFullYear();
-    const currentKey = `${currentMonth}-${year}`;
-    const prevKey = `${prevMonth}-${prevMonthIdx === 11 ? year - 1 : year}`;
-    // Só dispara o recap automático quando o usuário estava ativo no mês anterior
-    // (lastSeenMonth === prevKey). Evita pop-up ao editar meses passados retroativamente.
-    if (lastSeenMonth === prevKey && prevHasData) {
+    if (isTurnoverWindow) {
       setShowRecap(true);
     }
     if (!lastSeenMonth || lastSeenMonth !== currentKey) {
       setLastSeenMonth(currentKey);
     }
   }, []);
+
 
   const savingsRate = prevData.receitas > 0
     ? ((prevData.receitas - prevData.custosVariaveis - prevData.custosFixos) / prevData.receitas) * 100
@@ -186,6 +196,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const handleClose = () => {
     setShowRecap(false);
     setStep("recap");
+    setTurnoverAck(currentKey);
   };
 
   const triggerRecap = () => {
@@ -197,7 +208,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
 
   return (
     <>
-      {prevHasData && (
+      {isTurnoverWindow && (
+
         <button
           onClick={triggerRecap}
           className="w-full bg-card rounded-lg border border-border overflow-hidden hover:bg-muted/20 transition-colors text-left"

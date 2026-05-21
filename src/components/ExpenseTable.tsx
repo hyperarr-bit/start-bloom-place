@@ -70,7 +70,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
   });
-  const [showMore, setShowMore] = useState(false);
+  const [showMore, setShowMore] = useState(true);
 
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {

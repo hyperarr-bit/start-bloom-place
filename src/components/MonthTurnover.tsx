@@ -196,6 +196,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const handleClose = () => {
     setShowRecap(false);
     setStep("recap");
+    setTurnoverAck(currentKey);
   };
 
   const triggerRecap = () => {
@@ -207,7 +208,8 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
 
   return (
     <>
-      {prevHasData && (
+      {isTurnoverWindow && (
+
         <button
           onClick={triggerRecap}
           className="w-full bg-card rounded-lg border border-border overflow-hidden hover:bg-muted/20 transition-colors text-left"

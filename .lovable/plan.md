@@ -1,27 +1,24 @@
-# Ajustes nos cards de Custos (Fixos e Variáveis)
+# Corrigir contagens do tutorial no admin
 
-## 1. Tutorial / Spotlight do botão "+"
+## Problema encontrado
 
-O atributo `data-spotlight="add-expense"` e `add-fixed` continua no botão `+` no novo layout, então o `SpotlightOverlay` já segue o elemento. Vou apenas validar visualmente para garantir que a seta aponta corretamente para a nova posição (canto superior direito do card, ao lado do campo de valor) e ajustar offset se necessário.
+Na página `/admin/tutorial`, o filtro de período (Diário / 7d / 30d / 90d) **não funciona de verdade**. Os números mostrados são sempre dos últimos 1 dia, mesmo clicando em 7/30/90.
 
-## 2. "Mais opções" aberto por padrão
+### Causa técnica
 
-- `showMore` passa a iniciar como `true` em `ExpenseTable.tsx` e `FixedExpensesTable.tsx`.
-- Ao adicionar um item, **não** fechar mais o bloco (remover o `setShowMore(false)` do `addExpense`).
-- Usuário só recolhe se clicar manualmente em "Menos opções".
+Em `src/pages/admin/AdminTutorialCompare.tsx` a função `load` é criada com `useCallback(..., [])` — array de dependências vazio. Ela lê `dropoffDays` por closure, então o valor fica congelado em `1` (valor inicial). Trocar de aba não dispara refetch, e mesmo o auto-refresh a cada 30s continua chamando com `_days: 1`.
 
-## 3. Bug do campo de data (Custos Variáveis)
+Por isso o "Diário" parece o único que bate, e os outros ficam errados/parados.
 
-No print, o input `type="date"` aparece em branco (sem o texto "Data") e estoura para fora do card. Causa: em mobile o input `date` tem largura intrínseca maior que a célula do grid e não tem placeholder.
+## O que será feito
 
-Correções em `ExpenseTable.tsx`:
-- Adicionar `w-full min-w-0 block` no input de data para respeitar a coluna do grid.
-- Garantir que o grid `grid-cols-2` aplique `min-w-0` nos filhos (wrap em um `div className="min-w-0"` ou aplicar direto).
-- Adicionar um label visível acima ou um prefixo "Data:" para que o campo nunca fique "vazio" visualmente quando não há valor.
+1. **Corrigir o refetch por período** — adicionar `dropoffDays` nas deps do `useCallback`, para que mudar a aba realmente re-consulte o banco com o intervalo certo.
+2. **Zerar contadores a partir de agora** — chamar `admin_reset_analytics` automaticamente ao salvar essa correção (uma única vez), pra começar a contagem do zero com o fix em produção. A RPC já existe e move o `analytics_reset_at` no `app_config`, fazendo todas as funções de admin (`admin_tutorial_dropoff`, `admin_landing_funnel`, etc.) ignorarem eventos antigos.
+   - Alternativa: deixar você apertar o botão "Zerar contadores" que já existe no topo da página depois do deploy. Me diz qual prefere.
 
-## Arquivos
+## Detalhes técnicos
 
-- `src/components/ExpenseTable.tsx`
-- `src/components/FixedExpensesTable.tsx`
-
-Nenhuma mudança em storage, dados, categorias ou IncomeTable.
+- Arquivo único alterado: `src/pages/admin/AdminTutorialCompare.tsx`
+- Mudança: `useCallback(async (silent) => {...}, [])` → `useCallback(async (silent) => {...}, [dropoffDays])`
+- Sem migration nova. Sem mudança de schema.
+- Eventos de tutorial (`spotlight_shown`, `spotlight_step_view`, `quickstart_completed`) continuam sendo emitidos do jeito que já estão — eles estão corretos, só a leitura no admin que estava bugada.

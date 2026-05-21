@@ -394,8 +394,9 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
               >
                 {/* Image */}
                 {item.imageUrl ? (
-                  <div className="relative h-36 w-full overflow-hidden bg-muted">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                  <div className="relative h-36 w-full overflow-hidden bg-muted flex items-center justify-center">
+                    <img src={item.imageUrl} alt={item.name} className="max-w-full max-h-full object-contain" />
+
                     {isComplete && (
                       <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
                         <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">✓ CONQUISTADO</span>

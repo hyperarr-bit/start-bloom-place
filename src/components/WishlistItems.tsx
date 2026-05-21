@@ -310,8 +310,9 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
           {/* Image preview / upload */}
           <div className="flex items-center gap-3">
             {newItem.imageUrl ? (
-              <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0">
-                <img src={newItem.imageUrl} alt="" className="w-full h-full object-cover" />
+              <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0 bg-muted flex items-center justify-center">
+                <img src={newItem.imageUrl} alt="" className="max-w-full max-h-full object-contain" />
+
                 <button
                   onClick={() => setNewItem({ ...newItem, imageUrl: undefined })}
                   className="absolute top-0 right-0 bg-black/60 text-white rounded-bl p-0.5"
@@ -346,19 +347,16 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <select value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} className="h-8 text-xs rounded-md border border-input bg-background px-2">
               {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
-            <div className="relative">
-              <Input
-                type="date"
-                value={newItem.targetDate || ""}
-                onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
-                className="h-8 text-xs"
-              />
-              {!newItem.targetDate && (
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                  Data alvo
-                </span>
-              )}
-            </div>
+            <Input
+              type={newItem.targetDate ? "date" : "text"}
+              placeholder="Data alvo"
+              value={newItem.targetDate || ""}
+              onFocus={(e) => { e.currentTarget.type = "date"; }}
+              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
+              onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
+              className="h-8 text-xs"
+            />
+
             <Input type="number" placeholder="Já guardei (R$)" value={newItem.savedAmount || ""} onChange={(e) => setNewItem({ ...newItem, savedAmount: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
           </div>
 
@@ -397,8 +395,9 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
               >
                 {/* Image */}
                 {item.imageUrl ? (
-                  <div className="relative h-36 w-full overflow-hidden bg-muted">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                  <div className="relative h-36 w-full overflow-hidden bg-muted flex items-center justify-center">
+                    <img src={item.imageUrl} alt={item.name} className="max-w-full max-h-full object-contain" />
+
                     {isComplete && (
                       <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
                         <span className="bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full">✓ CONQUISTADO</span>

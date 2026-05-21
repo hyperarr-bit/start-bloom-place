@@ -110,11 +110,12 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     const cur = steps[stepIdx];
     if (!cur?.checkKey) return;
     const v = get<any>(cur.checkKey, null);
-    const has =
-      v != null &&
-      ((Array.isArray(v) && v.length > 0) ||
-        (typeof v === "object" && Object.keys(v).length > 0) ||
-        (typeof v === "string" && v.trim().length > 0));
+    const has = cur.checkValue
+      ? cur.checkValue(v)
+      : v != null &&
+        ((Array.isArray(v) && v.length > 0) ||
+          (typeof v === "object" && Object.keys(v).length > 0) ||
+          (typeof v === "string" && v.trim().length > 0));
     if (has) {
       const t = setTimeout(() => advance(), 400);
       return () => clearTimeout(t);

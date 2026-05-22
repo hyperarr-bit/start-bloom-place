@@ -6,6 +6,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
+import { QuickSignupStep } from "./QuickSignupStep";
+
 
 export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
 
@@ -36,7 +38,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const allDone = pending.length === 0;
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
-  const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
+  const [step, setStep] = useState<0 | 1 | 2>(skipWelcome || allDone ? 1 : 0);
   const { set, isGuest } = useUserData();
   const navigate = useNavigate();
   const startedRef = useRef(false);
@@ -71,12 +73,15 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
-    onComplete();
     if (isGuest) {
-      // Send guest to signup — guest data is migrated automatically on login.
-      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
+      // Inline quick signup — no redirect to /auth.
+      trackEvent("quicksignup_step_shown", {});
+      setStep(2);
+    } else {
+      onComplete();
     }
   };
+
 
 
   return (
@@ -92,7 +97,18 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     >
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
-          {step === 0 && !allDone ? (
+          {step === 2 ? (
+            <motion.div
+              key="quicksignup"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.25 }}
+            >
+              <QuickSignupStep />
+            </motion.div>
+          ) : step === 0 && !allDone ? (
+
             <motion.div
               key="promise"
               initial={{ opacity: 0, y: 16 }}

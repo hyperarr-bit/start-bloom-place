@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 
 interface QuickSignupStepProps {
-  /** Optional route to navigate to after successful signup. Defaults to /inicio. */
+  /** Optional route to navigate to after successful signup. If empty, stays on current page. */
   redirectTo?: string;
 }
 

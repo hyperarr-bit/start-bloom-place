@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 
 interface QuickSignupStepProps {
-  /** Optional route to navigate to after successful signup. Defaults to /inicio. */
+  /** Optional route to navigate to after successful signup. If empty, stays on current page. */
   redirectTo?: string;
 }
 
@@ -23,7 +23,7 @@ const schema = z.object({
     .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), "Use letras e números"),
 });
 
-export const QuickSignupStep = ({ redirectTo = "/inicio" }: QuickSignupStepProps) => {
+export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
   const { set } = useUserData();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -77,14 +77,16 @@ export const QuickSignupStep = ({ redirectTo = "/inicio" }: QuickSignupStepProps
     if (!data.session) {
       // Confirmação de e-mail ainda está ativa no Supabase.
       setLoading(false);
+      set("quicksignup-pending", "");
       toast.success("Quase lá! Confirme seu e-mail pra entrar.");
       navigate("/auth");
       return;
     }
 
+    // Limpa flag — modal fecha sozinho. Usuário já está na página certa.
+    set("quicksignup-pending", "");
     toast.success(`Tudo pronto, ${cleanName}! Bem-vindo ao CORE.`);
-    // The auth state change will hydrate user data + migrate guest store.
-    navigate(redirectTo);
+    if (redirectTo) navigate(redirectTo);
   };
 
   return (
@@ -93,8 +95,9 @@ export const QuickSignupStep = ({ redirectTo = "/inicio" }: QuickSignupStepProps
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-5 py-6"
+      className="flex flex-col gap-5"
     >
+
       <div className="space-y-2 text-center">
         <h1 className="text-2xl font-bold leading-tight text-foreground">
           Parabéns! Você desbloqueou o app completo 🎉

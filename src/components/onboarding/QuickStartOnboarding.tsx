@@ -6,7 +6,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
-import { QuickSignupStep } from "./QuickSignupStep";
+
 
 
 export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
@@ -38,8 +38,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const allDone = pending.length === 0;
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
-  const [step, setStep] = useState<0 | 1 | 2>(skipWelcome || allDone ? 1 : 0);
-  const { set, isGuest } = useUserData();
+  const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
+  const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
   const startedRef = useRef(false);
   const completedRef = useRef(false);
@@ -74,9 +74,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
     if (isGuest) {
-      // Inline quick signup — no redirect to /auth.
+      // Trigger global QuickSignupModal — usuário cai no app, modal aparece por cima.
       trackEvent("quicksignup_step_shown", {});
-      setStep(2);
+      set("quicksignup-pending", "true");
+      const targetKey = get<string>("quickstart-target-module", "");
+      const target = OPTIONS.find(o => o.key === targetKey);
+      const route = target?.route ?? "/inicio";
+      onComplete();
+      setTimeout(() => navigate(route), 50);
     } else {
       onComplete();
     }
@@ -97,17 +102,9 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     >
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
-          {step === 2 ? (
-            <motion.div
-              key="quicksignup"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.25 }}
-            >
-              <QuickSignupStep />
-            </motion.div>
-          ) : step === 0 && !allDone ? (
+          {step === 0 && !allDone ? (
+
+
 
             <motion.div
               key="promise"

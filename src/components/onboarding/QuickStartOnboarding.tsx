@@ -6,6 +6,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
+import { QuickSignupStep } from "./QuickSignupStep";
+
 
 export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
 

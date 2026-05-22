@@ -97,7 +97,18 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     >
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
-          {step === 0 && !allDone ? (
+          {step === 2 ? (
+            <motion.div
+              key="quicksignup"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.25 }}
+            >
+              <QuickSignupStep />
+            </motion.div>
+          ) : step === 0 && !allDone ? (
+
             <motion.div
               key="promise"
               initial={{ opacity: 0, y: 16 }}

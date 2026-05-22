@@ -95,8 +95,9 @@ export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col gap-5 py-6"
+      className="flex flex-col gap-5"
     >
+
       <div className="space-y-2 text-center">
         <h1 className="text-2xl font-bold leading-tight text-foreground">
           Parabéns! Você desbloqueou o app completo 🎉

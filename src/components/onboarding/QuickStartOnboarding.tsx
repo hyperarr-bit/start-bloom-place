@@ -74,9 +74,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
     if (isGuest) {
-      // Inline quick signup — no redirect to /auth.
+      // Trigger global QuickSignupModal — usuário cai no app, modal aparece por cima.
       trackEvent("quicksignup_step_shown", {});
-      setStep(2);
+      set("quicksignup-pending", "true");
+      const targetKey = get<string>("quickstart-target-module", "");
+      const target = OPTIONS.find(o => o.key === targetKey);
+      const route = target?.route ?? "/inicio";
+      onComplete();
+      setTimeout(() => navigate(route), 50);
     } else {
       onComplete();
     }

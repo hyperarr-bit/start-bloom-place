@@ -16,6 +16,7 @@ import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
+import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
 
 
 import Home from "./pages/Home";

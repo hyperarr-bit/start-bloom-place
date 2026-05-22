@@ -73,12 +73,15 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
-    onComplete();
     if (isGuest) {
-      // Send guest to signup — guest data is migrated automatically on login.
-      setTimeout(() => navigate("/auth?signup=1&fromTutorial=1"), 50);
+      // Inline quick signup — no redirect to /auth.
+      trackEvent("quicksignup_step_shown", {});
+      setStep(2);
+    } else {
+      onComplete();
     }
   };
+
 
 
   return (

@@ -23,7 +23,7 @@ const schema = z.object({
     .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), "Use letras e números"),
 });
 
-export const QuickSignupStep = ({ redirectTo = "/inicio" }: QuickSignupStepProps) => {
+export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
   const { set } = useUserData();
   const navigate = useNavigate();
   const [name, setName] = useState("");

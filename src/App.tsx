@@ -134,6 +134,7 @@ const App = () => (
               </Routes>
               <TrialBanner />
               <GlobalWinback />
+              <QuickSignupModal />
             </BrowserRouter>
           </div>
           <div className="app-safe-top-guard" aria-hidden="true" />

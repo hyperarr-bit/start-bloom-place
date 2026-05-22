@@ -4,9 +4,9 @@ import { useUserData } from "@/hooks/use-user-data";
 import { QuickSignupStep } from "./QuickSignupStep";
 
 export const QuickSignupModal = () => {
-  const { get, isGuest, loading } = useUserData();
-  const pending = get("quicksignup-pending") === "true";
-  const open = !loading && isGuest && pending;
+  const { get, isGuest, loaded } = useUserData();
+  const pending = get<string>("quicksignup-pending", "") === "true";
+  const open = loaded && isGuest && pending;
 
   useEffect(() => {
     if (!open) return;

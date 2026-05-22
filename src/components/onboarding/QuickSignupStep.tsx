@@ -77,14 +77,16 @@ export const QuickSignupStep = ({ redirectTo = "/inicio" }: QuickSignupStepProps
     if (!data.session) {
       // Confirmação de e-mail ainda está ativa no Supabase.
       setLoading(false);
+      set("quicksignup-pending", "");
       toast.success("Quase lá! Confirme seu e-mail pra entrar.");
       navigate("/auth");
       return;
     }
 
+    // Limpa flag — modal fecha sozinho. Usuário já está na página certa.
+    set("quicksignup-pending", "");
     toast.success(`Tudo pronto, ${cleanName}! Bem-vindo ao CORE.`);
-    // The auth state change will hydrate user data + migrate guest store.
-    navigate(redirectTo);
+    if (redirectTo) navigate(redirectTo);
   };
 
   return (

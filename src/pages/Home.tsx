@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
+
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 
 import { GreetingHeader } from "@/components/home/GreetingHeader";

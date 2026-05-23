@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles } from "lucide-react";
+import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
@@ -39,6 +39,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
+  const [transitioning, setTransitioning] = useState(false);
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
   const startedRef = useRef(false);
@@ -66,8 +67,11 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       trackEvent("pre_signup_tutorial_completed", { module: opt.key, is_guest: isGuest });
     }
     set("core-onboarding-done", "true");
-    onComplete();
-    setTimeout(() => navigate(opt.route), 50);
+    setTransitioning(true);
+    setTimeout(() => {
+      navigate(opt.route);
+      onComplete();
+    }, 50);
   };
 
 
@@ -101,6 +105,9 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
         paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
       }}
     >
+      {transitioning ? (
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      ) : (
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
           {step === 0 && !allDone ? (
@@ -229,6 +236,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
           )}
         </AnimatePresence>
       </div>
+      )}
     </motion.div>
   );
 };

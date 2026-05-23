@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wallet, Dumbbell, UtensilsCrossed, CalendarDays, ChevronRight, ArrowLeft } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { useUserData } from "@/hooks/use-user-data";
+
 
 interface Slide {
   key: string;

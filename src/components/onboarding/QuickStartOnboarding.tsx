@@ -105,6 +105,9 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
         paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
       }}
     >
+      {transitioning ? (
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      ) : (
       <div className="w-full max-w-md flex flex-col">
         <AnimatePresence mode="wait">
           {step === 0 && !allDone ? (

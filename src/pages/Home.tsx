@@ -99,11 +99,6 @@ const HomePage = () => {
     }
   };
 
-  const handleOnboardingComplete = () => {
-    setData("core-onboarding-done", "true");
-    setShowOnboarding(false);
-  };
-
   const handleNameChange = useCallback(() => {
     setDataTrigger(d => d + 1);
   }, []);
@@ -115,23 +110,13 @@ const HomePage = () => {
 
   return (
     <>
-
-      <AnimatePresence>
-        {showOnboarding && (
-          <QuickStartOnboarding
-            onComplete={handleOnboardingComplete}
-            pendingModules={pendingModules}
-            skipWelcome={!!get<string>("core-onboarding-done", "")}
-          />
-        )}
-      </AnimatePresence>
-
-      {!showOnboarding && <DailyNudge />}
+      <DailyNudge />
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <header className="sticky top-0 z-40 border-b border-border bg-card">
           <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
-            <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+            <GreetingHeader data={lifeData} onNameChange={handleNameChange} />
+
           </div>
         </header>
         <div className="max-w-lg md:max-w-4xl mx-auto px-4 pt-4 pb-5 space-y-6">

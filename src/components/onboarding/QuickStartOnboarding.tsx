@@ -68,10 +68,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     }
     set("core-onboarding-done", "true");
     setTransitioning(true);
-    setTimeout(() => {
-      navigate(opt.route);
-      onComplete();
-    }, 50);
+    navigate(opt.route);
   };
 
 

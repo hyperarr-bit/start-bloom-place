@@ -39,6 +39,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
   const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
+  const [transitioning, setTransitioning] = useState(false);
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
   const startedRef = useRef(false);

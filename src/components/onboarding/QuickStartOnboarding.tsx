@@ -91,15 +91,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 1 }}
-
-      className="fixed inset-0 z-[100] bg-background flex items-center justify-center p-5"
+    <div
+      className="fixed inset-0 z-[100] bg-background flex items-center justify-center p-5 overflow-y-auto"
       style={{
+        minHeight: "100dvh",
         paddingTop: "max(1.25rem, env(safe-area-inset-top))",
         paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",
+        paddingLeft: "max(1.25rem, env(safe-area-inset-left))",
+        paddingRight: "max(1.25rem, env(safe-area-inset-right))",
       }}
     >
       {transitioning ? (
@@ -234,6 +233,6 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
         </AnimatePresence>
       </div>
       )}
-    </motion.div>
+    </div>
   );
 };

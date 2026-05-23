@@ -233,6 +233,6 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
         </AnimatePresence>
       </div>
       )}
-    </motion.div>
+    </div>
   );
 };

@@ -73,8 +73,8 @@ const HomePage = () => {
   const computePending = (): ModuleKey[] =>
     ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));
 
-  const [pendingModules, setPendingModules] = useState<ModuleKey[]>(computePending);
-  const [showOnboarding, setShowOnboarding] = useState(() => isGuest && !get<string>("core-onboarding-done", ""));
+  const [pendingModules, setPendingModules] = useState<ModuleKey[]>([]);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
@@ -162,7 +162,7 @@ const HomePage = () => {
     <>
 
       <AnimatePresence>
-        {showOnboarding && (
+        {loaded && showOnboarding && (
           <QuickStartOnboarding
             onComplete={handleOnboardingComplete}
             pendingModules={pendingModules}

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Wallet, Dumbbell, UtensilsCrossed, CalendarDays, ChevronRight, ArrowLeft } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { useUserData } from "@/hooks/use-user-data";
+
 
 interface Slide {
   key: string;
@@ -70,6 +72,7 @@ interface PreSignupTutorialProps {
 
 export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
   const navigate = useNavigate();
+  const { set } = useUserData();
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -80,12 +83,17 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
     trackEvent("pre_signup_tutorial_step", { step: idx + 1, slide: SLIDES[idx].key });
   }, [idx]);
 
+  const goToQuickSignup = () => {
+    set("quicksignup-pending", "true");
+    navigate("/inicio");
+  };
+
   const next = () => {
     if (idx < SLIDES.length - 1) {
       setIdx(idx + 1);
     } else {
       trackEvent("pre_signup_tutorial_completed", {});
-      navigate("/auth?signup=1");
+      goToQuickSignup();
     }
   };
 
@@ -96,6 +104,7 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
       setIdx(idx - 1);
     }
   };
+
 
   const slide = SLIDES[idx];
   const Icon = slide.icon;
@@ -132,8 +141,9 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
         <button
           onClick={() => {
             trackEvent("pre_signup_tutorial_skipped", { at_step: idx + 1 });
-            navigate("/auth?signup=1");
+            goToQuickSignup();
           }}
+
           className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
         >
           Pular

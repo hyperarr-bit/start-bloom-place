@@ -164,7 +164,7 @@ const HomePage = () => {
     else addWidget(id);
   };
 
-  if (!loaded) {
+  if (!loaded || !onboardingResolved) {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 

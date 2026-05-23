@@ -26,7 +26,7 @@ export const QuickSignupModal = () => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-5 bg-background/40 backdrop-blur-md"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-5 bg-background"
           style={{
             paddingTop: "max(1.25rem, env(safe-area-inset-top))",
             paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))",

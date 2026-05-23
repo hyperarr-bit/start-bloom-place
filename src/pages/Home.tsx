@@ -75,12 +75,16 @@ const HomePage = () => {
 
   const [pendingModules, setPendingModules] = useState<ModuleKey[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingResolved, setOnboardingResolved] = useState(false);
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
   // Re-evaluate welcome/onboarding once data is loaded from Supabase
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded) {
+      setOnboardingResolved(false);
+      return;
+    }
 
     // Tutorial só roda no modo convidado (antes de criar a conta).
     // Usuários logados nunca veem o onboarding automaticamente — apenas via "replay tutorial".
@@ -93,6 +97,7 @@ const HomePage = () => {
       }
       setShowOnboarding(false);
       setPendingModules([]);
+      setOnboardingResolved(true);
       return;
     }
 
@@ -115,6 +120,7 @@ const HomePage = () => {
     const celebrated = !!get<string>("core-all-modules-celebrated", "");
     const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
     setShowOnboarding(shouldShow);
+    setOnboardingResolved(true);
   }, [loaded, isGuest, get, setData]);
 
   // Auto check-in on app open (only after data loaded)

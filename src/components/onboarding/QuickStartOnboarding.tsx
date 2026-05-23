@@ -79,7 +79,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       set("quicksignup-pending", "true");
       const targetKey = get<string>("quickstart-target-module", "");
       const target = OPTIONS.find(o => o.key === targetKey);
-      const route = target?.route ?? "/inicio";
+      const route = target?.route ?? "/home";
       onComplete();
       setTimeout(() => navigate(route), 50);
     } else {
@@ -93,7 +93,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 1 }}
+
       className="fixed inset-0 z-[100] bg-background flex items-center justify-center p-5"
       style={{
         paddingTop: "max(1.25rem, env(safe-area-inset-top))",

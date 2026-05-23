@@ -79,7 +79,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       set("quicksignup-pending", "true");
       const targetKey = get<string>("quickstart-target-module", "");
       const target = OPTIONS.find(o => o.key === targetKey);
-      const route = target?.route ?? "/home";
+      const route = target?.route ?? "/";
       onComplete();
       setTimeout(() => navigate(route), 50);
     } else {

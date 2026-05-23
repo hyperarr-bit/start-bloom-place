@@ -68,54 +68,9 @@ const HomePage = () => {
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
 
-  const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino"];
-
-  const computePending = (): ModuleKey[] =>
-    ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));
-
-  const [pendingModules, setPendingModules] = useState<ModuleKey[]>(computePending);
-  const [showOnboarding, setShowOnboarding] = useState(() => isGuest && !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
-  // Re-evaluate welcome/onboarding once data is loaded from Supabase
-  useEffect(() => {
-    if (!loaded) return;
-
-    // Tutorial só roda no modo convidado (antes de criar a conta).
-    // Usuários logados nunca veem o onboarding automaticamente — apenas via "replay tutorial".
-    if (!isGuest) {
-      if (!get<string>("core-onboarding-done", "")) {
-        setData("core-onboarding-done", "true");
-      }
-      if (!get<string>("core-all-modules-celebrated", "")) {
-        setData("core-all-modules-celebrated", "true");
-      }
-      setShowOnboarding(false);
-      setPendingModules([]);
-      return;
-    }
-
-    // One-time reset (apenas para convidados): replay onboarding após bump da chave
-    const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
-    if (!alreadyReset) {
-      setData("core-onboarding-done", "");
-      setData("spotlight-done-financas", "");
-      setData("spotlight-done-rotina", "");
-      setData("spotlight-done-dieta", "");
-      setData("spotlight-done-treino", "");
-      setData("core-all-modules-celebrated", "");
-      setData(ONBOARDING_RESET_KEY, "true");
-    }
-
-    const pending = computePending();
-    setPendingModules(pending);
-
-    const onboardingDone = !!get<string>("core-onboarding-done", "");
-    const celebrated = !!get<string>("core-all-modules-celebrated", "");
-    const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
-    setShowOnboarding(shouldShow);
-  }, [loaded, isGuest, get, setData]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {

@@ -168,20 +168,21 @@ const HomePage = () => {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 
+  if (showOnboarding) {
+    return (
+      <AnimatePresence>
+        <QuickStartOnboarding
+          onComplete={handleOnboardingComplete}
+          pendingModules={pendingModules}
+          skipWelcome={!!get<string>("core-onboarding-done", "")}
+        />
+      </AnimatePresence>
+    );
+  }
+
   return (
     <>
-
-      <AnimatePresence>
-        {loaded && showOnboarding && (
-          <QuickStartOnboarding
-            onComplete={handleOnboardingComplete}
-            pendingModules={pendingModules}
-            skipWelcome={!!get<string>("core-onboarding-done", "")}
-          />
-        )}
-      </AnimatePresence>
-
-      {!showOnboarding && <DailyNudge />}
+      <DailyNudge />
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <header className="sticky top-0 z-40 border-b border-border bg-card">

@@ -141,8 +141,9 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
         <button
           onClick={() => {
             trackEvent("pre_signup_tutorial_skipped", { at_step: idx + 1 });
-            navigate("/auth?signup=1");
+            goToQuickSignup();
           }}
+
           className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
         >
           Pular

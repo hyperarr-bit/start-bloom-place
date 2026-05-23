@@ -72,6 +72,7 @@ interface PreSignupTutorialProps {
 
 export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
   const navigate = useNavigate();
+  const { set } = useUserData();
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
@@ -82,12 +83,17 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
     trackEvent("pre_signup_tutorial_step", { step: idx + 1, slide: SLIDES[idx].key });
   }, [idx]);
 
+  const goToQuickSignup = () => {
+    set("quicksignup-pending", "true");
+    navigate("/inicio");
+  };
+
   const next = () => {
     if (idx < SLIDES.length - 1) {
       setIdx(idx + 1);
     } else {
       trackEvent("pre_signup_tutorial_completed", {});
-      navigate("/auth?signup=1");
+      goToQuickSignup();
     }
   };
 
@@ -98,6 +104,7 @@ export const PreSignupTutorial = ({ onClose }: PreSignupTutorialProps) => {
       setIdx(idx - 1);
     }
   };
+
 
   const slide = SLIDES[idx];
   const Icon = slide.icon;

@@ -1,10 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { useUserData } from "@/hooks/use-user-data";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
-
+import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
 import { DailyNudge } from "@/components/onboarding/DailyNudge";
 
 import { GreetingHeader } from "@/components/home/GreetingHeader";
@@ -19,6 +19,8 @@ import { useHomeWidgets, WidgetId, ActiveWidget } from "@/hooks/use-home-widgets
 import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
 
+// One-time reset key — bump version to replay onboarding for everyone
+const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
 
 // Widget components
 import { FinancesWidget } from "@/components/home/widgets/FinancesWidget";
@@ -66,9 +68,54 @@ const HomePage = () => {
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
 
+  const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino"];
+
+  const computePending = (): ModuleKey[] =>
+    ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));
+
+  const [pendingModules, setPendingModules] = useState<ModuleKey[]>(computePending);
+  const [showOnboarding, setShowOnboarding] = useState(() => isGuest && !get<string>("core-onboarding-done", ""));
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [editingWidgets, setEditingWidgets] = useState(false);
 
+  // Re-evaluate welcome/onboarding once data is loaded from Supabase
+  useEffect(() => {
+    if (!loaded) return;
+
+    // Tutorial só roda no modo convidado (antes de criar a conta).
+    // Usuários logados nunca veem o onboarding automaticamente — apenas via "replay tutorial".
+    if (!isGuest) {
+      if (!get<string>("core-onboarding-done", "")) {
+        setData("core-onboarding-done", "true");
+      }
+      if (!get<string>("core-all-modules-celebrated", "")) {
+        setData("core-all-modules-celebrated", "true");
+      }
+      setShowOnboarding(false);
+      setPendingModules([]);
+      return;
+    }
+
+    // One-time reset (apenas para convidados): replay onboarding após bump da chave
+    const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
+    if (!alreadyReset) {
+      setData("core-onboarding-done", "");
+      setData("spotlight-done-financas", "");
+      setData("spotlight-done-rotina", "");
+      setData("spotlight-done-dieta", "");
+      setData("spotlight-done-treino", "");
+      setData("core-all-modules-celebrated", "");
+      setData(ONBOARDING_RESET_KEY, "true");
+    }
+
+    const pending = computePending();
+    setPendingModules(pending);
+
+    const onboardingDone = !!get<string>("core-onboarding-done", "");
+    const celebrated = !!get<string>("core-all-modules-celebrated", "");
+    const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
+    setShowOnboarding(shouldShow);
+  }, [loaded, isGuest, get, setData]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {
@@ -97,6 +144,11 @@ const HomePage = () => {
     }
   };
 
+  const handleOnboardingComplete = () => {
+    setData("core-onboarding-done", "true");
+    setShowOnboarding(false);
+  };
+
   const handleNameChange = useCallback(() => {
     setDataTrigger(d => d + 1);
   }, []);
@@ -108,13 +160,23 @@ const HomePage = () => {
 
   return (
     <>
-      <DailyNudge />
+
+      <AnimatePresence>
+        {showOnboarding && (
+          <QuickStartOnboarding
+            onComplete={handleOnboardingComplete}
+            pendingModules={pendingModules}
+            skipWelcome={!!get<string>("core-onboarding-done", "")}
+          />
+        )}
+      </AnimatePresence>
+
+      {!showOnboarding && <DailyNudge />}
 
       <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <header className="sticky top-0 z-40 border-b border-border bg-card">
           <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
-            <GreetingHeader data={lifeData} onNameChange={handleNameChange} />
-
+            <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
           </div>
         </header>
         <div className="max-w-lg md:max-w-4xl mx-auto px-4 pt-4 pb-5 space-y-6">

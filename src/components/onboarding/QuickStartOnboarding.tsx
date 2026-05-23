@@ -67,8 +67,11 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
       trackEvent("pre_signup_tutorial_completed", { module: opt.key, is_guest: isGuest });
     }
     set("core-onboarding-done", "true");
-    onComplete();
-    setTimeout(() => navigate(opt.route), 50);
+    setTransitioning(true);
+    setTimeout(() => {
+      navigate(opt.route);
+      onComplete();
+    }, 50);
   };
 
 

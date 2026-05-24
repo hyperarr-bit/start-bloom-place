@@ -152,16 +152,16 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    // When WINBACK80 is valid, use a SEPARATE promo product (R$ 47,76/year)
+    // When WINBACK80 is valid, use a SEPARATE promo product (R$ 34,80/year ≈ R$ 2,90/mês)
     // pre-registered in AbacatePay so the API uses the discounted price natively.
     // The webhook activates the subscription via metadata.user_id + billing_period,
     // so the product used does not affect activation.
     const PROMO_PRODUCT = {
-      configKey: "abacatepay_product_annual_winback80_id",
-      externalId: "core-pro-annual-winback80",
-      name: "CORE Pro Anual — Oferta Winback 80% OFF",
-      description: "Oferta exclusiva de retenção — 80% de desconto no primeiro ano",
-      price: 4776, // R$ 47,76
+      configKey: "abacatepay_product_annual_winback80_v2_id",
+      externalId: "core-pro-annual-winback80-v2",
+      name: "CORE Pro Anual — Oferta Winback",
+      description: "Oferta exclusiva de retenção — R$ 2,90/mês equivalente (R$ 34,80/ano)",
+      price: 3480, // R$ 34,80
     };
 
     async function getOrCreatePromoProductId(): Promise<string> {

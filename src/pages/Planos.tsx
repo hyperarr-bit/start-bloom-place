@@ -56,8 +56,8 @@ const Planos = () => {
   }, [exitToPrevious]);
 
   const plans = {
-    monthly: { price: "19,90", period: "/mês" },
-    annual: { price: "14,90", period: "/mês", savings: "Economia de R$ 60/ano" },
+    monthly: { price: "14,90", period: "/mês" },
+    annual: { price: "3,90", period: "/mês", savings: "Economia de R$ 132/ano" },
   };
 
   const currentPlan = plans[billing];
@@ -152,7 +152,7 @@ const Planos = () => {
             Anual
             {billing === "annual" && (
               <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                -25%
+                -74%
               </span>
             )}
           </button>

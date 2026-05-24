@@ -6,11 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { toast } from "sonner";
 
-const FULL_MONTHLY = 19.90;
-const FULL_ANNUAL = 238.80; // 12 × 19,90 — preço cheio percebido
-const OFFER_ANNUAL = 47.76; // 80% off
-const OFFER_MONTHLY_EQUIV = 3.98;
-const SAVINGS = 191.04;
+const FULL_MONTHLY = 14.90;
+const FULL_ANNUAL = 178.80; // 12 × 14,90 — preço cheio percebido
+const OFFER_ANNUAL = 34.80; // ~80% off
+const OFFER_MONTHLY_EQUIV = 2.90;
+const SAVINGS = 144.00;
 
 const COUNTDOWN_SECONDS = 10 * 60;
 

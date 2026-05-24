@@ -102,7 +102,7 @@ export default function AdminChurn() {
           icon={DollarSign}
           label="MRR perdido 30d"
           value={`R$ ${deep.mrr_lost_30d.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-          sub="estimativa @ R$19,90"
+          sub="estimativa @ R$14,90"
           color="text-rose-400"
         />
       </div>

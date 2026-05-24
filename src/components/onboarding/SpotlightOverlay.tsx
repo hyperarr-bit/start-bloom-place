@@ -224,7 +224,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-auto"
             style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 14 : Math.max(8, rect.top - 100),
+              top: labelBelow ? rect.top + rect.height + PADDING + 18 : Math.max(8, rect.top - 120),
               left: bubbleLeft,
               width: BUBBLE_W,
             }}

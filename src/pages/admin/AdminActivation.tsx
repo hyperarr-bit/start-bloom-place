@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Target } from "lucide-react";
+import { CreditCard, Loader2, Target } from "lucide-react";
+import { toast } from "sonner";
 
 interface Row {
   action_key: string;
@@ -22,6 +23,8 @@ const LABELS: Record<string, string> = {
 export default function AdminActivation() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupResult, setSetupResult] = useState<string | null>(null);
 
   useEffect(() => {
     (supabase as any).rpc("admin_activation_funnel").then(({ data }: any) => {
@@ -34,11 +37,58 @@ export default function AdminActivation() {
 
   const total = rows[0]?.total_users || 0;
 
+  const handleSetupProducts = async () => {
+    setSetupLoading(true);
+    setSetupResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("abacatepay-setup-products", {
+        body: {},
+      });
+
+      if (error) throw error;
+
+      const configured = Object.keys((data as any)?.products ?? {}).length;
+      const message = `Produtos configurados: ${configured}`;
+      setSetupResult(message);
+      toast.success("Produtos do AbacatePay atualizados");
+    } catch (e: any) {
+      const message = e?.message ?? "Erro ao configurar produtos";
+      setSetupResult(message);
+      toast.error(message);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Ativação</h1>
         <p className="text-xs text-zinc-500 mt-1">% de usuários que completou cada ação-chave</p>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-primary" />
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Produtos AbacatePay
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">Cria/salva os produtos novos de mensal, anual e roleta.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSetupProducts}
+            disabled={setupLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60"
+          >
+            {setupLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Configurar produtos
+          </button>
+        </div>
+        {setupResult && <p className="text-xs text-muted-foreground mt-3">{setupResult}</p>}
       </div>
 
       <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">

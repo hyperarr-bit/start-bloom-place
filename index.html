@@ -43,6 +43,11 @@
           var palette = localStorage.getItem("core-theme-palette") || "default";
           var root = document.documentElement;
           if (mode === "dark") root.classList.add("dark");
+          // Inform UA so native widgets (inputs, scrollbars) render with
+          // correct colors on Android Chrome.
+          root.style.colorScheme = mode === "dark" ? "dark" : "light";
+
+
 
           var P = {
             midnight: {

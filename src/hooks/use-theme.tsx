@@ -291,7 +291,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     if (mode === "dark") root.classList.add("dark");
     else root.classList.remove("dark");
+    // Sync the UA color-scheme so Android Chrome paints native widgets
+    // (inputs, scrollbars, form controls) with the right colors.
+    root.style.colorScheme = mode === "dark" ? "dark" : "light";
   }, [mode]);
+
 
   useEffect(() => {
     localStorage.setItem("core-theme-palette", palette);

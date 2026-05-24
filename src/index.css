@@ -6,8 +6,10 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 0 0% 15%;
+
 
     --card: 0 0% 100%;
     --card-foreground: 0 0% 15%;
@@ -81,9 +83,11 @@
   }
 
   .dark {
+    color-scheme: dark;
     /* ===== Premium graphite base (Notion / Linear / Stripe inspired) ===== */
     --background: 222 16% 7%;          /* #0F1115 */
     --foreground: 0 0% 100%;           /* #FFFFFF */
+
     --card: 222 14% 11%;               /* #161A22 */
     --card-foreground: 0 0% 100%;
     --popover: 222 14% 11%;            /* #161A22 */

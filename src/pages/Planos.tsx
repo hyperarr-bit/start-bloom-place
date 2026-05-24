@@ -152,7 +152,7 @@ const Planos = () => {
             Anual
             {billing === "annual" && (
               <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                -25%
+                -74%
               </span>
             )}
           </button>

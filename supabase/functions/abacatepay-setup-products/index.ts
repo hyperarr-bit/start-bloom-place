@@ -11,25 +11,25 @@ const API_BASE = "https://api.abacatepay.com/v2";
 
 const PRODUCTS = [
   {
-    configKey: "abacatepay_product_monthly_id",
-    externalId: "core-pro-monthly",
+    configKey: "abacatepay_product_monthly_v2_id",
+    externalId: "core-pro-monthly-v2",
     name: "CORE Pro Mensal",
-    description: "Assinatura mensal do CORE Pro - acesso completo a todos os módulos",
-    price: 1990,
+    description: "Assinatura mensal do CORE Pro - acesso completo a todos os módulos (R$ 14,90/mês)",
+    price: 1490,
   },
   {
-    configKey: "abacatepay_product_annual_id",
-    externalId: "core-pro-annual",
+    configKey: "abacatepay_product_annual_v2_id",
+    externalId: "core-pro-annual-v2",
     name: "CORE Pro Anual",
-    description: "Assinatura anual do CORE Pro - acesso completo a todos os módulos",
-    price: 17880,
+    description: "Assinatura anual do CORE Pro - acesso completo a todos os módulos (R$ 46,80/ano)",
+    price: 4680,
   },
   {
-    configKey: "abacatepay_product_annual_winback80_id",
-    externalId: "core-pro-annual-winback80",
-    name: "CORE Pro Anual — Oferta Winback 80% OFF",
-    description: "Oferta exclusiva de retenção — 80% de desconto no primeiro ano",
-    price: 4776,
+    configKey: "abacatepay_product_annual_winback80_v2_id",
+    externalId: "core-pro-annual-winback80-v2",
+    name: "CORE Pro Anual — Oferta Winback",
+    description: "Oferta exclusiva de retenção — R$ 2,90/mês equivalente (R$ 34,80/ano)",
+    price: 3480,
   },
 ];
 

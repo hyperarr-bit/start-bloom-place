@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp, ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
@@ -32,6 +31,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [showFallback, setShowFallback] = useState(false);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   // Refs keep the activation listener stable across step changes,
   // so events fired in the same tick aren't lost.
@@ -69,18 +69,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
     setActive(false);
     if (reason === "completed") {
-      toast.success("Tutorial concluído! 🎉", {
-        position: "top-center",
-        duration: 10000,
-        description: (
-          <span className="flex items-center gap-2 text-foreground font-medium">
-            Toque na seta
-            <ArrowLeft className="w-4 h-4 text-primary animate-pulse" strokeWidth={2.5} />
-            no topo para explorar outro módulo.
-          </span>
-        ),
-        className: "border-2 border-primary/40 shadow-lg",
-      });
+      setShowCompletion(true);
     }
   }, [set, moduleKey]);
 
@@ -191,7 +180,60 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [step]);
 
-  if (!active || !step) return null;
+  const completionModal = (
+    <AnimatePresence>
+      {showCompletion && (
+        <motion.div
+          key="completion-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-background/70 backdrop-blur-sm pointer-events-auto px-6"
+          onClick={() => setShowCompletion(false)}
+        >
+          <motion.div
+            key="completion-card"
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-sm rounded-2xl border border-primary/30 bg-card shadow-2xl p-6 text-center"
+          >
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 200, damping: 15 }}
+              className="relative mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
+            >
+              <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+              <CheckCircle2 className="relative w-9 h-9 text-primary" strokeWidth={2.5} />
+            </motion.div>
+            <h3 className="relative text-lg font-bold text-foreground mb-2">
+              Tutorial concluído! 🎉
+            </h3>
+            <p className="relative text-sm text-muted-foreground leading-relaxed mb-5">
+              Toque na seta
+              <span className="inline-flex items-center justify-center w-6 h-6 mx-1.5 rounded-md bg-primary/15 align-middle">
+                <ArrowLeft className="w-3.5 h-3.5 text-primary" strokeWidth={2.5} />
+              </span>
+              no canto superior esquerdo para voltar e explorar outro módulo.
+            </p>
+            <button
+              onClick={() => setShowCompletion(false)}
+              className="relative w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+            >
+              Entendi
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  if (!active || !step) return completionModal;
+
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
   // Always show the bubble ABOVE the target so it never covers the card content.

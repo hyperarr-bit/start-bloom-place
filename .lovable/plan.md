@@ -1,34 +1,34 @@
-## Causa do bug
+## Objetivo
+Inserir o script da UTMify (`https://cdn.utmify.com.br/scripts/utms/latest.js`) na primeira página que o usuário acessa (landing `/inicio` — "Organize sua vida em 1 só lugar" com botão "Quero começar"), sem que o script apareça na UI ou cause regressões.
 
-No `index.html` existe um `<style>` inline que pinta `html, body, #root` antes do React carregar:
+## Análise
+- A landing page é a rota `/inicio`, renderizada pelo componente `WelcomeScreen.tsx`.
+- Scripts de rastreamento de UTM precisam carregar o mais cedo possível na primeira visualização (PV) para capturar corretamente os parâmetros de origem antes de qualquer redirecionamento ou navegação interna.
+- O script possui `async` e `defer`, portanto não bloqueia o parsing nem o render da página.
 
-```text
-html, body, #root { color: #1a1a1a; }   /* preto fixo */
+## Plano de implementação
+1. **Inserir o script no `index.html`** dentro do `<head>`, logo após os metas/title e antes de fechar `</head>`.
+   - Garante carregamento imediato em qualquer página que seja a primeira visualizada (PV).
+   - É invisível para o usuário.
+   - Não depende do React montar para executar.
+   - `async` + `defer` evita qualquer impacto no tempo de carregamento percebido.
 
-@media (prefers-color-scheme: dark) {
-  html.dark, html.dark body, html.dark #root { color: #f2f2f2; }
-}
-```
+2. **Manter os atributos exatos** fornecidos pelo usuário:
+   ```html
+   <script
+     src="https://cdn.utmify.com.br/scripts/utms/latest.js"
+     data-utmify-prevent-xcod-sck
+     data-utmify-prevent-subids
+     async
+     defer
+   ></script>
+   ```
 
-A regra escura está condicionada a `prefers-color-scheme: dark`, ou seja, só vale se o **sistema operacional** está em modo escuro. Se o Android está com tema claro do sistema e o usuário escolheu tema escuro só dentro do app, a media query não dispara — o `color: #1a1a1a` continua aplicado e todos os textos que herdam cor ficam pretos em cima de fundo preto.
-
-No iPhone do usuário, o sistema está em escuro, então a media query ativa e a cor herda branco — por isso "funciona no iPhone".
-
-Os textos que ainda aparecem no Android usam classes Tailwind com cor explícita (`text-muted-foreground`, `text-warning`, etc.), por isso sobrescrevem o preto. Os que somem (saudação "Olá, JO", "Vamos lá!", número do score, iniciais "JO") herdam cor do `<html>`.
-
-## Correção
-
-Remover a dependência de `prefers-color-scheme` no fallback do `index.html`: aplicar a cor escura sempre que a classe `.dark` estiver presente no `<html>`, independente da preferência do sistema.
-
-Trocar o bloco para:
-
-```text
-html, body, #root { background-color: #ffffff; color: #1a1a1a; }
-html.dark, html.dark body, html.dark #root { background-color: #0f1115; color: #f2f2f2; }
-```
-
-Sem `@media`. Isso garante que, quando o app marca `html.dark`, o texto base já nasce claro mesmo no Android com sistema em modo claro.
+## O que NÃO será alterado
+- Nenhum componente React.
+- Nenhuma lógica de routing, theming ou analytics existente.
+- Nenhum estilo ou layout da landing page.
 
 ## Validação
-
-Depois do fix, conferir no Android (modo claro do sistema + tema escuro no app) que: saudação, "Vamos lá!", número do score, iniciais do avatar e demais textos herdados aparecem em branco.
+- Recarregar a preview e confirmar no DevTools (aba Network ou Elements) que a requisição para `cdn.utmify.com.br` aparece sem erros 404/403.
+- Confirmar que a landing page continua renderizando normalmente e o botão "Quero começar" funciona.

@@ -70,13 +70,15 @@ export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
             <Plus className="w-4 h-4" />
           </button>
         </div>
-        <Input
-          type="date"
-          placeholder="Data"
-          value={newIncome.date}
-          onChange={(e) => setNewIncome({ ...newIncome, date: e.target.value })}
-          className="h-9 text-xs w-full"
-        />
+        <label className="h-9 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background w-full">
+          <span className="text-muted-foreground flex-shrink-0">Data:</span>
+          <input
+            type="date"
+            value={newIncome.date}
+            onChange={(e) => setNewIncome({ ...newIncome, date: e.target.value })}
+            className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
+          />
+        </label>
       </div>
 
       {/* Lista */}

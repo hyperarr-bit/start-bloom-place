@@ -154,41 +154,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
                 </button>
               )}
             </motion.div>
-          ) : allDone ? (
-            <motion.div
-              key="celebration"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.35 }}
-              className="flex flex-col items-center text-center gap-6 py-12"
-            >
-              <motion.div
-                initial={{ rotate: -10, scale: 0.8 }}
-                animate={{ rotate: 0, scale: 1 }}
-                transition={{ type: "spring", stiffness: 200 }}
-                className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center"
-              >
-                <Sparkles className="w-10 h-10 text-primary" />
-              </motion.div>
-              <div className="space-y-3">
-                <h1 className="text-2xl font-bold leading-tight text-foreground">
-                  Parabéns! 🎉
-                </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                  {isGuest
-                    ? "Você liberou todos os 16 módulos. Crie sua conta agora pra salvar tudo que você configurou."
-                    : "Você concluiu o tutorial e liberou todos os 16 módulos."}
-                </p>
-              </div>
-              <button
-                onClick={handleCelebrationDone}
-                className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-              >
-                {isGuest ? "Criar conta para salvar" : "Bora usar"} <ArrowRight className="w-4 h-4" />
-              </button>
-            </motion.div>
-          ) : (
+          ) : allDone ? null : (
             <motion.div
               key="choice"
               initial={{ opacity: 0, y: 16 }}

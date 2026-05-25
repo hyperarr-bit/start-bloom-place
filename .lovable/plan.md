@@ -1,13 +1,15 @@
-# Corrigir seta de voltar exigindo vários toques durante o tutorial
+## Objetivo
+Dar mais destaque à mensagem final do tutorial de finanças que orienta o usuário a tocar na seta ← para explorar outros módulos. Atualmente ela aparece como um toast padrão embaixo e passa despercebida.
 
-## Causa
+## Alterações propostas
 
-Em `src/components/onboarding/SpotlightOverlay.tsx`, o wrapper da bolha do passo ("Passo X de N") usa `className="absolute pointer-events-auto"`. Quando essa bolha é posicionada perto do topo da tela, ela passa por cima do header — incluindo a seta de voltar no canto superior esquerdo. Como a bolha captura ponteiro mas não tem nada clicável dentro, os toques na seta de voltar são engolidos. Só depois de a bolha se reposicionar (ou de o usuário acertar fora dela) é que o clique passa.
+1. **Posicionar o toast no topo** — usar `position: "top-center"` para ficar na área de maior atenção visual, próximo ao header onde a seta ← está localizada.
+2. **Aumentar a duração** — estender de 6s para 10s para dar mais tempo de leitura.
+3. **Adicionar ícone de seta no corpo do toast** — incluir um ícone `ArrowLeft` colorido dentro da descrição para criar associação visual imediata com o botão de voltar.
+4. **Estilo mais chamativo** — usar classes do sistema de design para dar destaque (ex: texto em cor de destaque, leve fundo de acento).
 
-## Correção
+## Arquivo
+- `src/components/onboarding/SpotlightOverlay.tsx` — ajustar o bloco `toast.success` dentro da função `finish` (linhas ~72-76).
 
-Trocar `pointer-events-auto` por `pointer-events-none` no wrapper da bolha (linha 225). A bolha continua aparecendo igual, mas deixa de bloquear cliques na seta de voltar e em qualquer outro elemento atrás dela. O botão rosa "Role pra cima/baixo" e o card de fallback continuam com `pointer-events-auto` próprios, então seguem funcionando normalmente.
-
-## Arquivo afetado
-
-- `src/components/onboarding/SpotlightOverlay.tsx` — 1 linha alterada
+## Nota técnica
+O toast do Sonner (`sonner`) aceita props como `position`, `duration` e suporta JSX na descrição, então não é necessário instalar nada novo.

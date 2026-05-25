@@ -1,15 +1,23 @@
-## Objetivo
-Dar mais destaque à mensagem final do tutorial de finanças que orienta o usuário a tocar na seta ← para explorar outros módulos. Atualmente ela aparece como um toast padrão embaixo e passa despercebida.
+## Problema
+Em vários módulos, ao tocar no campo de data, o input fica branco mas o seletor nativo não abre. Encontrei 35+ usos de `<Input type="date">` espalhados em ~30 arquivos (Finanças, Carreira, Biblioteca, Beleza, Treino, Estudos, Saúde, Casa, Pet, Travel, Relacionamentos, Home widgets, etc.).
 
-## Alterações propostas
+A causa provável é a combinação `appearance-none` + `<input type="date">` no iOS/WebKit, que esconde o indicador do picker e, em algumas versões, impede o picker de abrir no toque.
 
-1. **Posicionar o toast no topo** — usar `position: "top-center"` para ficar na área de maior atenção visual, próximo ao header onde a seta ← está localizada.
-2. **Aumentar a duração** — estender de 6s para 10s para dar mais tempo de leitura.
-3. **Adicionar ícone de seta no corpo do toast** — incluir um ícone `ArrowLeft` colorido dentro da descrição para criar associação visual imediata com o botão de voltar.
-4. **Estilo mais chamativo** — usar classes do sistema de design para dar destaque (ex: texto em cor de destaque, leve fundo de acento).
+## Correção (centralizada)
 
-## Arquivo
-- `src/components/onboarding/SpotlightOverlay.tsx` — ajustar o bloco `toast.success` dentro da função `finish` (linhas ~72-76).
+Em vez de mexer em 30+ arquivos, alterar **apenas** o componente compartilhado `src/components/ui/input.tsx` para que, quando `type === "date"` (ou `datetime-local`/`time`/`month`/`week`), o input chame `showPicker()` no `onClick`/`onFocus`. Isso garante que o seletor abre em todo lugar.
+
+### Alterações em `src/components/ui/input.tsx`
+- Adicionar handler `onClick` que, se for um input de tempo/data e `e.currentTarget.showPicker` existir, chama `showPicker()`.
+- Preservar qualquer `onClick` que o consumidor já tenha passado.
+- Nenhuma mudança de estilo ou API — totalmente retrocompatível.
+
+## Verificação
+Após o build, testar manualmente:
+- Finanças: Receitas, Despesas, Parcelas, Investimentos
+- Biblioteca: empréstimo/leitura
+- Saúde, Beleza, Pet, Travel, Carreira, Estudos, Relacionamentos
+em mobile (430px) — tocar no campo deve abrir o picker nativo de imediato.
 
 ## Nota técnica
-O toast do Sonner (`sonner`) aceita props como `position`, `duration` e suporta JSX na descrição, então não é necessário instalar nada novo.
+`HTMLInputElement.showPicker()` é suportado no iOS Safari 16+, Chrome 99+, Firefox 101+ — cobre praticamente toda a base. Em browsers sem suporte, o comportamento padrão do navegador continua valendo (sem regressão).

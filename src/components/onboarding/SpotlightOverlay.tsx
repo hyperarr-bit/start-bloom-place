@@ -188,7 +188,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-background/70 backdrop-blur-sm pointer-events-auto px-6"
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-background/70 pointer-events-auto px-6"
           onClick={() => setShowCompletion(false)}
         >
           <motion.div

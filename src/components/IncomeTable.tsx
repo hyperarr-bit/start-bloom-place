@@ -71,11 +71,9 @@ export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
           </button>
         </div>
         <Input
-          type={newIncome.date ? "date" : "text"}
+          type="date"
           placeholder="Data"
           value={newIncome.date}
-          onFocus={(e) => (e.currentTarget.type = "date")}
-          onBlur={(e) => { if (!newIncome.date) e.currentTarget.type = "text"; }}
           onChange={(e) => setNewIncome({ ...newIncome, date: e.target.value })}
           className="h-9 text-xs w-full"
         />

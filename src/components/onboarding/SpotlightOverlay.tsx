@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
@@ -70,8 +70,16 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     setActive(false);
     if (reason === "completed") {
       toast.success("Tutorial concluído! 🎉", {
-        description: "Toque na seta ← no topo para explorar outro módulo.",
-        duration: 6000,
+        position: "top-center",
+        duration: 10000,
+        description: (
+          <span className="flex items-center gap-2 text-foreground font-medium">
+            Toque na seta
+            <ArrowLeft className="w-4 h-4 text-primary animate-pulse" strokeWidth={2.5} />
+            no topo para explorar outro módulo.
+          </span>
+        ),
+        className: "border-2 border-primary/40 shadow-lg",
       });
     }
   }, [set, moduleKey]);

@@ -72,6 +72,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     navigate(opt.route);
   };
 
+  useEffect(() => {
+    if (!allDone || autoCelebratedRef.current) return;
+    autoCelebratedRef.current = true;
+    setTransitioning(true);
+    handleCelebrationDone();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allDone]);
+
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");

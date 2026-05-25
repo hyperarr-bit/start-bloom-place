@@ -44,6 +44,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const navigate = useNavigate();
   const startedRef = useRef(false);
   const completedRef = useRef(false);
+  const autoCelebratedRef = useRef(false);
 
   // Funil: dispara para todos (logado ou não) — admin filtra por flag se quiser.
   useEffect(() => {

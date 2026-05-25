@@ -1,34 +1,15 @@
-## Objetivo
-Inserir o script da UTMify (`https://cdn.utmify.com.br/scripts/utms/latest.js`) na primeira página que o usuário acessa (landing `/inicio` — "Organize sua vida em 1 só lugar" com botão "Quero começar"), sem que o script apareça na UI ou cause regressões.
+## Pular tela "Parabéns 🎉" após o tutorial
 
-## Análise
-- A landing page é a rota `/inicio`, renderizada pelo componente `WelcomeScreen.tsx`.
-- Scripts de rastreamento de UTM precisam carregar o mais cedo possível na primeira visualização (PV) para capturar corretamente os parâmetros de origem antes de qualquer redirecionamento ou navegação interna.
-- O script possui `async` e `defer`, portanto não bloqueia o parsing nem o render da página.
+A tela "Parabéns! Você liberou todos os 16 módulos" está em `src/components/onboarding/QuickStartOnboarding.tsx` (bloco `allDone`, linhas 156–189). Quando o usuário termina os 4 módulos do tutorial, ela aparece com o botão "Criar conta para salvar", que ao ser clicado chama `handleCelebrationDone()` e leva à tela de signup da foto (`QuickSignupStep` — "Parabéns! Você desbloqueou o app completo 🎉" com nome / e-mail / senha).
 
-## Plano de implementação
-1. **Inserir o script no `index.html`** dentro do `<head>`, logo após os metas/title e antes de fechar `</head>`.
-   - Garante carregamento imediato em qualquer página que seja a primeira visualizada (PV).
-   - É invisível para o usuário.
-   - Não depende do React montar para executar.
-   - `async` + `defer` evita qualquer impacto no tempo de carregamento percebido.
+### Mudança
+Remover o passo de celebração intermediário. Assim que `allDone` for `true`, disparar `handleCelebrationDone()` automaticamente (via `useEffect`), pulando direto para a página de cadastro da foto.
 
-2. **Manter os atributos exatos** fornecidos pelo usuário:
-   ```html
-   <script
-     src="https://cdn.utmify.com.br/scripts/utms/latest.js"
-     data-utmify-prevent-xcod-sck
-     data-utmify-prevent-subids
-     async
-     defer
-   ></script>
-   ```
+### Arquivo alterado
+- `src/components/onboarding/QuickStartOnboarding.tsx`
+  - Adicionar `useEffect` que, quando `allDone === true` e o usuário ainda não foi redirecionado, chama `handleCelebrationDone()` uma única vez (guard com `useRef` para evitar duplo disparo).
+  - Remover (ou deixar inacessível) o bloco JSX da celebração — sem ele, durante o frame intermediário não aparece nada visível além do fundo, e logo o redirect acontece. Para evitar qualquer flash, mantenho o `Loader2` (`transitioning`) ativo enquanto navega.
 
-## O que NÃO será alterado
-- Nenhum componente React.
-- Nenhuma lógica de routing, theming ou analytics existente.
-- Nenhum estilo ou layout da landing page.
-
-## Validação
-- Recarregar a preview e confirmar no DevTools (aba Network ou Elements) que a requisição para `cdn.utmify.com.br` aparece sem erros 404/403.
-- Confirmar que a landing page continua renderizando normalmente e o botão "Quero começar" funciona.
+### Fora de escopo
+- Nenhuma mudança no texto/layout da tela de signup (a da foto continua igual).
+- Nenhuma alteração nos eventos de analytics existentes além do que já é disparado por `handleCelebrationDone`.

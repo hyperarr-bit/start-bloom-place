@@ -128,7 +128,7 @@ const Index = () => {
       <AccountDrawer open={menuOpen} onOpenChange={setMenuOpen} displayName={displayName} />
       <SpotlightOverlay
         moduleKey="financas"
-        onComplete={() => { if (!user) navigate("/auth?signup=1"); }}
+        onComplete={() => {}}
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
@@ -142,6 +142,8 @@ const Index = () => {
           { selector: '[data-spotlight="tab-limites"]', label: 'Defina limites por categoria e acompanhe.', onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
+          { selector: '[data-spotlight="menu"]', label: 'Toque no menu pra abrir suas opções.' },
+          { selector: '[data-spotlight="minha-conta"]', label: 'Toque em "Minha conta" pra criar seu cadastro e liberar tudo.' },
         ]}
       />
       {/* Header */}

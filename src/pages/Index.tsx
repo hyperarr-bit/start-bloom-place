@@ -166,7 +166,7 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-5 space-y-5 min-h-[60vh]">
+      <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && (
           <div className="bg-card rounded-lg border border-border px-4 py-2 flex items-center justify-between gap-3 overflow-x-auto">

@@ -205,6 +205,9 @@ export const FinancialHealth = ({
     : 0;
 
   const hasAnyData = totalIncome > 0 || totalExpenses > 0 || totalDebts > 0 || investments.length > 0 || totalFixedExpenses > 0;
+  // Considera dados suficientes para calcular score só quando há receita E pelo menos uma despesa (variável, fixa ou parcela).
+  // Evita exibir score baixíssimo só porque o usuário ainda está cadastrando os dados (ex.: durante o tutorial).
+  const hasEnoughData = totalIncome > 0 && (totalExpenses + totalFixedExpenses + monthlyInstallments) > 0;
 
   if (!hasAnyData) {
     return (
@@ -219,6 +222,22 @@ export const FinancialHealth = ({
       </div>
     );
   }
+
+  if (!hasEnoughData) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg border border-primary/30 p-6 text-center">
+          <Target className="w-10 h-10 text-primary mx-auto mb-3" />
+          <h3 className="text-sm font-bold mb-1">Score em construção</h3>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Pra calcular um score que faça sentido, precisamos da sua <strong>receita</strong> e de pelo menos uma <strong>despesa</strong> (variável, fixa ou parcela).
+            Continue preenchendo em <strong>Meu Financeiro</strong> e o score aparece aqui automaticamente.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-4">

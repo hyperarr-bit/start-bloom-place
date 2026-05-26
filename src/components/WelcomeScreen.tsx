@@ -34,18 +34,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-16 bg-background overflow-hidden px-6 gap-3"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(1.5rem, env(safe-area-inset-top))",
-          paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
         }}
       >
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="flex flex-1 flex-col items-center justify-center gap-7 text-center"
+          className="flex flex-col items-center gap-4 text-center"
         >
           <div className="relative">
             <div className="absolute inset-0 blur-3xl bg-foreground/5 rounded-full" aria-hidden />
@@ -57,12 +56,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             />
           </div>
 
-          <div className="space-y-3 max-w-sm">
-            <h1 className="text-[28px] md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-              Bem-vindo ao CORE
+          <div className="space-y-1 max-w-sm">
+            <h1 className="text-[26px] md:text-4xl font-bold text-foreground tracking-tight leading-tight">
+              Organize sua vida financeira
             </h1>
             <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              Organize sua vida financeira.
+              em um só lugar.
             </p>
           </div>
         </motion.div>
@@ -71,7 +70,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut", delay: 0.12 }}
-          className="w-full max-w-sm mx-auto flex flex-col items-stretch gap-3 pb-2"
+          className="w-full max-w-sm flex flex-col items-stretch gap-2"
         >
           <button
             onClick={handleStart}

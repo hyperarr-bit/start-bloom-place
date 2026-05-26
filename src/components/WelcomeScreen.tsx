@@ -61,12 +61,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           className="flex-1 min-h-0 flex items-center justify-center py-4"
         >
           <div
-            className="relative h-full max-h-[420px] aspect-[9/19] rounded-[2.2rem] border-[6px] border-foreground/90 bg-background shadow-2xl overflow-hidden"
+            className="relative h-full max-h-[55vh] md:max-h-[65vh] lg:max-h-[70vh] aspect-[9/19.5] md:aspect-[9/18] rounded-[2.2rem] md:rounded-[2.5rem] border-[5px] md:border-[6px] border-foreground/90 bg-background shadow-2xl overflow-hidden"
           >
             <img
               src={financasMockup}
               alt="Tela de Finanças do CORE"
-              className="absolute inset-0 w-full h-full object-cover object-top select-none"
+              className="absolute inset-0 w-full h-full object-cover object-[50%_0%] select-none"
               draggable={false}
             />
           </div>

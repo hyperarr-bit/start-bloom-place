@@ -1,38 +1,29 @@
 ## Problema
 
-Hoje `/` redireciona direto para `/financas`, então o usuário nunca vê a tela "Organize sua vida financeira". Além disso, o tutorial começa apontando para o Dashboard — mas o usuário já está nele, então a primeira seta não faz sentido.
+1. Clicar em "Quero começar" manda pra `/auth?signup=1` em vez de levar pro tutorial de finanças. A ordem correta combinada antes é: **Quero começar → tutorial de finanças (como guest) → no fim, signup (nome + email + senha) → usar o app**.
+2. Proporções da `WelcomeScreen` no viewport 430x697 estão estranhas (logo enorme, espaços desbalanceados pra mobile).
 
 ## Mudanças
 
-### 1. `src/App.tsx` — RootGate na rota `/`
+### 1. `src/components/WelcomeScreen.tsx` — handleStart vai pro tutorial
 
-Trocar `<Route path="/" element={<Navigate to="/financas" replace />} />` por um componente `RootGate` que decide o que renderizar:
+- Remover a checagem de `useAuth` no `handleStart`.
+- `handleStart` sempre faz `window.location.href = "/financas"` (com `?tutorial=1` se precisar forçar replay, mas a chave `spotlight-done-financas` já controla isso pra primeira visita).
+- Manter "Já tem conta? Entrar" indo pra `/auth`.
 
-- Se `loading` do auth: tela vazia (já é o padrão do ProtectedRoute).
-- Se **não logado**: renderiza `<WelcomeScreen />` (mesma da `/inicio`).
-- Se **logado** e `spotlight-done-financas === true` no `useUserData`: `<Navigate to="/financas" replace />`.
-- Se **logado** e tutorial ainda não concluído: renderiza `<WelcomeScreen />` também — assim o fluxo "Quero começar → signup → tutorial" continua valendo, e quem já passou pelo tutorial vai direto pro app.
+### 2. `src/pages/Index.tsx` — signup no fim do tutorial
 
-Observação: `WelcomeScreen.handleStart` já manda pra `/auth?signup=1`. Para usuários já logados que ainda não completaram o tutorial, vamos ajustar o `handleStart` para detectar `user` e ir direto pra `/financas` em vez de `/auth`.
+No último passo do spotlight de finanças (atualmente o 12º), no `onExit`/`onComplete`, se o usuário **não estiver logado**, redirecionar pra `/auth?signup=1` (com a mensagem "Tudo que você configurou no tutorial será salvo na sua conta", que já existe na tela de Auth). Se já estiver logado, fica no `/financas` normalmente.
 
-### 2. `src/components/WelcomeScreen.tsx` — handleStart consciente de auth
+### 3. `src/components/WelcomeScreen.tsx` — ajustar proporções mobile
 
-Importar `useAuth`. No `handleStart`:
-- Se `user` existe → `window.location.href = "/financas"`.
-- Caso contrário → comportamento atual (`/auth?signup=1`).
-
-### 3. `src/pages/Index.tsx` — primeiro passo do tutorial vira "Meu Financeiro"
-
-No array `steps` do spotlight de finanças, remover o passo atual #1 (Dashboard) e colocar como passo inicial um apontando para a aba **Meu Financeiro** (`data-spotlight="financeiro"`), com cópia tipo:
-
-> "Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês."
-
-Os outros 12 passos permanecem iguais e na mesma ordem.
+- Reduzir logo no mobile: `w-24 h-24 md:w-32 md:h-32` (em vez de `w-32 h-32 md:w-40 md:h-40`).
+- Trocar `justify-between` por layout mais controlado: padding-top menor (`pt-16`), conteúdo central com `gap-8`, CTAs com `mt-auto pb-8`.
+- Garantir que título + tagline + CTA cabem sem scroll em 430x697.
 
 ## O que NÃO muda
 
-- Cópia do Welcome ("Organize sua vida financeira").
-- Signup com campo Nome.
-- Demais passos do tutorial e atributos `data-spotlight`.
-- Rotas dos outros módulos, Home em `/home`, `/inicio` continua existindo.
-- Chave `spotlight-done-financas` (sem replay forçado).
+- Cópia "Organize sua vida financeira".
+- Fluxo de signup (campo Nome, validação, etc.).
+- Passos do tutorial e `data-spotlight`.
+- `RootGate` em `/` (continua mostrando Welcome pra quem não terminou o tutorial e redirecionando os que já terminaram pra `/financas`).

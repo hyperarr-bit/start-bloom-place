@@ -1,8 +1,7 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import { PreSignupTutorial } from "@/components/welcome/PreSignupTutorial";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
 import { useTheme } from "@/hooks/use-theme";
@@ -14,7 +13,6 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
-    const [showTutorial, setShowTutorial] = useState(false);
     const { mode } = useTheme();
     const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 

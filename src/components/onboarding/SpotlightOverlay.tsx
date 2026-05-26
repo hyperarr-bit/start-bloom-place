@@ -153,12 +153,15 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       const target = document.querySelector(step.selector);
       const clicked = e.target as Element | null;
       const otherSpotlight = clicked?.closest?.("[data-spotlight]") as Element | null;
+      // Only block clicks on other spotlight elements when our target exists.
+      // If the current step's target is missing, allow free interaction so the
+      // user can navigate back to it (e.g. reopen a closed drawer).
       if (
+        target &&
         otherSpotlight &&
-        (!target ||
-          (otherSpotlight !== target &&
-            !target.contains(otherSpotlight) &&
-            !otherSpotlight.contains(target)))
+        otherSpotlight !== target &&
+        !target.contains(otherSpotlight) &&
+        !otherSpotlight.contains(target)
       ) {
         e.preventDefault();
         e.stopPropagation();
@@ -182,11 +185,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     };
   }, [active, stepIdx, steps, advance]);
 
-  // Fallback card timer: if target stays missing >800ms, show a centered hint.
+  // If the current step's target is missing but a previous step's target is
+  // present in the DOM, regress automatically. This handles cases like a drawer
+  // being closed mid-tutorial: we go back to the step that opens it instead of
+  // showing a confusing off-screen fallback.
   useEffect(() => {
     if (!active) return;
     if (rect) { setShowFallback(false); return; }
     const t = setTimeout(() => {
+      for (let i = stepIdx - 1; i >= 0; i--) {
+        const prev = steps[i];
+        if (prev && document.querySelector(prev.selector)) {
+          setStepIdx(i);
+          return;
+        }
+      }
       setShowFallback(true);
       trackEvent("spotlight_target_missing", {
         module: moduleKey,
@@ -268,7 +281,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
   const offScreen: "above" | "below" | null = !rect
     ? null
-    : rect.top + rect.height < 60
+    : rect.top + rect.height < 10
       ? "above"
       : rect.top > viewportH - 60
         ? "below"

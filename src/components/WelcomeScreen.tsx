@@ -1,9 +1,10 @@
-import { forwardRef, useEffect } from "react";
+import { forwardRef, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import financasMockup from "@/assets/financas-mockup.webp";
+import { AnimatedAppMockup } from "@/components/welcome/AnimatedAppMockup";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;

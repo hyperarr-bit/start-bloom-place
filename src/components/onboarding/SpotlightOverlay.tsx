@@ -281,7 +281,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
   const offScreen: "above" | "below" | null = !rect
     ? null
-    : rect.top + rect.height < 60
+    : rect.top + rect.height < 10
       ? "above"
       : rect.top > viewportH - 60
         ? "below"

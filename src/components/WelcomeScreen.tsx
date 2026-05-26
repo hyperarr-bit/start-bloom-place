@@ -5,7 +5,6 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
 import { useTheme } from "@/hooks/use-theme";
-import { useAuth } from "@/hooks/use-auth";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;
@@ -15,20 +14,17 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const { mode } = useTheme();
-    const { user } = useAuth();
     const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
     useEffect(() => {
-      // Captura UTM e registra a visita do anúncio/landing
       captureLandingMeta();
       trackEvent("landing_view", {});
     }, []);
 
     const handleStart = () => {
-      const destination = user ? "financas" : "signup";
-      trackEvent("start_clicked", { destination });
+      trackEvent("start_clicked", { destination: "financas" });
       onComplete?.();
-      window.location.href = user ? "/financas" : "/auth?signup=1";
+      window.location.href = "/financas";
     };
 
     const handleLogin = () => {
@@ -38,35 +34,32 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-between bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center bg-background overflow-hidden px-6"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(3rem, env(safe-area-inset-top))",
-          paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))",
+          paddingTop: "max(2.5rem, env(safe-area-inset-top))",
+          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
         }}
       >
-        {/* spacer */}
-        <div />
-
         {/* Logo + tagline */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="flex flex-col items-center gap-6 text-center"
+          className="flex flex-1 flex-col items-center justify-center gap-6 text-center"
         >
           <div className="relative">
             <div className="absolute inset-0 blur-3xl bg-foreground/5 rounded-full" aria-hidden />
             <img
               src={logoSrc}
               alt="CORE"
-              className="relative w-32 h-32 md:w-40 md:h-40 object-contain select-none"
+              className="relative w-24 h-24 md:w-32 md:h-32 object-contain select-none"
               draggable={false}
             />
           </div>
 
           <div className="space-y-2 max-w-sm">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
               Bem-vindo ao CORE
             </h1>
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed">

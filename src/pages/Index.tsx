@@ -40,6 +40,9 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { get: getUserData } = useUserData();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const displayName = getUserData<string>("core-user-name", "") || "";
   const [activeTab, setActiveTab] = useState("dashboard");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);

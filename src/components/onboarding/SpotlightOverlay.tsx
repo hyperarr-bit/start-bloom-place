@@ -60,16 +60,16 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   // Track step views (drop-off analytics) + fire onEnter callback
   useEffect(() => {
     if (!active) return;
-    const cur = steps[stepIdx];
+    const cur = stepsRef.current[stepIdx];
     if (!cur) return;
     trackEvent("spotlight_step_view", {
       module: moduleKey,
       step: stepIdx,
-      total: steps.length,
+      total: stepsRef.current.length,
       label: cur.label,
     });
     try { cur.onEnter?.(); } catch {}
-  }, [active, stepIdx, steps, moduleKey]);
+  }, [active, stepIdx, moduleKey]);
 
   const finish = useCallback((reason: "completed" | "dismissed") => {
     set(`spotlight-done-${moduleKey}`, "true");

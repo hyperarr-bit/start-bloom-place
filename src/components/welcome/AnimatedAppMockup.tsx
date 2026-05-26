@@ -357,13 +357,20 @@ const renderScene = (s: string) => {
   return <DietaScene />;
 };
 
-export const AnimatedAppMockup = () => {
+interface AnimatedAppMockupProps {
+  scene?: "home" | "financas" | "dieta";
+}
+
+export const AnimatedAppMockup = ({ scene }: AnimatedAppMockupProps = {}) => {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
+    if (scene) return;
     const id = setInterval(() => setIdx((i) => (i + 1) % SCENES.length), SCENE_DURATION);
     return () => clearInterval(id);
-  }, []);
+  }, [scene]);
+
+  const current = scene ?? SCENES[idx];
 
   return (
     <div className="absolute inset-0 bg-background overflow-hidden">
@@ -372,14 +379,14 @@ export const AnimatedAppMockup = () => {
       <div className="relative h-[calc(100%-1.6rem)] overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
-            key={SCENES[idx]}
+            key={current}
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.4 }}
             className="absolute inset-0 overflow-hidden"
           >
-            {renderScene(SCENES[idx])}
+            {renderScene(current)}
           </motion.div>
         </AnimatePresence>
       </div>

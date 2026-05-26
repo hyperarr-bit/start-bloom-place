@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import { AnimatedAppMockup } from "@/components/welcome/AnimatedAppMockup";
+import financasMockup from "@/assets/financas-mockup.png";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;

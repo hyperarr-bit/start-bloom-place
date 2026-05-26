@@ -13,6 +13,7 @@ import { BillsDueCards } from "@/components/BillsDueCards";
 import { Calculator } from "@/components/Calculator";
 import { Notes } from "@/components/Notes";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useAuth } from "@/hooks/use-auth";
 
 import { FinancialSummary } from "@/components/FinancialSummary";
 import { InstallmentTracker } from "@/components/InstallmentTracker";

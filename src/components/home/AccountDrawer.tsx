@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, KeyRound, RotateCcw, LogOut, UserCircle } from "lucide-react";
+import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -29,6 +29,11 @@ export const AccountDrawer = ({
   const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [view, setView] = useState<"menu" | "account">("menu");
+
+  useEffect(() => {
+    if (!open) setView("menu");
+  }, [open]);
 
   const initials = displayName
     ? displayName.slice(0, 2).toUpperCase()
@@ -68,102 +73,123 @@ export const AccountDrawer = ({
       onOpenChange(false);
       setUserData("quicksignup-pending", "true");
     } else {
-      setShowNameDialog(true);
+      setView("account");
     }
   };
 
   const menuItems = isGuest
     ? [
-        {
-          icon: UserCircle,
-          label: "Minha conta",
-          onClick: handleMinhaConta,
-          spotlight: "minha-conta",
-        },
+        { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
       ]
     : [
-        {
-          icon: UserCircle,
-          label: "Minha conta",
-          onClick: handleMinhaConta,
-          spotlight: "minha-conta",
-        },
-        {
-          icon: Pencil,
-          label: "Editar nome",
-          onClick: () => setShowNameDialog(true),
-        },
-        {
-          icon: Trophy,
-          label: "Conquistas",
-          onClick: () => { onOpenChange(false); navigate("/conquistas"); },
-        },
-        {
-          icon: CreditCard,
-          label: "Gerenciar assinatura",
-          onClick: handleManageSubscription,
-        },
-        {
-          icon: KeyRound,
-          label: "Alterar senha",
-          onClick: handleResetPassword,
-        },
-        {
-          icon: RotateCcw,
-          label: "Rever tutorial",
-          onClick: handleReplayTutorial,
-        },
+        { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
+        { icon: CreditCard, label: "Assinatura", onClick: handleManageSubscription },
+        { icon: Trophy, label: "Conquistas", onClick: () => { onOpenChange(false); navigate("/conquistas"); } },
+        { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="right" className="w-[300px] sm:w-[340px] p-0">
-          <SheetHeader className="px-5 pt-6 pb-4">
-            <SheetTitle className="text-sm font-semibold">Minha Conta</SheetTitle>
-          </SheetHeader>
+        <SheetContent
+          side="left"
+          className="w-[300px] sm:w-[340px] p-0 z-[300]"
+          overlayClassName="z-[290]"
+        >
+          {view === "menu" && (
+            <>
+              <SheetHeader className="px-5 pt-6 pb-4">
+                <SheetTitle className="text-sm font-semibold">Menu</SheetTitle>
+              </SheetHeader>
 
-          {/* Profile card */}
-          <div className="px-5 pb-4">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/50">
-              <Avatar className="h-10 w-10">
-                <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold truncate">{displayName || "Usuário"}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+              <div className="px-5 space-y-1">
+                {menuItems.map((item: any) => (
+                  <button
+                    key={item.label}
+                    onClick={item.onClick}
+                    data-spotlight={item.spotlight}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <item.icon className="w-4 h-4 text-muted-foreground" />
+                    {item.label}
+                  </button>
+                ))}
+
+                {!isGuest && (
+                  <div className="pt-2 mt-2 border-t border-border">
+                    <button
+                      onClick={signOut}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sair
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
+            </>
+          )}
 
-          {/* Menu items */}
-          <div className="px-5 space-y-1">
-            {menuItems.map((item: any) => (
-              <button
-                key={item.label}
-                onClick={item.onClick}
-                data-spotlight={item.spotlight}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted/50 transition-colors"
-              >
-                <item.icon className="w-4 h-4 text-muted-foreground" />
-                {item.label}
-              </button>
-            ))}
-
-            {!isGuest && (
-              <div className="pt-2 mt-2 border-t border-border">
+          {view === "account" && !isGuest && (
+            <>
+              <SheetHeader className="px-5 pt-6 pb-4 flex-row items-center gap-2 space-y-0">
                 <button
-                  onClick={signOut}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  onClick={() => setView("menu")}
+                  className="p-1 -ml-1 rounded-md hover:bg-muted transition-colors"
+                  aria-label="Voltar"
                 >
-                  <LogOut className="w-4 h-4" />
-                  Sair da conta
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
+                <SheetTitle className="text-sm font-semibold">Minha conta</SheetTitle>
+              </SheetHeader>
+
+              <div className="px-5 pb-4">
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border/50">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-bold">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold truncate">{displayName || "Usuário"}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+
+              <div className="px-5 space-y-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">Nome</p>
+                  <button
+                    onClick={() => setShowNameDialog(true)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="truncate">{displayName || "Adicionar nome"}</span>
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                  </button>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">E-mail</p>
+                  <div className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <span className="truncate">{user?.email}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">Senha</p>
+                  <button
+                    onClick={handleResetPassword}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <KeyRound className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    Redefinir senha
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </SheetContent>
       </Sheet>
 

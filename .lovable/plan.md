@@ -1,29 +1,37 @@
-## Problema
+## Objetivo
 
-1. Clicar em "Quero começar" manda pra `/auth?signup=1` em vez de levar pro tutorial de finanças. A ordem correta combinada antes é: **Quero começar → tutorial de finanças (como guest) → no fim, signup (nome + email + senha) → usar o app**.
-2. Proporções da `WelcomeScreen` no viewport 430x697 estão estranhas (logo enorme, espaços desbalanceados pra mobile).
+Refazer `src/components/WelcomeScreen.tsx` para ficar igual à referência enviada: logo wordmark "CORE" no topo, headline grande em negrito, subtítulo, mockup de iPhone com a tela de Finanças, CTA "Começar grátis", link "Já tem uma conta? Entrar" e linha de confiança "7 dias grátis. Sem complicação.".
 
 ## Mudanças
 
-### 1. `src/components/WelcomeScreen.tsx` — handleStart vai pro tutorial
+### `src/components/WelcomeScreen.tsx`
 
-- Remover a checagem de `useAuth` no `handleStart`.
-- `handleStart` sempre faz `window.location.href = "/financas"` (com `?tutorial=1` se precisar forçar replay, mas a chave `spotlight-done-financas` já controla isso pra primeira visita).
-- Manter "Já tem conta? Entrar" indo pra `/auth`.
+Estrutura nova (mobile-first, 430x697):
 
-### 2. `src/pages/Index.tsx` — signup no fim do tutorial
+```
+[CORE wordmark] (topo, pequeno)
+[Tenha controle da sua vida financeira] (h1, bold, ~32px, 2 linhas)
+[Acompanhe receitas, despesas e investimentos em um só lugar.] (subtítulo muted, 2 linhas)
+[Mockup iPhone com cena Finanças] (flex-1, centralizado)
+[Começar grátis] (botão preto full-width arredondado)
+[Já tem uma conta? Entrar] (link)
+[🛡 7 dias grátis. Sem complicação.] (trust line muted pequeno)
+```
 
-No último passo do spotlight de finanças (atualmente o 12º), no `onExit`/`onComplete`, se o usuário **não estiver logado**, redirecionar pra `/auth?signup=1` (com a mensagem "Tudo que você configurou no tutorial será salvo na sua conta", que já existe na tela de Auth). Se já estiver logado, fica no `/financas` normalmente.
+- Trocar logo png pelo wordmark "CORE" em texto (font-black tracking-tight) — bate com a referência.
+- Headline: `text-3xl md:text-4xl font-bold leading-[1.1]` — "Tenha controle da sua vida financeira".
+- Subtítulo: `text-base text-muted-foreground` — "Acompanhe receitas, despesas e investimentos em um só lugar."
+- Mockup: reutilizar `AnimatedAppMockup` dentro de uma moldura de iPhone simples (rounded-[2.5rem] border, dynamic island já existe no mockup), fixar na cena "financas" (sem ciclar) para combinar com a copy. Adicionar prop `scene?: "home" | "financas" | "dieta"` opcional em `AnimatedAppMockup` pra travar a cena; default mantém o ciclo atual (não quebra outros usos).
+- CTA: "Começar grátis" (em vez de "Quero começar"), mesmo `handleStart` → `/financas`.
+- Trust line nova: ícone shield-check do lucide + texto muted `text-xs`.
+- Layout: `flex flex-col` com header (logo+texto) no topo, mockup `flex-1 min-h-0` no meio com overflow hidden, e footer (CTA+link+trust) embaixo. Padding lateral `px-6`, safe-area top/bottom mantidos.
 
-### 3. `src/components/WelcomeScreen.tsx` — ajustar proporções mobile
+### `src/components/welcome/AnimatedAppMockup.tsx`
 
-- Reduzir logo no mobile: `w-24 h-24 md:w-32 md:h-32` (em vez de `w-32 h-32 md:w-40 md:h-40`).
-- Trocar `justify-between` por layout mais controlado: padding-top menor (`pt-16`), conteúdo central com `gap-8`, CTAs com `mt-auto pb-8`.
-- Garantir que título + tagline + CTA cabem sem scroll em 430x697.
+- Adicionar prop opcional `scene?: "home" | "financas" | "dieta"`. Se passada, renderiza só aquela cena sem `setInterval`.
 
 ## O que NÃO muda
 
-- Cópia "Organize sua vida financeira".
-- Fluxo de signup (campo Nome, validação, etc.).
-- Passos do tutorial e `data-spotlight`.
-- `RootGate` em `/` (continua mostrando Welcome pra quem não terminou o tutorial e redirecionando os que já terminaram pra `/financas`).
+- Rota destino do CTA (`/financas`), analytics, fluxo de auth.
+- Cópia do trust line é nova mas curta, sem mexer em backend.
+- Outras telas/componentes.

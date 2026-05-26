@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, KeyRound, RotateCcw, LogOut } from "lucide-react";
+import { Trophy, Pencil, CreditCard, KeyRound, RotateCcw, LogOut, UserCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";

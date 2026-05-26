@@ -34,17 +34,18 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-16 bg-background overflow-hidden px-6 gap-3"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6 gap-6"
         style={{
           minHeight: "100dvh",
-          paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+          paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+          paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
         }}
       >
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="flex flex-col items-center gap-4 text-center"
+          className="flex flex-col items-center gap-5 text-center"
         >
           <div className="relative">
             <div className="absolute inset-0 blur-3xl bg-foreground/5 rounded-full" aria-hidden />
@@ -56,21 +57,16 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             />
           </div>
 
-          <div className="space-y-1 max-w-sm">
-            <h1 className="text-[26px] md:text-4xl font-bold text-foreground tracking-tight leading-tight">
-              Organize sua vida financeira
-            </h1>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
-              em um só lugar.
-            </p>
-          </div>
+          <h1 className="text-[26px] md:text-4xl font-bold text-foreground tracking-tight leading-tight max-w-sm">
+            Organize sua vida financeira em um só lugar
+          </h1>
         </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut", delay: 0.12 }}
-          className="w-full max-w-sm flex flex-col items-stretch gap-2"
+          className="w-full max-w-sm flex flex-col items-stretch gap-3"
         >
           <button
             onClick={handleStart}

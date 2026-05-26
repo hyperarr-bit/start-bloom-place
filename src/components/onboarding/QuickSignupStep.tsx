@@ -85,11 +85,55 @@ export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
       return;
     }
 
-    // Limpa flag — modal fecha sozinho. Usuário já está na página certa.
+    // Marca o tutorial como concluído pra não reaparecer
+    set("spotlight-done-financas", "true");
+    set("quickstart-target-module", "");
+    // Mostra tela de sucesso com oferta de 7 dias grátis
+    setSuccessName(cleanName);
+    setSuccess(true);
+    setLoading(false);
+  };
+
+  const handleStartTrial = () => {
     set("quicksignup-pending", "");
-    toast.success(`Tudo pronto, ${cleanName}! Bem-vindo ao CORE.`);
+    toast.success(`Bem-vindo, ${successName}! Seu teste de 7 dias começou.`);
     if (redirectTo) navigate(redirectTo);
   };
+
+  if (success) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="flex flex-col items-center text-center gap-5 py-2"
+      >
+        <motion.div
+          initial={{ scale: 0, rotate: -90 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ delay: 0.15, type: "spring", stiffness: 200, damping: 14 }}
+          className="relative w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center"
+        >
+          <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+          <Sparkles className="relative w-10 h-10 text-primary" strokeWidth={2} />
+        </motion.div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold text-foreground leading-tight">
+            Você ganhou 7 dias grátis 🎉
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+            Use o CORE completo, sem limites, por 7 dias. Sem cobrança agora — você decide depois se quer continuar.
+          </p>
+        </div>
+        <button
+          onClick={handleStartTrial}
+          className="w-full py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform mt-2"
+        >
+          Aproveitar teste grátis <ArrowRight className="w-4 h-4" />
+        </button>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.form

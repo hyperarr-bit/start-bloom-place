@@ -153,12 +153,15 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       const target = document.querySelector(step.selector);
       const clicked = e.target as Element | null;
       const otherSpotlight = clicked?.closest?.("[data-spotlight]") as Element | null;
+      // Only block clicks on other spotlight elements when our target exists.
+      // If the current step's target is missing, allow free interaction so the
+      // user can navigate back to it (e.g. reopen a closed drawer).
       if (
+        target &&
         otherSpotlight &&
-        (!target ||
-          (otherSpotlight !== target &&
-            !target.contains(otherSpotlight) &&
-            !otherSpotlight.contains(target)))
+        otherSpotlight !== target &&
+        !target.contains(otherSpotlight) &&
+        !otherSpotlight.contains(target)
       ) {
         e.preventDefault();
         e.stopPropagation();

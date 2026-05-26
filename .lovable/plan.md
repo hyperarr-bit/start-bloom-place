@@ -1,42 +1,49 @@
-## Problema
+## Objetivo
 
-Ao clicar em "Meu Financeiro" estando em "Dashboard", a aba pisca rapidamente assim:
-1. mostra Financeiro (clique aplica)
-2. volta pra Dashboard (flash)
-3. vai pra Financeiro
+Adicionar 2 passos finais no tutorial de Finanças (último módulo do guest):
 
-Isso só acontece com o tutorial (SpotlightOverlay) ativo — usuários convidados/novos.
+1. **Passo: clicar no botão de menu (☰)** — abre o drawer lateral
+2. **Passo: clicar em "Minha conta"** — abre o modal de cadastro (nome / e-mail / senha)
+3. Após criar a conta, o modal mostra uma tela de sucesso: **"Você ganhou 7 dias grátis pra testar o app"** + botão **"Aproveitar teste grátis"** → fecha o modal e o usuário fica no app normalmente.
 
-## Causa raiz
+Reaproveita componentes existentes (`AccountDrawer`, `QuickSignupModal`/`QuickSignupStep`) para evitar duplicação.
 
-Em `src/components/onboarding/SpotlightOverlay.tsx`, o `useEffect` que dispara `onEnter` do passo atual (linhas 61–72) tem `steps` no array de dependências:
+## Mudanças
 
-```ts
-useEffect(() => {
-  // ...
-  try { cur.onEnter?.(); } catch {}
-}, [active, stepIdx, steps, moduleKey]);
-```
+### 1. `src/pages/Index.tsx`
+- Adicionar `data-spotlight="menu"` no botão hambúrguer.
+- Trocar o `onComplete` do `SpotlightOverlay`: em vez de redirecionar guest para `/auth?signup=1`, não faz nada (o cadastro acontece dentro do fluxo).
+- Adicionar 2 steps no fim do array `steps`:
+  - `{ selector: '[data-spotlight="menu"]', label: 'Toque no menu pra abrir suas opções.' }`
+  - `{ selector: '[data-spotlight="minha-conta"]', label: 'Toque em "Minha conta" pra criar seu cadastro e liberar tudo.' }`
 
-O array `steps` é recriado a cada render do `Index` (literal inline em `<SpotlightOverlay steps={[...]} />`). Quando o usuário clica na tab "Meu Financeiro":
+### 2. `src/components/home/AccountDrawer.tsx`
+- Adicionar item **"Minha conta"** no topo da lista, com `data-spotlight="minha-conta"`.
+- Comportamento: 
+  - **Guest** (`isGuest === true`): fecha o drawer e seta `quicksignup-pending = "true"` → abre o `QuickSignupModal`.
+  - **Logado**: abre o `NameEditDialog` (mesmo comportamento do atual "Editar nome").
+- Para guest, ocultar itens que exigem login (assinatura, alterar senha, sair).
 
-1. `setActiveTab("financeiro")` → render do Index → nova referência de `steps` → `Index` re-renderiza.
-2. O `useEffect` do Spotlight reexecuta porque `steps` mudou de referência, mesmo com `stepIdx` igual a 0.
-3. O `onEnter` do passo 0 (`() => setActiveTab("dashboard")`) dispara novamente → volta pra Dashboard (flash).
-4. 250 ms depois, o listener de clique do overlay chama `advance()` → `stepIdx` vira 1 → roda `onEnter` do passo 1 (`setActiveTab("financeiro")`) → vai pra Financeiro.
+### 3. `src/components/onboarding/QuickSignupStep.tsx`
+- Após `signUp` com sucesso e sessão criada, em vez de só fechar:
+  - Trocar para uma **tela de sucesso interna** com:
+    - Ícone/animação de check
+    - Título: **"Você ganhou 7 dias grátis 🎉"**
+    - Subtítulo curto explicando o teste
+    - Botão grande: **"Aproveitar teste grátis"** → ao clicar, faz `set("quicksignup-pending", "")` e o modal fecha (usuário fica no /index logado).
+- Marcar `spotlight-done-financas = "true"` para o tutorial não reabrir.
 
-## Correção
+### 4. `src/components/onboarding/QuickSignupModal.tsx`
+- Sem mudança lógica; só garantir que continua abrindo quando `quicksignup-pending === "true"` (já funciona).
 
-Em `src/components/onboarding/SpotlightOverlay.tsx`, fazer o efeito que executa `onEnter` depender apenas de `active` e `stepIdx`, lendo o passo via `stepsRef.current` (já existe). Assim o `onEnter` roda exatamente uma vez quando o passo muda, não a cada re-render do pai.
+## Pontos técnicos
 
-```ts
-useEffect(() => {
-  if (!active) return;
-  const cur = stepsRef.current[stepIdx];
-  if (!cur) return;
-  trackEvent("spotlight_step_view", { module: moduleKey, step: stepIdx, total: stepsRef.current.length, label: cur.label });
-  try { cur.onEnter?.(); } catch {}
-}, [active, stepIdx, moduleKey]);
-```
+- O `SpotlightOverlay` já bloqueia cliques em outros `[data-spotlight]` fora do passo atual (fix anterior), então o usuário não consegue burlar o fluxo.
+- `advanceOnClick` (default true) avança o passo do menu ao clicar no botão; o próximo passo procura `[data-spotlight="minha-conta"]` dentro do `Sheet` aberto — o `SpotlightOverlay` já tem polling de 250ms que detecta o elemento assim que o drawer renderiza.
+- Ao clicar em "Minha conta" o passo final completa, dispara `onComplete` (no-op pro guest) e marca `spotlight-done-financas`.
+- O `QuickSignupModal` abre por cima como já abre hoje (`z-[100]`).
+- Não toca em backend nem em rotas.
 
-Nenhuma outra mudança necessária. Não toco em `Index.tsx`.
+## Fora de escopo
+- Nenhuma mudança em DB, edge functions ou auth.
+- Nenhum refactor além do necessário.

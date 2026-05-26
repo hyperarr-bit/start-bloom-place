@@ -128,7 +128,12 @@ const Index = () => {
       <AccountDrawer open={menuOpen} onOpenChange={setMenuOpen} displayName={displayName} />
       <SpotlightOverlay
         moduleKey="financas"
-        onComplete={() => {}}
+        onComplete={() => {
+          // Após terminar o tutorial, espera ~5s e abre o cadastro rápido (7 dias grátis).
+          if (isGuest) {
+            setTimeout(() => setUserData("quicksignup-pending", "true"), 5000);
+          }
+        }}
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
@@ -139,7 +144,8 @@ const Index = () => {
           { selector: '[data-spotlight="add-investment"]', label: 'Cadastre seu primeiro aporte.', advanceOnAction: "first_investment", checkKey: "finance-investments", onEnter: () => setActiveTab("investimentos") },
           { selector: '[data-spotlight="tab-itens"]', label: 'Liste o que quer comprar e priorize.', onEnter: () => setActiveTab("investimentos") },
           { selector: '[data-spotlight="add-wish"]', label: 'Adicione um item da sua lista de desejos.', advanceOnAction: "first_wish", checkKey: "finance-wishlist", onEnter: () => setActiveTab("itens") },
-          { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES embaixo e adicione um limite pra uma categoria.', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, onEnter: () => setActiveTab("itens") },
+          { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES embaixo.', onEnter: () => setActiveTab("itens") },
+          { selector: '[data-spotlight="add-limit"]', label: 'Adicione um limite pra uma categoria.', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
         ]}

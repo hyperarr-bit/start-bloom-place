@@ -1,34 +1,94 @@
-# Corrigir header sumindo ao fechar tutorial
+## Pivot para app de Finanças
 
-## Problema
+Mantém todo o código de outros módulos no repo (acessíveis só por URL direta), mas remove qualquer entrada visível pra eles. O usuário entra → cai direto em `/financas`. Sem Home, sem escolha de módulo.
 
-Ao clicar em "Entendi" no modal de conclusão do tutorial, o header da página (DIETA, TREINO, etc.) desaparece por alguns instantes antes de reaparecer, deixando um espaço em branco no topo (visível no screenshot enviado).
+---
 
-## Causa
+### 1. Roteamento e entrada do app (`src/App.tsx`)
 
-O modal de conclusão em `SpotlightOverlay.tsx` usa:
-- `fixed inset-0` cobrindo a tela inteira
-- `backdrop-blur-sm` (filtro de blur na backdrop)
-- `z-[300]`, acima do header `sticky top-0 z-50`
+- Rota `/` deixa de renderizar `Home` e passa a redirecionar para `/financas` (`<Navigate to="/financas" replace />`), mantendo `allowGuest`.
+- `Home.tsx` continua no repo (não apagar), só sai do roteamento principal.
+- `QuickSignupModal` continua disparando, mas após cadastro vai pra `/financas` (já é hoje, confirmar).
 
-No iOS Safari, a combinação `backdrop-filter: blur` + elemento `position: sticky` na mesma viewport causa um bug de repintura: ao desmontar o backdrop (animação de exit do `AnimatePresence`), o header sticky fica "perdido" por alguns frames até o Safari refazer o layout.
+### 2. Landing / Welcome (`src/components/WelcomeScreen.tsx`)
 
-## Solução
+- Subtítulo: trocar de _"Organize sua vida — finanças, treino, dieta e rotina — em um só lugar."_ para **"Organize sua vida financeira."**
+- Título `Bem-vindo ao CORE` mantém.
+- Botão `Quero começar` mantém o texto.
 
-Ajustar o modal de conclusão para não disparar o bug, sem mudar o comportamento visual percebido:
+### 3. Tutorial pré-signup → eliminado
 
-1. **Remover `backdrop-blur-sm`** da backdrop — manter só `bg-background/70` (escurece sem causar repinturas problemáticas em elementos sticky).
-2. **Trocar o exit animation por algo instantâneo** — `exit={{ opacity: 0 }}` com `transition={{ duration: 0.15 }}` para não deixar o backdrop "pairando" sobre o header durante o fade-out.
-3. **Garantir desmontagem limpa**: ao clicar em "Entendi", setar `showCompletion = false` e o `AnimatePresence` cuida do unmount rápido.
+O usuário não quer mais a tela de slides antes do cadastro. Fluxo novo:
 
-Esses três ajustes eliminam o gatilho do bug de repintura mantendo a aparência do modal idêntica enquanto está aberto.
+```text
+Landing "Quero começar"  →  Tela de cadastro (Nome, Email, Senha)  →  /financas (com tutorial spotlight)
+```
 
-## Arquivo afetado
+- Em `WelcomeScreen.handleStart`: em vez de abrir `PreSignupTutorial`, navega direto para `/auth?signup=1`.
+- `PreSignupTutorial.tsx` permanece no repo mas deixa de ser usado.
+- `QuickStartOnboarding` (escolha de módulo) também sai do fluxo — não roda mais.
 
-- `src/components/onboarding/SpotlightOverlay.tsx` — apenas a JSX do `completionModal` (linhas ~186-220 aprox).
+### 4. Cadastro com Nome (`src/pages/Auth.tsx`)
 
-## Fora do escopo
+- Adicionar campo **Nome** no modo signup (acima do email).
+- Email e Senha já existem; rótulo do email vira "Email" (placeholder pode sugerir Gmail, sem validação restritiva — qualquer provedor passa).
+- Após `signUp(email, password, { data: { full_name: nome } })`, salvar nome via `useUserData().set("user-name", nome)` e navegar pra `/financas`.
+- Login normal também redireciona pra `/financas` em vez de `/`.
 
-- Não mexer no design do modal (já foi aprovado).
-- Não mexer em outros módulos do tutorial — a correção é no componente compartilhado e se aplica a todos os 4 (finanças, rotina, dieta, treino) automaticamente.
-- Não mexer no app padrão (modal só roda dentro do tutorial).
+### 5. Tutorial spotlight de Finanças expandido (`src/pages/Index.tsx`)
+
+Hoje tem 5 passos só na aba "Meu Financeiro". Expandir cobrindo mais abas com profundidade:
+
+```text
+1. Dashboard          → "Aqui você vê sua saúde financeira geral."
+2. Tab Financeiro     → "Abra Meu Financeiro."
+3. Add Receita        → "Adicione sua receita (salário, freelas…)."   [advanceOnAction]
+4. Add Custo Fixo     → "Cadastre um custo fixo (aluguel, internet…)." [advanceOnAction]
+5. Add Conta          → "Adicione 1 conta no vencimento."              [advanceOnAction]
+6. Add Nota           → "Escreva uma anotação financeira."             [advanceOnAction]
+7. Tab Investimentos  → "Acompanhe seus investimentos aqui."
+8. Add Investimento   → "Cadastre seu primeiro aporte."                [advanceOnAction]
+9. Tab Desejos        → "Liste o que quer comprar e priorize."
+10. Add Desejo        → "Adicione um item da sua wishlist."            [advanceOnAction]
+11. Tab Metas         → "Defina metas de economia e acompanhe."
+12. Tab Relatórios    → "Veja relatórios mensais automáticos."
+13. Tab Saúde         → "Acompanhe sua saúde financeira em um índice."
+```
+
+Para passos que mudam de aba, o spotlight precisa fazer `setActiveTab(...)` antes do passo aparecer. Implementar via callback `onStepEnter` no `SpotlightOverlay` (ou ajustando os steps para incluir `tab`).
+
+Adicionar `data-spotlight="..."` nos botões/tabs/itens correspondentes em:
+- tabs do header (`investimentos`, `desejos`, `metas`, `relatorios`, `saude`)
+- botões "Adicionar" em `InvestmentsTracker`, `WishlistItems`
+
+### 6. Esconder outros módulos da UI
+
+- `GreetingHeader` / `ModuleDrawer` / `QuickActions` não rodam mais (Home fora do fluxo).
+- `Inicio.tsx` continua pra rota `/inicio` (landing pra deslogado) — apenas o conteúdo do `WelcomeScreen` com copy nova.
+- Não tocar nas páginas dos outros módulos.
+
+### 7. O que NÃO mudar
+
+- Nenhuma página de módulo além de Finanças.
+- Nenhuma tabela do Supabase.
+- Admin, analytics, billing, edge functions.
+- Visual identity (cores, fontes, ícones).
+
+---
+
+### Detalhes técnicos
+
+**App.tsx**: substituir
+```tsx
+<Route path="/" element={<ProtectedRoute allowGuest><PageTransition><Home /></PageTransition></ProtectedRoute>} />
+```
+por
+```tsx
+<Route path="/" element={<Navigate to="/financas" replace />} />
+```
+
+**SpotlightOverlay**: adicionar suporte opcional a `onEnter?: () => void` em cada step, chamado quando o passo vira ativo (antes de medir o `rect`). Isso permite trocar de aba antes do spotlight procurar o elemento.
+
+**Auth.tsx**: estado `name`, input controlado, validação simples (não vazio em signup), passar `options.data.full_name` no `supabase.auth.signUp`. Salvar também em `user_data` pra usar no app.
+
+**Persistência do tutorial**: `spotlight-done-financas` continua sendo a chave única (não regerar pra usuários atuais, a menos que o usuário queira — confirmar se quer replay forçado pra todo mundo).

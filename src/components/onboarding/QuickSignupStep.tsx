@@ -11,6 +11,8 @@ import { trackEvent } from "@/lib/analytics";
 interface QuickSignupStepProps {
   /** Optional route to navigate to after successful signup. If empty, stays on current page. */
   redirectTo?: string;
+  /** Called after the user clicks the "Aproveitar teste grátis" button on the success screen. */
+  onFinished?: () => void;
 }
 
 const schema = z.object({
@@ -23,7 +25,7 @@ const schema = z.object({
     .refine((v) => /[A-Za-z]/.test(v) && /\d/.test(v), "Use letras e números"),
 });
 
-export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
+export const QuickSignupStep = ({ redirectTo = "", onFinished }: QuickSignupStepProps) => {
   const { set } = useUserData();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -98,6 +100,7 @@ export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
     set("quicksignup-pending", "");
     toast.success(`Bem-vindo, ${successName}! Seu teste de 7 dias começou.`);
     if (redirectTo) navigate(redirectTo);
+    onFinished?.();
   };
 
   if (success) {

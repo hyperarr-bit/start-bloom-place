@@ -1,32 +1,16 @@
-# Correções nos passos finais do tutorial Finanças
+## Problema
 
-## 1. Passo "Limites" — texto pouco claro
-Atualizar o label do passo `tab-limites` em `src/pages/Index.tsx` para instruir explicitamente:
+O `QuickSignupModal` só fica aberto enquanto `isGuest && quicksignup-pending === "true"`. Quando o `supabase.auth.signUp` retorna sessão, o usuário deixa de ser guest e o flag pendente é limpo, então o modal desmonta **antes** de o `QuickSignupStep` mostrar a tela de sucesso ("Você ganhou 7 dias grátis 🎉"). Resultado: o usuário cai direto no app sem ver a tela.
 
-> "Toque em LIMITES embaixo e adicione um limite pra uma categoria."
+## Correção
 
-## 2. Passo 13 ("Toque no menu") — aparece "Role pra cima" sem precisar
-Em `src/components/onboarding/SpotlightOverlay.tsx`, a detecção de "offscreen acima" usa o limiar `rect.top + rect.height < 60`. O botão de menu fica no header sticky (top ≈ 13, height ≈ 28 → 41), caindo na regra incorretamente.
+### 1. `src/components/onboarding/QuickSignupModal.tsx`
+- Adicionar estado local `keepOpen` que vira `true` quando o modal abre pela primeira vez e só volta a `false` quando o `QuickSignupStep` avisar que terminou (após o clique em "Aproveitar teste grátis").
+- Calcular `open = keepOpen || (loaded && isGuest && pending)` para não fechar quando a sessão for criada.
+- Passar um callback `onFinished` para `QuickSignupStep`.
 
-Reduzir o limiar para `< 10` (só dispara quando o alvo está realmente fora da viewport), mantendo a detecção para conteúdo abaixo.
+### 2. `src/components/onboarding/QuickSignupStep.tsx`
+- Aceitar prop opcional `onFinished?: () => void`.
+- Chamar `onFinished()` dentro de `handleStartTrial`, depois da navegação/toast, para que o modal feche apenas após o usuário ver a tela de 7 dias e clicar no botão.
 
-## 3. Passo 14 ("Minha conta") — balão fora da tela quando drawer está fechado
-Causa: se o usuário fecha o drawer durante o passo 14, o alvo `[data-spotlight="minha-conta"]` deixa de existir e o card de fallback aparece no canto inferior, parcialmente cortado.
-
-Solução: em `src/components/home/AccountDrawer.tsx`, quando o drawer for fechado E o passo atual do spotlight for `minha-conta`, voltar o passo para `menu` (regredir um passo). Implementar via um pequeno mecanismo:
-
-- Expor um evento global `core:spotlight-regress` que o `SpotlightOverlay` escuta para chamar `setStepIdx(Math.max(0, stepIdx - 1))`.
-- No `AccountDrawer`, no `onOpenChange(false)`, despachar esse evento se o passo atual da Finanças for o último (minha-conta).
-
-Alternativa mais simples (preferida): no `SpotlightOverlay`, quando o alvo do passo está ausente por > 400ms E o passo anterior tem um alvo presente, regredir automaticamente para o passo anterior em vez de mostrar fallback. Isso resolve o caso de forma genérica.
-
-## 4. Após clicar nos 3 traços e fechar, menu fica "travado" (não dá pra clicar de novo)
-Causa: em `SpotlightOverlay.tsx`, o `onPageClick` bloqueia qualquer clique em elementos com `[data-spotlight]` que não sejam o alvo do passo atual. Como o passo atual passa a ser `minha-conta` (dentro do drawer fechado), o `target` é `null` e o clique no botão `menu` é bloqueado por `preventDefault`/`stopPropagation`.
-
-Solução: alterar a condição para NÃO bloquear quando `target` é `null` — permitir cliques livres se o alvo do passo atual não existe na DOM. Isso resolve o problema e também combina bem com a correção #3 (a regressão automática para o passo `menu` reativa o avanço normal pelo clique).
-
-## Arquivos alterados
-- `src/pages/Index.tsx` — texto do passo `tab-limites`.
-- `src/components/onboarding/SpotlightOverlay.tsx` — limiar de off-screen acima; não bloquear cliques quando o alvo do passo está ausente; auto-regressão de passo quando alvo some e o anterior existe.
-
-Sem mudanças de backend, dados ou auth.
+Nenhuma outra lógica (signUp, set de flags, navegação) é alterada.

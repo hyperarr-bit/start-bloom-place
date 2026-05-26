@@ -12,6 +12,8 @@ const ACTIVATION_RULES: Array<{ match: RegExp; action: string; meaningful?: (v: 
   { match: /finance-notes/i, action: "first_note" },
   { match: /finance-expenses/i, action: "first_transaction" },
   { match: /finance-installments/i, action: "first_installment" },
+  { match: /finance-investments/i, action: "first_investment" },
+  { match: /finance-wishlist/i, action: "first_wish" },
   { match: /transac|financ/i, action: "first_transaction" },
   { match: /rotina-habits|^habit/i, action: "first_habit" },
   { match: /rotina-schedule/i, action: "first_schedule" },

@@ -25,19 +25,15 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     }, []);
 
     const handleStart = () => {
-      trackEvent("start_clicked", { destination: "pre_signup_tutorial" });
+      trackEvent("start_clicked", { destination: "signup" });
       onComplete?.();
-      setShowTutorial(true);
+      window.location.href = "/auth?signup=1";
     };
 
     const handleLogin = () => {
       trackEvent("login_clicked", {});
       onLogin?.();
     };
-
-    if (showTutorial) {
-      return <PreSignupTutorial onClose={() => setShowTutorial(false)} />;
-    }
 
     return (
       <div
@@ -73,7 +69,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               Bem-vindo ao CORE
             </h1>
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed">
-              Organize sua vida — finanças, treino, dieta e rotina — em um só lugar.
+              Organize sua vida financeira.
             </p>
           </div>
         </motion.div>

@@ -122,6 +122,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <SpotlightOverlay
         moduleKey="financas"
+        onComplete={() => { if (!user) navigate("/auth?signup=1"); }}
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },

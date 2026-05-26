@@ -125,6 +125,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <AccountDrawer open={menuOpen} onOpenChange={setMenuOpen} displayName={displayName} />
       <SpotlightOverlay
         moduleKey="financas"
         onComplete={() => { if (!user) navigate("/auth?signup=1"); }}

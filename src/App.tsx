@@ -17,6 +17,21 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { useAuth } from "@/hooks/use-auth";
+import { useUserData } from "@/hooks/use-user-data";
+
+const RootGate = () => {
+  const { user, loading } = useAuth();
+  const { get, loaded } = useUserData();
+  if (loading) return <div className="min-h-screen bg-background" aria-hidden />;
+  if (user) {
+    if (!loaded) return <div className="min-h-screen bg-background" aria-hidden />;
+    const done = get<boolean>("spotlight-done-financas", false);
+    if (done) return <Navigate to="/financas" replace />;
+  }
+  return <WelcomeScreen />;
+};
 
 
 import Home from "./pages/Home";

@@ -168,7 +168,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
         {unsetCats.length > 0 && (
           <div className="border-t border-border px-3 py-2">
             <p className="text-[10px] text-muted-foreground mb-1.5">Adicionar limite:</p>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1" data-spotlight="add-limit">
               {unsetCats.map(cat => (
                 <button
                   key={cat.value}

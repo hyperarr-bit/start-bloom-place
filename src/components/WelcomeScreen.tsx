@@ -60,16 +60,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
           className="flex-1 min-h-0 flex items-center justify-center py-4"
         >
-          <div
-            className="relative h-full max-h-[420px] aspect-[9/19] rounded-[2.2rem] border-[6px] border-foreground/90 bg-background shadow-2xl overflow-hidden"
-          >
-            <img
-              src={financasMockup}
-              alt="Tela de Finanças do CORE"
-              className="absolute inset-0 w-full h-full object-cover object-top select-none"
-              draggable={false}
-            />
-          </div>
+          <img
+            src={financasMockup}
+            alt="Tela de Finanças do CORE"
+            className="h-full max-h-[440px] w-auto object-contain select-none"
+            draggable={false}
+          />
         </motion.div>
 
         {/* Footer CTAs */}

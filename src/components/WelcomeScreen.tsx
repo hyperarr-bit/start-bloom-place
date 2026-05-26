@@ -34,10 +34,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6 gap-3"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-16 bg-background overflow-hidden px-6 gap-3"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(2rem, env(safe-area-inset-top))",
           paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
         }}
       >

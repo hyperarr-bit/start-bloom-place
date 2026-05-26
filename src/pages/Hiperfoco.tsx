@@ -63,7 +63,7 @@ const Hiperfoco = () => {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
+      <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4 min-h-[60vh]">
         <ModuleTip
           moduleId="hiperfoco"
           tips={[

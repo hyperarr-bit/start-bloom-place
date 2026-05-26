@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { QuickSignupStep } from "./QuickSignupStep";
@@ -6,7 +6,15 @@ import { QuickSignupStep } from "./QuickSignupStep";
 export const QuickSignupModal = () => {
   const { get, isGuest, loaded } = useUserData();
   const pending = get<string>("quicksignup-pending", "") === "true";
-  const open = loaded && isGuest && pending;
+  const shouldOpen = loaded && isGuest && pending;
+  const [keepOpen, setKeepOpen] = useState(false);
+
+  // Once opened, stay open until QuickSignupStep tells us it's done (success screen confirmed).
+  useEffect(() => {
+    if (shouldOpen && !keepOpen) setKeepOpen(true);
+  }, [shouldOpen, keepOpen]);
+
+  const open = keepOpen || shouldOpen;
 
   useEffect(() => {
     if (!open) return;
@@ -39,7 +47,7 @@ export const QuickSignupModal = () => {
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             className="w-full max-w-md rounded-2xl bg-card border border-border shadow-2xl p-6 max-h-[92vh] overflow-y-auto"
           >
-            <QuickSignupStep />
+            <QuickSignupStep onFinished={() => setKeepOpen(false)} />
           </motion.div>
         </motion.div>
       )}

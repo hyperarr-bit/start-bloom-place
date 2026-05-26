@@ -34,10 +34,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6 gap-3"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-16 bg-background overflow-hidden px-6 gap-3"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(1rem, env(safe-area-inset-top))",
           paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
         }}
       >
@@ -61,7 +60,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             <h1 className="text-[26px] md:text-4xl font-bold text-foreground tracking-tight leading-tight">
               Organize sua vida financeira
             </h1>
-            <p className="text-base md:text-lg font-bold text-muted-foreground leading-relaxed">
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
               em um só lugar.
             </p>
           </div>
@@ -75,7 +74,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         >
           <button
             onClick={handleStart}
-            className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-bold shadow-lg active:scale-[0.98] transition-transform"
+            className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
           >
             Quero começar
           </button>
@@ -83,9 +82,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <Link
             to="/auth"
             onClick={handleLogin}
-            className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors text-center py-1"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center py-1"
           >
-            Já tem uma conta? <span className="font-bold text-foreground">Entrar</span>
+            Já tem uma conta? <span className="font-medium text-foreground">Entrar</span>
           </Link>
         </motion.div>
       </div>

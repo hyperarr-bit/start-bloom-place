@@ -167,15 +167,6 @@ const Index = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
-        <ModuleTip
-          moduleId="financas"
-          tips={[
-            "Comece adicionando suas receitas (salário, freelance, etc.) na aba 💰 Receitas",
-            "Cadastre despesas fixas (aluguel, contas) e variáveis separadamente",
-            "Use o Dashboard para ter uma visão geral da sua saúde financeira",
-            "Defina metas de economia e acompanhe o progresso"
-          ]}
-        />
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && (
           <div className="bg-card rounded-lg border border-border px-4 py-2 flex items-center justify-between gap-3 overflow-x-auto">

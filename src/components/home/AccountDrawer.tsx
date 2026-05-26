@@ -140,10 +140,11 @@ export const AccountDrawer = ({
 
           {/* Menu items */}
           <div className="px-5 space-y-1">
-            {menuItems.map((item) => (
+            {menuItems.map((item: any) => (
               <button
                 key={item.label}
                 onClick={item.onClick}
+                data-spotlight={item.spotlight}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted/50 transition-colors"
               >
                 <item.icon className="w-4 h-4 text-muted-foreground" />
@@ -151,15 +152,17 @@ export const AccountDrawer = ({
               </button>
             ))}
 
-            <div className="pt-2 mt-2 border-t border-border">
-              <button
-                onClick={signOut}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sair da conta
-              </button>
-            </div>
+            {!isGuest && (
+              <div className="pt-2 mt-2 border-t border-border">
+                <button
+                  onClick={signOut}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair da conta
+                </button>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

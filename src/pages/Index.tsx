@@ -139,7 +139,7 @@ const Index = () => {
           { selector: '[data-spotlight="add-investment"]', label: 'Cadastre seu primeiro aporte.', advanceOnAction: "first_investment", checkKey: "finance-investments", onEnter: () => setActiveTab("investimentos") },
           { selector: '[data-spotlight="tab-itens"]', label: 'Liste o que quer comprar e priorize.', onEnter: () => setActiveTab("investimentos") },
           { selector: '[data-spotlight="add-wish"]', label: 'Adicione um item da sua lista de desejos.', advanceOnAction: "first_wish", checkKey: "finance-wishlist", onEnter: () => setActiveTab("itens") },
-          { selector: '[data-spotlight="tab-limites"]', label: 'Defina limites por categoria e acompanhe.', onEnter: () => setActiveTab("itens") },
+          { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES embaixo e adicione um limite pra uma categoria.', onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
           { selector: '[data-spotlight="menu"]', label: 'Toque no menu pra abrir suas opções.' },

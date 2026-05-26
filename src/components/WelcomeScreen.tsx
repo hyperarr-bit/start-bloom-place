@@ -25,9 +25,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     }, []);
 
     const handleStart = () => {
-      trackEvent("start_clicked", { destination: "signup" });
+      const destination = user ? "financas" : "signup";
+      trackEvent("start_clicked", { destination });
       onComplete?.();
-      window.location.href = "/auth?signup=1";
+      window.location.href = user ? "/financas" : "/auth?signup=1";
     };
 
     const handleLogin = () => {

@@ -63,7 +63,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <div
             className="relative h-full max-h-[420px] aspect-[9/19] rounded-[2.2rem] border-[6px] border-foreground/90 bg-background shadow-2xl overflow-hidden"
           >
-            <AnimatedAppMockup scene="financas" />
+            <img
+              src={financasMockup}
+              alt="Tela de Finanças do CORE"
+              className="absolute inset-0 w-full h-full object-cover object-top select-none"
+              draggable={false}
+            />
           </div>
         </motion.div>
 

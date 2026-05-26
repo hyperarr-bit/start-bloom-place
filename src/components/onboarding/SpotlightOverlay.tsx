@@ -151,6 +151,19 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
     const onPageClick = (e: MouseEvent) => {
       const target = document.querySelector(step.selector);
+      const clicked = e.target as Element | null;
+      const otherSpotlight = clicked?.closest?.("[data-spotlight]") as Element | null;
+      if (
+        otherSpotlight &&
+        (!target ||
+          (otherSpotlight !== target &&
+            !target.contains(otherSpotlight) &&
+            !otherSpotlight.contains(target)))
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (!target) return;
       if (target.contains(e.target as Node)) {
         if (step.advanceOnAction) return;

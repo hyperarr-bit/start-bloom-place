@@ -13,6 +13,7 @@ import { BillsDueCards } from "@/components/BillsDueCards";
 import { Calculator } from "@/components/Calculator";
 import { Notes } from "@/components/Notes";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useAuth } from "@/hooks/use-auth";
 
 import { FinancialSummary } from "@/components/FinancialSummary";
 import { InstallmentTracker } from "@/components/InstallmentTracker";
@@ -36,6 +37,7 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
@@ -120,6 +122,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <SpotlightOverlay
         moduleKey="financas"
+        onComplete={() => { if (!user) navigate("/auth?signup=1"); }}
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },

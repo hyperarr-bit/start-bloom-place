@@ -21,13 +21,15 @@ interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";
   steps: SpotlightStep[];
   activationActions?: string[];
+  /** Optional: called when the tutorial is fully completed (not dismissed). If provided, suppresses the default completion modal. */
+  onComplete?: () => void;
 }
 
 interface Rect { top: number; left: number; width: number; height: number }
 
 const PADDING = 8;
 
-export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: SpotlightOverlayProps) => {
+export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onComplete }: SpotlightOverlayProps) => {
   const { get, set, isGuest } = useUserData();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
@@ -75,9 +77,13 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
     setActive(false);
     if (reason === "completed") {
-      setShowCompletion(true);
+      if (onComplete) {
+        try { onComplete(); } catch {}
+      } else {
+        setShowCompletion(true);
+      }
     }
-  }, [set, moduleKey]);
+  }, [set, moduleKey, onComplete]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;

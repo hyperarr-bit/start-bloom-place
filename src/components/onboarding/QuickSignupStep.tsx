@@ -11,6 +11,8 @@ import { trackEvent } from "@/lib/analytics";
 interface QuickSignupStepProps {
   /** Optional route to navigate to after successful signup. If empty, stays on current page. */
   redirectTo?: string;
+  /** Called after the user clicks the "Aproveitar teste grátis" button on the success screen. */
+  onFinished?: () => void;
 }
 
 const schema = z.object({

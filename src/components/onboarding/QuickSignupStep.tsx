@@ -31,6 +31,8 @@ export const QuickSignupStep = ({ redirectTo = "" }: QuickSignupStepProps) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [successName, setSuccessName] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

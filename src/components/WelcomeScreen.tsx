@@ -5,6 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/hooks/use-auth";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;
@@ -14,6 +15,7 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const { mode } = useTheme();
+    const { user } = useAuth();
     const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
     useEffect(() => {
@@ -23,9 +25,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     }, []);
 
     const handleStart = () => {
-      trackEvent("start_clicked", { destination: "signup" });
+      const destination = user ? "financas" : "signup";
+      trackEvent("start_clicked", { destination });
       onComplete?.();
-      window.location.href = "/auth?signup=1";
+      window.location.href = user ? "/financas" : "/auth?signup=1";
     };
 
     const handleLogin = () => {

@@ -17,6 +17,21 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { useAuth } from "@/hooks/use-auth";
+import { useUserData } from "@/hooks/use-user-data";
+
+const RootGate = () => {
+  const { user, loading } = useAuth();
+  const { get, loaded } = useUserData();
+  if (loading) return <div className="min-h-screen bg-background" aria-hidden />;
+  if (user) {
+    if (!loaded) return <div className="min-h-screen bg-background" aria-hidden />;
+    const done = get<boolean>("spotlight-done-financas", false);
+    if (done) return <Navigate to="/financas" replace />;
+  }
+  return <WelcomeScreen />;
+};
 
 
 import Home from "./pages/Home";
@@ -69,7 +84,7 @@ const AnimatedRoutes = () => {
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/financas" replace />} />
+        <Route path="/" element={<RootGate />} />
         <Route path="/home" element={<ProtectedRoute allowGuest><PageTransition><Home /></PageTransition></ProtectedRoute>} />
         <Route path="/financas" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="financas"><TrackedModule moduleId="financas"><Index /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/rotina" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="rotina"><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />

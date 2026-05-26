@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Loader2, User, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Loader2, User, Mail, Lock, Eye, EyeOff, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserData } from "@/hooks/use-user-data";

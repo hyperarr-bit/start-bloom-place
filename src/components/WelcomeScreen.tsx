@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import financasMockup from "@/assets/financas-mockup.png";
+import financasMockup from "@/assets/financas-mockup.webp";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;
@@ -66,9 +66,15 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             <img
               src={financasMockup}
               alt="Tela de Finanças do CORE"
-              className="absolute inset-0 w-full h-full object-cover object-[50%_0%] select-none"
+              className="absolute inset-0 w-full h-full object-cover object-[50%_0%] select-none [image-rendering:auto]"
               draggable={false}
+              loading="eager"
+              decoding="async"
+              fetchPriority="high"
+              width={900}
+              height={1953}
             />
+
           </div>
         </motion.div>
 

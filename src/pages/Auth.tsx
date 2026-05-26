@@ -191,11 +191,25 @@ const Auth = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
+            {!isLogin && (
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Seu nome"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="pl-10"
+                  required
+                  autoComplete="name"
+                />
+              </div>
+            )}
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="email"
-                placeholder="seu@email.com"
+                placeholder="seu@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10"

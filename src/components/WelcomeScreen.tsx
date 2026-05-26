@@ -13,6 +13,8 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
+    const [imgError, setImgError] = useState(false);
+
     useEffect(() => {
       captureLandingMeta();
       trackEvent("landing_view", {});

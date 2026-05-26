@@ -142,8 +142,6 @@ const Index = () => {
           { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES embaixo e adicione um limite pra uma categoria.', onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
-          { selector: '[data-spotlight="menu"]', label: 'Toque no menu pra abrir suas opções.' },
-          { selector: '[data-spotlight="minha-conta"]', label: 'Toque em "Minha conta" pra criar seu cadastro e liberar tudo.' },
         ]}
       />
       {/* Header */}

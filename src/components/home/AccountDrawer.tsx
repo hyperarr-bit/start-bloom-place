@@ -26,7 +26,7 @@ export const AccountDrawer = ({
   onReplayTutorial,
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
-  const { set: setUserData } = useUserData();
+  const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
 

@@ -42,7 +42,7 @@ interface AuthContextType {
   inGracePeriod: boolean;
   graceDaysLeft: number | null;
   paymentMethod: string | null;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: any; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
@@ -119,13 +119,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, name?: string) => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: getAuthRedirectUrl("/auth/callback") },
+      options: {
+        emailRedirectTo: getAuthRedirectUrl("/auth/callback"),
+        data: name ? { full_name: name } : undefined,
+      },
     });
-    return { error };
+    return { error, session: data?.session ?? null };
   };
 
   const signIn = async (email: string, password: string) => {

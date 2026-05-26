@@ -121,11 +121,19 @@ const Index = () => {
       <SpotlightOverlay
         moduleKey="financas"
         steps={[
-          { selector: '[data-spotlight="financeiro"]', label: 'Abra "Meu Financeiro".' },
-          { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes" },
-          { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses" },
-          { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0) },
-          { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes" },
+          { selector: '[data-spotlight="tab-dashboard"]', label: 'Aqui você vê sua saúde financeira geral.', onEnter: () => setActiveTab("dashboard") },
+          { selector: '[data-spotlight="financeiro"]', label: 'Abra "Meu Financeiro" para lançar receitas e gastos.', onEnter: () => setActiveTab("dashboard") },
+          { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes", onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="tab-investimentos"]', label: 'Acompanhe seus investimentos aqui.', onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-investment"]', label: 'Cadastre seu primeiro aporte.', advanceOnAction: "first_investment", checkKey: "finance-investments", onEnter: () => setActiveTab("investimentos") },
+          { selector: '[data-spotlight="tab-itens"]', label: 'Liste o que quer comprar e priorize.', onEnter: () => setActiveTab("investimentos") },
+          { selector: '[data-spotlight="add-wish"]', label: 'Adicione um item da sua lista de desejos.', advanceOnAction: "first_wish", checkKey: "finance-wishlist", onEnter: () => setActiveTab("itens") },
+          { selector: '[data-spotlight="tab-limites"]', label: 'Defina limites por categoria e acompanhe.', onEnter: () => setActiveTab("itens") },
+          { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
+          { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
         ]}
       />
       {/* Header */}
@@ -146,7 +154,7 @@ const Index = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={tab.id === "financeiro" ? "financeiro" : undefined}
+              data-spotlight={tab.id === "financeiro" ? "financeiro" : `tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

@@ -13,6 +13,8 @@ export interface SpotlightStep {
   checkKey?: string;
   /** Optional: custom predicate to determine whether the data at checkKey counts as "done". */
   checkValue?: (v: any) => boolean;
+  /** Optional: called when this step becomes active (e.g. to switch tabs). */
+  onEnter?: () => void;
 }
 
 interface SpotlightOverlayProps {
@@ -43,14 +45,17 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
   useEffect(() => {
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
-    if (target === moduleKey && !done) {
+    // Auto-trigger for financas when user hasn't seen the tutorial yet,
+    // even without an explicit quickstart target (no Home/module-picker flow).
+    const shouldShow = !done && (target === moduleKey || moduleKey === "financas");
+    if (shouldShow) {
       setActive(true);
       trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
     }
   }, [moduleKey, get, isGuest]);
 
 
-  // Track step views (drop-off analytics)
+  // Track step views (drop-off analytics) + fire onEnter callback
   useEffect(() => {
     if (!active) return;
     const cur = steps[stepIdx];
@@ -61,6 +66,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [] }: S
       total: steps.length,
       label: cur.label,
     });
+    try { cur.onEnter?.(); } catch {}
   }, [active, stepIdx, steps, moduleKey]);
 
   const finish = useCallback((reason: "completed" | "dismissed") => {

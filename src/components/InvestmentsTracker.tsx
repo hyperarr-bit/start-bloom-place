@@ -198,7 +198,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
       <div className="bg-card rounded-lg border border-border">
         <div className="table-header-dark flex items-center justify-between px-4">
           <span className="text-xs font-bold">MEUS INVESTIMENTOS</span>
-          <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setShowForm(!showForm)}>
+          <Button data-spotlight="add-investment" size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setShowForm(!showForm)}>
             <Plus className="w-3 h-3 mr-1" /> Adicionar
           </Button>
         </div>

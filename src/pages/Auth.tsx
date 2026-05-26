@@ -4,11 +4,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle, User as UserIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
+import { useUserData } from "@/hooks/use-user-data";
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -22,6 +23,7 @@ const GoogleIcon = () => (
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const [isLogin, setIsLogin] = useState(() => searchParams.get("signup") !== "1");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +31,7 @@ const Auth = () => {
   const [confirmationSent, setConfirmationSent] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const { signUp, signIn } = useAuth();
+  const { set: setUserData } = useUserData();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -64,6 +67,10 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
+    if (!isLogin && !name.trim()) {
+      toast({ title: "Informe seu nome", description: "Digite seu nome para criar a conta.", variant: "destructive" });
+      return;
+    }
     
     // SECURITY: senha forte só no signup; no login mantém validação simples
     if (!isLogin) {
@@ -84,15 +91,21 @@ const Auth = () => {
         toast({ title: "Erro ao entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message, variant: "destructive" });
       } else {
         trackEvent("login_completed", { method: "password" });
-        navigate("/");
+        navigate("/financas");
       }
     } else {
-      const { error } = await signUp(email, password);
+      const { error, session } = await signUp(email, password, name.trim());
       if (error) {
         toast({ title: "Erro ao criar conta", description: error.message, variant: "destructive" });
       } else {
         trackEvent("signup_completed", { method: "password" });
-        setConfirmationSent(true);
+        try { setUserData("user-name", name.trim()); } catch {}
+        if (session) {
+          navigate("/financas");
+        } else {
+          // Email confirmation required by Supabase — fall back to confirm screen
+          setConfirmationSent(true);
+        }
       }
     }
     setLoading(false);
@@ -178,11 +191,25 @@ const Auth = () => {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
+            {!isLogin && (
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Seu nome"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="pl-10"
+                  required
+                  autoComplete="name"
+                />
+              </div>
+            )}
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 type="email"
-                placeholder="seu@email.com"
+                placeholder="seu@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="pl-10"

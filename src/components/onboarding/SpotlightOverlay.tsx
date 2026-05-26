@@ -30,7 +30,7 @@ interface Rect { top: number; left: number; width: number; height: number }
 const PADDING = 8;
 
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onComplete }: SpotlightOverlayProps) => {
-  const { get, set, isGuest } = useUserData();
+  const { get, set, isGuest, loaded } = useUserData();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -45,16 +45,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   stepsRef.current = steps;
 
   useEffect(() => {
+    // Wait for user data to load before deciding whether to show the tutorial.
+    // Otherwise, on first render `done` reads as "" (fallback) and the overlay
+    // would briefly activate and intercept clicks even when the tutorial was
+    // already completed.
+    if (!loaded) return;
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
-    // Auto-trigger for financas when user hasn't seen the tutorial yet,
-    // even without an explicit quickstart target (no Home/module-picker flow).
     const shouldShow = !done && (target === moduleKey || moduleKey === "financas");
     if (shouldShow) {
       setActive(true);
       trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
+    } else {
+      setActive(false);
     }
-  }, [moduleKey, get, isGuest]);
+  }, [moduleKey, get, isGuest, loaded]);
 
 
   // Track step views (drop-off analytics) + fire onEnter callback

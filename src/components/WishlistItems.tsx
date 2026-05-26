@@ -287,6 +287,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
 
       {/* Add Button */}
       <Button
+        data-spotlight="add-wish"
         onClick={() => setShowForm(!showForm)}
         className="w-full h-10 bg-gradient-to-r from-pink-500 to-rose-400 hover:from-pink-600 hover:to-rose-500 text-white border-0"
       >

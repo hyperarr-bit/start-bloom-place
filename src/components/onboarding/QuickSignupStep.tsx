@@ -100,6 +100,7 @@ export const QuickSignupStep = ({ redirectTo = "", onFinished }: QuickSignupStep
     set("quicksignup-pending", "");
     toast.success(`Bem-vindo, ${successName}! Seu teste de 7 dias começou.`);
     if (redirectTo) navigate(redirectTo);
+    onFinished?.();
   };
 
   if (success) {

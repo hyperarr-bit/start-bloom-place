@@ -15,6 +15,7 @@ interface WelcomeScreenProps {
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const { mode } = useTheme();
+    const { user } = useAuth();
     const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
     useEffect(() => {

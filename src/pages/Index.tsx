@@ -128,7 +128,7 @@ const Index = () => {
       <AccountDrawer open={menuOpen} onOpenChange={setMenuOpen} displayName={displayName} />
       <SpotlightOverlay
         moduleKey="financas"
-        onComplete={() => { if (!user) navigate("/auth?signup=1"); }}
+        onComplete={() => {}}
         steps={[
           { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
@@ -142,12 +142,14 @@ const Index = () => {
           { selector: '[data-spotlight="tab-limites"]', label: 'Defina limites por categoria e acompanhe.', onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => setActiveTab("relatorios") },
+          { selector: '[data-spotlight="menu"]', label: 'Toque no menu pra abrir suas opções.' },
+          { selector: '[data-spotlight="minha-conta"]', label: 'Toque em "Minha conta" pra criar seu cadastro e liberar tudo.' },
         ]}
       />
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setMenuOpen(true)} aria-label="Abrir menu" className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={() => setMenuOpen(true)} data-spotlight="menu" aria-label="Abrir menu" className="hover:bg-muted rounded-md p-1 transition-colors">
             <Menu className="w-5 h-5" />
           </button>
           <DollarSign className="w-5 h-5 text-amber-600" />

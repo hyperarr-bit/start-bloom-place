@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, KeyRound, RotateCcw, LogOut } from "lucide-react";
+import { Trophy, Pencil, CreditCard, KeyRound, RotateCcw, LogOut, UserCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -26,7 +26,7 @@ export const AccountDrawer = ({
   onReplayTutorial,
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
-  const { set: setUserData } = useUserData();
+  const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
 
@@ -63,33 +63,57 @@ export const AccountDrawer = ({
     onReplayTutorial?.();
   };
 
-  const menuItems = [
-    {
-      icon: Pencil,
-      label: "Editar nome",
-      onClick: () => setShowNameDialog(true),
-    },
-    {
-      icon: Trophy,
-      label: "Conquistas",
-      onClick: () => { onOpenChange(false); navigate("/conquistas"); },
-    },
-    {
-      icon: CreditCard,
-      label: "Gerenciar assinatura",
-      onClick: handleManageSubscription,
-    },
-    {
-      icon: KeyRound,
-      label: "Alterar senha",
-      onClick: handleResetPassword,
-    },
-    {
-      icon: RotateCcw,
-      label: "Rever tutorial",
-      onClick: handleReplayTutorial,
-    },
-  ];
+  const handleMinhaConta = () => {
+    if (isGuest) {
+      onOpenChange(false);
+      setUserData("quicksignup-pending", "true");
+    } else {
+      setShowNameDialog(true);
+    }
+  };
+
+  const menuItems = isGuest
+    ? [
+        {
+          icon: UserCircle,
+          label: "Minha conta",
+          onClick: handleMinhaConta,
+          spotlight: "minha-conta",
+        },
+      ]
+    : [
+        {
+          icon: UserCircle,
+          label: "Minha conta",
+          onClick: handleMinhaConta,
+          spotlight: "minha-conta",
+        },
+        {
+          icon: Pencil,
+          label: "Editar nome",
+          onClick: () => setShowNameDialog(true),
+        },
+        {
+          icon: Trophy,
+          label: "Conquistas",
+          onClick: () => { onOpenChange(false); navigate("/conquistas"); },
+        },
+        {
+          icon: CreditCard,
+          label: "Gerenciar assinatura",
+          onClick: handleManageSubscription,
+        },
+        {
+          icon: KeyRound,
+          label: "Alterar senha",
+          onClick: handleResetPassword,
+        },
+        {
+          icon: RotateCcw,
+          label: "Rever tutorial",
+          onClick: handleReplayTutorial,
+        },
+      ];
 
   return (
     <>
@@ -116,10 +140,11 @@ export const AccountDrawer = ({
 
           {/* Menu items */}
           <div className="px-5 space-y-1">
-            {menuItems.map((item) => (
+            {menuItems.map((item: any) => (
               <button
                 key={item.label}
                 onClick={item.onClick}
+                data-spotlight={item.spotlight}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-foreground hover:bg-muted/50 transition-colors"
               >
                 <item.icon className="w-4 h-4 text-muted-foreground" />
@@ -127,15 +152,17 @@ export const AccountDrawer = ({
               </button>
             ))}
 
-            <div className="pt-2 mt-2 border-t border-border">
-              <button
-                onClick={signOut}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                Sair da conta
-              </button>
-            </div>
+            {!isGuest && (
+              <div className="pt-2 mt-2 border-t border-border">
+                <button
+                  onClick={signOut}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair da conta
+                </button>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

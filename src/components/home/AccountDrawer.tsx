@@ -63,33 +63,57 @@ export const AccountDrawer = ({
     onReplayTutorial?.();
   };
 
-  const menuItems = [
-    {
-      icon: Pencil,
-      label: "Editar nome",
-      onClick: () => setShowNameDialog(true),
-    },
-    {
-      icon: Trophy,
-      label: "Conquistas",
-      onClick: () => { onOpenChange(false); navigate("/conquistas"); },
-    },
-    {
-      icon: CreditCard,
-      label: "Gerenciar assinatura",
-      onClick: handleManageSubscription,
-    },
-    {
-      icon: KeyRound,
-      label: "Alterar senha",
-      onClick: handleResetPassword,
-    },
-    {
-      icon: RotateCcw,
-      label: "Rever tutorial",
-      onClick: handleReplayTutorial,
-    },
-  ];
+  const handleMinhaConta = () => {
+    if (isGuest) {
+      onOpenChange(false);
+      setUserData("quicksignup-pending", "true");
+    } else {
+      setShowNameDialog(true);
+    }
+  };
+
+  const menuItems = isGuest
+    ? [
+        {
+          icon: UserCircle,
+          label: "Minha conta",
+          onClick: handleMinhaConta,
+          spotlight: "minha-conta",
+        },
+      ]
+    : [
+        {
+          icon: UserCircle,
+          label: "Minha conta",
+          onClick: handleMinhaConta,
+          spotlight: "minha-conta",
+        },
+        {
+          icon: Pencil,
+          label: "Editar nome",
+          onClick: () => setShowNameDialog(true),
+        },
+        {
+          icon: Trophy,
+          label: "Conquistas",
+          onClick: () => { onOpenChange(false); navigate("/conquistas"); },
+        },
+        {
+          icon: CreditCard,
+          label: "Gerenciar assinatura",
+          onClick: handleManageSubscription,
+        },
+        {
+          icon: KeyRound,
+          label: "Alterar senha",
+          onClick: handleResetPassword,
+        },
+        {
+          icon: RotateCcw,
+          label: "Rever tutorial",
+          onClick: handleReplayTutorial,
+        },
+      ];
 
   return (
     <>

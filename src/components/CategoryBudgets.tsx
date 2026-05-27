@@ -128,16 +128,16 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
                           />
                           <button
                             type="button"
-                            onClick={() => saveEdit(cat.value)}
-                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-green-500 hover:text-green-400 hover:bg-green-500/10 active:bg-green-500/20"
+                            onPointerDown={e => { e.preventDefault(); saveEdit(cat.value); }}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-green-500 hover:text-green-400 hover:bg-green-500/10 active:bg-green-500/20 touch-manipulation"
                             aria-label="Salvar"
                           >
                             <Check className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => removeLimit(cat.value)}
-                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20"
+                            onPointerDown={e => { e.preventDefault(); removeLimit(cat.value); }}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20 touch-manipulation"
                             aria-label="Remover limite"
                           >
                             <X className="w-4 h-4" />

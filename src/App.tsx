@@ -58,7 +58,7 @@ import Relacionamentos from "./pages/Relacionamentos";
 import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
-import { Navigate } from "react-router-dom";
+
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminChurn from "./pages/admin/AdminChurn";

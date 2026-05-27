@@ -58,20 +58,14 @@ import Relacionamentos from "./pages/Relacionamentos";
 import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
+
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminAnalyticsPage from "./pages/admin/AdminAnalyticsPage";
-import AdminConversion from "./pages/admin/AdminConversion";
 import AdminChurn from "./pages/admin/AdminChurn";
 import AdminUsers from "./pages/admin/AdminUsers";
-import AdminFunnel from "./pages/admin/AdminFunnel";
-import AdminActivation from "./pages/admin/AdminActivation";
 import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
-import AdminOnboarding from "./pages/admin/AdminOnboarding";
 import AdminRetention from "./pages/admin/AdminRetention";
-import AdminTutorialCompare from "./pages/admin/AdminTutorialCompare";
-import AdminLandingFunnel from "./pages/admin/AdminLandingFunnel";
+import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -105,18 +99,19 @@ const AnimatedRoutes = () => {
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route path="dashboard" element={<AdminDashboard />} />
-          <Route path="analytics" element={<AdminAnalyticsPage />} />
-          <Route path="conversao" element={<AdminConversion />} />
-          <Route path="churn" element={<AdminChurn />} />
+          <Route index element={<Navigate to="funil" replace />} />
+          <Route path="funil" element={<AdminFinanceFunnel />} />
           <Route path="usuarios" element={<AdminUsers />} />
-          <Route path="funil" element={<AdminFunnel />} />
-          <Route path="ativacao" element={<AdminActivation />} />
           <Route path="emails" element={<AdminEmailVariants />} />
-          <Route path="onboarding" element={<AdminOnboarding />} />
+          <Route path="churn" element={<AdminChurn />} />
           <Route path="retention" element={<AdminRetention />} />
-          <Route path="tutorial-compare" element={<AdminTutorialCompare />} />
-          <Route path="aquisicao" element={<AdminLandingFunnel />} />
+          <Route path="dashboard" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="analytics" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="conversao" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="ativacao" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="aquisicao" element={<Navigate to="/admin/funil" replace />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

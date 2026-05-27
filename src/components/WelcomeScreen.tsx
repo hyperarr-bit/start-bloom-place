@@ -29,50 +29,53 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background overflow-hidden px-6"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.25rem, env(safe-area-inset-top))",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
       >
-        {/* Header: wordmark + headline + subtitle */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="flex flex-col items-center justify-center text-center gap-2 flex-1"
-        >
-          <span className="text-xl font-black tracking-tight text-foreground">CORE</span>
-          <h1 className="text-[30px] md:text-4xl font-bold text-foreground tracking-tight leading-[1.1]">
-            Tenha controle da<br />sua vida financeira
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground max-w-xs leading-snug">
-            Acompanhe receitas, despesas e investimentos em um só lugar.
-          </p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-          className="w-full max-w-sm mx-auto flex flex-col items-stretch gap-1"
-        >
-          <button
-            onClick={handleStart}
-            className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+        <div className="flex flex-col items-center justify-center text-center gap-6 w-full max-w-sm">
+          {/* Header: wordmark + headline + subtitle */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex flex-col items-center text-center gap-2"
           >
-            Começar
-          </button>
+            <span className="text-xl font-black tracking-tight text-foreground">CORE</span>
+            <h1 className="text-[30px] md:text-4xl font-bold text-foreground tracking-tight leading-[1.1]">
+              Tenha controle da<br />sua vida financeira
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground max-w-xs leading-snug">
+              Acompanhe receitas, despesas e investimentos em um só lugar.
+            </p>
+          </motion.div>
 
-          <Link
-            to="/auth"
-            onClick={handleLogin}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+          {/* Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
+            className="w-full flex flex-col items-stretch gap-1"
           >
-            Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
-          </Link>
+            <button
+              onClick={handleStart}
+              className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+            >
+              Começar
+            </button>
 
-        </motion.div>
+            <Link
+              to="/auth"
+              onClick={handleLogin}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+            >
+              Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
+            </Link>
+          </motion.div>
+        </div>
       </div>
     );
   }

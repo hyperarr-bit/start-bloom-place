@@ -41,7 +41,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="flex flex-col items-center justify-center text-center gap-3 flex-1"
+          className="flex flex-col items-center justify-center text-center gap-2 flex-1"
         >
           <span className="text-xl font-black tracking-tight text-foreground">CORE</span>
           <h1 className="text-[30px] md:text-4xl font-bold text-foreground tracking-tight leading-[1.1]">
@@ -55,7 +55,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut", delay: 0.2 }}
-          className="w-full max-w-sm mx-auto flex flex-col items-stretch gap-3"
+          className="w-full max-w-sm mx-auto flex flex-col items-stretch gap-1"
         >
           <button
             onClick={handleStart}

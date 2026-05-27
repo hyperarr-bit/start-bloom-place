@@ -1,57 +1,55 @@
-# Refinamentos no Funil — Finanças
+## Plano
 
-## 1. Reset dos dados "a partir de agora"
+Manter apenas o módulo **Finanças** na página de Conquistas e expandir bastante o catálogo de badges financeiros.
 
-- Adicionar o botão `ResetAnalyticsButton` (já existe em `src/components/admin/`) no topo da página `AdminFinanceFunnel.tsx`, do lado do botão "Atualizar".
-- Ele chama a RPC `admin_reset_analytics` que grava `analytics_reset_at` em `app_config`. As duas RPCs do funil (`admin_landing_funnel` e `admin_tutorial_dropoff`) já respeitam esse cutoff, então os passos antigos 13/14 (que não existem mais no tutorial) somem na hora.
-- Após reset, recarrega a página automaticamente.
+### Mudanças em `src/components/gamification/AchievementsPage.tsx`
+- Remover toda lógica/leitura de saúde, hábitos, leitura, relacionamentos, pet, detox e general.
+- Remover seção "Progresso por Categoria" (sobra só uma) e cartão de streak (não é mais relevante sem hábitos) — manter só os cartões de Conquistas e XP.
+- `buildBadges` passa a ler somente chaves `finance-*` e devolver badges com `category: "finance"`.
+- Badge "Mestre" (Diamante) permanece como meta global de XP.
 
-## 2. Novas etapas no funil de aquisição
+### Mudanças em `src/components/gamification/BadgesGrid.tsx`
+- Já filtra por categoria, então funcionará automaticamente exibindo só a seção de Finanças.
 
-Hoje o funil termina em "Criaram conta". Vou inserir duas etapas que o usuário pediu, deixando assim:
+### Novos badges de Finanças (≈20 no total)
+Receitas/Despesas
+- Primeiro Salário (1ª receita) — já existe
+- Múltiplas Rendas (3+ receitas distintas)
+- Primeira Despesa registrada
+- Organizador (10+ despesas categorizadas)
+- Mestre do Orçamento (50+ lançamentos no mês)
 
-```text
-Viram a landing
-Clicaram em "Começar grátis"
-Iniciaram o tutorial pré-cadastro
-Terminaram o tutorial pré-cadastro
-Preencheram os dados de cadastro      ← NOVA (evento quicksignup_completed)
-Criaram a conta                        ← signups (auth.users)
-Aceitaram o teste grátis               ← NOVA (evento trial_started, já é disparado em handle_new_user)
-```
+Poupança
+- Poupador (≥20%) — já existe
+- Super Poupador (≥40%)
+- Formiguinha (≥60%)
 
-Isso exige adicionar dois campos na RPC `admin_landing_funnel`:
-- `quicksignup_submitted` — `COUNT(DISTINCT session_id)` de `quicksignup_completed`
-- `trial_started` — `COUNT(*)` de `analytics_events` onde `event_name = 'trial_started'` (já existe e é disparado pelo trigger `handle_new_user` em todo signup)
+Investimentos
+- Investidor R$ 1.000 — já existe
+- Investidor Pro R$ 10.000 — já existe
+- Patrimônio R$ 50.000
+- Patrimônio R$ 100.000
+- Diversificado (3+ ativos diferentes)
 
-## 3. Filtro detalhado de período
+Contas/Dívidas
+- Contas em Dia — já existe
+- Pontual (12 meses seguidos sem atraso) — baseado em histórico de `finance-dueDays`
+- Livre de Dívidas — já existe
+- Quitador (parcelamento totalmente quitado registrado)
 
-Substituir os três botões fixos (7d / 30d / 90d) por um seletor mais rico no topo:
+Metas/Planejamento
+- Sonhador (1ª meta criada em `finance-goals`)
+- Realizador (1ª meta concluída)
+- Reserva de Emergência (saldo guardado ≥ 3× despesas mensais)
 
-- **Presets rápidos**: Última hora • Hoje • 24h • 7d • 30d • 90d • Tudo
-- **Custom range**: dois date-time pickers (de / até) que aparecem ao escolher "Personalizado"
+Wishlist/Educação
+- Lista de Desejos (1+ item em `finance-wishlist`)
+- Comprador Consciente (item marcado como adquirido)
 
-Para suportar isso, as duas RPCs ganham assinatura nova:
+Mestre
+- Mestre Financeiro — desbloqueia ao atingir Diamante (2000 XP)
 
-```sql
-admin_landing_funnel(_from timestamptz DEFAULT NULL, _to timestamptz DEFAULT NULL)
-admin_tutorial_dropoff(_from timestamptz DEFAULT NULL, _to timestamptz DEFAULT NULL)
-```
-
-Comportamento:
-- Se `_from` for nulo, usa `analytics_reset_at` (igual hoje).
-- Se `_to` for nulo, usa `now()`.
-- Mantém o filtro por `is_test_user` e o cutoff de reset (cutoff = `GREATEST(_from, reset_at)`).
-
-As versões antigas com `_days` continuam funcionando (overload) pra não quebrar nada.
-
-## 4. Passos 13 / 14 do tutorial
-
-Aparecem porque ficaram dados antigos no banco. O reset do item 1 já resolve. Não preciso mexer no código do tutorial.
-
-## Arquivos tocados
-
-- `src/pages/admin/AdminFinanceFunnel.tsx` — novo seletor de período, novas linhas no funil, botão de reset.
-- Migration SQL — sobrescrever `admin_landing_funnel` e `admin_tutorial_dropoff` aceitando `_from`/`_to` e retornando os dois campos novos.
-
-Sem mudanças visuais fora do que foi pedido.
+### Detalhes técnicos
+- XP padrão 50; badges "Pro" e marcos altos valem 100; topo (patrimônio 100k, Mestre) valem 200.
+- Para "Pontual" e "Reserva de Emergência" usaremos heurísticas a partir dos dados já persistidos (sem novas chaves nem migrações).
+- Nenhuma alteração de banco, rotas ou outros módulos.

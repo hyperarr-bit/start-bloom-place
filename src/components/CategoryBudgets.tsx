@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Gauge, Pencil, Check, X, Target } from "lucide-react";
+import { Gauge, Pencil, Check, X, Target, Trash2 } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";

@@ -62,7 +62,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           >
             <button
               onClick={handleStart}
-              className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+              className="w-full py-4 rounded-2xl bg-success text-success-foreground text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
             >
               Começar
             </button>

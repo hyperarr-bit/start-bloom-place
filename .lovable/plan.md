@@ -1,61 +1,57 @@
-# Reformulação do Admin — foco no módulo Finanças
+# Refinamentos no Funil — Finanças
 
-## O que sai
+## 1. Reset dos dados "a partir de agora"
 
-- `AdminDashboard.tsx` (a tela "Hoje" / visão geral) — removida da navegação e do arquivo.
-- Itens da sidebar que não fazem mais sentido com um único módulo: **Dashboard, Aquisição, Tutorial (compare), Analytics, Conversão, Ativação, Onboarding, Funil módulos**.
-- Rota raiz `/admin/*` passa a redirecionar para `/admin/funil`.
+- Adicionar o botão `ResetAnalyticsButton` (já existe em `src/components/admin/`) no topo da página `AdminFinanceFunnel.tsx`, do lado do botão "Atualizar".
+- Ele chama a RPC `admin_reset_analytics` que grava `analytics_reset_at` em `app_config`. As duas RPCs do funil (`admin_landing_funnel` e `admin_tutorial_dropoff`) já respeitam esse cutoff, então os passos antigos 13/14 (que não existem mais no tutorial) somem na hora.
+- Após reset, recarrega a página automaticamente.
 
-## O que fica
+## 2. Novas etapas no funil de aquisição
 
-Sidebar enxuta:
-- **Funil** (nova, padrão)
-- **Usuários**
-- **E-mails**
-- **Churn**
-- **Retention**
-
-## Nova aba: Funil (única visão)
-
-Uma página só, com filtro de período (7 / 30 / 90 dias) no topo, dividida em duas seções verticais:
-
-### 1. Funil de aquisição (landing → trial)
-
-Barras horizontais com contagem absoluta + % de conversão entre etapas:
+Hoje o funil termina em "Criaram conta". Vou inserir duas etapas que o usuário pediu, deixando assim:
 
 ```text
-Landing "Tenha controle da sua vida financeira"   ████████████ 1.240
-Clicaram em "Começar grátis"                      ████████ 820 (66%)
-Iniciaram o tutorial pré-cadastro                 ███████ 710 (87%)
-Terminaram o tutorial pré-cadastro                ██████ 540 (76%)
-Criaram conta                                     █████ 410 (76%)
+Viram a landing
+Clicaram em "Começar grátis"
+Iniciaram o tutorial pré-cadastro
+Terminaram o tutorial pré-cadastro
+Preencheram os dados de cadastro      ← NOVA (evento quicksignup_completed)
+Criaram a conta                        ← signups (auth.users)
+Aceitaram o teste grátis               ← NOVA (evento trial_started, já é disparado em handle_new_user)
 ```
 
-Fontes (já existem no banco):
-- `landing_view`, `start_clicked`, `pre_signup_tutorial_started`, `pre_signup_tutorial_completed` em `analytics_events`
-- Cadastros em `auth.users`
-- RPC base: `admin_landing_funnel(_days)` — já retorna todos esses campos.
+Isso exige adicionar dois campos na RPC `admin_landing_funnel`:
+- `quicksignup_submitted` — `COUNT(DISTINCT session_id)` de `quicksignup_completed`
+- `trial_started` — `COUNT(*)` de `analytics_events` onde `event_name = 'trial_started'` (já existe e é disparado pelo trigger `handle_new_user` em todo signup)
 
-### 2. Funil do tutorial do módulo Finanças (passo a passo)
+## 3. Filtro detalhado de período
 
-Lista vertical de passos com o label real de cada passo do spotlight (ex.: "Receitas", "Despesas fixas", "Vencimentos", "Investimentos", "Desejos"…), mostrando:
+Substituir os três botões fixos (7d / 30d / 90d) por um seletor mais rico no topo:
 
-- Quantos usuários chegaram naquele passo
-- % vs. passo anterior
-- **Drop-off destacado em vermelho** quando a queda é > 20% (assim fica claro "saíram no passo de investimentos")
-- Linha final: "Concluíram o tutorial" (`quickstart_completed`)
+- **Presets rápidos**: Última hora • Hoje • 24h • 7d • 30d • 90d • Tudo
+- **Custom range**: dois date-time pickers (de / até) que aparecem ao escolher "Personalizado"
 
-Fonte: RPC `admin_tutorial_dropoff(_days)` já existente — retorna `modules[].steps[{ step, label, total, reached }]`. Vamos filtrar só `module_id = 'financas'`.
+Para suportar isso, as duas RPCs ganham assinatura nova:
 
-## Detalhes técnicos
+```sql
+admin_landing_funnel(_from timestamptz DEFAULT NULL, _to timestamptz DEFAULT NULL)
+admin_tutorial_dropoff(_from timestamptz DEFAULT NULL, _to timestamptz DEFAULT NULL)
+```
 
-- Arquivo novo: `src/pages/admin/AdminFinanceFunnel.tsx` consumindo as duas RPCs em paralelo.
-- `AdminLayout.tsx`: limpar `navItems`, manter apenas as 5 abas acima.
-- `App.tsx` (ou onde estão as rotas admin): remover rotas mortas, apontar `index` de `/admin/*` para `<Navigate to="funil" />`, adicionar `<Route path="funil" element={<AdminFinanceFunnel />} />`.
-- Deletar arquivos não usados: `AdminDashboard.tsx`, `AdminAnalyticsPage.tsx`, `AdminConversion.tsx`, `AdminActivation.tsx`, `AdminOnboarding.tsx`, `AdminTutorialCompare.tsx`, `AdminLandingFunnel.tsx`, `AdminFunnel.tsx` (o antigo de módulos).
-- Sem migrations — todas as RPCs necessárias já existem.
-- Estilo visual mantém o dark zinc + accent emerald do admin atual.
+Comportamento:
+- Se `_from` for nulo, usa `analytics_reset_at` (igual hoje).
+- Se `_to` for nulo, usa `now()`.
+- Mantém o filtro por `is_test_user` e o cutoff de reset (cutoff = `GREATEST(_from, reset_at)`).
 
-## Pergunta rápida antes de implementar
+As versões antigas com `_days` continuam funcionando (overload) pra não quebrar nada.
 
-Confirma que posso **deletar fisicamente** os arquivos das telas removidas (Dashboard, Analytics, Conversão, Ativação, Onboarding, Tutorial Compare, Aquisição, Funil de módulos)? Ou prefere que eu só tire da sidebar e deixe os arquivos parados?
+## 4. Passos 13 / 14 do tutorial
+
+Aparecem porque ficaram dados antigos no banco. O reset do item 1 já resolve. Não preciso mexer no código do tutorial.
+
+## Arquivos tocados
+
+- `src/pages/admin/AdminFinanceFunnel.tsx` — novo seletor de período, novas linhas no funil, botão de reset.
+- Migration SQL — sobrescrever `admin_landing_funnel` e `admin_tutorial_dropoff` aceitando `_from`/`_to` e retornando os dois campos novos.
+
+Sem mudanças visuais fora do que foi pedido.

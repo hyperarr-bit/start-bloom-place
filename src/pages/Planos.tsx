@@ -170,14 +170,9 @@ const Planos = () => {
               <Crown className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Finanças PRO</h2>
-              <p className="text-xs text-muted-foreground">Módulo Finanças completo</p>
+              <h2 className="font-bold text-lg">CORE PRO</h2>
             </div>
           </div>
-
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Organize receitas, despesas, dívidas, investimentos e desejos em um só lugar — com clareza pra saber exatamente pra onde seu dinheiro está indo.
-          </p>
 
           <div className="flex items-baseline gap-1">
             <span className="text-4xl font-bold">R$ {currentPlan.price}</span>

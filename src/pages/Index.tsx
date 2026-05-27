@@ -131,7 +131,7 @@ const Index = () => {
         onComplete={() => {
           // Após terminar o tutorial, espera ~5s e abre o cadastro rápido (7 dias grátis).
           if (isGuest) {
-            setTimeout(() => setUserData("quicksignup-pending", "true"), 5000);
+            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
           }
         }}
         steps={[

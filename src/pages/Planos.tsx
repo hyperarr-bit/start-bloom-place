@@ -63,11 +63,11 @@ const Planos = () => {
   const currentPlan = plans[billing];
 
   const features = [
-    "Todos os 16 módulos desbloqueados",
-    "Finanças, Treino, Dieta, Rotina e mais",
-    "Dados sincronizados e seguros",
-    "Atualizações e novos recursos",
-    "Suporte prioritário",
+    "Receitas, despesas e contas fixas",
+    "Dívidas e parcelamentos no controle",
+    "Investimentos e patrimônio",
+    "Desejos e metas financeiras",
+    "Atualizações e suporte prioritário",
   ];
 
   const handleCheckout = async () => {
@@ -118,7 +118,7 @@ const Planos = () => {
         {isSubscribed && (
           <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center space-y-3">
             <p className="text-sm font-medium text-green-600 dark:text-green-400">
-              ✅ Você já é assinante CORE PRO!
+              ✅ Você já é assinante!
             </p>
             <Button
               variant="ghost"
@@ -170,10 +170,14 @@ const Planos = () => {
               <Crown className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">CORE PRO</h2>
-              <p className="text-xs text-muted-foreground">Acesso completo</p>
+              <h2 className="font-bold text-lg">Finanças PRO</h2>
+              <p className="text-xs text-muted-foreground">Módulo Finanças completo</p>
             </div>
           </div>
+
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Organize receitas, despesas, dívidas, investimentos e desejos em um só lugar — com clareza pra saber exatamente pra onde seu dinheiro está indo.
+          </p>
 
           <div className="flex items-baseline gap-1">
             <span className="text-4xl font-bold">R$ {currentPlan.price}</span>
@@ -206,7 +210,7 @@ const Planos = () => {
             ) : isSubscribed ? (
               "Já assinante"
             ) : (
-              "Assinar CORE PRO"
+              "Assinar agora"
             )}
           </Button>
 

@@ -72,6 +72,7 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
     const next = { ...budgets };
     delete next[cat];
     setBudgets(next);
+    setEditValue("");
     setEditing(null);
   };
 

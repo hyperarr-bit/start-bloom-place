@@ -532,7 +532,9 @@ export type Database = {
           variant_key: string
         }[]
       }
-      admin_landing_funnel: { Args: { _days?: number }; Returns: Json }
+      admin_landing_funnel:
+        | { Args: { _days?: number }; Returns: Json }
+        | { Args: { _from?: string; _to?: string }; Returns: Json }
       admin_list_users: {
         Args: never
         Returns: {
@@ -599,7 +601,9 @@ export type Database = {
       }
       admin_retention_stats: { Args: never; Returns: Json }
       admin_tutorial_compare: { Args: { _cutoff?: string }; Returns: Json }
-      admin_tutorial_dropoff: { Args: { _days?: number }; Returns: Json }
+      admin_tutorial_dropoff:
+        | { Args: { _days?: number }; Returns: Json }
+        | { Args: { _from?: string; _to?: string }; Returns: Json }
       admin_tutorial_users: {
         Args: { _action_key?: string }
         Returns: {

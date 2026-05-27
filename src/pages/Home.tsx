@@ -184,80 +184,82 @@ const HomePage = () => {
     <>
       <DailyNudge />
 
-      <div className="min-h-screen bg-background" onClick={() => editingWidgets && setEditingWidgets(false)}>
-        <header className="sticky top-0 z-40 border-b border-border bg-card">
+      <div className="min-h-dvh bg-background flex flex-col" onClick={() => editingWidgets && setEditingWidgets(false)}>
+        <header className="sticky top-0 z-40 border-b border-border bg-card flex-shrink-0">
           <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
             <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
           </div>
         </header>
-        <div className="max-w-lg md:max-w-4xl mx-auto px-4 pt-4 pb-5 space-y-6">
+        <main className="flex-1 flex flex-col">
+          <div className="flex-1 max-w-lg md:max-w-4xl mx-auto w-full px-4 pt-4 pb-5 space-y-6 flex flex-col justify-center">
 
-          <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
-            <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>
-            <QuickActions />
-          </div>
-
-          {/* Widgets */}
-          {activeWidgets.length > 0 && (
-            <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={activeWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
-                  <WidgetGrid
-                    activeWidgets={activeWidgets}
-                    editing={editingWidgets}
-                    onRemove={removeWidget}
-                    onToggleSize={toggleSize}
-                  />
-                </SortableContext>
-              </DndContext>
-
-              {editingWidgets && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex gap-2"
-                >
-                  <button
-                    onClick={() => setShowWidgetPicker(true)}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-medium"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Adicionar
-                  </button>
-                  <button
-                    onClick={() => setEditingWidgets(false)}
-                    className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
-                  >
-                    Pronto
-                  </button>
-                </motion.div>
-              )}
+            <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
+              <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
             </div>
-          )}
 
-          {/* Add widget button - always visible when not editing */}
-          {!editingWidgets && (
-            <motion.button
-              onClick={() => setShowWidgetPicker(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
-              whileTap={{ scale: 0.98 }}
-            >
-              <Plus className="w-4 h-4" />
-              <span className="text-xs font-medium">Adicionar widget</span>
-            </motion.button>
-          )}
+            <div>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>
+              <QuickActions />
+            </div>
 
-          <NextHoursTimeline data={lifeData} />
-          <ModuleDrawer />
+            {/* Widgets */}
+            {activeWidgets.length > 0 && (
+              <div className="space-y-3" onClick={e => e.stopPropagation()} {...longPressHandlers}>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={activeWidgets.map(w => w.id)} strategy={rectSortingStrategy}>
+                    <WidgetGrid
+                      activeWidgets={activeWidgets}
+                      editing={editingWidgets}
+                      onRemove={removeWidget}
+                      onToggleSize={toggleSize}
+                    />
+                  </SortableContext>
+                </DndContext>
 
-          <p className="text-center text-[10px] text-muted-foreground py-2">
-            Core © {new Date().getFullYear()} — Organize sua vida
-          </p>
-        </div>
+                {editingWidgets && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-2"
+                  >
+                    <button
+                      onClick={() => setShowWidgetPicker(true)}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary text-xs font-medium"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Adicionar
+                    </button>
+                    <button
+                      onClick={() => setEditingWidgets(false)}
+                      className="px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
+                    >
+                      Pronto
+                    </button>
+                  </motion.div>
+                )}
+              </div>
+            )}
+
+            {/* Add widget button - always visible when not editing */}
+            {!editingWidgets && (
+              <motion.button
+                onClick={() => setShowWidgetPicker(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border/50 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+                whileTap={{ scale: 0.98 }}
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-xs font-medium">Adicionar widget</span>
+              </motion.button>
+            )}
+
+            <NextHoursTimeline data={lifeData} />
+            <ModuleDrawer />
+
+            <p className="text-center text-[10px] text-muted-foreground py-2">
+              Core © {new Date().getFullYear()} — Organize sua vida
+            </p>
+          </div>
+        </main>
       </div>
 
       <WidgetPicker

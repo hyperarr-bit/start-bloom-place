@@ -1,10 +1,7 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShieldCheck } from "lucide-react";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import financasMockup from "@/assets/financas-mockup.webp";
-import { AnimatedAppMockup } from "@/components/welcome/AnimatedAppMockup";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;
@@ -13,7 +10,6 @@ interface WelcomeScreenProps {
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
-    const [imgError, setImgError] = useState(false);
 
     useEffect(() => {
       captureLandingMeta();
@@ -45,7 +41,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="flex flex-col items-center text-center gap-3 pt-2"
+          className="flex flex-col items-center justify-center text-center gap-3 flex-1"
         >
           <span className="text-xl font-black tracking-tight text-foreground">CORE</span>
           <h1 className="text-[30px] md:text-4xl font-bold text-foreground tracking-tight leading-[1.1]">
@@ -55,10 +51,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             Acompanhe receitas, despesas e investimentos em um só lugar.
           </p>
         </motion.div>
-
-
-
-        {/* Footer CTAs */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -69,7 +61,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             onClick={handleStart}
             className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
           >
-            Começar grátis
+            Começar
           </button>
 
           <Link
@@ -80,10 +72,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
           </Link>
 
-          <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground pt-1">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>7 dias grátis. Sem complicação.</span>
-          </div>
         </motion.div>
       </div>
     );

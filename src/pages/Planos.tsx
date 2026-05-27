@@ -170,8 +170,7 @@ const Planos = () => {
               <Crown className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Finanças PRO</h2>
-              <p className="text-xs text-muted-foreground">Módulo Finanças completo</p>
+              <h2 className="font-bold text-lg">CORE PRO</h2>
             </div>
           </div>
 

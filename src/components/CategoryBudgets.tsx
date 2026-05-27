@@ -125,11 +125,21 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
                             placeholder="Limite"
                             autoFocus
                           />
-                          <button onClick={() => saveEdit(cat.value)} className="text-green-500 hover:text-green-400">
-                            <Check className="w-3.5 h-3.5" />
+                          <button
+                            type="button"
+                            onClick={() => saveEdit(cat.value)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-green-500 hover:text-green-400 hover:bg-green-500/10 active:bg-green-500/20"
+                            aria-label="Salvar"
+                          >
+                            <Check className="w-4 h-4" />
                           </button>
-                          <button onClick={() => removeLimit(cat.value)} className="text-red-400 hover:text-red-300">
-                            <X className="w-3.5 h-3.5" />
+                          <button
+                            type="button"
+                            onClick={() => removeLimit(cat.value)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20"
+                            aria-label="Remover limite"
+                          >
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (

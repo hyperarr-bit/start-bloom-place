@@ -174,11 +174,6 @@ const Planos = () => {
             </div>
           </div>
 
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Organize receitas, despesas, dívidas, investimentos e desejos em um só lugar — com clareza pra saber exatamente pra onde seu dinheiro está indo.
-          </p>
-
-          <div className="flex items-baseline gap-1">
             <span className="text-4xl font-bold">R$ {currentPlan.price}</span>
             <span className="text-muted-foreground">{currentPlan.period}</span>
           </div>

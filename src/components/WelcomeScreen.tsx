@@ -66,35 +66,24 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <motion.div
             animate={{ y: [0, -8, 0] }}
             transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-            className="relative h-full max-h-[55vh] md:max-h-[65vh] lg:max-h-[70vh] aspect-[9/19.5] md:aspect-[9/18] rounded-[2.6rem] md:rounded-[3rem] bg-zinc-900 p-[3px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]"
-            style={{
-              backgroundImage: "linear-gradient(145deg, #4a4a4a 0%, #1a1a1a 50%, #2a2a2a 100%)",
-            }}
+            className="relative h-full max-h-[55vh] md:max-h-[65vh] lg:max-h-[70vh] aspect-[9/19.5] md:aspect-[9/18] rounded-[2.2rem] md:rounded-[2.5rem] border-[5px] md:border-[6px] border-foreground/90 bg-background shadow-2xl overflow-hidden"
           >
-            {/* Inner black bezel */}
-            <div className="relative w-full h-full rounded-[2.4rem] md:rounded-[2.8rem] bg-black p-[6px] md:p-[8px] overflow-hidden">
-              {/* Screen */}
-              <div className="relative w-full h-full rounded-[2rem] md:rounded-[2.3rem] overflow-hidden bg-background">
-                {imgError ? (
-                  <AnimatedAppMockup scene="financas" />
-                ) : (
-                  <img
-                    src={financasMockup}
-                    alt="Tela de Finanças do CORE"
-                    className="absolute inset-0 w-full h-full object-cover object-[50%_0%] select-none [image-rendering:auto]"
-                    draggable={false}
-                    loading="eager"
-                    decoding="async"
-                    fetchPriority="high"
-                    width={900}
-                    height={1953}
-                    onError={() => setImgError(true)}
-                  />
-                )}
-                {/* Dynamic Island */}
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-[32%] h-[22px] md:h-[26px] rounded-full bg-black z-20 shadow-[inset_0_0_2px_rgba(255,255,255,0.1)]" />
-              </div>
-            </div>
+            {imgError ? (
+              <AnimatedAppMockup scene="financas" />
+            ) : (
+              <img
+                src={financasMockup}
+                alt="Tela de Finanças do CORE"
+                className="absolute inset-0 w-full h-full object-cover object-[50%_0%] select-none [image-rendering:auto]"
+                draggable={false}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
+                width={900}
+                height={1953}
+                onError={() => setImgError(true)}
+              />
+            )}
           </motion.div>
         </motion.div>
 

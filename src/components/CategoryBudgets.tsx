@@ -148,10 +148,26 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
                             R$ {spent.toLocaleString("pt-BR")}
                             {limit > 0 && <span> / R$ {limit.toLocaleString("pt-BR")}</span>}
                           </span>
-                          <button onClick={() => startEdit(cat.value)} className="text-muted-foreground hover:text-foreground transition-colors">
-                            <Pencil className="w-3 h-3" />
+                          <button
+                            type="button"
+                            onClick={() => startEdit(cat.value)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted/70 transition-colors"
+                            aria-label="Editar limite"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
                           </button>
+                          {limit > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => removeLimit(cat.value)}
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 active:bg-red-500/20"
+                              aria-label="Excluir limite"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </>
+
                       )}
                     </div>
                   </div>

@@ -174,6 +174,7 @@ const Planos = () => {
             </div>
           </div>
 
+          <div className="flex items-baseline gap-1">
             <span className="text-4xl font-bold">R$ {currentPlan.price}</span>
             <span className="text-muted-foreground">{currentPlan.period}</span>
           </div>

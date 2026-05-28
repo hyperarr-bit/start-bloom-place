@@ -30,7 +30,7 @@ const RootGate = () => {
     const done = get<boolean>("spotlight-done-financas", false);
     if (done) return <Navigate to="/financas" replace />;
   }
-  return <WelcomeScreen />;
+  return <QuickStartOnboarding onComplete={() => {}} />;
 };
 
 

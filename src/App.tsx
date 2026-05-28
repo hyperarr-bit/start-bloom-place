@@ -103,6 +103,7 @@ const AnimatedRoutes = () => {
           <Route index element={<Navigate to="funil" replace />} />
           <Route path="funil" element={<AdminFinanceFunnel />} />
           <Route path="usuarios" element={<AdminUsers />} />
+          <Route path="trials" element={<AdminTrials />} />
           <Route path="emails" element={<AdminEmailVariants />} />
           <Route path="churn" element={<AdminChurn />} />
           <Route path="retention" element={<AdminRetention />} />

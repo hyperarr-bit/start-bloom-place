@@ -22,9 +22,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 
 const RootGate = () => {
-  return <Navigate to="/financas" replace />;
+  const { user, loading } = useAuth();
+  const { get, loaded } = useUserData();
+  if (loading) return <div className="min-h-screen bg-background" aria-hidden />;
+  if (user) {
+    if (!loaded) return <div className="min-h-screen bg-background" aria-hidden />;
+    const done = get<boolean>("spotlight-done-financas", false);
+    if (done) return <Navigate to="/financas" replace />;
+  }
+  return <WelcomeScreen />;
 };
-
 
 
 import Home from "./pages/Home";

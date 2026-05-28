@@ -12,10 +12,22 @@ interface Income {
 interface IncomeTableProps {
   incomes: Income[];
   setIncomes: (incomes: Income[]) => void;
+  prefillExample?: boolean;
 }
 
-export const IncomeTable = ({ incomes, setIncomes }: IncomeTableProps) => {
-  const [newIncome, setNewIncome] = useState({ description: "", value: "", date: "" });
+export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: IncomeTableProps) => {
+  const [newIncome, setNewIncome] = useState(
+    prefillExample && incomes.length === 0
+      ? { description: "Salário", value: "3000", date: "" }
+      : { description: "", value: "", date: "" }
+  );
+
+  const exampleActive =
+    prefillExample &&
+    incomes.length === 0 &&
+    newIncome.description === "Salário" &&
+    newIncome.value === "3000";
+
 
   const addIncome = () => {
     if (newIncome.description && newIncome.value) {

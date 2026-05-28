@@ -237,7 +237,7 @@ const Index = () => {
                 />
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
-                    <IncomeTable incomes={incomes} setIncomes={setIncomes} />
+                    <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
                   </div>
                   <Calculator />
                 </div>

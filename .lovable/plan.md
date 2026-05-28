@@ -1,30 +1,24 @@
-## Contexto
+## Objetivo
 
-No app, todo cadastro inicia um trial automaticamente (o trigger `handle_new_user` insere o evento `trial_started` e agenda os emails). Hoje (28/05) houve **1 cadastro novo**: `davi.habeck15@gmail.com`.
+Remover a tela inicial "Tenha controle da sua vida financeira" (WelcomeScreen) e fazer o app abrir já no passo 1 do onboarding ("Organize sua vida em 1 só lugar" com o botão "Quero começar").
 
-A página `/admin/usuarios` já puxa do Supabase (RPC `admin_list_users`), mas não destaca quem iniciou o trial hoje, nem oferece um filtro "Trial iniciado". Vou adicionar essa visão.
+## Mudança
 
-## O que vou fazer
+**`src/App.tsx` — `RootGate`**
 
-1. **Nova RPC `admin_trials_started`** no Supabase, retornando:
-   - `user_id`, `email`, `started_at` (do evento `trial_started` ou fallback `auth.users.created_at`)
-   - `subscription_status` (active / trialing / canceled / none)
-   - `days_since_start`
-   - Filtro por período: hoje / 7d / 30d / tudo
-   - Exclui usuários de teste (já existe `is_test_user`)
+Trocar `<WelcomeScreen />` por `<QuickStartOnboarding />` para visitantes não logados (e usuários logados que ainda não passaram pelo spotlight de finanças).
 
-2. **Nova aba no admin: `/admin/trials`** ("Trials")
-   - 4 cards no topo: Hoje · 7 dias · 30 dias · Total
-   - Tabela com email, data de início, status da assinatura, dias ativo
-   - Filtros de período (Hoje / 7d / 30d / Tudo)
-   - Busca por email
-   - Auto-refresh a cada 30s (mesmo padrão de `AdminUsers`)
+- Importar `QuickStartOnboarding` em vez de `WelcomeScreen`.
+- Renderizar `<QuickStartOnboarding onComplete={() => {}} />` no fallback do gate.
+- Usuários logados que já concluíram (`spotlight-done-financas`) continuam sendo redirecionados para `/financas`.
 
-3. Adicionar item "Trials" no `AdminLayout` (entre Funil e Usuários) com ícone `UserPlus`.
+O componente `QuickStartOnboarding` já cuida sozinho de:
+- mostrar o passo 1 (logo CORE + "Organize sua vida em 1 só lugar" + "Quero começar")
+- avançar para a escolha de módulo
+- disparar `landing_view` / `pre_signup_tutorial_started` (mantendo o funil intacto)
+- abrir o `QuickSignupModal` para visitantes ao final
 
-## Arquivos
+## Fora do escopo
 
-- migration: nova função `admin_trials_started(_period text)`
-- novo: `src/pages/admin/AdminTrials.tsx`
-- editar: `src/pages/admin/AdminLayout.tsx` (adicionar nav item)
-- editar: `src/App.tsx` (adicionar rota)
+- `WelcomeScreen.tsx` e `pages/Inicio.tsx` permanecem no projeto (a rota `/inicio` continua existindo); só deixam de ser a porta de entrada do app. Posso remover depois se você quiser limpar.
+- Nenhuma mudança de lógica de auth, trial ou tracking.

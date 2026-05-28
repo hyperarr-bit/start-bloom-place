@@ -43,7 +43,7 @@ const Index = () => {
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
   const [menuOpen, setMenuOpen] = useState(false);
   const displayName = getUserData<string>("core-user-name", "") || "";
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState("financeiro");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const [openMonth, setOpenMonth] = useState<string | null>(null);

@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
 import {
-  Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, Filter
+  Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, Filter, UserPlus
 } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
 
 const navItems = [
   { to: "/admin/funil", label: "Funil", Icon: Filter },
+  { to: "/admin/trials", label: "Trials", Icon: UserPlus },
   { to: "/admin/usuarios", label: "Usuários", Icon: Users },
   { to: "/admin/emails", label: "E-mails", Icon: Mail },
   { to: "/admin/churn", label: "Churn", Icon: TrendingDown },

@@ -600,6 +600,16 @@ export type Database = {
         }[]
       }
       admin_retention_stats: { Args: never; Returns: Json }
+      admin_trials_started: {
+        Args: { _period?: string }
+        Returns: {
+          days_since_start: number
+          email: string
+          started_at: string
+          subscription_status: string
+          user_id: string
+        }[]
+      }
       admin_tutorial_compare: { Args: { _cutoff?: string }; Returns: Json }
       admin_tutorial_dropoff:
         | { Args: { _days?: number }; Returns: Json }

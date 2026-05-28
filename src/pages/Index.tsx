@@ -43,7 +43,9 @@ const Index = () => {
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
   const [menuOpen, setMenuOpen] = useState(false);
   const displayName = getUserData<string>("core-user-name", "") || "";
-  const [activeTab, setActiveTab] = useState("financeiro");
+  const [activeTab, setActiveTab] = useState(
+    getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
+  );
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const [openMonth, setOpenMonth] = useState<string | null>(null);

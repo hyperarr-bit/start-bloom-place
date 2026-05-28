@@ -17,7 +17,7 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
-import { QuickStartOnboarding } from "@/components/onboarding/QuickStartOnboarding";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 
@@ -30,7 +30,7 @@ const RootGate = () => {
     const done = get<boolean>("spotlight-done-financas", false);
     if (done) return <Navigate to="/financas" replace />;
   }
-  return <QuickStartOnboarding onComplete={() => {}} />;
+  return <WelcomeScreen />;
 };
 
 

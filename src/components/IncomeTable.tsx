@@ -91,6 +91,11 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
             className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
           />
         </label>
+        {exampleActive && (
+          <p className="text-[10px] text-muted-foreground">
+            Exemplo pré-preenchido — você pode editar antes de salvar.
+          </p>
+        )}
       </div>
 
       {/* Lista */}

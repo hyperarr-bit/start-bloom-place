@@ -1,30 +1,41 @@
-## Contexto
+## Objetivo
 
-No app, todo cadastro inicia um trial automaticamente (o trigger `handle_new_user` insere o evento `trial_started` e agenda os emails). Hoje (28/05) houve **1 cadastro novo**: `davi.habeck15@gmail.com`.
+Aplicar as duas mudanças discutidas no onboarding do módulo Finanças, sem mexer em mais nada:
 
-A página `/admin/usuarios` já puxa do Supabase (RPC `admin_list_users`), mas não destaca quem iniciou o trial hoje, nem oferece um filtro "Trial iniciado". Vou adicionar essa visão.
+1. **Remover o Passo 1** (tela "Aqui é o seu Meu Financeiro…") — passa a começar direto em "Adicione sua receita".
+2. **Pré-preencher o form de receita** com um exemplo (`Salário` / `3000`) enquanto o tutorial está no passo da receita e o usuário ainda não tem receita cadastrada, com microcopy "você pode editar antes de salvar".
 
-## O que vou fazer
+## Mudanças
 
-1. **Nova RPC `admin_trials_started`** no Supabase, retornando:
-   - `user_id`, `email`, `started_at` (do evento `trial_started` ou fallback `auth.users.created_at`)
-   - `subscription_status` (active / trialing / canceled / none)
-   - `days_since_start`
-   - Filtro por período: hoje / 7d / 30d / tudo
-   - Exclui usuários de teste (já existe `is_test_user`)
+### 1) `src/pages/Index.tsx` — remover Passo 1
+Apagar a linha do step `data-spotlight="financeiro"` no array de steps de Finanças (linha 138). O tutorial passa a iniciar diretamente no step `add-income`.
 
-2. **Nova aba no admin: `/admin/trials`** ("Trials")
-   - 4 cards no topo: Hoje · 7 dias · 30 dias · Total
-   - Tabela com email, data de início, status da assinatura, dias ativo
-   - Filtros de período (Hoje / 7d / 30d / Tudo)
-   - Busca por email
-   - Auto-refresh a cada 30s (mesmo padrão de `AdminUsers`)
+Nada mais no array muda — os demais steps continuam idênticos, na mesma ordem.
 
-3. Adicionar item "Trials" no `AdminLayout` (entre Funil e Usuários) com ícone `UserPlus`.
+### 2) `src/components/IncomeTable.tsx` — pré-preenchimento do exemplo
 
-## Arquivos
+- Aceitar uma nova prop opcional `prefillExample?: boolean`.
+- Quando `prefillExample` for `true` E `incomes.length === 0` E o usuário ainda não digitou nada (`description` e `value` vazios no mount), inicializar `newIncome` com `{ description: "Salário", value: "3000", date: "" }`.
+- Renderizar uma linha discreta de microcopy abaixo do form **somente quando o exemplo estiver ativo**:
+  > "Exemplo pré-preenchido — você pode editar antes de salvar."
+  Estilo: `text-[10px] text-muted-foreground` (consistente com microcopy existente nas linhas 88-89).
+- Ao clicar em Adicionar com o exemplo intocado, o item é salvo normalmente (mesmo fluxo atual) — isso satisfaz `advanceOnAction: "first_income"` e avança o tutorial.
 
-- migration: nova função `admin_trials_started(_period text)`
-- novo: `src/pages/admin/AdminTrials.tsx`
-- editar: `src/pages/admin/AdminLayout.tsx` (adicionar nav item)
-- editar: `src/App.tsx` (adicionar rota)
+### 3) `src/pages/Index.tsx` — passar a prop
+
+Passar `prefillExample={true}` para o `<IncomeTable>` apenas quando: o tutorial de Finanças está ativo E o step corrente é `add-income`. Reaproveitar o estado de spotlight já existente (mesma fonte usada para `data-spotlight`). Quando o tutorial não está ativo, a prop fica `false` e o comportamento do form é exatamente o de hoje.
+
+## Fora de escopo (não vou tocar)
+
+- Outros passos do tutorial (custo fixo, conta, anotação, etc.)
+- Layout/estilo do `SpotlightOverlay`, botões "Pular", contagem de passos.
+- `AdminFinanceFunnel` e qualquer telemetria.
+- Form de receita fora do contexto do tutorial.
+
+## Validação
+
+- Abrir trial novo → tutorial inicia direto em "Adicione sua receita" (sem a tela de boas-vindas do financeiro).
+- Form de receita já aparece com "Salário / 3000" + microcopy.
+- Clicar em + salva o item, tutorial avança para Passo 3 (custo fixo).
+- Editar antes de salvar funciona normalmente.
+- Usuário com receita já cadastrada (fora do tutorial): form continua vazio como hoje.

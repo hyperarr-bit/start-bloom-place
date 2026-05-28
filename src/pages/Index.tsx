@@ -135,7 +135,7 @@ const Index = () => {
           }
         }}
         steps={[
-          { selector: '[data-spotlight="financeiro"]', label: 'Aqui é o seu Meu Financeiro — onde você lança receitas, custos fixos, contas e anotações do mês.', onEnter: () => setActiveTab("dashboard") },
+          
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes", onEnter: () => setActiveTab("financeiro") },
@@ -237,7 +237,7 @@ const Index = () => {
                 />
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
-                    <IncomeTable incomes={incomes} setIncomes={setIncomes} />
+                    <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
                   </div>
                   <Calculator />
                 </div>

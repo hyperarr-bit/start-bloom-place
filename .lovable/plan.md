@@ -1,31 +1,51 @@
-Vou ajustar apenas o slide 1 do `src/components/WelcomeScreen.tsx` para bater pixel a pixel com a referência. Sem mexer em outros slides, lógica, rotas ou backend.
+Foco: deixar o slide 1 visualmente idêntico à referência. Só `src/components/WelcomeScreen.tsx`. Sem mudar outros slides, lógica, rotas ou backend.
 
-## Mudanças no slide 1
+## Problemas atuais vs referência
 
-**Texto:**
-- Título: "Tenha controle da sua vida financeira" (substitui o atual "Organize sua vida financeira em um só lugar").
-- Subtítulo: "Acompanhe receitas, despesas, contas, cartões, investimentos e metas em um só lugar."
+1. Cores dos cards trocadas:
+   - Despesas está verde → deveria ser lilás (`--chart-4`).
+   - Investimentos está rosa → deveria ser verde (`--chart-2`).
+   - Desejos está amarelo → deveria ser rosa (`--chart-1`).
+   - Receitas mantém amarelo/dourado (`--chart-3`).
+2. Cards estão pequenos demais, com layout apertado e o "Resumo do mês" some/sobrepõe.
+3. Forma dos cards não bate: a referência tem cards tipo "pill" largos com ícone circular grande à esquerda, label cinza em cima e valor preto em baixo, com sombra suave.
+4. Ícone do "Despesas" deve ser uma seta para baixo dentro de círculo (Download/ArrowDown), não TrendingDown.
+5. Resumo do mês: ícones devem ser outline grandes (~16px), divisórias finas entre linhas, valor "Saldo do mês" verde em destaque, "2" laranja e "2" rosa.
 
-**Card "Resumo do mês" (SlideOneMock):**
-- Adicionar divisórias `border-t` finas entre as 3 linhas, como na referência.
-- Trocar ícones por linha:
-  - Saldo do mês → `Calendar` verde (`--chart-2`)
-  - Contas a pagar → `Calendar` laranja/amarelo (`--chart-4`)
-  - Alertas inteligentes → `Bell` rosa (`--chart-5`)
-- Valor "Contas a pagar" e "Alertas inteligentes" mostrando "2" alinhado à direita, na cor do ícone.
-- Aumentar levemente padding interno e tamanho do título "Resumo do mês".
+## Mudanças no SlideOneMock
 
-**Cards flutuantes:**
-- Manter as 4 categorias (Receitas, Despesas, Investimentos, Desejos) com mesmas cores e rotações.
-- Aumentar levemente largura útil (mock até ~340px) para casar com a referência.
+- Aumentar o container do mock para ocupar a largura útil e altura suficiente para 4 cards + resumo sem sobrepor.
+- Trocar de `absolute` puro para um layout em 2 colunas escalonadas que reproduza a composição da referência:
+  - Coluna esquerda mais alta: Receitas (topo) e Investimentos (meio-baixo), levemente rotacionados para a esquerda.
+  - Coluna direita deslocada para baixo: Despesas (meio-topo) e Desejos (baixo), rotacionados para a direita.
+- Card "pill":
+  - `rounded-2xl`, padding maior, sombra suave (`shadow-md`).
+  - Círculo de ícone ~36px com cor sólida do token e ícone branco dentro.
+  - Texto: label pequeno cinza acima, valor `font-bold` preto abaixo.
+- Ícones:
+  - Receitas: `DollarSign` em círculo `--chart-3`.
+  - Despesas: `ArrowDown` em círculo `--chart-4`.
+  - Investimentos: `BarChart3` em círculo `--chart-2`.
+  - Desejos: `Heart` (filled) em círculo `--chart-1`.
+- Fundo de cada card usando o mesmo token com baixa opacidade (ex.: `hsl(var(--chart-x)/0.18)`).
+- Manter os dots decorativos espalhados para reforçar o "confetti".
 
-**Rodapé do slide 1 (só quando step === 0):**
-- Adicionar linha centralizada "7 dias grátis. Sem complicação." em `text-muted-foreground` acima da linha de Pular/dots/CTA.
-- Trocar o botão "Continuar" por "Começar grátis" só no slide 1, com pill preto arredondado mais largo (mais próximo do mock).
-- Manter "Pular" à esquerda e dots centralizados.
-- Link "Já tem uma conta? Entrar" continua abaixo.
+## Resumo do mês
 
-**Layout:**
-- Manter logo "CORE" no topo, hierarquia tipográfica, margens laterais e proporção mobile já existentes.
-- Não alterar slides 2, 3, 4 e 5.
-- Não tocar em lógica de navegação, analytics, autenticação ou imagem do iPad.
+- Card branco com borda sutil, raio grande, padding generoso.
+- Título "Resumo do mês" em `font-semibold` preto.
+- 3 linhas separadas por `border-t border-border/60`:
+  - Saldo do mês — ícone Calendar verde outline + label cinza, valor `+R$ 5.765,00` em verde forte (`--chart-2`).
+  - Contas a pagar — Calendar laranja (`--chart-3`), valor `2` laranja.
+  - Alertas inteligentes — Bell rosa (`--chart-1`), valor `2` rosa.
+- Ícones ~16px com `strokeWidth={1.75}`.
+
+## Layout geral do slide 1
+
+- Garantir altura mínima do mock para não sobrepor o resumo (≈ 360px) e o resumo ficar visivelmente abaixo dos 4 cards, como na imagem.
+- Não tocar nos textos do header, rodapé, "7 dias grátis", botão "Começar grátis" e link "Entrar" — já estão corretos.
+
+## Fora do escopo
+
+- Slides 2 a 5 ficam como estão.
+- Lógica de navegação, analytics, tokens globais e outros componentes não são alterados.

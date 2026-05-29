@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
-  Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw,
+  Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
 } from "lucide-react";
+
 import ipadImg from "@/assets/ipad-10.jpg";
 
 interface WelcomeScreenProps {

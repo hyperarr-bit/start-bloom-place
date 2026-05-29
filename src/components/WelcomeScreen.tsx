@@ -92,26 +92,36 @@ const SlideOneMock = () => (
     {/* Resumo do mês */}
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl p-3 shadow-sm"
+      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl px-4 py-3 shadow-sm"
     >
-      <p className="text-[11px] font-semibold text-foreground mb-2">Resumo do mês</p>
-      <div className="space-y-1.5 text-[11px]">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><Calendar className="w-3 h-3" />Saldo do mês</span>
-          <span className="font-semibold text-[hsl(var(--chart-1))]">+R$ 5.765,00</span>
+      <p className="text-[12px] font-semibold text-foreground mb-2">Resumo do mês</p>
+      <div className="text-[11px]">
+        <div className="flex items-center justify-between py-1.5">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" strokeWidth={1.75} />
+            Saldo do mês
+          </span>
+          <span className="font-semibold text-[hsl(var(--chart-2))]">+R$ 5.765,00</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><AlertCircle className="w-3 h-3" />Contas a pagar</span>
+        <div className="flex items-center justify-between py-1.5 border-t border-border/50">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-4))]" strokeWidth={1.75} />
+            Contas a pagar
+          </span>
           <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><Bell className="w-3 h-3" />Alertas inteligentes</span>
-          <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
+        <div className="flex items-center justify-between py-1.5 border-t border-border/50">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Bell className="w-3.5 h-3.5 text-[hsl(var(--chart-5))]" strokeWidth={1.75} />
+            Alertas inteligentes
+          </span>
+          <span className="font-semibold text-[hsl(var(--chart-5))]">2</span>
         </div>
       </div>
     </motion.div>
   </div>
 );
+
 
 const SlideTwoMock = () => (
   <div className="w-full max-w-[300px] mx-auto space-y-2.5">
@@ -367,10 +377,11 @@ const SlideFiveMock = () => (
 
 const slides = [
   {
-    title: <>Organize sua vida<br />financeira em um<br />só lugar</>,
-    subtitle: "Controle receitas, despesas, metas, desejos e investimentos com mais clareza no dia a dia.",
+    title: <>Tenha controle da<br />sua vida financeira</>,
+    subtitle: "Acompanhe receitas, despesas, contas, cartões, investimentos e metas em um só lugar.",
     mock: <SlideOneMock />,
   },
+
   {
     title: <>Veja seu mês<br />com clareza</>,
     subtitle: "Acompanhe saldo, receitas, despesas e alertas inteligentes sem se perder em planilhas.",
@@ -480,29 +491,35 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 pb-1">
-              {showSkip ? (
-                <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Pular
-                </button>
-              ) : (
-                <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Voltar
-                </button>
+            <div className="flex flex-col gap-3 pb-1">
+              {step === 0 && (
+                <p className="text-[11px] text-muted-foreground text-center">7 dias grátis. Sem complicação.</p>
               )}
-              <div className="flex gap-1.5">
-                {slides.map((_, i) => (
-                  <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
-                ))}
+              <div className="flex items-center justify-between gap-3">
+                {showSkip ? (
+                  <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Pular
+                  </button>
+                ) : (
+                  <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Voltar
+                  </button>
+                )}
+                <div className="flex gap-1.5">
+                  {slides.map((_, i) => (
+                    <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
+                  ))}
+                </div>
+                <button
+                  onClick={goNext}
+                  className={`rounded-2xl bg-foreground text-background font-semibold active:scale-[0.98] transition-transform ${step === 0 ? "px-6 py-3 text-sm shadow-lg" : "px-5 py-2.5 text-sm"}`}
+                >
+                  {step === 0 ? "Começar grátis" : "Continuar"}
+                </button>
               </div>
-              <button
-                onClick={goNext}
-                className="px-5 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold active:scale-[0.98] transition-transform"
-              >
-                Continuar
-              </button>
             </div>
           )}
+
 
           {step === 0 && (
             <Link

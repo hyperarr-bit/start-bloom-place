@@ -14,77 +14,97 @@ interface WelcomeScreenProps {
 
 // ---------- Slide mockups ----------
 
+const Dot = ({ className }: { className?: string }) => (
+  <span className={`absolute rounded-full ${className}`} />
+);
+
 const SlideOneMock = () => (
-  <div className="relative w-full max-w-[280px] h-[260px] mx-auto">
-    {/* floating cards */}
+  <div className="relative w-full max-w-[300px] h-[300px] mx-auto">
+    {/* decorative dots */}
+    <Dot className="w-1 h-1 bg-[hsl(var(--chart-2)/0.5)] top-2 left-10" />
+    <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-5)/0.5)] top-6 right-6" />
+    <Dot className="w-1 h-1 bg-[hsl(var(--chart-1)/0.5)] top-20 left-1" />
+    <Dot className="w-1 h-1 bg-[hsl(var(--chart-3)/0.6)] top-32 right-2" />
+    <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-2)/0.4)] bottom-32 left-4" />
+    <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] bottom-28 right-12" />
+
+    {/* Receitas — amarelo */}
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-      className="absolute top-2 left-0 bg-card border border-border rounded-2xl px-3 py-2 shadow-md flex items-center gap-2"
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
+      style={{ transform: "rotate(-3deg)" }}
+      className="absolute top-2 left-2 bg-[hsl(var(--chart-3)/0.3)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
     >
-      <div className="w-7 h-7 rounded-full bg-[hsl(var(--chart-1)/0.2)] flex items-center justify-center">
-        <DollarSign className="w-3.5 h-3.5 text-[hsl(var(--chart-1))]" />
+      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-3))] flex items-center justify-center">
+        <DollarSign className="w-4 h-4 text-white" />
       </div>
       <div>
-        <p className="text-[9px] text-muted-foreground leading-none">Receitas</p>
-        <p className="text-xs font-bold text-foreground leading-tight">R$ 6.400,00</p>
+        <p className="text-[10px] text-foreground/70 leading-none">Receitas</p>
+        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 6.400,00</p>
       </div>
     </motion.div>
 
+    {/* Despesas — lilás */}
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-      className="absolute top-4 right-0 bg-card border border-border rounded-2xl px-3 py-2 shadow-md flex items-center gap-2"
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+      style={{ transform: "rotate(4deg)" }}
+      className="absolute top-14 right-0 bg-[hsl(var(--chart-2)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
     >
-      <div className="w-7 h-7 rounded-full bg-[hsl(var(--chart-4)/0.2)] flex items-center justify-center">
-        <TrendingDown className="w-3.5 h-3.5 text-[hsl(var(--chart-4))]" />
+      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-2))] flex items-center justify-center">
+        <TrendingDown className="w-4 h-4 text-white" />
       </div>
       <div>
-        <p className="text-[9px] text-muted-foreground leading-none">Despesas</p>
-        <p className="text-xs font-bold text-foreground leading-tight">R$ 635,00</p>
+        <p className="text-[10px] text-foreground/70 leading-none">Despesas</p>
+        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 635,00</p>
       </div>
     </motion.div>
 
+    {/* Investimentos — verde */}
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-      className="absolute top-24 left-2 bg-card border border-border rounded-2xl px-3 py-2 shadow-md flex items-center gap-2"
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+      style={{ transform: "rotate(-2deg)" }}
+      className="absolute top-28 left-0 bg-[hsl(var(--chart-1)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
     >
-      <div className="w-7 h-7 rounded-full bg-[hsl(var(--chart-2)/0.2)] flex items-center justify-center">
-        <BarChart3 className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" />
+      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-1))] flex items-center justify-center">
+        <BarChart3 className="w-4 h-4 text-white" />
       </div>
       <div>
-        <p className="text-[9px] text-muted-foreground leading-none">Investimentos</p>
-        <p className="text-xs font-bold text-foreground leading-tight">R$ 14.500,00</p>
+        <p className="text-[10px] text-foreground/70 leading-none">Investimentos</p>
+        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 14.500,00</p>
       </div>
     </motion.div>
 
+    {/* Desejos — rosa */}
     <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-      className="absolute top-28 right-2 bg-card border border-border rounded-2xl px-3 py-2 shadow-md flex items-center gap-2"
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+      style={{ transform: "rotate(3deg)" }}
+      className="absolute top-40 right-4 bg-[hsl(var(--chart-5)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
     >
-      <div className="w-7 h-7 rounded-full bg-[hsl(var(--chart-5)/0.2)] flex items-center justify-center">
-        <Heart className="w-3.5 h-3.5 text-[hsl(var(--chart-5))]" />
+      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-5))] flex items-center justify-center">
+        <Heart className="w-4 h-4 text-white" />
       </div>
       <div>
-        <p className="text-[9px] text-muted-foreground leading-none">Desejos</p>
-        <p className="text-xs font-bold text-foreground leading-tight">R$ 1.200,00</p>
+        <p className="text-[10px] text-foreground/70 leading-none">Desejos</p>
+        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 1.200,00</p>
       </div>
     </motion.div>
 
+    {/* Resumo do mês */}
     <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-      className="absolute bottom-0 inset-x-0 bg-card border border-border rounded-2xl p-3 shadow-md"
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl p-3 shadow-sm"
     >
-      <p className="text-[10px] font-semibold text-foreground mb-1.5">Resumo do mês</p>
-      <div className="space-y-1 text-[10px]">
+      <p className="text-[11px] font-semibold text-foreground mb-2">Resumo do mês</p>
+      <div className="space-y-1.5 text-[11px]">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-muted-foreground"><Calendar className="w-2.5 h-2.5" />Saldo do mês</span>
+          <span className="flex items-center gap-1.5 text-muted-foreground"><Calendar className="w-3 h-3" />Saldo do mês</span>
           <span className="font-semibold text-[hsl(var(--chart-1))]">+R$ 5.765,00</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-muted-foreground"><AlertCircle className="w-2.5 h-2.5" />Contas a pagar</span>
+          <span className="flex items-center gap-1.5 text-muted-foreground"><AlertCircle className="w-3 h-3" />Contas a pagar</span>
           <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-muted-foreground"><Bell className="w-2.5 h-2.5" />Alertas inteligentes</span>
+          <span className="flex items-center gap-1.5 text-muted-foreground"><Bell className="w-3 h-3" />Alertas inteligentes</span>
           <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
         </div>
       </div>
@@ -93,52 +113,92 @@ const SlideOneMock = () => (
 );
 
 const SlideTwoMock = () => (
-  <div className="w-full max-w-[280px] mx-auto space-y-2">
+  <div className="w-full max-w-[300px] mx-auto space-y-2.5">
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-[hsl(var(--chart-3)/0.15)] rounded-xl p-2.5">
+      <div className="bg-[hsl(var(--chart-3)/0.2)] rounded-2xl p-3">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] text-muted-foreground">Receitas</span>
+          <span className="text-[10px] text-muted-foreground">Receitas</span>
           <DollarSign className="w-3 h-3 text-muted-foreground" />
         </div>
         <p className="text-sm font-bold text-foreground">R$ 6.400</p>
       </div>
-      <div className="bg-[hsl(var(--chart-4)/0.15)] rounded-xl p-2.5">
+      <div className="bg-[hsl(var(--chart-2)/0.2)] rounded-2xl p-3">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] text-muted-foreground">Despesas</span>
+          <span className="text-[10px] text-muted-foreground">Despesas</span>
           <TrendingDown className="w-3 h-3 text-muted-foreground" />
         </div>
         <p className="text-sm font-bold text-foreground">R$ 635</p>
       </div>
-      <div className="bg-[hsl(var(--chart-1)/0.15)] rounded-xl p-2.5">
+      <div className="bg-[hsl(var(--chart-1)/0.2)] rounded-2xl p-3">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] text-muted-foreground">Saldo do mês</span>
+          <span className="text-[10px] text-muted-foreground">Saldo do mês</span>
           <TrendingUp className="w-3 h-3 text-muted-foreground" />
         </div>
         <p className="text-sm font-bold text-foreground">+R$ 5.765</p>
       </div>
-      <div className="bg-[hsl(var(--chart-2)/0.15)] rounded-xl p-2.5">
+      <div className="bg-[hsl(var(--chart-4)/0.18)] rounded-2xl p-3">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[9px] text-muted-foreground">Investimentos</span>
+          <span className="text-[10px] text-muted-foreground">Investimentos</span>
           <BarChart3 className="w-3 h-3 text-muted-foreground" />
         </div>
         <p className="text-sm font-bold text-foreground">R$ 14.500</p>
       </div>
     </div>
 
-    <div className="bg-card border border-border rounded-xl p-2.5 space-y-2">
-      <p className="text-[10px] font-semibold text-foreground flex items-center gap-1.5">
+    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-2">
+      <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
         <Bell className="w-3 h-3" /> Alertas inteligentes
       </p>
-      <div className="flex items-start gap-2 bg-muted/50 rounded-lg p-2">
-        <Calendar className="w-3 h-3 text-[hsl(var(--chart-4))] mt-0.5" />
-        <div className="text-[9px]">
+      <div className="flex items-start gap-2 bg-muted/40 rounded-xl p-2">
+        <Calendar className="w-3 h-3 text-[hsl(var(--chart-4))] mt-0.5 flex-shrink-0" />
+        <div className="text-[10px]">
           <p className="text-foreground">2 conta(s) vencem em 2 dia(s)</p>
           <p className="text-muted-foreground">Cartão Nubank, Netflix</p>
         </div>
       </div>
-      <div className="flex items-start gap-2 bg-muted/50 rounded-lg p-2">
-        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5" />
-        <p className="text-[9px] text-foreground">Excelente! Você está poupando 90.1% da sua renda este mês.</p>
+      <div className="flex items-start gap-2 bg-muted/40 rounded-xl p-2">
+        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5 flex-shrink-0" />
+        <p className="text-[10px] text-foreground">Excelente! Você está poupando 90.1% da sua renda este mês.</p>
+      </div>
+    </div>
+
+    <div className="bg-card border border-border/60 rounded-2xl p-3">
+      <p className="text-[11px] font-semibold text-foreground mb-2">Gastos por categoria</p>
+      <div className="flex items-center gap-3">
+        {/* mini donut */}
+        <div
+          className="w-14 h-14 rounded-full flex-shrink-0"
+          style={{
+            background: `conic-gradient(
+              hsl(var(--chart-5)) 0% 30%,
+              hsl(var(--chart-3)) 30% 50%,
+              hsl(var(--chart-2)) 50% 65%,
+              hsl(var(--chart-1)) 65% 80%,
+              hsl(var(--chart-4)) 80% 100%
+            )`,
+          }}
+        >
+          <div className="w-full h-full rounded-full flex items-center justify-center">
+            <div className="w-7 h-7 rounded-full bg-card" />
+          </div>
+        </div>
+        <div className="flex-1 space-y-0.5 text-[10px]">
+          {[
+            { c: "--chart-5", n: "Moradia", v: "R$ 1.300" },
+            { c: "--chart-3", n: "Educação", v: "R$ 450" },
+            { c: "--chart-2", n: "Contas da Casa", v: "R$ 225" },
+            { c: "--chart-1", n: "Lazer", v: "R$ 180" },
+            { c: "--chart-4", n: "Outros", v: "R$ 120" },
+          ].map((r) => (
+            <div key={r.n} className="flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-foreground">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: `hsl(var(${r.c}))` }} />
+                {r.n}
+              </span>
+              <span className="text-muted-foreground tabular-nums">{r.v}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   </div>
@@ -146,7 +206,7 @@ const SlideTwoMock = () => (
 
 const SlideThreeMock = () => {
   const cats = [
-    { name: "Transporte", val: 50, max: 250, color: "--chart-1" },
+    { name: "Transporte", val: 50, max: 250, color: "--chart-2" },
     { name: "Alimentação", val: 180, max: 350, color: "--chart-3" },
     { name: "Vestuário", val: 220, max: 250, color: "--chart-5" },
     { name: "Lazer", val: 65, max: 180, color: "--chart-1" },
@@ -154,17 +214,17 @@ const SlideThreeMock = () => {
   ];
   const chips = ["Alimentação", "Transporte", "Moradia", "Educação", "Lazer", "Saúde", "Contas da Casa", "Internet", "Pets", "Viagem", "Presentes", "Outros"];
   return (
-    <div className="w-full max-w-[280px] mx-auto space-y-2">
-      <div className="bg-card border border-border rounded-xl p-2.5">
-        <p className="text-[10px] font-semibold text-foreground mb-2">Limites por categoria</p>
-        <div className="space-y-1.5">
+    <div className="w-full max-w-[300px] mx-auto space-y-2.5">
+      <div className="bg-card border border-border/60 rounded-2xl p-3">
+        <p className="text-[11px] font-semibold text-foreground mb-2.5">Limites por categoria</p>
+        <div className="space-y-2">
           {cats.map((c) => (
             <div key={c.name}>
-              <div className="flex items-center justify-between text-[9px] mb-0.5">
-                <span className="text-foreground">{c.name}</span>
-                <span className="text-muted-foreground">R$ {c.val} / R$ {c.max}</span>
+              <div className="flex items-center justify-between text-[10px] mb-1">
+                <span className="font-medium" style={{ color: `hsl(var(${c.color}))` }}>{c.name}</span>
+                <span className="text-muted-foreground tabular-nums">R$ {c.val} / R$ {c.max}</span>
               </div>
-              <div className="h-1 bg-muted rounded-full overflow-hidden">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${(c.val / c.max) * 100}%`, background: `hsl(var(${c.color}))` }}
@@ -174,15 +234,15 @@ const SlideThreeMock = () => {
           ))}
         </div>
       </div>
-      <div className="bg-card border border-border rounded-xl p-2.5">
-        <p className="text-[10px] font-semibold text-foreground mb-2">Categorias populares</p>
+      <div className="bg-card border border-border/60 rounded-2xl p-3">
+        <p className="text-[11px] font-semibold text-foreground mb-2">Categorias populares</p>
         <div className="flex flex-wrap gap-1">
           {chips.map((c, i) => (
             <span
               key={c}
-              className="text-[8px] px-1.5 py-0.5 rounded-full"
+              className="text-[9px] px-2 py-0.5 rounded-full font-medium"
               style={{
-                background: `hsl(var(--chart-${(i % 5) + 1}) / 0.15)`,
+                background: `hsl(var(--chart-${(i % 5) + 1}) / 0.18)`,
                 color: `hsl(var(--chart-${(i % 5) + 1}))`,
               }}
             >
@@ -196,69 +256,81 @@ const SlideThreeMock = () => {
 };
 
 const SlideFourMock = () => (
-  <div className="w-full max-w-[280px] mx-auto">
-    <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-      <p className="text-[10px] font-semibold text-foreground">Meu desejo</p>
-      <div className="bg-muted/40 rounded-lg h-20 flex items-center justify-center">
-        <div className="w-12 h-16 bg-gradient-to-br from-[hsl(var(--chart-2)/0.3)] to-[hsl(var(--chart-1)/0.3)] rounded-md" />
+  <div className="w-full max-w-[300px] mx-auto">
+    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-2.5">
+      <p className="text-[11px] font-semibold text-foreground">Meu desejo</p>
+      <div className="bg-muted/40 rounded-xl h-24 flex items-center justify-center relative">
+        {/* iPad mock */}
+        <div className="w-16 h-20 rounded-md bg-gradient-to-br from-[hsl(var(--chart-2))] via-[hsl(var(--chart-1))] to-[hsl(var(--chart-3))] border-[3px] border-foreground/80 relative">
+          <div className="absolute inset-1 rounded-sm bg-gradient-to-br from-white/30 to-transparent" />
+        </div>
+        <Heart className="absolute top-2 right-2 w-4 h-4 text-[hsl(var(--chart-5))] fill-[hsl(var(--chart-5))]" />
       </div>
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-bold text-foreground">iPad 10ª geração 64GB</p>
-        <Heart className="w-3 h-3 text-[hsl(var(--chart-5))]" />
+      <div>
+        <p className="text-sm font-bold text-foreground">iPad 10ª geração 64GB</p>
+        <span className="inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full bg-[hsl(var(--chart-2)/0.18)] text-[hsl(var(--chart-2))] font-medium">Tecnologia</span>
       </div>
-      <span className="inline-block text-[8px] px-1.5 py-0.5 rounded-full bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]">Tecnologia</span>
-      <div className="flex justify-between text-[9px] pt-1">
+      <div className="flex justify-between text-[10px]">
         <div>
           <p className="text-muted-foreground">Guardado</p>
-          <p className="font-bold text-[hsl(var(--chart-5))]">R$ 1.200,00</p>
+          <p className="font-bold text-[hsl(var(--chart-5))] text-xs">R$ 1.200,00</p>
         </div>
         <div className="text-right">
           <p className="text-muted-foreground">Falta</p>
-          <p className="font-bold text-[hsl(var(--chart-4))]">R$ 2.199,00</p>
+          <p className="font-bold text-[hsl(var(--chart-4))] text-xs">R$ 2.199,00</p>
         </div>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div className="h-full w-[35%] bg-gradient-to-r from-[hsl(var(--chart-5))] to-[hsl(var(--chart-4))]" />
+        <div className="h-full w-[35%] rounded-full bg-gradient-to-r from-[hsl(var(--chart-5))] to-[hsl(var(--chart-4))]" />
       </div>
-      <p className="text-[9px] text-right text-muted-foreground">35%</p>
-      <div className="grid grid-cols-2 gap-2 pt-1">
-        <div className="bg-muted/40 rounded-lg p-1.5">
-          <p className="text-[8px] text-muted-foreground">Tempo estimado</p>
-          <p className="text-[10px] font-bold text-foreground">5 meses</p>
+      <p className="text-[10px] text-right text-muted-foreground">35%</p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="bg-muted/40 rounded-xl p-2 flex items-center gap-1.5">
+          <Calendar className="w-3 h-3 text-muted-foreground" />
+          <div>
+            <p className="text-[9px] text-muted-foreground">Tempo estimado</p>
+            <p className="text-[11px] font-bold text-foreground">5 meses</p>
+          </div>
         </div>
-        <div className="bg-muted/40 rounded-lg p-1.5">
-          <p className="text-[8px] text-muted-foreground">Faltam</p>
-          <p className="text-[10px] font-bold text-foreground">5 meses</p>
+        <div className="bg-muted/40 rounded-xl p-2 flex items-center gap-1.5">
+          <Calendar className="w-3 h-3 text-muted-foreground" />
+          <div>
+            <p className="text-[9px] text-muted-foreground">Faltam</p>
+            <p className="text-[11px] font-bold text-foreground">5 meses</p>
+          </div>
         </div>
       </div>
-      <div className="bg-[hsl(var(--chart-1)/0.1)] rounded-lg p-2 flex items-start gap-1.5">
-        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5" />
-        <p className="text-[9px] text-foreground">Você está no caminho certo! Mantendo esse ritmo, seu objetivo será alcançado em Novembro de 2026.</p>
+      <div className="bg-[hsl(var(--chart-1)/0.12)] rounded-xl p-2 flex items-start gap-1.5">
+        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5 flex-shrink-0" />
+        <div className="text-[10px]">
+          <p className="font-semibold text-foreground">Você está no caminho certo!</p>
+          <p className="text-muted-foreground">Mantendo esse ritmo, seu objetivo será alcançado em Novembro de 2026.</p>
+        </div>
       </div>
     </div>
   </div>
 );
 
 const SlideFiveMock = () => (
-  <div className="w-full max-w-[280px] mx-auto">
-    <div className="bg-card border border-border rounded-xl p-3 space-y-2.5">
-      <p className="text-[10px] font-semibold text-foreground">Nova receita</p>
+  <div className="w-full max-w-[300px] mx-auto">
+    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-3">
+      <p className="text-[11px] font-semibold text-foreground">Nova receita</p>
       <div>
-        <p className="text-[9px] text-muted-foreground mb-1">Fonte da receita</p>
-        <div className="border border-border rounded-lg px-2.5 py-2 flex items-center justify-between">
+        <p className="text-[10px] text-muted-foreground mb-1">Fonte da receita</p>
+        <div className="border border-border rounded-lg px-3 py-2.5 flex items-center justify-between">
           <span className="text-xs text-foreground">Salário</span>
           <ChevronDown className="w-3 h-3 text-muted-foreground" />
         </div>
       </div>
       <div>
-        <p className="text-[9px] text-muted-foreground mb-1">Valor</p>
-        <div className="border border-border rounded-lg px-2.5 py-2">
+        <p className="text-[10px] text-muted-foreground mb-1">Valor</p>
+        <div className="border border-border rounded-lg px-3 py-2.5">
           <span className="text-xs text-foreground">R$ 6.400,00</span>
         </div>
       </div>
-      <div className="bg-[hsl(var(--chart-3)/0.15)] rounded-lg p-2 flex items-start gap-1.5">
-        <Star className="w-3 h-3 text-[hsl(var(--chart-3))] mt-0.5" />
-        <div className="text-[9px]">
+      <div className="bg-[hsl(var(--chart-3)/0.2)] rounded-xl p-2.5 flex items-start gap-2">
+        <Star className="w-3.5 h-3.5 text-[hsl(var(--chart-3))] mt-0.5 fill-[hsl(var(--chart-3))]" />
+        <div className="text-[10px]">
           <p className="font-semibold text-foreground">Ótimo começo!</p>
           <p className="text-muted-foreground">Registrar suas receitas é o primeiro passo para ter controle total das suas finanças.</p>
         </div>
@@ -301,6 +373,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const [step, setStep] = useState(0);
     const isLast = step === slides.length - 1;
+    const showSkip = step < 2; // slides 1 e 2 mostram "Pular"
 
     useEffect(() => {
       captureLandingMeta();
@@ -333,12 +406,12 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6"
         style={{
           minHeight: "100dvh",
-          paddingTop: "max(1.25rem, env(safe-area-inset-top))",
+          paddingTop: "max(1.5rem, env(safe-area-inset-top))",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
       >
         <div className="flex-1 flex flex-col w-full max-w-sm mx-auto">
-          <span className="text-xl font-black tracking-tight text-foreground mb-4">CORE</span>
+          <span className="text-2xl font-black tracking-tight text-foreground mb-5">CORE</span>
 
           <AnimatePresence mode="wait">
             <motion.div
@@ -349,10 +422,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="flex-1 flex flex-col"
             >
-              <h1 className="text-[26px] font-bold text-foreground tracking-tight leading-[1.15]">
+              <h1 className="text-[28px] font-bold text-foreground tracking-tight leading-[1.15]">
                 {current.title}
               </h1>
-              <p className="text-sm text-muted-foreground mt-2 leading-snug">
+              <p className="text-[13px] text-muted-foreground mt-2 leading-snug">
                 {current.subtitle}
               </p>
 
@@ -384,7 +457,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3 pb-1">
-              {step === 0 ? (
+              {showSkip ? (
                 <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                   Pular
                 </button>

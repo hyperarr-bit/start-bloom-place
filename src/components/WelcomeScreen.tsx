@@ -58,8 +58,9 @@ const FloatCard = ({
   </motion.div>
 );
 
-const SlideOneMock = () => (
-  <div className="w-full max-w-[340px] mx-auto">
+    {/* Área dos 4 cards flutuantes com confetes */}
+    <div className="relative w-full h-[230px]">
+
     {/* Área dos 4 cards flutuantes com confetes */}
     <div className="relative w-full h-[260px]">
       {/* dots decorativos */}

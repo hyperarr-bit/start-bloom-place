@@ -491,29 +491,35 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-3 pb-1">
-              {showSkip ? (
-                <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Pular
-                </button>
-              ) : (
-                <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Voltar
-                </button>
+            <div className="flex flex-col gap-3 pb-1">
+              {step === 0 && (
+                <p className="text-[11px] text-muted-foreground text-center">7 dias grátis. Sem complicação.</p>
               )}
-              <div className="flex gap-1.5">
-                {slides.map((_, i) => (
-                  <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
-                ))}
+              <div className="flex items-center justify-between gap-3">
+                {showSkip ? (
+                  <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Pular
+                  </button>
+                ) : (
+                  <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                    Voltar
+                  </button>
+                )}
+                <div className="flex gap-1.5">
+                  {slides.map((_, i) => (
+                    <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
+                  ))}
+                </div>
+                <button
+                  onClick={goNext}
+                  className={`rounded-2xl bg-foreground text-background font-semibold active:scale-[0.98] transition-transform ${step === 0 ? "px-6 py-3 text-sm shadow-lg" : "px-5 py-2.5 text-sm"}`}
+                >
+                  {step === 0 ? "Começar grátis" : "Continuar"}
+                </button>
               </div>
-              <button
-                onClick={goNext}
-                className="px-5 py-2.5 rounded-xl bg-foreground text-background text-sm font-semibold active:scale-[0.98] transition-transform"
-              >
-                Continuar
-              </button>
             </div>
           )}
+
 
           {step === 0 && (
             <Link

@@ -268,7 +268,8 @@ const SlideTwoMock = () => {
         <div className="flex items-start gap-2 bg-[hsl(var(--chart-3)/0.15)] rounded-xl p-2">
           <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-3))] mt-0.5 flex-shrink-0" strokeWidth={2} />
           <div className="text-[10px] leading-tight">
-            <p className="text-foreground">2 conta(s) vencem em 0 dia(s)</p>
+            <p className="text-foreground">2 conta(s) vencem em 2 dia(s)</p>
+
             <p className="text-muted-foreground">Cartão Nubank, Netflix</p>
           </div>
         </div>

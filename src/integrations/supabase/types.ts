@@ -655,6 +655,17 @@ export type Database = {
         }[]
       }
       admin_user_trial_journey: { Args: { _user_id: string }; Returns: Json }
+      admin_welcome_dropoff: {
+        Args: { _from?: string; _to?: string }
+        Returns: {
+          backs: number
+          dropoff_pct: number
+          exits: number
+          step: number
+          unique_users: number
+          views: number
+        }[]
+      }
       admin_winback_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

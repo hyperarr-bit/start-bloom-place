@@ -334,6 +334,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   className="absolute -top-5"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
+                  <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
+                </motion.div>
+              )}
               <div className="bg-card border border-border rounded-xl shadow-xl p-3">
                 <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
                   Passo {stepIdx + 1} de {steps.length}
@@ -352,7 +355,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   </div>
                 )}
               </div>
-
+              {!labelBelow && (
                 <motion.div
                   animate={{ y: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
@@ -363,6 +366,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 </motion.div>
               )}
             </div>
+
           </motion.div>
         )}
 

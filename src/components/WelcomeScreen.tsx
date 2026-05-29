@@ -4,8 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
-  Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw,
+  Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
 } from "lucide-react";
+
 import ipadImg from "@/assets/ipad-10.jpg";
 
 interface WelcomeScreenProps {
@@ -18,109 +19,138 @@ interface WelcomeScreenProps {
 const Dot = ({ className }: { className?: string }) => (
   <span className={`absolute rounded-full ${className}`} />
 );
+const FloatCard = ({
+  label,
+  value,
+  color,
+  icon: Icon,
+  iconFill = false,
+  className = "",
+  style,
+  delay = 0,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  icon: typeof DollarSign;
+  iconFill?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+  delay?: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay }}
+    style={style}
+    className={`absolute flex items-center gap-2.5 rounded-2xl pl-2 pr-4 py-2 shadow-md ${className}`}
+  >
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ background: `hsl(var(${color}))` }}
+    >
+      <Icon className="w-4 h-4 text-white" strokeWidth={2.25} fill={iconFill ? "currentColor" : "none"} />
+    </div>
+    <div>
+      <p className="text-[10px] text-foreground/60 leading-none">{label}</p>
+      <p className="text-[13px] font-bold text-foreground leading-tight mt-1">{value}</p>
+    </div>
+  </motion.div>
+);
 
 const SlideOneMock = () => (
-  <div className="relative w-full max-w-[300px] h-[300px] mx-auto">
-    {/* decorative dots */}
-    <Dot className="w-1 h-1 bg-[hsl(var(--chart-2)/0.5)] top-2 left-10" />
-    <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-5)/0.5)] top-6 right-6" />
-    <Dot className="w-1 h-1 bg-[hsl(var(--chart-1)/0.5)] top-20 left-1" />
-    <Dot className="w-1 h-1 bg-[hsl(var(--chart-3)/0.6)] top-32 right-2" />
-    <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-2)/0.4)] bottom-32 left-4" />
-    <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] bottom-28 right-12" />
+  <div className="w-full max-w-[340px] mx-auto">
+    {/* Área dos 4 cards flutuantes com confetes */}
+    <div className="relative w-full h-[230px]">
 
-    {/* Receitas — amarelo */}
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-      style={{ transform: "rotate(-3deg)" }}
-      className="absolute top-2 left-2 bg-[hsl(var(--chart-3)/0.3)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
-    >
-      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-3))] flex items-center justify-center">
-        <DollarSign className="w-4 h-4 text-white" />
-      </div>
-      <div>
-        <p className="text-[10px] text-foreground/70 leading-none">Receitas</p>
-        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 6.400,00</p>
-      </div>
-    </motion.div>
+      {/* dots decorativos */}
+      <Dot className="w-1 h-1 bg-[hsl(var(--chart-2)/0.6)] top-1 left-16" />
+      <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-1)/0.5)] top-3 right-8" />
+      <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] top-24 left-2" />
+      <Dot className="w-1 h-1 bg-[hsl(var(--chart-3)/0.6)] top-32 right-1" />
+      <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-2)/0.4)] bottom-8 left-8" />
+      <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] bottom-16 right-20" />
+      <Dot className="w-1 h-1 bg-[hsl(var(--chart-1)/0.5)] bottom-2 right-6" />
 
-    {/* Despesas — lilás */}
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-      style={{ transform: "rotate(4deg)" }}
-      className="absolute top-14 right-0 bg-[hsl(var(--chart-2)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
-    >
-      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-2))] flex items-center justify-center">
-        <TrendingDown className="w-4 h-4 text-white" />
-      </div>
-      <div>
-        <p className="text-[10px] text-foreground/70 leading-none">Despesas</p>
-        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 635,00</p>
-      </div>
-    </motion.div>
+      {/* Receitas — amarelo (chart-3) */}
+      <FloatCard
+        label="Receitas"
+        value="R$ 6.400,00"
+        color="--chart-3"
+        icon={DollarSign}
+        delay={0.05}
+        style={{ transform: "rotate(-4deg)" }}
+        className="top-0 left-0 bg-[hsl(var(--chart-3)/0.22)]"
+      />
 
-    {/* Investimentos — verde */}
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-      style={{ transform: "rotate(-2deg)" }}
-      className="absolute top-28 left-0 bg-[hsl(var(--chart-1)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
-    >
-      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-1))] flex items-center justify-center">
-        <BarChart3 className="w-4 h-4 text-white" />
-      </div>
-      <div>
-        <p className="text-[10px] text-foreground/70 leading-none">Investimentos</p>
-        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 14.500,00</p>
-      </div>
-    </motion.div>
+      {/* Despesas — lilás (chart-4) */}
+      <FloatCard
+        label="Despesas"
+        value="R$ 635,00"
+        color="--chart-4"
+        icon={ArrowDown}
+        delay={0.15}
+        style={{ transform: "rotate(4deg)" }}
+        className="top-16 right-0 bg-[hsl(var(--chart-4)/0.22)]"
+      />
 
-    {/* Desejos — rosa */}
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-      style={{ transform: "rotate(3deg)" }}
-      className="absolute top-40 right-4 bg-[hsl(var(--chart-5)/0.28)] rounded-2xl px-3 py-2 shadow-sm flex items-center gap-2"
-    >
-      <div className="w-8 h-8 rounded-full bg-[hsl(var(--chart-5))] flex items-center justify-center">
-        <Heart className="w-4 h-4 text-white" />
-      </div>
-      <div>
-        <p className="text-[10px] text-foreground/70 leading-none">Desejos</p>
-        <p className="text-xs font-bold text-foreground leading-tight mt-0.5">R$ 1.200,00</p>
-      </div>
-    </motion.div>
+      {/* Investimentos — verde (chart-2) */}
+      <FloatCard
+        label="Investimentos"
+        value="R$ 14.500,00"
+        color="--chart-2"
+        icon={BarChart3}
+        delay={0.25}
+        style={{ transform: "rotate(-3deg)" }}
+        className="top-[120px] left-2 bg-[hsl(var(--chart-2)/0.22)]"
+      />
+
+      {/* Desejos — rosa (chart-1) */}
+      <FloatCard
+        label="Desejos"
+        value="R$ 1.200,00"
+        color="--chart-1"
+        icon={Heart}
+        iconFill
+        delay={0.35}
+        style={{ transform: "rotate(3deg)" }}
+        className="top-[180px] right-0 bg-[hsl(var(--chart-1)/0.22)]"
+      />
+    </div>
 
     {/* Resumo do mês */}
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl px-4 py-3 shadow-sm"
+      className="bg-card border border-border/60 rounded-2xl px-4 py-3 shadow-sm mt-2"
     >
-      <p className="text-[12px] font-semibold text-foreground mb-2">Resumo do mês</p>
+      <p className="text-[12px] font-semibold text-foreground mb-1.5">Resumo do mês</p>
       <div className="text-[11px]">
         <div className="flex items-center justify-between py-1.5">
           <span className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" strokeWidth={1.75} />
+            <Calendar className="w-4 h-4 text-[hsl(var(--chart-2))]" strokeWidth={1.75} />
             Saldo do mês
           </span>
           <span className="font-semibold text-[hsl(var(--chart-2))]">+R$ 5.765,00</span>
         </div>
         <div className="flex items-center justify-between py-1.5 border-t border-border/50">
           <span className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-4))]" strokeWidth={1.75} />
+            <Calendar className="w-4 h-4 text-[hsl(var(--chart-3))]" strokeWidth={1.75} />
             Contas a pagar
           </span>
-          <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
+          <span className="font-semibold text-[hsl(var(--chart-3))]">2</span>
         </div>
         <div className="flex items-center justify-between py-1.5 border-t border-border/50">
           <span className="flex items-center gap-2 text-muted-foreground">
-            <Bell className="w-3.5 h-3.5 text-[hsl(var(--chart-5))]" strokeWidth={1.75} />
+            <Bell className="w-4 h-4 text-[hsl(var(--chart-1))]" strokeWidth={1.75} />
             Alertas inteligentes
           </span>
-          <span className="font-semibold text-[hsl(var(--chart-5))]">2</span>
+          <span className="font-semibold text-[hsl(var(--chart-1))]">2</span>
         </div>
       </div>
     </motion.div>
   </div>
 );
+
 
 
 const SlideTwoMock = () => (
@@ -464,9 +494,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 {current.subtitle}
               </p>
 
-              <div className="flex-1 flex items-center justify-center py-5">
+              <div className="flex-1 flex items-center justify-center py-3 min-h-0">
                 {current.mock}
               </div>
+
             </motion.div>
           </AnimatePresence>
 

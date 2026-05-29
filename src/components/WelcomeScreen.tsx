@@ -193,97 +193,128 @@ const SlideOneMock = () => (
 
 
 
-const SlideTwoMock = () => (
-  <div className="w-full max-w-[300px] mx-auto space-y-2.5">
-    <div className="grid grid-cols-2 gap-2">
-      <div className="bg-[hsl(var(--chart-3)/0.2)] rounded-2xl p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted-foreground">Receitas</span>
-          <DollarSign className="w-3 h-3 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-bold text-foreground">R$ 6.400</p>
-      </div>
-      <div className="bg-[hsl(var(--chart-2)/0.2)] rounded-2xl p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted-foreground">Despesas</span>
-          <TrendingDown className="w-3 h-3 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-bold text-foreground">R$ 635</p>
-      </div>
-      <div className="bg-[hsl(var(--chart-1)/0.2)] rounded-2xl p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted-foreground">Saldo do mês</span>
-          <TrendingUp className="w-3 h-3 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-bold text-foreground">+R$ 5.765</p>
-      </div>
-      <div className="bg-[hsl(var(--chart-4)/0.18)] rounded-2xl p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-muted-foreground">Investimentos</span>
-          <BarChart3 className="w-3 h-3 text-muted-foreground" />
-        </div>
-        <p className="text-sm font-bold text-foreground">R$ 14.500</p>
-      </div>
+const StatCard = ({
+  label,
+  value,
+  color,
+  icon: Icon,
+  delay = 0,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  icon: typeof DollarSign;
+  delay?: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay, duration: 0.4, ease: "easeOut" }}
+    className="bg-card border border-border/60 rounded-2xl px-3 py-2.5 flex flex-col justify-between min-h-[64px]"
+  >
+    <div className="flex items-start justify-between gap-2">
+      <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
+      <Icon className="w-3.5 h-3.5 flex-shrink-0" style={{ color: `hsl(var(${color}))` }} strokeWidth={2.25} />
     </div>
+    <p className="text-[15px] font-extrabold leading-none mt-1" style={{ color: `hsl(var(${color}))` }}>{value}</p>
+  </motion.div>
+);
 
-    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-2">
-      <p className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
-        <Bell className="w-3 h-3" /> Alertas inteligentes
-      </p>
-      <div className="flex items-start gap-2 bg-muted/40 rounded-xl p-2">
-        <Calendar className="w-3 h-3 text-[hsl(var(--chart-4))] mt-0.5 flex-shrink-0" />
-        <div className="text-[10px]">
-          <p className="text-foreground">2 conta(s) vencem em 2 dia(s)</p>
-          <p className="text-muted-foreground">Cartão Nubank, Netflix</p>
-        </div>
-      </div>
-      <div className="flex items-start gap-2 bg-muted/40 rounded-xl p-2">
-        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5 flex-shrink-0" />
-        <p className="text-[10px] text-foreground">Excelente! Você está poupando 90.1% da sua renda este mês.</p>
-      </div>
-    </div>
+const SlideTwoMock = () => {
+  const donutSegments = [
+    { c: "--chart-4", pct: 55 }, // Moradia roxo
+    { c: "--chart-1", pct: 19 }, // Educação rosa
+    { c: "--chart-3", pct: 10 }, // Contas da Casa laranja
+    { c: "--chart-2", pct: 9 },  // Vestuário verde
+    { c: "--chart-5", pct: 7 },  // Restaurante azul
+  ];
+  let acc = 0;
+  const gradient = donutSegments
+    .map((s) => {
+      const from = acc;
+      acc += s.pct;
+      return `hsl(var(${s.c})) ${from}% ${acc}%`;
+    })
+    .join(", ");
 
-    <div className="bg-card border border-border/60 rounded-2xl p-3">
-      <p className="text-[11px] font-semibold text-foreground mb-2">Gastos por categoria</p>
-      <div className="flex items-center gap-3">
-        {/* mini donut */}
-        <div
-          className="w-14 h-14 rounded-full flex-shrink-0"
-          style={{
-            background: `conic-gradient(
-              hsl(var(--chart-5)) 0% 30%,
-              hsl(var(--chart-3)) 30% 50%,
-              hsl(var(--chart-2)) 50% 65%,
-              hsl(var(--chart-1)) 65% 80%,
-              hsl(var(--chart-4)) 80% 100%
-            )`,
-          }}
-        >
-          <div className="w-full h-full rounded-full flex items-center justify-center">
-            <div className="w-7 h-7 rounded-full bg-card" />
+  const legend = [
+    { c: "--chart-4", n: "Moradia", v: "R$ 1.300" },
+    { c: "--chart-1", n: "Educação", v: "R$ 450" },
+    { c: "--chart-3", n: "Contas da Casa", v: "R$ 225" },
+    { c: "--chart-2", n: "Vestuário", v: "R$ 220" },
+    { c: "--chart-5", n: "Restaurante", v: "R$ 180" },
+  ];
+
+  return (
+    <div className="w-full max-w-[320px] mx-auto space-y-2.5">
+      {/* 4 stat cards */}
+      <div className="grid grid-cols-2 gap-2">
+        <StatCard label="Receitas do mês" value="R$ 6.400" color="--chart-2" icon={DollarSign} delay={0.05} />
+        <StatCard label="Despesas" value="R$ 635" color="--chart-1" icon={TrendingDown} delay={0.1} />
+        <StatCard label="Saldo disponível" value="+R$ 5.765" color="--chart-2" icon={TrendingUp} delay={0.15} />
+        <StatCard label="Investimentos" value="R$ 14.500" color="--chart-4" icon={TrendingUp} delay={0.2} />
+      </div>
+
+      {/* Alertas inteligentes */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.4 }}
+        className="bg-card border border-border/60 rounded-2xl p-2.5 space-y-1.5"
+      >
+        <p className="text-[11px] font-bold text-foreground flex items-center gap-1.5">
+          <Bell className="w-3.5 h-3.5" strokeWidth={2} /> Alertas inteligentes
+        </p>
+        <div className="flex items-start gap-2 bg-[hsl(var(--chart-3)/0.15)] rounded-xl p-2">
+          <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-3))] mt-0.5 flex-shrink-0" strokeWidth={2} />
+          <div className="text-[10px] leading-tight">
+            <p className="text-foreground">2 conta(s) vencem em 0 dia(s)</p>
+            <p className="text-muted-foreground">Cartão Nubank, Netflix</p>
           </div>
         </div>
-        <div className="flex-1 space-y-0.5 text-[10px]">
-          {[
-            { c: "--chart-5", n: "Moradia", v: "R$ 1.300" },
-            { c: "--chart-3", n: "Educação", v: "R$ 450" },
-            { c: "--chart-2", n: "Contas da Casa", v: "R$ 225" },
-            { c: "--chart-1", n: "Lazer", v: "R$ 180" },
-            { c: "--chart-4", n: "Outros", v: "R$ 120" },
-          ].map((r) => (
-            <div key={r.n} className="flex items-center justify-between">
-              <span className="flex items-center gap-1.5 text-foreground">
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: `hsl(var(${r.c}))` }} />
-                {r.n}
-              </span>
-              <span className="text-muted-foreground tabular-nums">{r.v}</span>
-            </div>
-          ))}
+        <div className="flex items-start gap-2 bg-[hsl(var(--chart-2)/0.15)] rounded-xl p-2">
+          <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--chart-2))] mt-0.5 flex-shrink-0" strokeWidth={2} />
+          <p className="text-[10px] text-foreground leading-tight">
+            Excelente! Você está poupando 90,1% da sua renda este mês.
+          </p>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Despesas por categoria */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35, duration: 0.4 }}
+        className="bg-card border border-border/60 rounded-2xl p-2.5"
+      >
+        <p className="text-[11px] font-bold text-foreground mb-2 flex items-center gap-1.5">
+          <BarChart3 className="w-3.5 h-3.5 text-[hsl(var(--chart-4))]" strokeWidth={2} />
+          Despesas por categoria
+        </p>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-16 h-16 rounded-full flex-shrink-0 flex items-center justify-center"
+            style={{ background: `conic-gradient(${gradient})` }}
+          >
+            <div className="w-8 h-8 rounded-full bg-card" />
+          </div>
+          <div className="flex-1 space-y-0.5 text-[10px]">
+            {legend.map((r) => (
+              <div key={r.n} className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-foreground">
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: `hsl(var(${r.c}))` }} />
+                  {r.n}
+                </span>
+                <span className="text-muted-foreground tabular-nums">{r.v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
     </div>
-  </div>
-);
+  );
+};
+
 
 const SlideThreeMock = () => {
   const cats = [

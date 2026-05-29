@@ -493,9 +493,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 {current.subtitle}
               </p>
 
-              <div className="flex-1 flex items-center justify-center py-5">
+              <div className="flex-1 flex items-center justify-center py-3 min-h-0">
                 {current.mock}
               </div>
+
             </motion.div>
           </AnimatePresence>
 

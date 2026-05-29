@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
@@ -6,6 +6,7 @@ import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
 } from "lucide-react";
+
 
 import ipadImg from "@/assets/ipad-10.jpg";
 
@@ -510,6 +511,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const [step, setStep] = useState(0);
     const isLast = step === slides.length - 1;
+    const stepRef = useRef(step);
+    const completedRef = useRef(false);
+    stepRef.current = step;
 
     useEffect(() => {
       captureLandingMeta();
@@ -517,21 +521,54 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     }, []);
 
     useEffect(() => {
-      trackEvent("onboarding_step_view", { step: step + 1 });
+      trackEvent("onboarding_step_view", {
+        step: step + 1,
+        slide_title: typeof slides[step]?.title === "string" ? slides[step].title : `slide_${step + 1}`,
+      });
     }, [step]);
+
+    // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
+    useEffect(() => {
+      const emitExit = (reason: string) => {
+        if (completedRef.current) return;
+        trackEvent("onboarding_step_exit", {
+          step: stepRef.current + 1,
+          total: slides.length,
+          reason,
+        });
+      };
+      const onPageHide = () => emitExit("pagehide");
+      const onVisibility = () => {
+        if (document.visibilityState === "hidden") emitExit("hidden");
+      };
+      window.addEventListener("pagehide", onPageHide);
+      document.addEventListener("visibilitychange", onVisibility);
+      return () => {
+        window.removeEventListener("pagehide", onPageHide);
+        document.removeEventListener("visibilitychange", onVisibility);
+        emitExit("unmount");
+      };
+    }, []);
 
     const goNext = () => {
       if (isLast) finish();
       else setStep((s) => s + 1);
     };
-    const goBack = () => setStep((s) => Math.max(0, s - 1));
+    const goBack = () => {
+      const from = stepRef.current;
+      const to = Math.max(0, from - 1);
+      trackEvent("onboarding_step_back", { from_step: from + 1, to_step: to + 1 });
+      setStep(to);
+    };
     const finish = () => {
+      completedRef.current = true;
       trackEvent("start_clicked", { destination: "financas", step: step + 1 });
       onComplete?.();
       window.location.href = "/financas";
     };
 
     const current = slides[step];
+
 
     const nav = isLast ? (
       <div className="flex flex-col gap-3 pb-1">
@@ -590,7 +627,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6 md:px-12 lg:px-20"
+        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-y-auto md:overflow-hidden px-6 md:px-12 lg:px-20"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.5rem, env(safe-area-inset-top))",
@@ -598,8 +635,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         }}
       >
         {/* Mobile layout (até md) */}
-        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden">
-          <span className="text-2xl font-black tracking-tight text-foreground mb-5">CORE</span>
+        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden min-h-0">
+          <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0">CORE</span>
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -610,14 +647,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 hidden: {},
                 show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
               }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col min-h-0"
             >
               <motion.h1
                 variants={{
                   hidden: { opacity: 0, y: 12 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
                 }}
-                className="text-[28px] font-bold text-foreground tracking-tight leading-[1.15]"
+                className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0"
               >
                 {current.title}
               </motion.h1>
@@ -626,7 +663,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 10 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
                 }}
-                className="text-[13px] text-muted-foreground mt-2 leading-snug"
+                className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0"
               >
                 {current.subtitle}
               </motion.p>
@@ -635,15 +672,18 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 16 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
                 }}
-                className="flex-1 flex items-center justify-center py-3 min-h-0"
+                className="flex-1 flex items-center justify-center py-2 min-h-0 overflow-hidden"
               >
                 {current.mock}
               </motion.div>
             </motion.div>
           </AnimatePresence>
-          {nav}
-          {loginLink}
+          <div className="shrink-0 pt-2">
+            {nav}
+            {loginLink}
+          </div>
         </div>
+
 
         {/* Desktop/tablet layout (md+) */}
         <div className="hidden md:grid md:grid-cols-2 md:gap-12 lg:gap-20 md:items-center flex-1 w-full max-w-6xl mx-auto">

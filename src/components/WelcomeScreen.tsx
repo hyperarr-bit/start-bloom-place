@@ -438,7 +438,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const [step, setStep] = useState(0);
     const isLast = step === slides.length - 1;
-    const showSkip = step < 2; // slides 1 e 2 mostram "Pular"
 
     useEffect(() => {
       captureLandingMeta();
@@ -458,10 +457,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       trackEvent("start_clicked", { destination: "financas", step: step + 1 });
       onComplete?.();
       window.location.href = "/financas";
-    };
-    const skip = () => {
-      trackEvent("onboarding_skipped", { step: step + 1 });
-      finish();
     };
 
     const current = slides[step];
@@ -521,20 +516,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 <span className="w-10" />
               </div>
             </div>
-          ) : (
             <div className="flex flex-col gap-3 pb-1">
-              {step === 0 && (
-                <p className="text-[11px] text-muted-foreground text-center">7 dias grátis. Sem complicação.</p>
-              )}
               <div className="flex items-center justify-between gap-3">
-                {showSkip ? (
-                  <button onClick={skip} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Pular
-                  </button>
-                ) : (
+                {step > 0 ? (
                   <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                     Voltar
                   </button>
+                ) : (
+                  <span className="w-10" />
                 )}
                 <div className="flex gap-1.5">
                   {slides.map((_, i) => (
@@ -549,7 +538,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 </button>
               </div>
             </div>
-          )}
 
 
           {step === 0 && (

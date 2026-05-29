@@ -377,10 +377,11 @@ const SlideFiveMock = () => (
 
 const slides = [
   {
-    title: <>Organize sua vida<br />financeira em um<br />só lugar</>,
-    subtitle: "Controle receitas, despesas, metas, desejos e investimentos com mais clareza no dia a dia.",
+    title: <>Tenha controle da<br />sua vida financeira</>,
+    subtitle: "Acompanhe receitas, despesas, contas, cartões, investimentos e metas em um só lugar.",
     mock: <SlideOneMock />,
   },
+
   {
     title: <>Veja seu mês<br />com clareza</>,
     subtitle: "Acompanhe saldo, receitas, despesas e alertas inteligentes sem se perder em planilhas.",

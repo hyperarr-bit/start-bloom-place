@@ -15,7 +15,10 @@ export interface SpotlightStep {
   checkValue?: (v: any) => boolean;
   /** Optional: called when this step becomes active (e.g. to switch tabs). */
   onEnter?: () => void;
+  /** Optional: if true, shows a "Pular este passo" button that advances to the next step. */
+  optional?: boolean;
 }
+
 
 interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";
@@ -341,6 +344,16 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 <p className="text-sm font-semibold text-foreground leading-snug">
                   {step.label}
                 </p>
+                {step.optional && (
+                  <div className="flex justify-end mt-2 pointer-events-auto">
+                    <button
+                      onClick={() => advance()}
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground px-2 py-1"
+                    >
+                      Pular este passo
+                    </button>
+                  </div>
+                )}
               </div>
               {!labelBelow && (
                 <motion.div
@@ -353,6 +366,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 </motion.div>
               )}
             </div>
+
           </motion.div>
         )}
 

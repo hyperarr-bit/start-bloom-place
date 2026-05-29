@@ -33,6 +33,7 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
+import { TrackedCard } from "@/components/admin/TrackedCard";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -208,19 +209,23 @@ const Index = () => {
 
         {activeTab === "dashboard" && (
           <>
-            <Dashboard
-              totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
-              totalDebts={totalDebts}
-              totalInvestments={totalInvestments}
-              expenses={expenses}
-              fixedExpenses={fixedExpenses}
-              dueDays={dueDays}
-              savingsRate={savingsRate}
-              incomes={incomes}
-              onNavigate={(tab) => setActiveTab(tab)}
-            />
-            <MonthComparison />
+            <TrackedCard cardKey="dashboard" tab="dashboard">
+              <Dashboard
+                totalIncome={totalIncome}
+                totalExpenses={totalExpenses}
+                totalDebts={totalDebts}
+                totalInvestments={totalInvestments}
+                expenses={expenses}
+                fixedExpenses={fixedExpenses}
+                dueDays={dueDays}
+                savingsRate={savingsRate}
+                incomes={incomes}
+                onNavigate={(tab) => setActiveTab(tab)}
+              />
+            </TrackedCard>
+            <TrackedCard cardKey="month-comparison" tab="dashboard">
+              <MonthComparison />
+            </TrackedCard>
           </>
         )}
 
@@ -230,33 +235,55 @@ const Index = () => {
               <MonthlySheet month={openMonth} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
-                <MonthTurnover onOpenMonth={setOpenMonth} />
-                <FinancialSummary
-                  totalIncome={totalIncome}
-                  totalExpenses={totalExpenses}
-                  totalDebts={totalDebts}
-                  totalInvestments={totalInvestments}
-                />
+                <TrackedCard cardKey="month-turnover" tab="financeiro">
+                  <MonthTurnover onOpenMonth={setOpenMonth} />
+                </TrackedCard>
+                <TrackedCard cardKey="summary" tab="financeiro">
+                  <FinancialSummary
+                    totalIncome={totalIncome}
+                    totalExpenses={totalExpenses}
+                    totalDebts={totalDebts}
+                    totalInvestments={totalInvestments}
+                  />
+                </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
-                    <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                    <TrackedCard cardKey="incomes" tab="financeiro">
+                      <IncomeTable incomes={incomes} setIncomes={setIncomes} prefillExample={getUserData<string>("spotlight-done-financas", "") !== "true" && incomes.length === 0} />
+                    </TrackedCard>
                   </div>
-                  <Calculator />
+                  <TrackedCard cardKey="calculator" tab="financeiro">
+                    <Calculator />
+                  </TrackedCard>
                 </div>
                 <div className="min-w-0">
-                  <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} />
+                  <TrackedCard cardKey="fixed-expenses" tab="financeiro">
+                    <FixedExpensesTable expenses={fixedExpenses} setExpenses={setFixedExpenses} />
+                  </TrackedCard>
                 </div>
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
-                    <ExpenseTable expenses={expenses} setExpenses={setExpenses} />
+                    <TrackedCard cardKey="expenses" tab="financeiro">
+                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} />
+                    </TrackedCard>
                   </div>
-                  <Notes notes={notes} setNotes={setNotes} />
+                  <TrackedCard cardKey="notes" tab="financeiro">
+                    <Notes notes={notes} setNotes={setNotes} />
+                  </TrackedCard>
                 </div>
-                <BillsDueCards dueDays={dueDays} setDueDays={setDueDays} />
-                <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />
+                <TrackedCard cardKey="bills-due" tab="financeiro">
+                  <BillsDueCards dueDays={dueDays} setDueDays={setDueDays} />
+                </TrackedCard>
+                <TrackedCard cardKey="installments" tab="financeiro">
+                  <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />
+                </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_200px] gap-4">
-                  <AnnualBudget />
-                  <MonthlyBudget budgets={monthlyBudgets} setBudgets={setMonthlyBudgets} onOpenMonth={setOpenMonth} />
+                  <TrackedCard cardKey="annual-budget" tab="financeiro">
+                    <AnnualBudget />
+                  </TrackedCard>
+                  <TrackedCard cardKey="monthly-budget" tab="financeiro">
+                    <MonthlyBudget budgets={monthlyBudgets} setBudgets={setMonthlyBudgets} onOpenMonth={setOpenMonth} />
+                  </TrackedCard>
                 </div>
               </>
             )}
@@ -264,65 +291,79 @@ const Index = () => {
         )}
 
         {activeTab === "investimentos" && (
-          <InvestmentsTracker investments={investments} setInvestments={setInvestments} />
+          <TrackedCard cardKey="investments" tab="investimentos">
+            <InvestmentsTracker investments={investments} setInvestments={setInvestments} />
+          </TrackedCard>
         )}
 
         {activeTab === "itens" && (
-          <WishlistItems 
-            items={wishlistItems} 
-            setItems={setWishlistItems} 
-            monthlyBudget={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            monthlyInstallments={monthlyInstallments}
-            fixedExpenses={fixedExpenses}
-            dueDays={dueDays}
-          />
+          <TrackedCard cardKey="wishlist" tab="itens">
+            <WishlistItems 
+              items={wishlistItems} 
+              setItems={setWishlistItems} 
+              monthlyBudget={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              monthlyInstallments={monthlyInstallments}
+              fixedExpenses={fixedExpenses}
+              dueDays={dueDays}
+            />
+          </TrackedCard>
         )}
 
         {activeTab === "viagem" && (
-          <TravelBudget />
+          <TrackedCard cardKey="travel-budget" tab="viagem">
+            <TravelBudget />
+          </TrackedCard>
         )}
 
         {activeTab === "simuladores" && (
-          <Simulators />
+          <TrackedCard cardKey="simulators" tab="simuladores">
+            <Simulators />
+          </TrackedCard>
         )}
 
 
         {activeTab === "limites" && (
-          <CategoryBudgets expenses={expenses} />
+          <TrackedCard cardKey="category-budgets" tab="limites">
+            <CategoryBudgets expenses={expenses} />
+          </TrackedCard>
         )}
 
         {activeTab === "relatorios" && (
-          <Reports
-            incomes={incomes}
-            expenses={expenses}
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            setIncomes={setIncomes}
-            setExpenses={setExpenses}
-          />
+          <TrackedCard cardKey="reports" tab="relatorios">
+            <Reports
+              incomes={incomes}
+              expenses={expenses}
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              setIncomes={setIncomes}
+              setExpenses={setExpenses}
+            />
+          </TrackedCard>
         )}
 
         {activeTab === "saude" && (
-          <FinancialHealth
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
-            totalFixedExpenses={totalFixedExpenses}
-            monthlyInstallments={monthlyInstallments}
-            totalDebts={totalDebts}
-            totalInvestments={totalInvestments}
-            emergencyFund={emergencyFund}
-            emergencyFundGoal={emergencyFundGoal}
-            goals={goals}
-            dueDays={dueDays}
-            installments={installments}
-            wishlistItems={wishlistItems}
-            trips={trips}
-            investments={investments}
-          />
+          <TrackedCard cardKey="financial-health" tab="saude">
+            <FinancialHealth
+              totalIncome={totalIncome}
+              totalExpenses={totalExpenses}
+              totalFixedExpenses={totalFixedExpenses}
+              monthlyInstallments={monthlyInstallments}
+              totalDebts={totalDebts}
+              totalInvestments={totalInvestments}
+              emergencyFund={emergencyFund}
+              emergencyFundGoal={emergencyFundGoal}
+              goals={goals}
+              dueDays={dueDays}
+              installments={installments}
+              wishlistItems={wishlistItems}
+              trips={trips}
+              investments={investments}
+            />
+          </TrackedCard>
         )}
       </main>
     </div>

@@ -28,6 +28,8 @@ const FloatCard = ({
   className = "",
   style,
   delay = 0,
+  floatRange = 6,
+  rotate = 0,
 }: {
   label: string;
   value: string;
@@ -37,19 +39,44 @@ const FloatCard = ({
   className?: string;
   style?: React.CSSProperties;
   delay?: number;
+  floatRange?: number;
+  rotate?: number;
 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay }}
+    initial={{ opacity: 0, y: 20, scale: 0.9, rotate }}
+    animate={{
+      opacity: 1,
+      scale: 1,
+      rotate,
+      y: [0, -floatRange, 0],
+    }}
+    transition={{
+      opacity: { delay, duration: 0.5, ease: "easeOut" },
+      scale: { delay, duration: 0.5, ease: "easeOut" },
+      rotate: { delay, duration: 0.5, ease: "easeOut" },
+      y: {
+        delay: delay + 0.5,
+        duration: 3.5 + Math.random(),
+        ease: "easeInOut",
+        repeat: Infinity,
+        repeatType: "loop",
+      },
+    }}
+    whileHover={{ scale: 1.05, rotate: 0, transition: { duration: 0.25 } }}
     style={style}
     className={`absolute flex items-center gap-2.5 rounded-2xl pl-2 pr-4 py-2 shadow-md ${className}`}
   >
     <div
-      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+      className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
       style={{ background: `hsl(var(${color}))` }}
     >
       <Icon className="w-4 h-4 text-white" strokeWidth={2.25} fill={iconFill ? "currentColor" : "none"} />
+      <motion.span
+        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-background"
+        style={{ background: `hsl(var(${color}))` }}
+        animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay }}
+      />
     </div>
     <div>
       <p className="text-[10px] text-foreground/60 leading-none">{label}</p>
@@ -58,19 +85,28 @@ const FloatCard = ({
   </motion.div>
 );
 
+const FloatingDot = ({ className, delay = 0 }: { className: string; delay?: number }) => (
+  <motion.span
+    className={`absolute rounded-full ${className}`}
+    animate={{ y: [0, -8, 0], opacity: [0.5, 1, 0.5] }}
+    transition={{ duration: 3 + Math.random() * 1.5, repeat: Infinity, ease: "easeInOut", delay }}
+  />
+);
+
+
 const SlideOneMock = () => (
   <div className="w-full max-w-[340px] mx-auto">
     {/* Área dos 4 cards flutuantes com confetes */}
     <div className="relative w-full h-[230px]">
 
-      {/* dots decorativos */}
-      <Dot className="w-1 h-1 bg-[hsl(var(--chart-2)/0.6)] top-1 left-16" />
-      <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-1)/0.5)] top-3 right-8" />
-      <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] top-24 left-2" />
-      <Dot className="w-1 h-1 bg-[hsl(var(--chart-3)/0.6)] top-32 right-1" />
-      <Dot className="w-1.5 h-1.5 bg-[hsl(var(--chart-2)/0.4)] bottom-8 left-8" />
-      <Dot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] bottom-16 right-20" />
-      <Dot className="w-1 h-1 bg-[hsl(var(--chart-1)/0.5)] bottom-2 right-6" />
+      {/* dots decorativos animados */}
+      <FloatingDot className="w-1 h-1 bg-[hsl(var(--chart-2)/0.6)] top-1 left-16" delay={0.2} />
+      <FloatingDot className="w-1.5 h-1.5 bg-[hsl(var(--chart-1)/0.5)] top-3 right-8" delay={0.6} />
+      <FloatingDot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] top-24 left-2" delay={1.1} />
+      <FloatingDot className="w-1 h-1 bg-[hsl(var(--chart-3)/0.6)] top-32 right-1" delay={0.4} />
+      <FloatingDot className="w-1.5 h-1.5 bg-[hsl(var(--chart-2)/0.4)] bottom-8 left-8" delay={0.9} />
+      <FloatingDot className="w-1 h-1 bg-[hsl(var(--chart-4)/0.5)] bottom-16 right-20" delay={1.4} />
+      <FloatingDot className="w-1 h-1 bg-[hsl(var(--chart-1)/0.5)] bottom-2 right-6" delay={0.7} />
 
       {/* Receitas — amarelo (chart-3) */}
       <FloatCard
@@ -79,7 +115,8 @@ const SlideOneMock = () => (
         color="--chart-3"
         icon={DollarSign}
         delay={0.05}
-        style={{ transform: "rotate(-4deg)" }}
+        rotate={-4}
+        floatRange={5}
         className="top-0 left-0 bg-[hsl(var(--chart-3)/0.22)]"
       />
 
@@ -90,7 +127,8 @@ const SlideOneMock = () => (
         color="--chart-4"
         icon={ArrowDown}
         delay={0.15}
-        style={{ transform: "rotate(4deg)" }}
+        rotate={4}
+        floatRange={7}
         className="top-16 right-0 bg-[hsl(var(--chart-4)/0.22)]"
       />
 
@@ -101,7 +139,8 @@ const SlideOneMock = () => (
         color="--chart-2"
         icon={BarChart3}
         delay={0.25}
-        style={{ transform: "rotate(-3deg)" }}
+        rotate={-3}
+        floatRange={6}
         className="top-[120px] left-2 bg-[hsl(var(--chart-2)/0.22)]"
       />
 
@@ -113,7 +152,8 @@ const SlideOneMock = () => (
         icon={Heart}
         iconFill
         delay={0.35}
-        style={{ transform: "rotate(3deg)" }}
+        rotate={3}
+        floatRange={5}
         className="top-[180px] right-0 bg-[hsl(var(--chart-1)/0.22)]"
       />
     </div>

@@ -255,23 +255,22 @@ const SlideThreeMock = () => {
     </div>
   );
 };
-
 const SlideFourMock = () => (
   <div className="w-full max-w-[300px] mx-auto">
-    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-2.5">
+    <div className="relative bg-card border border-border/60 rounded-2xl p-3.5 space-y-3 shadow-sm">
       <p className="text-[11px] font-semibold text-foreground">Meu desejo</p>
-      <div className="bg-muted/40 rounded-xl h-24 flex items-center justify-center relative">
-        {/* iPad mock */}
-        <div className="w-16 h-20 rounded-md bg-gradient-to-br from-[hsl(var(--chart-2))] via-[hsl(var(--chart-1))] to-[hsl(var(--chart-3))] border-[3px] border-foreground/80 relative">
-          <div className="absolute inset-1 rounded-sm bg-gradient-to-br from-white/30 to-transparent" />
-        </div>
-        <Heart className="absolute top-2 right-2 w-4 h-4 text-[hsl(var(--chart-5))] fill-[hsl(var(--chart-5))]" />
+      <Heart className="absolute top-3.5 right-3.5 w-4 h-4 text-[hsl(var(--chart-5))] fill-[hsl(var(--chart-5))]" />
+
+      <div className="bg-muted/30 rounded-xl h-24 flex items-center justify-center">
+        <img src={ipadImg} alt="iPad 10ª geração" className="h-20 w-auto object-contain" />
       </div>
+
       <div>
-        <p className="text-sm font-bold text-foreground">iPad 10ª geração 64GB</p>
-        <span className="inline-block mt-1 text-[9px] px-2 py-0.5 rounded-full bg-[hsl(var(--chart-2)/0.18)] text-[hsl(var(--chart-2))] font-medium">Tecnologia</span>
+        <p className="text-sm font-semibold text-foreground">iPad 10ª geração 64GB</p>
+        <span className="inline-block mt-1.5 text-[9px] px-2 py-0.5 rounded-full bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))] font-medium">Tecnologia</span>
       </div>
-      <div className="flex justify-between text-[10px]">
+
+      <div className="flex items-end justify-between text-[10px]">
         <div>
           <p className="text-muted-foreground">Guardado</p>
           <p className="font-bold text-[hsl(var(--chart-5))] text-xs">R$ 1.200,00</p>
@@ -281,10 +280,14 @@ const SlideFourMock = () => (
           <p className="font-bold text-[hsl(var(--chart-4))] text-xs">R$ 2.199,00</p>
         </div>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-        <div className="h-full w-[35%] rounded-full bg-gradient-to-r from-[hsl(var(--chart-5))] to-[hsl(var(--chart-4))]" />
+
+      <div className="space-y-1">
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+          <div className="h-full w-[35%] rounded-full bg-gradient-to-r from-[hsl(var(--chart-5))] to-[hsl(var(--chart-4))]" />
+        </div>
+        <p className="text-[10px] text-right text-muted-foreground font-medium">35%</p>
       </div>
-      <p className="text-[10px] text-right text-muted-foreground">35%</p>
+
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-muted/40 rounded-xl p-2 flex items-center gap-1.5">
           <Calendar className="w-3 h-3 text-muted-foreground" />
@@ -301,6 +304,7 @@ const SlideFourMock = () => (
           </div>
         </div>
       </div>
+
       <div className="bg-[hsl(var(--chart-1)/0.12)] rounded-xl p-2 flex items-start gap-1.5">
         <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5 flex-shrink-0" />
         <div className="text-[10px]">

@@ -56,21 +56,25 @@ export default function AdminUso() {
   const [period, setPeriod] = useState<Period>("7d");
   const [tabs, setTabs] = useState<TabRow[]>([]);
   const [cards, setCards] = useState<CardRow[]>([]);
+  const [dropoff, setDropoff] = useState<DropoffRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setRefreshing(true);
     const _from = fromForPeriod(period);
-    const [t, c] = await Promise.all([
+    const [t, c, d] = await Promise.all([
       (supabase as any).rpc("admin_finance_tab_usage", { _from, _to: null }),
       (supabase as any).rpc("admin_finance_card_usage", { _from, _to: null }),
+      (supabase as any).rpc("admin_welcome_dropoff", { _from, _to: null }),
     ]);
     setTabs(t.data || []);
     setCards(c.data || []);
+    setDropoff(d.data || []);
     setLoading(false);
     setRefreshing(false);
   }, [period]);
+
 
   useEffect(() => {
     load();

@@ -202,7 +202,54 @@ export default function AdminUso() {
               </table>
             </div>
           </section>
+
+          {/* Dropoff do tutorial inicial */}
+          <section className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+            <header className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800">
+              <LogOut className="w-4 h-4 text-amber-400" />
+              <h2 className="text-sm font-bold">Tutorial inicial — Dropoff por slide</h2>
+              <span className="text-[10px] text-zinc-500 ml-auto">{dropoff.length} slides</span>
+            </header>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-zinc-900 text-zinc-500 uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="text-left px-3 py-2">Slide</th>
+                    <th className="text-left px-3 py-2">Título</th>
+                    <th className="text-right px-3 py-2">Views</th>
+                    <th className="text-right px-3 py-2">Usuários</th>
+                    <th className="text-right px-3 py-2">Saídas</th>
+                    <th className="text-right px-3 py-2">Voltas</th>
+                    <th className="text-right px-3 py-2">% dropoff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dropoff.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-3 py-6 text-center text-zinc-500">
+                        Sem dados ainda — dropoff começa a aparecer depois do deploy.
+                      </td>
+                    </tr>
+                  )}
+                  {dropoff.map((r) => (
+                    <tr key={r.step} className="border-t border-zinc-800/50 hover:bg-zinc-800/30">
+                      <td className="px-3 py-2 text-zinc-100 font-bold">{r.step}</td>
+                      <td className="px-3 py-2 text-zinc-300">{SLIDE_TITLES[r.step] || "—"}</td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{r.views}</td>
+                      <td className="px-3 py-2 text-right text-zinc-300">{r.unique_users}</td>
+                      <td className="px-3 py-2 text-right text-amber-400 font-bold">{r.exits}</td>
+                      <td className="px-3 py-2 text-right text-zinc-400">{r.backs}</td>
+                      <td className={`px-3 py-2 text-right font-bold ${r.dropoff_pct >= 40 ? "text-red-400" : r.dropoff_pct >= 20 ? "text-amber-400" : "text-emerald-400"}`}>
+                        {r.dropoff_pct}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
+
       )}
     </div>
   );

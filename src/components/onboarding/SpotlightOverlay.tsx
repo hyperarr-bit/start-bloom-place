@@ -15,7 +15,10 @@ export interface SpotlightStep {
   checkValue?: (v: any) => boolean;
   /** Optional: called when this step becomes active (e.g. to switch tabs). */
   onEnter?: () => void;
+  /** Optional: if true, shows a "Pular este passo" button that advances to the next step. */
+  optional?: boolean;
 }
+
 
 interface SpotlightOverlayProps {
   moduleKey: "financas" | "rotina" | "dieta" | "treino";

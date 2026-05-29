@@ -514,6 +514,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const stepRef = useRef(step);
     const completedRef = useRef(false);
     stepRef.current = step;
+    const mockSlotRef = useRef<HTMLDivElement>(null);
+    const mockInnerRef = useRef<HTMLDivElement>(null);
+    const [mockScale, setMockScale] = useState(1);
 
     useEffect(() => {
       captureLandingMeta();

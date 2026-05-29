@@ -1,4 +1,14 @@
-import { useEffect, useRef, ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  ReactElement,
+  ReactNode,
+  Ref,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { trackEvent } from "@/lib/analytics";
 
 interface Props {
@@ -23,17 +33,27 @@ const seenThisSession = (key: string): boolean => {
   }
 };
 
+// Combine forwarded ref (function or object) with our internal ref.
+const setRefs = <T,>(node: T, ...refs: (Ref<T> | undefined)[]) => {
+  for (const ref of refs) {
+    if (!ref) continue;
+    if (typeof ref === "function") ref(node);
+    else (ref as React.MutableRefObject<T | null>).current = node;
+  }
+};
+
 /**
- * Wrapper invisível que rastreia "view" (1x por sessão) e "interact" (com throttle)
- * de um card. Não muda layout/CSS — usa display:contents.
+ * Wrapper que rastreia "view" (1x por sessão) e "interact" (com throttle)
+ * de um card SEM adicionar nenhum elemento ao DOM — anexa ref/listener
+ * direto no único filho via cloneElement. Layout/CSS do filho fica idêntico.
  */
 export const TrackedCard = ({ cardKey, tab, children }: Props) => {
-  const ref = useRef<HTMLDivElement>(null);
+  const elRef = useRef<HTMLElement | null>(null);
   const lastInteractRef = useRef(0);
   const viewKey = `${tab || ""}::${cardKey}`;
 
   useEffect(() => {
-    const el = ref.current;
+    const el = elRef.current;
     if (!el || seenThisSession(viewKey)) return;
     const io = new IntersectionObserver(
       (entries) => {
@@ -51,16 +71,33 @@ export const TrackedCard = ({ cardKey, tab, children }: Props) => {
     return () => io.disconnect();
   }, [cardKey, tab, viewKey]);
 
-  const handleClick = () => {
-    const now = Date.now();
-    if (now - lastInteractRef.current < INTERACT_THROTTLE_MS) return;
-    lastInteractRef.current = now;
-    trackEvent("finance_card_interact", { card: cardKey, tab: tab || "" });
-  };
-
-  return (
-    <div ref={ref} onClickCapture={handleClick} style={{ display: "contents" }}>
-      {children}
-    </div>
+  const handleClick = useCallback(
+    (originalHandler?: (e: React.MouseEvent) => void) =>
+      (e: React.MouseEvent) => {
+        const now = Date.now();
+        if (now - lastInteractRef.current >= INTERACT_THROTTLE_MS) {
+          lastInteractRef.current = now;
+          trackEvent("finance_card_interact", { card: cardKey, tab: tab || "" });
+        }
+        originalHandler?.(e);
+      },
+    [cardKey, tab],
   );
+
+  const child = Children.only(children);
+  if (!isValidElement(child)) return <>{children}</>;
+
+  const childElement = child as ReactElement<any>;
+  const existingRef = (childElement as any).ref as Ref<HTMLElement> | undefined;
+  const existingOnClickCapture = childElement.props.onClickCapture as
+    | ((e: React.MouseEvent) => void)
+    | undefined;
+
+  return cloneElement(childElement, {
+    ref: (node: HTMLElement | null) => {
+      elRef.current = node;
+      setRefs(node, existingRef);
+    },
+    onClickCapture: handleClick(existingOnClickCapture),
+  });
 };

@@ -1,36 +1,68 @@
-## Objetivo
+# Painel de uso de Finanças + jornada do trial
 
-O tutorial (`src/components/WelcomeScreen.tsx`) hoje usa `max-w-sm` numa única coluna ocupando a tela toda — fica ótimo no celular mas vira uma fita estreita no meio do notebook/Mac/PC. Vou deixar responsivo cobrindo iPhone, Android, tablet, notebook e desktop, sem mexer no design mobile que você já aprovou.
+Foco: só módulo `financas` (resto fica de fora, como você pediu).
 
-## O que muda
+## 1. Banco — 3 RPCs novas (security definer, só admin)
 
-Arquivo único: `src/components/WelcomeScreen.tsx`.
+**a) `admin_finance_tab_usage(_from timestamptz, _to timestamptz)`**
+Lê `module_analytics` onde `module_id='financas'`. Retorna por `tab_id`:
+- `sessions` (linhas), `unique_users`, `total_seconds`, `avg_seconds`, `last_used`.
+Ordena por `total_seconds DESC`. Exclui test users.
 
-### Mobile (até `md`, ~768px) — inalterado
-- Continua igual ao atual: coluna única, `max-w-sm`, CORE no topo, título → subtítulo → mock → dots/CTA embaixo. Animações iguais.
+**b) `admin_finance_card_usage(_from timestamptz, _to timestamptz)`**
+Lê `analytics_events` onde `event_name IN ('finance_card_view','finance_card_interact')`. Retorna por `card_key` (vindo de `event_data->>'card'`):
+- `views`, `interactions`, `unique_users`, `last_used`.
 
-### Tablet / Notebook / Desktop (`md:` em diante)
-- Container vira split-screen 2 colunas (`md:grid md:grid-cols-2`) ocupando a tela toda com `max-w-6xl` centralizado e `gap` generoso.
-- **Coluna esquerda:** logo CORE no topo, título maior (`md:text-5xl lg:text-6xl`), subtítulo (`md:text-base`), dots de progresso e botões (Voltar / Continuar ou Começar agora) fixos na base da coluna. Link "Já tem conta? Entrar" também aqui no step 0.
-- **Coluna direita:** apenas o `mock` do slide atual, centralizado verticalmente, com `max-w-md` e leve aumento de escala (`md:scale-110 lg:scale-125`) pra preencher o espaço sem distorcer o design dos cards.
-- Padding lateral aumenta progressivamente (`md:px-12 lg:px-20`).
+**c) `admin_user_trial_journey(_user_id uuid)`**
+Para um usuário:
+- Linha por `trial_day` (0..N, baseado em `auth.users.created_at`):
+  - segundos totais em finanças, abas usadas (array de `{tab, seconds}`), cards interagidos (array de `{card, count}`), activations completadas no dia (`user_activations.action_key`).
+- Resumo: `signup_at`, `last_active_at`, `last_active_day`, `first_inactive_day`, `total_days_active`, status atual da subscription.
 
-### Telas muito largas (`xl`/`2xl`)
-- Trava em `max-w-6xl` para não esticar demais e mantém proporção agradável.
+## 2. Tracking de cards em Finanças (`src/pages/Index.tsx`)
 
-### Animações
-- Mantém o `AnimatePresence`/stagger atual. As variantes funcionam igual nas duas colunas.
+Componente novo `src/components/admin/TrackedCard.tsx`:
+- Props: `cardKey: string`, `children`.
+- `IntersectionObserver`: dispara `trackEvent('finance_card_view', { card: cardKey, tab: activeTab })` 1x por sessão+card (dedup em `sessionStorage`).
+- `onClick` no wrapper: dispara `trackEvent('finance_card_interact', { card: cardKey, tab: activeTab })` (com throttle de 2s pra não floodar).
 
-## Detalhes técnicos
+Em `Index.tsx`, envolver os cards principais com `<TrackedCard cardKey="...">`:
+- Aba financeiro: `month-turnover`, `summary`, `incomes`, `fixed-expenses`, `expenses`, `notes`, `bills-due`, `installments`, `annual-budget`, `monthly-budget`, `calculator`.
+- Demais abas: `dashboard`, `investimentos`, `wishlist`, `viagem`, `simuladores`, `category-budgets`, `relatorios`, `financial-health`.
 
-- Wrapper externo continua `fixed inset-0 z-[100] bg-background overflow-hidden` com safe-area.
-- Substituir o `flex flex-col w-full max-w-sm mx-auto` por estrutura responsiva:
-  - mobile: `flex flex-col max-w-sm mx-auto`
-  - md+: `grid grid-cols-2 max-w-6xl mx-auto items-center gap-12`
-- Refatorar os blocos de navegação (botões + dots + link "Entrar") pra ficarem na coluna esquerda no md+ e no fluxo normal no mobile.
-- Nenhuma mudança em lógica, analytics, estado, slides, mocks ou cores.
+Sem mudar layout/CSS — `TrackedCard` é um `<div>` transparente (`contents`/`display: contents`) com ref no primeiro filho.
+
+## 3. Admin UI
+
+**a) Novo item no menu (`AdminLayout.tsx`)**: "Uso" → `/admin/uso`, ícone `BarChart3`.
+
+**b) Nova página `src/pages/admin/AdminUso.tsx`** (rota em `App.tsx`):
+- Filtro de período (hoje / 7d / 30d / tudo).
+- Card 1: **Ranking de abas** — tabela `aba | sessões | usuários | tempo total | tempo médio | último uso`.
+- Card 2: **Ranking de cards** — tabela `card | views | interações | usuários | último uso`.
+
+**c) Jornada do trial em `AdminTrials.tsx`**:
+- Botão "Ver jornada" em cada linha → abre `<Sheet>` (já tem shadcn) à direita.
+- Conteúdo: cabeçalho com email + signup + status + dia atual.
+- Timeline vertical por trial day (D0, D1, D2...): badge "ativo/inativo", segundos em finanças, lista de abas com tempo, lista de cards interagidos, activations marcadas no dia.
+- Resumo no topo: "Saiu no dia X" (= `first_inactive_day`), "Último ativo: D{n}".
+
+Sem mexer em outras páginas admin.
+
+## Arquivos
+
+```text
+NOVO  supabase/migrations/<ts>_admin_finance_usage.sql
+NOVO  src/components/admin/TrackedCard.tsx
+NOVO  src/pages/admin/AdminUso.tsx
+EDIT  src/pages/Index.tsx               (envolver cards com TrackedCard)
+EDIT  src/pages/admin/AdminLayout.tsx   (nav item "Uso")
+EDIT  src/pages/admin/AdminTrials.tsx   (botão "Ver jornada" + Sheet)
+EDIT  src/App.tsx                       (rota /admin/uso)
+```
 
 ## Fora do escopo
 
-- Não mudar copy, ícones, cores, animações ou estrutura dos mocks (slides 1–5).
-- Não mexer em outros componentes (OnboardingWizard, PreSignupTutorial, etc.).
+- Tracking de cards fora de Finanças.
+- Backfill de dados antigos (cards só começam a contar depois do deploy).
+- Alterações visuais nos cards do app (só wrapper invisível).

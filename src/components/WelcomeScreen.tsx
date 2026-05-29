@@ -158,36 +158,6 @@ const SlideOneMock = () => (
       />
     </div>
 
-        icon={ArrowDown}
-        delay={0.15}
-        style={{ transform: "rotate(4deg)" }}
-        className="top-16 right-0 bg-[hsl(var(--chart-4)/0.22)]"
-      />
-
-      {/* Investimentos — verde (chart-2) */}
-      <FloatCard
-        label="Investimentos"
-        value="R$ 14.500,00"
-        color="--chart-2"
-        icon={BarChart3}
-        delay={0.25}
-        style={{ transform: "rotate(-3deg)" }}
-        className="top-[120px] left-2 bg-[hsl(var(--chart-2)/0.22)]"
-      />
-
-      {/* Desejos — rosa (chart-1) */}
-      <FloatCard
-        label="Desejos"
-        value="R$ 1.200,00"
-        color="--chart-1"
-        icon={Heart}
-        iconFill
-        delay={0.35}
-        style={{ transform: "rotate(3deg)" }}
-        className="top-[180px] right-0 bg-[hsl(var(--chart-1)/0.22)]"
-      />
-    </div>
-
     {/* Resumo do mês */}
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}

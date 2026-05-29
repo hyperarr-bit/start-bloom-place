@@ -1,46 +1,35 @@
-Vou ajustar `src/components/WelcomeScreen.tsx` para ficar idêntico aos mockups, sem mexer em mais nada.
+## Refinar slide 4 do onboarding (Planeje seus desejos e objetivos)
 
-## Ajustes por slide
+Único arquivo editado: `src/components/WelcomeScreen.tsx` (apenas o componente `SlideFourMock`). Nenhum outro slide, nenhuma outra tela, nenhuma rota, nenhuma lógica de navegação/analytics será tocada.
 
-**Slide 1 — "Organize sua vida financeira"**
-- Trocar os 4 cards floating para pills coloridas sólidas (sem borda), arredondamento `rounded-2xl` grande, com leves rotações:
-  - Receitas: fundo amarelo claro (`--chart-3 / 0.25`), ícone DollarSign em círculo amarelo
-  - Despesas: fundo lilás (`--chart-2 / 0.22`), ícone TrendingDown em círculo roxo
-  - Investimentos: fundo verde menta (`--chart-1 / 0.22`), ícone BarChart3 em círculo verde
-  - Desejos: fundo rosa (`--chart-5 / 0.22`), ícone Heart em círculo rosa
-- Adicionar pontinhos decorativos espalhados em volta
-- Card "Resumo do mês" em baixo: mais limpo, sem borda forte, fundo card normal
+### O que muda
 
-**Slide 2 — "Veja seu mês com clareza"**
-- Os 4 cards de stats: cores mais suaves (amarelo, lilás, verde menta, azul), ícone à direita pequeno
-- Card de alertas: layout idêntico (já está bem próximo)
-- Adicionar mini donut chart "Gastos por categoria" abaixo dos alertas (lista com bolinhas coloridas: Moradia, Educação, Contas da Casa, Lazer, Outros + donut multicolorido à esquerda)
+1. **Imagem do iPad real**: copiar `user-uploads://IMG_7560.jpeg` para `src/assets/ipad-10.jpg` e importar no componente. Substituir o retângulo gradiente atual pela imagem real, centralizada no card de imagem (altura ~96px, `object-contain`).
 
-**Slide 3 — "Controle seus gastos e limites"**
-- Limites por categoria: nome com cor (Transporte azul, Alimentação amarelo, Vestuário roxo, Lazer verde, Pets cinza), barras coloridas
-- Chips de categorias populares: já está próximo, garantir cores variadas e estilo "+ Nome"
+2. **Card "Meu desejo"** — ajustes de fidelidade:
+   - Título "Meu desejo" no topo, alinhado à esquerda.
+   - Coração rosa (`Heart` preenchido em `--chart-5`) no canto superior direito do card inteiro (não dentro da área de imagem).
+   - Área da imagem com fundo branco/muted bem claro, sem gradiente, apenas a foto do iPad.
+   - Nome "iPad 10ª geração 64GB" em peso semibold.
+   - Chip "Tecnologia" abaixo do nome — fundo lilás suave `--chart-2/0.15`, texto `--chart-2`, pill arredondado.
+   - Linha "Guardado / Falta" com labels em cinza e valores: Guardado em rosa `--chart-5`, Falta em vermelho/laranja `--chart-4`; "35%" alinhado à direita ao lado de "Falta".
+   - Barra de progresso rosa→vermelho em 35%, fina e arredondada.
+   - Dois mini-cards lado a lado: "Tempo estimado / 5 meses" e "Faltam / 5 meses" com ícone `Calendar` cinza, fundo `muted/40`.
+   - Caixa de feedback verde suave: fundo `--chart-1/0.12`, ícone `CheckCircle2` verde, "Você está no caminho certo!" em semibold + subtítulo cinza.
+   - Sombra muito leve (`shadow-sm`), borda sutil, `rounded-2xl`.
 
-**Slide 4 — "Planeje seus desejos e objetivos"**
-- Substituir placeholder por imagem real de iPad (usar emoji/placeholder visual de tablet azul)
-- Coração no canto superior direito
-- Layout exato: nome do produto, chip "Tecnologia", Guardado/Falta, barra de progresso rosa→vermelho, 35%, cards Tempo estimado/Faltam, alerta verde
+3. **Tipografia e cores**: somente tokens semânticos (`--chart-1..5`, `--muted`, `--card`, `--foreground`, `--muted-foreground`). Sem hex hardcoded.
 
-**Slide 5 — "Comece pela sua primeira receita"**
-- Formulário "Nova receita": já está próximo
-- Card "Ótimo começo!" amarelo claro com estrela
-- Botão "Começar agora" preto sólido no rodapé (já existe)
+4. **Rodapé**: já existe e está correto (Voltar / dots / Continuar). Não muda.
 
-## Navegação (rodapé)
-- Slides 1 e 2: "Pular" à esquerda + dots + botão "Continuar" preto à direita
-- Slides 3 e 4: "Voltar" à esquerda + dots + botão "Continuar" preto à direita
-- Slide 5: "Voltar" à esquerda + dots, botão "Começar agora" largura total acima
+### Não muda
 
-Atualmente slide 2 mostra "Voltar" — corrigir para "Pular".
+- Slides 1, 2, 3, 5 permanecem intocados.
+- Lógica de `step`, `goNext`, `goBack`, `skip`, `finish`, analytics e redirecionamento `/financas` — tudo preservado.
+- Tutorial `QuickStartOnboarding`, `Index.tsx`, rotas — nada alterado.
+- Props `onComplete` / `onLogin` — sem mudanças.
 
-## Tipografia
-- Título maior e mais bold (já está em 26px, ajustar para ~28px)
-- "CORE" wordmark mais grosso (já black)
+### Arquivos
 
-## Não muda
-- Nada do tutorial, Index.tsx, rotas, props `onComplete`/`onLogin`, analytics, redirect `/financas`.
-- Só edita `src/components/WelcomeScreen.tsx`.
+- `src/assets/ipad-10.jpg` (novo — copiado do upload)
+- `src/components/WelcomeScreen.tsx` (apenas `SlideFourMock` + import da imagem)

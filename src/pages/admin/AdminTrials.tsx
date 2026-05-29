@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, Eye } from "lucide-react";
+import { TrialJourneySheet } from "@/components/admin/TrialJourneySheet";
 
 interface TrialRow {
   user_id: string;
@@ -22,6 +23,7 @@ export default function AdminTrials() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [q, setQ] = useState("");
   const [period, setPeriod] = useState<Period>("today");
+  const [selected, setSelected] = useState<{ id: string; email: string } | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -113,11 +115,12 @@ export default function AdminTrials() {
                   <th className="text-left px-3 py-2">Iniciou em</th>
                   <th className="text-left px-3 py-2">Status</th>
                   <th className="text-right px-3 py-2">Dias</th>
+                  <th className="text-right px-3 py-2">Jornada</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={4} className="px-3 py-6 text-center text-zinc-500">Nenhum trial neste período.</td></tr>
+                  <tr><td colSpan={5} className="px-3 py-6 text-center text-zinc-500">Nenhum trial neste período.</td></tr>
                 )}
                 {filtered.map(r => (
                   <tr key={r.user_id} className="border-t border-zinc-800/50 hover:bg-zinc-800/30">
@@ -132,6 +135,14 @@ export default function AdminTrials() {
                       }`}>{r.subscription_status}</span>
                     </td>
                     <td className="px-3 py-2 text-right text-zinc-100 font-bold">{r.days_since_start}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        onClick={() => setSelected({ id: r.user_id, email: r.email })}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-zinc-800 hover:bg-emerald-500/10 hover:text-emerald-400 text-zinc-300 transition-colors"
+                      >
+                        <Eye className="w-3 h-3" /> Ver
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -139,6 +150,12 @@ export default function AdminTrials() {
           </div>
         </div>
       )}
+
+      <TrialJourneySheet
+        userId={selected?.id || null}
+        email={selected?.email || null}
+        onClose={() => setSelected(null)}
+      />
     </div>
   );
 }

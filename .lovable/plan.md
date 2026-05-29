@@ -1,68 +1,47 @@
-# Painel de uso de Finanças + jornada do trial
+## Problema
 
-Foco: só módulo `financas` (resto fica de fora, como você pediu).
+No print do Android (tela pequena) o botão "Continuar / Começar agora" do tutorial inicial (`WelcomeScreen.tsx`) sai da viewport: o container usa `overflow-hidden` + `flex-1` no mock, então quando o conteúdo é maior que a altura, o nav fica abaixo da dobra e o usuário não consegue avançar.
 
-## 1. Banco — 3 RPCs novas (security definer, só admin)
+Esse é o "tutorial" antes do signup, com slides:
+1. Tenha controle da sua vida financeira
+2. Veja seu mês com clareza
+3. **Controle seus gastos e limites** ← o slide 3 que o usuário citou
+4. Planeje seus desejos e objetivos
+5. Comece pela sua primeira receita
 
-**a) `admin_finance_tab_usage(_from timestamptz, _to timestamptz)`**
-Lê `module_analytics` onde `module_id='financas'`. Retorna por `tab_id`:
-- `sessions` (linhas), `unique_users`, `total_seconds`, `avg_seconds`, `last_used`.
-Ordena por `total_seconds DESC`. Exclui test users.
+## O que fazer
 
-**b) `admin_finance_card_usage(_from timestamptz, _to timestamptz)`**
-Lê `analytics_events` onde `event_name IN ('finance_card_view','finance_card_interact')`. Retorna por `card_key` (vindo de `event_data->>'card'`):
-- `views`, `interactions`, `unique_users`, `last_used`.
+### 1. Layout responsivo seguro (mobile)
+`src/components/WelcomeScreen.tsx`:
+- Trocar `overflow-hidden` por `overflow-y-auto` no container raiz (mantendo desktop intacto).
+- Garantir que o bloco `nav` fique sempre visível: dar `shrink-0` ao nav e ao header "CORE", e trocar `flex-1` do mock por `min-h-0` + altura máxima limitada (`max-h-[clamp(180px,38vh,320px)]`) com `overflow-hidden` só na área do mock.
+- Reduzir paddings/margens em telas curtas (`h-[640px]` ou menos): `mb-5 → mb-3`, `py-3 → py-1`, `text-[28px] → text-2xl` quando `max-h-[700px]`.
+- Adicionar `pb-[max(1rem,env(safe-area-inset-bottom))]` reforçado no wrapper do nav para Androids com gesture bar.
 
-**c) `admin_user_trial_journey(_user_id uuid)`**
-Para um usuário:
-- Linha por `trial_day` (0..N, baseado em `auth.users.created_at`):
-  - segundos totais em finanças, abas usadas (array de `{tab, seconds}`), cards interagidos (array de `{card, count}`), activations completadas no dia (`user_activations.action_key`).
-- Resumo: `signup_at`, `last_active_at`, `last_active_day`, `first_inactive_day`, `total_days_active`, status atual da subscription.
+Resultado: nav (botão Continuar + dots + Voltar) sempre dentro da tela, mock se ajusta ao espaço restante e, se ainda não couber, o conteúdo do meio pode rolar — o botão nunca some.
 
-## 2. Tracking de cards em Finanças (`src/pages/Index.tsx`)
+### 2. Tracking de dropoff por slide
+`src/components/WelcomeScreen.tsx`:
+- Já existe `onboarding_step_view` por slide. Adicionar:
+  - `onboarding_step_exit` no unmount/`pagehide`/`visibilitychange:hidden` com `{ step, slide_title, completed: boolean }` quando o usuário sai sem clicar em "Começar agora".
+  - `onboarding_step_back` quando clica "Voltar" (com `from_step`, `to_step`).
+- Usar `useRef` pra guardar último step e flag `completedRef` (já temos `finish()` — setar antes de redirect).
 
-Componente novo `src/components/admin/TrackedCard.tsx`:
-- Props: `cardKey: string`, `children`.
-- `IntersectionObserver`: dispara `trackEvent('finance_card_view', { card: cardKey, tab: activeTab })` 1x por sessão+card (dedup em `sessionStorage`).
-- `onClick` no wrapper: dispara `trackEvent('finance_card_interact', { card: cardKey, tab: activeTab })` (com throttle de 2s pra não floodar).
-
-Em `Index.tsx`, envolver os cards principais com `<TrackedCard cardKey="...">`:
-- Aba financeiro: `month-turnover`, `summary`, `incomes`, `fixed-expenses`, `expenses`, `notes`, `bills-due`, `installments`, `annual-budget`, `monthly-budget`, `calculator`.
-- Demais abas: `dashboard`, `investimentos`, `wishlist`, `viagem`, `simuladores`, `category-budgets`, `relatorios`, `financial-health`.
-
-Sem mudar layout/CSS — `TrackedCard` é um `<div>` transparente (`contents`/`display: contents`) com ref no primeiro filho.
-
-## 3. Admin UI
-
-**a) Novo item no menu (`AdminLayout.tsx`)**: "Uso" → `/admin/uso`, ícone `BarChart3`.
-
-**b) Nova página `src/pages/admin/AdminUso.tsx`** (rota em `App.tsx`):
-- Filtro de período (hoje / 7d / 30d / tudo).
-- Card 1: **Ranking de abas** — tabela `aba | sessões | usuários | tempo total | tempo médio | último uso`.
-- Card 2: **Ranking de cards** — tabela `card | views | interações | usuários | último uso`.
-
-**c) Jornada do trial em `AdminTrials.tsx`**:
-- Botão "Ver jornada" em cada linha → abre `<Sheet>` (já tem shadcn) à direita.
-- Conteúdo: cabeçalho com email + signup + status + dia atual.
-- Timeline vertical por trial day (D0, D1, D2...): badge "ativo/inativo", segundos em finanças, lista de abas com tempo, lista de cards interagidos, activations marcadas no dia.
-- Resumo no topo: "Saiu no dia X" (= `first_inactive_day`), "Último ativo: D{n}".
-
-Sem mexer em outras páginas admin.
+### 3. Painel admin pra ver onde o usuário largou
+`src/pages/admin/AdminUso.tsx` (já existe):
+- Adicionar uma nova seção **"Tutorial inicial — Dropoff por slide"** abaixo das tabelas existentes.
+- Tabela com colunas: `Slide` (1..5 + título), `Views`, `Exits sem completar`, `% dropoff`, `Voltas (back)`.
+- Mesma RPC pattern dos outros: criar `admin_welcome_dropoff(_from, _to)` em SQL que lê `analytics_events` filtrando `event_name IN ('onboarding_step_view','onboarding_step_exit','onboarding_step_back')`, agrupa por `step`, exclui test users.
+- Reusa o filtro de período (hoje/7d/30d/tudo) já presente na página.
 
 ## Arquivos
 
-```text
-NOVO  supabase/migrations/<ts>_admin_finance_usage.sql
-NOVO  src/components/admin/TrackedCard.tsx
-NOVO  src/pages/admin/AdminUso.tsx
-EDIT  src/pages/Index.tsx               (envolver cards com TrackedCard)
-EDIT  src/pages/admin/AdminLayout.tsx   (nav item "Uso")
-EDIT  src/pages/admin/AdminTrials.tsx   (botão "Ver jornada" + Sheet)
-EDIT  src/App.tsx                       (rota /admin/uso)
-```
+- editar: `src/components/WelcomeScreen.tsx` (layout + novos eventos)
+- nova migration SQL: RPC `admin_welcome_dropoff`
+- editar: `src/pages/admin/AdminUso.tsx` (nova seção + chamada da RPC)
+- editar: `src/integrations/supabase/types.ts` (auto após migration)
 
-## Fora do escopo
+## Fora de escopo
 
-- Tracking de cards fora de Finanças.
-- Backfill de dados antigos (cards só começam a contar depois do deploy).
-- Alterações visuais nos cards do app (só wrapper invisível).
+- Não mexer no `PreSignupTutorial`, `QuickStartOnboarding`, `SpotlightOverlay` nem no layout desktop (já funciona).
+- Sem redesign visual dos slides.

@@ -516,6 +516,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 <span className="w-10" />
               </div>
             </div>
+          ) : (
             <div className="flex flex-col gap-3 pb-1">
               <div className="flex items-center justify-between gap-3">
                 {step > 0 ? (
@@ -538,6 +539,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 </button>
               </div>
             </div>
+          )}
 
 
           {step === 0 && (

@@ -21,6 +21,21 @@ interface CardRow {
   unique_users: number;
   last_used: string | null;
 }
+interface DropoffRow {
+  step: number;
+  views: number;
+  exits: number;
+  backs: number;
+  unique_users: number;
+  dropoff_pct: number;
+}
+const SLIDE_TITLES: Record<number, string> = {
+  1: "Tenha controle da sua vida financeira",
+  2: "Veja seu mês com clareza",
+  3: "Controle seus gastos e limites",
+  4: "Planeje seus desejos e objetivos",
+  5: "Comece pela sua primeira receita",
+};
 
 const fromForPeriod = (p: Period): string | null => {
   const now = Date.now();

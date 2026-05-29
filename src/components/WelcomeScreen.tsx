@@ -511,6 +511,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
   ({ onComplete, onLogin }, _ref) => {
     const [step, setStep] = useState(0);
     const isLast = step === slides.length - 1;
+    const stepRef = useRef(step);
+    const completedRef = useRef(false);
+    stepRef.current = step;
 
     useEffect(() => {
       captureLandingMeta();
@@ -518,21 +521,54 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     }, []);
 
     useEffect(() => {
-      trackEvent("onboarding_step_view", { step: step + 1 });
+      trackEvent("onboarding_step_view", {
+        step: step + 1,
+        slide_title: typeof slides[step]?.title === "string" ? slides[step].title : `slide_${step + 1}`,
+      });
     }, [step]);
+
+    // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
+    useEffect(() => {
+      const emitExit = (reason: string) => {
+        if (completedRef.current) return;
+        trackEvent("onboarding_step_exit", {
+          step: stepRef.current + 1,
+          total: slides.length,
+          reason,
+        });
+      };
+      const onPageHide = () => emitExit("pagehide");
+      const onVisibility = () => {
+        if (document.visibilityState === "hidden") emitExit("hidden");
+      };
+      window.addEventListener("pagehide", onPageHide);
+      document.addEventListener("visibilitychange", onVisibility);
+      return () => {
+        window.removeEventListener("pagehide", onPageHide);
+        document.removeEventListener("visibilitychange", onVisibility);
+        emitExit("unmount");
+      };
+    }, []);
 
     const goNext = () => {
       if (isLast) finish();
       else setStep((s) => s + 1);
     };
-    const goBack = () => setStep((s) => Math.max(0, s - 1));
+    const goBack = () => {
+      const from = stepRef.current;
+      const to = Math.max(0, from - 1);
+      trackEvent("onboarding_step_back", { from_step: from + 1, to_step: to + 1 });
+      setStep(to);
+    };
     const finish = () => {
+      completedRef.current = true;
       trackEvent("start_clicked", { destination: "financas", step: step + 1 });
       onComplete?.();
       window.location.href = "/financas";
     };
 
     const current = slides[step];
+
 
     const nav = isLast ? (
       <div className="flex flex-col gap-3 pb-1">

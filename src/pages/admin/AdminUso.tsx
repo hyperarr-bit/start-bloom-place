@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, BarChart3, MousePointerClick } from "lucide-react";
+import { RefreshCw, BarChart3, MousePointerClick, LogOut } from "lucide-react";
+
 
 type Period = "today" | "7d" | "30d" | "all";
 

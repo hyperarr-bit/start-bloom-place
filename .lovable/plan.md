@@ -1,51 +1,36 @@
-Foco: deixar o slide 1 visualmente idêntico à referência. Só `src/components/WelcomeScreen.tsx`. Sem mudar outros slides, lógica, rotas ou backend.
+## Objetivo
 
-## Problemas atuais vs referência
+O tutorial (`src/components/WelcomeScreen.tsx`) hoje usa `max-w-sm` numa única coluna ocupando a tela toda — fica ótimo no celular mas vira uma fita estreita no meio do notebook/Mac/PC. Vou deixar responsivo cobrindo iPhone, Android, tablet, notebook e desktop, sem mexer no design mobile que você já aprovou.
 
-1. Cores dos cards trocadas:
-   - Despesas está verde → deveria ser lilás (`--chart-4`).
-   - Investimentos está rosa → deveria ser verde (`--chart-2`).
-   - Desejos está amarelo → deveria ser rosa (`--chart-1`).
-   - Receitas mantém amarelo/dourado (`--chart-3`).
-2. Cards estão pequenos demais, com layout apertado e o "Resumo do mês" some/sobrepõe.
-3. Forma dos cards não bate: a referência tem cards tipo "pill" largos com ícone circular grande à esquerda, label cinza em cima e valor preto em baixo, com sombra suave.
-4. Ícone do "Despesas" deve ser uma seta para baixo dentro de círculo (Download/ArrowDown), não TrendingDown.
-5. Resumo do mês: ícones devem ser outline grandes (~16px), divisórias finas entre linhas, valor "Saldo do mês" verde em destaque, "2" laranja e "2" rosa.
+## O que muda
 
-## Mudanças no SlideOneMock
+Arquivo único: `src/components/WelcomeScreen.tsx`.
 
-- Aumentar o container do mock para ocupar a largura útil e altura suficiente para 4 cards + resumo sem sobrepor.
-- Trocar de `absolute` puro para um layout em 2 colunas escalonadas que reproduza a composição da referência:
-  - Coluna esquerda mais alta: Receitas (topo) e Investimentos (meio-baixo), levemente rotacionados para a esquerda.
-  - Coluna direita deslocada para baixo: Despesas (meio-topo) e Desejos (baixo), rotacionados para a direita.
-- Card "pill":
-  - `rounded-2xl`, padding maior, sombra suave (`shadow-md`).
-  - Círculo de ícone ~36px com cor sólida do token e ícone branco dentro.
-  - Texto: label pequeno cinza acima, valor `font-bold` preto abaixo.
-- Ícones:
-  - Receitas: `DollarSign` em círculo `--chart-3`.
-  - Despesas: `ArrowDown` em círculo `--chart-4`.
-  - Investimentos: `BarChart3` em círculo `--chart-2`.
-  - Desejos: `Heart` (filled) em círculo `--chart-1`.
-- Fundo de cada card usando o mesmo token com baixa opacidade (ex.: `hsl(var(--chart-x)/0.18)`).
-- Manter os dots decorativos espalhados para reforçar o "confetti".
+### Mobile (até `md`, ~768px) — inalterado
+- Continua igual ao atual: coluna única, `max-w-sm`, CORE no topo, título → subtítulo → mock → dots/CTA embaixo. Animações iguais.
 
-## Resumo do mês
+### Tablet / Notebook / Desktop (`md:` em diante)
+- Container vira split-screen 2 colunas (`md:grid md:grid-cols-2`) ocupando a tela toda com `max-w-6xl` centralizado e `gap` generoso.
+- **Coluna esquerda:** logo CORE no topo, título maior (`md:text-5xl lg:text-6xl`), subtítulo (`md:text-base`), dots de progresso e botões (Voltar / Continuar ou Começar agora) fixos na base da coluna. Link "Já tem conta? Entrar" também aqui no step 0.
+- **Coluna direita:** apenas o `mock` do slide atual, centralizado verticalmente, com `max-w-md` e leve aumento de escala (`md:scale-110 lg:scale-125`) pra preencher o espaço sem distorcer o design dos cards.
+- Padding lateral aumenta progressivamente (`md:px-12 lg:px-20`).
 
-- Card branco com borda sutil, raio grande, padding generoso.
-- Título "Resumo do mês" em `font-semibold` preto.
-- 3 linhas separadas por `border-t border-border/60`:
-  - Saldo do mês — ícone Calendar verde outline + label cinza, valor `+R$ 5.765,00` em verde forte (`--chart-2`).
-  - Contas a pagar — Calendar laranja (`--chart-3`), valor `2` laranja.
-  - Alertas inteligentes — Bell rosa (`--chart-1`), valor `2` rosa.
-- Ícones ~16px com `strokeWidth={1.75}`.
+### Telas muito largas (`xl`/`2xl`)
+- Trava em `max-w-6xl` para não esticar demais e mantém proporção agradável.
 
-## Layout geral do slide 1
+### Animações
+- Mantém o `AnimatePresence`/stagger atual. As variantes funcionam igual nas duas colunas.
 
-- Garantir altura mínima do mock para não sobrepor o resumo (≈ 360px) e o resumo ficar visivelmente abaixo dos 4 cards, como na imagem.
-- Não tocar nos textos do header, rodapé, "7 dias grátis", botão "Começar grátis" e link "Entrar" — já estão corretos.
+## Detalhes técnicos
+
+- Wrapper externo continua `fixed inset-0 z-[100] bg-background overflow-hidden` com safe-area.
+- Substituir o `flex flex-col w-full max-w-sm mx-auto` por estrutura responsiva:
+  - mobile: `flex flex-col max-w-sm mx-auto`
+  - md+: `grid grid-cols-2 max-w-6xl mx-auto items-center gap-12`
+- Refatorar os blocos de navegação (botões + dots + link "Entrar") pra ficarem na coluna esquerda no md+ e no fluxo normal no mobile.
+- Nenhuma mudança em lógica, analytics, estado, slides, mocks ou cores.
 
 ## Fora do escopo
 
-- Slides 2 a 5 ficam como estão.
-- Lógica de navegação, analytics, tokens globais e outros componentes não são alterados.
+- Não mudar copy, ícones, cores, animações ou estrutura dos mocks (slides 1–5).
+- Não mexer em outros componentes (OnboardingWizard, PreSignupTutorial, etc.).

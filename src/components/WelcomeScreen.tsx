@@ -530,6 +530,33 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       });
     }, [step]);
 
+    // Reduz proporcionalmente o mock para caber na tela em devices menores
+    useEffect(() => {
+      const fit = () => {
+        const slot = mockSlotRef.current;
+        const inner = mockInnerRef.current;
+        if (!slot || !inner) return;
+        // mede tamanho natural sem o transform atual
+        const prev = inner.style.transform;
+        inner.style.transform = "none";
+        const naturalH = inner.scrollHeight;
+        inner.style.transform = prev;
+        const availH = slot.clientHeight;
+        if (naturalH <= 0 || availH <= 0) return;
+        const next = Math.min(1, availH / naturalH);
+        setMockScale(Math.max(0.5, next));
+      };
+      fit();
+      const id = window.setTimeout(fit, 60);
+      const id2 = window.setTimeout(fit, 250);
+      window.addEventListener("resize", fit);
+      return () => {
+        window.removeEventListener("resize", fit);
+        window.clearTimeout(id);
+        window.clearTimeout(id2);
+      };
+    }, [step]);
+
     // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
     useEffect(() => {
       const emitExit = (reason: string) => {

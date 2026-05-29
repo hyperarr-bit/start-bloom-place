@@ -533,16 +533,72 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     const current = slides[step];
 
+    const nav = isLast ? (
+      <div className="flex flex-col gap-3 pb-1">
+        <button
+          onClick={finish}
+          className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+        >
+          Começar agora
+        </button>
+        <div className="flex items-center justify-between">
+          <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            Voltar
+          </button>
+          <div className="flex gap-1.5">
+            {slides.map((_, i) => (
+              <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
+            ))}
+          </div>
+          <span className="w-10" />
+        </div>
+      </div>
+    ) : (
+      <div className="flex flex-col gap-3 pb-1">
+        <div className="flex items-center justify-between gap-3">
+          {step > 0 ? (
+            <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Voltar
+            </button>
+          ) : (
+            <span className="w-10" />
+          )}
+          <div className="flex gap-1.5">
+            {slides.map((_, i) => (
+              <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
+            ))}
+          </div>
+          <button
+            onClick={goNext}
+            className={`rounded-2xl bg-foreground text-background font-semibold active:scale-[0.98] transition-transform ${step === 0 ? "px-6 py-3 text-sm shadow-lg" : "px-5 py-2.5 text-sm"}`}
+          >
+            {step === 0 ? "Começar grátis" : "Continuar"}
+          </button>
+        </div>
+      </div>
+    );
+
+    const loginLink = step === 0 && (
+      <Link
+        to="/auth"
+        onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}
+        className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center mt-3 md:text-left"
+      >
+        Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
+      </Link>
+    );
+
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6"
+        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6 md:px-12 lg:px-20"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.5rem, env(safe-area-inset-top))",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
       >
-        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto">
+        {/* Mobile layout (até md) */}
+        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden">
           <span className="text-2xl font-black tracking-tight text-foreground mb-5">CORE</span>
           <AnimatePresence mode="wait">
             <motion.div
@@ -574,7 +630,6 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               >
                 {current.subtitle}
               </motion.p>
-
               <motion.div
                 variants={{
                   hidden: { opacity: 0, y: 16 },
@@ -584,67 +639,71 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               >
                 {current.mock}
               </motion.div>
-
             </motion.div>
           </AnimatePresence>
+          {nav}
+          {loginLink}
+        </div>
 
-
-
-          {isLast ? (
-            <div className="flex flex-col gap-3 pb-1">
-              <button
-                onClick={finish}
-                className="w-full py-4 rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+        {/* Desktop/tablet layout (md+) */}
+        <div className="hidden md:grid md:grid-cols-2 md:gap-12 lg:gap-20 md:items-center flex-1 w-full max-w-6xl mx-auto">
+          {/* Coluna esquerda */}
+          <div className="flex flex-col h-full max-h-[720px]">
+            <span className="text-3xl font-black tracking-tight text-foreground mb-8">CORE</span>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`l-${step}`}
+                initial="hidden"
+                animate="show"
+                exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
+                variants={{
+                  hidden: {},
+                  show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
+                }}
+                className="flex-1 flex flex-col justify-center"
               >
-                Começar agora
-              </button>
-              <div className="flex items-center justify-between">
-                <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                  Voltar
-                </button>
-                <div className="flex gap-1.5">
-                  {slides.map((_, i) => (
-                    <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
-                  ))}
-                </div>
-                <span className="w-10" />
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 pb-1">
-              <div className="flex items-center justify-between gap-3">
-                {step > 0 ? (
-                  <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                    Voltar
-                  </button>
-                ) : (
-                  <span className="w-10" />
-                )}
-                <div className="flex gap-1.5">
-                  {slides.map((_, i) => (
-                    <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === step ? "bg-foreground" : "bg-muted"}`} />
-                  ))}
-                </div>
-                <button
-                  onClick={goNext}
-                  className={`rounded-2xl bg-foreground text-background font-semibold active:scale-[0.98] transition-transform ${step === 0 ? "px-6 py-3 text-sm shadow-lg" : "px-5 py-2.5 text-sm"}`}
+                <motion.h1
+                  variants={{
+                    hidden: { opacity: 0, y: 12 },
+                    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+                  }}
+                  className="text-5xl lg:text-6xl font-bold text-foreground tracking-tight leading-[1.1]"
                 >
-                  {step === 0 ? "Começar grátis" : "Continuar"}
-                </button>
-              </div>
+                  {current.title}
+                </motion.h1>
+                <motion.p
+                  variants={{
+                    hidden: { opacity: 0, y: 10 },
+                    show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+                  }}
+                  className="text-base lg:text-lg text-muted-foreground mt-5 leading-relaxed max-w-md"
+                >
+                  {current.subtitle}
+                </motion.p>
+              </motion.div>
+            </AnimatePresence>
+            <div className="max-w-md w-full">
+              {nav}
+              {loginLink}
             </div>
-          )}
+          </div>
 
-
-          {step === 0 && (
-            <Link
-              to="/auth"
-              onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors text-center mt-3"
-            >
-              Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
-            </Link>
-          )}
+          {/* Coluna direita: mock */}
+          <div className="flex items-center justify-center h-full max-h-[720px]">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`r-${step}`}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="w-full flex items-center justify-center"
+                style={{ transform: "scale(1.15)" }}
+              >
+                {current.mock}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     );

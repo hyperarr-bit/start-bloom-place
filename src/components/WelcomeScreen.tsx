@@ -92,25 +92,36 @@ const SlideOneMock = () => (
     {/* Resumo do mês */}
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl p-3 shadow-sm"
+      className="absolute bottom-0 inset-x-0 bg-card border border-border/60 rounded-2xl px-4 py-3 shadow-sm"
     >
-      <p className="text-[11px] font-semibold text-foreground mb-2">Resumo do mês</p>
-      <div className="space-y-1.5 text-[11px]">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><Calendar className="w-3 h-3" />Saldo do mês</span>
-          <span className="font-semibold text-[hsl(var(--chart-1))]">+R$ 5.765,00</span>
+      <p className="text-[12px] font-semibold text-foreground mb-2">Resumo do mês</p>
+      <div className="text-[11px]">
+        <div className="flex items-center justify-between py-1.5">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" strokeWidth={1.75} />
+            Saldo do mês
+          </span>
+          <span className="font-semibold text-[hsl(var(--chart-2))]">+R$ 5.765,00</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><AlertCircle className="w-3 h-3" />Contas a pagar</span>
+        <div className="flex items-center justify-between py-1.5 border-t border-border/50">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-4))]" strokeWidth={1.75} />
+            Contas a pagar
+          </span>
           <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 text-muted-foreground"><Bell className="w-3 h-3" />Alertas inteligentes</span>
-          <span className="font-semibold text-[hsl(var(--chart-4))]">2</span>
+        <div className="flex items-center justify-between py-1.5 border-t border-border/50">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Bell className="w-3.5 h-3.5 text-[hsl(var(--chart-5))]" strokeWidth={1.75} />
+            Alertas inteligentes
+          </span>
+          <span className="font-semibold text-[hsl(var(--chart-5))]">2</span>
         </div>
       </div>
     </motion.div>
   </div>
+);
+
 );
 
 const SlideTwoMock = () => (

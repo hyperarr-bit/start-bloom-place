@@ -588,7 +588,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
             </motion.div>
           </AnimatePresence>
 
-          </AnimatePresence>
+
 
           {isLast ? (
             <div className="flex flex-col gap-3 pb-1">

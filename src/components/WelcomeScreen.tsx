@@ -6,6 +6,7 @@ import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star,
 } from "lucide-react";
+import ipadImg from "@/assets/ipad-10.jpg";
 
 interface WelcomeScreenProps {
   onComplete?: () => void;

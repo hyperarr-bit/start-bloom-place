@@ -672,9 +672,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 16 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
                 }}
-                className="flex-1 flex items-center justify-center py-2 min-h-0 overflow-hidden"
+                className="flex-1 flex items-start justify-center py-2 min-h-0"
+                ref={mockSlotRef}
               >
-                {current.mock}
+                <div
+                  ref={mockInnerRef}
+                  style={{
+                    transform: `scale(${mockScale})`,
+                    transformOrigin: "top center",
+                    width: "100%",
+                  }}
+                >
+                  {current.mock}
+                </div>
               </motion.div>
             </motion.div>
           </AnimatePresence>

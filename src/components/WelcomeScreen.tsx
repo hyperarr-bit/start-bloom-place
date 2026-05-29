@@ -28,6 +28,8 @@ const FloatCard = ({
   className = "",
   style,
   delay = 0,
+  floatRange = 6,
+  rotate = 0,
 }: {
   label: string;
   value: string;
@@ -37,19 +39,45 @@ const FloatCard = ({
   className?: string;
   style?: React.CSSProperties;
   delay?: number;
+  floatRange?: number;
+  rotate?: number;
 }) => (
   <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay }}
+    initial={{ opacity: 0, y: 20, scale: 0.9, rotate }}
+    animate={{
+      opacity: 1,
+      scale: 1,
+      rotate,
+      y: [0, -floatRange, 0],
+    }}
+    transition={{
+      opacity: { delay, duration: 0.5, ease: "easeOut" },
+      scale: { delay, duration: 0.5, ease: "easeOut" },
+      rotate: { delay, duration: 0.5, ease: "easeOut" },
+      y: {
+        delay: delay + 0.5,
+        duration: 3.5 + Math.random(),
+        ease: "easeInOut",
+        repeat: Infinity,
+        repeatType: "loop",
+      },
+    }}
+    whileHover={{ scale: 1.05, rotate: 0, transition: { duration: 0.25 } }}
     style={style}
     className={`absolute flex items-center gap-2.5 rounded-2xl pl-2 pr-4 py-2 shadow-md ${className}`}
   >
     <div
-      className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+      className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
       style={{ background: `hsl(var(${color}))` }}
     >
       <Icon className="w-4 h-4 text-white" strokeWidth={2.25} fill={iconFill ? "currentColor" : "none"} />
+      {/* bolinha de cor decorativa */}
+      <motion.span
+        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-background"
+        style={{ background: `hsl(var(${color}))` }}
+        animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay }}
+      />
     </div>
     <div>
       <p className="text-[10px] text-foreground/60 leading-none">{label}</p>
@@ -57,6 +85,7 @@ const FloatCard = ({
     </div>
   </motion.div>
 );
+
 
 const SlideOneMock = () => (
   <div className="w-full max-w-[340px] mx-auto">

@@ -514,6 +514,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const stepRef = useRef(step);
     const completedRef = useRef(false);
     stepRef.current = step;
+    const mockSlotRef = useRef<HTMLDivElement>(null);
+    const mockInnerRef = useRef<HTMLDivElement>(null);
+    const [mockScale, setMockScale] = useState(1);
 
     useEffect(() => {
       captureLandingMeta();
@@ -525,6 +528,33 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         step: step + 1,
         slide_title: typeof slides[step]?.title === "string" ? slides[step].title : `slide_${step + 1}`,
       });
+    }, [step]);
+
+    // Reduz proporcionalmente o mock para caber na tela em devices menores
+    useEffect(() => {
+      const fit = () => {
+        const slot = mockSlotRef.current;
+        const inner = mockInnerRef.current;
+        if (!slot || !inner) return;
+        // mede tamanho natural sem o transform atual
+        const prev = inner.style.transform;
+        inner.style.transform = "none";
+        const naturalH = inner.scrollHeight;
+        inner.style.transform = prev;
+        const availH = slot.clientHeight;
+        if (naturalH <= 0 || availH <= 0) return;
+        const next = Math.min(1, availH / naturalH);
+        setMockScale(Math.max(0.5, next));
+      };
+      fit();
+      const id = window.setTimeout(fit, 60);
+      const id2 = window.setTimeout(fit, 250);
+      window.addEventListener("resize", fit);
+      return () => {
+        window.removeEventListener("resize", fit);
+        window.clearTimeout(id);
+        window.clearTimeout(id2);
+      };
     }, [step]);
 
     // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
@@ -672,9 +702,19 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 16 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
                 }}
-                className="flex-1 flex items-center justify-center py-2 min-h-0 overflow-hidden"
+                className="flex-1 flex items-start justify-center py-2 min-h-0"
+                ref={mockSlotRef}
               >
-                {current.mock}
+                <div
+                  ref={mockInnerRef}
+                  style={{
+                    transform: `scale(${mockScale})`,
+                    transformOrigin: "top center",
+                    width: "100%",
+                  }}
+                >
+                  {current.mock}
+                </div>
               </motion.div>
             </motion.div>
           </AnimatePresence>

@@ -627,7 +627,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6 md:px-12 lg:px-20"
+        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-y-auto md:overflow-hidden px-6 md:px-12 lg:px-20"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.5rem, env(safe-area-inset-top))",
@@ -635,8 +635,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         }}
       >
         {/* Mobile layout (até md) */}
-        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden">
-          <span className="text-2xl font-black tracking-tight text-foreground mb-5">CORE</span>
+        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden min-h-0">
+          <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0">CORE</span>
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -647,14 +647,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 hidden: {},
                 show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
               }}
-              className="flex-1 flex flex-col"
+              className="flex-1 flex flex-col min-h-0"
             >
               <motion.h1
                 variants={{
                   hidden: { opacity: 0, y: 12 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
                 }}
-                className="text-[28px] font-bold text-foreground tracking-tight leading-[1.15]"
+                className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0"
               >
                 {current.title}
               </motion.h1>
@@ -663,7 +663,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 10 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
                 }}
-                className="text-[13px] text-muted-foreground mt-2 leading-snug"
+                className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0"
               >
                 {current.subtitle}
               </motion.p>
@@ -672,15 +672,18 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                   hidden: { opacity: 0, y: 16 },
                   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
                 }}
-                className="flex-1 flex items-center justify-center py-3 min-h-0"
+                className="flex-1 flex items-center justify-center py-2 min-h-0 overflow-hidden"
               >
                 {current.mock}
               </motion.div>
             </motion.div>
           </AnimatePresence>
-          {nav}
-          {loginLink}
+          <div className="shrink-0 pt-2">
+            {nav}
+            {loginLink}
+          </div>
         </div>
+
 
         {/* Desktop/tablet layout (md+) */}
         <div className="hidden md:grid md:grid-cols-2 md:gap-12 lg:gap-20 md:items-center flex-1 w-full max-w-6xl mx-auto">

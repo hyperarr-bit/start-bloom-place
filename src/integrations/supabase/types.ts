@@ -532,6 +532,28 @@ export type Database = {
           variant_key: string
         }[]
       }
+      admin_finance_card_usage: {
+        Args: { _from?: string; _to?: string }
+        Returns: {
+          card_key: string
+          interactions: number
+          last_used: string
+          tab_id: string
+          unique_users: number
+          views: number
+        }[]
+      }
+      admin_finance_tab_usage: {
+        Args: { _from?: string; _to?: string }
+        Returns: {
+          avg_seconds: number
+          last_used: string
+          sessions: number
+          tab_id: string
+          total_seconds: number
+          unique_users: number
+        }[]
+      }
       admin_landing_funnel:
         | { Args: { _days?: number }; Returns: Json }
         | { Args: { _from?: string; _to?: string }; Returns: Json }
@@ -632,6 +654,7 @@ export type Database = {
           session_id: string
         }[]
       }
+      admin_user_trial_journey: { Args: { _user_id: string }; Returns: Json }
       admin_winback_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {

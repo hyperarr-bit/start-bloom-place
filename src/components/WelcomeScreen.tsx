@@ -256,74 +256,84 @@ const SlideThreeMock = () => {
   );
 };
 const SlideFourMock = () => (
-  <div className="w-full max-w-[300px] mx-auto">
-    <div className="relative bg-card border border-border/60 rounded-2xl p-3.5 space-y-3 shadow-sm">
+  <div className="w-full max-w-[320px] mx-auto space-y-2.5">
+    {/* Card externo "Meu desejo" */}
+    <div className="bg-card border border-border/60 rounded-2xl p-3 space-y-2.5">
       <p className="text-[11px] font-semibold text-foreground">Meu desejo</p>
-      <Heart className="absolute top-3.5 right-3.5 w-4 h-4 text-muted-foreground" />
 
-      <div className="bg-muted/30 rounded-xl h-24 flex items-center justify-center">
-        <img
-          src={ipadImg}
-          alt="iPad 10ª geração"
-          width={80}
-          height={80}
-          loading="eager"
-          decoding="async"
-          fetchPriority="high"
-          className="h-20 w-auto object-contain"
-        />
-      </div>
+      {/* Card interno do produto */}
+      <div className="relative bg-card border border-border/60 rounded-2xl p-3">
+        <Heart className="absolute top-3 right-3 w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
 
-      <div>
-        <p className="text-sm font-semibold text-foreground">iPad 10ª geração 64GB</p>
-        <span className="inline-block mt-1.5 text-[9px] px-2 py-0.5 rounded-full bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))] font-medium">Tecnologia</span>
-      </div>
-
-      <div className="flex items-end justify-between text-[10px]">
-        <div>
-          <p className="text-muted-foreground">Guardado</p>
-          <p className="font-bold text-[hsl(var(--chart-1))] text-xs">R$ 1.200,00</p>
+        <div className="flex items-center justify-center py-2">
+          <img
+            src={ipadImg}
+            alt="iPad 10ª geração"
+            width={96}
+            height={96}
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            className="h-24 w-auto object-contain"
+          />
         </div>
-        <div className="text-right">
-          <p className="text-muted-foreground">Falta</p>
-          <p className="font-bold text-[hsl(var(--chart-5))] text-xs">R$ 2.199,00</p>
+
+        <p className="text-[13px] font-semibold text-foreground mt-1">iPad 10ª geração 64GB</p>
+        <span className="inline-block mt-1.5 text-[9px] px-2 py-0.5 rounded-md bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))] font-medium">
+          Tecnologia
+        </span>
+
+        <div className="border-t border-border/60 mt-3 pt-2.5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[10px] text-muted-foreground">Guardado</p>
+              <p className="text-[13px] font-bold text-[hsl(var(--chart-2))] mt-0.5">R$ 1.200,00</p>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground">Falta</p>
+              <p className="text-[13px] font-bold text-[hsl(var(--chart-1))] mt-0.5">R$ 2.199,00</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full w-[35%] rounded-full bg-[hsl(var(--chart-1))]" />
+            </div>
+            <p className="text-[10px] text-muted-foreground font-medium">35%</p>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full w-[35%] rounded-full bg-[hsl(var(--chart-5))]" />
-        </div>
-        <p className="text-[10px] text-muted-foreground font-medium">35%</p>
-      </div>
-
+      {/* Grid de dois mini cards */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="bg-muted/40 rounded-xl p-2 flex items-center gap-1.5">
-          <Calendar className="w-3 h-3 text-muted-foreground" />
+        <div className="bg-card border border-border/60 rounded-xl p-2.5 flex items-center gap-2">
+          <Calendar className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
           <div>
-            <p className="text-[9px] text-muted-foreground">Tempo estimado</p>
-            <p className="text-[11px] font-bold text-foreground">5 meses</p>
+            <p className="text-[9px] text-muted-foreground leading-tight">Tempo estimado</p>
+            <p className="text-[11px] font-bold text-foreground leading-tight mt-0.5">5 meses</p>
           </div>
         </div>
-        <div className="bg-muted/40 rounded-xl p-2 flex items-center gap-1.5">
-          <RefreshCw className="w-3 h-3 text-[hsl(var(--chart-1))]" />
+        <div className="bg-card border border-border/60 rounded-xl p-2.5 flex items-center gap-2">
+          <RefreshCw className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" strokeWidth={1.5} />
           <div>
-            <p className="text-[9px] text-muted-foreground">Faltam</p>
-            <p className="text-[11px] font-bold text-foreground">5 meses</p>
+            <p className="text-[9px] text-muted-foreground leading-tight">Faltam</p>
+            <p className="text-[11px] font-bold text-foreground leading-tight mt-0.5">5 meses</p>
           </div>
         </div>
       </div>
+    </div>
 
-      <div className="bg-[hsl(var(--chart-1)/0.12)] rounded-xl p-2 flex items-start gap-1.5">
-        <CheckCircle2 className="w-3 h-3 text-[hsl(var(--chart-1))] mt-0.5 flex-shrink-0" />
-        <div className="text-[10px]">
-          <p className="font-semibold text-foreground">Você está no caminho certo!</p>
-          <p className="text-muted-foreground">Mantendo esse ritmo, seu objetivo será alcançado em Novembro de 2026.</p>
-        </div>
+    {/* Feedback verde fora do card */}
+    <div className="bg-[hsl(var(--chart-2)/0.1)] border border-[hsl(var(--chart-2)/0.2)] rounded-xl p-2.5 flex items-start gap-2">
+      <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--chart-2))] mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+      <div className="text-[10px] leading-snug">
+        <p className="font-semibold text-foreground">Você está no caminho certo!</p>
+        <p className="text-muted-foreground mt-0.5">Mantendo esse ritmo, seu objetivo será alcançado em Novembro de 2026.</p>
       </div>
     </div>
   </div>
 );
+
 
 const SlideFiveMock = () => (
   <div className="w-full max-w-[300px] mx-auto">

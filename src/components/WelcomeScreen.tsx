@@ -58,6 +58,33 @@ const FloatCard = ({
         delay: delay + 0.5,
         duration: 3.5 + Math.random(),
         ease: "easeInOut",
+        repeat: Infinity,
+        repeatType: "loop",
+      },
+    }}
+    whileHover={{ scale: 1.05, rotate: 0, transition: { duration: 0.25 } }}
+    style={style}
+    className={`absolute flex items-center gap-2.5 rounded-2xl pl-2 pr-4 py-2 shadow-md ${className}`}
+  >
+    <div
+      className="relative w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+      style={{ background: `hsl(var(${color}))` }}
+    >
+      <Icon className="w-4 h-4 text-white" strokeWidth={2.25} fill={iconFill ? "currentColor" : "none"} />
+      <motion.span
+        className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-background"
+        style={{ background: `hsl(var(${color}))` }}
+        animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay }}
+      />
+    </div>
+    <div>
+      <p className="text-[10px] text-foreground/60 leading-none">{label}</p>
+      <p className="text-[13px] font-bold text-foreground leading-tight mt-1">{value}</p>
+    </div>
+  </motion.div>
+);
+
 const FloatingDot = ({ className, delay = 0 }: { className: string; delay?: number }) => (
   <motion.span
     className={`absolute rounded-full ${className}`}
@@ -65,6 +92,7 @@ const FloatingDot = ({ className, delay = 0 }: { className: string; delay?: numb
     transition={{ duration: 3 + Math.random() * 1.5, repeat: Infinity, ease: "easeInOut", delay }}
   />
 );
+
 
 const SlideOneMock = () => (
   <div className="w-full max-w-[340px] mx-auto">

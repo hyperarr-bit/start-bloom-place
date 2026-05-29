@@ -67,6 +67,7 @@ import AdminTrials from "./pages/admin/AdminTrials";
 import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
 import AdminRetention from "./pages/admin/AdminRetention";
 import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
+import AdminUso from "./pages/admin/AdminUso";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -107,6 +108,7 @@ const AnimatedRoutes = () => {
           <Route path="emails" element={<AdminEmailVariants />} />
           <Route path="churn" element={<AdminChurn />} />
           <Route path="retention" element={<AdminRetention />} />
+          <Route path="uso" element={<AdminUso />} />
           <Route path="dashboard" element={<Navigate to="/admin/funil" replace />} />
           <Route path="analytics" element={<Navigate to="/admin/funil" replace />} />
           <Route path="conversao" element={<Navigate to="/admin/funil" replace />} />

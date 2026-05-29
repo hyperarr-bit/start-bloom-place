@@ -122,7 +122,6 @@ const SlideOneMock = () => (
   </div>
 );
 
-);
 
 const SlideTwoMock = () => (
   <div className="w-full max-w-[300px] mx-auto space-y-2.5">

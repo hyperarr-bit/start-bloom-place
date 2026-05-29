@@ -352,10 +352,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   </div>
                 )}
               </div>
-              {!labelBelow && (
 
-              </div>
-              {!labelBelow && (
                 <motion.div
                   animate={{ y: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}

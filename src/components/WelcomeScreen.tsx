@@ -150,7 +150,6 @@ const SlideOneMock = () => (
   </div>
 );
 
-);
 
 
 const SlideTwoMock = () => (

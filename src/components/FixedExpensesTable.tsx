@@ -78,7 +78,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
       return;
     }
     if (!newExpense.value) {
-      toast.error("Adicione o valor para ir");
+      toast.error("Informe o valor");
       return;
     }
     setExpenses([

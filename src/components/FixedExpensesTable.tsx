@@ -105,6 +105,24 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
 
       {/* Form sempre visível */}
       <div className="p-3 border-b border-border bg-muted/20 space-y-2">
+        {expenses.length === 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            <span className="text-[10px] text-muted-foreground self-center mr-0.5">Sugestões:</span>
+            {[
+              { description: "Aluguel", category: "moradia" },
+              { description: "Internet", category: "internet_telefone" },
+              { description: "Academia", category: "academia" },
+            ].map((s) => (
+              <button
+                key={s.description}
+                onClick={() => setNewExpense({ ...newExpense, description: s.description, category: s.category })}
+                className={`text-[11px] px-2 py-0.5 rounded-full font-medium hover:opacity-80 transition-opacity ${getCategoryStyle(s.category)}`}
+              >
+                + {s.description}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Input
             placeholder="+ Novo custo fixo"
@@ -129,6 +147,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
             <Plus className="w-4 h-4" />
           </button>
         </div>
+
 
         <button
           onClick={() => setShowMore((s) => !s)}

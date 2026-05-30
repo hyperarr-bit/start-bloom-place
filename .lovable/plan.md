@@ -1,21 +1,15 @@
-## Objetivo
-Remover o Passo 3 (anotação financeira) do tutorial spotlight de Finanças, que está causando ~69% de drop-off.
+## Contexto
+Atualmente, no `FixedExpensesTable.tsx`, a funcao `addExpense` (linha 70) so adiciona o item se `newExpense.description && newExpense.value` forem preenchidos. Caso contrario, silencia — nada acontece e o usuario nao recebe feedback.
 
-## Mudança
-**Arquivo:** `src/pages/Index.tsx` (linha 144)
+## O que mudar
+No `src/components/FixedExpensesTable.tsx`:
 
-Remover esta única linha do array `steps` do `SpotlightOverlay`:
+1. **Importar `toast` do `sonner`** para exibir mensagens.
+2. **Na funcao `addExpense`**, antes do `if`, verificar quais campos obrigatorios estao vazios:
+   - Se `description` vazio → `toast.error("Adicione o nome")`
+   - Se `value` vazio → `toast.error("Adicione o valor para ir")`
+   - Se ambos → priorizar uma mensagem (ex: "Adicione o nome e o valor")
+3. **Nao alterar** layout, campos, sugestoes, lista, nem outros componentes.
 
-```ts
-{ selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes", onEnter: () => setActiveTab("financeiro") },
-```
-
-Resultado: o tutorial pula direto de "Cadastre um custo fixo" (passo 2) para "Adicione 1 conta no vencimento" (que vira o novo passo 3). Os contadores "Passo X de N" se ajustam automaticamente (de 12 → 11 passos).
-
-## Fora do escopo
-- Não mexer no componente `Notes` em si (continua existindo no app, só não faz mais parte do tutorial).
-- Não mexer em analytics, eventos, ou no `SpotlightOverlay`.
-- Sem outras "melhorias" não pedidas.
-
-## Validação
-Abrir `/` como guest, dar replay do tutorial via menu e confirmar que após "custo fixo" o tutorial vai direto pra "vencimento".
+## Resultado esperado
+Ao clicar no "+" sem preencher o nome, aparece "Adicione o nome". Ao clicar sem preencher o valor, aparece "Adicione o valor para ir". So adiciona quando ambos estao preenchidos.

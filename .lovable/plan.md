@@ -1,15 +1,28 @@
-## Contexto
-Atualmente, no `FixedExpensesTable.tsx`, a funcao `addExpense` (linha 70) so adiciona o item se `newExpense.description && newExpense.value` forem preenchidos. Caso contrario, silencia — nada acontece e o usuario nao recebe feedback.
+## Resumo
+Substituir a lógica de cores discretas (verde/amarelo/vermelho) na barra de progresso dos limites por categoria por um gradiente contínuo baseado na porcentagem de gasto vs limite.
 
-## O que mudar
-No `src/components/FixedExpensesTable.tsx`:
+## Problema Atual
+A função `getBarColor` no `CategoryBudgets.tsx` tem apenas 3 estados:
+- < 75% → verde
+- 75-99% → amarelo
+- ≥ 100% → vermelho
 
-1. **Importar `toast` do `sonner`** para exibir mensagens.
-2. **Na funcao `addExpense`**, antes do `if`, verificar quais campos obrigatorios estao vazios:
-   - Se `description` vazio → `toast.error("Adicione o nome")`
-   - Se `value` vazio → `toast.error("Adicione o valor para ir")`
-   - Se ambos → priorizar uma mensagem (ex: "Adicione o nome e o valor")
-3. **Nao alterar** layout, campos, sugestoes, lista, nem outros componentes.
+O usuário quer transições suaves: verde fraco quando está muito longe do limite, verde forte quando se aproxima, amarelo/laranja variando conforme chega perto, e vermelho ao ultrapassar.
 
-## Resultado esperado
-Ao clicar no "+" sem preencher o nome, aparece "Adicione o nome". Ao clicar sem preencher o valor, aparece "Adicione o valor para ir". So adiciona quando ambos estao preenchidos.
+## Solução
+Implementar interpolação de cores HSL na função `getBarColor`:
+- 0% → verde claro/fraco
+- ~50% → verde médio
+- ~75% → verde forte
+- ~85% → amarelo
+- ~95% → laranja
+- 100% → vermelho
+- > 100% → vermelho escuro/forte
+
+## Arquivo a modificar
+- `src/components/CategoryBudgets.tsx` — função `getBarColor` (linha 79-83)
+
+## Detalhes Técnicos
+Usar interpolação HSL (hue, saturation, lightness) para criar transições suaves entre as cores conforme a porcentagem aumenta. A cor será calculada dinamicamente com base no `pct`, sem classes Tailwind fixas — será um style inline `backgroundColor` com HSL gerado via função JavaScript.
+
+Também ajustar o texto de alerta "Limite excedido" para manter coerência visual.

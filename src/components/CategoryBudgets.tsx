@@ -76,10 +76,26 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
     setEditing(null);
   };
 
-  const getBarColor = (pct: number) => {
-    if (pct >= 100) return "bg-red-500";
-    if (pct >= 75) return "bg-yellow-500";
-    return "bg-green-500";
+  const getBarHsl = (pct: number) => {
+    // Gradiente contínuo: verde fraco -> verde forte -> amarelo -> laranja -> vermelho
+    const p = Math.max(0, Math.min(pct, 130));
+    let hue: number;
+    let sat: number;
+    let light: number;
+    if (p <= 100) {
+      // 0 -> 100: hue de 145 (verde) até 0 (vermelho)
+      hue = 145 - (p / 100) * 145;
+      // saturação cresce de 55% a 75% conforme se aproxima do limite
+      sat = 55 + (p / 100) * 20;
+      // luminosidade cai de 55% a 45% (verde fraco -> cor mais forte)
+      light = 55 - (p / 100) * 10;
+    } else {
+      // > 100: vermelho ficando mais escuro/forte
+      hue = 0;
+      sat = 80;
+      light = Math.max(35, 45 - (p - 100) * 0.3);
+    }
+    return `hsl(${hue}, ${sat}%, ${light}%)`;
   };
 
   const hasBudgets = Object.keys(budgets).length > 0;
@@ -159,8 +175,8 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
                   {limit > 0 && (
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${getBarColor(pct)}`}
-                        style={{ width: `${Math.min(pct, 100)}%` }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: getBarHsl(pct) }}
                       />
                     </div>
                   )}

@@ -77,26 +77,33 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
   };
 
   const getBarHsl = (pct: number) => {
-    // Gradiente contínuo: verde fraco -> verde forte -> amarelo -> laranja -> vermelho
+    // Paleta Apple Health: verde menta -> amarelo dourado -> laranja vivo -> vermelho coral
+    const stops = [
+      { p: 0,   r: 48,  g: 209, b: 88  }, // #30D158 verde menta
+      { p: 70,  r: 48,  g: 209, b: 88  }, // mantém verde até 70%
+      { p: 85,  r: 255, g: 214, b: 10  }, // #FFD60A amarelo dourado
+      { p: 95,  r: 255, g: 159, b: 10  }, // #FF9F0A laranja vivo
+      { p: 100, r: 255, g: 69,  b: 58  }, // #FF453A vermelho coral
+      { p: 130, r: 200, g: 40,  b: 35  }, // vermelho mais escuro ao ultrapassar
+    ];
     const p = Math.max(0, Math.min(pct, 130));
-    let hue: number;
-    let sat: number;
-    let light: number;
-    if (p <= 100) {
-      // 0 -> 100: hue de 145 (verde) até 0 (vermelho)
-      hue = 145 - (p / 100) * 145;
-      // saturação cresce de 55% a 75% conforme se aproxima do limite
-      sat = 55 + (p / 100) * 20;
-      // luminosidade cai de 55% a 45% (verde fraco -> cor mais forte)
-      light = 55 - (p / 100) * 10;
-    } else {
-      // > 100: vermelho ficando mais escuro/forte
-      hue = 0;
-      sat = 80;
-      light = Math.max(35, 45 - (p - 100) * 0.3);
+    let lo = stops[0];
+    let hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (p >= stops[i].p && p <= stops[i + 1].p) {
+        lo = stops[i];
+        hi = stops[i + 1];
+        break;
+      }
     }
-    return `hsl(${hue}, ${sat}%, ${light}%)`;
+    const span = hi.p - lo.p || 1;
+    const t = (p - lo.p) / span;
+    const r = Math.round(lo.r + (hi.r - lo.r) * t);
+    const g = Math.round(lo.g + (hi.g - lo.g) * t);
+    const b = Math.round(lo.b + (hi.b - lo.b) * t);
+    return `rgb(${r}, ${g}, ${b})`;
   };
+
 
   const hasBudgets = Object.keys(budgets).length > 0;
 

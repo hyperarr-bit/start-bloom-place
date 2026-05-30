@@ -326,7 +326,7 @@ const Index = () => {
 
         {activeTab === "limites" && (
           <TrackedCard cardKey="category-budgets" tab="limites">
-            <CategoryBudgets expenses={expenses} />
+            <CategoryBudgets expenses={[...expenses, ...fixedExpenses]} />
           </TrackedCard>
         )}
 

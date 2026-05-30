@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -68,21 +69,30 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   const [showMore, setShowMore] = useState(expenses.length === 0);
 
   const addExpense = () => {
-    if (newExpense.description && newExpense.value) {
-      setExpenses([
-        ...expenses,
-        {
-          id: Date.now().toString(),
-          description: newExpense.description,
-          category: newExpense.category || "outros",
-          value: parseFloat(newExpense.value),
-          paymentMethod: newExpense.paymentMethod || "boleto",
-          cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
-        },
-      ]);
-      setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "" });
-      
+    if (!newExpense.description && !newExpense.value) {
+      toast.error("Adicione o nome e o valor");
+      return;
     }
+    if (!newExpense.description) {
+      toast.error("Adicione o nome");
+      return;
+    }
+    if (!newExpense.value) {
+      toast.error("Adicione o valor para ir");
+      return;
+    }
+    setExpenses([
+      ...expenses,
+      {
+        id: Date.now().toString(),
+        description: newExpense.description,
+        category: newExpense.category || "outros",
+        value: parseFloat(newExpense.value),
+        paymentMethod: newExpense.paymentMethod || "boleto",
+        cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+      },
+    ]);
+    setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "" });
   };
 
   const deleteExpense = (id: string) => {

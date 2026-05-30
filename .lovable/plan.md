@@ -1,28 +1,14 @@
 ## Resumo
-Substituir a lógica de cores discretas (verde/amarelo/vermelho) na barra de progresso dos limites por categoria por um gradiente contínuo baseado na porcentagem de gasto vs limite.
+Atualizar a função `getBarHsl` em `CategoryBudgets.tsx` para usar a paleta Apple Health escolhida pelo usuário:
+- Muito longe do limite → verde menta (#30D158)
+- Se aproximando → amarelo dourado (#FFD60A)
+- Próximo do limite → laranja vivo (#FF9F0A)
+- Ultrapassou → vermelho coral (#FF453A)
 
-## Problema Atual
-A função `getBarColor` no `CategoryBudgets.tsx` tem apenas 3 estados:
-- < 75% → verde
-- 75-99% → amarelo
-- ≥ 100% → vermelho
+A interpolação será suave via HSL/RGB entre os pontos de corte da porcentagem.
 
-O usuário quer transições suaves: verde fraco quando está muito longe do limite, verde forte quando se aproxima, amarelo/laranja variando conforme chega perto, e vermelho ao ultrapassar.
+## Arquivo
+- `src/components/CategoryBudgets.tsx` — função `getBarHsl`
 
-## Solução
-Implementar interpolação de cores HSL na função `getBarColor`:
-- 0% → verde claro/fraco
-- ~50% → verde médio
-- ~75% → verde forte
-- ~85% → amarelo
-- ~95% → laranja
-- 100% → vermelho
-- > 100% → vermelho escuro/forte
-
-## Arquivo a modificar
-- `src/components/CategoryBudgets.tsx` — função `getBarColor` (linha 79-83)
-
-## Detalhes Técnicos
-Usar interpolação HSL (hue, saturation, lightness) para criar transições suaves entre as cores conforme a porcentagem aumenta. A cor será calculada dinamicamente com base no `pct`, sem classes Tailwind fixas — será um style inline `backgroundColor` com HSL gerado via função JavaScript.
-
-Também ajustar o texto de alerta "Limite excedido" para manter coerência visual.
+## Abordagem Técnica
+Substituir a interpolação HSL genérica por uma interpolação entre 4 cores fixas (Apple Health palette), com transições suaves entre elas conforme a porcentagem avança de 0% a 100%+.

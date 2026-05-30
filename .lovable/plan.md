@@ -1,27 +1,21 @@
-# Corrigir o design quebrado pela aba Uso
+## Objetivo
+Remover o Passo 3 (anotação financeira) do tutorial spotlight de Finanças, que está causando ~69% de drop-off.
 
-## O bug
-O wrapper `TrackedCard` usa `display: contents`. Os pais no `Index.tsx` usam classes `space-y-*` do Tailwind, que aplicam `margin-top` nos irmãos diretos via `> * + *`. Como `display: contents` faz o wrapper não gerar caixa, a margem desaparece e os cards ficam colados — Anotações grudado em Vencimentos, faixa Receitas/Despesas/Dívidas/Invest. colada no card de baixo, etc.
+## Mudança
+**Arquivo:** `src/pages/Index.tsx` (linha 144)
 
-## Correção
-Trocar a estratégia do `TrackedCard` para não interferir no layout, mantendo o tracking funcionando igual:
+Remover esta única linha do array `steps` do `SpotlightOverlay`:
 
-1. Em `src/components/admin/TrackedCard.tsx`, remover `display: contents`. Renderizar um `<div>` real com `className="contents"` substituído por uma div neutra que herda o comportamento de bloco padrão — **mas** isso ainda muda layout em flex/grid. Solução real: manter um wrapper que se comporta como o filho.
+```ts
+{ selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes", onEnter: () => setActiveTab("financeiro") },
+```
 
-   Abordagem escolhida: tornar `TrackedCard` um **componente sem DOM extra**, anexando os listeners via `cloneElement` no único filho. Assim o DOM final é idêntico ao de antes do tracking — zero impacto visual.
+Resultado: o tutorial pula direto de "Cadastre um custo fixo" (passo 2) para "Adicione 1 conta no vencimento" (que vira o novo passo 3). Os contadores "Passo X de N" se ajustam automaticamente (de 12 → 11 passos).
 
-   - Aceitar exatamente 1 elemento filho.
-   - Usar `React.cloneElement` para anexar `ref` (combinando com ref existente se houver) e `onClickCapture`.
-   - `IntersectionObserver` continua observando o `ref` do filho real.
-   - Throttle e dedup por sessão permanecem iguais.
+## Fora do escopo
+- Não mexer no componente `Notes` em si (continua existindo no app, só não faz mais parte do tutorial).
+- Não mexer em analytics, eventos, ou no `SpotlightOverlay`.
+- Sem outras "melhorias" não pedidas.
 
-2. Não alterar `Index.tsx` — os usos de `<TrackedCard>` continuam idênticos.
-
-3. Não mexer em mais nada (sem refactors, sem "melhorias").
-
-## Verificação
-- Abrir `/` e conferir que Anotações, Vencimentos, faixa de receitas, e demais cards voltaram a ter o espaçamento original das imagens enviadas.
-- Conferir que eventos `finance_card_view` / `finance_card_interact` continuam sendo enviados (sem mudança na lógica).
-
-## Por que aconteceu
-Usei `display: contents` sem testar o layout. Não vou mais adicionar/alterar nada que não foi pedido, e vou validar visualmente mudanças que tocam componentes existentes antes de marcar como prontas.
+## Validação
+Abrir `/` como guest, dar replay do tutorial via menu e confirmar que após "custo fixo" o tutorial vai direto pra "vencimento".

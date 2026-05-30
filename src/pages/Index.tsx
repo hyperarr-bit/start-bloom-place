@@ -141,7 +141,7 @@ const Index = () => {
           
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
-          { selector: '[data-spotlight="add-note"]', label: 'Escreva uma anotação financeira.', advanceOnAction: "first_note", checkKey: "finance-notes", onEnter: () => setActiveTab("financeiro") },
+          
           { selector: '[data-spotlight="add-bill"]', label: 'Adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="tab-investimentos"]', label: 'Acompanhe seus investimentos aqui.', onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-investment"]', label: 'Cadastre seu primeiro aporte.', advanceOnAction: "first_investment", checkKey: "finance-investments", onEnter: () => setActiveTab("investimentos") },

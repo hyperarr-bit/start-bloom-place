@@ -1023,7 +1023,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 transition={{ delay: 0.25, duration: 0.35 }}
                 className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
               >
-                Veja seus gastos separados por categoria e descubra para onde seu dinheiro está indo.
+                Veja seus gastos separados por categoria e entenda exatamente onde seu dinheiro está indo.
               </motion.p>
 
               {/* Hero do slide 2 */}

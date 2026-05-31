@@ -1187,7 +1187,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 onClick={goNext}
                 className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
-                <span>Próximo</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
               </motion.button>
 

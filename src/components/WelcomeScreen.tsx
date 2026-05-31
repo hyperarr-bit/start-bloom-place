@@ -1321,15 +1321,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-y-auto md:overflow-hidden px-6 md:px-12 lg:px-20"
+        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6 md:px-12 lg:px-20"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.5rem, env(safe-area-inset-top))",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
       >
-        {/* Mobile layout (até md) */}
-        <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto md:hidden min-h-0">
+        {/* Mobile layout (até md) — auto-fit por zoom */}
+        <div ref={fitSlotRef} className="flex-1 flex flex-col w-full md:hidden min-h-0 overflow-hidden">
+          <div ref={fitInnerRef} className="flex flex-col items-center w-full max-w-sm mx-auto" style={{ transformOrigin: "top center" }}>
+
           {step === 0 ? (
             <motion.div
               key="slide-0"

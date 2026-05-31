@@ -5,7 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
-  ArrowRight, Clock, Home, PieChart,
+  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt, BookOpen,
 } from "lucide-react";
 
 
@@ -493,6 +493,125 @@ const SlideThreeHero = () => (
   </div>
 );
 
+
+// ---------- Slide 4 hero (Limites por categoria) ----------
+type LimitRow = {
+  name: string;
+  icon: React.ComponentType<any>;
+  iconColor: string; // hsl token name e.g. --destructive
+  pillBg: string; // background hsl()/alpha
+  spent: number;
+  limit: number;
+  barColor: string; // hsl token name
+};
+
+const SLIDE_FOUR_LIMITS: LimitRow[] = [
+  { name: "Restaurante", icon: () => <span className="text-[15px] leading-none">🍴</span>, iconColor: "--chart-2", pillBg: "hsl(var(--chart-2) / 0.12)", spent: 180, limit: 150, barColor: "--destructive" },
+  { name: "Transporte", icon: Bus, iconColor: "--chart-3", pillBg: "hsl(var(--chart-3) / 0.12)", spent: 50, limit: 250, barColor: "--success" },
+  { name: "Vestuário", icon: Shirt, iconColor: "--chart-3", pillBg: "hsl(var(--chart-3) / 0.12)", spent: 220, limit: 980, barColor: "--success" },
+  { name: "Educação", icon: BookOpen, iconColor: "--chart-1", pillBg: "hsl(var(--chart-1) / 0.14)", spent: 450, limit: 580, barColor: "--chart-1" },
+  { name: "Moradia", icon: Home, iconColor: "--chart-2", pillBg: "hsl(var(--chart-2) / 0.12)", spent: 1300, limit: 1400, barColor: "--chart-2" },
+];
+
+const fmtBRL = (n: number) =>
+  `R$ ${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+
+const SlideFourHero = () => (
+  <div className="w-full flex flex-col gap-3">
+    {/* Card branco — Limites por categoria */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+      className="bg-card border border-border/60 rounded-3xl p-4 shadow-sm"
+    >
+      {/* header */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--muted) / 0.7)" }}
+        >
+          <Target className="w-[18px] h-[18px] text-foreground" strokeWidth={2.25} />
+        </div>
+        <p className="text-[16px] font-bold text-foreground">Limites por categoria</p>
+      </div>
+
+      {/* rows */}
+      <div className="flex flex-col gap-2.5">
+        {SLIDE_FOUR_LIMITS.map((row, i) => {
+          const pct = Math.min(1, row.spent / row.limit);
+          const exceeded = row.spent > row.limit;
+          const Icon = row.icon;
+          return (
+            <motion.div
+              key={row.name}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.25 + i * 0.08, duration: 0.32 }}
+              className="flex flex-col gap-1.5"
+            >
+              <div className="flex items-center justify-between">
+                <div
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                  style={{ background: row.pillBg }}
+                >
+                  <Icon
+                    className="w-[14px] h-[14px]"
+                    style={{ color: `hsl(var(${row.iconColor}))` }}
+                    strokeWidth={2.25}
+                  />
+                  <span className="text-[12.5px] font-medium text-foreground">{row.name}</span>
+                </div>
+                <div className="text-[12.5px] tabular-nums">
+                  <span
+                    className="font-bold"
+                    style={{ color: exceeded ? "hsl(var(--destructive))" : "hsl(var(--foreground))" }}
+                  >
+                    {fmtBRL(row.spent)}
+                  </span>
+                  <span className="text-muted-foreground"> / {fmtBRL(row.limit)}</span>
+                </div>
+              </div>
+              <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "hsl(var(--muted) / 0.7)" }}>
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${pct * 100}%` }}
+                  transition={{ delay: 0.35 + i * 0.08, duration: 0.6, ease: "easeOut" }}
+                  className="h-full rounded-full"
+                  style={{ background: `hsl(var(${row.barColor}))` }}
+                />
+              </div>
+              {exceeded && (
+                <p className="text-[11.5px] font-medium" style={{ color: "hsl(var(--destructive))" }}>
+                  Limite excedido em {fmtBRL(row.spent - row.limit)}
+                </p>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.div>
+
+    {/* tip card */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.85, duration: 0.4, ease: "easeOut" }}
+      className="rounded-2xl p-3 flex items-center gap-3"
+      style={{ background: "hsl(var(--destructive) / 0.08)" }}
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--destructive) / 0.15)" }}
+      >
+        <Bell className="w-[18px] h-[18px]" style={{ color: "hsl(var(--destructive))" }} strokeWidth={2.25} />
+      </div>
+      <p className="text-[12.5px] text-foreground leading-snug">
+        Alertas ajudam você a corrigir<br />antes de gastar demais
+      </p>
+    </motion.div>
+  </div>
+);
 
 
 const StatCard = ({
@@ -1184,6 +1303,70 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.85, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+              >
+                <span>Continuar</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
+              </p>
+            </motion.div>
+          ) : step === 3 ? (
+            <motion.div
+              key="slide-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+              >
+                CORE
+              </motion.h2>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+              >
+                Defina limites e evite<br />passar do ponto
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                Crie limites por categoria e receba alertas quando estiver perto de exceder.
+              </motion.p>
+
+              <div className="w-full mt-7">
+                <SlideFourHero />
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.95, duration: 0.35 }}
                 onClick={goNext}
                 className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >

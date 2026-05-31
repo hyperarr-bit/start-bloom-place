@@ -497,7 +497,7 @@ const SlideThreeHero = () => (
 // ---------- Slide 4 hero (Limites por categoria) ----------
 type LimitRow = {
   name: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }>;
+  icon: React.ComponentType<any>;
   iconColor: string; // hsl token name e.g. --destructive
   pillBg: string; // background hsl()/alpha
   spent: number;

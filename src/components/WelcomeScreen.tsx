@@ -724,6 +724,77 @@ const SlideFiveDesejosHero = () => {
   );
 };
 
+// ---------- Slide 6 — Comece pela sua primeira receita ----------
+
+const SlideSixHero = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+    className="bg-card rounded-[22px] px-[16px] pt-[14px] pb-[14px]"
+    style={{ boxShadow: "var(--limit-card-shadow)" }}
+  >
+    {/* header */}
+    <div className="flex items-center gap-[10px] mb-[14px]">
+      <div
+        className="w-[36px] h-[36px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--chart-2) / 0.14)" }}
+      >
+        <DollarSign
+          className="w-[18px] h-[18px]"
+          style={{ color: "hsl(var(--chart-2))" }}
+          strokeWidth={2.6}
+        />
+      </div>
+      <p className="text-[17px] font-extrabold leading-none text-foreground">Nova receita</p>
+    </div>
+
+    {/* Fonte da receita */}
+    <div className="mb-[10px]">
+      <p className="text-[12px] text-muted-foreground mb-[6px]">Fonte da receita</p>
+      <div className="border border-border rounded-[12px] px-[12px] py-[11px] flex items-center justify-between">
+        <span className="text-[14px] font-medium text-foreground">Salário</span>
+        <ChevronDown className="w-[16px] h-[16px] text-muted-foreground" strokeWidth={2.25} />
+      </div>
+    </div>
+
+    {/* Valor */}
+    <div className="mb-[12px]">
+      <p className="text-[12px] text-muted-foreground mb-[6px]">Valor</p>
+      <div className="border border-border rounded-[12px] px-[12px] py-[11px]">
+        <span className="text-[14px] font-extrabold text-foreground tabular-nums">R$ 6.400,00</span>
+      </div>
+    </div>
+
+    {/* destaque Ótimo começo */}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35, duration: 0.4 }}
+      className="rounded-[14px] px-[13px] py-[10px] flex items-start gap-[12px] border"
+      style={{ background: "hsl(var(--chart-3) / 0.10)", borderColor: "hsl(var(--chart-3) / 0.22)" }}
+    >
+      <div
+        className="w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--chart-3) / 0.18)" }}
+      >
+        <Star
+          className="w-[16px] h-[16px]"
+          style={{ color: "hsl(var(--chart-3))" }}
+          fill="currentColor"
+          strokeWidth={2}
+        />
+      </div>
+      <div className="text-[13px] leading-[1.35]">
+        <p className="font-bold text-foreground">Ótimo começo!</p>
+        <p className="text-muted-foreground">Registrar suas receitas é o primeiro passo para ter controle total das suas finanças.</p>
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
+
+
 
 const StatCard = ({
   label,
@@ -1039,7 +1110,7 @@ const slides = [
   {
     title: <>Comece pela sua<br />primeira receita</>,
     subtitle: "Adicione sua fonte de renda para montar a base da sua organização financeira.",
-    mock: <SlideFiveMock />,
+    mock: <SlideSixHero />,
   },
 
 ];
@@ -1542,6 +1613,70 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="w-full max-w-[336px] mt-4">
                 <SlideFiveDesejosHero />
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.95, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full max-w-[336px] h-[52px] rounded-[13px] bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-4 flex items-center justify-center relative"
+              >
+                <span>Continuar</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-3 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
+              </p>
+            </motion.div>
+          ) : step === 5 ? (
+            <motion.div
+              key="slide-5"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+              >
+                CORE
+              </motion.h2>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-6 px-2"
+              >
+                Comece pela sua<br />primeira receita
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                Adicione sua fonte de renda para montar<br />a base da sua organização financeira.
+              </motion.p>
+
+              <div className="w-full max-w-[336px] mt-4">
+                <SlideSixHero />
               </div>
 
               <motion.button

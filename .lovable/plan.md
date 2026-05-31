@@ -1,32 +1,27 @@
-Vou corrigir somente o slide 4 usando o print anexado como gabarito visual.
+## Slide 6 — "Comece pela sua primeira receita"
 
-Plano:
-1. Recriar as cores exatas do card de limites:
-   - Restaurante: ícones laranja, pill bege, barra vermelha, texto de excedido vermelho.
-   - Transporte: ícone azul, pill azul claro, barra verde curta.
-   - Vestuário: ícone ciano, pill ciano claro, barra verde média.
-   - Educação: ícone verde, pill verde claro, barra verde-limão longa.
-   - Moradia: ícone laranja/vermelho, pill pêssego, barra laranja quase cheia.
+Hoje o step===5 cai no fallback genérico (mock escalado + título pequeno + nav). Vou trazê-lo para o mesmo formato dos slides 4 e 5.
 
-2. Corrigir os ícones para bater com o print:
-   - Garfo/faca no Restaurante.
-   - Ônibus no Transporte.
-   - Camiseta no Vestuário.
-   - Livro aberto preenchido no Educação.
-   - Casa preenchida no Moradia.
-   - Alvo no cabeçalho e sino no alerta.
+### Estrutura (igual aos slides 3/4/5 mobile)
+1. Dots no topo (6 dots, 6º ativo).
+2. `CORE` em black gigante (mesmo tamanho/tracking dos outros).
+3. Título: "Comece pela sua<br />primeira receita".
+4. Subtítulo: "Adicione sua fonte de renda para montar a base da sua organização financeira."
+5. Hero card (`SlideSixHero`) reaproveitando o conteúdo já existente do `SlideFiveMock`:
+   - Card branco arredondado com sombra suave (mesmo shadow token usado nos outros heros).
+   - "Nova receita" como header com ícone Lucide (DollarSign) em pill rosa, igual padrão dos outros heros.
+   - Campo "Fonte da receita" com valor "Salário" + chevron.
+   - Campo "Valor" com "R$ 6.400,00".
+   - Bloco destaque "Ótimo começo!" com ícone Star, no padrão dos cards de dica dos outros slides.
+6. Botão `Continuar` preto com seta (mesmo estilo dos slides 3/4/5). No último slide ele dispara `onComplete` (avança pro app), não `goNext`.
+7. Microcopy "Leva menos de 2 minutos para configurar." com ícone Clock.
 
-3. Ajustar proporções e espaçamentos:
-   - Card branco maior, com raio, sombra e padding mais próximos do print.
-   - Linhas internas com divisórias finas.
-   - Pills, textos e valores alinhados como na imagem.
-   - Tip card vermelho claro com borda e tamanho/posição mais próximos.
-   - Botão preto arredondado com seta à direita como no print.
+### Mudanças no arquivo `src/components/WelcomeScreen.tsx`
+- Criar componente `SlideSixHero` espelhando o estilo de `SlideFiveDesejosHero` (mesmo radius, padding, shadow, tipografia).
+- Atualizar entrada do slide 6 em `slides[]` para usar `<SlideSixHero />` como mock.
+- Adicionar branch `step === 5 ?` no render mobile, igual aos branches `step === 3` e `step === 4`, com CTA chamando `onComplete?.()` em vez de `goNext`.
+- Manter o fallback intacto (não há mais steps que caiam nele depois dessa mudança, mas fica seguro).
 
-4. Garantir responsividade sem scroll vertical:
-   - Ajustar tamanhos com `clamp()`/classes responsivas para caber no viewport atual de 430x697.
-   - Manter a hierarquia visual do print, reduzindo apenas proporcionalmente quando a tela for menor.
-
-5. Validar antes de entregar:
-   - Comparar visualmente o resultado renderizado com o print.
-   - Se ainda estiver diferente em cores, ícones, espaçamentos ou tamanho, ajustar de novo antes de responder.
+### Fora de escopo
+- Não mexer no desktop layout, nos outros slides, nem em copy/cores.
+- Não trocar ícones por aproximação — usar Lucide já importado (DollarSign, ChevronDown, Star, Clock, ArrowRight).

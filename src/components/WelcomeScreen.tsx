@@ -283,7 +283,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Receitas"
       value="R$ 3.000,00"
-      color="--chart-2"
+      color="--success"
       icon={DollarSign}
       trendIcon={TrendingUp}
       delay={0.05}
@@ -291,7 +291,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Gastos"
       value="R$ 635,00"
-      color="--chart-1"
+      color="--destructive"
       icon={TrendingDown}
       trendIcon={TrendingDown}
       delay={0.12}
@@ -299,7 +299,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Saldo do mês"
       value="+R$ 2.365,00"
-      color="--chart-2"
+      color="--success"
       icon={TrendingUp}
       trendIcon={TrendingUp}
       delay={0.19}

@@ -811,59 +811,75 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
-              initial="hidden"
-              animate="show"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
-              variants={{
-                hidden: {},
-                show: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-              }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
               className="flex-1 flex flex-col min-h-0"
             >
-              <motion.h1
-                variants={{
-                  hidden: { opacity: 0, y: 12 },
-                  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-                }}
-                className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0"
-              >
-                {current.title}
-              </motion.h1>
-              <motion.p
-                variants={{
-                  hidden: { opacity: 0, y: 10 },
-                  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-                }}
-                className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0"
-              >
-                {current.subtitle}
-              </motion.p>
-              <motion.div
-                variants={{
-                  hidden: { opacity: 0, y: 16 },
-                  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
-                }}
-                className="flex-1 flex items-start justify-center py-2 min-h-0"
-                ref={mockSlotRef}
-              >
-                <div
-                  ref={mockInnerRef}
-                  style={{
-                    transform: `scale(${mockScale})`,
-                    transformOrigin: "top center",
-                    width: "100%",
-                  }}
-                >
-                  {current.mock}
+              {step === 0 ? (
+                <div className="flex-1 flex flex-col justify-center min-h-0">
+                  <SlideOneHero />
                 </div>
-              </motion.div>
+              ) : (
+                <>
+                  <h1 className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0">
+                    {current.title}
+                  </h1>
+                  <p className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0">
+                    {current.subtitle}
+                  </p>
+                  <div className="flex-1 flex items-start justify-center py-2 min-h-0" ref={mockSlotRef}>
+                    <div
+                      ref={mockInnerRef}
+                      style={{
+                        transform: `scale(${mockScale})`,
+                        transformOrigin: "top center",
+                        width: "100%",
+                      }}
+                    >
+                      {current.mock}
+                    </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           </AnimatePresence>
           <div className="shrink-0 pt-2">
-            {nav}
-            {loginLink}
+            {step === 0 ? (
+              <div className="flex flex-col gap-3 pb-1">
+                <div className="flex justify-center gap-1.5">
+                  {slides.map((_, i) => (
+                    <span
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                    />
+                  ))}
+                </div>
+                <button
+                  onClick={goNext}
+                  className="w-full h-[56px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+                >
+                  Começar grátis
+                </button>
+                <Link
+                  to="/auth"
+                  onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+                >
+                  Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
+                </Link>
+              </div>
+            ) : (
+              <>
+                {nav}
+                {loginLink}
+              </>
+            )}
           </div>
         </div>
+
+
 
 
         {/* Desktop/tablet layout (md+) */}

@@ -819,40 +819,96 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       >
         {/* Mobile layout (até md) */}
         <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto md:hidden min-h-0">
-          <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0 text-center">CORE</span>
-          <AnimatePresence mode="wait">
+          {step === 0 ? (
             <motion.div
-              key={step}
+              key="slide-0"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex-1 flex flex-col items-center justify-center min-h-0 w-full"
+              className="flex-1 flex flex-col items-center w-full min-h-0"
             >
-              <div className="w-full flex items-center justify-center py-2 min-h-0" ref={mockSlotRef}>
-                <div
-                  ref={mockInnerRef}
-                  style={{
-                    transform: step === 0 ? undefined : `scale(${mockScale})`,
-                    transformOrigin: "top center",
-                    width: "100%",
-                  }}
-                >
-                  {step === 0 ? <SlideOneHero /> : current.mock}
-                </div>
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
               </div>
-              <h1 className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0 text-center mt-4">
-                {current.title}
+
+              {/* CORE */}
+              <h2 className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8">
+                CORE
+              </h2>
+
+              {/* Título + subtítulo */}
+              <h1 className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2">
+                Controle sua vida financeira em um só lugar
               </h1>
-              <p className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0 text-center">
-                {current.subtitle}
+              <p className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2">
+                Acompanhe receitas, gastos, contas, metas e investimentos sem complicação.
+              </p>
+
+              {/* 3 cards */}
+              <div className="w-full mt-7">
+                <SlideOneHero />
+              </div>
+
+              {/* CTA */}
+              <button
+                onClick={finish}
+                className="w-full h-[56px] rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+              >
+                <span>Começar agora</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </button>
+
+              {/* Microcopy */}
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
               </p>
             </motion.div>
-          </AnimatePresence>
-          <div className="shrink-0 pt-2 w-full">
-            {mobileNav}
-          </div>
+          ) : (
+            <>
+              <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0 text-center">CORE</span>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="flex-1 flex flex-col items-center justify-center min-h-0 w-full"
+                >
+                  <div className="w-full flex items-center justify-center py-2 min-h-0" ref={mockSlotRef}>
+                    <div
+                      ref={mockInnerRef}
+                      style={{
+                        transform: `scale(${mockScale})`,
+                        transformOrigin: "top center",
+                        width: "100%",
+                      }}
+                    >
+                      {current.mock}
+                    </div>
+                  </div>
+                  <h1 className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0 text-center mt-4">
+                    {current.title}
+                  </h1>
+                  <p className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0 text-center">
+                    {current.subtitle}
+                  </p>
+                </motion.div>
+              </AnimatePresence>
+              <div className="shrink-0 pt-2 w-full">
+                {mobileNav}
+              </div>
+            </>
+          )}
         </div>
+
 
 
 

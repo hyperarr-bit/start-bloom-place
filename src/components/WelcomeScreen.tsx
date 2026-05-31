@@ -1110,7 +1110,7 @@ const slides = [
   {
     title: <>Comece pela sua<br />primeira receita</>,
     subtitle: "Adicione sua fonte de renda para montar a base da sua organização financeira.",
-    mock: <SlideFiveMock />,
+    mock: <SlideSixHero />,
   },
 
 ];

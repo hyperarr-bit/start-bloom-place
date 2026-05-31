@@ -409,6 +409,107 @@ const SlideTwoHero = () => (
 );
 
 
+const SlideThreeHero = () => (
+  <div className="w-full flex flex-col gap-3">
+    {/* Card branco — Previsão do mês */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+      className="bg-card border border-border/60 rounded-3xl p-4 shadow-sm"
+    >
+      {/* header */}
+      <div className="flex items-center gap-2.5 mb-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--success) / 0.15)" }}
+        >
+          <BarChart3 className="w-[18px] h-[18px]" style={{ color: "hsl(var(--success))" }} strokeWidth={2.25} />
+        </div>
+        <p className="text-[17px] font-bold text-foreground">Previsão do mês</p>
+      </div>
+
+      {/* destaque verde */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.25, duration: 0.4 }}
+        className="rounded-2xl px-4 py-3"
+        style={{
+          background: "hsl(var(--success) / 0.10)",
+          border: "1px solid hsl(var(--success) / 0.25)",
+        }}
+      >
+        <p className="text-[12px] text-muted-foreground">Saldo previsto positivo</p>
+        <p className="text-[28px] font-extrabold leading-tight mt-0.5" style={{ color: "hsl(var(--success))" }}>
+          +R$ 965
+        </p>
+      </motion.div>
+
+      {/* linhas */}
+      <div className="mt-3 space-y-2">
+        {[
+          { n: "Receita", v: "+ R$ 3.000", c: "--success" },
+          { n: "Gastos atuais", v: "- R$ 635", c: "--destructive" },
+          { n: "Contas pendentes", v: "- R$ 1.400", c: "--chart-3" },
+        ].map((r, i) => (
+          <motion.div
+            key={r.n}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.35 + i * 0.08, duration: 0.3 }}
+            className="flex items-center justify-between text-[13px]"
+          >
+            <span className="text-foreground">{r.n}</span>
+            <span className="font-semibold tabular-nums" style={{ color: `hsl(var(${r.c}))` }}>{r.v}</span>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* divisor */}
+      <div className="h-px bg-border/70 my-3" />
+
+      {/* total */}
+      <div className="flex items-center justify-between">
+        <span className="text-[14px] font-bold text-foreground">Saldo previsto</span>
+        <span className="text-[20px] font-extrabold tabular-nums" style={{ color: "hsl(var(--success))" }}>
+          +R$ 965
+        </span>
+      </div>
+
+      {/* status */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7, duration: 0.35 }}
+        className="flex items-center justify-center gap-1.5 mt-3 text-[12px]"
+        style={{ color: "hsl(var(--success))" }}
+      >
+        <CheckCircle2 className="w-3.5 h-3.5" strokeWidth={2.25} />
+        Tudo sob controle este mês.
+      </motion.div>
+    </motion.div>
+
+    {/* Card verde — tip */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.75, duration: 0.45, ease: "easeOut" }}
+      className="rounded-2xl p-3.5 flex items-center gap-3"
+      style={{ background: "hsl(var(--success) / 0.10)" }}
+    >
+      <div
+        className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--success) / 0.20)" }}
+      >
+        <TrendingUp className="w-5 h-5" style={{ color: "hsl(var(--success))" }} strokeWidth={2.25} />
+      </div>
+      <p className="text-[13px] text-foreground leading-tight">
+        Você ainda pode se organizar<br />antes do fim do mês
+      </p>
+    </motion.div>
+  </div>
+);
 
 
 
@@ -1044,6 +1145,70 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </motion.button>
 
               {/* Microcopy */}
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
+              </p>
+            </motion.div>
+          ) : step === 2 ? (
+            <motion.div
+              key="slide-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+              >
+                CORE
+              </motion.h2>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+              >
+                Saiba se o mês<br />vai fechar no positivo
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                O CORE calcula receitas, despesas e contas pendentes para mostrar uma previsão antes do problema acontecer.
+              </motion.p>
+
+              <div className="w-full mt-7">
+                <SlideThreeHero />
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.85, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+              >
+                <span>Próximo</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
               <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
                 <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Leva menos de 2 minutos para configurar.

@@ -232,11 +232,10 @@ const MiniFloatCard = ({
   </motion.div>
 );
 
-// Layout do slide 1 mobile: mockup no topo + hero embaixo
+// Layout do slide 1 mobile: apenas a área visual (mocks + Resumo do mês)
 const SlideOneHero = () => (
   <div className="w-full flex flex-col">
-    {/* Área visual: 4 mini cards no topo + Resumo do mês embaixo */}
-    <div className="relative w-full mb-8">
+    <div className="relative w-full">
       {/* halo decorativo sutil */}
       <div className="absolute inset-x-8 top-4 bottom-8 bg-muted/40 rounded-full blur-3xl -z-10" />
 
@@ -314,26 +313,9 @@ const SlideOneHero = () => (
         </div>
       </motion.div>
     </div>
-
-    {/* Hero text */}
-    <motion.h1
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4, duration: 0.45, ease: "easeOut" }}
-      className="text-[28px] font-bold text-foreground tracking-tight leading-[1.1]"
-    >
-      Controle sua vida<br />financeira em um só lugar
-    </motion.h1>
-    <motion.p
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.46, duration: 0.45, ease: "easeOut" }}
-      className="text-[14px] text-muted-foreground mt-3 leading-relaxed"
-    >
-      Acompanhe receitas, despesas, contas, cartões, investimentos e metas de forma simples.
-    </motion.p>
   </div>
 );
+
 
 
 

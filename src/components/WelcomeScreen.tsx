@@ -424,7 +424,7 @@ const SlideThreeHero = () => (
           className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "hsl(var(--success) / 0.15)" }}
         >
-          <BarChart3 className="w-4.5 h-4.5" style={{ color: "hsl(var(--success))" }} strokeWidth={2.25} />
+          <BarChart3 className="w-[18px] h-[18px]" style={{ color: "hsl(var(--success))" }} strokeWidth={2.25} />
         </div>
         <p className="text-[17px] font-bold text-foreground">Previsão do mês</p>
       </div>

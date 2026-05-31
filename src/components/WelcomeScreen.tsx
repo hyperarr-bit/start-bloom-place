@@ -735,19 +735,7 @@ const SlideSixHero = () => (
     style={{ boxShadow: "var(--limit-card-shadow)" }}
   >
     {/* header */}
-    <div className="flex items-center gap-[10px] mb-[14px]">
-      <div
-        className="w-[36px] h-[36px] rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: "hsl(var(--chart-2) / 0.14)" }}
-      >
-        <DollarSign
-          className="w-[18px] h-[18px]"
-          style={{ color: "hsl(var(--chart-2))" }}
-          strokeWidth={2.6}
-        />
-      </div>
-      <p className="text-[17px] font-extrabold leading-none text-foreground">Nova receita</p>
-    </div>
+    <p className="text-[17px] font-extrabold leading-none text-foreground mb-[14px]">Nova receita</p>
 
     {/* Fonte da receita */}
     <div className="mb-[10px]">

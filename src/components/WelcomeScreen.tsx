@@ -1113,6 +1113,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const mockSlotRef = useRef<HTMLDivElement>(null);
     const mockInnerRef = useRef<HTMLDivElement>(null);
     const [mockScale, setMockScale] = useState(1);
+    const fitSlotRef = useRef<HTMLDivElement>(null);
+    const fitInnerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       captureLandingMeta();
@@ -1153,7 +1155,36 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
     }, [step]);
 
-    // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
+    // Auto-fit do slide mobile inteiro: mede altura natural vs viewport e aplica zoom
+    // para nunca precisar de scroll em telas pequenas e não ficar perdido em telas grandes.
+    useEffect(() => {
+      const fit = () => {
+        const slot = fitSlotRef.current;
+        const inner = fitInnerRef.current;
+        if (!slot || !inner) return;
+        (inner.style as any).zoom = "1";
+        const naturalH = inner.scrollHeight;
+        const availH = slot.clientHeight;
+        if (naturalH <= 0 || availH <= 0) return;
+        const ratio = availH / naturalH;
+        const next = Math.max(0.7, Math.min(1.18, ratio));
+        (inner.style as any).zoom = String(next);
+      };
+      fit();
+      const id1 = window.setTimeout(fit, 60);
+      const id2 = window.setTimeout(fit, 240);
+      const id3 = window.setTimeout(fit, 600);
+      window.addEventListener("resize", fit);
+      window.addEventListener("orientationchange", fit);
+      return () => {
+        window.removeEventListener("resize", fit);
+        window.removeEventListener("orientationchange", fit);
+        window.clearTimeout(id1);
+        window.clearTimeout(id2);
+        window.clearTimeout(id3);
+      };
+    }, [step]);
+
     useEffect(() => {
       const emitExit = (reason: string) => {
         if (completedRef.current) return;
@@ -1290,15 +1321,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     return (
       <div
-        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-y-auto md:overflow-hidden px-6 md:px-12 lg:px-20"
+        className="fixed inset-0 z-[100] flex flex-col bg-background overflow-hidden px-6 md:px-12 lg:px-20"
         style={{
           minHeight: "100dvh",
           paddingTop: "max(1.5rem, env(safe-area-inset-top))",
           paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
         }}
       >
-        {/* Mobile layout (até md) */}
-        <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto md:hidden min-h-0">
+        {/* Mobile layout (até md) — auto-fit por zoom */}
+        <div ref={fitSlotRef} className="flex-1 flex flex-col w-full md:hidden min-h-0 overflow-hidden">
+          <div ref={fitInnerRef} className="flex flex-col items-center w-full max-w-sm mx-auto" style={{ transformOrigin: "top center" }}>
+
           {step === 0 ? (
             <motion.div
               key="slide-0"
@@ -1318,7 +1351,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
 
               {/* CORE */}
-              <h2 className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8">
+              <h2 className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-8">
                 CORE
               </h2>
 
@@ -1381,7 +1414,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[40px] min-[390px]:text-[46px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1448,7 +1481,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[40px] min-[390px]:text-[46px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1511,7 +1544,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-8"
               >
                 CORE
               </motion.h2>
@@ -1574,7 +1607,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1637,7 +1670,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1715,7 +1748,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
             </>
           )}
+          </div>
         </div>
+
 
 
 

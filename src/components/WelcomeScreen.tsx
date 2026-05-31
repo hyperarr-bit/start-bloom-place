@@ -1256,14 +1256,14 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.75, duration: 0.35 }}
                 onClick={goNext}
-                className="w-full h-[52px] rounded-[13px] bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-4 flex items-center justify-center relative"
+                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
                 <span>Continuar</span>
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
               </motion.button>
 
               {/* Microcopy */}
-              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-3 mb-1">
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
                 <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Leva menos de 2 minutos para configurar.
               </p>

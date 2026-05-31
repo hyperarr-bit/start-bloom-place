@@ -496,14 +496,14 @@ const SlideThreeHero = () => (
 
 // ---------- Slide 4 hero (Limites por categoria) ----------
 const FilledUtensils = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...props} fill="currentColor">
     <path d="M6.2 2.5c.43 0 .78.35.78.78v6.06h1.2V3.28a.78.78 0 0 1 1.56 0v6.06h1.1V3.28a.78.78 0 0 1 1.56 0v6.2c0 2.1-1.28 3.84-3.05 4.28v6.92a1.15 1.15 0 0 1-2.3 0v-6.92C5.27 13.32 4 11.58 4 9.48v-6.2c0-.43.35-.78.78-.78s.78.35.78.78v6.06h1.1V3.28c0-.43.35-.78.78-.78Z" />
     <path d="M17.6 2.75c1.74 0 2.9 2.2 2.9 5.42 0 2.72-.82 4.78-2.05 5.35v7.18a1.15 1.15 0 0 1-2.3 0V3.28c0-.29.23-.53.53-.53h.92Z" />
   </svg>
 );
 
 const FilledBook = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...props} fill="currentColor">
     <path d="M5 4.25c2.08 0 3.9.44 5.35 1.38.42.27.65.72.65 1.22v12.7c0 .35-.38.56-.68.38C8.9 19.08 7.08 18.7 5 18.7H3.9c-.77 0-1.4-.63-1.4-1.4V5.65c0-.77.63-1.4 1.4-1.4H5Z" />
     <path d="M19 4.25h1.1c.77 0 1.4.63 1.4 1.4V17.3c0 .77-.63 1.4-1.4 1.4H19c-2.08 0-3.9.38-5.32 1.23-.3.18-.68-.03-.68-.38V6.85c0-.5.23-.95.65-1.22C15.1 4.69 16.92 4.25 19 4.25Z" />
   </svg>

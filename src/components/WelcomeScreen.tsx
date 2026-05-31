@@ -724,7 +724,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
     const current = slides[step];
 
-
+    // Nav desktop (mantém o layout antigo)
     const nav = isLast ? (
       <div className="flex flex-col gap-3 pb-1">
         <button
@@ -780,6 +780,43 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       </Link>
     );
 
+    // Nav mobile unificado: dots centralizados → CTA full-width → Voltar/Entrar
+    const mobileCtaLabel = isLast ? "Começar agora" : step === 0 ? "Começar grátis" : "Continuar";
+    const mobileNav = (
+      <div className="flex flex-col items-center gap-3 pb-1">
+        <div className="flex justify-center gap-1.5">
+          {slides.map((_, i) => (
+            <span
+              key={i}
+              className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+            />
+          ))}
+        </div>
+        <button
+          onClick={goNext}
+          className="w-full h-[56px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
+        >
+          {mobileCtaLabel}
+        </button>
+        {step === 0 ? (
+          <Link
+            to="/auth"
+            onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+          >
+            Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
+          </Link>
+        ) : (
+          <button
+            onClick={goBack}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Voltar
+          </button>
+        )}
+      </div>
+    );
+
     return (
       <div
         className="fixed inset-0 z-[100] flex flex-col bg-background overflow-y-auto md:overflow-hidden px-6 md:px-12 lg:px-20"
@@ -790,8 +827,8 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
         }}
       >
         {/* Mobile layout (até md) */}
-        <div className="flex-1 flex flex-col w-full max-w-sm mx-auto md:hidden min-h-0">
-          <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0">CORE</span>
+        <div className="flex-1 flex flex-col items-center w-full max-w-sm mx-auto md:hidden min-h-0">
+          <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0 text-center">CORE</span>
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
@@ -799,53 +836,33 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -20, transition: { duration: 0.2 } }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex-1 flex flex-col min-h-0"
+              className="flex-1 flex flex-col items-center justify-center min-h-0 w-full"
             >
-              {step === 0 ? (
-                <div className="flex-1 flex flex-col justify-center min-h-0">
-                  <SlideOneHero />
+              <div className="w-full flex items-center justify-center py-2 min-h-0" ref={mockSlotRef}>
+                <div
+                  ref={mockInnerRef}
+                  style={{
+                    transform: step === 0 ? undefined : `scale(${mockScale})`,
+                    transformOrigin: "top center",
+                    width: "100%",
+                  }}
+                >
+                  {step === 0 ? <SlideOneHero /> : current.mock}
                 </div>
-              ) : (
-                <>
-                  <h1 className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0">
-                    {current.title}
-                  </h1>
-                  <p className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0">
-                    {current.subtitle}
-                  </p>
-                  <div className="flex-1 flex items-start justify-center py-2 min-h-0" ref={mockSlotRef}>
-                    <div
-                      ref={mockInnerRef}
-                      style={{
-                        transform: `scale(${mockScale})`,
-                        transformOrigin: "top center",
-                        width: "100%",
-                      }}
-                    >
-                      {current.mock}
-                    </div>
-                  </div>
-                </>
-              )}
+              </div>
+              <h1 className="text-2xl sm:text-[28px] font-bold text-foreground tracking-tight leading-[1.15] shrink-0 text-center mt-4">
+                {current.title}
+              </h1>
+              <p className="text-[13px] text-muted-foreground mt-2 leading-snug shrink-0 text-center">
+                {current.subtitle}
+              </p>
             </motion.div>
           </AnimatePresence>
-          <div className="shrink-0 pt-2">
-            {step === 0 ? (
-              <div className="flex flex-col gap-3 pb-1">
-                <div className="flex justify-center gap-1.5">
-                  {slides.map((_, i) => (
-                    <span
-                      key={i}
-                      className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
-                    />
-                  ))}
-                </div>
-                <button
-                  onClick={goNext}
-                  className="w-full h-[56px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform"
-                >
-                  Começar grátis
-                </button>
+          <div className="shrink-0 pt-2 w-full">
+            {mobileNav}
+          </div>
+        </div>
+
                 <Link
                   to="/auth"
                   onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}

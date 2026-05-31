@@ -235,17 +235,58 @@ const MiniFloatCard = ({
 // Layout do slide 1 mobile: mockup no topo + hero embaixo
 const SlideOneHero = () => (
   <div className="w-full flex flex-col">
-    {/* Área visual: Resumo do mês + 4 mini cards ao redor */}
-    <div className="relative w-full h-[260px] mb-8">
+    {/* Área visual: 4 mini cards no topo + Resumo do mês embaixo */}
+    <div className="relative w-full mb-8">
       {/* halo decorativo sutil */}
-      <div className="absolute inset-x-6 top-6 bottom-6 bg-muted/40 rounded-full blur-3xl -z-10" />
+      <div className="absolute inset-x-8 top-4 bottom-8 bg-muted/40 rounded-full blur-3xl -z-10" />
 
-      {/* Card central: Resumo do mês */}
+      {/* Mini cards em 2x2 com leve rotação */}
+      <div className="relative w-full h-[120px] mb-3">
+        <MiniFloatCard
+          label="Receitas"
+          value="R$ 6.400,00"
+          color="--chart-3"
+          icon={DollarSign}
+          delay={0.05}
+          rotate={-3}
+          className="top-0 left-2"
+        />
+        <MiniFloatCard
+          label="Despesas"
+          value="R$ 635,00"
+          color="--chart-4"
+          icon={ArrowDown}
+          delay={0.12}
+          rotate={3}
+          className="top-1 right-2"
+        />
+        <MiniFloatCard
+          label="Investimentos"
+          value="R$ 14.500"
+          color="--chart-2"
+          icon={BarChart3}
+          delay={0.19}
+          rotate={-2}
+          className="bottom-0 left-6"
+        />
+        <MiniFloatCard
+          label="Desejos"
+          value="R$ 1.000,00"
+          color="--chart-1"
+          icon={Heart}
+          iconFill
+          delay={0.26}
+          rotate={2}
+          className="bottom-1 right-6"
+        />
+      </div>
+
+      {/* Card Resumo do mês — full width abaixo */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05, duration: 0.5, ease: "easeOut" }}
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[78%] bg-card border border-border/60 rounded-3xl px-4 py-3.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.18)]"
+        transition={{ delay: 0.32, duration: 0.5, ease: "easeOut" }}
+        className="w-full bg-card border border-border/60 rounded-3xl px-4 py-3.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.18)]"
       >
         <p className="text-[12px] font-semibold text-foreground mb-2.5">Resumo do mês</p>
         <div className="text-[11px]">
@@ -272,45 +313,6 @@ const SlideOneHero = () => (
           </div>
         </div>
       </motion.div>
-
-      {/* Mini cards flutuantes ao redor — accents nas cores do app */}
-      <MiniFloatCard
-        label="Receitas"
-        value="R$ 6.400,00"
-        color="--chart-3"
-        icon={DollarSign}
-        delay={0.15}
-        rotate={-4}
-        className="top-0 left-0"
-      />
-      <MiniFloatCard
-        label="Despesas"
-        value="R$ 635,00"
-        color="--chart-4"
-        icon={ArrowDown}
-        delay={0.22}
-        rotate={4}
-        className="top-6 right-0"
-      />
-      <MiniFloatCard
-        label="Investimentos"
-        value="R$ 14.500"
-        color="--chart-2"
-        icon={BarChart3}
-        delay={0.29}
-        rotate={-3}
-        className="bottom-2 left-0"
-      />
-      <MiniFloatCard
-        label="Desejos"
-        value="R$ 1.000,00"
-        color="--chart-1"
-        icon={Heart}
-        iconFill
-        delay={0.36}
-        rotate={3}
-        className="bottom-0 right-0"
-      />
     </div>
 
     {/* Hero text */}

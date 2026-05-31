@@ -1,35 +1,60 @@
 ## Escopo
 
-Apenas o layout **mobile** do `WelcomeScreen.tsx` (`md:hidden`). Desktop, slides em si, mocks, tracking e backend ficam inalterados.
+Apenas o slide 0 no layout **mobile** (`md:hidden`) do `WelcomeScreen.tsx`. Desktop e slides 2–5 ficam inalterados.
 
-## Mudanças
+## Mudança
 
-1. **Layout editorial nos slides 2–5 (mobile)**: hoje só o slide 0 usa "mock em cima, hero embaixo". Aplicar o mesmo padrão nos slides 1–4 (índice), removendo o branch que coloca título → subtítulo → mock. Nova ordem para todos os slides:
+Substituir o `SlideOneHero` atual (mini cards flutuantes 2x2 + Resumo do mês) e a ordem mock→texto pelo layout exato da foto enviada.
 
-   ```text
-   CORE (centralizado)
-   [mock do slide]
-   Título
-   Subtítulo
-   ─────────────
-   dots
-   botão CTA full-width
-   "Já tem uma conta? Entrar" (só slide 0)
-   ```
+### Nova ordem do slide 0 (de cima para baixo)
 
-   O `SlideOneHero` deixa de existir como caso especial — o texto hero do slide 0 vira o mesmo bloco `h1`/`p` usado pelos outros (lendo `current.title`/`current.subtitle`), e o mock do slide 0 passa a ser apenas a área visual (4 mini cards + Resumo do mês) sem o texto embutido.
+```text
+• dots (7 bolinhas, ativa = primeira, largas)
+CORE                       (mega título, font-black, ~64px)
+Controle sua vida financeira
+em um só lugar             (h1 bold ~26px, 2 linhas, centro)
+Acompanhe receitas, gastos, contas,
+metas e investimentos sem complicação.   (subtítulo cinza ~14px, centro)
 
-2. **Centralização**: 
-   - Logo `CORE`: trocar de left-align para `text-center` (remover `mb-3` solto, manter no fluxo centralizado, container `items-center`)
-   - Título e subtítulo: `text-center`, container `items-center`
-   - Botão CTA: já full-width no slide 0; padronizar **todos** os slides (incluindo "Continuar" e "Começar agora") como botão full-width pill `h-[56px] rounded-full bg-foreground text-background` centralizado
-   - Dots: centralizados acima do CTA em todos os slides (já é o caso no slide 0; replicar)
-   - Link "Voltar": vira link pequeno centralizado abaixo do CTA (em vez de na mesma linha dos dots)
+[ $  Receitas       R$ 3.000,00       ↗ ]     ← card branco, ícone verde
+[ ↘  Gastos         R$ 635,00         ↘ ]     ← ícone vermelho
+[ ↗  Saldo do mês   +R$ 2.365,00      ↗ ]     ← ícone verde
 
-3. **Unificar o bloco de navegação mobile**: um único bloco `nav` para todos os slides com a estrutura: dots centralizados → CTA full-width → (Voltar OU Entrar). Remove a duplicação atual entre `step === 0` e o `nav` desktop reaproveitado.
+[       Começar agora              → ]   ← pill preto full-width
+🕐 Leva menos de 2 minutos para configurar.
+```
+
+### Detalhes visuais (idênticos à foto)
+
+- **Dots no topo** do slide (acima do CORE), centralizados — mover do `mobileNav` para o topo só no slide 0
+- **CORE**: `text-[64px] sm:text-[72px] font-black tracking-tight`, centralizado, peso máximo
+- **Título**: `text-[26px] font-bold leading-[1.2]`, centro, ~2 linhas
+- **Subtítulo**: `text-[14px] text-muted-foreground`, centro
+- **3 cards** (não 4 mini flutuantes): `bg-card border border-border/60 rounded-2xl px-4 py-3.5`, layout `flex items-center gap-3`:
+  - Tile do ícone à esquerda: `w-12 h-12 rounded-2xl` com bg `hsl(var(--chart-X)/0.18)` e ícone colorido
+  - Coluna central: label pequena cinza (`text-xs`) + valor `text-[20px] font-extrabold` colorido (verde/vermelho/verde)
+  - Mini ícone de tendência à direita (mesmo da esquerda em versão outline)
+  - Card 1: `DollarSign` + verde (`--chart-2`) — Receitas / R$ 3.000,00 / ↗
+  - Card 2: `TrendingDown` + vermelho (`--chart-1`) — Gastos / R$ 635,00 / ↘
+  - Card 3: `TrendingUp` + verde (`--chart-2`) — Saldo do mês / +R$ 2.365,00 / ↗
+- **CTA**: pill preto full-width `h-[56px] rounded-2xl bg-foreground text-background font-semibold` com label "Começar agora" e seta `→` à direita (ícone `ArrowRight`)
+- **Microcopy embaixo**: `flex items-center justify-center gap-2 text-xs text-muted-foreground` com ícone `Clock` outline + "Leva menos de 2 minutos para configurar."
+- Link "Já tem uma conta? Entrar" some do slide 0 (não aparece na foto). Manter só nos outros slides? → **remover do slide 0**.
+
+### Implementação
+
+1. Reescrever `SlideOneHero` para retornar **apenas os 3 cards** (sem dots, sem texto, sem CTA — esses ficam no shell).
+2. No bloco mobile (`md:hidden`), criar um branch dedicado para `step === 0` com:
+   - dots no topo (largura ativa 20px, inativos 6px)
+   - CORE, título, subtítulo (centro)
+   - `<SlideOneHero />` (3 cards empilhados)
+   - CTA "Começar agora" com `ArrowRight`
+   - linha "Leva menos de 2 minutos para configurar"
+3. Para `step > 0`, manter o layout mobile atual (mock em cima, texto, `mobileNav`).
+4. Importar `ArrowRight`, `Clock` de lucide-react.
 
 ## Fora de escopo
 
-- Desktop (`md:grid`) — sem mudanças
-- Conteúdo dos mocks, textos, tracking, rotas, `useUserData`
-- Slides do tutorial admin ou qualquer outro componente
+- Desktop (`md:grid`)
+- Slides 2–5 (mobile e desktop)
+- Conteúdo dos mocks dos outros slides, tracking, rotas, `useUserData`

@@ -283,7 +283,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Receitas"
       value="R$ 3.000,00"
-      color="--chart-2"
+      color="--success"
       icon={DollarSign}
       trendIcon={TrendingUp}
       delay={0.05}
@@ -291,7 +291,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Gastos"
       value="R$ 635,00"
-      color="--chart-1"
+      color="--destructive"
       icon={TrendingDown}
       trendIcon={TrendingDown}
       delay={0.12}
@@ -299,7 +299,7 @@ const SlideOneHero = () => (
     <SlideOneRow
       label="Saldo do mês"
       value="+R$ 2.365,00"
-      color="--chart-2"
+      color="--success"
       icon={TrendingUp}
       trendIcon={TrendingUp}
       delay={0.19}
@@ -857,7 +857,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               {/* CTA */}
               <button
-                onClick={finish}
+                onClick={goNext}
                 className="w-full h-[56px] rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
                 <span>Começar agora</span>

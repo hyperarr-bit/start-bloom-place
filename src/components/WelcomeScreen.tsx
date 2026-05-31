@@ -317,25 +317,26 @@ const SlideTwoCategories = [
 ];
 
 const Slide2Donut = () => {
-  const R = 56;
+  const R = 62;
   const C = 2 * Math.PI * R;
+  const GAP_PCT = 1.2; // gap branco entre segmentos
   let cumulative = 0;
   return (
-    <svg viewBox="0 0 140 140" className="w-[140px] h-[140px] -rotate-90">
-      <circle cx="70" cy="70" r={R} fill="none" stroke="hsl(var(--muted))" strokeWidth="16" opacity="0.35" />
+    <svg viewBox="0 0 160 160" className="w-[160px] h-[160px] -rotate-90">
       {SlideTwoCategories.map((s, i) => {
-        const len = (s.pct / 100) * C;
+        const visiblePct = Math.max(0, s.pct - GAP_PCT);
+        const len = (visiblePct / 100) * C;
         const offset = (cumulative / 100) * C;
         cumulative += s.pct;
         return (
           <motion.circle
             key={s.n}
-            cx="70"
-            cy="70"
+            cx="80"
+            cy="80"
             r={R}
             fill="none"
             stroke={`hsl(var(${s.c}))`}
-            strokeWidth="16"
+            strokeWidth="26"
             strokeLinecap="butt"
             strokeDasharray={`0 ${C}`}
             animate={{ strokeDasharray: `${len} ${C}` }}
@@ -357,28 +358,28 @@ const SlideTwoHero = () => (
       transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
       className="bg-card border border-border/60 rounded-3xl p-4 shadow-sm"
     >
-      <p className="text-[11px] font-bold text-foreground/80 tracking-wider uppercase flex items-center gap-1.5 mb-3">
-        <PieChart className="w-3.5 h-3.5" strokeWidth={2.25} />
+      <p className="text-[12px] font-extrabold text-foreground tracking-wider uppercase flex items-center gap-2 mb-3">
+        <span className="text-base leading-none" aria-hidden>📊</span>
         Gastos por categoria
       </p>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="flex-shrink-0">
           <Slide2Donut />
         </div>
-        <div className="flex-1 space-y-1.5">
+        <div className="flex-1 space-y-2">
           {SlideTwoCategories.map((r, i) => (
             <motion.div
               key={r.n}
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 + i * 0.08, duration: 0.3 }}
-              className="flex items-center justify-between text-[11px]"
+              className="flex items-center justify-between gap-2 text-[12px]"
             >
-              <span className="flex items-center gap-1.5 text-foreground">
-                <span className="w-2 h-2 rounded-full" style={{ background: `hsl(var(${r.c}))` }} />
+              <span className="flex items-center gap-2 text-foreground">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: `hsl(var(${r.c}))` }} />
                 {r.n}
               </span>
-              <span className="text-muted-foreground tabular-nums font-medium">{r.v}</span>
+              <span className="text-muted-foreground tabular-nums">{r.v}</span>
             </motion.div>
           ))}
         </div>
@@ -390,18 +391,18 @@ const SlideTwoHero = () => (
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.65, duration: 0.45, ease: "easeOut" }}
-      className="rounded-3xl p-3.5 flex items-center gap-3"
+      className="rounded-2xl p-3.5 flex items-center gap-3"
       style={{ background: "hsl(var(--chart-4) / 0.12)" }}
     >
       <div
-        className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+        className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: "hsl(var(--chart-4) / 0.22)" }}
       >
         <Home className="w-5 h-5" style={{ color: "hsl(var(--chart-4))" }} strokeWidth={2.25} />
       </div>
       <div className="leading-tight">
-        <p className="text-[11px] text-muted-foreground">Maior gasto do mês</p>
-        <p className="text-[15px] font-extrabold text-foreground">Moradia · R$ 1.300</p>
+        <p className="text-[12px] text-muted-foreground">Maior gasto:</p>
+        <p className="text-[18px] font-extrabold mt-0.5" style={{ color: "hsl(var(--chart-4))" }}>Moradia</p>
       </div>
     </motion.div>
   </div>
@@ -1022,7 +1023,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 transition={{ delay: 0.25, duration: 0.35 }}
                 className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
               >
-                Veja seus gastos separados por categoria e descubra para onde seu dinheiro está indo.
+                Veja seus gastos separados por categoria e entenda exatamente onde seu dinheiro está indo.
               </motion.p>
 
               {/* Hero do slide 2 */}
@@ -1036,7 +1037,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.75, duration: 0.35 }}
                 onClick={goNext}
-                className="w-full h-[56px] rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
                 <span>Continuar</span>
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />

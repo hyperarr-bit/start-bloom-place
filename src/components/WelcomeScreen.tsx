@@ -233,87 +233,77 @@ const MiniFloatCard = ({
   </motion.div>
 );
 
-// Layout do slide 1 mobile: apenas a área visual (mocks + Resumo do mês)
-const SlideOneHero = () => (
-  <div className="w-full flex flex-col">
-    <div className="relative w-full">
-      {/* halo decorativo sutil */}
-      <div className="absolute inset-x-8 top-4 bottom-8 bg-muted/40 rounded-full blur-3xl -z-10" />
-
-      {/* Mini cards em 2x2 com leve rotação */}
-      <div className="relative w-full h-[120px] mb-3">
-        <MiniFloatCard
-          label="Receitas"
-          value="R$ 6.400,00"
-          color="--chart-3"
-          icon={DollarSign}
-          delay={0.05}
-          rotate={-3}
-          className="top-0 left-2"
-        />
-        <MiniFloatCard
-          label="Despesas"
-          value="R$ 635,00"
-          color="--chart-4"
-          icon={ArrowDown}
-          delay={0.12}
-          rotate={3}
-          className="top-1 right-2"
-        />
-        <MiniFloatCard
-          label="Investimentos"
-          value="R$ 14.500"
-          color="--chart-2"
-          icon={BarChart3}
-          delay={0.19}
-          rotate={-2}
-          className="bottom-0 left-6"
-        />
-        <MiniFloatCard
-          label="Desejos"
-          value="R$ 1.000,00"
-          color="--chart-1"
-          icon={Heart}
-          iconFill
-          delay={0.26}
-          rotate={2}
-          className="bottom-1 right-6"
-        />
-      </div>
-
-      {/* Card Resumo do mês — full width abaixo */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.32, duration: 0.5, ease: "easeOut" }}
-        className="w-full bg-card border border-border/60 rounded-3xl px-4 py-3.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.18)]"
-      >
-        <p className="text-[12px] font-semibold text-foreground mb-2.5">Resumo do mês</p>
-        <div className="text-[11px]">
-          <div className="flex items-center justify-between py-1.5">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" strokeWidth={1.75} />
-              Saldo do mês
-            </span>
-            <span className="font-semibold text-[hsl(var(--chart-2))]">+R$ 5.765,00</span>
-          </div>
-          <div className="flex items-center justify-between py-1.5 border-t border-border/50">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="w-3.5 h-3.5 text-[hsl(var(--chart-3))]" strokeWidth={1.75} />
-              Contas a pagar
-            </span>
-            <span className="font-semibold text-[hsl(var(--chart-3))]">2</span>
-          </div>
-          <div className="flex items-center justify-between py-1.5 border-t border-border/50">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <Bell className="w-3.5 h-3.5 text-[hsl(var(--chart-1))]" strokeWidth={1.75} />
-              Alertas inteligentes
-            </span>
-            <span className="font-semibold text-[hsl(var(--chart-1))]">2</span>
-          </div>
-        </div>
-      </motion.div>
+// Slide 1 mobile: 3 cards empilhados (Receitas, Gastos, Saldo do mês)
+const SlideOneRow = ({
+  label,
+  value,
+  color,
+  icon: Icon,
+  trendIcon: TrendIcon,
+  delay = 0,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  icon: typeof DollarSign;
+  trendIcon: typeof TrendingUp;
+  delay?: number;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay, duration: 0.45, ease: "easeOut" }}
+    className="flex items-center gap-3 bg-card border border-border/60 rounded-2xl px-3.5 py-3 shadow-[0_4px_16px_-8px_rgba(0,0,0,0.08)]"
+  >
+    <div
+      className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+      style={{ background: `hsl(var(${color}) / 0.18)` }}
+    >
+      <Icon className="w-5 h-5" style={{ color: `hsl(var(${color}))` }} strokeWidth={2.5} />
     </div>
+    <div className="flex-1 min-w-0">
+      <p className="text-[12px] text-muted-foreground leading-none">{label}</p>
+      <p
+        className="text-[20px] font-extrabold leading-tight mt-1 tabular-nums"
+        style={{ color: `hsl(var(${color}))` }}
+      >
+        {value}
+      </p>
+    </div>
+    <TrendIcon
+      className="w-5 h-5 flex-shrink-0"
+      style={{ color: `hsl(var(${color}) / 0.55)` }}
+      strokeWidth={2.25}
+    />
+  </motion.div>
+);
+
+const SlideOneHero = () => (
+  <div className="w-full flex flex-col gap-2.5">
+    <SlideOneRow
+      label="Receitas"
+      value="R$ 3.000,00"
+      color="--chart-2"
+      icon={DollarSign}
+      trendIcon={TrendingUp}
+      delay={0.05}
+    />
+    <SlideOneRow
+      label="Gastos"
+      value="R$ 635,00"
+      color="--chart-1"
+      icon={TrendingDown}
+      trendIcon={TrendingDown}
+      delay={0.12}
+    />
+    <SlideOneRow
+      label="Saldo do mês"
+      value="+R$ 2.365,00"
+      color="--chart-2"
+      icon={TrendingUp}
+      trendIcon={TrendingUp}
+      delay={0.19}
+    />
   </div>
 );
 

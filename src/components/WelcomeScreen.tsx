@@ -630,6 +630,100 @@ const SlideFourHero = () => (
   </div>
 );
 
+// ---------- Slide 5 — Acompanhe seus desejos e metas ----------
+
+const SlideFiveDesejosHero = () => {
+  const meta = 3399;
+  const guardado = 1200;
+  const falta = meta - guardado;
+  const pct = Math.round((guardado / meta) * 100);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+      className="bg-card rounded-[22px] px-[16px] pt-[14px] pb-[14px]"
+      style={{ boxShadow: "var(--limit-card-shadow)" }}
+    >
+      {/* header: Desejo atual */}
+      <div className="flex items-center gap-[10px] mb-[12px]">
+        <div
+          className="w-[36px] h-[36px] rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--chart-1) / 0.12)" }}
+        >
+          <Heart
+            className="w-[18px] h-[18px]"
+            style={{ color: "hsl(var(--chart-1))" }}
+            strokeWidth={2.4}
+          />
+        </div>
+        <p className="text-[17px] font-extrabold leading-none text-foreground">Desejo atual</p>
+      </div>
+
+      {/* 3 colunas */}
+      <div className="grid grid-cols-3 gap-0 mb-[12px]">
+        {/* Meta total */}
+        <div className="flex flex-col pr-[8px]">
+          <div className="flex items-center gap-[5px] mb-[4px]">
+            <Target className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-1))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none">Meta total</span>
+          </div>
+          <p className="text-[15px] font-extrabold text-foreground tabular-nums leading-none">R$ 3.399</p>
+        </div>
+        {/* Já guardado */}
+        <div className="flex flex-col px-[10px] border-l border-r border-border/60">
+          <div className="flex items-center gap-[5px] mb-[4px]">
+            <TrendingUp className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-2))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none">Já guardado</span>
+          </div>
+          <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-2))" }}>R$ 1.200</p>
+        </div>
+        {/* Falta */}
+        <div className="flex flex-col pl-[10px]">
+          <div className="flex items-center gap-[5px] mb-[4px]">
+            <ShoppingCart className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-3))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none">Falta</span>
+          </div>
+          <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-3))" }}>R$ 2.199</p>
+        </div>
+      </div>
+
+      <div className="h-px w-full bg-border/70 mb-[12px]" />
+
+      {/* Produto */}
+      <div className="flex items-center gap-[12px] mb-[12px]">
+        <img src={ipadImg} alt="Apple iPad 128 GB" className="w-[78px] h-[78px] object-contain flex-shrink-0" />
+        <div className="flex-1 min-w-0 flex flex-col gap-[5px]">
+          <p className="text-[15px] font-extrabold text-foreground leading-tight">Apple iPad 128 GB</p>
+          <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-md px-[8px] py-[2px] self-start leading-none">Outros</span>
+          <p className="text-[15px] font-extrabold text-foreground tabular-nums leading-none mt-[2px]">R$ 3.399,00</p>
+        </div>
+      </div>
+
+      {/* Progresso */}
+      <div className="flex items-center justify-between mb-[6px]">
+        <span className="text-[12px] font-medium tabular-nums" style={{ color: "hsl(var(--chart-2))" }}>
+          Guardado: R$ 1.200,00
+        </span>
+        <span className="text-[12px] font-medium tabular-nums" style={{ color: "hsl(var(--chart-3))" }}>
+          Falta: R$ 2.199,00
+        </span>
+      </div>
+      <div className="h-[7px] w-full rounded-full overflow-hidden" style={{ background: "hsl(var(--muted) / 0.7)" }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ delay: 0.4, duration: 0.7, ease: "easeOut" }}
+          className="h-full rounded-full"
+          style={{ background: "linear-gradient(90deg, hsl(var(--chart-1)) 0%, hsl(330 80% 65%) 100%)" }}
+        />
+      </div>
+      <p className="text-[13px] font-semibold text-foreground mt-[6px] tabular-nums">{pct}%</p>
+    </motion.div>
+  );
+};
+
 
 const StatCard = ({
   label,

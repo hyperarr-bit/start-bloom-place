@@ -490,24 +490,6 @@ const SlideThreeHero = () => (
       </motion.div>
     </motion.div>
 
-    {/* Card verde — tip */}
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.75, duration: 0.45, ease: "easeOut" }}
-      className="rounded-2xl p-3.5 flex items-center gap-3"
-      style={{ background: "hsl(var(--success) / 0.10)" }}
-    >
-      <div
-        className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: "hsl(var(--success) / 0.20)" }}
-      >
-        <TrendingUp className="w-5 h-5" style={{ color: "hsl(var(--success))" }} strokeWidth={2.25} />
-      </div>
-      <p className="text-[13px] text-foreground leading-tight">
-        Você ainda pode se organizar<br />antes do fim do mês
-      </p>
-    </motion.div>
   </div>
 );
 
@@ -1205,7 +1187,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 onClick={goNext}
                 className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
-                <span>Próximo</span>
+                <span>Continuar</span>
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
               </motion.button>
 

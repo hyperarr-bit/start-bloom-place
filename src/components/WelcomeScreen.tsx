@@ -5,7 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
-  ArrowRight, Clock, Home, PieChart,
+  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt, BookOpen,
 } from "lucide-react";
 
 

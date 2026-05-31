@@ -1421,11 +1421,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
               </motion.button>
 
-              {/* Microcopy */}
-              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
-                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
-                Leva menos de 2 minutos para configurar.
-              </p>
+              {/* Voltar */}
+              <button onClick={goBack} className="text-xs text-muted-foreground hover:text-foreground transition-colors mt-4 mb-1 mx-auto">
+                Voltar
+              </button>
             </motion.div>
           ) : step === 2 ? (
             <motion.div

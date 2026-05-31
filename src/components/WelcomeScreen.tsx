@@ -5,7 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
-  ArrowRight, Clock,
+  ArrowRight, Clock, Home, PieChart,
 } from "lucide-react";
 
 
@@ -306,6 +306,107 @@ const SlideOneHero = () => (
     />
   </div>
 );
+
+
+const SlideTwoCategories = [
+  { c: "--chart-4", n: "Moradia", v: "R$ 1.300", pct: 54.7 },
+  { c: "--chart-1", n: "Educação", v: "R$ 450", pct: 18.9 },
+  { c: "--chart-3", n: "Contas da Casa", v: "R$ 225", pct: 9.5 },
+  { c: "--chart-2", n: "Vestuário", v: "R$ 220", pct: 9.3 },
+  { c: "--chart-5", n: "Restaurante", v: "R$ 180", pct: 7.6 },
+];
+
+const Slide2Donut = () => {
+  const R = 56;
+  const C = 2 * Math.PI * R;
+  let cumulative = 0;
+  return (
+    <svg viewBox="0 0 140 140" className="w-[140px] h-[140px] -rotate-90">
+      <circle cx="70" cy="70" r={R} fill="none" stroke="hsl(var(--muted))" strokeWidth="16" opacity="0.35" />
+      {SlideTwoCategories.map((s, i) => {
+        const len = (s.pct / 100) * C;
+        const offset = (cumulative / 100) * C;
+        cumulative += s.pct;
+        return (
+          <motion.circle
+            key={s.n}
+            cx="70"
+            cy="70"
+            r={R}
+            fill="none"
+            stroke={`hsl(var(${s.c}))`}
+            strokeWidth="16"
+            strokeLinecap="butt"
+            strokeDasharray={`0 ${C}`}
+            animate={{ strokeDasharray: `${len} ${C}` }}
+            transition={{ delay: 0.4 + i * 0.18, duration: 0.7, ease: "easeOut" }}
+            style={{ strokeDashoffset: -offset }}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+const SlideTwoHero = () => (
+  <div className="w-full flex flex-col gap-3">
+    {/* Card do gráfico */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+      className="bg-card border border-border/60 rounded-3xl p-4 shadow-sm"
+    >
+      <p className="text-[11px] font-bold text-foreground/80 tracking-wider uppercase flex items-center gap-1.5 mb-3">
+        <PieChart className="w-3.5 h-3.5" strokeWidth={2.25} />
+        Gastos por categoria
+      </p>
+      <div className="flex items-center gap-4">
+        <div className="flex-shrink-0">
+          <Slide2Donut />
+        </div>
+        <div className="flex-1 space-y-1.5">
+          {SlideTwoCategories.map((r, i) => (
+            <motion.div
+              key={r.n}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 + i * 0.08, duration: 0.3 }}
+              className="flex items-center justify-between text-[11px]"
+            >
+              <span className="flex items-center gap-1.5 text-foreground">
+                <span className="w-2 h-2 rounded-full" style={{ background: `hsl(var(${r.c}))` }} />
+                {r.n}
+              </span>
+              <span className="text-muted-foreground tabular-nums font-medium">{r.v}</span>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+
+    {/* Card lavanda — Maior gasto */}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.65, duration: 0.45, ease: "easeOut" }}
+      className="rounded-3xl p-3.5 flex items-center gap-3"
+      style={{ background: "hsl(var(--chart-4) / 0.12)" }}
+    >
+      <div
+        className="w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--chart-4) / 0.22)" }}
+      >
+        <Home className="w-5 h-5" style={{ color: "hsl(var(--chart-4))" }} strokeWidth={2.25} />
+      </div>
+      <div className="leading-tight">
+        <p className="text-[11px] text-muted-foreground">Maior gasto do mês</p>
+        <p className="text-[15px] font-extrabold text-foreground">Moradia · R$ 1.300</p>
+      </div>
+    </motion.div>
+  </div>
+);
+
 
 
 
@@ -876,6 +977,75 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 <Link to="/auth" className="text-foreground font-semibold underline underline-offset-2">
                   Entrar
                 </Link>
+              </p>
+            </motion.div>
+          ) : step === 1 ? (
+            <motion.div
+              key="slide-1"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              {/* CORE */}
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+              >
+                CORE
+              </motion.h2>
+
+              {/* Título + subtítulo */}
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+              >
+                Pare de perder dinheiro sem perceber
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                Veja seus gastos separados por categoria e descubra para onde seu dinheiro está indo.
+              </motion.p>
+
+              {/* Hero do slide 2 */}
+              <div className="w-full mt-7">
+                <SlideTwoHero />
+              </div>
+
+              {/* CTA */}
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.75, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full h-[56px] rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+              >
+                <span>Continuar</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
+              {/* Microcopy */}
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
               </p>
             </motion.div>
           ) : (

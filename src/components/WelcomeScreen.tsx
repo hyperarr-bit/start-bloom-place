@@ -532,24 +532,24 @@ const fmtBRL = (n: number) =>
   `R$ ${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
 
 const SlideFourHero = () => (
-  <div className="w-full flex flex-col gap-[14px]">
+  <div className="w-full flex flex-col gap-[10px]">
     {/* Card branco — Limites por categoria */}
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
-      className="bg-card border border-border/70 rounded-[22px] px-[18px] py-[17px]"
+      className="bg-card border border-border/70 rounded-[22px] px-[16px] py-[14px]"
       style={{ boxShadow: "var(--limit-card-shadow)" }}
     >
       {/* header */}
-      <div className="flex items-center gap-[13px] mb-[17px]">
+      <div className="flex items-center gap-[12px] mb-[12px]">
         <div
-          className="w-[43px] h-[43px] rounded-full flex items-center justify-center flex-shrink-0"
+          className="w-[39px] h-[39px] rounded-full flex items-center justify-center flex-shrink-0"
           style={{ background: "hsl(var(--muted) / 0.72)" }}
         >
-          <Target className="w-[20px] h-[20px] text-foreground" strokeWidth={3} />
+          <Target className="w-[19px] h-[19px] text-foreground" strokeWidth={3} />
         </div>
-        <p className="text-[19px] font-extrabold leading-none text-foreground">Limites por categoria</p>
+        <p className="text-[18px] font-extrabold leading-none text-foreground">Limites por categoria</p>
       </div>
 
       {/* rows */}
@@ -564,22 +564,22 @@ const SlideFourHero = () => (
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.25 + i * 0.08, duration: 0.32 }}
-              className={`flex flex-col ${i === SLIDE_FOUR_LIMITS.length - 1 ? "pt-[10px]" : "border-b border-border/55 py-[10px]"} ${i === 0 ? "pt-0" : ""}`}
+              className={`flex flex-col ${i === SLIDE_FOUR_LIMITS.length - 1 ? "pt-[7px]" : "border-b border-border/55 py-[7px]"} ${i === 0 ? "pt-0" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <div
-                  className="flex items-center gap-[9px] px-[10px] py-[7px] rounded-[8px]"
+                  className="flex items-center gap-[8px] px-[9px] py-[5px] rounded-[8px]"
                   style={{ background: row.pillBg }}
                 >
                   <Icon
-                    className="w-[18px] h-[18px] flex-shrink-0"
+                    className="w-[16px] h-[16px] flex-shrink-0"
                     style={{ color: `hsl(var(${row.iconColor}))` }}
                     strokeWidth={2.8}
                     fill={row.iconFill ? "currentColor" : undefined}
                   />
-                  <span className="text-[16px] font-medium leading-none text-foreground">{row.name}</span>
+                  <span className="text-[14px] font-medium leading-none text-foreground">{row.name}</span>
                 </div>
-                <div className="text-[16px] tabular-nums whitespace-nowrap">
+                <div className="text-[14px] tabular-nums whitespace-nowrap">
                   <span
                     className="font-extrabold"
                     style={{ color: exceeded ? "hsl(var(--limit-red))" : "hsl(var(--foreground))" }}
@@ -589,7 +589,7 @@ const SlideFourHero = () => (
                   <span className="text-muted-foreground"> / {fmtBRL(row.limit)}</span>
                 </div>
               </div>
-              <div className="h-[6px] w-full rounded-full overflow-hidden mt-[9px]" style={{ background: "hsl(var(--muted) / 0.62)" }}>
+              <div className="h-[5px] w-full rounded-full overflow-hidden mt-[6px]" style={{ background: "hsl(var(--muted) / 0.62)" }}>
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${pct * 100}%` }}
@@ -599,7 +599,7 @@ const SlideFourHero = () => (
                 />
               </div>
               {exceeded && (
-                <p className="text-[14px] font-medium mt-[8px]" style={{ color: "hsl(var(--limit-red))" }}>
+                <p className="text-[13px] font-medium mt-[6px]" style={{ color: "hsl(var(--limit-red))" }}>
                   Limite excedido em {fmtBRL(row.spent - row.limit)}
                 </p>
               )}
@@ -614,16 +614,16 @@ const SlideFourHero = () => (
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.85, duration: 0.4, ease: "easeOut" }}
-      className="rounded-[14px] px-[14px] py-[11px] flex items-center gap-[17px] border"
+      className="rounded-[14px] px-[13px] py-[10px] flex items-center gap-[15px] border"
       style={{ background: "hsl(var(--limit-red) / 0.055)", borderColor: "hsl(var(--limit-red) / 0.18)" }}
     >
       <div
-        className="w-[42px] h-[42px] rounded-full flex items-center justify-center flex-shrink-0"
+        className="w-[39px] h-[39px] rounded-full flex items-center justify-center flex-shrink-0"
         style={{ background: "hsl(var(--limit-red) / 0.11)" }}
       >
-        <Bell className="w-[22px] h-[22px]" style={{ color: "hsl(var(--limit-red))" }} strokeWidth={2.35} />
+        <Bell className="w-[20px] h-[20px]" style={{ color: "hsl(var(--limit-red))" }} strokeWidth={2.35} />
       </div>
-      <p className="text-[15px] text-foreground leading-[1.35]">
+      <p className="text-[14px] text-foreground leading-[1.35]">
         Alertas ajudam você a corrigir<br />antes de gastar demais
       </p>
     </motion.div>

@@ -67,6 +67,7 @@ import AdminTrials from "./pages/admin/AdminTrials";
 import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
 import AdminRetention from "./pages/admin/AdminRetention";
 import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
+import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
 import AdminUso from "./pages/admin/AdminUso";
 import NotFound from "./pages/NotFound";
 
@@ -103,6 +104,7 @@ const AnimatedRoutes = () => {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="funil" replace />} />
           <Route path="funil" element={<AdminFinanceFunnel />} />
+          <Route path="tutorial-inicial" element={<AdminTutorialInicial />} />
           <Route path="usuarios" element={<AdminUsers />} />
           <Route path="trials" element={<AdminTrials />} />
           <Route path="emails" element={<AdminEmailVariants />} />

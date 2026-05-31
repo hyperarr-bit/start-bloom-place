@@ -598,6 +598,10 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_pre_signup_funnel: {
+        Args: { _from?: string; _to?: string }
+        Returns: Json
+      }
       admin_recent_visitors: {
         Args: { _limit?: number }
         Returns: {

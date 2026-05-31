@@ -857,7 +857,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               {/* CTA */}
               <button
-                onClick={finish}
+                onClick={goNext}
                 className="w-full h-[56px] rounded-2xl bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
               >
                 <span>Começar agora</span>

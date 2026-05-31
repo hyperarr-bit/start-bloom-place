@@ -1748,7 +1748,9 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
             </>
           )}
+          </div>
         </div>
+
 
 
 

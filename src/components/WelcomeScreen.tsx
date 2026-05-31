@@ -865,9 +865,17 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </button>
 
               {/* Microcopy */}
-              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4">
                 <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Leva menos de 2 minutos para configurar.
+              </p>
+
+              {/* Login link */}
+              <p className="text-xs text-muted-foreground text-center mt-3 mb-1">
+                Já tem uma conta?{" "}
+                <Link to="/auth" className="text-foreground font-semibold underline underline-offset-2">
+                  Entrar
+                </Link>
               </p>
             </motion.div>
           ) : (

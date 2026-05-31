@@ -1032,10 +1032,16 @@ const slides = [
     mock: <SlideFourMock />,
   },
   {
+    title: <>Acompanhe seus<br />desejos e metas</>,
+    subtitle: "Crie desejos, acompanhe quanto já guardou e veja quanto falta para chegar lá.",
+    mock: <SlideFiveDesejosHero />,
+  },
+  {
     title: <>Comece pela sua<br />primeira receita</>,
     subtitle: "Adicione sua fonte de renda para montar a base da sua organização financeira.",
     mock: <SlideFiveMock />,
   },
+
 ];
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(

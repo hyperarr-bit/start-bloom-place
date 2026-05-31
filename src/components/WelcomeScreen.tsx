@@ -724,6 +724,77 @@ const SlideFiveDesejosHero = () => {
   );
 };
 
+// ---------- Slide 6 — Comece pela sua primeira receita ----------
+
+const SlideSixHero = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+    className="bg-card rounded-[22px] px-[16px] pt-[14px] pb-[14px]"
+    style={{ boxShadow: "var(--limit-card-shadow)" }}
+  >
+    {/* header */}
+    <div className="flex items-center gap-[10px] mb-[14px]">
+      <div
+        className="w-[36px] h-[36px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--chart-2) / 0.14)" }}
+      >
+        <DollarSign
+          className="w-[18px] h-[18px]"
+          style={{ color: "hsl(var(--chart-2))" }}
+          strokeWidth={2.6}
+        />
+      </div>
+      <p className="text-[17px] font-extrabold leading-none text-foreground">Nova receita</p>
+    </div>
+
+    {/* Fonte da receita */}
+    <div className="mb-[10px]">
+      <p className="text-[12px] text-muted-foreground mb-[6px]">Fonte da receita</p>
+      <div className="border border-border rounded-[12px] px-[12px] py-[11px] flex items-center justify-between">
+        <span className="text-[14px] font-medium text-foreground">Salário</span>
+        <ChevronDown className="w-[16px] h-[16px] text-muted-foreground" strokeWidth={2.25} />
+      </div>
+    </div>
+
+    {/* Valor */}
+    <div className="mb-[12px]">
+      <p className="text-[12px] text-muted-foreground mb-[6px]">Valor</p>
+      <div className="border border-border rounded-[12px] px-[12px] py-[11px]">
+        <span className="text-[14px] font-extrabold text-foreground tabular-nums">R$ 6.400,00</span>
+      </div>
+    </div>
+
+    {/* destaque Ótimo começo */}
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.35, duration: 0.4 }}
+      className="rounded-[14px] px-[13px] py-[10px] flex items-start gap-[12px] border"
+      style={{ background: "hsl(var(--chart-3) / 0.10)", borderColor: "hsl(var(--chart-3) / 0.22)" }}
+    >
+      <div
+        className="w-[34px] h-[34px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--chart-3) / 0.18)" }}
+      >
+        <Star
+          className="w-[16px] h-[16px]"
+          style={{ color: "hsl(var(--chart-3))" }}
+          fill="currentColor"
+          strokeWidth={2}
+        />
+      </div>
+      <div className="text-[13px] leading-[1.35]">
+        <p className="font-bold text-foreground">Ótimo começo!</p>
+        <p className="text-muted-foreground">Registrar suas receitas é o primeiro passo para ter controle total das suas finanças.</p>
+      </div>
+    </motion.div>
+  </motion.div>
+);
+
+
+
 
 const StatCard = ({
   label,

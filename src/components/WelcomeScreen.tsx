@@ -672,17 +672,17 @@ const SlideFiveDesejosHero = () => {
           <p className="text-[15px] font-extrabold text-foreground tabular-nums leading-none">R$ 3.399</p>
         </div>
         {/* Já guardado */}
-        <div className="flex flex-col px-[10px] border-l border-r border-border/60">
-          <div className="flex items-center gap-[5px] mb-[4px]">
-            <TrendingUp className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-2))" }} strokeWidth={2.6} />
-            <span className="text-[11px] text-muted-foreground leading-none">Já guardado</span>
+        <div className="flex flex-col px-[8px] border-l border-r border-border/60">
+          <div className="flex items-center gap-[4px] mb-[4px]">
+            <TrendingUp className="w-[13px] h-[13px] flex-shrink-0" style={{ color: "hsl(var(--chart-2))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none whitespace-nowrap">Já guardado</span>
           </div>
           <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-2))" }}>R$ 1.200</p>
         </div>
         {/* Falta */}
-        <div className="flex flex-col pl-[10px]">
-          <div className="flex items-center gap-[5px] mb-[4px]">
-            <ShoppingCart className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-3))" }} strokeWidth={2.6} />
+        <div className="flex flex-col pl-[8px]">
+          <div className="flex items-center gap-[4px] mb-[4px]">
+            <ShoppingCart className="w-[13px] h-[13px] flex-shrink-0" style={{ color: "hsl(var(--chart-3))" }} strokeWidth={2.6} />
             <span className="text-[11px] text-muted-foreground leading-none">Falta</span>
           </div>
           <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-3))" }}>R$ 2.199</p>

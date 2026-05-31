@@ -5,7 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
-  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt, BookOpen,
+  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt,
 } from "lucide-react";
 
 
@@ -495,49 +495,65 @@ const SlideThreeHero = () => (
 
 
 // ---------- Slide 4 hero (Limites por categoria) ----------
+const FilledUtensils = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...props} fill="currentColor">
+    <path d="M6.2 2.5c.43 0 .78.35.78.78v6.06h1.2V3.28a.78.78 0 0 1 1.56 0v6.06h1.1V3.28a.78.78 0 0 1 1.56 0v6.2c0 2.1-1.28 3.84-3.05 4.28v6.92a1.15 1.15 0 0 1-2.3 0v-6.92C5.27 13.32 4 11.58 4 9.48v-6.2c0-.43.35-.78.78-.78s.78.35.78.78v6.06h1.1V3.28c0-.43.35-.78.78-.78Z" />
+    <path d="M17.6 2.75c1.74 0 2.9 2.2 2.9 5.42 0 2.72-.82 4.78-2.05 5.35v7.18a1.15 1.15 0 0 1-2.3 0V3.28c0-.29.23-.53.53-.53h.92Z" />
+  </svg>
+);
+
+const FilledBook = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" {...props} fill="currentColor">
+    <path d="M5 4.25c2.08 0 3.9.44 5.35 1.38.42.27.65.72.65 1.22v12.7c0 .35-.38.56-.68.38C8.9 19.08 7.08 18.7 5 18.7H3.9c-.77 0-1.4-.63-1.4-1.4V5.65c0-.77.63-1.4 1.4-1.4H5Z" />
+    <path d="M19 4.25h1.1c.77 0 1.4.63 1.4 1.4V17.3c0 .77-.63 1.4-1.4 1.4H19c-2.08 0-3.9.38-5.32 1.23-.3.18-.68-.03-.68-.38V6.85c0-.5.23-.95.65-1.22C15.1 4.69 16.92 4.25 19 4.25Z" />
+  </svg>
+);
+
 type LimitRow = {
   name: string;
   icon: React.ComponentType<any>;
-  iconColor: string; // hsl token name e.g. --destructive
-  pillBg: string; // background hsl()/alpha
+  iconColor: string;
+  pillBg: string;
   spent: number;
   limit: number;
-  barColor: string; // hsl token name
+  barColor: string;
+  iconFill?: boolean;
 };
 
 const SLIDE_FOUR_LIMITS: LimitRow[] = [
-  { name: "Restaurante", icon: () => <span className="text-[15px] leading-none">🍴</span>, iconColor: "--chart-2", pillBg: "hsl(var(--chart-2) / 0.12)", spent: 180, limit: 150, barColor: "--destructive" },
-  { name: "Transporte", icon: Bus, iconColor: "--chart-3", pillBg: "hsl(var(--chart-3) / 0.12)", spent: 50, limit: 250, barColor: "--success" },
-  { name: "Vestuário", icon: Shirt, iconColor: "--chart-3", pillBg: "hsl(var(--chart-3) / 0.12)", spent: 220, limit: 980, barColor: "--success" },
-  { name: "Educação", icon: BookOpen, iconColor: "--chart-1", pillBg: "hsl(var(--chart-1) / 0.14)", spent: 450, limit: 580, barColor: "--chart-1" },
-  { name: "Moradia", icon: Home, iconColor: "--chart-2", pillBg: "hsl(var(--chart-2) / 0.12)", spent: 1300, limit: 1400, barColor: "--chart-2" },
+  { name: "Restaurante", icon: FilledUtensils, iconColor: "--limit-orange", pillBg: "hsl(var(--limit-orange) / 0.10)", spent: 180, limit: 150, barColor: "--limit-red" },
+  { name: "Transporte", icon: Bus, iconColor: "--limit-blue", pillBg: "hsl(var(--limit-blue) / 0.10)", spent: 50, limit: 250, barColor: "--limit-green", iconFill: true },
+  { name: "Vestuário", icon: Shirt, iconColor: "--limit-cyan", pillBg: "hsl(var(--limit-cyan) / 0.10)", spent: 220, limit: 980, barColor: "--limit-green", iconFill: true },
+  { name: "Educação", icon: FilledBook, iconColor: "--limit-green", pillBg: "hsl(var(--limit-green) / 0.10)", spent: 450, limit: 580, barColor: "--limit-lime" },
+  { name: "Moradia", icon: Home, iconColor: "--limit-orange", pillBg: "hsl(var(--limit-orange) / 0.08)", spent: 1300, limit: 1400, barColor: "--limit-orange", iconFill: true },
 ];
 
 const fmtBRL = (n: number) =>
   `R$ ${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
 
 const SlideFourHero = () => (
-  <div className="w-full flex flex-col gap-3">
+  <div className="w-full flex flex-col gap-[10px]">
     {/* Card branco — Limites por categoria */}
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
-      className="bg-card border border-border/60 rounded-3xl p-4 shadow-sm"
+      className="bg-card border border-border/70 rounded-[22px] px-[16px] py-[14px]"
+      style={{ boxShadow: "var(--limit-card-shadow)" }}
     >
       {/* header */}
-      <div className="flex items-center gap-2.5 mb-3">
+      <div className="flex items-center gap-[12px] mb-[12px]">
         <div
-          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-          style={{ background: "hsl(var(--muted) / 0.7)" }}
+          className="w-[39px] h-[39px] rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--muted) / 0.72)" }}
         >
-          <Target className="w-[18px] h-[18px] text-foreground" strokeWidth={2.25} />
+          <Target className="w-[19px] h-[19px] text-foreground" strokeWidth={3} />
         </div>
-        <p className="text-[16px] font-bold text-foreground">Limites por categoria</p>
+        <p className="text-[18px] font-extrabold leading-none text-foreground">Limites por categoria</p>
       </div>
 
       {/* rows */}
-      <div className="flex flex-col gap-2.5">
+      <div>
         {SLIDE_FOUR_LIMITS.map((row, i) => {
           const pct = Math.min(1, row.spent / row.limit);
           const exceeded = row.spent > row.limit;
@@ -548,31 +564,32 @@ const SlideFourHero = () => (
               initial={{ opacity: 0, x: 8 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.25 + i * 0.08, duration: 0.32 }}
-              className="flex flex-col gap-1.5"
+              className={`flex flex-col ${i === SLIDE_FOUR_LIMITS.length - 1 ? "pt-[7px]" : "border-b border-border/55 py-[7px]"} ${i === 0 ? "pt-0" : ""}`}
             >
               <div className="flex items-center justify-between">
                 <div
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                  className="flex items-center gap-[8px] px-[9px] py-[5px] rounded-[8px]"
                   style={{ background: row.pillBg }}
                 >
                   <Icon
-                    className="w-[14px] h-[14px]"
+                    className="w-[16px] h-[16px] flex-shrink-0"
                     style={{ color: `hsl(var(${row.iconColor}))` }}
-                    strokeWidth={2.25}
+                    strokeWidth={2.8}
+                    fill={row.iconFill ? "currentColor" : undefined}
                   />
-                  <span className="text-[12.5px] font-medium text-foreground">{row.name}</span>
+                  <span className="text-[14px] font-medium leading-none text-foreground">{row.name}</span>
                 </div>
-                <div className="text-[12.5px] tabular-nums">
+                <div className="text-[14px] tabular-nums whitespace-nowrap">
                   <span
-                    className="font-bold"
-                    style={{ color: exceeded ? "hsl(var(--destructive))" : "hsl(var(--foreground))" }}
+                    className="font-extrabold"
+                    style={{ color: exceeded ? "hsl(var(--limit-red))" : "hsl(var(--foreground))" }}
                   >
                     {fmtBRL(row.spent)}
                   </span>
                   <span className="text-muted-foreground"> / {fmtBRL(row.limit)}</span>
                 </div>
               </div>
-              <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: "hsl(var(--muted) / 0.7)" }}>
+              <div className="h-[5px] w-full rounded-full overflow-hidden mt-[6px]" style={{ background: "hsl(var(--muted) / 0.62)" }}>
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${pct * 100}%` }}
@@ -582,7 +599,7 @@ const SlideFourHero = () => (
                 />
               </div>
               {exceeded && (
-                <p className="text-[11.5px] font-medium" style={{ color: "hsl(var(--destructive))" }}>
+                <p className="text-[13px] font-medium mt-[6px]" style={{ color: "hsl(var(--limit-red))" }}>
                   Limite excedido em {fmtBRL(row.spent - row.limit)}
                 </p>
               )}
@@ -597,16 +614,16 @@ const SlideFourHero = () => (
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.85, duration: 0.4, ease: "easeOut" }}
-      className="rounded-2xl p-3 flex items-center gap-3"
-      style={{ background: "hsl(var(--destructive) / 0.08)" }}
+      className="rounded-[14px] px-[13px] py-[10px] flex items-center gap-[15px] border"
+      style={{ background: "hsl(var(--limit-red) / 0.055)", borderColor: "hsl(var(--limit-red) / 0.18)" }}
     >
       <div
-        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: "hsl(var(--destructive) / 0.15)" }}
+        className="w-[39px] h-[39px] rounded-full flex items-center justify-center flex-shrink-0"
+        style={{ background: "hsl(var(--limit-red) / 0.11)" }}
       >
-        <Bell className="w-[18px] h-[18px]" style={{ color: "hsl(var(--destructive))" }} strokeWidth={2.25} />
+        <Bell className="w-[20px] h-[20px]" style={{ color: "hsl(var(--limit-red))" }} strokeWidth={2.35} />
       </div>
-      <p className="text-[12.5px] text-foreground leading-snug">
+      <p className="text-[14px] text-foreground leading-[1.35]">
         Alertas ajudam você a corrigir<br />antes de gastar demais
       </p>
     </motion.div>
@@ -1129,10 +1146,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex-1 flex flex-col items-center w-full min-h-0"
+              className="flex-1 flex flex-col items-center w-full min-h-0 justify-start"
             >
               {/* dots topo */}
-              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+              <div className="flex justify-center gap-1.5 shrink-0 pt-0">
                 {slides.map((_, i) => (
                   <span
                     key={i}
@@ -1188,10 +1205,10 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
-              className="flex-1 flex flex-col items-center w-full min-h-0"
+              className="flex-1 flex flex-col items-center w-full min-h-0 justify-start"
             >
               {/* dots topo */}
-              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+              <div className="flex justify-center gap-1.5 shrink-0 pt-0">
                 {slides.map((_, i) => (
                   <span
                     key={i}
@@ -1205,7 +1222,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1215,7 +1232,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15, duration: 0.35 }}
-                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+                className="text-[22px] min-[390px]:text-[25px] font-bold text-foreground tracking-tight leading-[1.16] text-center mt-6 px-2"
               >
                 Pare de perder dinheiro sem perceber
               </motion.h1>
@@ -1223,13 +1240,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25, duration: 0.35 }}
-                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+                className="text-[13px] min-[390px]:text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
               >
                 Veja seus gastos separados por categoria e entenda exatamente onde seu dinheiro está indo.
               </motion.p>
 
               {/* Hero do slide 2 */}
-              <div className="w-full mt-7">
+              <div className="w-full mt-5">
                 <SlideTwoHero />
               </div>
 
@@ -1273,7 +1290,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1282,7 +1299,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15, duration: 0.35 }}
-                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+                className="text-[22px] min-[390px]:text-[25px] font-bold text-foreground tracking-tight leading-[1.16] text-center mt-6 px-2"
               >
                 Saiba se o mês<br />vai fechar no positivo
               </motion.h1>
@@ -1290,7 +1307,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25, duration: 0.35 }}
-                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+                className="text-[13px] min-[390px]:text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
               >
                 O CORE calcula receitas, despesas e contas pendentes para mostrar uma previsão antes do problema acontecer.
               </motion.p>
@@ -1359,7 +1376,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 Crie limites por categoria e receba alertas quando estiver perto de exceder.
               </motion.p>
 
-              <div className="w-full mt-7">
+              <div className="w-full max-w-[336px] mt-5">
                 <SlideFourHero />
               </div>
 
@@ -1368,13 +1385,13 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.95, duration: 0.35 }}
                 onClick={goNext}
-                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+                className="w-full max-w-[336px] h-[52px] rounded-[13px] bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-4 flex items-center justify-center relative"
               >
                 <span>Continuar</span>
                 <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
               </motion.button>
 
-              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-3 mb-1">
                 <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Leva menos de 2 minutos para configurar.
               </p>

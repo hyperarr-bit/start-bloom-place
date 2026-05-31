@@ -1318,7 +1318,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
               </div>
 
               {/* CORE */}
-              <h2 className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8">
+              <h2 className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-8">
                 CORE
               </h2>
 
@@ -1381,7 +1381,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[40px] min-[390px]:text-[46px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1448,7 +1448,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[56px] min-[390px]:text-[64px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[40px] min-[390px]:text-[46px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1511,7 +1511,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-8"
               >
                 CORE
               </motion.h2>
@@ -1574,7 +1574,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>
@@ -1637,7 +1637,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.05, duration: 0.35 }}
-                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+                className="text-[44px] sm:text-[52px] font-black tracking-tight text-foreground text-center leading-none mt-6"
               >
                 CORE
               </motion.h2>

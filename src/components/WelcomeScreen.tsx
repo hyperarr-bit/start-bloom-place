@@ -863,22 +863,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
           </div>
         </div>
 
-                <Link
-                  to="/auth"
-                  onClick={() => { trackEvent("login_clicked", {}); onLogin?.(); }}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
-                >
-                  Já tem uma conta? <span className="font-semibold text-foreground">Entrar</span>
-                </Link>
-              </div>
-            ) : (
-              <>
-                {nav}
-                {loginLink}
-              </>
-            )}
-          </div>
-        </div>
+
 
 
 

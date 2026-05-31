@@ -1,15 +1,20 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, TrendingDown, Eye, MousePointerClick, CheckCircle2, UserPlus } from "lucide-react";
+import { RefreshCw, TrendingDown, Eye, MousePointerClick } from "lucide-react";
 
-interface Slide {
-  key: string;
-  label: string;
-  reached: number;
-}
+const SLIDE_TITLES: Record<number, string> = {
+  1: "Tenha controle da sua vida financeira",
+  2: "Veja seu mês com clareza",
+  3: "Controle seus gastos e limites",
+  4: "Planeje seus desejos e objetivos",
+  5: "Comece pela sua primeira receita",
+};
+const TOTAL_SLIDES = 5;
+
 interface FunnelData {
-  slides: Slide[];
-  modules: { module: string; reached: number }[];
+  landing: number;
+  start_clicked: number;
+  slides: { step: number; reached: number }[];
 }
 
 type PresetKey = "1h" | "today" | "24h" | "7d" | "30d" | "all" | "day_hour";
@@ -27,13 +32,6 @@ const PRESETS: { key: PresetKey; label: string }[] = [
 const pct = (n: number, d: number) => (d > 0 ? (n / d) * 100 : 0);
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 
-const ICONS: Record<string, typeof Eye> = {
-  landing: Eye,
-  module_choice: MousePointerClick,
-  module_chosen: CheckCircle2,
-  signup: UserPlus,
-};
-
 const todayISO = () => {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
@@ -43,7 +41,7 @@ const todayISO = () => {
 export default function AdminTutorialInicial() {
   const [preset, setPreset] = useState<PresetKey>("7d");
   const [day, setDay] = useState<string>(todayISO());
-  const [hour, setHour] = useState<string>("all"); // "all" | "0".."23"
+  const [hour, setHour] = useState<string>("all");
   const [data, setData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -65,14 +63,16 @@ export default function AdminTutorialInicial() {
         if (!day) return { from: null, to: null };
         const [y, m, d] = day.split("-").map(Number);
         if (hour === "all") {
-          const start = new Date(y, m - 1, d, 0, 0, 0);
-          const end = new Date(y, m - 1, d, 23, 59, 59, 999);
-          return { from: iso(start), to: iso(end) };
+          return {
+            from: iso(new Date(y, m - 1, d, 0, 0, 0)),
+            to:   iso(new Date(y, m - 1, d, 23, 59, 59, 999)),
+          };
         }
         const h = Number(hour);
-        const start = new Date(y, m - 1, d, h, 0, 0);
-        const end = new Date(y, m - 1, d, h, 59, 59, 999);
-        return { from: iso(start), to: iso(end) };
+        return {
+          from: iso(new Date(y, m - 1, d, h, 0, 0)),
+          to:   iso(new Date(y, m - 1, d, h, 59, 59, 999)),
+        };
       }
     }
   }, [preset, day, hour]);
@@ -89,15 +89,28 @@ export default function AdminTutorialInicial() {
 
   useEffect(() => { load(); }, [load]);
 
-  const slides = data?.slides ?? [];
-  const max = Math.max(1, ...slides.map(s => s.reached));
+  // Monta o funil completo: landing + 5 slides + start_clicked
+  const rows = (() => {
+    if (!data) return [];
+    const slideMap = new Map<number, number>(data.slides.map(s => [s.step, s.reached]));
+    const list: { label: string; value: number; isStart?: boolean }[] = [];
+    list.push({ label: "Entrou na landing", value: data.landing });
+    for (let i = 1; i <= TOTAL_SLIDES; i++) {
+      list.push({ label: `Slide ${i} — ${SLIDE_TITLES[i]}`, value: slideMap.get(i) ?? 0 });
+    }
+    list.push({ label: 'Clicou em "Começar grátis"', value: data.start_clicked, isStart: true });
+    return list;
+  })();
+  const max = Math.max(1, ...rows.map(r => r.value));
 
   return (
     <div className="space-y-8">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tutorial Inicial — Dropoff por Slide</h1>
-          <p className="text-xs text-zinc-500 mt-1">Quantas pessoas chegaram em cada tela do onboarding</p>
+          <p className="text-xs text-zinc-500 mt-1">
+            Funil dos 5 slides da landing "Tenha controle da sua vida financeira"
+          </p>
         </div>
         <button
           onClick={load}
@@ -109,7 +122,6 @@ export default function AdminTutorialInicial() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-3 space-y-3">
         <div className="flex flex-wrap gap-1">
           {PRESETS.map((p) => (
@@ -158,32 +170,31 @@ export default function AdminTutorialInicial() {
 
       {err && <div className="text-sm text-red-400">Erro: {err}</div>}
 
-      {/* Funil por slide */}
       <section className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-        <h2 className="text-sm font-bold text-zinc-100 mb-1">Funil do onboarding</h2>
+        <h2 className="text-sm font-bold text-zinc-100 mb-1">Funil slide a slide</h2>
         <p className="text-[11px] text-zinc-500 mb-5">
-          Slide a slide — onde as pessoas estão desistindo
+          Quantos viram cada slide e a % de quem continuou em relação ao anterior
         </p>
 
         {!data ? (
           <div className="text-xs text-zinc-500">{loading ? "Carregando…" : "Sem dados."}</div>
         ) : (
           <div className="space-y-3">
-            {slides.map((s, i) => {
-              const prev = i === 0 ? s.reached : slides[i - 1].reached;
-              const conv = i === 0 ? 100 : pct(s.reached, prev);
+            {rows.map((r, i) => {
+              const prev = i === 0 ? r.value : rows[i - 1].value;
+              const conv = i === 0 ? 100 : pct(r.value, prev);
               const drop = i > 0 && conv < 80;
-              const w = (s.reached / max) * 100;
-              const Icon = ICONS[s.key] ?? Eye;
+              const w = (r.value / max) * 100;
+              const Icon = drop ? TrendingDown : r.isStart ? MousePointerClick : Eye;
               return (
-                <div key={s.key}>
-                  <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="flex items-center gap-2 text-zinc-300">
-                      {drop ? <TrendingDown className="w-3.5 h-3.5 text-red-400" /> : <Icon className="w-3.5 h-3.5 text-zinc-500" />}
-                      {s.label}
+                <div key={i}>
+                  <div className="flex items-center justify-between text-xs mb-1.5 gap-3">
+                    <span className="flex items-center gap-2 text-zinc-300 min-w-0">
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${drop ? "text-red-400" : "text-zinc-500"}`} />
+                      <span className="truncate">{r.label}</span>
                     </span>
-                    <span className="text-zinc-500 tabular-nums">
-                      <span className="text-zinc-200 font-semibold">{s.reached.toLocaleString("pt-BR")}</span>
+                    <span className="text-zinc-500 tabular-nums shrink-0">
+                      <span className="text-zinc-200 font-semibold">{r.value.toLocaleString("pt-BR")}</span>
                       {i > 0 && (
                         <span className={`ml-2 ${drop ? "text-red-400" : "text-emerald-400"}`}>
                           {fmtPct(conv)}
@@ -203,35 +214,6 @@ export default function AdminTutorialInicial() {
           </div>
         )}
       </section>
-
-      {/* Por módulo escolhido */}
-      {data && data.modules.length > 0 && (
-        <section className="bg-gradient-to-br from-zinc-900/80 to-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-zinc-100 mb-1">Módulo escolhido no slide 3</h2>
-          <p className="text-[11px] text-zinc-500 mb-5">Distribuição entre os 4 módulos</p>
-          <div className="space-y-3">
-            {(() => {
-              const mMax = Math.max(1, ...data.modules.map(m => m.reached));
-              return data.modules.map((m) => {
-                const w = (m.reached / mMax) * 100;
-                return (
-                  <div key={m.module}>
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-zinc-300 capitalize">{m.module}</span>
-                      <span className="text-zinc-200 font-semibold tabular-nums">
-                        {m.reached.toLocaleString("pt-BR")}
-                      </span>
-                    </div>
-                    <div className="h-2.5 bg-zinc-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${w}%` }} />
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </section>
-      )}
     </div>
   );
 }

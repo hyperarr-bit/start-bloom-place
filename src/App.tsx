@@ -67,6 +67,7 @@ import AdminTrials from "./pages/admin/AdminTrials";
 import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
 import AdminRetention from "./pages/admin/AdminRetention";
 import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
+import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
 import AdminUso from "./pages/admin/AdminUso";
 import NotFound from "./pages/NotFound";
 

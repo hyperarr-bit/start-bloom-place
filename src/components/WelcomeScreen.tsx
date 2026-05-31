@@ -1150,6 +1150,70 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
                 Leva menos de 2 minutos para configurar.
               </p>
             </motion.div>
+          ) : step === 2 ? (
+            <motion.div
+              key="slide-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-8"
+              >
+                CORE
+              </motion.h2>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-8 px-2"
+              >
+                Saiba se o mês<br />vai fechar no positivo
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                O CORE calcula receitas, despesas e contas pendentes para mostrar uma previsão antes do problema acontecer.
+              </motion.p>
+
+              <div className="w-full mt-7">
+                <SlideThreeHero />
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.85, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full h-[60px] rounded-full bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-6 flex items-center justify-center relative"
+              >
+                <span>Próximo</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
+              </p>
+            </motion.div>
           ) : (
             <>
               <span className="text-2xl font-black tracking-tight text-foreground mb-3 shrink-0 text-center">CORE</span>

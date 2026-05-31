@@ -1155,7 +1155,36 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       };
     }, [step]);
 
-    // Dropoff tracking: emite exit quando o usuário sai (unmount / pagehide / aba escondida) sem completar
+    // Auto-fit do slide mobile inteiro: mede altura natural vs viewport e aplica zoom
+    // para nunca precisar de scroll em telas pequenas e não ficar perdido em telas grandes.
+    useEffect(() => {
+      const fit = () => {
+        const slot = fitSlotRef.current;
+        const inner = fitInnerRef.current;
+        if (!slot || !inner) return;
+        (inner.style as any).zoom = "1";
+        const naturalH = inner.scrollHeight;
+        const availH = slot.clientHeight;
+        if (naturalH <= 0 || availH <= 0) return;
+        const ratio = availH / naturalH;
+        const next = Math.max(0.7, Math.min(1.18, ratio));
+        (inner.style as any).zoom = String(next);
+      };
+      fit();
+      const id1 = window.setTimeout(fit, 60);
+      const id2 = window.setTimeout(fit, 240);
+      const id3 = window.setTimeout(fit, 600);
+      window.addEventListener("resize", fit);
+      window.addEventListener("orientationchange", fit);
+      return () => {
+        window.removeEventListener("resize", fit);
+        window.removeEventListener("orientationchange", fit);
+        window.clearTimeout(id1);
+        window.clearTimeout(id2);
+        window.clearTimeout(id3);
+      };
+    }, [step]);
+
     useEffect(() => {
       const emitExit = (reason: string) => {
         if (completedRef.current) return;

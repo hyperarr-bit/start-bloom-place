@@ -5,7 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
   DollarSign, TrendingDown, TrendingUp, BarChart3, Heart,
   Calendar, AlertCircle, Bell, CheckCircle2, ChevronDown, Star, RefreshCw, ArrowDown,
-  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt,
+  ArrowRight, Clock, Home, PieChart, Target, Bus, Shirt, ShoppingCart,
 } from "lucide-react";
 
 
@@ -630,6 +630,100 @@ const SlideFourHero = () => (
   </div>
 );
 
+// ---------- Slide 5 — Acompanhe seus desejos e metas ----------
+
+const SlideFiveDesejosHero = () => {
+  const meta = 3399;
+  const guardado = 1200;
+  const falta = meta - guardado;
+  const pct = Math.round((guardado / meta) * 100);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1, duration: 0.45, ease: "easeOut" }}
+      className="bg-card rounded-[22px] px-[16px] pt-[14px] pb-[14px]"
+      style={{ boxShadow: "var(--limit-card-shadow)" }}
+    >
+      {/* header: Desejo atual */}
+      <div className="flex items-center gap-[10px] mb-[12px]">
+        <div
+          className="w-[36px] h-[36px] rounded-full flex items-center justify-center flex-shrink-0"
+          style={{ background: "hsl(var(--chart-1) / 0.12)" }}
+        >
+          <Heart
+            className="w-[18px] h-[18px]"
+            style={{ color: "hsl(var(--chart-1))" }}
+            strokeWidth={2.4}
+          />
+        </div>
+        <p className="text-[17px] font-extrabold leading-none text-foreground">Desejo atual</p>
+      </div>
+
+      {/* 3 colunas */}
+      <div className="grid grid-cols-3 gap-0 mb-[12px]">
+        {/* Meta total */}
+        <div className="flex flex-col pr-[8px]">
+          <div className="flex items-center gap-[5px] mb-[4px]">
+            <Target className="w-[13px] h-[13px]" style={{ color: "hsl(var(--chart-1))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none">Meta total</span>
+          </div>
+          <p className="text-[15px] font-extrabold text-foreground tabular-nums leading-none">R$ 3.399</p>
+        </div>
+        {/* Já guardado */}
+        <div className="flex flex-col px-[8px] border-l border-r border-border/60">
+          <div className="flex items-center gap-[4px] mb-[4px]">
+            <TrendingUp className="w-[13px] h-[13px] flex-shrink-0" style={{ color: "hsl(var(--chart-2))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none whitespace-nowrap">Já guardado</span>
+          </div>
+          <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-2))" }}>R$ 1.200</p>
+        </div>
+        {/* Falta */}
+        <div className="flex flex-col pl-[8px]">
+          <div className="flex items-center gap-[4px] mb-[4px]">
+            <ShoppingCart className="w-[13px] h-[13px] flex-shrink-0" style={{ color: "hsl(var(--chart-3))" }} strokeWidth={2.6} />
+            <span className="text-[11px] text-muted-foreground leading-none">Falta</span>
+          </div>
+          <p className="text-[15px] font-extrabold tabular-nums leading-none" style={{ color: "hsl(var(--chart-3))" }}>R$ 2.199</p>
+        </div>
+      </div>
+
+      <div className="h-px w-full bg-border/70 mb-[12px]" />
+
+      {/* Produto */}
+      <div className="flex items-center gap-[12px] mb-[12px]">
+        <img src={ipadImg} alt="Apple iPad 128 GB" className="w-[78px] h-[78px] object-contain flex-shrink-0" />
+        <div className="flex-1 min-w-0 flex flex-col gap-[5px]">
+          <p className="text-[15px] font-extrabold text-foreground leading-tight">Apple iPad 128 GB</p>
+          <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-md px-[8px] py-[2px] self-start leading-none">Outros</span>
+          <p className="text-[15px] font-extrabold text-foreground tabular-nums leading-none mt-[2px]">R$ 3.399,00</p>
+        </div>
+      </div>
+
+      {/* Progresso */}
+      <div className="flex items-center justify-between mb-[6px]">
+        <span className="text-[12px] font-medium tabular-nums" style={{ color: "hsl(var(--chart-2))" }}>
+          Guardado: R$ 1.200,00
+        </span>
+        <span className="text-[12px] font-medium tabular-nums" style={{ color: "hsl(var(--chart-3))" }}>
+          Falta: R$ 2.199,00
+        </span>
+      </div>
+      <div className="h-[7px] w-full rounded-full overflow-hidden" style={{ background: "hsl(var(--muted) / 0.7)" }}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ delay: 0.4, duration: 0.7, ease: "easeOut" }}
+          className="h-full rounded-full"
+          style={{ background: "linear-gradient(90deg, hsl(var(--chart-1)) 0%, hsl(330 80% 65%) 100%)" }}
+        />
+      </div>
+      <p className="text-[13px] font-semibold text-foreground mt-[6px] tabular-nums">{pct}%</p>
+    </motion.div>
+  );
+};
+
 
 const StatCard = ({
   label,
@@ -938,10 +1032,16 @@ const slides = [
     mock: <SlideFourMock />,
   },
   {
+    title: <>Acompanhe seus<br />desejos e metas</>,
+    subtitle: "Crie desejos, acompanhe quanto já guardou e veja quanto falta para chegar lá.",
+    mock: <SlideFiveDesejosHero />,
+  },
+  {
     title: <>Comece pela sua<br />primeira receita</>,
     subtitle: "Adicione sua fonte de renda para montar a base da sua organização financeira.",
     mock: <SlideFiveMock />,
   },
+
 ];
 
 export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
@@ -1378,6 +1478,70 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
 
               <div className="w-full max-w-[336px] mt-5">
                 <SlideFourHero />
+              </div>
+
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.95, duration: 0.35 }}
+                onClick={goNext}
+                className="w-full max-w-[336px] h-[52px] rounded-[13px] bg-foreground text-background text-base font-semibold shadow-lg active:scale-[0.98] transition-transform mt-4 flex items-center justify-center relative"
+              >
+                <span>Continuar</span>
+                <ArrowRight className="w-5 h-5 absolute right-5" strokeWidth={2.25} />
+              </motion.button>
+
+              <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-3 mb-1">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
+                Leva menos de 2 minutos para configurar.
+              </p>
+            </motion.div>
+          ) : step === 4 ? (
+            <motion.div
+              key="slide-4"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center w-full min-h-0"
+            >
+              {/* dots topo */}
+              <div className="flex justify-center gap-1.5 shrink-0 pt-1">
+                {slides.map((_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 rounded-full transition-all ${i === step ? "w-5 bg-foreground" : "w-1.5 bg-muted"}`}
+                  />
+                ))}
+              </div>
+
+              <motion.h2
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05, duration: 0.35 }}
+                className="text-[64px] sm:text-[72px] font-black tracking-tight text-foreground text-center leading-none mt-6"
+              >
+                CORE
+              </motion.h2>
+
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.35 }}
+                className="text-[26px] font-bold text-foreground tracking-tight leading-[1.2] text-center mt-6 px-2"
+              >
+                Acompanhe seus<br />desejos e metas
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="text-[14px] text-muted-foreground text-center mt-3 leading-snug px-2"
+              >
+                Crie desejos, acompanhe quanto já guardou<br />e veja quanto falta para chegar lá.
+              </motion.p>
+
+              <div className="w-full max-w-[336px] mt-4">
+                <SlideFiveDesejosHero />
               </div>
 
               <motion.button

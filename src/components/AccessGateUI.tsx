@@ -1,4 +1,4 @@
-import { MoreHorizontal, Link2, Hand } from "lucide-react";
+import { MoreHorizontal, Link2, Hand, ArrowUp } from "lucide-react";
 import { toast } from "sonner";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
@@ -20,15 +20,17 @@ export const AccessGateUI = () => {
 
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center px-6 py-10 overflow-y-auto">
+      {/* Seta canto superior direito apontando pros 3 pontinhos */}
+      <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-muted flex items-end justify-start pb-10 pl-10 pointer-events-none">
+        <ArrowUp className="w-10 h-10 text-foreground animate-bounce" />
+      </div>
+
       <div className="max-w-sm w-full flex flex-col items-center text-center gap-6">
         <img src={logoSrc} alt="Core" className="h-12 w-auto" />
 
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">Bem-vindo ao Core</h1>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Pra ter a melhor experiência, siga esses dois passinhos rápidos:
-          </p>
-        </div>
+        <h1 className="text-xl font-bold tracking-tight leading-snug">
+          Para ter acesso ao site do CORE, siga esses 2 passos
+        </h1>
 
         <div className="w-full space-y-4 text-left">
           <div className="flex items-center gap-3">

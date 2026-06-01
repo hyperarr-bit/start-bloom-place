@@ -20,17 +20,22 @@ export const AccessGateUI = () => {
 
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center px-6 py-10 overflow-y-auto">
-      {/* Seta canto superior direito apontando pros 3 pontinhos */}
-      <div className="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-muted flex items-end justify-start pb-10 pl-10 pointer-events-none">
-        <ArrowUp className="w-10 h-10 text-foreground animate-bounce" />
+      {/* Halo + botão circular apontando pros 3 pontinhos */}
+      <div className="absolute top-0 right-0 pointer-events-none">
+        <div className="relative w-48 h-48 -translate-y-20 translate-x-20 rounded-full bg-primary/15">
+          <div className="absolute bottom-12 left-12 w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg">
+            <ArrowUp className="w-8 h-8 text-primary-foreground" strokeWidth={2.5} />
+          </div>
+        </div>
       </div>
 
       <div className="max-w-sm w-full flex flex-col items-center text-center gap-6">
         <img src={logoSrc} alt="Core" className="h-12 w-auto" />
 
         <h1 className="text-xl font-bold tracking-tight leading-snug">
-          Para ter acesso ao site do CORE, siga esses 2 passos
+          Para acessar o site do Core e organizar suas finanças, siga esses 2 passos:
         </h1>
+
 
         <div className="w-full space-y-4 text-left">
           <div className="flex items-center gap-3">

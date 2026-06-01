@@ -598,6 +598,28 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_paying_user_funnel: { Args: { _user_id: string }; Returns: Json }
+      admin_paying_users: {
+        Args: never
+        Returns: {
+          billing_period: string
+          cards_filled_count: number
+          current_period_end: string
+          days_trial_to_paid: number
+          email: string
+          payment_method: string
+          plan: string
+          signup_at: string
+          status: string
+          subscribed_at: string
+          tabs_visited_count: number
+          top_module: string
+          total_seconds_in_app: number
+          total_sessions: number
+          trial_days_active: number
+          user_id: string
+        }[]
+      }
       admin_pre_signup_funnel: {
         Args: { _from?: string; _to?: string }
         Returns: Json

@@ -1,59 +1,55 @@
-## Objetivo
+## Bugs / ajustes
 
-Detectar quando o app está rodando dentro do navegador in-app do TikTok (que tem bugs conhecidos com PWA/Supabase/cookies/storage) e mostrar um overlay tela cheia explicando, com identidade visual do app, como abrir no navegador padrão (Safari/Chrome) via os 3 pontinhos do topo.
+**1. Tela de Finanças renderiza por trás (spotlight "PASSO 2 DE 11" vaza por cima)**
 
-## Como detectar TikTok
+Hoje o `TikTokBrowserGate` é um overlay `fixed inset-0 z-[100]`, mas o resto do app (rotas, `RootGate` → `/financas`, spotlight tutorial) continua montado por baixo. O spotlight usa portal/z-index alto e fura o overlay.
 
-UserAgent contém uma destas marcas (case-insensitive):
-- `musical_ly`
-- `Bytedance`
-- `TikTok`
-- `BytedanceWebview`
+Correção: detectar TikTok bem no topo do `App` e, quando for TikTok, **renderizar APENAS** a `AccessGateUI` — sem `BrowserRouter`, sem `UserDataProvider`, sem Financas, sem spotlight. Nada do app monta.
 
-Hook novo: `src/hooks/use-in-app-browser.ts` → retorna `{ isTikTok: boolean }`. SSR-safe (checa `typeof navigator`).
+```tsx
+// src/App.tsx (esqueleto)
+const App = () => {
+  const { isTikTok } = useIsTikTokBrowser();
+  if (isTikTok) {
+    return (
+      <ThemeProvider>
+        <Sonner />
+        <AccessGateUI />
+      </ThemeProvider>
+    );
+  }
+  // ...resto igual (sem o <TikTokBrowserGate /> que existe hoje)
+};
+```
 
-## Componente do overlay
+Mantém a rota `/acesso` igual (renderiza `AccessGateUI` direto, sem providers pesados que importam) — independe da detecção.
 
-Novo: `src/components/TikTokBrowserGate.tsx`
+**2. Seta apontando pros 3 pontinhos (estilo Porquim, mas na cor do Core)**
 
-Estrutura (segue identidade visual — Inter, tokens semânticos, sem hex hardcoded, ícones Lucide):
+Adicionar no canto superior direito da `AccessGateUI`:
+- Círculo grande com fundo `bg-muted` (cinza claro do tema), posicionado `absolute top-0 right-0`, formato meio-círculo (raio grande) saindo da borda — igual o verde do Porquim.
+- Dentro, `ArrowUp` (Lucide) em `text-foreground`, com `animate-bounce` leve.
+- Sem texto "3 pontinhos" embaixo (Porquim não tem, fica mais limpo).
 
-- `fixed inset-0 z-[100] bg-background` cobrindo tudo (bloqueia interação com o app atrás).
-- Centro:
-  - Ícone `AlertCircle` (text-amber-500 via token) no topo.
-  - Título: "Abra no seu navegador" (text-lg font-bold).
-  - Subtítulo curto: "O navegador do TikTok não funciona bem com o app. Em 2 cliques você abre direto no Safari/Chrome e cai na tela de Finanças."
-- Bloco de instrução visual (card com border, rounded-lg, p-4):
-  - Passo 1: ícone `MoreHorizontal` + "Toque nos 3 pontinhos no canto superior direito"
-  - Passo 2: ícone `ExternalLink` + "Escolha 'Abrir no navegador' (ou 'Open in browser')"
-  - Seta animada (CSS pulse) apontando pra cima-direita, mimetizando o vídeo.
-- Botão secundário pequeno embaixo, em `text-muted-foreground text-xs underline`: "Copiar link" — copia `window.location.href` (com `?from=tiktok` removido e `/financas` como path) pro clipboard, com toast "Link copiado, cole no navegador".
-- Sem botão "continuar mesmo assim" (conforme escolha do usuário).
+Cor: tokens semânticos (`bg-muted` + `text-foreground`), nada de verde nem hex.
 
-## Onde montar
+**3. Copy**
 
-`src/App.tsx`, no topo do `<BrowserRouter>` (ou logo dentro do root, antes das rotas), renderizar `<TikTokBrowserGate />`. O componente decide sozinho se aparece (early return `null` quando `!isTikTok`).
+Trocar título + subtítulo por:
 
-Como cobre `inset-0 z-[100]`, fica por cima de qualquer rota — inclusive `/financas` pra onde o `RootGate` já redireciona.
+- Título: `Para ter acesso ao site do CORE, siga esses 2 passos`
+- Remover o subtítulo "Pra ter a melhor experiência..."
 
-## Link a divulgar no TikTok
+Logo CORE continua acima do título.
 
-A bio do TikTok deve apontar pra `https://coreaplicativo.lovable.app/financas` (ou `/` que já redireciona pra `/financas`). Nada muda no roteamento — o redirect atual já cobre.
+## Arquivos
 
-## O que NÃO muda
-
-- Nenhuma alteração em `WelcomeScreen`, `Index`, spotlight, auth.
-- Nenhuma alteração em rotas além de montar o gate global.
-- Sem dependências novas.
+- `src/App.tsx` — adicionar early return no topo quando `isTikTok`; remover `<TikTokBrowserGate />` do meio da árvore (não precisa mais, vira redundante).
+- `src/components/AccessGateUI.tsx` — adicionar seta no canto, trocar copy, remover subtítulo.
+- `src/components/TikTokBrowserGate.tsx` — pode deletar (não é mais usado) ou deixar como wrapper fino caso queira reusar em outro lugar. Sugiro deletar pra não confundir.
 
 ## Verificação
 
-1. Abrir preview com DevTools → Network conditions → custom UA contendo `musical_ly` → overlay aparece.
-2. UA normal → overlay não aparece, app funciona igual.
-3. Botão "Copiar link" copia URL correta e mostra toast.
-
-## Limitações honestas
-
-- iOS: não dá pra forçar abertura no Safari programaticamente. O overlay com instrução é a melhor solução possível.
-- Android: também não conseguimos abrir externo via `intent://` de dentro do webview do TikTok de forma confiável. Mesma estratégia.
-- Por isso o overlay manual é o caminho — é o que apps grandes (Spotify, Notion, etc.) fazem nessa situação.
+1. Simular UA do TikTok no DevTools → só vê a gate, sem nenhum tooltip/spotlight vazando.
+2. `/acesso` em navegador normal → mesma tela.
+3. UA normal → app funciona igual, sem overlay.

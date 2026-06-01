@@ -23,9 +23,10 @@ export const AccessGateUI = () => {
       {/* Halo + botão circular apontando pros 3 pontinhos */}
       <div className="absolute top-0 right-0 pointer-events-none">
         <div className="relative w-48 h-48 -translate-y-20 translate-x-20 rounded-full bg-primary/15">
-          <div className="absolute bottom-12 left-12 w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <div className="absolute bottom-12 left-12 w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg animate-[arrow-nudge_1.4s_ease-in-out_infinite]">
             <ArrowUp className="w-8 h-8 text-primary-foreground" strokeWidth={2.5} />
           </div>
+
         </div>
       </div>
 

@@ -11,7 +11,7 @@ export const TikTokBrowserGate = () => {
   if (!isTikTok) return null;
 
   const url = `${window.location.origin}/financas`;
-  const logoSrc = theme === "dark" ? coreLogo : coreLogoBlack;
+  const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
   const handleCopy = async () => {
     try {

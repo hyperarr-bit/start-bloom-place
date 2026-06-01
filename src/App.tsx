@@ -17,6 +17,7 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { TikTokBrowserGate } from "@/components/TikTokBrowserGate";
 
 const RootGate = () => {
   return <Navigate to="/financas" replace />;
@@ -127,6 +128,7 @@ const App = () => (
         <AppShell>
           <Toaster />
           <Sonner />
+          <TikTokBrowserGate />
           <div className="app-safe-shell">
             <OfflineBanner />
             <BrowserRouter>

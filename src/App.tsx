@@ -120,40 +120,55 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <AuthProvider>
-        <UserDataProvider>
-        <TooltipProvider>
-        <AppShell>
-          <Toaster />
-          <Sonner />
-          <TikTokBrowserGate />
-          <div className="app-safe-shell">
-            <OfflineBanner />
-            <BrowserRouter>
-              <ScrollToTop />
-              <GracePeriodBanner />
-              <Routes>
-                <Route path="/acesso" element={<Acesso />} />
-                <Route path="/inicio" element={<Inicio />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-                <Route path="*" element={<AnimatedRoutes />} />
-              </Routes>
-              <TrialBanner />
-              <GlobalWinback />
-              <QuickSignupModal />
-            </BrowserRouter>
-          </div>
-          <div className="app-safe-top-guard" aria-hidden="true" />
-        </AppShell>
-        </TooltipProvider>
-        </UserDataProvider>
-      </AuthProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+import { useIsTikTokBrowser } from "@/hooks/use-in-app-browser";
+import { AccessGateUI } from "@/components/AccessGateUI";
+
+const App = () => {
+  const { isTikTok } = useIsTikTokBrowser();
+
+  if (isTikTok) {
+    return (
+      <ThemeProvider>
+        <Sonner />
+        <AccessGateUI />
+      </ThemeProvider>
+    );
+  }
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <UserDataProvider>
+          <TooltipProvider>
+          <AppShell>
+            <Toaster />
+            <Sonner />
+            <div className="app-safe-shell">
+              <OfflineBanner />
+              <BrowserRouter>
+                <ScrollToTop />
+                <GracePeriodBanner />
+                <Routes>
+                  <Route path="/acesso" element={<Acesso />} />
+                  <Route path="/inicio" element={<Inicio />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="*" element={<AnimatedRoutes />} />
+                </Routes>
+                <TrialBanner />
+                <GlobalWinback />
+                <QuickSignupModal />
+              </BrowserRouter>
+            </div>
+            <div className="app-safe-top-guard" aria-hidden="true" />
+          </AppShell>
+          </TooltipProvider>
+          </UserDataProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

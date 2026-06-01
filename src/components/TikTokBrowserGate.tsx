@@ -7,7 +7,7 @@ import { useTheme } from "@/hooks/use-theme";
 
 export const TikTokBrowserGate = () => {
   const { isTikTok } = useIsTikTokBrowser();
-  const { theme } = useTheme();
+  const { mode } = useTheme();
   if (!isTikTok) return null;
 
   const url = `${window.location.origin}/financas`;

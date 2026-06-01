@@ -25,6 +25,7 @@ const RootGate = () => {
 
 
 import Home from "./pages/Home";
+import Acesso from "./pages/Acesso";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Inicio from "./pages/Inicio";
@@ -135,6 +136,7 @@ const App = () => (
               <ScrollToTop />
               <GracePeriodBanner />
               <Routes>
+                <Route path="/acesso" element={<Acesso />} />
                 <Route path="/inicio" element={<Inicio />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />

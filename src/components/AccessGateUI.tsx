@@ -19,14 +19,13 @@ export const AccessGateUI = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center px-6 py-10 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] w-screen h-screen bg-background flex flex-col items-center justify-center px-6 py-10 overflow-x-hidden overflow-y-auto">
       {/* Halo + botão circular apontando pros 3 pontinhos */}
-      <div className="absolute top-0 right-0 pointer-events-none">
-        <div className="relative w-48 h-48 -translate-y-20 translate-x-20 rounded-full bg-primary/15">
-          <div className="absolute bottom-12 left-12 w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg animate-[arrow-nudge_1.4s_ease-in-out_infinite]">
-            <ArrowUp className="w-8 h-8 text-primary-foreground" strokeWidth={2.5} />
+      <div className="absolute top-0 right-0 pointer-events-none overflow-hidden w-40 h-40">
+        <div className="relative w-40 h-40 -translate-y-16 translate-x-16 rounded-full bg-primary/15">
+          <div className="absolute bottom-10 left-10 w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg animate-[arrow-nudge_1.4s_ease-in-out_infinite]">
+            <ArrowUp className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
           </div>
-
         </div>
       </div>
 

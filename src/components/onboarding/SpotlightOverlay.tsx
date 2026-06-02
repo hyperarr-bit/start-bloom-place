@@ -15,6 +15,8 @@ export interface SpotlightStep {
   checkValue?: (v: any) => boolean;
   /** Optional: called when this step becomes active (e.g. to switch tabs). */
   onEnter?: () => void;
+  /** Optional: show a "Pular este passo" link inside the bubble. */
+  skippable?: boolean;
 }
 
 interface SpotlightOverlayProps {

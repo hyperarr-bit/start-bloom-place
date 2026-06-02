@@ -1091,6 +1091,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const isLast = step === slides.length - 1;
     const stepRef = useRef(step);
     const completedRef = useRef(false);
+    const navigate = useNavigate();
     stepRef.current = step;
     const mockSlotRef = useRef<HTMLDivElement>(null);
     const mockInnerRef = useRef<HTMLDivElement>(null);

@@ -324,7 +324,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-none"
             style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 18 : Math.max(8, rect.top - 120),
+              top: labelBelow ? rect.top + rect.height + PADDING + 24 : Math.max(8, rect.top - 140),
               left: bubbleLeft,
               width: BUBBLE_W,
             }}
@@ -334,7 +334,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 <motion.div
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-5"
+                  className="absolute -top-7"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
                   <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
@@ -367,7 +367,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 <motion.div
                   animate={{ y: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -bottom-5"
+                  className="absolute -bottom-7"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
                   <ArrowDown className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />

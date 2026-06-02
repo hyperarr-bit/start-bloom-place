@@ -324,7 +324,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-none"
             style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 24 : Math.max(8, rect.top - 140),
+              top: labelBelow
+                ? rect.top + rect.height + PADDING + 24
+                : step.placement === "above"
+                  ? 72
+                  : Math.max(8, rect.top - 140),
               left: bubbleLeft,
               width: BUBBLE_W,
             }}

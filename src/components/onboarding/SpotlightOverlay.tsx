@@ -17,6 +17,8 @@ export interface SpotlightStep {
   onEnter?: () => void;
   /** Optional: show a "Pular este passo" link inside the bubble. */
   skippable?: boolean;
+  /** Optional: force bubble placement above/below target. Defaults to auto. */
+  placement?: "auto" | "above" | "below";
 }
 
 interface SpotlightOverlayProps {

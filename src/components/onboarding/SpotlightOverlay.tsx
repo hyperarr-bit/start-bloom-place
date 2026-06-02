@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
@@ -282,10 +282,14 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
 
   const viewportH = typeof window !== "undefined" ? window.innerHeight : 800;
-  // Prefer placing the bubble BELOW the target when there's room — keeps it
-  // off existing content above. Only place above if there's no room below.
+  const BUBBLE_H_EST = 140;
+  // Prefer placing the bubble BELOW the target when there's room below;
+  // otherwise place ABOVE only if there's room above; else fall back below.
   const spaceBelow = rect ? viewportH - (rect.top + rect.height) : 0;
-  const labelBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+  const spaceAbove = rect ? rect.top : 0;
+  const labelBelow = rect
+    ? spaceBelow >= BUBBLE_H_EST + 24 || spaceAbove < BUBBLE_H_EST + 24
+    : false;
 
   const offScreen: "above" | "below" | null = !rect
     ? null
@@ -298,6 +302,14 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   const BUBBLE_W = 260;
   const bubbleLeft = rect
     ? Math.max(12, Math.min(rect.left + rect.width / 2 - BUBBLE_W / 2, window.innerWidth - BUBBLE_W - 12))
+    : 0;
+  const rawTop = rect
+    ? (labelBelow
+        ? rect.top + rect.height + PADDING + 18
+        : rect.top - PADDING - 18 - BUBBLE_H_EST)
+    : 0;
+  const bubbleTop = rect
+    ? Math.max(8, Math.min(rawTop, viewportH - BUBBLE_H_EST - 8))
     : 0;
   const targetCenterX = rect ? rect.left + rect.width / 2 : 0;
   // Arrow X relative to bubble's left edge, clamped inside bubble
@@ -321,7 +333,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-none"
             style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 18 : Math.max(8, rect.top - 120),
+              top: bubbleTop,
               left: bubbleLeft,
               width: BUBBLE_W,
             }}
@@ -352,9 +364,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                         trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
                         advance();
                       }}
-                      className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
                     >
-                      Pular este passo →
+                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      Pular este passo
                     </button>
                   </div>
                 )}

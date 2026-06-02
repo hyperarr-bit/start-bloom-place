@@ -355,9 +355,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                         trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
                         advance();
                       }}
-                      className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
                     >
-                      Pular este passo →
+                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      Pular este passo
                     </button>
                   </div>
                 )}

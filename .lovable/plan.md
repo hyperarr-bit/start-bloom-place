@@ -1,13 +1,16 @@
-## Problemas
+## Problema
 
-1. **Slide 4 (Defina limites)** — o card extra "Alertas ajudam você a corrigir antes de gastar demais" aumenta a altura do slide. O auto-fit (`mockScale`) encolhe tudo, incluindo o botão "Continuar", deixando ele pequeno comparado aos outros slides.
-2. **Slide 6 (Comece pela sua primeira receita)** — o clique em "Adicionar primeira receita" chama `window.location.href = "/financas"`, que faz reload completo (slow). Trocar por SPA navigation deixa instantâneo.
+Mudei o posicionamento padrão do balão (`autoBelow`) sem ser pedido — agora ele aparece abaixo cobrindo o card de receita. Antes ficava acima.
 
-## Mudanças
+## Mudança
 
-### `src/components/WelcomeScreen.tsx`
+### `src/components/onboarding/SpotlightOverlay.tsx`
 
-1. Remover o bloco `tip card` "Alertas ajudam..." (linhas ~612-629, o `motion.div` com `<Bell />` e o texto).
-2. Importar `useNavigate` do `react-router-dom` (linha 2) e usar dentro do componente: `const navigate = useNavigate();`. Em `finish` (linha 1224), trocar `window.location.href = "/financas"` por `navigate("/financas")`.
+Reverter a lógica `autoBelow` para o comportamento original: preferir **acima** do alvo, só ir abaixo se não houver espaço em cima.
 
-Nenhum outro arquivo é tocado.
+```ts
+const spaceAbove = rect ? rect.top : 0;
+const autoBelow = rect ? spaceAbove < 130 : false;
+```
+
+Nada mais é alterado — placement explícito (`above`/`below`) por step continua respeitado.

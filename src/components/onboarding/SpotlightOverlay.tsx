@@ -334,7 +334,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 <motion.div
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-5"
+                  className="absolute -top-7"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
                   <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />

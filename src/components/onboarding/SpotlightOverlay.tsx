@@ -336,13 +336,27 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
                 </motion.div>
               )}
-              <div className="bg-card border border-border rounded-xl shadow-xl p-3">
+              <div className="bg-card border border-border rounded-xl shadow-xl p-3 pointer-events-auto">
                 <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
                   Passo {stepIdx + 1} de {steps.length}
                 </p>
                 <p className="text-sm font-semibold text-foreground leading-snug">
                   {step.label}
                 </p>
+                {step.skippable && (
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
+                        advance();
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
+                    >
+                      Pular este passo
+                    </button>
+                  </div>
+                )}
               </div>
               {!labelBelow && (
                 <motion.div

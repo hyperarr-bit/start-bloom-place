@@ -1204,7 +1204,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       completedRef.current = true;
       trackEvent("start_clicked", { destination: "financas", step: step + 1 });
       onComplete?.();
-      window.location.href = "/financas";
+      navigate("/financas");
     };
 
     const current = slides[step];

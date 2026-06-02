@@ -140,7 +140,7 @@ const Index = () => {
         steps={[
           
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", placement: "above", onEnter: () => setActiveTab("financeiro") },
-          { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-fixed"]', label: 'Cadastre um custo fixo (aluguel, internet...).', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", placement: "above", onEnter: () => setActiveTab("financeiro") },
           
           { selector: '[data-spotlight="add-bill"]', label: 'Clique em "Editar" e adicione 1 conta no vencimento.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="tab-investimentos"]', label: 'Acompanhe seus investimentos aqui.', onEnter: () => { setActiveTab("financeiro"); setTimeout(() => document.querySelector('[data-spotlight="tab-investimentos"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
@@ -148,7 +148,7 @@ const Index = () => {
           { selector: '[data-spotlight="tab-itens"]', label: 'Liste o que quer comprar e priorize.', onEnter: () => { setActiveTab("investimentos"); setTimeout(() => document.querySelector('[data-spotlight="tab-itens"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="add-wish"]', label: 'Adicione um item da sua lista de desejos.', advanceOnAction: "first_wish", checkKey: "finance-wishlist", skippable: true, placement: "above", onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES embaixo.', onEnter: () => { setActiveTab("itens"); setTimeout(() => document.querySelector('[data-spotlight="tab-limites"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
-          { selector: '[data-spotlight="add-limit"]', label: 'Adicione um limite pra uma categoria.', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, onEnter: () => setActiveTab("limites") },
+          { selector: '[data-spotlight="add-limit"]', label: 'Adicione um limite pra uma categoria.', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, placement: "above", onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Veja relatórios mensais automáticos.', onEnter: () => { setActiveTab("limites"); setTimeout(() => document.querySelector('[data-spotlight="tab-relatorios"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="tab-saude"]', label: 'Acompanhe sua saúde financeira em um índice.', onEnter: () => { setActiveTab("relatorios"); setTimeout(() => document.querySelector('[data-spotlight="tab-saude"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
         ]}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 
@@ -17,6 +17,8 @@ export interface SpotlightStep {
   onEnter?: () => void;
   /** Optional: show a "Pular este passo" link inside the bubble. */
   skippable?: boolean;
+  /** Optional: force bubble placement above/below target. Defaults to auto. */
+  placement?: "auto" | "above" | "below";
 }
 
 interface SpotlightOverlayProps {
@@ -285,7 +287,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   // Prefer placing the bubble BELOW the target when there's room — keeps it
   // off existing content above. Only place above if there's no room below.
   const spaceBelow = rect ? viewportH - (rect.top + rect.height) : 0;
-  const labelBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+  const autoBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+  const labelBelow = step.placement === "above" ? false : step.placement === "below" ? true : autoBelow;
 
   const offScreen: "above" | "below" | null = !rect
     ? null
@@ -352,9 +355,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                         trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
                         advance();
                       }}
-                      className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
                     >
-                      Pular este passo →
+                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
+                      Pular este passo
                     </button>
                   </div>
                 )}

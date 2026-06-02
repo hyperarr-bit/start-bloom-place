@@ -1,42 +1,30 @@
 ## Problemas
 
-1. No passo "Adicione um limite pra uma categoria", o balão fica acima do alvo e cobre a lista "Limites por categoria" que está acima.
-2. Em passos que apontam para abas (LIMITES, RELATÓRIOS, INVESTIMENTOS, ITENS, SAÚDE), a tira de abas tem scroll horizontal. Se a aba destacada está fora da viewport, o `rect` cai na posição da próxima aba visível e a seta aponta pra aba errada.
+1. No passo "Adicione um item da sua lista de desejos" (e o equivalente de investimentos), o alvo é o botão "Adicionar Desejo"/"Adicionar Investimento". Quando o usuário clica e o formulário abre logo abaixo, o balão fica posicionado entre o botão e o formulário, cobrindo o card.
+2. Usuário relata que no passo da aba (INVESTIMENTOS/DESEJOS) o link "Pular este passo" não aparece — no código atual `tab-investimentos` e `tab-itens` já têm `skippable: true`, mas vamos garantir que o botão "Pular" seja visível nos passos das abas e ficar consistente.
+3. O botão "Pular este passo →" usa uma seta, e já existe seta no balão apontando pro alvo. Trocar por um ícone diferente (X) pra não duplicar o visual de seta.
 
 ## Mudanças
 
 ### `src/components/onboarding/SpotlightOverlay.tsx`
 
-Trocar a heurística de posicionamento do balão para preferir **abaixo** do alvo quando há espaço (≥140px até o final da viewport). Só fica acima se não couber abaixo.
-
-```ts
-// antes: labelBelow = rect ? rect.top < 90 : false;
-const spaceBelow = rect ? (viewportH - (rect.top + rect.height)) : 0;
-const labelBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
-```
-
-Isso resolve o passo de limites (balão vai pro espaço vazio abaixo do "Adicionar limite") e também melhora os passos de abas (balão fica logo abaixo da tira de abas, com seta pra cima apontando direto no alvo).
+1. Adicionar campo opcional `placement?: "auto" | "above" | "below"` em `SpotlightStep`. Quando definido, sobrescreve a heurística automática de `labelBelow`.
+2. Trocar o "→" do botão Pular por um ícone `X` do lucide-react (e remover a seta textual). Mantém o destaque atual (borda/bg primary).
 
 ### `src/pages/Index.tsx`
 
-Nos passos que apontam pra abas, garantir que a aba alvo entre na viewport horizontal antes de medir. Adicionar `scrollIntoView({ inline: "center" })` no `onEnter` de cada step de aba:
-
-- `tab-investimentos`
-- `tab-itens`
-- `tab-limites`
-- `tab-relatorios`
-- `tab-saude`
-
-Padrão:
-
-```ts
-onEnter: () => {
-  setActiveTab("...");
-  setTimeout(() => {
-    document.querySelector('[data-spotlight="tab-limites"]')
-      ?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
-  }, 150);
-}
-```
+Nos passos `add-wish` e `add-investment`, adicionar `placement: "above"` para forçar o balão a ficar acima do botão "Adicionar", evitando que ele cubra o formulário que abre logo abaixo.
 
 Nenhum outro arquivo é tocado.
+
+&nbsp;
+
+irmão você não entendeu o tópico 2 
+
+Exemplo 
+
+Quando a seta apontar para a aba de investimentos a opção de pular o passo NÃO DEVE APARECER
+
+ela só deve aparecer quando o usuário tiver clicado e entrado na aba e a seta tiver apontando para o card em si
+
+a mesma coisa para o desejos 

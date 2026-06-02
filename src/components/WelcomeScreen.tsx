@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import {
@@ -609,24 +609,6 @@ const SlideFourHero = () => (
       </div>
     </motion.div>
 
-    {/* tip card */}
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.85, duration: 0.4, ease: "easeOut" }}
-      className="rounded-[14px] px-[13px] py-[10px] flex items-center gap-[15px] border"
-      style={{ background: "hsl(var(--limit-red) / 0.055)", borderColor: "hsl(var(--limit-red) / 0.18)" }}
-    >
-      <div
-        className="w-[39px] h-[39px] rounded-full flex items-center justify-center flex-shrink-0"
-        style={{ background: "hsl(var(--limit-red) / 0.11)" }}
-      >
-        <Bell className="w-[20px] h-[20px]" style={{ color: "hsl(var(--limit-red))" }} strokeWidth={2.35} />
-      </div>
-      <p className="text-[14px] text-foreground leading-[1.35]">
-        Alertas ajudam você a corrigir<br />antes de gastar demais
-      </p>
-    </motion.div>
   </div>
 );
 
@@ -1109,6 +1091,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
     const isLast = step === slides.length - 1;
     const stepRef = useRef(step);
     const completedRef = useRef(false);
+    const navigate = useNavigate();
     stepRef.current = step;
     const mockSlotRef = useRef<HTMLDivElement>(null);
     const mockInnerRef = useRef<HTMLDivElement>(null);
@@ -1221,7 +1204,7 @@ export const WelcomeScreen = forwardRef<HTMLDivElement, WelcomeScreenProps>(
       completedRef.current = true;
       trackEvent("start_clicked", { destination: "financas", step: step + 1 });
       onComplete?.();
-      window.location.href = "/financas";
+      navigate("/financas");
     };
 
     const current = slides[step];

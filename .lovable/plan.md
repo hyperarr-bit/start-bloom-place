@@ -1,15 +1,13 @@
-## Problema
+## Problemas
 
-Nos passos com `placement: "above"` (add-investment, add-wish) o balão fica em `top: rect.top - 120`. Com altura ~110px, a borda inferior do balão encosta no alvo, e a `ArrowDown` (em `-bottom-5`) cai praticamente sobre a borda do card alvo — parecendo estar "dentro" dele em vez de apontar de fora.
+1. **Slide 4 (Defina limites)** — o card extra "Alertas ajudam você a corrigir antes de gastar demais" aumenta a altura do slide. O auto-fit (`mockScale`) encolhe tudo, incluindo o botão "Continuar", deixando ele pequeno comparado aos outros slides.
+2. **Slide 6 (Comece pela sua primeira receita)** — o clique em "Adicionar primeira receita" chama `window.location.href = "/financas"`, que faz reload completo (slow). Trocar por SPA navigation deixa instantâneo.
 
-## Mudança
+## Mudanças
 
-### `src/components/onboarding/SpotlightOverlay.tsx`
+### `src/components/WelcomeScreen.tsx`
 
-Aumentar o gap entre o balão e o alvo quando posicionado acima, e mover a seta pra ficar claramente nesse espaço, apontando pro alvo:
-
-- Trocar `top: Math.max(8, rect.top - 120)` por `top: Math.max(8, rect.top - 140)` (placement above).
-- Trocar a classe da `ArrowDown` de `-bottom-5` pra `-bottom-7` (mantém a seta entre o balão e o alvo, não sobreposta a ele).
-- Aplicar mudança espelhada no `labelBelow=true` (ArrowUp em `-top-5` → `-top-7`) e ajustar o `top` desse ramo de `rect.top + rect.height + PADDING + 18` pra `rect.top + rect.height + PADDING + 24` pra manter coerência visual.
+1. Remover o bloco `tip card` "Alertas ajudam..." (linhas ~612-629, o `motion.div` com `<Bell />` e o texto).
+2. Importar `useNavigate` do `react-router-dom` (linha 2) e usar dentro do componente: `const navigate = useNavigate();`. Em `finish` (linha 1224), trocar `window.location.href = "/financas"` por `navigate("/financas")`.
 
 Nenhum outro arquivo é tocado.

@@ -1,83 +1,55 @@
 ## Objetivo
 
-Criar uma página dedicada **Pagantes** no admin que mostra todos os usuários que pagaram (assinatura `status = 'active'` ou `'canceled'` paga) e, pra cada um, um funil completo do trial até a conversão — quantos dias usaram, quais abas tocaram, quais cards preencheram, qual módulo foi o mais usado, qual o gap entre signup e pagamento.
+Voltar o fluxo de entrada do app pros 6 slides do `WelcomeScreen` (rota `/inicio`) antes de cair no passo 1 ("Adicione sua receita") do tutorial em `/financas`. Hoje o `/` redireciona direto pra `/financas`, pulando os slides — inclusive quando o usuário do TikTok clica em "Abrir no navegador".
 
-**Sem mexer em mais nada do app** (espaçamentos, cards, tela do gate, etc.). Só rotas/admin.
+## O que muda
 
-## Por que é necessário
+### 1. `src/App.tsx` — `RootGate`
 
-- A nova assinante (`marinasilveriobusch@gmail.com`, paga hoje 01/06) já está no banco mas só aparece misturada na lista geral de Usuários, sem destaque.
-- Hoje não dá pra responder rápido: "ela usou o app no trial? quais abas? o que a fez converter?"
+Hoje:
+```ts
+const RootGate = () => {
+  return <Navigate to="/financas" replace />;
+};
+```
 
-## Mudanças
+Trocar por: usuário logado → `/financas`; visitante (sem sessão) → `/inicio` (onde já moram os 6 slides do `WelcomeScreen`). Usa `useAuth()` que já existe.
 
-### 1. Backend — 2 RPCs novas (migration)
+```ts
+const RootGate = () => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return <Navigate to={user ? "/financas" : "/inicio"} replace />;
+};
+```
 
-**`admin_paying_users()`** — retorna 1 linha por assinante pago:
-- `user_id`, `email`, `plan`, `billing_period`, `status` (active/canceled), `subscribed_at`, `current_period_end`, `payment_method`
-- `signup_at`, `days_trial_to_paid` (dias entre signup e assinatura)
-- `trial_days_active` (dias com sessão > 30s)
-- `total_sessions`, `total_seconds_in_app`
-- `top_module` (módulo mais usado no trial)
-- `tabs_visited_count`, `cards_filled_count`
+### 2. `src/components/AccessGateUI.tsx` — link do navegador (gate TikTok)
 
-Ordenada por `subscribed_at DESC`. Inclui também canceladas que já pagaram pelo menos uma vez.
+Hoje o link "Abrir no navegador" e o "Copiar link" usam `/financas`, então o usuário do TikTok pula os slides. Trocar pra raiz `/`, que vai cair no `RootGate` e levar pro `/inicio` (slide 1).
 
-**`admin_paying_user_funnel(_user_id uuid)`** — funil detalhado de 1 assinante:
-- Resumo: signup, primeira sessão, dia que assinou, plano, valor
-- **Etapas do funil** (com timestamps + bool atingido):
-  1. Cadastrou
-  2. Abriu o app (primeira sessão)
-  3. Usou trial (sessão > 30s)
-  4. Voltou no D2 / D3 / D7
-  5. Preencheu primeiro card (`first_bill`, etc — usa `user_activations`)
-  6. Atingiu activation completa (3+ ativações)
-  7. Iniciou checkout
-  8. Pagou
-- **Abas usadas** (lista ordenada por tempo): `tab_id`, `module_id`, `seconds`, `visits`
-- **Cards preenchidos**: `action_key`, `completed_at`
-- **Timeline diária** (D0–D7): segundos, abas tocadas, ativações
+```ts
+const url = `${window.location.origin}/`;
+```
 
-### 2. Frontend — nova página `AdminPaying.tsx`
+(Mantém o `RootGate` como ponto único de decisão; assim usuário já logado que abre o link também é direcionado certo.)
 
-Rota: `/admin/pagantes` (adicionada no `App.tsx` + item no `AdminLayout` nav, com ícone `CreditCard`, posicionado logo abaixo de "Funil").
+### 3. Nada muda no WelcomeScreen
 
-**Topo — KPIs em cards** (mesma estética dos outros admins, sem mudar tokens):
-- Total pagantes ativos
-- MRR estimado (soma de planos ativos)
-- Conversão trial → pago (% do total de signups)
-- Tempo médio trial → pago
+`src/components/WelcomeScreen.tsx` já tem os 6 slides e o último (`SlideSixHero` — "Comece pela sua primeira receita") já chama `finish()` que redireciona pra `/financas`, onde o `SpotlightOverlay` do `Index.tsx` mostra o passo 1 "Adicione sua receita (salário, freelas...)".
 
-**Tabela de pagantes** (mesma estética da `AdminUsers`):
-- Colunas: Email · Plano · Período · Status · Pagou em · Dias até pagar · Sessões no trial · Top módulo · Ver
-- Clique abre **drawer/sheet** lateral com o funil completo (reutiliza padrão do `TrialJourneySheet`).
+## Fluxo final
 
-**Sheet de funil** (`PayingUserFunnelSheet.tsx`):
-- Resumo (plano, valor, signup, pagamento, dias de gap)
-- Lista vertical das **etapas do funil** com check verde / cinza, timestamp por etapa
-- Seção **"Abas que usou no trial"** — chips com `tab_id` + tempo
-- Seção **"Cards preenchidos"** — chips com `action_key`
-- **Timeline D0–D7** (mesmo padrão visual do `TrialJourneySheet` atual)
+```text
+TikTok → AccessGateUI ("Abrir no navegador")
+       → /  (RootGate)
+       → /inicio  (6 slides do WelcomeScreen)
+       → último slide: "Começar agora"
+       → /financas  (SpotlightOverlay passo 1: Adicione sua receita)
+```
 
-### 3. Pequenos ajustes
+## Arquivos tocados
 
-- `AdminLayout.tsx`: adicionar entry `{ to: "/admin/pagantes", label: "Pagantes", Icon: CreditCard }`.
-- `App.tsx`: registrar a rota.
-- **Nada mais é tocado.**
+- `src/App.tsx` (apenas o `RootGate`)
+- `src/components/AccessGateUI.tsx` (apenas a `url`)
 
-## Detalhes técnicos
-
-- Critério de "pagante": `subscriptions.status = 'active'` **ou** (`status = 'canceled'` com `current_period_end` no passado, ou seja, já pagou) — exclui registros que nunca tiveram pagamento.
-- Cálculos de funil usam `module_analytics` (tempo/abas), `user_activations` (cards), `auth.users.created_at` (signup), `subscriptions.created_at` (pagamento).
-- RPCs com `SECURITY DEFINER` + check `has_role(auth.uid(),'admin')` no início (padrão das outras admin RPCs).
-- Grants: `GRANT EXECUTE ... TO authenticated`.
-
-## Arquivos afetados
-
-- `supabase/migrations/<nova>.sql` (novas RPCs)
-- `src/pages/admin/AdminPaying.tsx` (novo)
-- `src/components/admin/PayingUserFunnelSheet.tsx` (novo)
-- `src/pages/admin/AdminLayout.tsx` (1 linha no array de nav)
-- `src/App.tsx` (1 rota)
-
-Nenhum arquivo do app principal (gate, cards, finance, etc.) é tocado.
+Nada de backend, nada de admin, nada nos cards do app.

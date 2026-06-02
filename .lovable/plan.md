@@ -1,27 +1,42 @@
-## Objetivo
+## Problemas
 
-Adicionar botão **"Pular"** no balão do tutorial nos passos de **investimentos** e **desejos**, pra quem ainda não tem investimento ou nenhum desejo em mente conseguir avançar sem precisar preencher.
+1. No passo "Adicione um limite pra uma categoria", o balão fica acima do alvo e cobre a lista "Limites por categoria" que está acima.
+2. Em passos que apontam para abas (LIMITES, RELATÓRIOS, INVESTIMENTOS, ITENS, SAÚDE), a tira de abas tem scroll horizontal. Se a aba destacada está fora da viewport, o `rect` cai na posição da próxima aba visível e a seta aponta pra aba errada.
 
-## O que muda
+## Mudanças
 
-### 1. `src/components/onboarding/SpotlightOverlay.tsx`
+### `src/components/onboarding/SpotlightOverlay.tsx`
 
-- Adicionar campo opcional `skippable?: boolean` no tipo `SpotlightStep`.
-- Quando `step.skippable` for `true`, renderizar um botão discreto **"Pular este passo"** dentro do balão (logo abaixo do label). Ao clicar, chama `advance()` e dispara `trackEvent("spotlight_step_skipped", { module, step, label })`.
-- Estilo: link pequeno (`text-xs text-muted-foreground hover:text-foreground`), alinhado à direita, sem mexer no resto do layout do balão.
+Trocar a heurística de posicionamento do balão para preferir **abaixo** do alvo quando há espaço (≥140px até o final da viewport). Só fica acima se não couber abaixo.
 
-### 2. `src/pages/Index.tsx` — marcar passos como `skippable`
+```ts
+// antes: labelBelow = rect ? rect.top < 90 : false;
+const spaceBelow = rect ? (viewportH - (rect.top + rect.height)) : 0;
+const labelBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+```
 
-Adicionar `skippable: true` nos 4 passos relacionados:
+Isso resolve o passo de limites (balão vai pro espaço vazio abaixo do "Adicionar limite") e também melhora os passos de abas (balão fica logo abaixo da tira de abas, com seta pra cima apontando direto no alvo).
 
-- `tab-investimentos` — "Acompanhe seus investimentos aqui."
-- `add-investment` — "Cadastre seu primeiro aporte."
-- `tab-itens` — "Liste o que quer comprar e priorize."
-- `add-wish` — "Adicione um item da sua lista de desejos."
+### `src/pages/Index.tsx`
 
-## Arquivos tocados
+Nos passos que apontam pra abas, garantir que a aba alvo entre na viewport horizontal antes de medir. Adicionar `scrollIntoView({ inline: "center" })` no `onEnter` de cada step de aba:
 
-- `src/components/onboarding/SpotlightOverlay.tsx`
-- `src/pages/Index.tsx`
+- `tab-investimentos`
+- `tab-itens`
+- `tab-limites`
+- `tab-relatorios`
+- `tab-saude`
 
-Nada além disso.
+Padrão:
+
+```ts
+onEnter: () => {
+  setActiveTab("...");
+  setTimeout(() => {
+    document.querySelector('[data-spotlight="tab-limites"]')
+      ?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, 150);
+}
+```
+
+Nenhum outro arquivo é tocado.

@@ -287,7 +287,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   // Prefer placing the bubble BELOW the target when there's room — keeps it
   // off existing content above. Only place above if there's no room below.
   const spaceBelow = rect ? viewportH - (rect.top + rect.height) : 0;
-  const labelBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+  const autoBelow = rect ? (spaceBelow >= 140 || rect.top < 130) : false;
+  const labelBelow = step.placement === "above" ? false : step.placement === "below" ? true : autoBelow;
 
   const offScreen: "above" | "below" | null = !rect
     ? null

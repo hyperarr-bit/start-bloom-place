@@ -345,16 +345,16 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   {step.label}
                 </p>
                 {step.skippable && (
-                  <div className="flex justify-end mt-2">
+                  <div className="flex justify-end mt-2.5">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
                         advance();
                       }}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
+                      className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
                     >
-                      Pular este passo
+                      Pular este passo →
                     </button>
                   </div>
                 )}

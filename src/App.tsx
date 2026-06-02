@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { AuthProvider } from "@/hooks/use-auth";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -20,7 +20,9 @@ import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
 
 
 const RootGate = () => {
-  return <Navigate to="/financas" replace />;
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return <Navigate to={user ? "/financas" : "/inicio"} replace />;
 };
 
 

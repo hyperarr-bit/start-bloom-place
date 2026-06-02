@@ -6,7 +6,7 @@ import { useTheme } from "@/hooks/use-theme";
 
 export const AccessGateUI = () => {
   const { mode } = useTheme();
-  const url = `${window.location.origin}/financas`;
+  const url = `${window.location.origin}/`;
   const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
 
   const handleCopy = async () => {

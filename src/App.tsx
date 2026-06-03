@@ -124,21 +124,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-import { useIsTikTokBrowser } from "@/hooks/use-in-app-browser";
-import { AccessGateUI } from "@/components/AccessGateUI";
-
 const App = () => {
-  const { isTikTok } = useIsTikTokBrowser();
-
-  if (isTikTok) {
-    return (
-      <ThemeProvider>
-        <Sonner />
-        <AccessGateUI />
-      </ThemeProvider>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>

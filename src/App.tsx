@@ -17,6 +17,9 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
+
+
 
 
 const RootGate = () => {

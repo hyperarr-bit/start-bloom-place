@@ -1,38 +1,23 @@
-import { MoreHorizontal, DollarSign, TrendingDown, TrendingUp, ArrowUpRight, ClipboardList, ArrowRight, Clock } from "lucide-react";
+import { MoreHorizontal, DollarSign, TrendingDown, TrendingUp, ArrowUpRight, ClipboardList, ArrowRight, Clock, ArrowUp } from "lucide-react";
 
 export const AccessGateUI = () => {
   const url = `${window.location.origin}/`;
 
   return (
     <div className="fixed inset-0 z-[100] w-screen h-screen bg-white overflow-x-hidden overflow-y-auto">
-      {/* Seta curva apontando pros 3 pontinhos */}
-      <svg
-        className="absolute top-12 right-6 pointer-events-none"
-        width="80"
-        height="80"
-        viewBox="0 0 80 80"
-        fill="none"
-      >
-        <path
-          d="M10 70 Q 20 30 65 18"
-          stroke="#f59e0b"
-          strokeWidth="3"
-          strokeLinecap="round"
-          fill="none"
-        />
-        <path
-          d="M55 14 L68 16 L62 26"
-          stroke="#f59e0b"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-      </svg>
+      {/* Indicador apontando pros 3 pontinhos do TikTok */}
+      <div className="absolute top-0 right-0 pointer-events-none">
+        {/* Halo verde claro */}
+        <div className="absolute -top-14 -right-14 w-40 h-40 rounded-full bg-green-100" />
+        {/* Botão circular verde escuro */}
+        <div className="absolute top-3 right-4 w-14 h-14 rounded-full bg-green-700 flex items-center justify-center shadow-md animate-pulse">
+          <ArrowUp className="w-7 h-7 text-white" strokeWidth={2.5} />
+        </div>
+      </div>
 
       <div className="max-w-sm mx-auto px-5 pt-20 pb-8 flex flex-col gap-5">
         {/* CORE título */}
-        <h1 className="text-center text-[64px] font-black tracking-tight leading-none text-black">
+        <h1 className="text-center text-5xl font-black tracking-tight leading-none text-black">
           CORE
         </h1>
 

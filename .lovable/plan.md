@@ -1,14 +1,16 @@
-## Mudanças em `src/components/AccessGateUI.tsx`
+## Compactar `AccessGateUI` para caber em uma tela só
 
-### 1. Diminuir o título "CORE"
-- Reduzir de `text-[64px]` para algo como `text-5xl` (48px) para caber bem em telas pequenas (iPhone SE/Mini) sem quebrar.
+Reduzir tamanhos e espaçamentos para que todo o conteúdo (título → CTA + microcopy) caiba na primeira dobra de qualquer celular (Android pequeno incluso), sem scroll.
 
-### 2. Substituir a seta curva pelo botão circular (estilo da referência)
-- Remover o SVG atual da seta curva amarela.
-- Colocar no canto superior direito (`absolute top-3 right-3`):
-  - Um **halo verde claro** (círculo grande translúcido tipo `bg-green-100`) saindo levemente pra fora da tela (parcialmente cortado, como na imagem de referência).
-  - Por cima, um **botão circular verde escuro** (`bg-green-700` ou similar) contendo um ícone `ArrowUp` branco, apontando exatamente pros 3 pontinhos do TikTok que ficam acima dele.
-  - Sutil `animate-pulse` no botão para chamar atenção.
-- Ajustar o `pt-` do container para o conteúdo não colidir com o halo.
+### Ajustes em `src/components/AccessGateUI.tsx`
 
-Nada mais é alterado (cards, instrução, CTA, microcopy permanecem iguais).
+- Container: `pt-20` → `pt-14`, `pb-8` → `pb-4`, `gap-5` → `gap-3`.
+- Título "CORE": `text-5xl` → `text-4xl`.
+- Headline: `text-[26px]` → `text-xl`, `space-y-3` → `space-y-1.5`.
+- Subheadline: `text-base` → `text-sm`.
+- Cards (3): padding `p-4` → `p-2.5`, ícone `w-12 h-12` → `w-10 h-10`, valor `text-lg` → `text-base`, label `text-sm` → `text-xs`, spacing `space-y-3` → `space-y-2`, `mt-2` removido.
+- Bloco "Para acessar agora": `p-4` → `p-3`, `space-y-3` → `space-y-2`, círculos numerados `w-7 h-7` → `w-6 h-6`, texto `text-base`/`text-sm` reduzidos um nível, divisor mantido fininho.
+- Botão CTA: `py-4` → `py-3`, `text-base` → `text-sm`.
+- Halo/botão verde do canto: halo `-top-14 -right-14 w-40 h-40` → `-top-10 -right-10 w-28 h-28`, botão `w-14 h-14` → `w-12 h-12`, `top-3 right-4` → `top-2 right-3`, ícone `w-7 h-7` → `w-6 h-6`.
+
+Nenhum texto, ícone, ordem ou outra estrutura muda — só tamanhos/spacings.

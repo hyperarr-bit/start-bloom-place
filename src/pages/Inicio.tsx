@@ -1,5 +1,5 @@
-import { Navigate } from "react-router-dom";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 
-const Inicio = () => <Navigate to="/financas" replace />;
+const Inicio = () => <WelcomeScreen />;
 
 export default Inicio;

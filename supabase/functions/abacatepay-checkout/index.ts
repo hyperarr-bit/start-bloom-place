@@ -64,7 +64,7 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get("ABACATEPAY_API_KEY");
+    const apiKey = Deno.env.get("ABACATEPAY_API_KEY")?.trim();
     if (!apiKey) throw new Error("ABACATEPAY_API_KEY not configured");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";

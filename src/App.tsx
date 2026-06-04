@@ -20,9 +20,10 @@ import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
 
 
 const RootGate = () => {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
   if (loading) return null;
-  return <Navigate to="/financas" replace />;
+  if (user) return <Navigate to="/financas" replace />;
+  return <WelcomeScreen />;
 };
 
 

@@ -1,104 +1,114 @@
-import { MoreHorizontal, Link2, ArrowUp, Wallet, Gauge, Target } from "lucide-react";
-import { toast } from "sonner";
-import coreLogo from "@/assets/core-logo.png";
-import coreLogoBlack from "@/assets/core-logo-black.png";
-import { useTheme } from "@/hooks/use-theme";
+import { MoreHorizontal, DollarSign, TrendingDown, TrendingUp, ArrowUpRight, ClipboardList, ArrowRight, Clock } from "lucide-react";
 
 export const AccessGateUI = () => {
-  const { mode } = useTheme();
   const url = `${window.location.origin}/`;
-  const logoSrc = mode === "dark" ? coreLogo : coreLogoBlack;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copiado", { description: "Cole no Safari ou Chrome." });
-    } catch {
-      toast.error("Não foi possível copiar o link.");
-    }
-  };
-
-  const benefits = [
-    {
-      icon: Wallet,
-      title: "Veja quanto entra e sai",
-      desc: "Acompanhe receitas e despesas sem se perder.",
-    },
-    {
-      icon: Gauge,
-      title: "Saiba quanto ainda pode gastar",
-      desc: "Defina limites e evite passar do ponto.",
-    },
-    {
-      icon: Target,
-      title: "Transforme dinheiro em objetivos",
-      desc: "Crie desejos e acompanhe suas metas.",
-    },
-  ];
 
   return (
-    <div className="fixed inset-0 z-[100] w-screen h-screen bg-background overflow-x-hidden overflow-y-auto">
-      {/* Seta sutil apontando pros 3 pontinhos do TikTok */}
-      <div className="absolute top-3 right-3 pointer-events-none">
-        <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center shadow-md animate-pulse">
-          <ArrowUp className="w-4 h-4 text-primary-foreground" strokeWidth={2.5} />
-        </div>
-      </div>
+    <div className="fixed inset-0 z-[100] w-screen h-screen bg-white overflow-x-hidden overflow-y-auto">
+      {/* Seta curva apontando pros 3 pontinhos */}
+      <svg
+        className="absolute top-12 right-6 pointer-events-none"
+        width="80"
+        height="80"
+        viewBox="0 0 80 80"
+        fill="none"
+      >
+        <path
+          d="M10 70 Q 20 30 65 18"
+          stroke="#f59e0b"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path
+          d="M55 14 L68 16 L62 26"
+          stroke="#f59e0b"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </svg>
 
-      <div className="max-w-sm mx-auto px-5 pt-6 pb-10 flex flex-col gap-5">
-        {/* Logo */}
-        <div className="flex justify-center">
-          <img src={logoSrc} alt="Core" className="h-7 w-auto" />
-        </div>
+      <div className="max-w-sm mx-auto px-5 pt-20 pb-8 flex flex-col gap-5">
+        {/* CORE título */}
+        <h1 className="text-center text-[64px] font-black tracking-tight leading-none text-black">
+          CORE
+        </h1>
 
         {/* Headline */}
-        <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold tracking-tight leading-tight text-foreground">
-            Controle sua vida financeira em um só app
-          </h1>
-          <p className="text-sm text-muted-foreground leading-snug">
-            Receitas, despesas, investimentos, desejos e limites em um painel simples para você saber exatamente para onde seu dinheiro está indo.
+        <div className="space-y-3 text-center">
+          <h2 className="text-[26px] font-bold tracking-tight leading-tight text-black">
+            Controle sua vida financeira em um só lugar
+          </h2>
+          <p className="text-base text-neutral-500 leading-snug">
+            Receitas, gastos, contas, desejos e investimentos sem complicação.
           </p>
         </div>
 
-        {/* Benefícios */}
-        <div className="space-y-2">
-          {benefits.map(({ icon: Icon, title, desc }) => (
-            <div
-              key={title}
-              className="flex items-start gap-3 rounded-xl border border-border bg-card shadow-sm p-3"
-            >
-              <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                <Icon className="w-4 h-4 text-foreground" strokeWidth={2} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground leading-tight">{title}</p>
-                <p className="text-xs text-muted-foreground leading-snug mt-0.5">{desc}</p>
-              </div>
+        {/* Cards de exemplo */}
+        <div className="space-y-3 mt-2">
+          {/* Receitas */}
+          <div className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white shadow-sm p-4">
+            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-green-600" strokeWidth={2.5} />
             </div>
-          ))}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-neutral-500">Receitas</p>
+              <p className="text-lg font-bold text-green-600">R$ 3.000,00</p>
+            </div>
+            <TrendingUp className="w-6 h-6 text-green-400 flex-shrink-0" strokeWidth={2.5} />
+          </div>
+
+          {/* Gastos */}
+          <div className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white shadow-sm p-4">
+            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+              <TrendingDown className="w-6 h-6 text-red-500" strokeWidth={2.5} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-neutral-500">Gastos</p>
+              <p className="text-lg font-bold text-red-500">R$ 635,00</p>
+            </div>
+            <TrendingDown className="w-6 h-6 text-red-300 flex-shrink-0" strokeWidth={2.5} />
+          </div>
+
+          {/* Saldo do mês */}
+          <div className="flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white shadow-sm p-4">
+            <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
+              <ArrowUpRight className="w-6 h-6 text-green-600" strokeWidth={2.5} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-neutral-500">Saldo do mês</p>
+              <p className="text-lg font-bold text-green-600">+R$ 2.365,00</p>
+            </div>
+            <TrendingUp className="w-6 h-6 text-green-400 flex-shrink-0" strokeWidth={2.5} />
+          </div>
         </div>
 
         {/* Instrução */}
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-          <p className="text-sm font-semibold text-foreground">
-            Para acessar o Core, abra pelo navegador do celular:
-          </p>
-          <div className="space-y-2.5">
+        <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-200 flex items-center justify-center">
+              <ClipboardList className="w-4 h-4 text-neutral-700" strokeWidth={2} />
+            </div>
+            <p className="text-base font-bold text-black">Para acessar agora:</p>
+          </div>
+          <div className="space-y-2.5 pl-1">
             <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-neutral-200 flex items-center justify-center text-sm font-semibold text-neutral-700">
                 1
               </div>
-              <p className="text-sm text-foreground">
-                Toque nos <MoreHorizontal className="inline w-4 h-4 mx-0.5 -mt-0.5" /> no canto superior direito
+              <p className="text-sm text-neutral-700">
+                Toque em <MoreHorizontal className="inline w-5 h-5 mx-0.5 -mt-0.5" /> no <span className="font-semibold text-black">canto superior direito</span>
               </p>
             </div>
+            <div className="border-t border-neutral-200" />
             <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-neutral-200 flex items-center justify-center text-sm font-semibold text-neutral-700">
                 2
               </div>
-              <p className="text-sm text-foreground">
-                Escolha <span className="font-semibold">"Abrir no navegador"</span>
+              <p className="text-sm text-neutral-700">
+                Depois, toque em <span className="font-semibold text-black">"Abrir no navegador"</span>
               </p>
             </div>
           </div>
@@ -107,22 +117,16 @@ export const AccessGateUI = () => {
         {/* CTA */}
         <a
           href={url}
-          className="w-full flex items-center justify-center bg-foreground text-background rounded-full py-3.5 px-6 text-sm font-semibold active:opacity-80 transition-opacity"
+          className="w-full flex items-center justify-between bg-black text-white rounded-full py-4 px-6 text-base font-semibold active:opacity-80 transition-opacity"
         >
-          Toque nos 3 pontos para continuar
+          <span className="flex-1 text-center">Toque nos 3 pontos para continuar</span>
+          <ArrowRight className="w-5 h-5 flex-shrink-0" strokeWidth={2.5} />
         </a>
 
-        <p className="text-xs text-muted-foreground text-center leading-snug px-2">
-          O TikTok pode limitar o carregamento completo. No navegador do celular, o Core abre normalmente.
-        </p>
-
-        <button
-          onClick={handleCopy}
-          className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Link2 className="w-3.5 h-3.5" />
-          Copiar link
-        </button>
+        <div className="flex items-center justify-center gap-2 text-sm text-neutral-500">
+          <Clock className="w-4 h-4" />
+          <span>Leva menos de 2 minutos para configurar.</span>
+        </div>
       </div>
     </div>
   );

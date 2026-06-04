@@ -30,41 +30,41 @@ export const AccessGateUI = () => {
         </div>
 
         {/* Cards de exemplo */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {/* Receitas */}
-          <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white shadow-sm p-2.5">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-green-600" strokeWidth={2.5} />
+          <div className="flex items-center gap-2.5 rounded-xl border border-neutral-200 bg-white shadow-sm p-2">
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-green-600" strokeWidth={2.5} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-neutral-500">Receitas</p>
-              <p className="text-base font-bold text-green-600">R$ 3.000,00</p>
+              <p className="text-[11px] text-neutral-500 leading-tight">Receitas</p>
+              <p className="text-sm font-bold text-green-600 leading-tight">R$ 3.000,00</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-green-400 flex-shrink-0" strokeWidth={2.5} />
+            <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" strokeWidth={2.5} />
           </div>
 
           {/* Gastos */}
-          <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white shadow-sm p-2.5">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-              <TrendingDown className="w-5 h-5 text-red-500" strokeWidth={2.5} />
+          <div className="flex items-center gap-2.5 rounded-xl border border-neutral-200 bg-white shadow-sm p-2">
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4 text-red-500" strokeWidth={2.5} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-neutral-500">Gastos</p>
-              <p className="text-base font-bold text-red-500">R$ 635,00</p>
+              <p className="text-[11px] text-neutral-500 leading-tight">Gastos</p>
+              <p className="text-sm font-bold text-red-500 leading-tight">R$ 635,00</p>
             </div>
-            <TrendingDown className="w-5 h-5 text-red-300 flex-shrink-0" strokeWidth={2.5} />
+            <TrendingDown className="w-4 h-4 text-red-300 flex-shrink-0" strokeWidth={2.5} />
           </div>
 
           {/* Saldo do mês */}
-          <div className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white shadow-sm p-2.5">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
-              <ArrowUpRight className="w-5 h-5 text-green-600" strokeWidth={2.5} />
+          <div className="flex items-center gap-2.5 rounded-xl border border-neutral-200 bg-white shadow-sm p-2">
+            <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+              <ArrowUpRight className="w-4 h-4 text-green-600" strokeWidth={2.5} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-neutral-500">Saldo do mês</p>
-              <p className="text-base font-bold text-green-600">+R$ 2.365,00</p>
+              <p className="text-[11px] text-neutral-500 leading-tight">Saldo do mês</p>
+              <p className="text-sm font-bold text-green-600 leading-tight">+R$ 2.365,00</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-green-400 flex-shrink-0" strokeWidth={2.5} />
+            <TrendingUp className="w-4 h-4 text-green-400 flex-shrink-0" strokeWidth={2.5} />
           </div>
         </div>
 

@@ -13,9 +13,9 @@ export const AccessGateUI = () => {
         </div>
       </div>
 
-      <div className="max-w-sm mx-auto px-5 pt-14 pb-4 flex flex-col gap-3">
+      <div className="max-w-sm mx-auto px-4 pt-10 pb-3 flex flex-col gap-2.5">
         {/* CORE título */}
-        <h1 className="text-center text-4xl font-black tracking-tight leading-none text-black">
+        <h1 className="text-center text-3xl font-black tracking-tight leading-none text-black">
           CORE
         </h1>
 

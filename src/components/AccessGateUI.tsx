@@ -20,11 +20,11 @@ export const AccessGateUI = () => {
         </h1>
 
         {/* Headline */}
-        <div className="space-y-1.5 text-center">
-          <h2 className="text-xl font-bold tracking-tight leading-tight text-black">
+        <div className="space-y-1 text-center">
+          <h2 className="text-lg font-bold tracking-tight leading-tight text-black">
             Controle sua vida financeira em um só lugar
           </h2>
-          <p className="text-sm text-neutral-500 leading-snug">
+          <p className="text-xs text-neutral-500 leading-snug">
             Receitas, gastos, contas, desejos e investimentos sem complicação.
           </p>
         </div>

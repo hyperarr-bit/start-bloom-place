@@ -224,7 +224,7 @@ export const GoalsBoardV2 = () => {
                   <Button size="sm" variant="ghost" className="h-9" onClick={() => setShowNewGoal(false)}><X className="w-4 h-4" /></Button>
                 </div>
               ) : (
-                <button onClick={() => setShowNewGoal(true)}
+                <button onClick={() => setShowNewGoal(true)} data-spotlight="add-goal"
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground">
                   <Plus className="w-4 h-4" />
                   <span className="text-sm">Nova meta</span>

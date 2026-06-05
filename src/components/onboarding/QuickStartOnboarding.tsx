@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Dumbbell, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { Wallet, CheckCircle2, Apple, Target, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
@@ -9,7 +9,7 @@ import coreLogoBlack from "@/assets/core-logo-black.png";
 
 
 
-export type ModuleKey = "financas" | "rotina" | "dieta" | "treino";
+export type ModuleKey = "financas" | "rotina" | "dieta" | "metas";
 
 interface QuickStartOnboardingProps {
   onComplete: () => void;
@@ -30,7 +30,7 @@ const OPTIONS: Array<{
   { key: "financas", route: "/financas", label: "Finanças", benefit: "Saiba pra onde seu dinheiro vai", Icon: Wallet, tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
   { key: "rotina", route: "/rotina", label: "Hábitos", benefit: "Construa rotina sem culpa", Icon: CheckCircle2, tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
   { key: "dieta", route: "/dieta", label: "Dieta", benefit: "Coma sem se perder", Icon: Apple, tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
-  { key: "treino", route: "/treino", label: "Treino", benefit: "Não falte mais", Icon: Dumbbell, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
+  { key: "metas", route: "/desenvolvimento", label: "Metas", benefit: "Defina onde quer chegar", Icon: Target, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
 ];
 
 export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }: QuickStartOnboardingProps) => {

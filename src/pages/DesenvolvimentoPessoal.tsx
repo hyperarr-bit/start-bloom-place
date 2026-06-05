@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useUserData } from "@/hooks/use-user-data";
 
 
 const defaultAffirmations: string[] = [];
@@ -53,6 +55,7 @@ const DesenvolvimentoPessoal = () => {
   const [activeTab, setActiveTab] = useState("sobre");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const { set: setUserData, isGuest } = useUserData();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // SOBRE MIM
@@ -187,6 +190,18 @@ const DesenvolvimentoPessoal = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <SpotlightOverlay
+        moduleKey="metas"
+        onComplete={() => {
+          if (isGuest) {
+            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
+          }
+        }}
+        steps={[
+          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', checkKey: "dp-motivations", onEnter: () => setActiveTab("sobre") },
+          { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
@@ -241,7 +256,7 @@ const DesenvolvimentoPessoal = () => {
 
           {/* ========== SOBRE MIM ========== */}
           {activeTab === "sobre" && <div className="space-y-4">
-            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
+            <div data-spotlight="add-motivation" className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</h3>
               <ListEditor items={motivations} setItems={setMotivations} newItem={newMotivation} setNewItem={setNewMotivation}
                 placeholder="Adicionar motivação..." colorClass="bg-yellow-100/80 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20" />

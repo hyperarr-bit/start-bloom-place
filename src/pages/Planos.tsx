@@ -1,21 +1,134 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Crown, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Crown,
+  Loader2,
+  Wallet,
+  Utensils,
+  Dumbbell,
+  CalendarCheck,
+  Target,
+  Home as HomeIcon,
+  Plane,
+  GraduationCap,
+  Brain,
+  Briefcase,
+  Heart,
+  PawPrint,
+  Sparkles,
+  Trophy,
+  HeartPulse,
+  Smartphone,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
-import { WinbackFlow } from "@/components/retention/WinbackFlow";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
+
+const MODULE_GROUPS: Array<{
+  icon: typeof Wallet;
+  title: string;
+  items: string[];
+}> = [
+  {
+    icon: Wallet,
+    title: "Finanças",
+    items: [
+      "Receitas, despesas e contas fixas",
+      "Dívidas, parcelamentos e investimentos",
+      "Limites por categoria e relatórios",
+      "Desejos, metas e saúde financeira",
+    ],
+  },
+  {
+    icon: Utensils,
+    title: "Dieta",
+    items: ["Plano alimentar, calorias e macros", "Receitas e lista de compras"],
+  },
+  {
+    icon: Dumbbell,
+    title: "Treino",
+    items: ["Rotinas, séries e progressão de cargas"],
+  },
+  {
+    icon: CalendarCheck,
+    title: "Rotina",
+    items: ["Hábitos, agenda e lembretes diários"],
+  },
+  {
+    icon: Target,
+    title: "Metas & Desenvolvimento",
+    items: ["Motivações diárias e metas pessoais"],
+  },
+  {
+    icon: HomeIcon,
+    title: "Casa",
+    items: ["Inventário, manutenção e contas da casa"],
+  },
+  {
+    icon: Plane,
+    title: "Viagens",
+    items: ["Planejamento, orçamento e checklist"],
+  },
+  {
+    icon: GraduationCap,
+    title: "Estudos & Biblioteca",
+    items: ["Matérias, livros e leituras"],
+  },
+  {
+    icon: Brain,
+    title: "Hiperfoco",
+    items: ["Sessões de foco e priorização"],
+  },
+  {
+    icon: Briefcase,
+    title: "Carreira",
+    items: ["Objetivos profissionais e progresso"],
+  },
+  {
+    icon: Heart,
+    title: "Relacionamentos",
+    items: ["Pessoas importantes, datas e contatos"],
+  },
+  {
+    icon: PawPrint,
+    title: "Pet",
+    items: ["Vacinas, ração e cuidados"],
+  },
+  {
+    icon: Sparkles,
+    title: "Beleza",
+    items: ["Rotina de skincare e cuidados"],
+  },
+  {
+    icon: HeartPulse,
+    title: "Saúde",
+    items: ["Consultas, exames e medicamentos"],
+  },
+  {
+    icon: Smartphone,
+    title: "Detox digital",
+    items: ["Limites de tela e foco offline"],
+  },
+  {
+    icon: Trophy,
+    title: "Conquistas",
+    items: ["Acompanhe suas vitórias e evolução"],
+  },
+];
 
 const Planos = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isSubscribed, trialExpired, user } = useAuth();
+  const { isSubscribed, user } = useAuth();
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -27,48 +140,26 @@ const Planos = () => {
 
   const shouldOfferWinback = !!user && !isSubscribed;
 
-  // Sair de /planos: marca intent (a roleta abre na próxima rota via GlobalWinback)
-  // e volta direto para a tela anterior (ex.: trial expirado).
   const exitToPrevious = useCallback(() => {
-    if (shouldOfferWinback) {
-      winback.markIntent();
-    }
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/", { replace: true });
-    }
+    if (shouldOfferWinback) winback.markIntent();
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/", { replace: true });
   }, [navigate, shouldOfferWinback, winback]);
 
-  // Botão voltar do navegador / sistema.
   useEffect(() => {
     if (!shouldOfferWinback) return;
-    const onPopState = () => {
-      // Marca intent antes que a próxima rota monte o GlobalWinback.
-      winback.markIntent();
-    };
+    const onPopState = () => winback.markIntent();
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [shouldOfferWinback, winback]);
 
-  const handleBack = useCallback(() => {
-    exitToPrevious();
-  }, [exitToPrevious]);
+  const handleBack = useCallback(() => exitToPrevious(), [exitToPrevious]);
 
   const plans = {
     monthly: { price: "14,90", period: "/mês" },
     annual: { price: "3,90", period: "/mês", savings: "Economia de R$ 132/ano" },
   };
-
   const currentPlan = plans[billing];
-
-  const features = [
-    "Receitas, despesas e contas fixas",
-    "Dívidas e parcelamentos no controle",
-    "Investimentos e patrimônio",
-    "Desejos e metas financeiras",
-    "Atualizações e suporte prioritário",
-  ];
 
   const handleCheckout = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -77,7 +168,6 @@ const Planos = () => {
       navigate("/auth");
       return;
     }
-
     setLoading(true);
     winback.markIntent();
     try {
@@ -86,9 +176,7 @@ const Planos = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      if (data?.url) {
-        window.location.href = data.url;
-      }
+      if (data?.url) window.location.href = data.url;
     } catch (err: any) {
       const msg = err.message || "";
       if (msg.includes("not authenticated") || msg.includes("missing sub claim")) {
@@ -104,21 +192,25 @@ const Planos = () => {
   return (
     <div className="min-h-screen bg-background">
       <PaymentStatus />
-      
-      <header className="border-b border-border bg-card">
+
+      <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={handleBack} className="p-2 rounded-lg hover:bg-muted">
+          <button
+            onClick={handleBack}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            aria-label="Voltar"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold">Escolha seu plano</h1>
         </div>
       </header>
 
-      <main className="max-w-md mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-2xl mx-auto px-4 py-6 sm:py-10 space-y-8 pb-32 sm:pb-10">
         {isSubscribed && (
-          <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-4 text-center space-y-3">
-            <p className="text-sm font-medium text-green-600 dark:text-green-400">
-              ✅ Você já é assinante!
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center space-y-3">
+            <p className="text-sm font-medium text-primary">
+              Você já é assinante CORE PRO
             </p>
             <Button
               variant="ghost"
@@ -130,8 +222,20 @@ const Planos = () => {
             </Button>
           </div>
         )}
-
         <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} />
+
+        {/* Hero */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/30">
+            <Crown className="w-7 h-7 text-primary-foreground" />
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Tudo da sua vida em um só app
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            16 módulos para organizar finanças, saúde, rotina, metas e muito mais.
+          </p>
+        </div>
 
         {/* Billing toggle */}
         <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">
@@ -150,11 +254,9 @@ const Planos = () => {
             }`}
           >
             Anual
-            {billing === "annual" && (
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                -74%
-              </span>
-            )}
+            <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
+              -74%
+            </span>
           </button>
         </div>
 
@@ -163,36 +265,45 @@ const Planos = () => {
           key={billing}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl border-2 border-primary/20 bg-card p-6 space-y-6"
+          className="relative rounded-2xl border-2 border-primary/30 bg-card p-6 sm:p-8 space-y-5 shadow-xl shadow-primary/10 overflow-hidden"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Crown className="w-5 h-5 text-primary" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Crown className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg leading-tight">CORE PRO</h3>
+                <p className="text-xs text-muted-foreground">Acesso completo</p>
+              </div>
             </div>
-            <div>
-              <h2 className="font-bold text-lg">CORE PRO</h2>
-            </div>
+            {billing === "annual" && (
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-1 rounded-md">
+                Mais escolhido
+              </span>
+            )}
           </div>
 
-          <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-bold">R$ {currentPlan.price}</span>
-            <span className="text-muted-foreground">{currentPlan.period}</span>
+          <div className="space-y-1">
+            {billing === "annual" && (
+              <p className="text-sm text-muted-foreground line-through">
+                R$ 14,90/mês
+              </p>
+            )}
+            <div className="flex items-baseline gap-1">
+              <span className="text-5xl font-bold tracking-tight">
+                R$ {currentPlan.price}
+              </span>
+              <span className="text-muted-foreground">{currentPlan.period}</span>
+            </div>
+            {billing === "annual" && (
+              <p className="text-xs text-primary font-medium">
+                {plans.annual.savings}
+              </p>
+            )}
           </div>
-
-          {billing === "annual" && (
-            <p className="text-xs text-green-600 font-medium">
-              {plans.annual.savings}
-            </p>
-          )}
-
-          <ul className="space-y-3">
-            {features.map((f) => (
-              <li key={f} className="flex items-center gap-3 text-sm">
-                <Check className="w-4 h-4 text-green-500 shrink-0" />
-                {f}
-              </li>
-            ))}
-          </ul>
 
           <Button
             className="w-full"
@@ -201,7 +312,9 @@ const Planos = () => {
             disabled={loading || isSubscribed}
           >
             {loading ? (
-              <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...
+              </>
             ) : isSubscribed ? (
               "Já assinante"
             ) : (
@@ -209,8 +322,76 @@ const Planos = () => {
             )}
           </Button>
 
+          <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Cancele quando quiser · 7 dias grátis · Sem fidelidade</span>
+          </div>
         </motion.div>
+
+        {/* All modules benefits */}
+        <section className="space-y-4">
+          <div className="text-center space-y-1">
+            <h3 className="text-lg font-bold">O que está incluído</h3>
+            <p className="text-xs text-muted-foreground">
+              Todos os 16 módulos liberados, sem limites
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            {MODULE_GROUPS.map((group) => {
+              const Icon = group.icon;
+              return (
+                <div
+                  key={group.title}
+                  className="rounded-xl border border-border bg-card p-4 space-y-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-primary" />
+                    </div>
+                    <h4 className="font-semibold text-sm">{group.title}</h4>
+                  </div>
+                  <ul className="space-y-1.5 pl-1">
+                    {group.items.map((item) => (
+                      <li
+                        key={item}
+                        className="flex items-start gap-2 text-xs text-muted-foreground"
+                      >
+                        <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       </main>
+
+      {/* Sticky CTA mobile */}
+      {!isSubscribed && (
+        <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="leading-tight">
+              <p className="text-[11px] text-muted-foreground">A partir de</p>
+              <p className="text-base font-bold">
+                R$ {currentPlan.price}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {currentPlan.period}
+                </span>
+              </p>
+            </div>
+            <Button onClick={handleCheckout} disabled={loading} className="flex-1 max-w-[60%]">
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Assinar agora"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

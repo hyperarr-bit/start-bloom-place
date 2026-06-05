@@ -4,8 +4,8 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { Menu, DollarSign } from "lucide-react";
-import { AccountDrawer } from "@/components/home/AccountDrawer";
+import { ArrowLeft, DollarSign } from "lucide-react";
+
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { IncomeTable } from "@/components/IncomeTable";

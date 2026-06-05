@@ -190,6 +190,18 @@ const DesenvolvimentoPessoal = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <SpotlightOverlay
+        moduleKey="metas"
+        onComplete={() => {
+          if (isGuest) {
+            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
+          }
+        }}
+        steps={[
+          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', checkKey: "dp-motivations", onEnter: () => setActiveTab("sobre") },
+          { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>

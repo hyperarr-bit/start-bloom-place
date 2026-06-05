@@ -55,6 +55,7 @@ const DesenvolvimentoPessoal = () => {
   const [activeTab, setActiveTab] = useState("sobre");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const { set: setUserData, isGuest } = useUserData();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // SOBRE MIM

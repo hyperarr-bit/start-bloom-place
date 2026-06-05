@@ -293,7 +293,7 @@ export const AccessGateUI = () => {
           className="w-full flex items-center justify-between bg-black text-white rounded-full font-semibold active:opacity-80 transition-opacity"
           style={{ ...s.cta, marginTop: "clamp(0.625rem, 1.8svh, 1.25rem)" }}
         >
-          <span className="flex-1 text-center">Toque nos 3 pontos para continuar</span>
+          <span className="flex-1 text-center">Use o menu ⋯ do TikTok para continuar</span>
           <ArrowRight className="flex-shrink-0" style={{ width: "1.1em", height: "1.1em" }} strokeWidth={2.5} />
         </a>
 

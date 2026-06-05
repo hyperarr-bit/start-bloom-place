@@ -1,7 +1,144 @@
-import { MoreHorizontal, DollarSign, TrendingDown, TrendingUp, ArrowUpRight, ClipboardList, ArrowRight, Clock, ArrowUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  MoreHorizontal,
+  ClipboardList,
+  ArrowRight,
+  Clock,
+  ArrowUp,
+  Wallet,
+  Utensils,
+  Dumbbell,
+  CalendarCheck,
+  Target,
+  HeartPulse,
+  Brain,
+  GraduationCap,
+  TrendingUp,
+  Check,
+  Flame,
+  Droplets,
+  BookOpen,
+  Timer,
+  type LucideIcon,
+} from "lucide-react";
+
+type ModuleCard = {
+  key: string;
+  icon: LucideIcon;
+  trailingIcon: LucideIcon;
+  label: string;
+  value: string;
+  iconBg: string;
+  iconColor: string;
+  valueColor: string;
+  trailingColor: string;
+};
+
+const MODULE_CARDS: ModuleCard[] = [
+  {
+    key: "financas",
+    icon: Wallet,
+    trailingIcon: TrendingUp,
+    label: "Saldo do mês",
+    value: "+R$ 2.365,00",
+    iconBg: "bg-green-100",
+    iconColor: "text-green-600",
+    valueColor: "text-green-600",
+    trailingColor: "text-green-400",
+  },
+  {
+    key: "dieta",
+    icon: Utensils,
+    trailingIcon: Flame,
+    label: "Calorias hoje",
+    value: "1.840 kcal",
+    iconBg: "bg-orange-100",
+    iconColor: "text-orange-600",
+    valueColor: "text-orange-600",
+    trailingColor: "text-orange-400",
+  },
+  {
+    key: "treino",
+    icon: Dumbbell,
+    trailingIcon: TrendingUp,
+    label: "Treino de hoje",
+    value: "Peito + Tríceps",
+    iconBg: "bg-blue-100",
+    iconColor: "text-blue-600",
+    valueColor: "text-blue-600",
+    trailingColor: "text-blue-400",
+  },
+  {
+    key: "rotina",
+    icon: CalendarCheck,
+    trailingIcon: Check,
+    label: "Hábitos hoje",
+    value: "5 de 7",
+    iconBg: "bg-purple-100",
+    iconColor: "text-purple-600",
+    valueColor: "text-purple-600",
+    trailingColor: "text-purple-400",
+  },
+  {
+    key: "metas",
+    icon: Target,
+    trailingIcon: TrendingUp,
+    label: "Meta da semana",
+    value: "75% concluída",
+    iconBg: "bg-pink-100",
+    iconColor: "text-pink-600",
+    valueColor: "text-pink-600",
+    trailingColor: "text-pink-400",
+  },
+  {
+    key: "saude",
+    icon: HeartPulse,
+    trailingIcon: Droplets,
+    label: "Água hoje",
+    value: "1,8 / 2,5L",
+    iconBg: "bg-cyan-100",
+    iconColor: "text-cyan-600",
+    valueColor: "text-cyan-600",
+    trailingColor: "text-cyan-400",
+  },
+  {
+    key: "hiperfoco",
+    icon: Brain,
+    trailingIcon: Timer,
+    label: "Foco hoje",
+    value: "2h 15min",
+    iconBg: "bg-indigo-100",
+    iconColor: "text-indigo-600",
+    valueColor: "text-indigo-600",
+    trailingColor: "text-indigo-400",
+  },
+  {
+    key: "estudos",
+    icon: GraduationCap,
+    trailingIcon: BookOpen,
+    label: "Leitura",
+    value: "32 págs hoje",
+    iconBg: "bg-amber-100",
+    iconColor: "text-amber-600",
+    valueColor: "text-amber-600",
+    trailingColor: "text-amber-400",
+  },
+];
 
 export const AccessGateUI = () => {
   const url = `${window.location.origin}/`;
+  const [offset, setOffset] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setOffset((o) => (o + 3) % MODULE_CARDS.length);
+    }, 2500);
+    return () => clearInterval(id);
+  }, []);
+
+  const visibleCards = [0, 1, 2].map(
+    (i) => MODULE_CARDS[(offset + i) % MODULE_CARDS.length],
+  );
 
   // Tamanhos fluidos baseados em svh (small viewport height = estável no iOS Safari)
   const s = {
@@ -75,50 +212,50 @@ export const AccessGateUI = () => {
         {/* Headline */}
         <div className="space-y-1 text-center" style={{ marginTop: "clamp(0.625rem, 1.8svh, 1.25rem)" }}>
           <h2 className="font-bold tracking-tight text-black" style={s.h2}>
-            Controle sua vida financeira em um só lugar
+            Organize toda a sua vida em um só app
           </h2>
           <p className="text-neutral-500 leading-snug" style={s.sub}>
-            Receitas, gastos, contas, desejos e investimentos sem complicação.
+            Finanças, dieta, treino, rotina, metas e muito mais sem complicação.
           </p>
         </div>
 
-        {/* Cards de exemplo */}
-        <div className="flex flex-col" style={{ ...s.cardsGap, marginTop: "clamp(0.625rem, 1.8svh, 1.25rem)" }}>
-          {/* Receitas */}
-          <div className="flex items-center rounded-xl border border-neutral-200 bg-white shadow-sm" style={s.card}>
-            <div className="flex-shrink-0 rounded-lg bg-green-100 flex items-center justify-center" style={s.cardIcon}>
-              <DollarSign className="text-green-600" style={s.cardLucide} strokeWidth={2.5} />
-            </div>
-            <div className="flex-1 min-w-0" style={{ marginLeft: "clamp(0.5rem, 1.2svh, 0.75rem)" }}>
-              <p className="text-neutral-500 leading-tight" style={s.cardLabel}>Receitas</p>
-              <p className="font-bold text-green-600 leading-tight" style={s.cardValue}>R$ 3.000,00</p>
-            </div>
-            <TrendingUp className="text-green-400 flex-shrink-0" style={s.cardLucide} strokeWidth={2.5} />
-          </div>
-
-          {/* Gastos */}
-          <div className="flex items-center rounded-xl border border-neutral-200 bg-white shadow-sm" style={s.card}>
-            <div className="flex-shrink-0 rounded-lg bg-red-100 flex items-center justify-center" style={s.cardIcon}>
-              <TrendingDown className="text-red-500" style={s.cardLucide} strokeWidth={2.5} />
-            </div>
-            <div className="flex-1 min-w-0" style={{ marginLeft: "clamp(0.5rem, 1.2svh, 0.75rem)" }}>
-              <p className="text-neutral-500 leading-tight" style={s.cardLabel}>Gastos</p>
-              <p className="font-bold text-red-500 leading-tight" style={s.cardValue}>R$ 635,00</p>
-            </div>
-            <TrendingDown className="text-red-300 flex-shrink-0" style={s.cardLucide} strokeWidth={2.5} />
-          </div>
-
-          {/* Saldo do mês */}
-          <div className="flex items-center rounded-xl border border-neutral-200 bg-white shadow-sm" style={s.card}>
-            <div className="flex-shrink-0 rounded-lg bg-green-100 flex items-center justify-center" style={s.cardIcon}>
-              <ArrowUpRight className="text-green-600" style={s.cardLucide} strokeWidth={2.5} />
-            </div>
-            <div className="flex-1 min-w-0" style={{ marginLeft: "clamp(0.5rem, 1.2svh, 0.75rem)" }}>
-              <p className="text-neutral-500 leading-tight" style={s.cardLabel}>Saldo do mês</p>
-              <p className="font-bold text-green-600 leading-tight" style={s.cardValue}>+R$ 2.365,00</p>
-            </div>
-            <TrendingUp className="text-green-400 flex-shrink-0" style={s.cardLucide} strokeWidth={2.5} />
-          </div>
+        {/* Cards rotativos por módulo */}
+        <div
+          key={offset}
+          className="flex flex-col transition-opacity duration-500"
+          style={{ ...s.cardsGap, marginTop: "clamp(0.625rem, 1.8svh, 1.25rem)" }}
+        >
+          {visibleCards.map((card) => {
+            const Icon = card.icon;
+            const Trailing = card.trailingIcon;
+            return (
+              <div
+                key={card.key}
+                className="flex items-center rounded-xl border border-neutral-200 bg-white shadow-sm"
+                style={s.card}
+              >
+                <div
+                  className={`flex-shrink-0 rounded-lg flex items-center justify-center ${card.iconBg}`}
+                  style={s.cardIcon}
+                >
+                  <Icon className={card.iconColor} style={s.cardLucide} strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0" style={{ marginLeft: "clamp(0.5rem, 1.2svh, 0.75rem)" }}>
+                  <p className="text-neutral-500 leading-tight" style={s.cardLabel}>
+                    {card.label}
+                  </p>
+                  <p className={`font-bold leading-tight ${card.valueColor}`} style={s.cardValue}>
+                    {card.value}
+                  </p>
+                </div>
+                <Trailing
+                  className={`flex-shrink-0 ${card.trailingColor}`}
+                  style={s.cardLucide}
+                  strokeWidth={2.5}
+                />
+              </div>
+            );
+          })}
         </div>
 
         {/* Instrução */}

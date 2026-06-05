@@ -1,59 +1,43 @@
-# Plano: Varredura geral + Redesign de Planos
+## Objetivo
+Atualizar `src/components/AccessGateUI.tsx` (tela que abre no in-app browser do TikTok) pra refletir que o CORE agora cobre todos os 16 módulos, não só finanças.
 
-## Parte 1 — Varredura de bugs e responsividade
+## Mudanças
 
-Vou rodar uma checagem completa em:
+**Headline**
+- De: "Controle sua vida financeira em um só lugar"
+- Para: "Organize toda a sua vida em um só app"
 
-1. **Fluxo principal de onboarding** (após as últimas mudanças):
-   - `Index` (picker dos 4 módulos) em 320px, 375px, 430px, tablet e desktop
-   - `SpotlightOverlay` (16 módulos em Finanças, e os tutoriais de Dieta/Rotina/Metas)
-   - `QuickStartOnboarding` (picker)
-   - `DesenvolvimentoPessoal` (novo spotlight de motivação + meta)
-   - Fluxo guest → quicksignup → trial → home
+**Subtítulo**
+- Mantém estilo atual, trocando exemplos:
+- De: "Receitas, gastos, contas, desejos e investimentos sem complicação."
+- Para: "Finanças, dieta, treino, rotina, metas e muito mais sem complicação."
 
-2. **Páginas-chave** (verificar overflow, header sobrepondo conteúdo, botão voltar, safe-area iOS):
-   - Home, Finanças, Dieta, Rotina, Desenvolvimento, Planos, Auth
+**Cards de exemplo (3 cards rotativos por módulo)**
+- Substituir os 3 cards fixos (Receitas/Gastos/Saldo) por 3 cards que rotacionam entre módulos a cada ~2.5s com fade/slide suave.
+- Cada card mantém o mesmo layout atual (ícone colorido à esquerda, label + valor, ícone de tendência à direita).
+- Pool de exemplos (1 por módulo, com ícone Lucide e cor temática):
+  - Finanças — Wallet — "Saldo do mês" / "+R$ 2.365,00" (verde)
+  - Dieta — Utensils — "Calorias hoje" / "1.840 kcal" (laranja)
+  - Treino — Dumbbell — "Treino de hoje" / "Peito + Tríceps" (azul)
+  - Rotina — CalendarCheck — "Hábitos hoje" / "5 de 7 ✓" (roxo)
+  - Metas — Target — "Meta da semana" / "75% concluída" (rosa)
+  - Saúde — HeartPulse — "Água hoje" / "1,8 / 2,5L" (ciano)
+  - Hiperfoco — Brain — "Foco hoje" / "2h 15min" (índigo)
+  - Estudos — GraduationCap — "Leitura" / "32 págs hoje" (âmbar)
+- A cada ciclo, mostra 3 cards diferentes do pool (rotação contínua).
 
-3. **Sinais a checar**: console errors, network 4xx/5xx, runtime errors, layout quebrado em 320px (menor mobile), elementos clicáveis cortados.
+**Restante mantido igual**
+- Halo verde + seta (indicador dos 3 pontos)
+- Título "CORE"
+- Caixa "Para acessar agora" com passos 1 e 2
+- CTA preto "Toque nos 3 pontos para continuar"
+- Footer "Leva menos de 2 minutos para configurar"
+- Todos os tamanhos fluidos com `clamp()` + `svh` (estável no iOS Safari)
 
-4. **Correções pontuais** apenas dos bugs encontrados — sem refactor além do necessário.
+## Arquivos
+- editar `src/components/AccessGateUI.tsx`
 
-## Parte 2 — Redesign da tela `/planos`
-
-Estado atual (`src/pages/Planos.tsx`): card único com 5 features só de Finanças, toggle mensal/anual, badge -74%.
-
-### Mudanças
-
-**Lista de benefícios completa** agrupada por módulo (com ícone Lucide pequeno na frente de cada grupo), cobrindo todos os 16 módulos do app:
-- 💰 Finanças: receitas, despesas, contas fixas, dívidas, investimentos, metas, desejos
-- 🥗 Dieta: planos alimentares, calorias, receitas, lista de compras
-- 💪 Treino: rotinas, progressão, registro
-- 📅 Rotina: hábitos, agenda, lembretes
-- 🎯 Desenvolvimento: motivações, metas pessoais
-- 🏠 Casa, ✈️ Viagens, 📚 Estudos, 🧠 Hiperfoco, 💼 Trabalho, 🛒 Lista, 📊 Relatórios, ⚙️ Configurações, 🔔 Notificações, 📈 Patrimônio, 🎁 Recompensas
-
-(Vou ler quais são exatamente os 16 módulos ativos no `Home.tsx` / config dos módulos antes de finalizar a lista para não inventar.)
-
-**Visual mais bonito** mantendo o design system (tokens, sem hex hardcoded):
-- Header com gradiente sutil usando `--primary`
-- Card do plano com borda gradiente + glow leve (sombra com `--primary`)
-- Ícone Crown maior, tipografia da headline em 2 níveis ("Acesso completo" / "Tudo em um só app")
-- Toggle mensal/anual mantido, mas com badge "Mais escolhido" no anual
-- Preço com risco no valor cheio quando anual (R$ ~~14,90~~ por **R$ 3,90/mês**)
-- Lista de módulos em grid 2 colunas no mobile (ícone + nome curto), com seção "E muito mais" listando features detalhadas em accordion/expand
-- CTA grande sticky no rodapé no mobile para não exigir scroll
-- Indicadores de confiança abaixo do CTA: "Cancele quando quiser • Sem fidelidade • 7 dias grátis"
-
-**Sem mexer** em: lógica de checkout, winback, cancel flow, billing toggle behavior, rotas.
-
-### Arquivos afetados
-- `src/pages/Planos.tsx` (redesign visual + nova lista de benefícios)
-- Possíveis pequenos fixes em arquivos onde a varredura encontrar bugs (a confirmar durante execução)
-
-## Pergunta antes de implementar
-
-Confirma que posso prosseguir com:
-- (a) varredura + correções de bugs encontrados
-- (b) redesign de Planos com benefícios de todos os módulos como descrito acima
-
-Ou prefere que eu faça só uma das duas partes primeiro?
+## Detalhes técnicos
+- Rotação via `useState` + `useEffect` com `setInterval`, sem libs novas.
+- Transição com classes Tailwind (`transition-opacity duration-500`) + `key` no container pra trigger do fade.
+- Cores via classes Tailwind existentes (green/red/blue/orange/purple/pink/cyan/indigo/amber-100 + -500/600), mantendo padrão atual do componente (esse arquivo já usa cores diretas, não tokens — manter consistência local).

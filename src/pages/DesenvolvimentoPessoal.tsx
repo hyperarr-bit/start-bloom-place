@@ -244,7 +244,7 @@ const DesenvolvimentoPessoal = () => {
 
           {/* ========== SOBRE MIM ========== */}
           {activeTab === "sobre" && <div className="space-y-4">
-            <div className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
+            <div data-spotlight="add-motivation" className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</h3>
               <ListEditor items={motivations} setItems={setMotivations} newItem={newMotivation} setNewItem={setNewMotivation}
                 placeholder="Adicionar motivação..." colorClass="bg-yellow-100/80 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20" />

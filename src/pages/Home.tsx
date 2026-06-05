@@ -108,7 +108,7 @@ const HomePage = () => {
       setData("spotlight-done-financas", "");
       setData("spotlight-done-rotina", "");
       setData("spotlight-done-dieta", "");
-      setData("spotlight-done-treino", "");
+      setData("spotlight-done-metas", "");
       setData("core-all-modules-celebrated", "");
       setData(ONBOARDING_RESET_KEY, "true");
     }

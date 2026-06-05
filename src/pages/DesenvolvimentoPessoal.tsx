@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useUserData } from "@/hooks/use-user-data";
 
 
 const defaultAffirmations: string[] = [];

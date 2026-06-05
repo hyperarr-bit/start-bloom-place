@@ -198,8 +198,8 @@ const DesenvolvimentoPessoal = () => {
           }
         }}
         steps={[
-          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', checkKey: "dp-motivations", onEnter: () => setActiveTab("sobre") },
-          { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
+          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', advanceOnClick: false, checkKey: "dp-motivations", onEnter: () => setActiveTab("sobre") },
+          { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', advanceOnClick: false, checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

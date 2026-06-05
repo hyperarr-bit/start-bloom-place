@@ -1,34 +1,59 @@
-## O que muda
+# Plano: Varredura geral + Redesign de Planos
 
-Voltar pro fluxo antigo (4-módulo picker → tutorial in-app → signup 7 dias → home), mantendo as melhorias visuais já feitas. Logado abre na Home (16 módulos), não mais direto no Finanças. No header do Finanças, troco o ícone de perfil por um voltar.
+## Parte 1 — Varredura de bugs e responsividade
 
-## Passos
+Vou rodar uma checagem completa em:
 
-### 1. `src/App.tsx` — RootGate
-- Logado: `<Navigate to="/home" replace />` (era `/financas`).
-- Convidado (sem login): renderizar `<Navigate to="/home" replace />` no lugar de `<WelcomeScreen />`. Como `/home` é `allowGuest`, ele cai no Home, e o `QuickStartOnboarding` já existente assume o picker dos 4 módulos automaticamente (pendingModules calculado por `spotlight-done-*`).
-- Remover o import de `WelcomeScreen` no App.tsx (não é mais usado em lugar nenhum).
+1. **Fluxo principal de onboarding** (após as últimas mudanças):
+   - `Index` (picker dos 4 módulos) em 320px, 375px, 430px, tablet e desktop
+   - `SpotlightOverlay` (16 módulos em Finanças, e os tutoriais de Dieta/Rotina/Metas)
+   - `QuickStartOnboarding` (picker)
+   - `DesenvolvimentoPessoal` (novo spotlight de motivação + meta)
+   - Fluxo guest → quicksignup → trial → home
 
-### 2. `src/pages/Index.tsx` (Finanças) — botão voltar
-No header (linhas ~157-168), trocar:
-- O botão com `Menu` que abre `AccountDrawer` → por um botão com `ArrowLeft` que faz `navigate("/home")`.
-- Remover o `<AccountDrawer ... />` e o state `menuOpen` deste arquivo (e os imports `Menu`, `AccountDrawer`, `useUserData`'s `displayName` se ficar órfão — manter `useUserData` pois é usado em outros pontos).
-- Manter todo o resto da página intacto (tabs, spotlight, etc.).
+2. **Páginas-chave** (verificar overflow, header sobrepondo conteúdo, botão voltar, safe-area iOS):
+   - Home, Finanças, Dieta, Rotina, Desenvolvimento, Planos, Auth
 
-### 3. Tutorial dos 4 módulos
-Já existe e funciona via `QuickStartOnboarding` em `src/pages/Home.tsx` (mostra picker → navega pro módulo escolhido → SpotlightOverlay roda → QuickSignupModal aparece pra convidados). Nenhuma mudança de código aqui, só passa a aparecer porque RootGate agora joga todo mundo em `/home`.
+3. **Sinais a checar**: console errors, network 4xx/5xx, runtime errors, layout quebrado em 320px (menor mobile), elementos clicáveis cortados.
 
-### 4. Arquivos não usados
-- `src/pages/Inicio.tsx` e `src/components/welcome/PreSignupTutorial.tsx`: não vou tocar (Inicio ainda é rota `/inicio` no App.tsx — deixo como está pra não quebrar links salvos; PreSignupTutorial não é importado em lugar nenhum, mas também não tira pra não causar diff fora do escopo). Idem `WelcomeScreen` (fica como arquivo morto mas sem import).
+4. **Correções pontuais** apenas dos bugs encontrados — sem refactor além do necessário.
 
-## Detalhes técnicos
+## Parte 2 — Redesign da tela `/planos`
 
-- `/home` já é `<ProtectedRoute allowGuest>`, então convidado pode entrar.
-- `QuickStartOnboarding` salva `quickstart-target-module` e navega pra rota do módulo escolhido. Ao fim do `SpotlightOverlay` em Finanças, `isGuest` dispara `quicksignup-pending=true` (já está no Index.tsx linhas 132-139), e `QuickSignupModal` global mostra o cadastro com 7 dias.
-- Logado: `RootGate` → `/home` → `useEffect` em Home seta `core-onboarding-done=true` e não mostra picker (linhas 91-102 de Home.tsx). Cai direto no grid dos 16 módulos via `ModuleDrawer`.
+Estado atual (`src/pages/Planos.tsx`): card único com 5 features só de Finanças, toggle mensal/anual, badge -74%.
 
-## Fora de escopo
+### Mudanças
 
-- Não mexer no `WelcomeScreen` em si (fica como arquivo não usado).
-- Não mexer em `PreSignupTutorial`.
-- Não mexer em nenhum outro módulo além do header do Finanças.
+**Lista de benefícios completa** agrupada por módulo (com ícone Lucide pequeno na frente de cada grupo), cobrindo todos os 16 módulos do app:
+- 💰 Finanças: receitas, despesas, contas fixas, dívidas, investimentos, metas, desejos
+- 🥗 Dieta: planos alimentares, calorias, receitas, lista de compras
+- 💪 Treino: rotinas, progressão, registro
+- 📅 Rotina: hábitos, agenda, lembretes
+- 🎯 Desenvolvimento: motivações, metas pessoais
+- 🏠 Casa, ✈️ Viagens, 📚 Estudos, 🧠 Hiperfoco, 💼 Trabalho, 🛒 Lista, 📊 Relatórios, ⚙️ Configurações, 🔔 Notificações, 📈 Patrimônio, 🎁 Recompensas
+
+(Vou ler quais são exatamente os 16 módulos ativos no `Home.tsx` / config dos módulos antes de finalizar a lista para não inventar.)
+
+**Visual mais bonito** mantendo o design system (tokens, sem hex hardcoded):
+- Header com gradiente sutil usando `--primary`
+- Card do plano com borda gradiente + glow leve (sombra com `--primary`)
+- Ícone Crown maior, tipografia da headline em 2 níveis ("Acesso completo" / "Tudo em um só app")
+- Toggle mensal/anual mantido, mas com badge "Mais escolhido" no anual
+- Preço com risco no valor cheio quando anual (R$ ~~14,90~~ por **R$ 3,90/mês**)
+- Lista de módulos em grid 2 colunas no mobile (ícone + nome curto), com seção "E muito mais" listando features detalhadas em accordion/expand
+- CTA grande sticky no rodapé no mobile para não exigir scroll
+- Indicadores de confiança abaixo do CTA: "Cancele quando quiser • Sem fidelidade • 7 dias grátis"
+
+**Sem mexer** em: lógica de checkout, winback, cancel flow, billing toggle behavior, rotas.
+
+### Arquivos afetados
+- `src/pages/Planos.tsx` (redesign visual + nova lista de benefícios)
+- Possíveis pequenos fixes em arquivos onde a varredura encontrar bugs (a confirmar durante execução)
+
+## Pergunta antes de implementar
+
+Confirma que posso prosseguir com:
+- (a) varredura + correções de bugs encontrados
+- (b) redesign de Planos com benefícios de todos os módulos como descrito acima
+
+Ou prefere que eu faça só uma das duas partes primeiro?

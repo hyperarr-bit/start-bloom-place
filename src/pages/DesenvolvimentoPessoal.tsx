@@ -168,14 +168,20 @@ const DesenvolvimentoPessoal = () => {
   };
   const saveGratitude = () => { setGratitudeEntries({ ...gratitudeEntries, [today]: todayGratitude }); };
 
-  const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass }: {
-    items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string;
-  }) => (
-    <div>
+  const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass, onAdd }: {
+    items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string; onAdd?: () => void;
+  }) => {
+    const handleAdd = () => {
+      if (!newItem.trim()) return;
+      addToList(items, setItems, newItem, setNewItem);
+      onAdd?.();
+    };
+
+    return <div>
       <div className="flex gap-2 mb-2">
         <Input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder={placeholder}
-          className="text-xs h-8" onKeyDown={e => e.key === "Enter" && addToList(items, setItems, newItem, setNewItem)} />
-        <Button size="sm" className="h-8 px-2" onClick={() => addToList(items, setItems, newItem, setNewItem)}><Plus className="w-3 h-3" /></Button>
+          className="text-xs h-8" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }} />
+        <Button size="sm" className="h-8 px-2" onClick={handleAdd}><Plus className="w-3 h-3" /></Button>
       </div>
       <div className="space-y-1">
         {items.map((item, i) => (
@@ -185,8 +191,8 @@ const DesenvolvimentoPessoal = () => {
           </div>
         ))}
       </div>
-    </div>
-  );
+    </div>;
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -198,7 +204,7 @@ const DesenvolvimentoPessoal = () => {
           }
         }}
         steps={[
-          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', advanceOnClick: false, checkKey: "dp-motivations", onEnter: () => setActiveTab("sobre") },
+          { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', advanceOnClick: false, advanceOnAction: "first_motivation", onEnter: () => setActiveTab("sobre") },
           { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', advanceOnClick: false, checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
         ]}
       />
@@ -259,7 +265,8 @@ const DesenvolvimentoPessoal = () => {
             <div data-spotlight="add-motivation" className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-500/10 dark:to-amber-500/10 rounded-xl border border-yellow-200 dark:border-yellow-500/30 p-4">
               <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><Star className="w-4 h-4 text-yellow-500" /> O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</h3>
               <ListEditor items={motivations} setItems={setMotivations} newItem={newMotivation} setNewItem={setNewMotivation}
-                placeholder="Adicionar motivação..." colorClass="bg-yellow-100/80 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20" />
+                placeholder="Adicionar motivação..." colorClass="bg-yellow-100/80 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/20"
+                onAdd={() => window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: "first_motivation" } }))} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gradient-to-br from-pink-50 to-rose-50 dark:from-pink-500/10 dark:to-rose-500/10 rounded-xl border border-pink-200 dark:border-pink-500/30 p-4">

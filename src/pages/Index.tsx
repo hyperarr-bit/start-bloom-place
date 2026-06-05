@@ -4,8 +4,8 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { Menu, DollarSign } from "lucide-react";
-import { AccountDrawer } from "@/components/home/AccountDrawer";
+import { ArrowLeft, DollarSign } from "lucide-react";
+
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { IncomeTable } from "@/components/IncomeTable";
@@ -42,14 +42,13 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const displayName = getUserData<string>("core-user-name", "") || "";
   const [activeTab, setActiveTab] = useState(
     getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
   );
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
+
 
   const [incomes, setIncomes] = usePersistedState("finance-incomes", [] as any[]);
 
@@ -128,7 +127,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AccountDrawer open={menuOpen} onOpenChange={setMenuOpen} displayName={displayName} />
       <SpotlightOverlay
         moduleKey="financas"
         onComplete={() => {
@@ -156,9 +154,10 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setMenuOpen(true)} data-spotlight="menu" aria-label="Abrir menu" className="hover:bg-muted rounded-md p-1 transition-colors">
-            <Menu className="w-5 h-5" />
+          <button onClick={() => navigate("/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
+            <ArrowLeft className="w-5 h-5" />
           </button>
+
           <DollarSign className="w-5 h-5 text-amber-600" />
           <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
           <div className="flex items-center gap-2 ml-auto">

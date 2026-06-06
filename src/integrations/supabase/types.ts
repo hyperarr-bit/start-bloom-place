@@ -648,6 +648,17 @@ export type Database = {
         }[]
       }
       admin_retention_stats: { Args: never; Returns: Json }
+      admin_top_tabs: {
+        Args: { _from?: string; _to?: string }
+        Returns: {
+          last_used: string
+          module_id: string
+          sessions: number
+          tab_id: string
+          total_seconds: number
+          unique_users: number
+        }[]
+      }
       admin_trials_started: {
         Args: { _period?: string }
         Returns: {

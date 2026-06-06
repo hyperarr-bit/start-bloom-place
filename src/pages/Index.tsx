@@ -43,6 +43,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
+  const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
   const [activeTab, setActiveTab] = useState(
     getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
   );

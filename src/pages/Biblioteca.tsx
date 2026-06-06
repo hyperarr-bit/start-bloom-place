@@ -516,7 +516,7 @@ const Biblioteca = () => {
               </div>
             )}
 
-            {showForm && <BookForm />}
+            {showForm && BookForm()}
           </div>}
 
           {/* ══════ TAB: ESTANTE ══════ */}
@@ -539,7 +539,7 @@ const Biblioteca = () => {
               <Button size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white" onClick={openNew}><Plus className="w-4 h-4" /></Button>
             </div>
 
-            {showForm && <BookForm />}
+            {showForm && BookForm()}
 
             {filterStatus === "all" ? (
               statusGroups.map(group => {

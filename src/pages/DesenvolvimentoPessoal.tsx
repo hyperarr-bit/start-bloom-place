@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useUserData } from "@/hooks/use-user-data";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 
 
 const defaultAffirmations: string[] = [];

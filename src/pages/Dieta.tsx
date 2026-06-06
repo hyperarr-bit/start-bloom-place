@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Switch } from "@/components/ui/switch";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];

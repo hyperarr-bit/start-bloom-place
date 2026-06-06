@@ -85,11 +85,6 @@ export default function AdminDashboard() {
 
   const logout = async () => { await supabase.auth.signOut(); navigate("/admin", { replace: true }); };
 
-  if (loading || allowed === null) {
-    return <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">Verificando…</div>;
-  }
-  if (!allowed) return null;
-
   const o = data.overview ?? {};
   const m = data.metrics ?? {};
   const f = data.funnel ?? {};
@@ -103,9 +98,13 @@ export default function AdminDashboard() {
     { label: "Cadastrou (quick signup)", value: f.quicksignup_submitted ?? 0, icon: Users },
     { label: "Conta criada", value: f.signups ?? 0, icon: Users },
     { label: "Iniciou trial", value: f.trial_started ?? 0, icon: Activity },
-    { label: "Ativou (usou app)", value: f.activated ?? 0, icon: Activity },
     { label: "Pagou", value: f.paid ?? 0, icon: CreditCard },
   ]), [f]);
+
+  if (loading || allowed === null) {
+    return <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">Verificando…</div>;
+  }
+  if (!allowed) return null;
   const maxF = Math.max(1, ...funnelSteps.map(s => s.value));
 
   const dropoffModules: any[] = data.dropoff?.modules ?? [];

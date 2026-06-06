@@ -487,11 +487,12 @@ const Rituals = () => {
 
   return (
     <div className="grid md:grid-cols-2 gap-4">
-      <RitualList title="RITUAL MATINAL" icon={<Sun className="w-4 h-4 text-white" />} gradient="from-amber-400 to-orange-500 dark:from-amber-700 dark:to-orange-700" items={morningItems} checked={morningChecked} type="morning" newText={newMorning} setNewText={setNewMorning} />
-      <RitualList title="RITUAL NOTURNO" icon={<Moon className="w-4 h-4 text-white" />} gradient="from-indigo-500 to-purple-600 dark:from-indigo-700 dark:to-purple-800" items={nightItems} checked={nightChecked} type="night" newText={newNight} setNewText={setNewNight} />
+      {RitualList({ title: "RITUAL MATINAL", icon: <Sun className="w-4 h-4 text-white" />, gradient: "from-amber-400 to-orange-500 dark:from-amber-700 dark:to-orange-700", items: morningItems, checked: morningChecked, type: "morning", newText: newMorning, setNewText: setNewMorning })}
+      {RitualList({ title: "RITUAL NOTURNO", icon: <Moon className="w-4 h-4 text-white" />, gradient: "from-indigo-500 to-purple-600 dark:from-indigo-700 dark:to-purple-800", items: nightItems, checked: nightChecked, type: "night", newText: newNight, setNewText: setNewNight })}
     </div>
   );
 };
+
 
 // ============= HABIT HEATMAP (GitHub Style) =============
 const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[] }) => {

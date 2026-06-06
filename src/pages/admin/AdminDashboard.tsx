@@ -6,6 +6,7 @@ import { checkIsAdmin } from "@/lib/admin";
 import {
   Shield, LogOut, RefreshCw, Users, Activity, CreditCard, TrendingDown,
   Filter, BarChart3, Globe, MousePointerClick, AlertTriangle, Layers,
+  RotateCcw, X, Eye,
 } from "lucide-react";
 
 const ADMIN_EMAIL = "jv20101958@gmail.com";
@@ -35,9 +36,16 @@ const dur = (s: number) => {
   if (s < 3600) return `${Math.round(s / 60)}m`;
   return `${(s / 3600).toFixed(1)}h`;
 };
+const dt = (s: string | null | undefined) => s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 const MODULE_LABEL: Record<string, string> = {
   financas: "Finanças", rotina: "Rotina", dieta: "Dieta", treino: "Treino",
+};
+
+type UserListSpec = {
+  title: string;
+  fetch: () => Promise<any>;
+  columns: { key: string; label: string; fmt?: (v: any, row: any) => any }[];
 };
 
 export default function AdminDashboard() {
@@ -48,6 +56,7 @@ export default function AdminDashboard() {
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState<any>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [userList, setUserList] = useState<UserListSpec | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -95,7 +104,16 @@ export default function AdminDashboard() {
 
   useEffect(() => { if (allowed) load(); }, [allowed, load]);
 
+  const resetCard = useCallback(async (key: string, label: string) => {
+    if (!confirm(`Zerar o contador do card "${label}"? Os dados anteriores deixarão de aparecer aqui.`)) return;
+    const { error } = await (supabase as any).rpc("admin_set_card_reset", { _key: key });
+    if (error) { alert("Erro ao zerar: " + error.message); return; }
+    load();
+  }, [load]);
+
   const logout = async () => { await supabase.auth.signOut(); navigate("/admin", { replace: true }); };
+
+  const openUserList = useCallback((spec: UserListSpec) => setUserList(spec), []);
 
   const o = data.overview ?? {};
   const m = data.metrics ?? {};
@@ -162,27 +180,75 @@ export default function AdminDashboard() {
         )}
         {/* KPIs */}
         <section>
-          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">
-            <BarChart3 className="w-3.5 h-3.5" /> Visão geral
-          </h2>
+          <SectionHeader icon={BarChart3} title="Visão geral" tiny onReset={() => resetCard("overview", "Visão geral")} />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KPI label="Usuários totais" value={fmt(o.total_users)} icon={Users} />
-            <KPI label="Cadastros hoje" value={fmt(o.signups_today)} sub={`${fmt(o.signups_7d)} em 7d`} icon={Users} />
+            <KPI label="Usuários totais" value={fmt(o.total_users)} icon={Users} onClick={() => openUserList({
+              title: "Todos os usuários",
+              fetch: () => (supabase as any).rpc("admin_list_users"),
+              columns: [
+                { key: "email", label: "Email" },
+                { key: "plan", label: "Plano", fmt: (v, row) => v ?? row.status ?? "—" },
+                { key: "created_at", label: "Cadastro", fmt: dt },
+                { key: "last_session", label: "Última sessão", fmt: dt },
+                { key: "total_sessions", label: "Sessões", fmt: fmt },
+              ],
+            })} />
+            <KPI label="Cadastros hoje" value={fmt(o.signups_today)} sub={`${fmt(o.signups_7d)} em 7d`} icon={Users} onClick={() => openUserList({
+              title: "Cadastros recentes (hoje)",
+              fetch: () => (supabase as any).rpc("admin_trials_started", { _period: "today" }),
+              columns: [
+                { key: "email", label: "Email" },
+                { key: "started_at", label: "Cadastro", fmt: dt },
+                { key: "subscription_status", label: "Status" },
+                { key: "days_since_start", label: "Dias", fmt: fmt },
+              ],
+            })} />
             <KPI label="Ativos agora" value={fmt(o.active_now)} sub={`${fmt(o.active_24h)} em 24h`} icon={Activity} accent="emerald" />
             <KPI label="Ativos 7d / 30d" value={`${fmt(o.active_7d)} / ${fmt(o.active_30d)}`} icon={Activity} />
-            <KPI label="Trials ativos" value={fmt(o.trial_active)} icon={Activity} />
-            <KPI label="Pagantes" value={fmt(o.paid_active)} icon={CreditCard} accent="emerald" />
+            <KPI label="Trials ativos" value={fmt(o.trial_active)} icon={Activity} onClick={() => openUserList({
+              title: "Trials ativos",
+              fetch: async () => {
+                const res = await (supabase as any).rpc("admin_trials_started", { _period: "all" });
+                if (res?.data) res.data = res.data.filter((r: any) => r.subscription_status === "trialing");
+                return res;
+              },
+              columns: [
+                { key: "email", label: "Email" },
+                { key: "started_at", label: "Iniciou trial", fmt: dt },
+                { key: "days_since_start", label: "Dias", fmt: fmt },
+                { key: "subscription_status", label: "Status" },
+              ],
+            })} />
+            <KPI label="Pagantes" value={fmt(o.paid_active)} icon={CreditCard} accent="emerald" onClick={() => openUserList({
+              title: "Usuários pagantes",
+              fetch: () => (supabase as any).rpc("admin_paying_users"),
+              columns: [
+                { key: "email", label: "Email" },
+                { key: "plan", label: "Plano" },
+                { key: "billing_period", label: "Período" },
+                { key: "subscribed_at", label: "Pagou em", fmt: dt },
+                { key: "current_period_end", label: "Renova em", fmt: dt },
+                { key: "payment_method", label: "Pgto" },
+              ],
+            })} />
             <KPI label="MRR estimado" value={brl(o.mrr_brl ?? 0)} icon={CreditCard} accent="emerald" />
-            <KPI label="Churn 30d / Conv 30d" value={`${m.churn_rate_30d ?? 0}% / ${m.conversion_rate_30d ?? 0}%`} icon={TrendingDown} accent="rose" />
+            <KPI label="Churn 30d / Conv 30d" value={`${m.churn_rate_30d ?? 0}% / ${m.conversion_rate_30d ?? 0}%`} icon={TrendingDown} accent="rose" onClick={() => openUserList({
+              title: "Cancelados (30d)",
+              fetch: () => (supabase as any).rpc("admin_canceled_users", { _days: 30 }),
+              columns: [
+                { key: "email", label: "Email" },
+                { key: "plan", label: "Plano" },
+                { key: "canceled_at", label: "Cancelou em", fmt: dt },
+                { key: "reason", label: "Motivo", fmt: (v) => v ?? "—" },
+              ],
+            })} />
           </div>
         </section>
 
         {/* Funil tutorial */}
         <section className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-            <Filter className="w-4 h-4 text-emerald-400" /> Funil de aquisição & tutorial
-          </h2>
-          <p className="text-[11px] text-zinc-500 mb-5">Da visita à conversão paga</p>
+          <SectionHeader icon={Filter} title="Funil de aquisição & tutorial" subtitle="Da visita à conversão paga"
+            onReset={() => resetCard("funnel", "Funil")} />
           <div className="space-y-2.5">
             {funnelSteps.map((s, i) => {
               const prev = i === 0 ? s.value : funnelSteps[i - 1].value;
@@ -213,10 +279,8 @@ export default function AdminDashboard() {
 
         {/* Dropoff por módulo do tutorial */}
         <section className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-            <Layers className="w-4 h-4 text-emerald-400" /> Dropoff por módulo do tutorial
-          </h2>
-          <p className="text-[11px] text-zinc-500 mb-5">Em qual passo o usuário abandona cada módulo</p>
+          <SectionHeader icon={Layers} title="Dropoff por módulo do tutorial" subtitle="Em qual passo o usuário abandona cada módulo"
+            onReset={() => resetCard("dropoff", "Dropoff do tutorial")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {dropoffModules.map((mod: any) => {
               const steps = mod.steps ?? [];
@@ -264,10 +328,8 @@ export default function AdminDashboard() {
         {/* Módulos e abas mais usadas */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-              <BarChart3 className="w-4 h-4 text-emerald-400" /> Módulos mais usados
-            </h2>
-            <p className="text-[11px] text-zinc-500 mb-4">Por tempo total (todo período)</p>
+            <SectionHeader icon={BarChart3} title="Módulos mais usados" subtitle="Por tempo total (todo período)"
+              onReset={() => resetCard("modules", "Módulos mais usados")} />
             <Table
               headers={["Módulo", "Usuários", "Sessões", "Tempo"]}
               rows={(data.modules ?? []).slice(0, 12).map((row: any) => [
@@ -281,10 +343,8 @@ export default function AdminDashboard() {
           </div>
 
           <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-            <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-              <Layers className="w-4 h-4 text-emerald-400" /> Abas mais usadas
-            </h2>
-            <p className="text-[11px] text-zinc-500 mb-4">Top abas no período selecionado</p>
+            <SectionHeader icon={Layers} title="Abas mais usadas" subtitle="Top abas no período selecionado"
+              onReset={() => resetCard("tabs", "Abas mais usadas")} />
             <Table
               headers={["Módulo · Aba", "Usuários", "Sessões", "Tempo"]}
               rows={(data.tabs ?? []).slice(0, 15).map((row: any) => [
@@ -300,10 +360,8 @@ export default function AdminDashboard() {
 
         {/* Tráfego por fonte */}
         <section className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-            <Globe className="w-4 h-4 text-emerald-400" /> Tráfego por fonte
-          </h2>
-          <p className="text-[11px] text-zinc-500 mb-4">Visitas à landing por UTM source</p>
+          <SectionHeader icon={Globe} title="Tráfego por fonte" subtitle="Visitas à landing por UTM source"
+            onReset={() => resetCard("funnel", "Tráfego por fonte")} />
           <Table
             headers={["Fonte", "Visitas"]}
             rows={(f.by_source ?? []).map((s: any) => [s.source, fmt(s.visits)])}
@@ -313,10 +371,25 @@ export default function AdminDashboard() {
 
         {/* Churn & retenção */}
         <section className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100 mb-1">
-            <AlertTriangle className="w-4 h-4 text-rose-400" /> Churn & retenção (30d)
-          </h2>
-          <p className="text-[11px] text-zinc-500 mb-4">Motivos de cancelamento e save rate</p>
+          <SectionHeader icon={AlertTriangle} title="Churn & retenção (30d)" subtitle="Motivos de cancelamento e save rate"
+            iconClass="text-rose-400"
+            onReset={() => resetCard("retention", "Churn & retenção")}
+            action={
+              <button onClick={() => openUserList({
+                title: "Cancelados (30d)",
+                fetch: () => (supabase as any).rpc("admin_canceled_users", { _days: 30 }),
+                columns: [
+                  { key: "email", label: "Email" },
+                  { key: "plan", label: "Plano" },
+                  { key: "canceled_at", label: "Cancelou em", fmt: dt },
+                  { key: "reason", label: "Motivo", fmt: (v) => v ?? "—" },
+                ],
+              })}
+                className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-emerald-400">
+                <Eye className="w-3 h-3" /> ver usuários
+              </button>
+            }
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             <Mini label="Tentativas" value={fmt(r.total_attempts_30d)} />
             <Mini label="Salvos" value={fmt(r.saved_count_30d)} />
@@ -330,21 +403,70 @@ export default function AdminDashboard() {
           />
         </section>
       </main>
+
+      {userList && <UserListModal spec={userList} onClose={() => setUserList(null)} />}
     </div>
   );
 }
 
-function KPI({ label, value, sub, icon: Icon, accent }: { label: string; value: string; sub?: string; icon: any; accent?: "emerald" | "rose" }) {
-  const color = accent === "emerald" ? "text-emerald-400" : accent === "rose" ? "text-rose-400" : "text-zinc-300";
+function SectionHeader({
+  icon: Icon, title, subtitle, tiny, onReset, iconClass, action,
+}: {
+  icon: any; title: string; subtitle?: string; tiny?: boolean;
+  onReset?: () => void; iconClass?: string; action?: React.ReactNode;
+}) {
+  if (tiny) {
+    return (
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
+          <Icon className="w-3.5 h-3.5" /> {title}
+        </h2>
+        {onReset && <ResetBtn onClick={onReset} />}
+      </div>
+    );
+  }
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-3.5">
+    <div className="flex items-start justify-between gap-3 mb-4">
+      <div className="min-w-0">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-zinc-100">
+          <Icon className={`w-4 h-4 ${iconClass ?? "text-emerald-400"}`} /> {title}
+        </h2>
+        {subtitle && <p className="text-[11px] text-zinc-500 mt-1">{subtitle}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {action}
+        {onReset && <ResetBtn onClick={onReset} />}
+      </div>
+    </div>
+  );
+}
+
+function ResetBtn({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} title="Zerar contador deste card"
+      className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 px-2 py-1 rounded-md transition-colors">
+      <RotateCcw className="w-3 h-3" /> zerar
+    </button>
+  );
+}
+
+function KPI({ label, value, sub, icon: Icon, accent, onClick }: { label: string; value: string; sub?: string; icon: any; accent?: "emerald" | "rose"; onClick?: () => void }) {
+  const color = accent === "emerald" ? "text-emerald-400" : accent === "rose" ? "text-rose-400" : "text-zinc-300";
+  const clickable = !!onClick;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      className={`text-left bg-zinc-900/40 border border-zinc-800 rounded-xl p-3.5 transition-all ${clickable ? "hover:border-emerald-500/40 hover:bg-zinc-900/70 cursor-pointer" : "cursor-default"}`}
+    >
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] uppercase tracking-wider text-zinc-500">{label}</span>
-        <Icon className={`w-3.5 h-3.5 ${color}`} />
+        {clickable ? <Eye className="w-3 h-3 text-zinc-600" /> : <Icon className={`w-3.5 h-3.5 ${color}`} />}
       </div>
       <div className={`text-lg font-bold tabular-nums ${color}`}>{value}</div>
       {sub && <div className="text-[10px] text-zinc-500 mt-0.5">{sub}</div>}
-    </div>
+    </button>
   );
 }
 
@@ -379,6 +501,85 @@ function Table({ headers, rows, emptyMsg }: { headers: string[]; rows: (string |
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function UserListModal({ spec, onClose }: { spec: UserListSpec; onClose: () => void }) {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [filter, setFilter] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await spec.fetch();
+        if (cancelled) return;
+        if (res?.error) { setErr(res.error.message); return; }
+        setRows(Array.isArray(res?.data) ? res.data : []);
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message ?? String(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [spec]);
+
+  const filtered = useMemo(() => {
+    if (!rows) return [];
+    if (!filter.trim()) return rows;
+    const q = filter.toLowerCase();
+    return rows.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  }, [rows, filter]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-6" onClick={onClose}>
+      <div className="bg-zinc-950 border border-zinc-800 rounded-t-2xl md:rounded-2xl w-full max-w-4xl max-h-[88vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+          <div>
+            <h3 className="text-sm font-bold text-zinc-100">{spec.title}</h3>
+            <p className="text-[10px] text-zinc-500 mt-0.5">{rows ? `${filtered.length} de ${rows.length}` : "carregando…"}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-3 border-b border-zinc-800 shrink-0">
+          <input
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            placeholder="Buscar email, plano, status…"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-md px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-emerald-500/40"
+          />
+        </div>
+        <div className="overflow-auto flex-1">
+          {err && <div className="p-4 text-xs text-rose-300">Erro: {err}</div>}
+          {!err && rows === null && <div className="p-6 text-center text-xs text-zinc-500">Carregando…</div>}
+          {!err && rows && filtered.length === 0 && <div className="p-6 text-center text-xs text-zinc-500">Nenhum usuário encontrado.</div>}
+          {!err && filtered.length > 0 && (
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-zinc-950">
+                <tr className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  {spec.columns.map(c => (
+                    <th key={c.key} className="px-3 py-2 font-medium text-left">{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row, i) => (
+                  <tr key={i} className="border-t border-zinc-800/60 hover:bg-zinc-900/40">
+                    {spec.columns.map(c => (
+                      <td key={c.key} className="px-3 py-2 text-zinc-300">
+                        {c.fmt ? c.fmt(row[c.key], row) : (row[c.key] ?? "—")}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

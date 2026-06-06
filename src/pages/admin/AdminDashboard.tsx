@@ -47,6 +47,7 @@ export default function AdminDashboard() {
   const [range, setRange] = useState<Range>("7d");
   const [busy, setBusy] = useState(false);
   const [data, setData] = useState<any>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -59,26 +60,37 @@ export default function AdminDashboard() {
 
   const load = useCallback(async () => {
     setBusy(true);
-    const { from, to } = rangeBounds(range);
-    const [overview, funnel, dropoff, modules, tabs, retention, metrics] = await Promise.all([
-      (supabase as any).rpc("admin_dashboard_v2"),
-      (supabase as any).rpc("admin_landing_funnel", { _from: from, _to: to }),
-      (supabase as any).rpc("admin_tutorial_dropoff", { _from: from, _to: to }),
-      (supabase as any).rpc("admin_module_funnel"),
-      (supabase as any).rpc("admin_top_tabs", { _from: from, _to: to }),
-      (supabase as any).rpc("admin_retention_stats"),
-      (supabase as any).rpc("admin_metrics_overview"),
-    ]);
-    setData({
-      overview: overview.data,
-      funnel: funnel.data,
-      dropoff: dropoff.data,
-      modules: modules.data ?? [],
-      tabs: tabs.data ?? [],
-      retention: retention.data,
-      metrics: metrics.data,
-    });
-    setBusy(false);
+    setLoadError(null);
+    try {
+      const { from, to } = rangeBounds(range);
+      const results = await Promise.all([
+        (supabase as any).rpc("admin_dashboard_v2"),
+        (supabase as any).rpc("admin_landing_funnel", { _from: from, _to: to }),
+        (supabase as any).rpc("admin_tutorial_dropoff", { _from: from, _to: to }),
+        (supabase as any).rpc("admin_module_funnel"),
+        (supabase as any).rpc("admin_top_tabs", { _from: from, _to: to }),
+        (supabase as any).rpc("admin_retention_stats"),
+        (supabase as any).rpc("admin_metrics_overview"),
+      ]);
+      const [overview, funnel, dropoff, modules, tabs, retention, metrics] = results;
+      results.forEach((r: any, i: number) => { if (r?.error) console.error(`[admin] rpc ${i} error:`, r.error); });
+      const obj = (v: any) => (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+      const arr = (v: any) => Array.isArray(v) ? v : [];
+      setData({
+        overview: obj(overview?.data),
+        funnel: obj(funnel?.data),
+        dropoff: obj(dropoff?.data),
+        modules: arr(modules?.data),
+        tabs: arr(tabs?.data),
+        retention: obj(retention?.data),
+        metrics: obj(metrics?.data),
+      });
+    } catch (e: any) {
+      console.error("[admin] load failed:", e);
+      setLoadError(e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
   }, [range]);
 
   useEffect(() => { if (allowed) load(); }, [allowed, load]);
@@ -143,6 +155,11 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
+        {loadError && (
+          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-lg px-3 py-2">
+            Erro ao carregar dados: {loadError}
+          </div>
+        )}
         {/* KPIs */}
         <section>
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">

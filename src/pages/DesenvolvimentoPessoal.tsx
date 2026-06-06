@@ -51,6 +51,43 @@ const moodOptions = [
   { emoji: "😞", label: "Ruim", value: 1, color: "bg-red-300" },
 ];
 
+const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass, onAdd }: {
+  items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string; onAdd?: () => void;
+}) => {
+  const handleAdd = () => {
+    const v = newItem.trim();
+    if (!v) return;
+    setItems([...items, v]);
+    setNewItem("");
+    onAdd?.();
+  };
+  const removeAt = (idx: number) => setItems(items.filter((_, i) => i !== idx));
+  return (
+    <div>
+      <div className="flex gap-2 mb-2">
+        <Input
+          value={newItem}
+          onChange={e => setNewItem(e.target.value)}
+          placeholder={placeholder}
+          className="text-xs h-8"
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+        />
+        <Button size="sm" className="h-8 px-2" onClick={handleAdd}><Plus className="w-3 h-3" /></Button>
+      </div>
+      <div className="space-y-1">
+        {items.map((item, i) => (
+          <div key={i} className={`flex items-center justify-between rounded-md px-3 py-1.5 text-xs ${colorClass}`}>
+            <span>{item}</span>
+            <button onClick={() => removeAt(i)} className="opacity-50 hover:opacity-100"><X className="w-3 h-3" /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+
+
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("sobre");
@@ -161,39 +198,8 @@ const DesenvolvimentoPessoal = () => {
   // === NEW: DAILY QUOTE ===
   const [dailyQuote] = useState(() => motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
 
-  const addToList = (list: string[], setList: (v: string[]) => void, value: string, setValue: (v: string) => void) => {
-    if (value.trim()) { setList([...list, value.trim()]); setValue(""); }
-  };
-  const removeFromList = (list: string[], setList: (v: string[]) => void, idx: number) => {
-    setList(list.filter((_, i) => i !== idx));
-  };
   const saveGratitude = () => { setGratitudeEntries({ ...gratitudeEntries, [today]: todayGratitude }); };
 
-  const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass, onAdd }: {
-    items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string; onAdd?: () => void;
-  }) => {
-    const handleAdd = () => {
-      if (!newItem.trim()) return;
-      addToList(items, setItems, newItem, setNewItem);
-      onAdd?.();
-    };
-
-    return <div>
-      <div className="flex gap-2 mb-2">
-        <Input value={newItem} onChange={e => setNewItem(e.target.value)} placeholder={placeholder}
-          className="text-xs h-8" onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }} />
-        <Button size="sm" className="h-8 px-2" onClick={handleAdd}><Plus className="w-3 h-3" /></Button>
-      </div>
-      <div className="space-y-1">
-        {items.map((item, i) => (
-          <div key={i} className={`flex items-center justify-between rounded-md px-3 py-1.5 text-xs ${colorClass}`}>
-            <span>{item}</span>
-            <button onClick={() => removeFromList(items, setItems, i)} className="opacity-50 hover:opacity-100"><X className="w-3 h-3" /></button>
-          </div>
-        ))}
-      </div>
-    </div>;
-  };
 
   const { onModuleComplete, CompletionDialog } = useModuleCompletionFlow("metas");
 

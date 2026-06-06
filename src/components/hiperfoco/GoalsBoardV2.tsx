@@ -336,18 +336,6 @@ export const GoalsBoardV2 = () => {
     </>
   );
 
-  const DetailTaskInput = ({ groupId }: { groupId: string }) => {
-    const [text, setText] = useState("");
-    return (
-      <div className="flex items-center gap-2 pl-7 py-1.5">
-        <div className="w-5 h-5 rounded-full border-2 border-dashed border-muted-foreground/20 shrink-0" />
-        <input value={text} onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") { addTask(groupId, text); setText(""); } }}
-          placeholder="Adicionar uma tarefa..."
-          className="bg-transparent text-sm text-muted-foreground outline-none flex-1 placeholder:text-muted-foreground/40" />
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-4">

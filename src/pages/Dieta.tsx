@@ -204,8 +204,10 @@ const Dieta = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      {DietaCompletionDialog}
       <SpotlightOverlay
         moduleKey="dieta"
+        onComplete={onDietaComplete}
         steps={[
           { selector: '[data-spotlight="first-day"]', label: "Toque num dia e adicione uma refeição.", advanceOnAction: "first_meal", checkKey: "saude-meals" },
         ]}

@@ -1000,6 +1000,7 @@ const WeeklyReview = () => {
 const Rotina = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });

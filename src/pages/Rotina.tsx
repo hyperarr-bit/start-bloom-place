@@ -1091,8 +1091,10 @@ const Rotina = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {RotinaCompletionDialog}
       <SpotlightOverlay
         moduleKey="rotina"
+        onComplete={onRotinaComplete}
         steps={[
           { selector: '[data-spotlight="add-habit"]', label: "Crie 1 hábito (ex: 'estudar').", advanceOnAction: "first_habit", checkKey: "rotina-habits" },
           { selector: '[data-spotlight="weekly-schedule"]', label: "Toque numa célula da semana e escreva algo.", advanceOnAction: "first_schedule", checkKey: "rotina-schedule" },

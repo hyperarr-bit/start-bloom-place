@@ -48,6 +48,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 const Dieta = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("cardapio");
+  const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });

@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
 

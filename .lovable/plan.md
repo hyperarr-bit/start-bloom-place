@@ -1,43 +1,40 @@
-## Objetivo
-Atualizar `src/components/AccessGateUI.tsx` (tela que abre no in-app browser do TikTok) pra refletir que o CORE agora cobre todos os 16 módulos, não só finanças.
+## Problema atual
 
-## Mudanças
+Hoje o app dispara `quicksignup-pending = true` (que abre o `QuickSignupModal` com a oferta de teste grátis) assim que o tutorial de **Finanças** (`src/pages/Index.tsx`) ou **Metas** (`src/pages/DesenvolvimentoPessoal.tsx`) termina — sem checar se os outros módulos (Rotina, Dieta) ainda estão pendentes. Rotina e Dieta, por sua vez, só mostram o modal genérico "Tutorial concluído!" e não disparam nada.
 
-**Headline**
-- De: "Controle sua vida financeira em um só lugar"
-- Para: "Organize toda a sua vida em um só app"
+Resultado: o pop-up de cadastro aparece no meio do fluxo, antes do usuário completar os 4 módulos.
 
-**Subtítulo**
-- Mantém estilo atual, trocando exemplos:
-- De: "Receitas, gastos, contas, desejos e investimentos sem complicação."
-- Para: "Finanças, dieta, treino, rotina, metas e muito mais sem complicação."
+## O que vai mudar
 
-**Cards de exemplo (3 cards rotativos por módulo)**
-- Substituir os 3 cards fixos (Receitas/Gastos/Saldo) por 3 cards que rotacionam entre módulos a cada ~2.5s com fade/slide suave.
-- Cada card mantém o mesmo layout atual (ícone colorido à esquerda, label + valor, ícone de tendência à direita).
-- Pool de exemplos (1 por módulo, com ícone Lucide e cor temática):
-  - Finanças — Wallet — "Saldo do mês" / "+R$ 2.365,00" (verde)
-  - Dieta — Utensils — "Calorias hoje" / "1.840 kcal" (laranja)
-  - Treino — Dumbbell — "Treino de hoje" / "Peito + Tríceps" (azul)
-  - Rotina — CalendarCheck — "Hábitos hoje" / "5 de 7 ✓" (roxo)
-  - Metas — Target — "Meta da semana" / "75% concluída" (rosa)
-  - Saúde — HeartPulse — "Água hoje" / "1,8 / 2,5L" (ciano)
-  - Hiperfoco — Brain — "Foco hoje" / "2h 15min" (índigo)
-  - Estudos — GraduationCap — "Leitura" / "32 págs hoje" (âmbar)
-- A cada ciclo, mostra 3 cards diferentes do pool (rotação contínua).
+Comportamento desejado ao terminar o tutorial de qualquer módulo (Finanças, Rotina, Dieta, Metas):
 
-**Restante mantido igual**
-- Halo verde + seta (indicador dos 3 pontos)
-- Título "CORE"
-- Caixa "Para acessar agora" com passos 1 e 2
-- CTA preto "Toque nos 3 pontos para continuar"
-- Footer "Leva menos de 2 minutos para configurar"
-- Todos os tamanhos fluidos com `clamp()` + `svh` (estável no iOS Safari)
+- **Ainda há módulos pendentes** → mostrar um card de conclusão com texto curto ("Falta X módulo(s) pra desbloquear seu teste grátis") e um botão **"Voltar e terminar os outros"** que navega para `/home` (lá o `QuickStartOnboarding` já reabre com os módulos restantes).
+- **Foi o último módulo (0 pendentes)** e o usuário é convidado → aí sim setar `quicksignup-pending = true` após um pequeno delay, abrindo o `QuickSignupModal` (oferta de 7 dias grátis).
+- Usuário já logado → nunca dispara o pop-up; mostra apenas o card de "tudo concluído" com botão de voltar pra Home.
 
-## Arquivos
-- editar `src/components/AccessGateUI.tsx`
+## Implementação
 
-## Detalhes técnicos
-- Rotação via `useState` + `useEffect` com `setInterval`, sem libs novas.
-- Transição com classes Tailwind (`transition-opacity duration-500`) + `key` no container pra trigger do fade.
-- Cores via classes Tailwind existentes (green/red/blue/orange/purple/pink/cyan/indigo/amber-100 + -500/600), mantendo padrão atual do componente (esse arquivo já usa cores diretas, não tokens — manter consistência local).
+1. **Novo hook `useModuleCompletionFlow`** (`src/hooks/use-module-completion-flow.tsx`):
+   - Expõe `onModuleComplete(moduleKey)` e um `<CompletionDialog />` para renderizar na página.
+   - Calcula pendentes a partir das chaves `spotlight-done-financas|rotina|dieta|metas` via `useUserData`.
+   - Se pendentes > 0 → abre dialog com lista dos módulos restantes + botão "Voltar e terminar os outros" → `navigate("/home")`.
+   - Se pendentes === 0 e `isGuest` → `setTimeout(() => set("quicksignup-pending","true"), 1500)` e mostra dialog "Tudo pronto! Vamos liberar seu teste grátis" com botão "Continuar".
+   - Se pendentes === 0 e logado → dialog padrão "Tutorial concluído".
+
+2. **Plugar o hook nas 4 páginas de módulo** passando como `onComplete` do `SpotlightOverlay`:
+   - `src/pages/Index.tsx` — substitui o `setTimeout(setUserData("quicksignup-pending","true"), 3000)` atual.
+   - `src/pages/DesenvolvimentoPessoal.tsx` — idem.
+   - `src/pages/Rotina.tsx` — adiciona `onComplete` (hoje usa modal padrão).
+   - `src/pages/Dieta.tsx` — adiciona `onComplete` (hoje usa modal padrão).
+
+3. **Sem mudanças** em `QuickSignupModal`, `QuickStartOnboarding`, `SpotlightOverlay` (o modal padrão continua existindo como fallback caso o `onComplete` não seja passado, ex.: replays).
+
+## Arquivos afetados
+
+- `src/hooks/use-module-completion-flow.tsx` (novo)
+- `src/pages/Index.tsx`
+- `src/pages/DesenvolvimentoPessoal.tsx`
+- `src/pages/Rotina.tsx`
+- `src/pages/Dieta.tsx`
+
+Nada de mudanças em backend, dados ou estilo geral — apenas o gatilho do pop-up e o card de conclusão por módulo.

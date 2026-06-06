@@ -430,7 +430,7 @@ export const GoalsBoardV2 = () => {
                     <button onClick={() => removeTask(group.id, task.id)} className="opacity-0 group-hover/task:opacity-100 text-muted-foreground/40 hover:text-destructive"><X className="w-3 h-3" /></button>
                   </div>
                 ))}
-                <DetailTaskInput groupId={group.id} />
+                <DetailTaskInput onAdd={(text) => addTask(group.id, text)} />
               </div>
             );
           })}

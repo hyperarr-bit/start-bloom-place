@@ -55,16 +55,7 @@ import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
 
 import AdminLogin from "./pages/admin/AdminLogin";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminChurn from "./pages/admin/AdminChurn";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminTrials from "./pages/admin/AdminTrials";
-import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
-import AdminRetention from "./pages/admin/AdminRetention";
-import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
-import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
-import AdminUso from "./pages/admin/AdminUso";
-import AdminPaying from "./pages/admin/AdminPaying";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

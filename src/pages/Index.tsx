@@ -129,14 +129,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {FinanceCompletionDialog}
       <SpotlightOverlay
         moduleKey="financas"
-        onComplete={() => {
-          // Após terminar o tutorial, espera ~5s e abre o cadastro rápido (7 dias grátis).
-          if (isGuest) {
-            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
-          }
-        }}
+        onComplete={onFinanceTutorialComplete}
         steps={[
           
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },

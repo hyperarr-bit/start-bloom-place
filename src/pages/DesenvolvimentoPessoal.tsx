@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useUserData } from "@/hooks/use-user-data";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 
 
 const defaultAffirmations: string[] = [];
@@ -194,15 +195,14 @@ const DesenvolvimentoPessoal = () => {
     </div>;
   };
 
+  const { onModuleComplete, CompletionDialog } = useModuleCompletionFlow("metas");
+
   return (
     <div className="min-h-screen bg-background pb-20">
+      {CompletionDialog}
       <SpotlightOverlay
         moduleKey="metas"
-        onComplete={() => {
-          if (isGuest) {
-            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
-          }
-        }}
+        onComplete={onModuleComplete}
         steps={[
           { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', advanceOnClick: false, advanceOnAction: "first_motivation", onEnter: () => setActiveTab("sobre") },
           { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', advanceOnClick: false, checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },

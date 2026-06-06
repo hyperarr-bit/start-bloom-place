@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -999,6 +1000,7 @@ const WeeklyReview = () => {
 const Rotina = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -1089,8 +1091,10 @@ const Rotina = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {RotinaCompletionDialog}
       <SpotlightOverlay
         moduleKey="rotina"
+        onComplete={onRotinaComplete}
         steps={[
           { selector: '[data-spotlight="add-habit"]', label: "Crie 1 hábito (ex: 'estudar').", advanceOnAction: "first_habit", checkKey: "rotina-habits" },
           { selector: '[data-spotlight="weekly-schedule"]', label: "Toque numa célula da semana e escreva algo.", advanceOnAction: "first_schedule", checkKey: "rotina-schedule" },

@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Switch } from "@/components/ui/switch";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
@@ -47,6 +48,7 @@ const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-T
 const Dieta = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("cardapio");
+  const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
@@ -202,8 +204,10 @@ const Dieta = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      {DietaCompletionDialog}
       <SpotlightOverlay
         moduleKey="dieta"
+        onComplete={onDietaComplete}
         steps={[
           { selector: '[data-spotlight="first-day"]', label: "Toque num dia e adicione uma refeição.", advanceOnAction: "first_meal", checkKey: "saude-meals" },
         ]}

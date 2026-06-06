@@ -15,6 +15,7 @@ import { BillsDueCards } from "@/components/BillsDueCards";
 import { Calculator } from "@/components/Calculator";
 import { Notes } from "@/components/Notes";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { useAuth } from "@/hooks/use-auth";
 
 import { FinancialSummary } from "@/components/FinancialSummary";
@@ -42,6 +43,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
+  const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
   const [activeTab, setActiveTab] = useState(
     getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
   );
@@ -127,14 +129,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {FinanceCompletionDialog}
       <SpotlightOverlay
         moduleKey="financas"
-        onComplete={() => {
-          // Após terminar o tutorial, espera ~5s e abre o cadastro rápido (7 dias grátis).
-          if (isGuest) {
-            setTimeout(() => setUserData("quicksignup-pending", "true"), 3000);
-          }
-        }}
+        onComplete={onFinanceTutorialComplete}
         steps={[
           
           { selector: '[data-spotlight="add-income"]', label: 'Adicione sua receita (salário, freelas...).', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },

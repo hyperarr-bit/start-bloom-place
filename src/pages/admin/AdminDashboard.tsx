@@ -155,6 +155,11 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 py-6 space-y-8">
+        {loadError && (
+          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-lg px-3 py-2">
+            Erro ao carregar dados: {loadError}
+          </div>
+        )}
         {/* KPIs */}
         <section>
           <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500 mb-3">

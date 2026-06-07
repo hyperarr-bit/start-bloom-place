@@ -655,11 +655,11 @@ header.sticky.top-0 {
 
 
 
-/* iOS Safari: evitar auto-zoom ao focar inputs em mobile */
+/* Mobile Safari/Chrome: evita auto-zoom ao focar campos com classes text-xs/text-sm */
 @media (max-width: 768px) {
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }

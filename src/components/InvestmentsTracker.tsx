@@ -333,25 +333,25 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:items-center">
+                  <div className="mt-2 flex items-center gap-2">
                     <Input
                       type="number"
                       placeholder="Atualizar valor atual"
-                      className="h-8 text-base sm:h-6 sm:flex-1 md:text-[10px]"
+                      className="h-6 text-[10px] flex-1"
                       onBlur={(e) => updateCurrentValue(inv.id, parseFloat(e.target.value) || inv.currentValue)}
                       defaultValue={inv.currentValue}
                     />
                     <Input
                       type="number"
                       placeholder="Rent. esperada (% a.a.)"
-                      className="h-8 text-base sm:h-6 sm:w-24 md:text-[10px]"
+                      className="h-6 text-[10px] w-24"
                       defaultValue={inv.expectedReturn ?? 10}
                       onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
                     />
                     <Input
                       type="number"
                       placeholder="Novo aporte"
-                      className="h-8 text-base sm:h-6 sm:w-28 md:text-[10px]"
+                      className="h-6 text-[10px] w-28"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           const val = parseFloat((e.target as HTMLInputElement).value) || 0;

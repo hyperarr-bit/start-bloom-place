@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ListOrdered, Layers } from "lucide-react";
-import { ResetAnalyticsButton } from "@/components/admin/ResetAnalyticsButton";
+import ResetAnalyticsButton from "@/components/admin/ResetAnalyticsButton";
 
 type Stage = { key: string; label: string; users: number };
 type ModuleRow = {

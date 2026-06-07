@@ -210,12 +210,12 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Nome do investimento"
                 value={newInvestment.name || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, name: e.target.value })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <select
                 value={newInvestment.type}
                 onChange={(e) => setNewInvestment({ ...newInvestment, type: e.target.value as any })}
-                className="h-8 text-xs rounded-md border border-input bg-background px-2"
+                className="h-8 text-base rounded-md border border-input bg-background px-2 md:text-xs"
               >
                 {Object.entries(typeLabels).map(([key, info]) => (
                   <option key={key} value={key}>{info.icon} {info.label}</option>
@@ -226,14 +226,14 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Valor investido"
                 value={newInvestment.investedAmount || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, investedAmount: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <Input
                 type="number"
                 placeholder="Valor atual"
                 value={newInvestment.currentValue || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, currentValue: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
@@ -242,14 +242,14 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Aporte mensal (R$)"
                 value={newInvestment.monthlyContribution || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, monthlyContribution: parseFloat(e.target.value) || 0 })}
-                  className="h-8 text-base md:text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <Input
                 type="number"
                 placeholder="Rentabilidade esperada (% a.a.)"
                 value={newInvestment.expectedReturn !== undefined && newInvestment.expectedReturn !== 10 ? newInvestment.expectedReturn : ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <div className="relative">
                 <Input
@@ -268,7 +268,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Corretora (opcional)"
                 value={newInvestment.broker || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, broker: e.target.value })}
-                  className="h-8 text-base md:text-xs"
+                className="h-8 text-base md:text-xs"
               />
             </div>
             <Button size="sm" onClick={addInvestment} className="h-7 text-xs">

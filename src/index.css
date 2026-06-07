@@ -611,6 +611,18 @@ body {
   margin: 0;
 }
 
+@media (max-width: 768px) {
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .h-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+}
+
 .app-safe-shell {
   min-height: 100vh;
   min-height: 100dvh;

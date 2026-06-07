@@ -1,71 +1,96 @@
-## Objetivo
+## Contexto
 
-Reformular a página `/admin/tutorial-inicial` para mostrar **todas** as etapas do funil de onboarding (da primeira visita até aceitar os 7 dias grátis), com números absolutos, % de conversão em relação ao passo anterior e % de drop, no lugar do funil atual que só tem landing + 5 slides + start_clicked.
+A tela "Organize sua vida em 1 só lugar" (imagem 1) e "Por onde você quer começar?" (imagem 2) já são as DUAS únicas telas do `QuickStartOnboarding` (passo 0 e passo 1). Não existem slides no meio hoje — `PreSignupTutorial` não está mais em uso, e `WelcomeScreen` (6 slides) só existe na rota `/inicio`, fora do fluxo principal.
 
-## Etapas do funil que serão exibidas
+Vou (1) garantir que esses slides antigos não aparecem em lugar nenhum do fluxo, (2) adicionar os eventos que faltam para conseguir medir as 12 etapas com precisão, e (3) refazer `/admin/tutorial-inicial` mostrando cada etapa em ordem com nome explícito, número absoluto, % vs anterior e % vs topo.
 
-Todas baseadas nos eventos que **já** são disparados em `analytics_events` hoje (nenhum tracking novo precisa ser adicionado):
+## Eventos que já existem (não mexer)
 
-1. **Abriu a landing inicial** — `landing_view` sem `source=quickstart`
-2. **Iniciou o tutorial "Quero começar"** — `pre_signup_tutorial_started`
-3. **Slide 1 — Tenha controle da sua vida financeira** — `pre_signup_tutorial_step` step=1
-4. **Slide 2 — Veja seu mês com clareza** — step=2
-5. **Slide 3 — Controle seus gastos e limites** — step=3
-6. **Slide 4 — Planeje seus desejos e objetivos** — step=4
-7. **Slide 5 — Comece pela sua primeira receita** — step=5
-8. **Clicou em "Quero começar"** — `start_clicked`
-9. **Entrou em "Por onde você quer começar?"** — `landing_view` com `source=quickstart`
-10. **Clicou em um módulo** — `quickstart_module_chosen` (com breakdown por módulo: Finanças, Dieta, Rotina, Desenvolvimento Pessoal)
-11. **Entrou no módulo (tutorial abriu)** — `spotlight_shown` (com breakdown por módulo)
-12. **Fez passo 1, 2, 3, … do módulo** — `spotlight_step_view` agrupado por `step` (com breakdown por módulo)
-13. **Finalizou o módulo** — `quickstart_completed` (com breakdown por módulo)
-14. **Form de cadastro apareceu** — `quicksignup_step_shown`
-15. **Terminou o form / Aceitou os 7 dias grátis** — `quicksignup_completed`
+| Etapa do usuário | Evento atual |
+|---|---|
+| 1. Abriu "Organize sua vida" | `landing_view` com `source=quickstart` |
+| 2. Clicou em "Quero começar" | `start_clicked` com `destination=module_choice` |
+| 4. Clicou em um módulo | `quickstart_module_chosen` (com `module`) |
+| 6. Fez passo N do módulo | `spotlight_step_view` (com `module`, `step`) |
+| 7. Finalizou o módulo | `quickstart_completed` (com `module`) |
+| 10. Form apareceu | `quicksignup_step_shown` |
+| 11. Form terminado | `quicksignup_completed` |
 
-## Layout da página
+## Eventos novos que vou adicionar
 
-- Mantém os filtros de período que já existem (1h, Hoje, 24h, 7d, 30d, Tudo, Dia+Hora).
-- **Seção 1 — Funil macro:** lista vertical das 15 etapas acima, cada linha com:
-  - Nome da etapa (descritivo, em português, igual ao que o usuário pediu)
-  - Número absoluto de pessoas únicas
-  - % em relação à etapa anterior (verde se ≥80%, vermelho se <80%)
-  - % em relação ao topo do funil (passo 1)
-  - Barra de progresso proporcional
-- **Seção 2 — Detalhe por módulo:** tabela com uma linha por módulo (Finanças, Dieta, Rotina, Desenvolvimento Pessoal) e colunas:
-  - Clicou no card
-  - Tutorial abriu
-  - Passo 1, Passo 2, Passo 3, … (colunas dinâmicas conforme `max(step)` daquele módulo)
-  - Finalizou
-  - % conclusão (finalizou / clicou)
-- **Seção 3 — Conversão final:** card destacando "Form apareceu → Form terminado → Aceitou 7 dias" com os 3 números e as 2 taxas de conversão.
+| Etapa | Novo evento | Onde disparar |
+|---|---|---|
+| 3. Entrou na página "Por onde você quer começar?" | `module_picker_view` | `QuickStartOnboarding` quando `step` muda para 1 |
+| 5. Entrou de fato na página do módulo escolhido | `quickstart_module_opened` (com `module`) | `Index/Rotina/Dieta/DesenvolvimentoPessoal` no mount, quando `quickstart-target-module` bate com a rota |
+| 8. Voltou pra fazer outro módulo | `quickstart_module_returned` | `QuickStartOnboarding` quando renderiza step 1 com `pendingModules` < 4 (ou seja, já completou ao menos 1 e voltou) |
+| 9. Finalizou o tutorial inteiro (4 módulos) | `quickstart_all_completed` | `useModuleCompletionFlow` quando `allDone === true` |
+| 13. Aceitou os 7 dias grátis | `trial_accepted` | logo após `quicksignup_completed` no `QuickSignupStep` (assinatura do trial dispara aqui) |
 
-## Mudanças técnicas
+Nenhum evento existente é renomeado — só adição.
 
-- **Nova RPC `admin_onboarding_funnel(_from, _to)`** (migration) que devolve JSON com:
-  - `macro`: array das 15 etapas `{ key, label, users }` (distinct user_id, com fallback pra session_id quando user_id é null — guests).
-  - `by_module`: array `{ module, clicked, tutorial_opened, steps: [{step, users}], completed }` para cada um dos 4 módulos.
-- A RPC substitui `admin_pre_signup_funnel`, que continuará existindo só para compat se for usada em outro lugar (vou verificar — se for só nessa página, removo).
-- `AdminTutorialInicial.tsx` reescrito pra consumir a nova RPC e renderizar as 3 seções.
-- Sem mudanças em código de tracking (eventos já existem todos).
+## Limpeza dos slides
 
-## Detalhes técnicos
+- Remover import e uso de `PreSignupTutorial` se aparecer em qualquer lugar (já não aparece, mas confirmo no momento da execução).
+- Não alterar `QuickStartOnboarding` além de adicionar os 3 novos `trackEvent` listados.
+- Não alterar `WelcomeScreen` / `/inicio` (não está no fluxo).
 
-```text
-Seção 1 (exemplo de linha):
-┌─────────────────────────────────────────────────────────────────┐
-│ 👁  Abriu a landing inicial             1.240   100%   ▓▓▓▓▓▓▓▓ │
-│ ▶  Iniciou o tutorial "Quero começar"   1.180    95%   ▓▓▓▓▓▓▓░ │
-│ 📄 Slide 1 — Tenha controle...          1.120    94%   ▓▓▓▓▓▓▓░ │
-│ ...                                                              │
-│ 🎯 Aceitou os 7 dias grátis                85     71%   ▓░       │
-└─────────────────────────────────────────────────────────────────┘
+## Admin: `/admin/tutorial-inicial`
 
-Seção 2:
-Módulo        Clicou  Tutorial  P1   P2   P3   P4   Finalizou  Conv%
-Finanças       420     410      390  370  340  310    290        69%
-Dieta          180     175      ...
-Rotina         150     ...
-Desenv. Pess.  120     ...
-```
+Reescrever a página inteira, removendo o funil genérico atual. Estrutura nova:
 
-Pessoas únicas = `count(distinct coalesce(user_id::text, session_id))` filtrado pela janela de tempo escolhida nos filtros.
+### Seção única: Funil em ordem cronológica (12 cards verticais)
+
+Cada card mostra:
+- Número da etapa (1 a 12, pulando 12 → "13" conforme pedido do usuário) 
+- Título em português, exatamente como o usuário descreveu
+- Número absoluto de **usuários únicos** (distinct user_id quando logado, senão distinct session_id)
+- % de conversão **vs etapa anterior**
+- % vs **topo do funil** (etapa 1)
+- Barra de progresso proporcional à etapa 1
+
+Lista exata, na ordem:
+
+1. Abriram a página "Organize sua vida em 1 só lugar"
+2. Clicaram em "Quero começar"
+3. Entraram na página "Por onde você quer começar?"
+4. Clicaram em um módulo
+5. Entraram de fato no módulo escolhido
+6. Fizeram pelo menos 1 passo do tutorial do módulo
+7. Finalizaram o módulo
+8. Voltaram pra fazer outro módulo
+9. Finalizaram o tutorial inteiro (4 módulos)
+10. Apareceu o form de cadastro
+11. Terminaram o form
+12. Aceitaram os 7 dias grátis
+
+### Bloco extra (abaixo do funil): detalhe por módulo
+
+Tabela pequena com Finanças / Hábitos / Dieta / Metas mostrando, em colunas:
+- Cliques (4)
+- Entraram (5)
+- Passo 1, Passo 2, Passo 3… (6, dinâmico)
+- Finalizaram (7)
+- % de conversão clique → finalizou
+
+### Filtros de período
+
+Manter os mesmos do funil atual: 1h, hoje, 24h, 7d, 30d, tudo, dia+hora.
+
+## Backend
+
+Nova RPC `admin_onboarding_funnel_v2(_from timestamptz, _to timestamptz)`:
+- Admin-only via `has_role(auth.uid(), 'admin')`
+- Respeita `analytics_reset_at` de `app_config`
+- Retorna JSON com `stages` (12 linhas: `key`, `label`, `users`) e `by_module` (linhas por módulo com `clicked`, `opened`, `steps` jsonb, `completed`)
+- Unicidade: `coalesce(user_id::text, session_id)`
+
+A RPC antiga `admin_onboarding_funnel` continua existindo para não quebrar nada.
+
+## Arquivos tocados
+
+- `src/components/onboarding/QuickStartOnboarding.tsx` — 2 novos `trackEvent`
+- `src/pages/Index.tsx`, `src/pages/Rotina.tsx`, `src/pages/Dieta.tsx`, `src/pages/DesenvolvimentoPessoal.tsx` — `trackEvent("quickstart_module_opened")` no mount se for o módulo escolhido
+- `src/hooks/use-module-completion-flow.tsx` — `trackEvent("quickstart_all_completed")` quando `allDone`
+- `src/components/onboarding/QuickSignupStep.tsx` — `trackEvent("trial_accepted")` após sucesso
+- `supabase/migrations/...sql` — nova RPC `admin_onboarding_funnel_v2`
+- `src/pages/admin/AdminTutorialInicial.tsx` — reescrever para consumir a nova RPC e renderizar exatamente as 12 etapas + tabela por módulo

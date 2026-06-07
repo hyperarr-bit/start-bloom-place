@@ -97,6 +97,7 @@ export const QuickSignupStep = ({ redirectTo = "", onFinished }: QuickSignupStep
   };
 
   const handleStartTrial = () => {
+    trackEvent("trial_accepted", {});
     set("quicksignup-pending", "");
     toast.success(`Bem-vindo, ${successName}! Seu teste de 7 dias começou.`);
     if (redirectTo) navigate(redirectTo);

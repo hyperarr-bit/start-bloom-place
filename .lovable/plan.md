@@ -1,17 +1,24 @@
 ## Plano
 
-1. Remover os bloqueios globais de gesto em `src/main.tsx`
-   - Tirar os listeners de `gesturestart`, `gesturechange` e `gestureend` que fazem `preventDefault()`.
-   - Tirar os bloqueios de `wheel` com `ctrlKey` e atalhos de zoom do teclado.
-   - Tirar o bloqueio de duplo toque, porque ele também interfere em gestos nativos do navegador.
+Auditoria completou: a maior parte já foi removida no turno anterior (viewport sem `user-scalable=no`/`maximum-scale`, listeners de `gesturestart/change/end`, `wheel` ctrl, atalhos de zoom, e `html { touch-action: pan-x pan-y }`).
 
-2. Ajustar CSS global em `src/index.css`
-   - Remover a regra global `touch-action: pan-x pan-y` do `html`.
-   - Remover `-ms-content-zooming: none`.
-   - Manter `touch-action: manipulation` só nos elementos interativos se não atrapalhar navegação; se ainda travar, remover também.
+Restam apenas duas regras `touch-action: manipulation` em `src/index.css`:
 
-3. Tirar comportamento de app instalado/PWA em `index.html` e `public/manifest.json`
-   - Remover metas `apple-mobile-web-app-capable` e `mobile-web-app-capable`, que fazem o site se comportar como app em alguns celulares.
-   - Trocar `display: "standalone"` para `display: "browser"`, para abrir como site normal com abas do navegador.
+- linha 243 → na classe `.notion-tab`
+- linha 582 → no seletor `input, textarea, select, button, a, [role="button"], label`
 
-Resultado esperado: a pinça/gesto de sair da tela do app e mostrar abas do navegador volta a funcionar, e o site deixa de tentar prender o usuário em modo app.
+Tecnicamente `manipulation` ainda permite pinch-zoom (ele só desativa double-tap zoom), mas como você pediu para remover qualquer `touch-action: manipulation`, vou tirar as duas. Assim o padrão fica `touch-action: auto` em tudo.
+
+### Mudanças
+
+1. `src/index.css` linha ~243 — remover `touch-action: manipulation;` da `.notion-tab`.
+2. `src/index.css` linha ~582 — remover o bloco inteiro de `touch-action: manipulation` aplicado a `input, textarea, select, button, a, [role="button"], label`.
+
+### Não vou mexer
+
+- Layout, design, cores, componentes, fluxo, textos.
+- `overflow: hidden` da linha 522 (escopo de classe utilitária, não global em `html/body`).
+- Nenhum bloqueador de touch global resta no JS — `src/main.tsx` já está limpo.
+- Viewport do `index.html` já está correta: `width=device-width, initial-scale=1.0, viewport-fit=cover`.
+
+Resultado: pinça funciona em qualquer ponto da tela, inclusive no meio, em Safari iOS, Chrome iOS/Android e web normal.

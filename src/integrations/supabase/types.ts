@@ -610,6 +610,10 @@ export type Database = {
           trial_day: number
         }[]
       }
+      admin_onboarding_funnel: {
+        Args: { _from?: string; _to?: string }
+        Returns: Json
+      }
       admin_paying_user_funnel: { Args: { _user_id: string }; Returns: Json }
       admin_paying_users: {
         Args: never

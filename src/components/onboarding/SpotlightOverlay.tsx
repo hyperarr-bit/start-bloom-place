@@ -59,6 +59,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const shouldShow = !done && (target === moduleKey || moduleKey === "financas");
     if (shouldShow) {
       setActive(true);
+      trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
       trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
     } else {
       setActive(false);

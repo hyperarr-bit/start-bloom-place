@@ -45,6 +45,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
   const startedRef = useRef(false);
   const completedRef = useRef(false);
   const autoCelebratedRef = useRef(false);
+  const pickerViewRef = useRef(false);
 
   // Funil: dispara para todos (logado ou não) — admin filtra por flag se quiser.
   useEffect(() => {
@@ -54,6 +55,17 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     trackEvent("landing_view", { source: "quickstart", is_guest: isGuest });
     trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length, is_guest: isGuest });
   }, [isGuest]);
+
+  // Etapa 3 / 8: dispara quando a página "Por onde você quer começar?" aparece.
+  useEffect(() => {
+    if (step !== 1 || allDone || pickerViewRef.current) return;
+    pickerViewRef.current = true;
+    trackEvent("module_picker_view", { pending: pending.length, is_guest: isGuest });
+    // Se ele já completou ao menos 1 módulo antes (pending < 4), conta como "voltou pra fazer outro".
+    if (pending.length < OPTIONS.length) {
+      trackEvent("quickstart_module_returned", { pending: pending.length, is_guest: isGuest });
+    }
+  }, [step, allDone, pending.length, isGuest]);
 
   const handleStartClick = () => {
     trackEvent("start_clicked", { destination: "module_choice", is_guest: isGuest });

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { trackEvent } from "@/lib/analytics";
 
 export type CoreModuleKey = "financas" | "rotina" | "dieta" | "metas";
 
@@ -30,6 +31,10 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
     setPending(remaining);
     const done = remaining.length === 0;
     setAllDone(done);
+
+    if (done) {
+      trackEvent("quickstart_all_completed", { is_guest: isGuest });
+    }
 
     if (done && isGuest) {
       // Pula o card "Tudo pronto" e abre o form de cadastro direto.

@@ -614,6 +614,10 @@ export type Database = {
         Args: { _from?: string; _to?: string }
         Returns: Json
       }
+      admin_onboarding_funnel_v2: {
+        Args: { _from?: string; _to?: string }
+        Returns: Json
+      }
       admin_paying_user_funnel: { Args: { _user_id: string }; Returns: Json }
       admin_paying_users: {
         Args: never

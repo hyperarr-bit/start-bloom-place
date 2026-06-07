@@ -4,7 +4,7 @@ import { Shield, AlertCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
-const ADMIN_EMAIL = "jv20101958@gmail.com";
+import { ADMIN_EMAIL } from "./AdminLayout";
 
 export default function AdminLogin() {
   const navigate = useNavigate();

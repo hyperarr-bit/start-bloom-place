@@ -512,17 +512,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      admin_canceled_users: {
-        Args: { _days?: number }
-        Returns: {
-          canceled_at: string
-          email: string
-          plan: string
-          reason: string
-          user_id: string
-        }[]
-      }
-      admin_card_reset_at: { Args: { _key: string }; Returns: string }
       admin_conversion_by_trial_day: {
         Args: never
         Returns: {
@@ -565,7 +554,6 @@ export type Database = {
           unique_users: number
         }[]
       }
-      admin_get_card_resets: { Args: never; Returns: Json }
       admin_landing_funnel:
         | { Args: { _days?: number }; Returns: Json }
         | { Args: { _from?: string; _to?: string }; Returns: Json }
@@ -660,18 +648,6 @@ export type Database = {
         }[]
       }
       admin_retention_stats: { Args: never; Returns: Json }
-      admin_set_card_reset: { Args: { _key: string }; Returns: string }
-      admin_top_tabs: {
-        Args: { _from?: string; _to?: string }
-        Returns: {
-          last_used: string
-          module_id: string
-          sessions: number
-          tab_id: string
-          total_seconds: number
-          unique_users: number
-        }[]
-      }
       admin_trials_started: {
         Args: { _period?: string }
         Returns: {

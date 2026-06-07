@@ -32,6 +32,10 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
     const done = remaining.length === 0;
     setAllDone(done);
 
+    if (done) {
+      trackEvent("quickstart_all_completed", { is_guest: isGuest });
+    }
+
     if (done && isGuest) {
       // Pula o card "Tudo pronto" e abre o form de cadastro direto.
       set("quicksignup-pending", "true");

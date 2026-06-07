@@ -240,7 +240,6 @@
 
   .notion-tab {
     @apply px-4 py-1.5 text-sm border border-border rounded-sm cursor-pointer transition-colors;
-    touch-action: manipulation;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     scroll-margin-inline: 16px;
@@ -572,15 +571,6 @@
 }
 
 
-input,
-textarea,
-select,
-button,
-a,
-[role="button"],
-label {
-  touch-action: manipulation;
-}
 
 /* ============================================================
    Safe-area global (notch / horário / bateria)

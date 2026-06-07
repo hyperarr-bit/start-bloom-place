@@ -205,17 +205,17 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
 
         {showForm && (
           <div className="p-3 border-b border-border bg-muted/30 space-y-2">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
               <Input
                 placeholder="Nome do investimento"
                 value={newInvestment.name || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, name: e.target.value })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <select
                 value={newInvestment.type}
                 onChange={(e) => setNewInvestment({ ...newInvestment, type: e.target.value as any })}
-                className="h-8 text-xs rounded-md border border-input bg-background px-2"
+                className="h-8 text-base rounded-md border border-input bg-background px-2 md:text-xs"
               >
                 {Object.entries(typeLabels).map(([key, info]) => (
                   <option key={key} value={key}>{info.icon} {info.label}</option>
@@ -226,37 +226,37 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Valor investido"
                 value={newInvestment.investedAmount || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, investedAmount: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <Input
                 type="number"
                 placeholder="Valor atual"
                 value={newInvestment.currentValue || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, currentValue: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
               <Input
                 type="number"
                 placeholder="Aporte mensal (R$)"
                 value={newInvestment.monthlyContribution || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, monthlyContribution: parseFloat(e.target.value) || 0 })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <Input
                 type="number"
                 placeholder="Rentabilidade esperada (% a.a.)"
                 value={newInvestment.expectedReturn !== undefined && newInvestment.expectedReturn !== 10 ? newInvestment.expectedReturn : ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
               <div className="relative">
                 <Input
                   type="date"
                   value={newInvestment.startDate || ""}
                   onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                  className="h-8 text-xs appearance-none [&::-webkit-date-and-time-value]:text-left"
+                  className="h-8 text-base appearance-none md:text-xs [&::-webkit-date-and-time-value]:text-left"
                 />
                 {!newInvestment.startDate && (
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
@@ -268,7 +268,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 placeholder="Corretora (opcional)"
                 value={newInvestment.broker || ""}
                 onChange={(e) => setNewInvestment({ ...newInvestment, broker: e.target.value })}
-                className="h-8 text-xs"
+                className="h-8 text-base md:text-xs"
               />
             </div>
             <Button size="sm" onClick={addInvestment} className="h-7 text-xs">
@@ -333,25 +333,25 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:items-center">
                     <Input
                       type="number"
                       placeholder="Atualizar valor atual"
-                      className="h-6 text-[10px] flex-1"
+                      className="h-8 text-base sm:h-6 sm:flex-1 md:text-[10px]"
                       onBlur={(e) => updateCurrentValue(inv.id, parseFloat(e.target.value) || inv.currentValue)}
                       defaultValue={inv.currentValue}
                     />
                     <Input
                       type="number"
                       placeholder="Rent. esperada (% a.a.)"
-                      className="h-6 text-[10px] w-24"
+                      className="h-8 text-base sm:h-6 sm:w-24 md:text-[10px]"
                       defaultValue={inv.expectedReturn ?? 10}
                       onBlur={(e) => updateExpectedReturn(inv.id, parseFloat(e.target.value) || inv.expectedReturn)}
                     />
                     <Input
                       type="number"
                       placeholder="Novo aporte"
-                      className="h-6 text-[10px] w-28"
+                      className="h-8 text-base sm:h-6 sm:w-28 md:text-[10px]"
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           const val = parseFloat((e.target as HTMLInputElement).value) || 0;

@@ -194,7 +194,7 @@ export const AccessGateUI = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] w-screen h-screen bg-white overflow-x-hidden overflow-y-auto">
+    <div className="fixed inset-0 z-[100] w-full max-w-full h-[100dvh] bg-white overflow-x-hidden overflow-y-auto">
       {/* Indicador apontando pros 3 pontinhos do TikTok */}
       <div className="absolute top-0 right-0 pointer-events-none">
         <div className="absolute rounded-full bg-green-100" style={s.haloOuter} />

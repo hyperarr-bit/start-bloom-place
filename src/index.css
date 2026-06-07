@@ -572,11 +572,6 @@
 }
 
 
-/* Prevent double-tap zoom and pinch-zoom on interactive elements */
-html {
-  touch-action: pan-x pan-y;
-  -ms-content-zooming: none;
-}
 input,
 textarea,
 select,

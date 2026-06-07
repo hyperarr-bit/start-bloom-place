@@ -30,11 +30,13 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
     setPending(remaining);
     const done = remaining.length === 0;
     setAllDone(done);
-    setOpen(true);
 
     if (done && isGuest) {
-      setTimeout(() => set("quicksignup-pending", "true"), 1500);
+      // Pula o card "Tudo pronto" e abre o form de cadastro direto.
+      set("quicksignup-pending", "true");
+      return;
     }
+    setOpen(true);
   }, [currentModule, get, set, isGuest]);
 
   const handleClose = () => {

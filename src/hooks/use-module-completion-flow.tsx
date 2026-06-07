@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { trackEvent } from "@/lib/analytics";
 
 export type CoreModuleKey = "financas" | "rotina" | "dieta" | "metas";
 

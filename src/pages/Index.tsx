@@ -347,7 +347,7 @@ const Index = () => {
           <TrackedCard cardKey="financial-health" tab="saude">
             <FinancialHealth
               totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
+              totalExpenses={totalVariableExpenses}
               totalFixedExpenses={totalFixedExpenses}
               monthlyInstallments={monthlyInstallments}
               totalDebts={totalDebts}

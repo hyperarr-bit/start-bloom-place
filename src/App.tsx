@@ -119,7 +119,7 @@ const AnimatedRoutes = () => {
           <Route path="ativacao" element={<Navigate to="/admin/funil" replace />} />
           <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
           <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="aquisicao" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="aquisicao" element={<AdminAquisicao />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

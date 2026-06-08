@@ -133,22 +133,46 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          landing_path: string | null
           phone: string | null
+          referrer: string | null
+          source_captured_at: string | null
           tax_id: string | null
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
           created_at?: string
           display_name?: string | null
           id: string
+          landing_path?: string | null
           phone?: string | null
+          referrer?: string | null
+          source_captured_at?: string | null
           tax_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
           created_at?: string
           display_name?: string | null
           id?: string
+          landing_path?: string | null
           phone?: string | null
+          referrer?: string | null
+          source_captured_at?: string | null
           tax_id?: string | null
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: []
       }
@@ -569,6 +593,19 @@ export type Database = {
       admin_landing_funnel:
         | { Args: { _days?: number }; Returns: Json }
         | { Args: { _from?: string; _to?: string }; Returns: Json }
+      admin_lead_sources_summary: {
+        Args: never
+        Returns: {
+          converted: number
+          first_seen: string
+          last_seen: string
+          referrer_host: string
+          source_label: string
+          total: number
+          utm_medium: string
+          utm_source: string
+        }[]
+      }
       admin_list_users: {
         Args: never
         Returns: {
@@ -578,10 +615,14 @@ export type Database = {
           last_session: string
           last_sign_in_at: string
           plan: string
+          referrer: string
           status: string
           top_module: string
           total_sessions: number
           user_id: string
+          utm_campaign: string
+          utm_medium: string
+          utm_source: string
         }[]
       }
       admin_metrics_overview: { Args: never; Returns: Json }

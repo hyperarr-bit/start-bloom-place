@@ -69,6 +69,7 @@ import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
 import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
 import AdminUso from "./pages/admin/AdminUso";
 import AdminPaying from "./pages/admin/AdminPaying";
+import AdminAquisicao from "./pages/admin/AdminAquisicao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

@@ -94,8 +94,9 @@ const Index = () => {
 
   // Computed values
   const totalIncome = incomes.reduce((sum: number, i: any) => sum + i.value, 0);
-  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + e.value, 0);
+  const totalVariableExpenses = expenses.reduce((sum: number, e: any) => sum + e.value, 0);
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
+  const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
   const totalInvestments = investments.reduce((sum: number, i: any) => sum + i.currentValue, 0);
   const monthlyInstallments = installments.reduce((sum: number, i: any) => i.paidInstallments < i.totalInstallments ? sum + i.installmentValue : sum, 0);

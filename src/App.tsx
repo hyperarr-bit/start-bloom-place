@@ -17,6 +17,10 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { captureLeadSource } from "@/lib/lead-source";
+
+// Capture acquisition source as early as possible (runs once at module load)
+captureLeadSource();
 
 
 

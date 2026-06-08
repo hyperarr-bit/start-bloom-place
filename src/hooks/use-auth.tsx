@@ -128,6 +128,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         data: name ? { full_name: name } : undefined,
       },
     });
+    // Persist captured lead source to the new user's profile (best-effort)
+    try {
+      const newUserId = data?.user?.id;
+      if (newUserId && !error) {
+        const { getLeadSource } = await import("@/lib/lead-source");
+        const src = getLeadSource();
+        if (src) {
+          await supabase.from("profiles").update({
+            utm_source: src.utm_source,
+            utm_medium: src.utm_medium,
+            utm_campaign: src.utm_campaign,
+            utm_content: src.utm_content,
+            utm_term: src.utm_term,
+            referrer: src.referrer,
+            landing_path: src.landing_path,
+            source_captured_at: src.source_captured_at,
+          }).eq("id", newUserId);
+        }
+      }
+    } catch (e) {
+      console.warn("lead-source persist failed", e);
+    }
     return { error, session: data?.session ?? null };
   };
 

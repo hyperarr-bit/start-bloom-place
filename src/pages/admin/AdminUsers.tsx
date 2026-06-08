@@ -7,6 +7,38 @@ interface UserRow {
   user_id: string; email: string; created_at: string;
   last_sign_in_at: string | null; plan: string | null; status: string;
   total_sessions: number; last_session: string | null; top_module: string | null;
+  utm_source: string | null; utm_medium: string | null; utm_campaign: string | null; referrer: string | null;
+}
+
+function labelSource(r: { utm_source: string | null; utm_medium: string | null; referrer: string | null }): string {
+  const us = (r.utm_source || "").toLowerCase();
+  const um = (r.utm_medium || "").toLowerCase();
+  const paid = ["paid", "cpc", "ppc", "ads", "social-paid", "paidsocial"].includes(um);
+  if (us) {
+    const net = us.includes("instagram") ? "Instagram"
+      : us.includes("facebook") ? "Facebook"
+      : us.includes("meta") ? "Meta"
+      : us.includes("tiktok") ? "TikTok"
+      : us.includes("youtube") ? "YouTube"
+      : us.includes("google") ? "Google"
+      : us.includes("whatsapp") ? "WhatsApp"
+      : us.includes("linkedin") ? "LinkedIn"
+      : us.includes("twitter") || us.includes("x.com") ? "Twitter/X"
+      : us;
+    return `${net} ${paid ? "pago" : "orgânico"}`;
+  }
+  const ref = (r.referrer || "").toLowerCase();
+  if (!ref) return "Direto";
+  const host = ref.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "");
+  if (host.includes("tiktok.com")) return "TikTok orgânico (ref)";
+  if (host.includes("instagram.com")) return "Instagram orgânico (ref)";
+  if (host.includes("facebook.com") || host.includes("fb.com")) return "Facebook orgânico (ref)";
+  if (host.includes("youtube.com") || host.includes("youtu.be")) return "YouTube orgânico (ref)";
+  if (host.includes("google.")) return "Google orgânico (ref)";
+  if (host.includes("whatsapp") || host.includes("wa.me")) return "WhatsApp (ref)";
+  if (host.includes("linkedin.com")) return "LinkedIn (ref)";
+  if (host.includes("twitter.com") || host.includes("x.com") || host.includes("t.co")) return "Twitter/X (ref)";
+  return host;
 }
 
 const fmtDate = (s: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—";
@@ -109,6 +141,7 @@ export default function AdminUsers() {
                 <tr>
                   <th className="text-left px-3 py-2">Email</th>
                   <th className="text-left px-3 py-2">Cadastro</th>
+                  <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Plano</th>
                   <th className="text-left px-3 py-2">Status</th>
                   <th className="text-right px-3 py-2">Sessões</th>
@@ -119,7 +152,7 @@ export default function AdminUsers() {
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
+                  <tr><td colSpan={9} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
                 )}
                 {filtered.map(r => (
                   <tr
@@ -129,6 +162,7 @@ export default function AdminUsers() {
                   >
                     <td className="px-3 py-2 text-zinc-100 truncate max-w-[200px]">{r.email}</td>
                     <td className="px-3 py-2 text-zinc-400">{fmtDate(r.created_at)}</td>
+                    <td className="px-3 py-2 text-zinc-300" title={`utm_source=${r.utm_source||""} utm_medium=${r.utm_medium||""} utm_campaign=${r.utm_campaign||""} ref=${r.referrer||""}`}>{labelSource(r)}</td>
                     <td className="px-3 py-2 text-zinc-400">{r.plan || "—"}</td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${

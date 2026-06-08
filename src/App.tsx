@@ -17,6 +17,10 @@ import { GlobalWinback } from "@/components/retention/GlobalWinback";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
+import { captureLeadSource } from "@/lib/lead-source";
+
+// Capture acquisition source as early as possible (runs once at module load)
+captureLeadSource();
 
 
 
@@ -65,6 +69,7 @@ import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
 import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
 import AdminUso from "./pages/admin/AdminUso";
 import AdminPaying from "./pages/admin/AdminPaying";
+import AdminAquisicao from "./pages/admin/AdminAquisicao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -114,7 +119,7 @@ const AnimatedRoutes = () => {
           <Route path="ativacao" element={<Navigate to="/admin/funil" replace />} />
           <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
           <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="aquisicao" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="aquisicao" element={<AdminAquisicao />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

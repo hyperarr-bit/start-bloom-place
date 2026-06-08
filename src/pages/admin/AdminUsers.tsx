@@ -141,6 +141,7 @@ export default function AdminUsers() {
                 <tr>
                   <th className="text-left px-3 py-2">Email</th>
                   <th className="text-left px-3 py-2">Cadastro</th>
+                  <th className="text-left px-3 py-2">Origem</th>
                   <th className="text-left px-3 py-2">Plano</th>
                   <th className="text-left px-3 py-2">Status</th>
                   <th className="text-right px-3 py-2">Sessões</th>
@@ -151,7 +152,7 @@ export default function AdminUsers() {
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={8} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
+                  <tr><td colSpan={9} className="px-3 py-6 text-center text-zinc-500">Nenhum usuário encontrado.</td></tr>
                 )}
                 {filtered.map(r => (
                   <tr

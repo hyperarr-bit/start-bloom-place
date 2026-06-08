@@ -162,6 +162,7 @@ export default function AdminUsers() {
                   >
                     <td className="px-3 py-2 text-zinc-100 truncate max-w-[200px]">{r.email}</td>
                     <td className="px-3 py-2 text-zinc-400">{fmtDate(r.created_at)}</td>
+                    <td className="px-3 py-2 text-zinc-300" title={`utm_source=${r.utm_source||""} utm_medium=${r.utm_medium||""} utm_campaign=${r.utm_campaign||""} ref=${r.referrer||""}`}>{labelSource(r)}</td>
                     <td className="px-3 py-2 text-zinc-400">{r.plan || "—"}</td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${

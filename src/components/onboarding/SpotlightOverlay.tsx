@@ -56,15 +56,22 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     if (!loaded) return;
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
-    const shouldShow = !done && (target === moduleKey || moduleKey === "financas");
+    // Tutorial guiado (spotlight) só roda no modo convidado. Usuários já cadastrados
+    // que pularam passos NÃO devem ver o tutorial aparecer ao navegar para os módulos.
+    const shouldShow = isGuest && !done && (target === moduleKey || moduleKey === "financas");
     if (shouldShow) {
       setActive(true);
       trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
       trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
     } else {
       setActive(false);
+      // Para usuários logados, marca o módulo como concluído para não reaparecer
+      // em re-renders e para manter o estado consistente em todos os clientes.
+      if (!isGuest && !done) {
+        set(`spotlight-done-${moduleKey}`, "true");
+      }
     }
-  }, [moduleKey, get, isGuest, loaded]);
+  }, [moduleKey, get, set, isGuest, loaded]);
 
 
   // Track step views (drop-off analytics) + fire onEnter callback

@@ -4,7 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, DollarSign } from "lucide-react";
+import { ArrowLeft, DollarSign, LayoutGrid } from "lucide-react";
 
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -153,14 +153,20 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+          <button
+            onClick={() => navigate("/home")}
+            aria-label="Voltar para todos os módulos"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/60 hover:bg-muted transition-colors text-xs font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <LayoutGrid className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Todos módulos</span>
           </button>
 
           <DollarSign className="w-5 h-5 text-amber-600" />
           <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs capitalize hidden sm:inline">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

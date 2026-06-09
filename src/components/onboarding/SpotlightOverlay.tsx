@@ -71,7 +71,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         set(`spotlight-done-${moduleKey}`, "true");
       }
     }
-  }, [moduleKey, get, isGuest, loaded]);
+  }, [moduleKey, get, set, isGuest, loaded]);
 
 
   // Track step views (drop-off analytics) + fire onEnter callback

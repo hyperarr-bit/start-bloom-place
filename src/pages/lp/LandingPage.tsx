@@ -125,8 +125,8 @@ const RoutinePhone = () => {
           <div className="font-semibold text-black/60 w-8 text-center">Beber 2L</div>
           <div className="font-semibold text-black/60 w-8 text-center">Treinar</div>
           {days.map((d, i) => (
-            <>
-              <div key={d} className="font-medium">{d}</div>
+            <Fragment key={d}>
+              <div className="font-medium">{d}</div>
               <div className="w-8 flex justify-center">
                 <div className={`w-3 h-3 rounded-sm ${i < 5 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
                   {i < 5 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
@@ -137,7 +137,7 @@ const RoutinePhone = () => {
                   {i % 2 === 0 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
                 </div>
               </div>
-            </>
+            </Fragment>
           ))}
         </div>
       </div>

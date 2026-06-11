@@ -690,9 +690,9 @@ export default function LandingPage() {
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {/* Anual */}
-              <div className="relative rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
-                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-semibold flex items-center gap-1">
-                  <Leaf className="w-3 h-3" /> MELHOR CUSTO-BENEFÍCIO
+              <div className="relative rounded-xl border-2 border-black/80 bg-black/[0.03] p-5">
+                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-black text-white text-[10px] font-semibold">
+                  MELHOR CUSTO-BENEFÍCIO
                 </div>
                 <div className="text-sm font-semibold mb-1">Anual</div>
                 <div className="flex items-baseline gap-1 mb-1">
@@ -704,7 +704,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth"
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
                 </Link>

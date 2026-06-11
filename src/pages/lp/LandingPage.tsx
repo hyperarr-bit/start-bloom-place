@@ -513,7 +513,7 @@ const PhoneTrio = () => (
     className="w-full flex justify-center"
   >
     <img
-      src={heroPhones.url}
+      src={heroPhones}
       alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
       className="w-full max-w-[640px] h-auto object-contain mx-auto"
       loading="eager"

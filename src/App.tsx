@@ -58,6 +58,7 @@ import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
 import LandingPage from "./pages/lp/LandingPage";
+import Preview from "./pages/Preview";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -85,6 +86,7 @@ const AnimatedRoutes = () => {
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
         <Route path="/" element={<RootGate />} />
         <Route path="/lp" element={<PageTransition><LandingPage /></PageTransition>} />
+        <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
         <Route path="/home" element={<ProtectedRoute allowGuest><PageTransition><Home /></PageTransition></ProtectedRoute>} />
         <Route path="/financas" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="financas"><TrackedModule moduleId="financas"><Index /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/rotina" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="rotina"><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />

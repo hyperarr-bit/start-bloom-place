@@ -327,7 +327,15 @@ const ModulesCarousel = () => {
               <Icon className={`w-5 h-5 ${m.iconFg}`} strokeWidth={2.2} />
               <span className={`font-bold ${m.titleColor} text-[15px] tracking-wider`}>{m.title}</span>
             </div>
-            <p className="text-[15px] md:text-base text-black/70 mb-5 leading-snug">{m.desc}</p>
+            <p className="text-[15px] md:text-base text-black/70 mb-3 leading-snug">{m.desc}</p>
+            <a
+              href={`/preview/${m.key === "dev" ? "desenvolvimento" : m.key}`}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-black hover:text-black/70 transition mb-5 underline underline-offset-4 decoration-black/30"
+            >
+              Ver demonstração ao vivo →
+            </a>
             {Preview && <Preview />}
           </motion.div>
         </AnimatePresence>

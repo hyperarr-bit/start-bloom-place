@@ -678,3 +678,45 @@ header.sticky.top-0 {
     font-size: 16px !important;
   }
 }
+
+/* ============================================================
+   Botão com brilho passando (CTA shine)
+   ============================================================ */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 75%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 70%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  animation: btn-shine-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes btn-shine-sweep {
+  0% { left: -150%; }
+  60% { left: 150%; }
+  100% { left: 150%; }
+}
+
+/* Entrada suave dos componentes da landing */
+@keyframes lp-rise {
+  0% { opacity: 0; transform: translateY(24px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.lp-enter {
+  animation: lp-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

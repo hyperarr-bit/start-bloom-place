@@ -591,7 +591,7 @@ export default function LandingPage() {
             <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
               Organize sua vida<br />em um só lugar.
             </h1>
-            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
+            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md mx-auto">
               Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">

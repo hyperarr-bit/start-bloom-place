@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
 import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
 import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
+import financasPreviewPoster from "@/assets/financas-preview-poster.jpg.asset.json";
+import rotinaPreviewPoster from "@/assets/rotina-preview-poster.jpg.asset.json";
 import testimonialMarina from "@/assets/testimonial-marina.png.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.png.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.png.asset.json";
@@ -783,12 +785,14 @@ export default function LandingPage() {
             <div className="w-full max-w-[320px]">
               <video
                 src={financasPreviewVideo.url}
+                poster={financasPreviewPoster.url}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="metadata"
-                controls
+                preload="auto"
+                disableRemotePlayback
+                onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
                 onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
                 className="w-full h-auto rounded-[2rem] bg-black"
               />
@@ -804,12 +808,14 @@ export default function LandingPage() {
             <div className="w-full max-w-[320px]">
               <video
                 src={rotinaPreviewVideo.url}
+                poster={rotinaPreviewPoster.url}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="metadata"
-                controls
+                preload="auto"
+                disableRemotePlayback
+                onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
                 onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
                 className="w-full h-auto rounded-[2rem] bg-black"
               />

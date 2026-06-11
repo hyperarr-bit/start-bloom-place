@@ -1,11 +1,113 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, CalendarDays, ShieldCheck, XCircle,
   Wallet, Calendar as CalendarIcon, Sparkles, LayoutGrid,
   Sun, Heart, TrendingUp, TrendingDown, Leaf,
+  ChevronLeft, ChevronRight,
+  Utensils, Dumbbell, Brain, GraduationCap, Home as HomeIcon,
+  PawPrint, Plane, Users, Briefcase, BookOpen, HeartPulse, Flower2,
+  type LucideIcon,
 } from "lucide-react";
+
+type ModuleItem = {
+  key: string;
+  title: string;
+  desc: string;
+  icon: LucideIcon;
+  bg: string;
+  iconBg: string;
+  iconFg: string;
+  titleColor: string;
+};
+
+const MODULES: ModuleItem[] = [
+  { key: "financas", title: "FINANÇAS", desc: "Entenda receitas, despesas e investimentos com clareza.", icon: Wallet, bg: "bg-orange-50/70 border-orange-100", iconBg: "bg-orange-100", iconFg: "text-orange-600", titleColor: "text-orange-700" },
+  { key: "rotina", title: "ROTINA", desc: "Organize hábitos, consistência e sua semana em poucos toques.", icon: CalendarIcon, bg: "bg-emerald-50/70 border-emerald-100", iconBg: "bg-emerald-100", iconFg: "text-emerald-600", titleColor: "text-emerald-700" },
+  { key: "dev", title: "DESENVOLVIMENTO PESSOAL", desc: "Acompanhe metas, forças, afirmações e evolução pessoal.", icon: Sparkles, bg: "bg-violet-50/70 border-violet-100", iconBg: "bg-violet-100", iconFg: "text-violet-600", titleColor: "text-violet-700" },
+  { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, bg: "bg-amber-50/70 border-amber-100", iconBg: "bg-amber-100", iconFg: "text-amber-600", titleColor: "text-amber-700" },
+  { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, bg: "bg-blue-50/70 border-blue-100", iconBg: "bg-blue-100", iconFg: "text-blue-600", titleColor: "text-blue-700" },
+  { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, bg: "bg-rose-50/70 border-rose-100", iconBg: "bg-rose-100", iconFg: "text-rose-600", titleColor: "text-rose-700" },
+  { key: "hiperfoco", title: "HIPERFOCO", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, bg: "bg-indigo-50/70 border-indigo-100", iconBg: "bg-indigo-100", iconFg: "text-indigo-600", titleColor: "text-indigo-700" },
+  { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, bg: "bg-yellow-50/70 border-yellow-100", iconBg: "bg-yellow-100", iconFg: "text-yellow-700", titleColor: "text-yellow-700" },
+  { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, bg: "bg-slate-50/70 border-slate-200", iconBg: "bg-slate-100", iconFg: "text-slate-700", titleColor: "text-slate-700" },
+  { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, bg: "bg-stone-50/70 border-stone-200", iconBg: "bg-stone-100", iconFg: "text-stone-700", titleColor: "text-stone-700" },
+  { key: "casa", title: "CASA", desc: "Limpeza, despensa, manutenções e rotinas do lar.", icon: HomeIcon, bg: "bg-teal-50/70 border-teal-100", iconBg: "bg-teal-100", iconFg: "text-teal-600", titleColor: "text-teal-700" },
+  { key: "viagens", title: "VIAGENS", desc: "Roteiros, malas, orçamento e bucket list em um só lugar.", icon: Plane, bg: "bg-sky-50/70 border-sky-100", iconBg: "bg-sky-100", iconFg: "text-sky-600", titleColor: "text-sky-700" },
+  { key: "relacionamentos", title: "RELACIONAMENTOS", desc: "Pessoas, datas importantes, presentes e momentos.", icon: Users, bg: "bg-pink-50/70 border-pink-100", iconBg: "bg-pink-100", iconFg: "text-pink-600", titleColor: "text-pink-700" },
+  { key: "pet", title: "PET", desc: "Saúde, rotina, gastos e diário do seu pet.", icon: PawPrint, bg: "bg-lime-50/70 border-lime-100", iconBg: "bg-lime-100", iconFg: "text-lime-700", titleColor: "text-lime-700" },
+  { key: "beleza", title: "BELEZA", desc: "Skincare, cabelo, produtos e cronogramas personalizados.", icon: Flower2, bg: "bg-fuchsia-50/70 border-fuchsia-100", iconBg: "bg-fuchsia-100", iconFg: "text-fuchsia-600", titleColor: "text-fuchsia-700" },
+  { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, bg: "bg-green-50/70 border-green-100", iconBg: "bg-green-100", iconFg: "text-green-600", titleColor: "text-green-700" },
+];
+
+const ModulesCarousel = () => {
+  const [idx, setIdx] = useState(0);
+  const go = (dir: 1 | -1) => setIdx((i) => (i + dir + MODULES.length) % MODULES.length);
+  const m = MODULES[idx];
+  const Icon = m.icon;
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[11px] font-semibold text-black/50 tracking-wider">MÓDULOS</div>
+          <div className="text-[22px] md:text-3xl font-bold leading-tight">+{MODULES.length} áreas da sua vida</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => go(-1)}
+            aria-label="Anterior"
+            className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={() => go(1)}
+            aria-label="Próximo"
+            className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={m.key}
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.25 }}
+            className={`rounded-2xl border ${m.bg} p-6 md:p-8 max-w-2xl mx-auto`}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-11 h-11 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center`}>
+                <Icon className="w-6 h-6" />
+              </div>
+              <span className={`font-bold ${m.titleColor} text-base tracking-wide`}>{m.title}</span>
+            </div>
+            <p className="text-[15px] text-black/70 mb-1">{m.desc}</p>
+            <div className="mt-4 text-[12px] text-black/40 font-medium">
+              {idx + 1} / {MODULES.length}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-1.5 mt-5">
+        {MODULES.map((mod, i) => (
+          <button
+            key={mod.key}
+            onClick={() => setIdx(i)}
+            aria-label={mod.title}
+            className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-emerald-500" : "w-1.5 bg-black/15 hover:bg-black/30"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /* =========================================================
    PHONE MOCKUPS (Tailwind only, sem assets externos)
@@ -310,101 +412,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* RECURSOS — 3 cards */}
+      {/* RECURSOS — carrossel de módulos */}
       <section id="recursos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* Finanças */}
-          <div className="rounded-2xl bg-orange-50/70 border border-orange-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-orange-100 text-orange-600 flex items-center justify-center">
-                <Wallet className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-orange-700 text-sm tracking-wide">FINANÇAS</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Entenda receitas, despesas e investimentos com clareza.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="text-[10px] text-black/50">Saldo do Mês</div>
-                  <div className="text-lg font-bold text-emerald-600">+R$ 2.365</div>
-                </div>
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-14 h-14 rounded-full"
-                  style={{ background: "conic-gradient(#8b5cf6 0 35%, #ec4899 35% 55%, #f59e0b 55% 70%, #10b981 70% 85%, #ef4444 85% 100%)" }}
-                >
-                  <div className="w-6 h-6 bg-white rounded-full m-4" />
-                </div>
-                <div className="flex-1 text-[10px] space-y-0.5">
-                  <div className="flex justify-between"><span>● Moradia</span><span>R$ 1.300</span></div>
-                  <div className="flex justify-between"><span>● Educação</span><span>R$ 450</span></div>
-                  <div className="flex justify-between"><span>● Contas da Casa</span><span>R$ 225</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Rotina */}
-          <div className="rounded-2xl bg-emerald-50/70 border border-emerald-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                <CalendarIcon className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-emerald-700 text-sm tracking-wide">ROTINA</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Organize hábitos, consistência e sua semana em poucos toques.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="text-[10px] font-semibold text-emerald-700 mb-2">HÁBITOS DIÁRIOS ✓</div>
-              <div className="grid grid-cols-[1fr_auto_auto] gap-y-1 gap-x-3 text-[11px]">
-                <div className="text-black/50 font-semibold text-[10px]">DIA</div>
-                <div className="text-black/50 font-semibold text-[10px] text-center">Beber 2L</div>
-                <div className="text-black/50 font-semibold text-[10px] text-center">Treinar</div>
-                {["SEG", "TER"].map((d, i) => (
-                  <Fragment key={d}>
-                    <div className="font-medium">{d}</div>
-                    <div className="flex justify-center">
-                      <div className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
-                      </div>
-                    </div>
-                    <div className="flex justify-center">
-                      <div className={`w-4 h-4 rounded ${i === 0 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
-                        {i === 0 && <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />}
-                      </div>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Dev */}
-          <div className="rounded-2xl bg-violet-50/70 border border-violet-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-violet-700 text-sm tracking-wide">DESENVOLVIMENTO PESSOAL</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Acompanhe metas, forças, afirmações e evolução pessoal.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="text-[10px] font-semibold mb-2 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-violet-500" /> MINHAS FORÇAS
-              </div>
-              <div className="space-y-1.5 text-[11px]">
-                {["Comunicação", "Persistência", "Curiosidade"].map((f) => (
-                  <div key={f} className="flex items-center justify-between bg-black/[0.03] rounded px-2 py-1.5">
-                    <span>{f}</span>
-                    <span className="text-black/30">×</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <ModulesCarousel />
       </section>
+
 
       {/* MOCKUP — Tudo no seu celular */}
       <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">

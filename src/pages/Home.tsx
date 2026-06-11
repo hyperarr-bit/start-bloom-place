@@ -86,9 +86,10 @@ const HomePage = () => {
       return;
     }
 
-    // Tutorial só roda no modo convidado (antes de criar a conta).
-    // Usuários logados nunca veem o onboarding automaticamente — apenas via "replay tutorial".
-    if (!isGuest) {
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
+
+    // Tutorial roda no modo convidado OU para um usuário recém-cadastrado (force-new-user-tutorial).
+    if (!isGuest && !forceNewUser) {
       if (!get<string>("core-onboarding-done", "")) {
         setData("core-onboarding-done", "true");
       }
@@ -102,15 +103,17 @@ const HomePage = () => {
     }
 
     // One-time reset (apenas para convidados): replay onboarding após bump da chave
-    const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
-    if (!alreadyReset) {
-      setData("core-onboarding-done", "");
-      setData("spotlight-done-financas", "");
-      setData("spotlight-done-rotina", "");
-      setData("spotlight-done-dieta", "");
-      setData("spotlight-done-metas", "");
-      setData("core-all-modules-celebrated", "");
-      setData(ONBOARDING_RESET_KEY, "true");
+    if (isGuest) {
+      const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
+      if (!alreadyReset) {
+        setData("core-onboarding-done", "");
+        setData("spotlight-done-financas", "");
+        setData("spotlight-done-rotina", "");
+        setData("spotlight-done-dieta", "");
+        setData("spotlight-done-metas", "");
+        setData("core-all-modules-celebrated", "");
+        setData(ONBOARDING_RESET_KEY, "true");
+      }
     }
 
     const pending = computePending();
@@ -152,6 +155,7 @@ const HomePage = () => {
 
   const handleOnboardingComplete = () => {
     setData("core-onboarding-done", "true");
+    setData("force-new-user-tutorial", "");
     setShowOnboarding(false);
   };
 
@@ -169,12 +173,14 @@ const HomePage = () => {
   }
 
   if (showOnboarding) {
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
     return (
       <AnimatePresence>
         <QuickStartOnboarding
           onComplete={handleOnboardingComplete}
           pendingModules={pendingModules}
-          skipWelcome={!!get<string>("core-onboarding-done", "")}
+          skipWelcome={!!get<string>("core-onboarding-done", "") || forceNewUser}
+          forNewUser={forceNewUser}
         />
       </AnimatePresence>
     );

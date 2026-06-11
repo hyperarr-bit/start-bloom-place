@@ -654,7 +654,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link
-                to="/auth"
+                to="/auth?signup=1"
                 className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
@@ -1026,7 +1026,7 @@ export default function LandingPage() {
                   Pago anualmente<br />R$ 46,80/ano
                 </div>
                 <Link
-                  to="/auth"
+                  to="/auth?signup=1"
                   className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
@@ -1042,7 +1042,7 @@ export default function LandingPage() {
                   Pago mensalmente<br />R$ 14,90/mês
                 </div>
                 <Link
-                  to="/auth"
+                  to="/auth?signup=1"
                   className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
@@ -1079,7 +1079,7 @@ export default function LandingPage() {
             </div>
           </div>
           <Link
-            to="/auth"
+            to="/auth?signup=1"
             className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-white text-black hover:bg-white/90 font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />

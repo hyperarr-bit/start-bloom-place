@@ -712,11 +712,20 @@ header.sticky.top-0 {
   100% { left: 150%; }
 }
 
-/* Entrada suave dos componentes da landing */
+/* Entrada suave dos componentes da landing (reveal on scroll) */
 @keyframes lp-rise {
-  0% { opacity: 0; transform: translateY(24px); }
+  0% { opacity: 0; transform: translateY(28px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 .lp-enter {
-  animation: lp-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  opacity: 0;
+  transform: translateY(28px);
+  will-change: opacity, transform;
 }
+.lp-enter.lp-enter-in {
+  animation: lp-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp-enter { opacity: 1; transform: none; animation: none; }
+}
+

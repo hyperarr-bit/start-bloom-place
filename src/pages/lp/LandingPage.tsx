@@ -412,101 +412,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* RECURSOS — 3 cards */}
+      {/* RECURSOS — carrossel de módulos */}
       <section id="recursos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* Finanças */}
-          <div className="rounded-2xl bg-orange-50/70 border border-orange-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-orange-100 text-orange-600 flex items-center justify-center">
-                <Wallet className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-orange-700 text-sm tracking-wide">FINANÇAS</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Entenda receitas, despesas e investimentos com clareza.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="text-[10px] text-black/50">Saldo do Mês</div>
-                  <div className="text-lg font-bold text-emerald-600">+R$ 2.365</div>
-                </div>
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
-              </div>
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-14 h-14 rounded-full"
-                  style={{ background: "conic-gradient(#8b5cf6 0 35%, #ec4899 35% 55%, #f59e0b 55% 70%, #10b981 70% 85%, #ef4444 85% 100%)" }}
-                >
-                  <div className="w-6 h-6 bg-white rounded-full m-4" />
-                </div>
-                <div className="flex-1 text-[10px] space-y-0.5">
-                  <div className="flex justify-between"><span>● Moradia</span><span>R$ 1.300</span></div>
-                  <div className="flex justify-between"><span>● Educação</span><span>R$ 450</span></div>
-                  <div className="flex justify-between"><span>● Contas da Casa</span><span>R$ 225</span></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Rotina */}
-          <div className="rounded-2xl bg-emerald-50/70 border border-emerald-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center">
-                <CalendarIcon className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-emerald-700 text-sm tracking-wide">ROTINA</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Organize hábitos, consistência e sua semana em poucos toques.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="text-[10px] font-semibold text-emerald-700 mb-2">HÁBITOS DIÁRIOS ✓</div>
-              <div className="grid grid-cols-[1fr_auto_auto] gap-y-1 gap-x-3 text-[11px]">
-                <div className="text-black/50 font-semibold text-[10px]">DIA</div>
-                <div className="text-black/50 font-semibold text-[10px] text-center">Beber 2L</div>
-                <div className="text-black/50 font-semibold text-[10px] text-center">Treinar</div>
-                {["SEG", "TER"].map((d, i) => (
-                  <Fragment key={d}>
-                    <div className="font-medium">{d}</div>
-                    <div className="flex justify-center">
-                      <div className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center">
-                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
-                      </div>
-                    </div>
-                    <div className="flex justify-center">
-                      <div className={`w-4 h-4 rounded ${i === 0 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
-                        {i === 0 && <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />}
-                      </div>
-                    </div>
-                  </Fragment>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Dev */}
-          <div className="rounded-2xl bg-violet-50/70 border border-violet-100 p-5">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <span className="font-bold text-violet-700 text-sm tracking-wide">DESENVOLVIMENTO PESSOAL</span>
-            </div>
-            <p className="text-sm text-black/70 mb-4">Acompanhe metas, forças, afirmações e evolução pessoal.</p>
-            <div className="rounded-xl bg-white border border-black/5 p-3">
-              <div className="text-[10px] font-semibold mb-2 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-violet-500" /> MINHAS FORÇAS
-              </div>
-              <div className="space-y-1.5 text-[11px]">
-                {["Comunicação", "Persistência", "Curiosidade"].map((f) => (
-                  <div key={f} className="flex items-center justify-between bg-black/[0.03] rounded px-2 py-1.5">
-                    <span>{f}</span>
-                    <span className="text-black/30">×</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <ModulesCarousel />
       </section>
+
 
       {/* MOCKUP — Tudo no seu celular */}
       <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">

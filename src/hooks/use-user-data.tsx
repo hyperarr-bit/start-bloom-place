@@ -159,7 +159,8 @@ interface UserDataContextType {
   fetchKey: <T>(key: string) => Promise<T | null>;
 }
 
-const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
+export const UserDataContext = createContext<UserDataContextType | undefined>(undefined);
+export type { UserDataContextType };
 
 const DEBOUNCE_MS = 250;
 const HEAVY_KEY_BYTES = 50_000;

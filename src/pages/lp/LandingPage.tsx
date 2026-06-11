@@ -537,13 +537,12 @@ const PhoneTrio = () => (
     initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.7 }}
-    className="relative w-full mx-auto"
-    style={{ maxWidth: 640 }}
+    className="relative w-screen left-1/2 -translate-x-1/2"
   >
     <img
       src={heroPhones.url}
       alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
-      className="w-full h-auto object-contain"
+      className="w-full h-auto block"
       loading="eager"
     />
   </motion.div>

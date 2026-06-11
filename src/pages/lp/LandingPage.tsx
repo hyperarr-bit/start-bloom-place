@@ -41,11 +41,259 @@ const MODULES: ModuleItem[] = [
   { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, bg: "bg-green-50/70 border-green-100", iconBg: "bg-green-100", iconFg: "text-green-600", titleColor: "text-green-700" },
 ];
 
+/* ---------- Mini previews per module (reference style) ---------- */
+
+const PreviewCard = ({ title, titleIcon, children }: { title: string; titleIcon?: React.ReactNode; children: React.ReactNode }) => (
+  <div className="rounded-xl bg-white border border-black/10 shadow-sm p-3 md:p-4">
+    <div className="flex items-center gap-1.5 text-[11px] font-bold text-black/80 mb-2.5">
+      {titleIcon}
+      <span className="tracking-wide">{title}</span>
+    </div>
+    {children}
+  </div>
+);
+
+const FinancePreview = () => (
+  <PreviewCard title="">
+    <div className="text-[10px] text-black/50">Saldo do Mês</div>
+    <div className="flex items-center justify-between">
+      <div className="text-emerald-600 font-bold text-lg">+R$ 2.365</div>
+      <TrendingUp className="w-4 h-4 text-emerald-500" />
+    </div>
+    <div className="flex items-center gap-3 mt-2">
+      <div
+        className="w-14 h-14 rounded-full shrink-0"
+        style={{ background: "conic-gradient(#8b5cf6 0 55%, #ec4899 55% 75%, #f59e0b 75% 90%, #10b981 90% 100%)" }}
+      >
+        <div className="w-full h-full rounded-full grid place-items-center">
+          <div className="w-7 h-7 rounded-full bg-white" />
+        </div>
+      </div>
+      <div className="flex-1 space-y-1 text-[10px]">
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-violet-500" />Moradia</span><span className="font-semibold">R$ 1.300</span></div>
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-pink-500" />Educação</span><span className="font-semibold">R$ 450</span></div>
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-amber-500" />Contas da Casa</span><span className="font-semibold">R$ 225</span></div>
+      </div>
+    </div>
+  </PreviewCard>
+);
+
+const Check2 = ({ on }: { on: boolean }) => (
+  <div className={`w-4 h-4 rounded-[4px] flex items-center justify-center ${on ? "bg-emerald-500" : "border border-black/20"}`}>
+    {on && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+  </div>
+);
+
+const RotinaPreview = () => (
+  <PreviewCard title="HÁBITOS DIÁRIOS" titleIcon={<Check className="w-3 h-3 text-emerald-600" />}>
+    <div className="grid grid-cols-4 gap-y-1.5 text-[10px]">
+      <div className="text-black/50">DIA</div>
+      <div className="text-black/50 text-center">Beber 2L</div>
+      <div className="text-black/50 text-center">Treinar</div>
+      <div className="text-black/50 text-center">Ler 30min</div>
+      <div className="font-semibold">SEG</div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on={false} /></div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="font-semibold">TER</div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on={false} /></div>
+    </div>
+  </PreviewCard>
+);
+
+const DevPreview = () => (
+  <PreviewCard title="MINHAS FORÇAS" titleIcon={<Sparkles className="w-3 h-3 text-violet-600" />}>
+    <div className="space-y-1.5">
+      {["Comunicação", "Persistência", "Curiosidade"].map((s) => (
+        <div key={s} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-md bg-violet-50 border border-violet-100">
+          <span>{s}</span>
+          <XCircle className="w-3 h-3 text-black/30" />
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const Bar = ({ pct, color }: { pct: number; color: string }) => (
+  <div className="h-1.5 rounded-full bg-black/5 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${pct}%` }} /></div>
+);
+
+const DietaPreview = () => (
+  <PreviewCard title="MACROS DE HOJE" titleIcon={<Utensils className="w-3 h-3 text-amber-600" />}>
+    <div className="flex items-end justify-between mb-2">
+      <div className="text-lg font-bold">1.840<span className="text-[10px] font-normal text-black/50"> / 2.000 kcal</span></div>
+    </div>
+    <div className="space-y-1.5 text-[10px]">
+      <div className="flex justify-between"><span>Proteína</span><span>92g</span></div><Bar pct={75} color="bg-rose-400" />
+      <div className="flex justify-between"><span>Carboidrato</span><span>210g</span></div><Bar pct={60} color="bg-amber-400" />
+      <div className="flex justify-between"><span>Gordura</span><span>48g</span></div><Bar pct={40} color="bg-blue-400" />
+    </div>
+  </PreviewCard>
+);
+
+const TreinoPreview = () => (
+  <PreviewCard title="TREINO A · PEITO" titleIcon={<Dumbbell className="w-3 h-3 text-blue-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Supino reto", "4 × 10"], ["Crucifixo", "3 × 12"], ["Crossover", "3 × 15"]].map(([n, s]) => (
+        <div key={n} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-blue-50/60">
+          <span>{n}</span><span className="font-semibold text-blue-700">{s}</span>
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const SaudePreview = () => (
+  <PreviewCard title="HIDRATAÇÃO" titleIcon={<HeartPulse className="w-3 h-3 text-rose-600" />}>
+    <div className="flex items-end justify-between mb-2">
+      <div className="text-lg font-bold">6<span className="text-[10px] font-normal text-black/50"> / 8 copos</span></div>
+      <div className="text-[10px] text-rose-600 font-semibold">75%</div>
+    </div>
+    <div className="flex gap-1">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className={`flex-1 h-6 rounded-sm ${i < 6 ? "bg-rose-400" : "bg-black/5"}`} />
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const HiperfocoPreview = () => (
+  <PreviewCard title="IDEIAS CAPTURADAS" titleIcon={<Brain className="w-3 h-3 text-indigo-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {["Lançar newsletter semanal", "Estudar React Server Comp.", "Organizar reunião 1:1"].map((t) => (
+        <div key={t} className="px-2 py-1.5 rounded-md bg-indigo-50 border-l-2 border-indigo-400">{t}</div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const EstudosPreview = () => (
+  <PreviewCard title="MATÉRIAS" titleIcon={<GraduationCap className="w-3 h-3 text-yellow-700" />}>
+    <div className="space-y-2 text-[11px]">
+      {[["Matemática", 80, "bg-yellow-500"], ["História", 55, "bg-orange-400"], ["Inglês", 35, "bg-emerald-400"]].map(([n, p, c]) => (
+        <div key={n as string}>
+          <div className="flex justify-between mb-0.5"><span>{n}</span><span className="text-black/50">{p}%</span></div>
+          <Bar pct={p as number} color={c as string} />
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const CarreiraPreview = () => (
+  <PreviewCard title="METAS DO TRIMESTRE" titleIcon={<Briefcase className="w-3 h-3 text-slate-700" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Fechar projeto X", true], ["Promoção sênior", false], ["Curso de liderança", true]].map(([t, d]) => (
+        <div key={t as string} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-slate-50">
+          <Check2 on={d as boolean} /><span className={d ? "line-through text-black/40" : ""}>{t}</span>
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const BibliotecaPreview = () => (
+  <PreviewCard title="LENDO AGORA" titleIcon={<BookOpen className="w-3 h-3 text-stone-700" />}>
+    <div className="flex gap-2 mb-2">
+      <div className="w-8 h-12 rounded-sm bg-rose-400" />
+      <div className="w-8 h-12 rounded-sm bg-indigo-500" />
+      <div className="w-8 h-12 rounded-sm bg-emerald-500" />
+      <div className="w-8 h-12 rounded-sm bg-amber-500" />
+    </div>
+    <div className="text-[11px]"><span className="font-semibold">Atomic Habits</span> · pág. 142 / 320</div>
+    <Bar pct={44} color="bg-stone-700" />
+  </PreviewCard>
+);
+
+const CasaPreview = () => (
+  <PreviewCard title="LIMPEZA DA SEMANA" titleIcon={<HomeIcon className="w-3 h-3 text-teal-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Aspirar sala", true], ["Trocar lençóis", false], ["Lavar banheiro", true], ["Regar plantas", false]].map(([t, d]) => (
+        <div key={t as string} className="flex items-center gap-2"><Check2 on={d as boolean} /><span className={d ? "line-through text-black/40" : ""}>{t}</span></div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const ViagensPreview = () => (
+  <PreviewCard title="PRÓXIMA VIAGEM" titleIcon={<Plane className="w-3 h-3 text-sky-600" />}>
+    <div className="flex items-center justify-between mb-2">
+      <div>
+        <div className="text-[10px] text-black/50">Lisboa, Portugal</div>
+        <div className="text-lg font-bold text-sky-700">Faltam 12 dias</div>
+      </div>
+      <div className="text-2xl">🇵🇹</div>
+    </div>
+    <div className="flex gap-1 text-[10px]">
+      <span className="px-2 py-1 rounded bg-sky-50 border border-sky-100">Mala 60%</span>
+      <span className="px-2 py-1 rounded bg-sky-50 border border-sky-100">Roteiro ok</span>
+    </div>
+  </PreviewCard>
+);
+
+const RelacionamentosPreview = () => (
+  <PreviewCard title="PESSOAS IMPORTANTES" titleIcon={<Users className="w-3 h-3 text-pink-600" />}>
+    <div className="flex -space-x-2 mb-2">
+      {["bg-rose-400", "bg-amber-400", "bg-violet-400", "bg-emerald-400"].map((c, i) => (
+        <div key={i} className={`w-8 h-8 rounded-full border-2 border-white ${c}`} />
+      ))}
+    </div>
+    <div className="text-[11px]"><span className="font-semibold">Aniversário do João</span> · em 5 dias</div>
+    <div className="text-[10px] text-black/50">Ideia de presente: livro favorito</div>
+  </PreviewCard>
+);
+
+const PetPreview = () => (
+  <PreviewCard title="MEU PET" titleIcon={<PawPrint className="w-3 h-3 text-lime-700" />}>
+    <div className="flex items-center gap-2 mb-2">
+      <div className="w-10 h-10 rounded-full bg-lime-200 grid place-items-center text-lg">🐶</div>
+      <div>
+        <div className="text-[11px] font-semibold">Thor · 3 anos</div>
+        <div className="text-[10px] text-black/50">Golden Retriever</div>
+      </div>
+    </div>
+    <div className="text-[10px] px-2 py-1.5 rounded-md bg-lime-50 border border-lime-100">💉 Próxima vacina em 8 dias</div>
+  </PreviewCard>
+);
+
+const BelezaPreview = () => (
+  <PreviewCard title="ROTINA DE HOJE" titleIcon={<Flower2 className="w-3 h-3 text-fuchsia-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      <div className="px-2 py-1.5 rounded-md bg-fuchsia-50 border border-fuchsia-100"><span className="font-semibold">AM</span> · Limpeza · Vit C · Protetor</div>
+      <div className="px-2 py-1.5 rounded-md bg-fuchsia-50 border border-fuchsia-100"><span className="font-semibold">PM</span> · Limpeza · Retinol · Hidratante</div>
+    </div>
+  </PreviewCard>
+);
+
+const DetoxPreview = () => (
+  <PreviewCard title="STREAK ATUAL" titleIcon={<Leaf className="w-3 h-3 text-green-600" />}>
+    <div className="text-lg font-bold text-green-700 mb-1">7 dias limpo 🔥</div>
+    <div className="flex gap-1 mb-2">
+      {Array.from({ length: 14 }).map((_, i) => (
+        <div key={i} className={`flex-1 h-5 rounded-sm ${i < 7 ? "bg-green-500" : "bg-black/5"}`} />
+      ))}
+    </div>
+    <div className="text-[10px] text-black/50">Recorde anterior: 12 dias</div>
+  </PreviewCard>
+);
+
+const PREVIEWS: Record<string, React.FC> = {
+  financas: FinancePreview, rotina: RotinaPreview, dev: DevPreview,
+  dieta: DietaPreview, treino: TreinoPreview, saude: SaudePreview,
+  hiperfoco: HiperfocoPreview, estudos: EstudosPreview, carreira: CarreiraPreview,
+  biblioteca: BibliotecaPreview, casa: CasaPreview, viagens: ViagensPreview,
+  relacionamentos: RelacionamentosPreview, pet: PetPreview, beleza: BelezaPreview,
+  detox: DetoxPreview,
+};
+
 const ModulesCarousel = () => {
   const [idx, setIdx] = useState(0);
   const go = (dir: 1 | -1) => setIdx((i) => (i + dir + MODULES.length) % MODULES.length);
   const m = MODULES[idx];
   const Icon = m.icon;
+  const Preview = PREVIEWS[m.key];
   return (
     <div className="relative">
       <div className="flex items-center justify-between mb-4">
@@ -54,18 +302,10 @@ const ModulesCarousel = () => {
           <div className="text-[22px] md:text-3xl font-bold leading-tight">+{MODULES.length} áreas da sua vida</div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => go(-1)}
-            aria-label="Anterior"
-            className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition"
-          >
+          <button onClick={() => go(-1)} aria-label="Anterior" className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition">
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <button
-            onClick={() => go(1)}
-            aria-label="Próximo"
-            className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition"
-          >
+          <button onClick={() => go(1)} aria-label="Próximo" className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition">
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
@@ -81,16 +321,12 @@ const ModulesCarousel = () => {
             transition={{ duration: 0.25 }}
             className={`rounded-2xl border ${m.bg} p-6 md:p-8 max-w-2xl mx-auto`}
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-11 h-11 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center`}>
-                <Icon className="w-6 h-6" />
-              </div>
-              <span className={`font-bold ${m.titleColor} text-base tracking-wide`}>{m.title}</span>
+            <div className="flex items-center gap-2.5 mb-2">
+              <Icon className={`w-5 h-5 ${m.iconFg}`} strokeWidth={2.2} />
+              <span className={`font-bold ${m.titleColor} text-[15px] tracking-wider`}>{m.title}</span>
             </div>
-            <p className="text-[15px] text-black/70 mb-1">{m.desc}</p>
-            <div className="mt-4 text-[12px] text-black/40 font-medium">
-              {idx + 1} / {MODULES.length}
-            </div>
+            <p className="text-[15px] md:text-base text-black/70 mb-5 leading-snug">{m.desc}</p>
+            {Preview && <Preview />}
           </motion.div>
         </AnimatePresence>
       </div>

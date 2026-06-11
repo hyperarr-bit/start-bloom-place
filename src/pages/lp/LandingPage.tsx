@@ -992,8 +992,8 @@ export default function LandingPage() {
         </div>
         <div className="grid md:grid-cols-3 gap-4 md:gap-5">
           {[
-            { n: "Marina S.", c: "São Paulo, SP", t: "Comecei pelo módulo de Finanças só pra testar. Duas semanas depois já tava usando Rotina e Dieta também. É o tipo de app que vai te puxando.", a: "bg-rose-300" },
-            { n: "Pedro H.", c: "Curitiba, PR", t: "O que me pegou foi não precisar abrir 4 abas pra ver como tá minha semana. Tudo aparece junto, no lugar certo, sem firula.", a: "bg-indigo-300" },
+            { n: "Marina S.", c: "São Paulo, SP", t: "Entrei só pra organizar meus gastos do mês. Em poucos dias eu já sabia exatamente o que podia gastar, o que tinha vencendo e pra onde meu dinheiro estava indo. Virou meu painel diário.", a: "bg-rose-300" },
+            { n: "Pedro H.", c: "Curitiba, PR", t: "Antes eu abria banco, planilha, notas e calculadora pra entender minha semana. No CORE aparece tudo junto, simples e sem bagunça. Foi isso que me fez continuar usando.", a: "bg-indigo-300" },
             { n: "Júlia M.", c: "Recife, PE", t: "No começo achei que ia ser mais uma coisa pra abandonar em uma semana. Tô há 3 meses e virou parte da rotina, abro toda manhã.", a: "bg-emerald-300" },
           ].map((d) => (
             <div key={d.n} className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">

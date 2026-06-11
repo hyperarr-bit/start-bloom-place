@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import heroPhones from "@/assets/hero-phones.png.asset.json";
+import heroPhones from "@/assets/hero-phones-v2.png.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -581,7 +581,7 @@ export default function LandingPage() {
       {/* HERO */}
       <section className="max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div>
+          <div className="text-center flex flex-col items-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-semibold tracking-wide mb-5"
@@ -594,7 +594,7 @@ export default function LandingPage() {
             <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
               Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
               <Link
                 to="/auth"
                 className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
@@ -608,13 +608,13 @@ export default function LandingPage() {
                 Ver como funciona <ArrowRight className="w-4 h-4" />
               </a>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
               {[
                 { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
                 { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
                 { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade em primeiro lugar" },
               ].map((b) => (
-                <div key={b.t} className="space-y-1">
+                <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
                   <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <b.icon className="w-4 h-4" />
                   </div>

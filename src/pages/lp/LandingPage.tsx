@@ -906,7 +906,7 @@ export default function LandingPage() {
               {
                 t: "Quem quer evoluir profissionalmente",
                 emoji: "📈",
-                mods: ["CARREIRA", "ESTUDOS", "HIPERFOCO", "BIBLIOTECA"],
+                mods: ["CARREIRA", "ESTUDOS", "MENTE", "BIBLIOTECA"],
                 color: "border-indigo-200 bg-indigo-50/40",
               },
             ].map((p) => (

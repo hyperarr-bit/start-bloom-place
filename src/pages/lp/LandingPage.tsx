@@ -655,7 +655,7 @@ export default function LandingPage() {
                   <div className="font-semibold text-[14px] md:text-[15px] text-black leading-tight">{f.t}</div>
                   <div className="text-[12.5px] md:text-[13px] text-black/55 leading-snug mt-0.5">{f.s}</div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-black/30 shrink-0" />
+                
               </div>
             ))}
           </div>

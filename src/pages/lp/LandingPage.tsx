@@ -747,7 +747,7 @@ export default function LandingPage() {
           </div>
           <Link
             to="/auth"
-            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition whitespace-nowrap"
+            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />
           </Link>

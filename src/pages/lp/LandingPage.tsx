@@ -721,7 +721,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth"
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
                 </Link>

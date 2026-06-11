@@ -362,8 +362,8 @@ export default function LandingPage() {
                 <div className="text-black/50 font-semibold text-[10px] text-center">Beber 2L</div>
                 <div className="text-black/50 font-semibold text-[10px] text-center">Treinar</div>
                 {["SEG", "TER"].map((d, i) => (
-                  <>
-                    <div key={d} className="font-medium">{d}</div>
+                  <Fragment key={d}>
+                    <div className="font-medium">{d}</div>
                     <div className="flex justify-center">
                       <div className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center">
                         <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
@@ -374,7 +374,7 @@ export default function LandingPage() {
                         {i === 0 && <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />}
                       </div>
                     </div>
-                  </>
+                  </Fragment>
                 ))}
               </div>
             </div>

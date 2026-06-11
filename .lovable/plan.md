@@ -1,39 +1,48 @@
-## Preview público dos módulos na landing
+## Novo fluxo de cadastro + tutorial
 
-Adicionar botão "Ver demonstração" em cada card do carrossel "Veja cada área em detalhe". Ao clicar, abre uma rota pública `/preview/:moduloKey` que renderiza a página real do módulo, populada com dados fake e em modo somente-leitura (sem login, sem persistência).
+### 1. Landing Page (`src/pages/lp/LandingPage.tsx`)
+Trocar todos os CTAs "Teste grátis / Testar grátis / Começar agora" que hoje apontam para `/auth` para `/auth?signup=1`, garantindo que o Auth abra direto em modo cadastro (a página já lê `searchParams.get("signup") === "1"`).
 
-### O que muda
+Linhas afetadas: 631, 657, 1029, 1045, 1082 (mantém o link "Entrar / Criar Conta" do rodapé como `/auth`).
 
-**1. Rota pública `/preview/:moduloKey`** (em `App.tsx`)
-- Não passa por `ProtectedRoute`.
-- Renderiza um `<PreviewShell>` que:
-  - Envolve a página real (`Index`, `Rotina`, `Treino`, etc.) em um `PreviewUserDataProvider` que substitui o contexto de `useUserData` por uma versão **in-memory** com dados de demonstração pré-carregados. Nada vai para Supabase nem localStorage.
-  - Exibe um banner fino no topo: "Você está vendo uma demonstração — Criar minha conta grátis" (CTA fixo, link para `/auth`).
-  - Bloqueia navegação para outras rotas internas (qualquer link sai do preview e vai pra `/auth`).
+### 2. Página Auth (`src/pages/Auth.tsx`)
+- Remover o card "Tudo que você configurou no tutorial será salvo na sua conta." (bloco `hasGuest` em ~175–189).
+- Após `signUp` com sucesso **e** sessão criada, em vez de `navigate("/financas")`, redirecionar para `/inicio` marcando uma flag nova `force-new-user-tutorial = "true"` em `useUserData` (linha ~104). Isso faz o Home disparar o tutorial mesmo para usuários logados.
 
-**2. Provider de preview** (`src/hooks/use-preview-user-data.tsx`)
-- Exporta um `PreviewUserDataProvider` que reusa o mesmo `UserDataContext` exportado por `use-user-data.tsx`, mas com implementação local: `Map` em memória + seeds por módulo.
-- `setData`/`deleteData` viram no-op visual (atualizam o estado local mas com toast "Modo demonstração — crie sua conta para salvar"). Isso garante que clicar em qualquer ação não quebra.
+### 3. Home / gating do tutorial (`src/pages/Home.tsx`)
+Hoje o tutorial só roda para `isGuest`. Alterar o `useEffect` (~83–124) para também rodar quando `force-new-user-tutorial === "true"`:
 
-**3. Seeds de demonstração** (`src/lib/preview-seeds.ts`)
-- Um objeto por módulo com as chaves principais já preenchidas (despesas, hábitos, treinos, refeições, etc.). Cada módulo recebe um conjunto enxuto e realista para passar a sensação de app cheio.
+- Quando a flag estiver setada, NÃO marcar automaticamente `core-onboarding-done`/`core-all-modules-celebrated` como `true`; tratar igual ao fluxo guest (calcular `pendingModules`, mostrar `QuickStartOnboarding`).
+- Limpar a flag quando o tutorial terminar (`handleOnboardingComplete`).
 
-**4. Botão "Ver demonstração" no card** (`LandingPage.tsx`)
-- Botão secundário abaixo da descrição do módulo no `ModulesCarousel`, abrindo `/preview/${m.key}` em nova aba.
-- Mapeia `dev → desenvolvimento` e `hiperfoco → hiperfoco` para casar com as rotas existentes.
+### 4. QuickStartOnboarding (`src/components/onboarding/QuickStartOnboarding.tsx`)
+- Pular o passo de welcome ("Quero começar") sempre que o usuário **não** for convidado. Hoje `step` inicial é `skipWelcome || allDone ? 1 : 0`; trocar para `(skipWelcome || allDone || !isGuest) ? 1 : 0`.
+- Em `handleCelebrationDone`, quando o usuário **não** for guest, NÃO setar `quicksignup-pending` e NÃO disparar o modal de signup. Em vez disso, exibir um novo popup de celebração antes de chamar `onComplete()`.
 
-**5. Suporte a todos os 16 módulos**: financas, rotina, desenvolvimento, dieta, treino, saude, hiperfoco, estudos, carreira, biblioteca, casa, viagens, relacionamentos, pet, beleza, detox.
+### 5. Novo popup de celebração
+Criar `src/components/onboarding/TutorialDonePopup.tsx` (modal simples com framer-motion):
+- Título: "Parabéns! Você terminou o tutorial 🎉"
+- Subtítulo: "Você desbloqueou o app. Aproveite seus 7 dias grátis."
+- Botão único "Começar a usar" que fecha o popup e chama `onComplete()` (que leva ao Home final).
 
-### Detalhes técnicos
+`QuickStartOnboarding` renderiza esse popup como overlay quando `allDone && !isGuest`, em vez de redirecionar imediatamente.
 
-- **Sem alteração nas páginas de módulo.** Elas continuam usando `useUserData`; só muda quem fornece o contexto.
-- **Para tornar isso possível**, é preciso exportar `UserDataContext` de `use-user-data.tsx` (hoje provavelmente não exportado) para o preview provider poder fornecê-lo. Mudança mínima e segura.
-- **Componentes que chamam Supabase diretamente** (não via `useUserData`) ficam inertes no preview porque não há sessão — `RouteErrorBoundary` já cobre falhas. Os módulos centrais (financas/rotina/treino/dieta) usam `useUserData` para tudo, então funcionam bem.
-- **`ProtectedRoute` e `TrackedModule` ficam fora** do shell de preview — a página é renderizada direta.
-- **Seeds são determinísticos**, sem datas aleatórias que mudam a cada render.
+### 6. QuickSignupModal
+Sem alterações no componente — ele só dispara via `quicksignup-pending` para guests, e o passo 4 garante que essa flag nunca seja setada para usuários já logados.
 
-### Fora de escopo
+### Resumo do fluxo final
+```
+LP "Teste grátis" 
+  → /auth?signup=1 (sem banner de guest)
+  → Criar conta (sessão criada)
+  → /inicio com flag force-new-user-tutorial
+  → QuickStartOnboarding direto no passo "Por onde você quer começar?"
+  → Pick módulo → spotlight no módulo → volta → repete até completar
+  → Popup "Parabéns! Você terminou o tutorial. Aproveite seu teste grátis"
+  → Home final
+```
 
-- Não alterar o design dos cards (só adicionar o botão).
-- Não criar variantes mobile-only de páginas — usar as páginas reais como estão.
-- Não tocar em copy, espaçamentos ou outros pontos da landing.
+### Pontos técnicos
+- `force-new-user-tutorial` fica em `useUserData` (Supabase user_data), então sobrevive ao reload.
+- `QuickSignupModal` continua montado globalmente, mas inerte para usuários logados (passo 4).
+- O fluxo guest atual (sem conta) permanece inalterado.

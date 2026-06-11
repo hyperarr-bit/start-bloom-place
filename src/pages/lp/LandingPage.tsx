@@ -571,7 +571,7 @@ export default function LandingPage() {
           </nav>
           <Link
             to="/auth"
-            className="px-4 py-1.5 rounded-md border border-emerald-500 text-emerald-600 text-sm font-medium hover:bg-emerald-50 transition"
+            className="px-4 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition"
           >
             Entrar
           </Link>

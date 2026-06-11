@@ -597,16 +597,10 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
               <Link
                 to="/auth"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
+                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
-              <a
-                href="#mockup"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md border border-black/15 hover:border-black/30 text-sm font-semibold transition"
-              >
-                Ver como funciona <ArrowRight className="w-4 h-4" />
-              </a>
             </div>
             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
               {[

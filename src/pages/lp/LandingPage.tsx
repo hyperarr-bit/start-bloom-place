@@ -143,7 +143,7 @@ const RoutinePhone = () => {
       </div>
       <div className="rounded-md bg-white border border-black/10 p-1.5">
         <div className="text-[7px] font-semibold mb-1">⌧ CONSISTÊNCIA</div>
-        <div className="grid grid-cols-14 gap-[2px]">
+        <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(14, 1fr)" }}>
           {Array.from({ length: 42 }).map((_, i) => (
             <div key={i} className={`aspect-square rounded-[1px] ${Math.random() > 0.4 ? "bg-emerald-400" : "bg-black/5"}`} />
           ))}

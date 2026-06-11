@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import heroPhones from "@/assets/hero-phones.png.asset.json";
+import heroPhones from "@/assets/hero-phones-v2.png.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {

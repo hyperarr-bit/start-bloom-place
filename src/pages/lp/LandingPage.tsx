@@ -558,8 +558,7 @@ export default function LandingPage() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
-          <Link to="/lp" className="flex items-center gap-2 font-bold text-[15px]">
-            <span className="w-6 h-6 rounded-full border-[3px] border-emerald-500 border-l-transparent" />
+          <Link to="/lp" className="font-bold text-[17px] tracking-tight text-black">
             CORE
           </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
@@ -571,7 +570,7 @@ export default function LandingPage() {
           </nav>
           <Link
             to="/auth"
-            className="px-4 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition"
+            className="px-4 py-1.5 rounded-md bg-black hover:bg-black/85 text-white text-sm font-semibold transition"
           >
             Entrar
           </Link>

@@ -608,7 +608,7 @@ export default function LandingPage() {
                 { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade em primeiro lugar" },
               ].map((b) => (
                 <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
-                  <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
                     <b.icon className="w-4 h-4" />
                   </div>
                   <div className="text-[12px] font-semibold leading-tight">{b.t}</div>

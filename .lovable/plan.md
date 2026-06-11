@@ -1,48 +1,47 @@
-## Novo fluxo de cadastro + tutorial
+## Nova etapa: escolher módulos do tutorial
 
-### 1. Landing Page (`src/pages/lp/LandingPage.tsx`)
-Trocar todos os CTAs "Teste grátis / Testar grátis / Começar agora" que hoje apontam para `/auth` para `/auth?signup=1`, garantindo que o Auth abra direto em modo cadastro (a página já lê `searchParams.get("signup") === "1"`).
-
-Linhas afetadas: 631, 657, 1029, 1045, 1082 (mantém o link "Entrar / Criar Conta" do rodapé como `/auth`).
-
-### 2. Página Auth (`src/pages/Auth.tsx`)
-- Remover o card "Tudo que você configurou no tutorial será salvo na sua conta." (bloco `hasGuest` em ~175–189).
-- Após `signUp` com sucesso **e** sessão criada, em vez de `navigate("/financas")`, redirecionar para `/inicio` marcando uma flag nova `force-new-user-tutorial = "true"` em `useUserData` (linha ~104). Isso faz o Home disparar o tutorial mesmo para usuários logados.
-
-### 3. Home / gating do tutorial (`src/pages/Home.tsx`)
-Hoje o tutorial só roda para `isGuest`. Alterar o `useEffect` (~83–124) para também rodar quando `force-new-user-tutorial === "true"`:
-
-- Quando a flag estiver setada, NÃO marcar automaticamente `core-onboarding-done`/`core-all-modules-celebrated` como `true`; tratar igual ao fluxo guest (calcular `pendingModules`, mostrar `QuickStartOnboarding`).
-- Limpar a flag quando o tutorial terminar (`handleOnboardingComplete`).
-
-### 4. QuickStartOnboarding (`src/components/onboarding/QuickStartOnboarding.tsx`)
-- Pular o passo de welcome ("Quero começar") sempre que o usuário **não** for convidado. Hoje `step` inicial é `skipWelcome || allDone ? 1 : 0`; trocar para `(skipWelcome || allDone || !isGuest) ? 1 : 0`.
-- Em `handleCelebrationDone`, quando o usuário **não** for guest, NÃO setar `quicksignup-pending` e NÃO disparar o modal de signup. Em vez disso, exibir um novo popup de celebração antes de chamar `onComplete()`.
-
-### 5. Novo popup de celebração
-Criar `src/components/onboarding/TutorialDonePopup.tsx` (modal simples com framer-motion):
-- Título: "Parabéns! Você terminou o tutorial 🎉"
-- Subtítulo: "Você desbloqueou o app. Aproveite seus 7 dias grátis."
-- Botão único "Começar a usar" que fecha o popup e chama `onComplete()` (que leva ao Home final).
-
-`QuickStartOnboarding` renderiza esse popup como overlay quando `allDone && !isGuest`, em vez de redirecionar imediatamente.
-
-### 6. QuickSignupModal
-Sem alterações no componente — ele só dispara via `quicksignup-pending` para guests, e o passo 4 garante que essa flag nunca seja setada para usuários já logados.
-
-### Resumo do fluxo final
+### Fluxo final
 ```
-LP "Teste grátis" 
-  → /auth?signup=1 (sem banner de guest)
-  → Criar conta (sessão criada)
-  → /inicio com flag force-new-user-tutorial
-  → QuickStartOnboarding direto no passo "Por onde você quer começar?"
-  → Pick módulo → spotlight no módulo → volta → repete até completar
-  → Popup "Parabéns! Você terminou o tutorial. Aproveite seu teste grátis"
-  → Home final
+Welcome ("Quero começar")  ← só guest, igual hoje
+   ↓
+[NOVA] Seleção de módulos do tutorial
+   ↓
+Picker "Por onde você quer começar?" (só com os escolhidos)
+   ↓
+Spotlight em cada módulo até zerar
+   ↓
+Popup de parabéns / QuickSignup
 ```
+
+Vale pros DOIS fluxos (guest e novo usuário logado).
+
+### 1. Nova etapa em `QuickStartOnboarding.tsx`
+- Adicionar um novo `step` intermediário (vira `0 | 1 | 2`, onde `1` = nova seleção e `2` = picker atual).
+- Para guest: `welcome → seleção → picker`.
+- Para `forNewUser`: pula welcome, começa direto na seleção.
+- Estado novo `selectedModules: ModuleKey[]` (default: todos os 4 marcados, usuário pode desmarcar).
+- Mínimo 1 selecionado pra liberar o botão "Continuar".
+- Persistir em `useUserData` com chave `tutorial-selected-modules` (sobrevive a reload).
+
+### 2. Tela de seleção (copy melhorada)
+- Título: **"Vamos começar seu tutorial"**
+- Subtítulo: **"Escolha os módulos que você quer aprender a usar com calma. A gente te guia passo a passo em cada um."**
+- 4 cards (mesma estética dos cards do picker: ícone colorido + label + benefit), cada um com um checkbox/estado selecionado.
+- Todos vêm pré-marcados.
+- Tap alterna seleção; visual de borda + check quando marcado.
+- Botão "Continuar" no rodapé (desabilitado se 0 selecionados).
+- Contador discreto: "X de 4 selecionados".
+
+### 3. Picker (etapa seguinte) — sem mudança visual
+- Continua igual: "Por onde você quer começar? / Escolhe 1. Os outros ficam aqui esperando."
+- Mudança única: `visibleOptions` passa a respeitar a interseção entre `pendingModules` (passado pelo `Home`) e `tutorial-selected-modules` (escolhidos na nova etapa).
+
+### 4. Conclusão antecipada
+- Quando todos os módulos **selecionados** forem completados, o tutorial encerra normalmente (popup de parabéns pro novo usuário / QuickSignup pro guest), mesmo que existam módulos não-selecionados ainda "pendentes".
+- A lógica `allDone` em `Home.tsx` passa a comparar contra a lista selecionada, não contra os 4 fixos.
 
 ### Pontos técnicos
-- `force-new-user-tutorial` fica em `useUserData` (Supabase user_data), então sobrevive ao reload.
-- `QuickSignupModal` continua montado globalmente, mas inerte para usuários logados (passo 4).
-- O fluxo guest atual (sem conta) permanece inalterado.
+- Chave nova em `useUserData`: `tutorial-selected-modules` (`ModuleKey[]`).
+- `QuickStartOnboarding` ganha lógica de step `0 | 1 | 2` e renderização condicional da nova tela.
+- `Home.tsx`: ao calcular `pendingModules`, considerar somente os que estão em `tutorial-selected-modules` (se a chave existir).
+- Nenhum módulo novo, nenhuma rota nova. Só uma tela a mais no wizard.

@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import heroPhones from "@/assets/hero-phones.png.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -532,37 +533,20 @@ const DevPhone = () => (
    ========================================================= */
 
 const PhoneTrio = () => (
-  <div className="relative w-full mx-auto" style={{ maxWidth: 560 }}>
-    <div className="relative flex items-end justify-center">
-      {/* Left phone */}
-      <motion.div
-        initial={{ opacity: 0, y: 30, rotate: -10 }}
-        animate={{ opacity: 1, y: 0, rotate: -8 }}
-        transition={{ duration: 0.7, delay: 0.1 }}
-        className="w-[32%] translate-y-6 -mr-4 z-10"
-      >
-        <PhoneFrame><RoutinePhone /></PhoneFrame>
-      </motion.div>
-      {/* Center phone */}
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.7 }}
-        className="w-[40%] z-20"
-      >
-        <PhoneFrame><FinancePhone /></PhoneFrame>
-      </motion.div>
-      {/* Right phone */}
-      <motion.div
-        initial={{ opacity: 0, y: 30, rotate: 10 }}
-        animate={{ opacity: 1, y: 0, rotate: 8 }}
-        transition={{ duration: 0.7, delay: 0.1 }}
-        className="w-[32%] translate-y-6 -ml-4 z-10"
-      >
-        <PhoneFrame><DevPhone /></PhoneFrame>
-      </motion.div>
-    </div>
-  </div>
+  <motion.div
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.7 }}
+    className="relative w-full mx-auto"
+    style={{ maxWidth: 640 }}
+  >
+    <img
+      src={heroPhones.url}
+      alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
+      className="w-full h-auto object-contain"
+      loading="eager"
+    />
+  </motion.div>
 );
 
 /* =========================================================

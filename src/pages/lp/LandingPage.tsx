@@ -1,538 +1,524 @@
+import { Fragment } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useState } from "react";
 import {
-  ArrowRight, Check, ChevronDown, Sparkles,
-  Wallet, Calendar, Brain, HeartPulse, Home as HomeIcon, GraduationCap,
-  BookOpen, Flower2, Plane, Briefcase, Dumbbell, Salad, Target,
-  Users, PawPrint, ShieldOff, Trophy, LayoutGrid, Zap, Flame, Smartphone,
+  ArrowRight, Check, CalendarDays, ShieldCheck, XCircle,
+  Wallet, Calendar as CalendarIcon, Sparkles, LayoutGrid,
+  Sun, Heart, TrendingUp, TrendingDown, Leaf,
 } from "lucide-react";
 
-// ---------------- Data ----------------
+/* =========================================================
+   PHONE MOCKUPS (Tailwind only, sem assets externos)
+   ========================================================= */
 
-const modules = [
-  { icon: Wallet, name: "Finanças", desc: "Receitas, despesas, contas, cartões, investimentos, desejos." },
-  { icon: Calendar, name: "Rotina", desc: "Tarefas, hábitos e agenda do dia." },
-  { icon: Brain, name: "Dev. Pessoal", desc: "Acompanhe seu crescimento." },
-  { icon: HeartPulse, name: "Saúde", desc: "Hidratação, jejum, evolução corporal, log médico." },
-  { icon: HomeIcon, name: "Casa", desc: "Limpeza, mercado, contas, manutenção e despensa." },
-  { icon: GraduationCap, name: "Estudos", desc: "Tracking de estudos e progresso." },
-  { icon: BookOpen, name: "Biblioteca", desc: "Lidos, lendo, quero ler — com metadados." },
-  { icon: Flower2, name: "Beleza", desc: "Skincare, cabelo e inventário de produtos." },
-  { icon: Plane, name: "Viagens", desc: "Bucket list, orçamento, mala, diário e câmbio." },
-  { icon: Briefcase, name: "Carreira", desc: "Tracking da sua trajetória profissional." },
-  { icon: Dumbbell, name: "Treino", desc: "Plano de treino e registros do dia." },
-  { icon: Salad, name: "Dieta", desc: "Calorias, macros e refeições." },
-  { icon: Target, name: "Mente", desc: "Captura de ideias, metas, sonhos e estratégia." },
-  { icon: Users, name: "Relações", desc: "Pessoas, datas e ideias de presente." },
-  { icon: PawPrint, name: "Pet", desc: "Diário, saúde, gastos e rotina." },
-  { icon: ShieldOff, name: "Detox", desc: "Menos tela, mais vida." },
-];
-
-const mechanics = [
-  { icon: LayoutGrid, title: "Home customizável", desc: "Widgets arrastáveis. Monte a tela como quiser." },
-  { icon: Flame, title: "Streak diária", desc: "Sua sequência de dias ativos. Vicia no bom." },
-  { icon: Zap, title: "Quick Actions", desc: "Registre água, gasto, treino ou ideia em 1 toque." },
-  { icon: Trophy, title: "Conquistas", desc: "Cada hábito vira badge. Cada badge vira identidade." },
-];
-
-const benefits = [
-  "Pare de pular entre 15 apps — sua vida inteira em um só painel.",
-  "Em 3 segundos, saiba como está seu mês financeiro.",
-  "Nunca mais esqueça uma conta, treino, remédio ou refeição.",
-  "Crie o hábito que nenhum app vertical te deu — com streak e score.",
-  "Visual premium estilo Notion/Linear. Bonito o bastante pra abrir todo dia.",
-  "Mobile-first real. Roda no navegador. Sem precisar baixar.",
-];
-
-const faq = [
-  { q: "O que é o CORE?", a: "Um app que reúne 16 módulos pra organizar sua vida inteira: finanças, treino, dieta, rotina, saúde, casa, viagens, leitura, hábitos e mais." },
-  { q: "Preciso usar todos os módulos?", a: "Não. Você escolhe os que importam pra você na Home. O resto fica guardado." },
-  { q: "É grátis?", a: "Você tem 7 dias grátis sem cartão. Depois R$ 3,90/mês no plano anual ou R$ 14,90/mês no mensal." },
-  { q: "Posso cancelar quando quiser?", a: "Sim. Sem fidelidade, sem multa." },
-  { q: "Funciona no iPhone e Android?", a: "Sim. O CORE é PWA mobile-first — roda direto no navegador." },
-  { q: "Meus dados ficam seguros?", a: "Sim. Tudo armazenado de forma criptografada em nuvem. Só você acessa." },
-  { q: "Preciso entender de finanças ou de produtividade?", a: "Não. A linguagem é simples e os painéis vêm prontos." },
-  { q: "Como cancelo?", a: "Direto no app, em 1 clique." },
-];
-
-// ---------------- Helpers ----------------
-
-const fade = (delay = 0) => ({
-  initial: { opacity: 0, y: 16 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-60px" },
-  transition: { duration: 0.5, delay, ease: "easeOut" as const },
-});
-
-const CTA = ({ children = "Testar grátis por 7 dias", className = "" }: { children?: React.ReactNode; className?: string }) => (
-  <Link
-    to="/auth"
-    className={`inline-flex items-center justify-center gap-2 rounded-2xl bg-foreground text-background px-6 py-3.5 text-sm font-semibold shadow-sm hover:opacity-90 transition ${className}`}
+const PhoneFrame = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div
+    className={
+      "relative bg-black rounded-[2rem] p-[5px] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] " +
+      "ring-1 ring-black/10 " + className
+    }
   >
-    {children}
-    <ArrowRight className="w-4 h-4" />
-  </Link>
-);
-
-// ---------------- Sections ----------------
-
-const Nav = () => (
-  <header className="sticky top-0 z-50 backdrop-blur-md bg-background/80 border-b border-border/60">
-    <div className="max-w-6xl mx-auto px-5 py-3.5 flex items-center justify-between">
-      <Link to="/lp" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-xl bg-foreground text-background flex items-center justify-center font-bold text-sm">C</div>
-        <span className="font-bold tracking-tight">CORE</span>
-      </Link>
-      <div className="flex items-center gap-2">
-        <Link to="/auth" className="hidden sm:inline text-sm text-muted-foreground hover:text-foreground px-3 py-2">Entrar</Link>
-        <CTA className="!px-4 !py-2 !text-xs">Começar grátis</CTA>
+    {/* notch */}
+    <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[34%] h-[18px] bg-black rounded-full z-20" />
+    <div className="relative bg-white rounded-[1.7rem] overflow-hidden aspect-[9/19.5]">
+      {/* status bar */}
+      <div className="flex items-center justify-between px-4 pt-2 pb-1 text-[9px] font-semibold text-black/80">
+        <span>10:36</span>
+        <span className="opacity-60">••• 📶 🔋</span>
       </div>
-    </div>
-  </header>
-);
-
-const Hero = () => (
-  <section className="relative overflow-hidden">
-    <div className="absolute inset-0 -z-10 opacity-60" style={{
-      background: "radial-gradient(circle at 20% 10%, hsl(var(--chart-1)/0.18), transparent 50%), radial-gradient(circle at 80% 30%, hsl(var(--chart-2)/0.18), transparent 55%), radial-gradient(circle at 50% 90%, hsl(var(--chart-4)/0.18), transparent 60%)",
-    }} />
-    <div className="max-w-6xl mx-auto px-5 pt-14 pb-20 md:pt-20 md:pb-28">
-      <motion.h1 {...fade(0)} className="text-center text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] max-w-3xl mx-auto">
-        Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.
-        <br />
-        <span className="text-muted-foreground">Agora, </span>
-        <span className="bg-gradient-to-r from-[hsl(var(--chart-1))] via-[hsl(var(--chart-4))] to-[hsl(var(--chart-2))] bg-clip-text text-transparent">
-          tudo em um só lugar.
-        </span>
-      </motion.h1>
-
-      <motion.p {...fade(0.1)} className="mt-5 text-center text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-        16 módulos integrados — finanças, treino, dieta, rotina, saúde, casa, viagens, leitura, hábitos e mais. Sem fragmentação. Sem 15 notificações.
-      </motion.p>
-
-      <motion.div {...fade(0.15)} className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
-        <CTA />
-        <p className="text-xs text-muted-foreground">Sem cartão · Cancele quando quiser</p>
-      </motion.div>
-
-      {/* iPhones + badge */}
-      <div className="relative mt-16">
-        <motion.div
-          {...fade(0.2)}
-          className="absolute -top-4 right-4 md:right-12 z-20 w-24 h-24 md:w-32 md:h-32 rounded-full bg-foreground text-background flex flex-col items-center justify-center shadow-2xl rotate-[8deg]"
-        >
-          <span className="text-2xl md:text-3xl font-bold leading-none">+15</span>
-          <span className="text-[9px] md:text-[11px] font-bold tracking-[0.15em] mt-1">MÓDULOS</span>
-        </motion.div>
-
-        <div className="flex items-end justify-center gap-3 md:gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 40, rotate: -6 }}
-            whileInView={{ opacity: 1, y: 0, rotate: -6 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.15 }}
-            className="hidden md:block w-[220px] flex-shrink-0"
-          >
-            <PhoneMockup variant="finance" />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="w-[260px] md:w-[280px] flex-shrink-0 relative z-10"
-          >
-            <PhoneMockup variant="home" />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 40, rotate: 6 }}
-            whileInView={{ opacity: 1, y: 0, rotate: 6 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.25 }}
-            className="hidden md:block w-[220px] flex-shrink-0"
-          >
-            <PhoneMockup variant="workout" />
-          </motion.div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
-
-const PhoneFrame = ({ children }: { children: React.ReactNode }) => (
-  <div className="relative rounded-[2.5rem] border-[10px] border-foreground/90 bg-foreground/90 shadow-2xl overflow-hidden aspect-[9/19]">
-    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-foreground rounded-b-2xl z-10" />
-    <div className="w-full h-full bg-background overflow-hidden rounded-[1.6rem]">
-      {children}
+      <div className="px-3 pb-3 text-black">{children}</div>
     </div>
   </div>
 );
 
-const PhoneMockup = ({ variant }: { variant: "home" | "finance" | "workout" }) => {
-  if (variant === "home") {
-    return (
-      <PhoneFrame>
-        <div className="p-4 pt-8 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[9px] text-muted-foreground">Bom dia,</p>
-              <p className="text-sm font-bold">Vamos pra cima 👋</p>
-            </div>
-            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[hsl(var(--chart-2))] to-[hsl(var(--chart-3))] flex items-center justify-center text-background font-bold text-xs">87</div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="bg-[hsl(var(--chart-3)/0.15)] rounded-lg p-2">
-              <p className="text-[8px] text-muted-foreground">Saldo</p>
-              <p className="text-xs font-bold text-[hsl(var(--chart-2))]">+R$ 5.765</p>
-            </div>
-            <div className="bg-[hsl(var(--chart-1)/0.15)] rounded-lg p-2">
-              <p className="text-[8px] text-muted-foreground">Treino</p>
-              <p className="text-xs font-bold">Peito</p>
-            </div>
-            <div className="bg-[hsl(var(--chart-2)/0.15)] rounded-lg p-2">
-              <p className="text-[8px] text-muted-foreground">Calorias</p>
-              <p className="text-xs font-bold">1.420</p>
-            </div>
-            <div className="bg-[hsl(var(--chart-4)/0.15)] rounded-lg p-2">
-              <p className="text-[8px] text-muted-foreground">Hábitos</p>
-              <p className="text-xs font-bold">4/6</p>
-            </div>
-          </div>
-          <div className="bg-muted rounded-lg p-2 flex items-center gap-1.5">
-            <Flame className="w-3 h-3 text-[hsl(var(--chart-3))]" />
-            <span className="text-[10px] font-bold">23 dias seguidos</span>
-          </div>
-          <div className="space-y-1.5">
-            {["Beber água", "Treinar", "Ler 30min"].map(h => (
-              <div key={h} className="flex items-center justify-between bg-card border border-border rounded-lg p-2">
-                <span className="text-[10px]">{h}</span>
-                <Check className="w-3 h-3 text-[hsl(var(--chart-2))]" />
-              </div>
-            ))}
-          </div>
+const FinancePhone = () => (
+  <div className="space-y-2 text-[8px]">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-1 font-bold">
+        <span>≡</span>
+        <span className="text-emerald-600">$</span>
+        <span>FINANÇAS</span>
+      </div>
+      <div className="text-[7px] text-black/60 flex items-center gap-1">
+        Maio De 2026 <Sun className="w-2 h-2" />
+      </div>
+    </div>
+    <div className="flex gap-1">
+      <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">DASHBOARD</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">MEU FINANCEIRO</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">INVESTIMENTOS</span>
+    </div>
+    <div className="grid grid-cols-2 gap-1.5">
+      <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-emerald-700">Receitas</span>
+          <span className="text-emerald-600 text-[7px]">$</span>
         </div>
-      </PhoneFrame>
-    );
-  }
-  if (variant === "finance") {
-    return (
-      <PhoneFrame>
-        <div className="p-3 pt-7 space-y-2.5">
-          <div className="flex items-center gap-1.5">
-            <Wallet className="w-3 h-3" />
-            <p className="text-xs font-bold">Finanças</p>
-          </div>
-          <div className="rounded-lg bg-gradient-to-br from-[hsl(var(--chart-2))] to-[hsl(var(--chart-3))] p-3 text-background">
-            <p className="text-[9px] opacity-80">Saldo do mês</p>
-            <p className="text-lg font-bold">R$ 5.765</p>
-            <p className="text-[9px] opacity-80 mt-1">+12% vs mês passado</p>
-          </div>
-          <div className="space-y-1.5">
-            {[
-              { c: "Aluguel", v: "1.800", neg: true },
-              { c: "Mercado", v: "620", neg: true },
-              { c: "Salário", v: "8.500", neg: false },
-              { c: "Freelance", v: "1.200", neg: false },
-            ].map(t => (
-              <div key={t.c} className="flex justify-between bg-card border border-border rounded-lg p-2">
-                <span className="text-[10px]">{t.c}</span>
-                <span className={`text-[10px] font-bold ${t.neg ? "text-[hsl(var(--chart-5))]" : "text-[hsl(var(--chart-2))]"}`}>
-                  {t.neg ? "-" : "+"}R$ {t.v}
-                </span>
-              </div>
-            ))}
-          </div>
+        <div className="font-bold text-[9px] text-emerald-700">R$ 3.000</div>
+      </div>
+      <div className="rounded-md bg-rose-50 border border-rose-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-rose-700">Despesas</span>
+          <TrendingDown className="w-2 h-2 text-rose-600" />
         </div>
-      </PhoneFrame>
-    );
-  }
+        <div className="font-bold text-[9px] text-rose-700">R$ 635</div>
+      </div>
+      <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-emerald-700">Saldo do Mês</span>
+          <TrendingUp className="w-2 h-2 text-emerald-600" />
+        </div>
+        <div className="font-bold text-[9px] text-emerald-700">+R$ 2.365</div>
+      </div>
+      <div className="rounded-md bg-violet-50 border border-violet-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-violet-700">Investimentos</span>
+          <TrendingUp className="w-2 h-2 text-violet-600" />
+        </div>
+        <div className="font-bold text-[9px] text-violet-700">R$ 14.500</div>
+      </div>
+    </div>
+    <div className="rounded-md bg-amber-50 border border-amber-100 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold text-amber-700">⚠ ALERTAS INTELIGENTES</div>
+      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-amber-100">2 conta(s) vencem em 4 dia(s): Aluguel, Plano de Saúde</div>
+      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-amber-100">2 conta(s) vencem em 0 dia(s): YouTube Music, Fatura</div>
+      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-emerald-100 text-emerald-700">Excelente! Você está poupando 78,8% da renda</div>
+    </div>
+    <div className="rounded-md bg-white border border-black/10 p-1.5">
+      <div className="text-[6.5px] font-semibold mb-1">⊙ GASTOS POR CATEGORIA</div>
+      <div className="flex items-center gap-2">
+        <div
+          className="w-8 h-8 rounded-full"
+          style={{
+            background: "conic-gradient(#6366f1 0 30%, #ec4899 30% 50%, #f59e0b 50% 68%, #10b981 68% 85%, #ef4444 85% 100%)",
+          }}
+        >
+          <div className="w-3 h-3 bg-white rounded-full m-2.5" />
+        </div>
+        <div className="flex-1 space-y-0.5 text-[6px]">
+          <div className="flex justify-between"><span>● Moradia</span><span>R$ 1.300</span></div>
+          <div className="flex justify-between"><span>● Educação</span><span>R$ 450</span></div>
+          <div className="flex justify-between"><span>● Contas da Casa</span><span>R$ 225</span></div>
+          <div className="flex justify-between"><span>● Vestuário</span><span>R$ 220</span></div>
+          <div className="flex justify-between"><span>● Restaurante</span><span>R$ 180</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const RoutinePhone = () => {
+  const days = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
   return (
-    <PhoneFrame>
-      <div className="p-3 pt-7 space-y-2.5">
-        <div className="flex items-center gap-1.5">
-          <Dumbbell className="w-3 h-3" />
-          <p className="text-xs font-bold">Treino de hoje</p>
-        </div>
-        <div className="rounded-lg bg-[hsl(var(--chart-1)/0.15)] p-3">
-          <p className="text-[9px] text-muted-foreground">Push Day</p>
-          <p className="text-base font-bold">Peito + Tríceps</p>
-          <p className="text-[9px] text-muted-foreground mt-1">6 exercícios · 45min</p>
-        </div>
-        <div className="space-y-1.5">
-          {[
-            { e: "Supino reto", s: "4x10" },
-            { e: "Supino inclinado", s: "4x10" },
-            { e: "Crucifixo", s: "3x12" },
-            { e: "Tríceps testa", s: "4x12" },
-            { e: "Corda", s: "3x15" },
-          ].map(t => (
-            <div key={t.e} className="flex justify-between bg-card border border-border rounded-lg p-2">
-              <span className="text-[10px]">{t.e}</span>
-              <span className="text-[10px] font-bold text-muted-foreground">{t.s}</span>
-            </div>
+    <div className="space-y-2 text-[8px]">
+      <div className="flex items-center justify-between font-bold">
+        <span>← ROTINA</span>
+        <span className="text-[7px] text-black/50">Junho</span>
+      </div>
+      <div className="flex gap-1">
+        <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">MINHA SEMANA</span>
+        <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">MEU MÊS</span>
+      </div>
+      <div className="rounded-md bg-emerald-50/60 border border-emerald-100 p-1.5">
+        <div className="text-[7px] font-semibold text-emerald-700 mb-1">HÁBITOS DIÁRIOS ✓</div>
+        <div className="grid grid-cols-[1fr_auto_auto] gap-1 text-[6.5px]">
+          <div className="font-semibold text-black/60">DIA</div>
+          <div className="font-semibold text-black/60 w-8 text-center">Beber 2L</div>
+          <div className="font-semibold text-black/60 w-8 text-center">Treinar</div>
+          {days.map((d, i) => (
+            <Fragment key={d}>
+              <div className="font-medium">{d}</div>
+              <div className="w-8 flex justify-center">
+                <div className={`w-3 h-3 rounded-sm ${i < 5 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
+                  {i < 5 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
+                </div>
+              </div>
+              <div className="w-8 flex justify-center">
+                <div className={`w-3 h-3 rounded-sm ${i % 2 === 0 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
+                  {i % 2 === 0 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
+                </div>
+              </div>
+            </Fragment>
           ))}
         </div>
       </div>
-    </PhoneFrame>
-  );
-};
-
-const Problem = () => (
-  <section className="border-t border-border/60">
-    <div className="max-w-4xl mx-auto px-5 py-20 md:py-28 text-center">
-      <motion.h2 {...fade()} className="text-3xl md:text-5xl font-bold tracking-tight">
-        Sua vida está em 15 apps diferentes.
-        <br />
-        <span className="text-muted-foreground">E você não usa nenhum direito.</span>
-      </motion.h2>
-      <motion.div {...fade(0.1)} className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-3 text-left">
-        {[
-          "Finanças no app do banco. Treino no Strava. Dieta numa nota. Hábitos na cabeça.",
-          "Já tentou Notion, planilha, bullet journal — largou em 2 semanas.",
-          "Esquece contas, treinos, remédios, refeições.",
-          "Não enxerga a semana — só o que está bem na sua frente.",
-        ].map((t, i) => (
-          <div key={i} className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
-            {t}
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  </section>
-);
-
-const Solution = () => (
-  <section className="border-t border-border/60 bg-muted/30">
-    <div className="max-w-4xl mx-auto px-5 py-20 md:py-28 text-center">
-      <motion.p {...fade()} className="text-xs font-bold tracking-[0.2em] text-muted-foreground uppercase">A solução</motion.p>
-      <motion.h2 {...fade(0.05)} className="mt-3 text-3xl md:text-5xl font-bold tracking-tight">
-        Um app. Todas as áreas. Um painel só.
-      </motion.h2>
-      <motion.p {...fade(0.1)} className="mt-5 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-        O CORE foi feito pra durar. Bonito o bastante pra você abrir todo dia.
-        Leve o bastante pra rodar no celular sem peso.
-      </motion.p>
-    </div>
-  </section>
-);
-
-const HowItWorks = () => (
-  <section className="border-t border-border/60">
-    <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-      <motion.h2 {...fade()} className="text-3xl md:text-4xl font-bold tracking-tight text-center">Como funciona</motion.h2>
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-5">
-        {[
-          { n: "01", t: "Monte sua Home", d: "Escolha os widgets que importam pra você. Arraste, redimensione, organize." },
-          { n: "02", t: "Registre em 1 toque", d: "Gasto, treino, água, refeição, hábito, ideia. Quick Actions em qualquer lugar." },
-          { n: "03", t: "Construa sua streak", d: "Score do dia, sequência de dias ativos, conquistas que viram identidade." },
-        ].map((s, i) => (
-          <motion.div key={s.n} {...fade(i * 0.08)} className="rounded-2xl border border-border bg-card p-6">
-            <div className="text-xs font-mono text-muted-foreground">{s.n}</div>
-            <h3 className="mt-2 text-lg font-bold">{s.t}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{s.d}</p>
-          </motion.div>
-        ))}
+      <div className="rounded-md bg-white border border-black/10 p-1.5">
+        <div className="text-[7px] font-semibold mb-1">⌧ CONSISTÊNCIA</div>
+        <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(14, 1fr)" }}>
+          {Array.from({ length: 42 }).map((_, i) => (
+            <div key={i} className={`aspect-square rounded-[1px] ${Math.random() > 0.4 ? "bg-emerald-400" : "bg-black/5"}`} />
+          ))}
+        </div>
       </div>
-    </div>
-  </section>
-);
-
-const Modules = () => (
-  <section className="border-t border-border/60 bg-muted/30">
-    <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-      <motion.div {...fade()} className="text-center max-w-2xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">16 módulos, um app</h2>
-        <p className="mt-4 text-muted-foreground">Use os que importam pra você. O resto fica guardado, esperando.</p>
-      </motion.div>
-      <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-3">
-        {modules.map((m, i) => {
-          const Icon = m.icon;
-          return (
-            <motion.div
-              key={m.name}
-              {...fade(i * 0.02)}
-              className="rounded-2xl border border-border bg-card p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center mb-3">
-                <Icon className="w-4 h-4" />
-              </div>
-              <h3 className="font-bold text-sm">{m.name}</h3>
-              <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">{m.desc}</p>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  </section>
-);
-
-const Mechanics = () => (
-  <section className="border-t border-border/60">
-    <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-      <motion.h2 {...fade()} className="text-3xl md:text-4xl font-bold tracking-tight text-center max-w-2xl mx-auto">
-        Mecânicas que <span className="italic">viciam no bom</span>
-      </motion.h2>
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {mechanics.map((m, i) => {
-          const Icon = m.icon;
-          return (
-            <motion.div key={m.title} {...fade(i * 0.05)} className="rounded-2xl border border-border bg-card p-6 flex gap-4">
-              <div className="w-11 h-11 rounded-xl bg-foreground text-background flex items-center justify-center flex-shrink-0">
-                <Icon className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-bold">{m.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{m.desc}</p>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  </section>
-);
-
-const Benefits = () => (
-  <section className="border-t border-border/60 bg-muted/30">
-    <div className="max-w-4xl mx-auto px-5 py-20 md:py-28">
-      <motion.h2 {...fade()} className="text-3xl md:text-4xl font-bold tracking-tight text-center">
-        O que você ganha
-      </motion.h2>
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-2 gap-3">
-        {benefits.map((b, i) => (
-          <motion.div key={i} {...fade(i * 0.03)} className="flex gap-3 rounded-2xl border border-border bg-card p-5">
-            <div className="w-6 h-6 rounded-full bg-[hsl(var(--chart-2)/0.18)] flex items-center justify-center flex-shrink-0 mt-0.5">
-              <Check className="w-3.5 h-3.5 text-[hsl(var(--chart-2))]" />
-            </div>
-            <p className="text-sm">{b}</p>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-const Pricing = () => (
-  <section className="border-t border-border/60">
-    <div className="max-w-4xl mx-auto px-5 py-20 md:py-28">
-      <motion.div {...fade()} className="text-center max-w-xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Risco zero pra começar</h2>
-        <p className="mt-4 text-muted-foreground">7 dias grátis. Sem cartão. Cancele quando quiser.</p>
-      </motion.div>
-
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <motion.div {...fade(0.05)} className="rounded-2xl border border-border bg-card p-6">
-          <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">Mensal</p>
-          <p className="mt-3 text-3xl font-bold">R$ 14,90<span className="text-sm font-normal text-muted-foreground">/mês</span></p>
-          <p className="mt-1 text-xs text-muted-foreground">Flexibilidade total</p>
-          <ul className="mt-6 space-y-2 text-sm">
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />Acesso aos 16 módulos</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />Home customizável</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />Cancele quando quiser</li>
-          </ul>
-          <Link to="/auth" className="mt-6 inline-flex w-full justify-center items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-semibold hover:bg-muted transition">Começar com 7 dias grátis</Link>
-        </motion.div>
-
-        <motion.div {...fade(0.1)} className="relative rounded-2xl border-2 border-foreground bg-card p-6">
-          <span className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-full bg-foreground text-background px-3 py-1 text-[10px] font-bold tracking-wider uppercase">
-            Mais escolhido
-          </span>
-          <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">Anual</p>
-          <p className="mt-3 text-3xl font-bold">R$ 3,90<span className="text-sm font-normal text-muted-foreground">/mês</span></p>
-          <p className="mt-1 text-xs text-[hsl(var(--chart-2))] font-medium">Economia de R$ 132/ano</p>
-          <ul className="mt-6 space-y-2 text-sm">
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />Tudo do mensal</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />74% de desconto</li>
-            <li className="flex gap-2"><Check className="w-4 h-4 text-[hsl(var(--chart-2))] flex-shrink-0 mt-0.5" />1 ano completo</li>
-          </ul>
-          <CTA className="mt-6 w-full">Começar com 7 dias grátis</CTA>
-        </motion.div>
-      </div>
-
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        Sem cartão pra testar · Cancele em 1 clique · Sem fidelidade
-      </p>
-    </div>
-  </section>
-);
-
-const FAQItem = ({ q, a }: { q: string; a: string }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b border-border/60">
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between py-5 text-left">
-        <span className="font-medium">{q}</span>
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && <p className="pb-5 text-sm text-muted-foreground">{a}</p>}
     </div>
   );
 };
 
-const FAQ = () => (
-  <section className="border-t border-border/60 bg-muted/30">
-    <div className="max-w-3xl mx-auto px-5 py-20 md:py-28">
-      <motion.h2 {...fade()} className="text-3xl md:text-4xl font-bold tracking-tight text-center">Perguntas frequentes</motion.h2>
-      <div className="mt-10">
-        {faq.map(item => <FAQItem key={item.q} {...item} />)}
+const DevPhone = () => (
+  <div className="space-y-2 text-[8px]">
+    <div className="flex items-center justify-between">
+      <span className="font-bold flex items-center gap-1">
+        <span className="text-violet-600">✦</span> DESENVOLVIMENTO PESSOAL
+      </span>
+      <span className="text-[6.5px] text-black/50">23/05</span>
+    </div>
+    <div className="flex gap-1">
+      <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">METAS</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">DIÁRIO</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">DÁRIO</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">HUMOR</span>
+    </div>
+    <div className="rounded-md bg-violet-50 border border-violet-100 p-2 text-center">
+      <div className="text-[6.5px] text-violet-700 font-semibold flex items-center justify-center gap-1 mb-0.5">
+        <Leaf className="w-2 h-2" /> Frase do dia
       </div>
+      <div className="italic text-[8px]">"Grandes coisas nunca vieram de zonas de conforto."</div>
     </div>
-  </section>
-);
-
-const FinalCTA = () => (
-  <section className="border-t border-border/60">
-    <div className="max-w-3xl mx-auto px-5 py-24 md:py-32 text-center">
-      <motion.div {...fade()} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground mb-6">
-        <Smartphone className="w-3 h-3" /> Mobile-first · PWA · sem app store
-      </motion.div>
-      <motion.h2 {...fade(0.05)} className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-        Comece hoje.
-        <br />
-        <span className="text-muted-foreground">Sua vida agradece.</span>
-      </motion.h2>
-      <motion.div {...fade(0.1)} className="mt-8 flex flex-col items-center gap-3">
-        <CTA />
-        <p className="text-xs text-muted-foreground">7 dias grátis · sem cartão · cancele quando quiser</p>
-      </motion.div>
+    <div className="rounded-md bg-white border border-black/10 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold">O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</div>
+      <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Ser exemplo pra família</div>
+      <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Viajar pelo mundo</div>
     </div>
-  </section>
-);
-
-const Footer = () => (
-  <footer className="border-t border-border/60">
-    <div className="max-w-6xl mx-auto px-5 py-10 flex flex-col md:flex-row items-center justify-between gap-4">
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-lg bg-foreground text-background flex items-center justify-center font-bold text-xs">C</div>
-        <span className="font-bold text-sm">CORE</span>
+    <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold text-emerald-700 flex items-center gap-1">
+        <Sparkles className="w-2 h-2" /> AFIRMAÇÕES
       </div>
-      <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} CORE — Organize sua vida</p>
+      <div className="bg-white rounded px-1.5 py-1 text-[6.5px]">Eu sou capaz de construir a vida que quero.</div>
+      <div className="bg-white rounded px-1.5 py-1 text-[6.5px]">Cada dia me aproxima das minhas metas.</div>
     </div>
-  </footer>
-);
-
-// ---------------- Page ----------------
-
-const LandingPage = () => (
-  <div className="min-h-dvh bg-background text-foreground antialiased">
-    <Nav />
-    <main>
-      <Hero />
-      <Problem />
-      <Solution />
-      <HowItWorks />
-      <Modules />
-      <Mechanics />
-      <Benefits />
-      <Pricing />
-      <FAQ />
-      <FinalCTA />
-    </main>
-    <Footer />
   </div>
 );
 
-export default LandingPage;
+/* =========================================================
+   PHONE TRIO (Hero) — leque com proporção mobile cuidadosa
+   ========================================================= */
+
+const PhoneTrio = () => (
+  <div className="relative w-full mx-auto" style={{ maxWidth: 560 }}>
+    <div className="relative flex items-end justify-center">
+      {/* Left phone */}
+      <motion.div
+        initial={{ opacity: 0, y: 30, rotate: -10 }}
+        animate={{ opacity: 1, y: 0, rotate: -8 }}
+        transition={{ duration: 0.7, delay: 0.1 }}
+        className="w-[32%] translate-y-6 -mr-4 z-10"
+      >
+        <PhoneFrame><RoutinePhone /></PhoneFrame>
+      </motion.div>
+      {/* Center phone */}
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7 }}
+        className="w-[40%] z-20"
+      >
+        <PhoneFrame><FinancePhone /></PhoneFrame>
+      </motion.div>
+      {/* Right phone */}
+      <motion.div
+        initial={{ opacity: 0, y: 30, rotate: 10 }}
+        animate={{ opacity: 1, y: 0, rotate: 8 }}
+        transition={{ duration: 0.7, delay: 0.1 }}
+        className="w-[32%] translate-y-6 -ml-4 z-10"
+      >
+        <PhoneFrame><DevPhone /></PhoneFrame>
+      </motion.div>
+    </div>
+  </div>
+);
+
+/* =========================================================
+   PAGE
+   ========================================================= */
+
+export default function LandingPage() {
+  return (
+    <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground">
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-black/5">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
+          <Link to="/lp" className="flex items-center gap-2 font-bold text-[15px]">
+            <span className="w-6 h-6 rounded-full border-[3px] border-emerald-500 border-l-transparent" />
+            CORE
+          </Link>
+          <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
+            <a href="#recursos" className="hover:text-black">Recursos</a>
+            <a href="#beneficios" className="hover:text-black">Benefícios</a>
+            <a href="#mockup" className="hover:text-black">Depoimentos</a>
+            <a href="#precos" className="hover:text-black">Preços</a>
+            <a href="#faq" className="hover:text-black">Perguntas</a>
+          </nav>
+          <Link
+            to="/auth"
+            className="px-4 py-1.5 rounded-md border border-emerald-500 text-emerald-600 text-sm font-medium hover:bg-emerald-50 transition"
+          >
+            Entrar
+          </Link>
+        </div>
+      </header>
+
+      {/* HERO */}
+      <section className="max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
+        <div className="grid md:grid-cols-2 gap-10 items-center">
+          <div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-semibold tracking-wide mb-5"
+            >
+              <Check className="w-3 h-3" /> TUDO PARA SUA VIDA. EM UM SÓ LUGAR.
+            </motion.div>
+            <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
+              Organize sua vida<br />em um só lugar.
+            </h1>
+            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
+              Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 mb-8">
+              <Link
+                to="/auth"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
+              >
+                Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
+              </Link>
+              <a
+                href="#mockup"
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md border border-black/15 hover:border-black/30 text-sm font-semibold transition"
+              >
+                Ver como funciona <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
+                { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
+                { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade em primeiro lugar" },
+              ].map((b) => (
+                <div key={b.t} className="space-y-1">
+                  <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <b.icon className="w-4 h-4" />
+                  </div>
+                  <div className="text-[12px] font-semibold leading-tight">{b.t}</div>
+                  <div className="text-[10.5px] text-black/50 leading-tight">{b.s}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="-mx-2 md:mx-0">
+            <PhoneTrio />
+          </div>
+        </div>
+      </section>
+
+      {/* RECURSOS — 3 cards */}
+      <section id="recursos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+        <div className="grid md:grid-cols-3 gap-4">
+          {/* Finanças */}
+          <div className="rounded-2xl bg-orange-50/70 border border-orange-100 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-md bg-orange-100 text-orange-600 flex items-center justify-center">
+                <Wallet className="w-4 h-4" />
+              </div>
+              <span className="font-bold text-orange-700 text-sm tracking-wide">FINANÇAS</span>
+            </div>
+            <p className="text-sm text-black/70 mb-4">Entenda receitas, despesas e investimentos com clareza.</p>
+            <div className="rounded-xl bg-white border border-black/5 p-3">
+              <div className="flex items-start justify-between mb-2">
+                <div>
+                  <div className="text-[10px] text-black/50">Saldo do Mês</div>
+                  <div className="text-lg font-bold text-emerald-600">+R$ 2.365</div>
+                </div>
+                <TrendingUp className="w-4 h-4 text-emerald-500" />
+              </div>
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-14 h-14 rounded-full"
+                  style={{ background: "conic-gradient(#8b5cf6 0 35%, #ec4899 35% 55%, #f59e0b 55% 70%, #10b981 70% 85%, #ef4444 85% 100%)" }}
+                >
+                  <div className="w-6 h-6 bg-white rounded-full m-4" />
+                </div>
+                <div className="flex-1 text-[10px] space-y-0.5">
+                  <div className="flex justify-between"><span>● Moradia</span><span>R$ 1.300</span></div>
+                  <div className="flex justify-between"><span>● Educação</span><span>R$ 450</span></div>
+                  <div className="flex justify-between"><span>● Contas da Casa</span><span>R$ 225</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rotina */}
+          <div className="rounded-2xl bg-emerald-50/70 border border-emerald-100 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <CalendarIcon className="w-4 h-4" />
+              </div>
+              <span className="font-bold text-emerald-700 text-sm tracking-wide">ROTINA</span>
+            </div>
+            <p className="text-sm text-black/70 mb-4">Organize hábitos, consistência e sua semana em poucos toques.</p>
+            <div className="rounded-xl bg-white border border-black/5 p-3">
+              <div className="text-[10px] font-semibold text-emerald-700 mb-2">HÁBITOS DIÁRIOS ✓</div>
+              <div className="grid grid-cols-[1fr_auto_auto] gap-y-1 gap-x-3 text-[11px]">
+                <div className="text-black/50 font-semibold text-[10px]">DIA</div>
+                <div className="text-black/50 font-semibold text-[10px] text-center">Beber 2L</div>
+                <div className="text-black/50 font-semibold text-[10px] text-center">Treinar</div>
+                {["SEG", "TER"].map((d, i) => (
+                  <Fragment key={d}>
+                    <div className="font-medium">{d}</div>
+                    <div className="flex justify-center">
+                      <div className="w-4 h-4 rounded bg-emerald-500 flex items-center justify-center">
+                        <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />
+                      </div>
+                    </div>
+                    <div className="flex justify-center">
+                      <div className={`w-4 h-4 rounded ${i === 0 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
+                        {i === 0 && <Check className="w-2.5 h-2.5 text-white" strokeWidth={4} />}
+                      </div>
+                    </div>
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Dev */}
+          <div className="rounded-2xl bg-violet-50/70 border border-violet-100 p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <span className="font-bold text-violet-700 text-sm tracking-wide">DESENVOLVIMENTO PESSOAL</span>
+            </div>
+            <p className="text-sm text-black/70 mb-4">Acompanhe metas, forças, afirmações e evolução pessoal.</p>
+            <div className="rounded-xl bg-white border border-black/5 p-3">
+              <div className="text-[10px] font-semibold mb-2 flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-violet-500" /> MINHAS FORÇAS
+              </div>
+              <div className="space-y-1.5 text-[11px]">
+                {["Comunicação", "Persistência", "Curiosidade"].map((f) => (
+                  <div key={f} className="flex items-center justify-between bg-black/[0.03] rounded px-2 py-1.5">
+                    <span>{f}</span>
+                    <span className="text-black/30">×</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* MOCKUP — Tudo no seu celular */}
+      <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center">
+          <div>
+            <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
+            <p className="text-black/60 text-[15px]">
+              Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
+            <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
+            <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
+            <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
+          </div>
+        </div>
+      </section>
+
+      {/* BENEFÍCIOS — Feito para o seu dia a dia */}
+      <section id="beneficios" className="max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12">
+          <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
+            {[
+              { icon: Check, bg: "bg-emerald-50", fg: "text-emerald-600", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
+              { icon: LayoutGrid, bg: "bg-violet-50", fg: "text-violet-600", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
+              { icon: Sun, bg: "bg-amber-50", fg: "text-amber-600", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
+              { icon: Heart, bg: "bg-rose-50", fg: "text-rose-600", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
+            ].map((f) => (
+              <div key={f.t}>
+                <div className={`w-9 h-9 rounded-md ${f.bg} ${f.fg} flex items-center justify-center mb-2`}>
+                  <f.icon className="w-4 h-4" />
+                </div>
+                <div className="font-semibold text-[14px] mb-1 leading-tight">{f.t}</div>
+                <div className="text-[12.5px] text-black/55 leading-snug">{f.s}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PREÇOS */}
+      <section id="precos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+        <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
+          <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
+            <div>
+              <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
+              <p className="text-[13px] text-black/50">7 dias grátis · Cancele quando quiser</p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Anual */}
+              <div className="relative rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
+                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-semibold flex items-center gap-1">
+                  <Leaf className="w-3 h-3" /> MELHOR CUSTO-BENEFÍCIO
+                </div>
+                <div className="text-sm font-semibold mb-1">Anual</div>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-3xl font-bold">R$ 3,90</span>
+                  <span className="text-sm text-black/50">/mês</span>
+                </div>
+                <div className="text-[12px] text-black/50 mb-4">
+                  Pago anualmente<br />R$ 46,80/ano
+                </div>
+                <Link
+                  to="/auth"
+                  className="block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                >
+                  Começar agora
+                </Link>
+              </div>
+              {/* Mensal */}
+              <div className="rounded-xl border border-black/10 bg-white p-5">
+                <div className="text-sm font-semibold mb-1">Mensal</div>
+                <div className="flex items-baseline gap-1 mb-1">
+                  <span className="text-3xl font-bold">R$ 14,90</span>
+                  <span className="text-sm text-black/50">/mês</span>
+                </div>
+                <div className="text-[12px] text-black/50 mb-4">
+                  Pago mensalmente<br />R$ 14,90/mês
+                </div>
+                <Link
+                  to="/auth"
+                  className="block w-full text-center py-2.5 rounded-md border border-black/15 hover:border-black/30 font-semibold text-sm transition"
+                >
+                  Começar agora
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA FINAL */}
+      <section id="faq" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
+        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+          <div className="flex items-start gap-3 flex-1">
+            <Sparkles className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />
+            <div>
+              <div className="font-bold text-[18px] md:text-2xl leading-tight mb-1">
+                Pare de se perder entre mil<br className="hidden md:block" /> apps e anotações.
+              </div>
+              <div className="text-[13px] md:text-sm text-black/60">
+                Tenha clareza, foco e controle da sua vida em um só lugar com o CORE.
+              </div>
+            </div>
+          </div>
+          <Link
+            to="/auth"
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition whitespace-nowrap"
+          >
+            Quero testar o CORE <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}

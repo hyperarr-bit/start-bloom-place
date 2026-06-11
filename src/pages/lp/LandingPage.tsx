@@ -596,7 +596,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
               <Link
                 to="/auth"
-                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
+                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>

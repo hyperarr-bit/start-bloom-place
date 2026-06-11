@@ -97,74 +97,188 @@ const Hero = () => (
     <div className="absolute inset-0 -z-10 opacity-60" style={{
       background: "radial-gradient(circle at 20% 10%, hsl(var(--chart-1)/0.18), transparent 50%), radial-gradient(circle at 80% 30%, hsl(var(--chart-2)/0.18), transparent 55%), radial-gradient(circle at 50% 90%, hsl(var(--chart-4)/0.18), transparent 60%)",
     }} />
-    <div className="max-w-6xl mx-auto px-5 pt-14 pb-20 md:pt-24 md:pb-28">
-      <motion.div {...fade(0)} className="flex justify-center">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-[11px] text-muted-foreground">
-          <Sparkles className="w-3 h-3" /> O sistema operacional da sua vida
-        </span>
-      </motion.div>
-      <motion.h1 {...fade(0.05)} className="mt-5 text-center text-4xl md:text-6xl font-bold tracking-tight leading-[1.05]">
-        Sua vida inteira
+    <div className="max-w-6xl mx-auto px-5 pt-14 pb-20 md:pt-20 md:pb-28">
+      <motion.h1 {...fade(0)} className="text-center text-3xl md:text-5xl font-bold tracking-tight leading-[1.15] max-w-3xl mx-auto">
+        Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.
         <br />
+        <span className="text-muted-foreground">Agora, </span>
         <span className="bg-gradient-to-r from-[hsl(var(--chart-1))] via-[hsl(var(--chart-4))] to-[hsl(var(--chart-2))] bg-clip-text text-transparent">
-          em um só painel.
+          tudo em um só lugar.
         </span>
       </motion.h1>
+
       <motion.p {...fade(0.1)} className="mt-5 text-center text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-        16 módulos integrados — finanças, treino, dieta, rotina, saúde, casa, viagens, leitura, hábitos e mais.
-        Sem fragmentação. Sem 15 notificações.
+        16 módulos integrados — finanças, treino, dieta, rotina, saúde, casa, viagens, leitura, hábitos e mais. Sem fragmentação. Sem 15 notificações.
       </motion.p>
+
       <motion.div {...fade(0.15)} className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
         <CTA />
         <p className="text-xs text-muted-foreground">Sem cartão · Cancele quando quiser</p>
       </motion.div>
 
-      {/* Mockup */}
-      <motion.div {...fade(0.2)} className="mt-14 mx-auto max-w-md">
-        <div className="relative rounded-[2.2rem] border border-border bg-card p-3 shadow-2xl">
-          <div className="rounded-[1.6rem] bg-background p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[11px] text-muted-foreground">Bom dia,</p>
-                <p className="text-base font-bold">Vamos pra cima 👋</p>
-              </div>
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[hsl(var(--chart-2))] to-[hsl(var(--chart-3))] flex items-center justify-center text-background font-bold text-xs">
-                87
-              </div>
-            </div>
+      {/* iPhones + badge */}
+      <div className="relative mt-16">
+        <motion.div
+          {...fade(0.2)}
+          className="absolute -top-4 right-4 md:right-12 z-20 w-24 h-24 md:w-32 md:h-32 rounded-full bg-foreground text-background flex flex-col items-center justify-center shadow-2xl rotate-[8deg]"
+        >
+          <span className="text-2xl md:text-3xl font-bold leading-none">+15</span>
+          <span className="text-[9px] md:text-[11px] font-bold tracking-[0.15em] mt-1">MÓDULOS</span>
+        </motion.div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-[hsl(var(--chart-3)/0.15)] rounded-xl p-3">
-                <p className="text-[10px] text-muted-foreground">Saldo do mês</p>
-                <p className="text-sm font-bold text-[hsl(var(--chart-2))]">+R$ 5.765</p>
-              </div>
-              <div className="bg-[hsl(var(--chart-1)/0.15)] rounded-xl p-3">
-                <p className="text-[10px] text-muted-foreground">Treino</p>
-                <p className="text-sm font-bold">Peito + Tríceps</p>
-              </div>
-              <div className="bg-[hsl(var(--chart-2)/0.15)] rounded-xl p-3">
-                <p className="text-[10px] text-muted-foreground">Calorias</p>
-                <p className="text-sm font-bold">1.420 / 2.100</p>
-              </div>
-              <div className="bg-[hsl(var(--chart-4)/0.15)] rounded-xl p-3">
-                <p className="text-[10px] text-muted-foreground">Hábitos hoje</p>
-                <p className="text-sm font-bold">4 / 6</p>
-              </div>
-            </div>
+        <div className="flex items-end justify-center gap-3 md:gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 40, rotate: -6 }}
+            whileInView={{ opacity: 1, y: 0, rotate: -6 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+            className="hidden md:block w-[220px] flex-shrink-0"
+          >
+            <PhoneMockup variant="finance" />
+          </motion.div>
 
-            <div className="bg-muted rounded-xl p-3">
-              <p className="text-[10px] text-muted-foreground mb-1">Streak</p>
-              <div className="flex items-center gap-1.5">
-                <Flame className="w-4 h-4 text-[hsl(var(--chart-3))]" />
-                <span className="text-sm font-bold">23 dias seguidos</span>
-              </div>
-            </div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="w-[260px] md:w-[280px] flex-shrink-0 relative z-10"
+          >
+            <PhoneMockup variant="home" />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 40, rotate: 6 }}
+            whileInView={{ opacity: 1, y: 0, rotate: 6 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.25 }}
+            className="hidden md:block w-[220px] flex-shrink-0"
+          >
+            <PhoneMockup variant="workout" />
+          </motion.div>
         </div>
-      </motion.div>
+      </div>
     </div>
   </section>
 );
+
+const PhoneFrame = ({ children }: { children: React.ReactNode }) => (
+  <div className="relative rounded-[2.5rem] border-[10px] border-foreground/90 bg-foreground/90 shadow-2xl overflow-hidden aspect-[9/19]">
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-foreground rounded-b-2xl z-10" />
+    <div className="w-full h-full bg-background overflow-hidden rounded-[1.6rem]">
+      {children}
+    </div>
+  </div>
+);
+
+const PhoneMockup = ({ variant }: { variant: "home" | "finance" | "workout" }) => {
+  if (variant === "home") {
+    return (
+      <PhoneFrame>
+        <div className="p-4 pt-8 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] text-muted-foreground">Bom dia,</p>
+              <p className="text-sm font-bold">Vamos pra cima 👋</p>
+            </div>
+            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[hsl(var(--chart-2))] to-[hsl(var(--chart-3))] flex items-center justify-center text-background font-bold text-xs">87</div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[hsl(var(--chart-3)/0.15)] rounded-lg p-2">
+              <p className="text-[8px] text-muted-foreground">Saldo</p>
+              <p className="text-xs font-bold text-[hsl(var(--chart-2))]">+R$ 5.765</p>
+            </div>
+            <div className="bg-[hsl(var(--chart-1)/0.15)] rounded-lg p-2">
+              <p className="text-[8px] text-muted-foreground">Treino</p>
+              <p className="text-xs font-bold">Peito</p>
+            </div>
+            <div className="bg-[hsl(var(--chart-2)/0.15)] rounded-lg p-2">
+              <p className="text-[8px] text-muted-foreground">Calorias</p>
+              <p className="text-xs font-bold">1.420</p>
+            </div>
+            <div className="bg-[hsl(var(--chart-4)/0.15)] rounded-lg p-2">
+              <p className="text-[8px] text-muted-foreground">Hábitos</p>
+              <p className="text-xs font-bold">4/6</p>
+            </div>
+          </div>
+          <div className="bg-muted rounded-lg p-2 flex items-center gap-1.5">
+            <Flame className="w-3 h-3 text-[hsl(var(--chart-3))]" />
+            <span className="text-[10px] font-bold">23 dias seguidos</span>
+          </div>
+          <div className="space-y-1.5">
+            {["Beber água", "Treinar", "Ler 30min"].map(h => (
+              <div key={h} className="flex items-center justify-between bg-card border border-border rounded-lg p-2">
+                <span className="text-[10px]">{h}</span>
+                <Check className="w-3 h-3 text-[hsl(var(--chart-2))]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </PhoneFrame>
+    );
+  }
+  if (variant === "finance") {
+    return (
+      <PhoneFrame>
+        <div className="p-3 pt-7 space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Wallet className="w-3 h-3" />
+            <p className="text-xs font-bold">Finanças</p>
+          </div>
+          <div className="rounded-lg bg-gradient-to-br from-[hsl(var(--chart-2))] to-[hsl(var(--chart-3))] p-3 text-background">
+            <p className="text-[9px] opacity-80">Saldo do mês</p>
+            <p className="text-lg font-bold">R$ 5.765</p>
+            <p className="text-[9px] opacity-80 mt-1">+12% vs mês passado</p>
+          </div>
+          <div className="space-y-1.5">
+            {[
+              { c: "Aluguel", v: "1.800", neg: true },
+              { c: "Mercado", v: "620", neg: true },
+              { c: "Salário", v: "8.500", neg: false },
+              { c: "Freelance", v: "1.200", neg: false },
+            ].map(t => (
+              <div key={t.c} className="flex justify-between bg-card border border-border rounded-lg p-2">
+                <span className="text-[10px]">{t.c}</span>
+                <span className={`text-[10px] font-bold ${t.neg ? "text-[hsl(var(--chart-5))]" : "text-[hsl(var(--chart-2))]"}`}>
+                  {t.neg ? "-" : "+"}R$ {t.v}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </PhoneFrame>
+    );
+  }
+  return (
+    <PhoneFrame>
+      <div className="p-3 pt-7 space-y-2.5">
+        <div className="flex items-center gap-1.5">
+          <Dumbbell className="w-3 h-3" />
+          <p className="text-xs font-bold">Treino de hoje</p>
+        </div>
+        <div className="rounded-lg bg-[hsl(var(--chart-1)/0.15)] p-3">
+          <p className="text-[9px] text-muted-foreground">Push Day</p>
+          <p className="text-base font-bold">Peito + Tríceps</p>
+          <p className="text-[9px] text-muted-foreground mt-1">6 exercícios · 45min</p>
+        </div>
+        <div className="space-y-1.5">
+          {[
+            { e: "Supino reto", s: "4x10" },
+            { e: "Supino inclinado", s: "4x10" },
+            { e: "Crucifixo", s: "3x12" },
+            { e: "Tríceps testa", s: "4x12" },
+            { e: "Corda", s: "3x15" },
+          ].map(t => (
+            <div key={t.e} className="flex justify-between bg-card border border-border rounded-lg p-2">
+              <span className="text-[10px]">{t.e}</span>
+              <span className="text-[10px] font-bold text-muted-foreground">{t.s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </PhoneFrame>
+  );
+};
 
 const Problem = () => (
   <section className="border-t border-border/60">

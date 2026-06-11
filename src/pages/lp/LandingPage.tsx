@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
+import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
 import testimonialMarina from "@/assets/testimonial-marina.png.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.png.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.png.asset.json";
@@ -799,8 +800,17 @@ export default function LandingPage() {
       <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div className="flex justify-center">
-            <div className="w-full max-w-[280px]">
-              <PhoneFrame><RoutinePhone /></PhoneFrame>
+            <div className="w-full max-w-[320px]">
+              <video
+                src={rotinaPreviewVideo.url}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="auto"
+                controls={false}
+                className="w-full h-auto rounded-[2rem]"
+              />
             </div>
           </div>
           <div>
@@ -808,17 +818,17 @@ export default function LandingPage() {
               <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Veja sua consistência crescer dia a dia.
+              Construa hábitos que ficam — sem depender de motivação.
             </h2>
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Hábitos não acontecem por motivação — acontecem por sistema. O módulo Rotina te dá esse sistema.
+              Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade.
             </p>
             <div className="space-y-2.5">
               {[
-                "Hábitos diários com checks rápidos por semana",
-                "Heatmap visual de consistência (estilo GitHub)",
-                "Visão semanal e mensal lado a lado",
-                "Streaks pra manter o ritmo",
+                "Check rápido dos hábitos do dia, sem fricção",
+                "Visão semanal pra enxergar onde você travou",
+                "Streaks que mostram sua sequência crescendo",
+                "Calendário mensal pra acompanhar a evolução",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
                   <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">

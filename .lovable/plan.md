@@ -1,47 +1,25 @@
-## Nova etapa: escolher módulos do tutorial
+## Card "MÓDULO ROTINA" da landing page
 
-### Fluxo final
-```
-Welcome ("Quero começar")  ← só guest, igual hoje
-   ↓
-[NOVA] Seleção de módulos do tutorial
-   ↓
-Picker "Por onde você quer começar?" (só com os escolhidos)
-   ↓
-Spotlight em cada módulo até zerar
-   ↓
-Popup de parabéns / QuickSignup
-```
+### 1. Trocar o mockup pelo vídeo enviado
+Hoje (linhas 801-805 de `src/pages/lp/LandingPage.tsx`) o card usa `<PhoneFrame><RoutinePhone /></PhoneFrame>` — um mockup desenhado em React que não mostra o app de verdade.
 
-Vale pros DOIS fluxos (guest e novo usuário logado).
+Substituir pela mesma estrutura usada no card de Finanças (linhas 781-794):
+- Subir o `Cópia_de_Design_sem_nome.mp4` enviado como asset via `lovable-assets` → `src/assets/rotina-preview.mp4.asset.json`.
+- Importar e renderizar com `<video autoPlay muted loop playsInline preload="auto" controls={false} className="w-full h-auto rounded-[2rem]" />` dentro de um wrapper `max-w-[320px]`.
+- `RoutinePhone` segue existindo no arquivo; só não é mais usado nesse card (não vou removê-lo pra não mexer em nada fora do escopo).
 
-### 1. Nova etapa em `QuickStartOnboarding.tsx`
-- Adicionar um novo `step` intermediário (vira `0 | 1 | 2`, onde `1` = nova seleção e `2` = picker atual).
-- Para guest: `welcome → seleção → picker`.
-- Para `forNewUser`: pula welcome, começa direto na seleção.
-- Estado novo `selectedModules: ModuleKey[]` (default: todos os 4 marcados, usuário pode desmarcar).
-- Mínimo 1 selecionado pra liberar o botão "Continuar".
-- Persistir em `useUserData` com chave `tutorial-selected-modules` (sobrevive a reload).
+### 2. Melhorar a copy do card
+A frase "Heatmap visual de consistência (estilo GitHub)" sai. Novos textos focados nas vantagens reais do módulo (hábitos, semana, streaks, visão mensal, check rápido):
 
-### 2. Tela de seleção (copy melhorada)
-- Título: **"Vamos começar seu tutorial"**
-- Subtítulo: **"Escolha os módulos que você quer aprender a usar com calma. A gente te guia passo a passo em cada um."**
-- 4 cards (mesma estética dos cards do picker: ícone colorido + label + benefit), cada um com um checkbox/estado selecionado.
-- Todos vêm pré-marcados.
-- Tap alterna seleção; visual de borda + check quando marcado.
-- Botão "Continuar" no rodapé (desabilitado se 0 selecionados).
-- Contador discreto: "X de 4 selecionados".
-
-### 3. Picker (etapa seguinte) — sem mudança visual
-- Continua igual: "Por onde você quer começar? / Escolhe 1. Os outros ficam aqui esperando."
-- Mudança única: `visibleOptions` passa a respeitar a interseção entre `pendingModules` (passado pelo `Home`) e `tutorial-selected-modules` (escolhidos na nova etapa).
-
-### 4. Conclusão antecipada
-- Quando todos os módulos **selecionados** forem completados, o tutorial encerra normalmente (popup de parabéns pro novo usuário / QuickSignup pro guest), mesmo que existam módulos não-selecionados ainda "pendentes".
-- A lógica `allDone` em `Home.tsx` passa a comparar contra a lista selecionada, não contra os 4 fixos.
+- **H2:** "Construa hábitos que ficam — sem depender de motivação."
+- **Subtítulo:** "Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade."
+- **Bullets (4):**
+  1. "Check rápido dos hábitos do dia, sem fricção"
+  2. "Visão semanal pra enxergar onde você travou"
+  3. "Streaks que mostram sua sequência crescendo"
+  4. "Calendário mensal pra acompanhar a evolução"
 
 ### Pontos técnicos
-- Chave nova em `useUserData`: `tutorial-selected-modules` (`ModuleKey[]`).
-- `QuickStartOnboarding` ganha lógica de step `0 | 1 | 2` e renderização condicional da nova tela.
-- `Home.tsx`: ao calcular `pendingModules`, considerar somente os que estão em `tutorial-selected-modules` (se a chave existir).
-- Nenhum módulo novo, nenhuma rota nova. Só uma tela a mais no wizard.
+- Único arquivo de código editado: `src/pages/lp/LandingPage.tsx` (bloco linhas 798-833).
+- Novo arquivo: `src/assets/rotina-preview.mp4.asset.json` (pointer gerado pelo CLI).
+- Sem mudanças em outros módulos, rotas ou lógica.

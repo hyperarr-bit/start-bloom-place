@@ -1094,15 +1094,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* STICKY MOBILE CTA */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-black/10 px-4 py-3">
-        <Link
-          to="/auth"
-          className="btn-shine flex items-center justify-center gap-2 w-full py-3 rounded-md bg-black text-white font-semibold text-sm"
-        >
-          Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
     </div>
   );
 }

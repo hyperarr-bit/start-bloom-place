@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
+import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
 import testimonialMarina from "@/assets/testimonial-marina.png.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.png.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.png.asset.json";

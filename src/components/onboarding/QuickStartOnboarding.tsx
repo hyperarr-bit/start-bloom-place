@@ -6,6 +6,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
 import coreLogoBlack from "@/assets/core-logo-black.png";
+import { TutorialDonePopup } from "@/components/onboarding/TutorialDonePopup";
 
 
 
@@ -17,6 +18,8 @@ interface QuickStartOnboardingProps {
   pendingModules?: ModuleKey[];
   /** Skip the welcome step and go straight to module choice / celebration. */
   skipWelcome?: boolean;
+  /** Newly signed-up (already authenticated) user — skip welcome and show tutorial-done popup instead of QuickSignup. */
+  forNewUser?: boolean;
 }
 
 const OPTIONS: Array<{
@@ -33,13 +36,14 @@ const OPTIONS: Array<{
   { key: "metas", route: "/desenvolvimento", label: "Metas", benefit: "Defina onde quer chegar", Icon: Target, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
 ];
 
-export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }: QuickStartOnboardingProps) => {
+export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser }: QuickStartOnboardingProps) => {
   const pending = pendingModules ?? OPTIONS.map(o => o.key);
   const allDone = pending.length === 0;
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key));
 
-  const [step, setStep] = useState<0 | 1>(skipWelcome || allDone ? 1 : 0);
+  const [step, setStep] = useState<0 | 1>(skipWelcome || allDone || forNewUser ? 1 : 0);
   const [transitioning, setTransitioning] = useState(false);
+  const [showDonePopup, setShowDonePopup] = useState(false);
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
   const startedRef = useRef(false);
@@ -95,6 +99,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
 
   const handleCelebrationDone = () => {
     set("core-all-modules-celebrated", "true");
+    if (forNewUser) {
+      // Usuário já tem conta — não dispara QuickSignup. Mostra popup de parabéns.
+      setTransitioning(false);
+      setShowDonePopup(true);
+      return;
+    }
     if (isGuest) {
       // Trigger global QuickSignupModal — usuário cai no app, modal aparece por cima.
       trackEvent("quicksignup_step_shown", {});
@@ -107,6 +117,11 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome }
     } else {
       onComplete();
     }
+  };
+
+  const handleDonePopupClose = () => {
+    setShowDonePopup(false);
+    onComplete();
   };
 
 

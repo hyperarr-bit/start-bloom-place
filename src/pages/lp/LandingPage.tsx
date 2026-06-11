@@ -520,15 +520,24 @@ const PhoneTrio = () => (
     transition={{ duration: 0.7 }}
     className="w-full flex justify-center"
   >
-    <img
-      src="/hero-phones.png"
-      alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
-      className="w-full max-w-[640px] h-auto object-contain mx-auto"
-      loading="eager"
-      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-    />
+    <picture>
+      <source srcSet="/hero-phones.webp" type="image/webp" />
+      <img
+        src="/hero-phones.webp"
+        alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
+        className="w-full max-w-[640px] h-auto object-contain mx-auto"
+        loading="eager"
+        decoding="async"
+        // @ts-expect-error fetchpriority is a valid HTML attribute
+        fetchpriority="high"
+        width={1280}
+        height={960}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+    </picture>
   </motion.div>
 );
+
 
 /* =========================================================
    FAQ

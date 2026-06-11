@@ -1,25 +1,28 @@
-## Card "MÓDULO ROTINA" da landing page
+# Corrigir os vídeos da landing page
 
-### 1. Trocar o mockup pelo vídeo enviado
-Hoje (linhas 801-805 de `src/pages/lp/LandingPage.tsx`) o card usa `<PhoneFrame><RoutinePhone /></PhoneFrame>` — um mockup desenhado em React que não mostra o app de verdade.
+## O que está errado (análise técnica dos arquivos)
 
-Substituir pela mesma estrutura usada no card de Finanças (linhas 781-794):
-- Subir o `Cópia_de_Design_sem_nome.mp4` enviado como asset via `lovable-assets` → `src/assets/rotina-preview.mp4.asset.json`.
-- Importar e renderizar com `<video autoPlay muted loop playsInline preload="auto" controls={false} className="w-full h-auto rounded-[2rem]" />` dentro de um wrapper `max-w-[320px]`.
-- `RoutinePhone` segue existindo no arquivo; só não é mais usado nesse card (não vou removê-lo pra não mexer em nada fora do escopo).
+Analisei os dois arquivos de vídeo hospedados no CDN e encontrei problemas concretos:
 
-### 2. Melhorar a copy do card
-A frase "Heatmap visual de consistência (estilo GitHub)" sai. Novos textos focados nas vantagens reais do módulo (hábitos, semana, streaks, visão mensal, check rápido):
+1. **Vídeo da Rotina (15 MB)**: o índice do vídeo (`moov atom`) está no **final do arquivo**. Isso significa que o navegador precisa baixar praticamente os 15 MB inteiros antes de conseguir começar a reproduzir. Em rede móvel (Safari, Chrome, navegador do TikTok) isso aparece como vídeo "morto"/preto que nunca toca. No preview do desktop com internet rápida ele funciona — por isso parecia OK antes.
+2. **Vídeo de Finanças**: usa perfil de cor `yuvj420p` (full-range) + profile High, que tem compatibilidade irregular em alguns players móveis (especialmente WebViews como o do TikTok).
+3. **Peso**: 15 MB é pesado demais para um card de landing page mobile.
 
-- **H2:** "Construa hábitos que ficam — sem depender de motivação."
-- **Subtítulo:** "Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade."
-- **Bullets (4):**
-  1. "Check rápido dos hábitos do dia, sem fricção"
-  2. "Visão semanal pra enxergar onde você travou"
-  3. "Streaks que mostram sua sequência crescendo"
-  4. "Calendário mensal pra acompanhar a evolução"
+## O que vou fazer
 
-### Pontos técnicos
-- Único arquivo de código editado: `src/pages/lp/LandingPage.tsx` (bloco linhas 798-833).
-- Novo arquivo: `src/assets/rotina-preview.mp4.asset.json` (pointer gerado pelo CLI).
-- Sem mudanças em outros módulos, rotas ou lógica.
+1. **Re-encodar os dois vídeos** com configuração universalmente compatível:
+   - H.264 profile Main, `yuv420p`, `+faststart` (índice no início → começa a tocar imediatamente, em streaming)
+   - Compressão para reduzir o vídeo da Rotina de 15 MB para algo em torno de 3–5 MB sem perda visível
+   - Remover faixa de áudio (os vídeos tocam mudos de qualquer forma — áudio bloqueia autoplay em WebViews)
+2. **Re-upload para o CDN** e atualizar os dois `.asset.json`
+3. **Ajustar as tags `<video>`** na landing page:
+   - Adicionar `poster` (primeiro frame como imagem) para nunca aparecer um quadrado preto enquanto carrega
+   - Manter `autoPlay + muted + playsInline + loop`
+4. **Verificar no navegador** (preview mobile 430px) que ambos os vídeos carregam e tocam
+
+## Detalhes técnicos
+
+- Re-encode com ffmpeg: `-c:v libx264 -profile:v main -pix_fmt yuv420p -movflags +faststart -an -crf 26`
+- Upload via `lovable-assets create`, sobrescrevendo os pointers `financas-preview.mp4.asset.json` e `rotina-preview.mp4.asset.json`
+- Extrair o primeiro frame de cada vídeo como JPG para usar de `poster`
+- Arquivo alterado: `src/pages/lp/LandingPage.tsx` (apenas os atributos das tags `<video>`)

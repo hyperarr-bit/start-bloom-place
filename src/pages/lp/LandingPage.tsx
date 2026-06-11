@@ -558,8 +558,7 @@ export default function LandingPage() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
-          <Link to="/lp" className="flex items-center gap-2 font-bold text-[15px]">
-            <span className="w-6 h-6 rounded-full border-[3px] border-emerald-500 border-l-transparent" />
+          <Link to="/lp" className="font-bold text-[17px] tracking-tight text-black">
             CORE
           </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
@@ -571,7 +570,7 @@ export default function LandingPage() {
           </nav>
           <Link
             to="/auth"
-            className="px-4 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold transition"
+            className="px-4 py-1.5 rounded-md bg-black hover:bg-black/85 text-white text-sm font-semibold transition"
           >
             Entrar
           </Link>
@@ -584,7 +583,7 @@ export default function LandingPage() {
           <div className="text-center flex flex-col items-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-semibold tracking-wide mb-5"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
             >
               <Check className="w-3 h-3" /> TUDO PARA SUA VIDA. EM UM SÓ LUGAR.
             </motion.div>
@@ -597,7 +596,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
               <Link
                 to="/auth"
-                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
+                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
@@ -609,7 +608,7 @@ export default function LandingPage() {
                 { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade em primeiro lugar" },
               ].map((b) => (
                 <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
-                  <div className="w-8 h-8 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
                     <b.icon className="w-4 h-4" />
                   </div>
                   <div className="text-[12px] font-semibold leading-tight">{b.t}</div>
@@ -691,9 +690,9 @@ export default function LandingPage() {
             </div>
             <div className="grid md:grid-cols-2 gap-4">
               {/* Anual */}
-              <div className="relative rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
-                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-emerald-500 text-white text-[10px] font-semibold flex items-center gap-1">
-                  <Leaf className="w-3 h-3" /> MELHOR CUSTO-BENEFÍCIO
+              <div className="relative rounded-xl border-2 border-black/80 bg-black/[0.03] p-5">
+                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-black text-white text-[10px] font-semibold">
+                  MELHOR CUSTO-BENEFÍCIO
                 </div>
                 <div className="text-sm font-semibold mb-1">Anual</div>
                 <div className="flex items-baseline gap-1 mb-1">
@@ -705,7 +704,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth"
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
                 </Link>
@@ -722,7 +721,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth"
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
                 </Link>
@@ -734,9 +733,9 @@ export default function LandingPage() {
 
       {/* CTA FINAL */}
       <section id="faq" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+        <div className="rounded-2xl bg-black/[0.04] border border-black/10 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
-            <Sparkles className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-black shrink-0 mt-1" />
             <div>
               <div className="font-bold text-[18px] md:text-2xl leading-tight mb-1">
                 Pare de se perder entre mil<br className="hidden md:block" /> apps e anotações.
@@ -748,7 +747,7 @@ export default function LandingPage() {
           </div>
           <Link
             to="/auth"
-            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition whitespace-nowrap"
+            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />
           </Link>

@@ -579,7 +579,7 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
+      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div className="text-center flex flex-col items-center">
             <motion.div

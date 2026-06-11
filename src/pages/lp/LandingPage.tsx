@@ -632,33 +632,36 @@ export default function LandingPage() {
 
 
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
-      <section id="beneficios" className="lp-enter max-w-[720px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <h2 className="text-[28px] md:text-4xl font-bold leading-tight text-center mb-8 md:mb-10">
-          Feito para o<br />seu dia a dia
-        </h2>
-        <div className="flex flex-col gap-4 md:gap-5">
-          {[
-            { icon: Check, t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar no dia a dia, sem complicação." },
-            { icon: LayoutGrid, t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
-            { icon: Sun, t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
-            { icon: Heart, t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
-          ].map((f, i) => (
-            <div
-              key={f.t}
-              className="relative rounded-2xl border border-black/10 bg-white p-5 md:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
-            >
-              <span className="absolute top-4 right-5 text-[34px] md:text-[40px] font-bold text-emerald-500/15 leading-none tracking-tight">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
-                <f.icon className="w-5 h-5" />
+      <section id="beneficios" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="rounded-2xl border border-black/10 bg-white p-5 md:p-7 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+          <h2 className="text-[20px] md:text-2xl font-bold leading-tight mb-4 md:mb-5">
+            Feito para o seu dia a dia
+          </h2>
+          <div className="flex flex-col gap-2.5 md:gap-3">
+            {[
+              { icon: Check, color: "text-emerald-500", bg: "bg-emerald-50", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
+              { icon: LayoutGrid, color: "text-violet-500", bg: "bg-violet-50", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
+              { icon: Sun, color: "text-amber-500", bg: "bg-amber-50", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
+              { icon: Heart, color: "text-rose-500", bg: "bg-rose-50", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
+            ].map((f) => (
+              <div
+                key={f.t}
+                className="flex items-center gap-3 md:gap-4 rounded-xl border border-black/5 bg-white px-3.5 py-3 md:px-4 md:py-3.5 hover:border-black/15 transition"
+              >
+                <div className={`shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-lg ${f.bg} ${f.color} flex items-center justify-center`}>
+                  <f.icon className="w-5 h-5" strokeWidth={2.2} />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="font-semibold text-[14px] md:text-[15px] text-black leading-tight">{f.t}</div>
+                  <div className="text-[12.5px] md:text-[13px] text-black/55 leading-snug mt-0.5">{f.s}</div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-black/30 shrink-0" />
               </div>
-              <div className="font-bold text-[17px] md:text-[18px] text-black mb-1.5 leading-tight">{f.t}</div>
-              <div className="text-[14px] text-black/55 leading-relaxed max-w-md">{f.s}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
+
 
 
       {/* MOCKUP — Tudo no seu celular */}

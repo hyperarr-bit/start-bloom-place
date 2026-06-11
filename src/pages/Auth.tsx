@@ -101,7 +101,8 @@ const Auth = () => {
         trackEvent("signup_completed", { method: "password" });
         try { setUserData("user-name", name.trim()); } catch {}
         if (session) {
-          navigate("/financas");
+          try { setUserData("force-new-user-tutorial", "true"); } catch {}
+          navigate("/inicio");
         } else {
           // Email confirmation required by Supabase — fall back to confirm screen
           setConfirmationSent(true);
@@ -172,21 +173,6 @@ const Auth = () => {
           </p>
         </div>
 
-        {(() => {
-          let hasGuest = false;
-          try {
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i);
-              if (k && k.startsWith("guest:")) { hasGuest = true; break; }
-            }
-          } catch {}
-          if (!hasGuest) return null;
-          return (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-center text-xs text-foreground">
-              Tudo que você configurou no tutorial será salvo na sua conta.
-            </div>
-          );
-        })()}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">

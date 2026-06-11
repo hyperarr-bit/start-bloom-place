@@ -6,9 +6,11 @@ import {
   ArrowRight, Check, CalendarDays, ShieldCheck, XCircle,
   Wallet, Calendar as CalendarIcon, Sparkles, LayoutGrid,
   Sun, Heart, TrendingUp, TrendingDown, Leaf,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ChevronDown,
   Utensils, Dumbbell, Brain, GraduationCap, Home as HomeIcon,
   PawPrint, Plane, Users, Briefcase, BookOpen, HeartPulse, Flower2,
+  Trophy, Flame, Wifi, Moon, Smartphone, Lock, Zap, Target,
+  FileSpreadsheet, StickyNote, Bell, BarChart3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,7 +44,7 @@ const MODULES: ModuleItem[] = [
   { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, bg: "bg-green-50/70 border-green-100", iconBg: "bg-green-100", iconFg: "text-green-600", titleColor: "text-green-700" },
 ];
 
-/* ---------- Mini previews per module (reference style) ---------- */
+/* ---------- Mini previews per module ---------- */
 
 const PreviewCard = ({ title, titleIcon, children }: { title: string; titleIcon?: React.ReactNode; children: React.ReactNode }) => (
   <div className="rounded-xl bg-white border border-black/10 shadow-sm p-3 md:p-4">
@@ -299,8 +301,8 @@ const ModulesCarousel = () => {
     <div className="relative">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <div className="text-[11px] font-semibold text-black/50 tracking-wider">MÓDULOS</div>
-          <div className="text-[22px] md:text-3xl font-bold leading-tight">+{MODULES.length} áreas da sua vida</div>
+          <div className="text-[11px] font-semibold text-black/50 tracking-wider">EXPLORE POR MÓDULO</div>
+          <div className="text-[22px] md:text-3xl font-bold leading-tight">Veja cada área em detalhe</div>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => go(-1)} aria-label="Anterior" className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition">
@@ -338,7 +340,7 @@ const ModulesCarousel = () => {
             key={mod.key}
             onClick={() => setIdx(i)}
             aria-label={mod.title}
-            className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-emerald-500" : "w-1.5 bg-black/15 hover:bg-black/30"}`}
+            className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-black" : "w-1.5 bg-black/15 hover:bg-black/30"}`}
           />
         ))}
       </div>
@@ -347,7 +349,7 @@ const ModulesCarousel = () => {
 };
 
 /* =========================================================
-   PHONE MOCKUPS (Tailwind only, sem assets externos)
+   PHONE MOCKUPS
    ========================================================= */
 
 const PhoneFrame = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
@@ -357,10 +359,8 @@ const PhoneFrame = ({ children, className = "" }: { children: React.ReactNode; c
       "ring-1 ring-black/10 " + className
     }
   >
-    {/* notch */}
     <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[34%] h-[18px] bg-black rounded-full z-20" />
     <div className="relative bg-white rounded-[1.7rem] overflow-hidden aspect-[9/19.5]">
-      {/* status bar */}
       <div className="flex items-center justify-between px-4 pt-2 pb-1 text-[9px] font-semibold text-black/80">
         <span>10:36</span>
         <span className="opacity-60">••• 📶 🔋</span>
@@ -420,28 +420,7 @@ const FinancePhone = () => (
     <div className="rounded-md bg-amber-50 border border-amber-100 p-1.5 space-y-1">
       <div className="text-[6.5px] font-semibold text-amber-700">⚠ ALERTAS INTELIGENTES</div>
       <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-amber-100">2 conta(s) vencem em 4 dia(s): Aluguel, Plano de Saúde</div>
-      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-amber-100">2 conta(s) vencem em 0 dia(s): YouTube Music, Fatura</div>
       <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-emerald-100 text-emerald-700">Excelente! Você está poupando 78,8% da renda</div>
-    </div>
-    <div className="rounded-md bg-white border border-black/10 p-1.5">
-      <div className="text-[6.5px] font-semibold mb-1">⊙ GASTOS POR CATEGORIA</div>
-      <div className="flex items-center gap-2">
-        <div
-          className="w-8 h-8 rounded-full"
-          style={{
-            background: "conic-gradient(#6366f1 0 30%, #ec4899 30% 50%, #f59e0b 50% 68%, #10b981 68% 85%, #ef4444 85% 100%)",
-          }}
-        >
-          <div className="w-3 h-3 bg-white rounded-full m-2.5" />
-        </div>
-        <div className="flex-1 space-y-0.5 text-[6px]">
-          <div className="flex justify-between"><span>● Moradia</span><span>R$ 1.300</span></div>
-          <div className="flex justify-between"><span>● Educação</span><span>R$ 450</span></div>
-          <div className="flex justify-between"><span>● Contas da Casa</span><span>R$ 225</span></div>
-          <div className="flex justify-between"><span>● Vestuário</span><span>R$ 220</span></div>
-          <div className="flex justify-between"><span>● Restaurante</span><span>R$ 180</span></div>
-        </div>
-      </div>
     </div>
   </div>
 );
@@ -504,7 +483,6 @@ const DevPhone = () => (
     <div className="flex gap-1">
       <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">METAS</span>
       <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">DIÁRIO</span>
-      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">DÁRIO</span>
       <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">HUMOR</span>
     </div>
     <div className="rounded-md bg-violet-50 border border-violet-100 p-2 text-center">
@@ -514,7 +492,7 @@ const DevPhone = () => (
       <div className="italic text-[8px]">"Grandes coisas nunca vieram de zonas de conforto."</div>
     </div>
     <div className="rounded-md bg-white border border-black/10 p-1.5 space-y-1">
-      <div className="text-[6.5px] font-semibold">O QUE ME MOTIVA A ACORDAR TODOS OS DIAS?</div>
+      <div className="text-[6.5px] font-semibold">O QUE ME MOTIVA?</div>
       <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Ser exemplo pra família</div>
       <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Viajar pelo mundo</div>
     </div>
@@ -523,14 +501,9 @@ const DevPhone = () => (
         <Sparkles className="w-2 h-2" /> AFIRMAÇÕES
       </div>
       <div className="bg-white rounded px-1.5 py-1 text-[6.5px]">Eu sou capaz de construir a vida que quero.</div>
-      <div className="bg-white rounded px-1.5 py-1 text-[6.5px]">Cada dia me aproxima das minhas metas.</div>
     </div>
   </div>
 );
-
-/* =========================================================
-   PHONE TRIO (Hero) — leque com proporção mobile cuidadosa
-   ========================================================= */
 
 const PhoneTrio = () => (
   <motion.div
@@ -549,12 +522,54 @@ const PhoneTrio = () => (
 );
 
 /* =========================================================
+   FAQ
+   ========================================================= */
+
+const FAQ_ITEMS = [
+  { q: "Funciona offline?", a: "Sim. O CORE foi feito como PWA, então continua funcionando mesmo sem internet — seus dados sincronizam quando você reconectar." },
+  { q: "Meus dados ficam seguros?", a: "Sim. Usamos Supabase com Row Level Security: cada usuário só consegue acessar os próprios dados, com criptografia em trânsito e em repouso." },
+  { q: "Preciso instalar algum app?", a: "Não. O CORE roda no navegador como aplicativo (PWA) — você pode adicionar à tela inicial do celular em 2 toques." },
+  { q: "Tem versão grátis?", a: "Sim, 7 dias de teste completo, sem precisar cadastrar cartão de crédito." },
+  { q: "Posso usar só alguns módulos?", a: "Pode. Ative só Finanças, só Rotina, ou os 16 — você escolhe. Não tem upsell escondido: o plano inclui tudo." },
+  { q: "Posso cancelar quando quiser?", a: "Sim. Cancelamento é com 1 clique, sem fidelidade, sem ligação, sem burocracia." },
+  { q: "Funciona no computador também?", a: "Sim, o CORE é responsivo e funciona perfeitamente no celular, tablet e desktop." },
+];
+
+const FAQItem = ({ q, a }: { q: string; a: string }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-black/10 last:border-b-0">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between py-4 text-left gap-4"
+      >
+        <span className="font-semibold text-[15px] text-black">{q}</span>
+        <ChevronDown className={`w-5 h-5 text-black/40 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <p className="pb-4 text-[14px] text-black/60 leading-relaxed">{a}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+/* =========================================================
    PAGE
    ========================================================= */
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground">
+    <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground pb-20 md:pb-0">
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
@@ -562,9 +577,9 @@ export default function LandingPage() {
             CORE
           </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
-            <a href="#recursos" className="hover:text-black">Recursos</a>
+            <a href="#modulos" className="hover:text-black">Módulos</a>
+            <a href="#financas" className="hover:text-black">Finanças</a>
             <a href="#beneficios" className="hover:text-black">Benefícios</a>
-            <a href="#mockup" className="hover:text-black">Depoimentos</a>
             <a href="#precos" className="hover:text-black">Preços</a>
             <a href="#faq" className="hover:text-black">Perguntas</a>
           </nav>
@@ -580,20 +595,20 @@ export default function LandingPage() {
       {/* HERO */}
       <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div className="text-center flex flex-col items-center">
+          <div className="text-center md:text-left flex flex-col items-center md:items-start">
             <motion.div
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
             >
-              <Check className="w-3 h-3" /> TUDO PARA SUA VIDA. EM UM SÓ LUGAR.
+              <Check className="w-3 h-3" /> 16 MÓDULOS · 1 ÚNICO APP
             </motion.div>
             <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
               Organize sua vida<br />em um só lugar.
             </h1>
-            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md mx-auto">
-              Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia.
+            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
+              Substitui sua planilha de gastos, seu app de hábitos, seu caderno de metas e mais 13 coisas. Tudo num app simples e bonito.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link
                 to="/auth"
                 className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
@@ -605,7 +620,7 @@ export default function LandingPage() {
               {[
                 { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
                 { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
-                { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade em primeiro lugar" },
+                { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade total" },
               ].map((b) => (
                 <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
                   <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
@@ -622,57 +637,375 @@ export default function LandingPage() {
             <PhoneTrio />
           </div>
         </div>
+
+        {/* Modules ticker */}
+        <div className="mt-10 pt-6 border-t border-black/5">
+          <div className="text-[10.5px] font-semibold text-black/40 tracking-widest text-center mb-3">
+            O QUE CABE NO CORE
+          </div>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[12.5px] text-black/55">
+            {MODULES.map((m, i) => (
+              <Fragment key={m.key}>
+                <span className="font-medium">{m.title}</span>
+                {i < MODULES.length - 1 && <span className="text-black/20">·</span>}
+              </Fragment>
+            ))}
+          </div>
+        </div>
       </section>
 
-      {/* RECURSOS — carrossel de módulos */}
-      <section id="recursos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
-        <ModulesCarousel />
+      {/* PROBLEM */}
+      <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
+          <div className="text-center mb-10">
+            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">O PROBLEMA</div>
+            <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+              Sua vida tá espalhada em<br />6 apps e 3 cadernos.
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-8">
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: FileSpreadsheet, t: "Planilha de gastos" },
+                { icon: Check, t: "App de hábitos" },
+                { icon: StickyNote, t: "Caderno de metas" },
+                { icon: Bell, t: "Lembretes soltos" },
+                { icon: BookOpen, t: "Lista de livros" },
+                { icon: Dumbbell, t: "App de treino" },
+              ].map((b) => (
+                <div key={b.t} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-black/10 text-[12.5px]">
+                  <b.icon className="w-4 h-4 text-black/40 shrink-0" />
+                  <span className="text-black/70 truncate">{b.t}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex md:flex-col items-center justify-center gap-2 text-black/30">
+              <ArrowRight className="w-8 h-8 hidden md:block rotate-0" />
+              <ArrowRight className="w-6 h-6 md:hidden rotate-90" />
+            </div>
+            <div className="rounded-2xl bg-black text-white p-6 md:p-8 text-center">
+              <div className="text-[11px] font-semibold tracking-widest text-white/60 mb-2">A SOLUÇÃO</div>
+              <div className="text-3xl md:text-4xl font-bold mb-2">CORE</div>
+              <div className="text-[13px] text-white/70 leading-relaxed">
+                Tudo num app só. Conversando entre si. Sem trocar de aba, sem perder dado.
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-
-      {/* BENEFÍCIOS — Feito para o seu dia a dia */}
-      <section id="beneficios" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="rounded-2xl border border-black/10 bg-white p-5 md:p-7 shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
-          <h2 className="text-[20px] md:text-2xl font-bold leading-tight mb-4 md:mb-5">
-            Feito para o seu dia a dia
+      {/* MODULES GRID */}
+      <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">TUDO QUE O CORE FAZ</div>
+          <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-3">
+            16 módulos. Uma vida inteira.
           </h2>
-          <div className="flex flex-col gap-2.5 md:gap-3">
-            {[
-              { icon: Check, color: "text-emerald-500", bg: "bg-emerald-50", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
-              { icon: LayoutGrid, color: "text-violet-500", bg: "bg-violet-50", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
-              { icon: Sun, color: "text-amber-500", bg: "bg-amber-50", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
-              { icon: Heart, color: "text-rose-500", bg: "bg-rose-50", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
-            ].map((f) => (
+          <p className="text-[14px] md:text-base text-black/55 max-w-xl mx-auto">
+            Ative só o que importa pra você. Cada módulo é completo, integrado e pensado pro dia a dia.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {MODULES.map((m) => {
+            const Icon = m.icon;
+            return (
               <div
-                key={f.t}
-                className="flex items-center gap-3 md:gap-4 rounded-xl border border-black/5 bg-white px-3.5 py-3 md:px-4 md:py-3.5 hover:border-black/15 transition"
+                key={m.key}
+                className={`rounded-xl border ${m.bg} p-4 md:p-5 transition hover:shadow-md hover:-translate-y-0.5`}
               >
-                <div className={`shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-lg ${f.bg} ${f.color} flex items-center justify-center`}>
-                  <f.icon className="w-5 h-5" strokeWidth={2.2} />
+                <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-3`}>
+                  <Icon className="w-5 h-5" strokeWidth={2.2} />
                 </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="font-semibold text-[14px] md:text-[15px] text-black leading-tight">{f.t}</div>
-                  <div className="text-[12.5px] md:text-[13px] text-black/55 leading-snug mt-0.5">{f.s}</div>
+                <div className={`text-[12px] font-bold ${m.titleColor} tracking-wide mb-1`}>{m.title}</div>
+                <div className="text-[12px] text-black/55 leading-snug">{m.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* RECURSOS — carrossel (deep-dive) */}
+      <section id="recursos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+          <ModulesCarousel />
+        </div>
+      </section>
+
+      {/* SPOTLIGHT FINANÇAS */}
+      <section id="financas" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+          <div className="order-2 md:order-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-700 text-[11px] font-bold tracking-wide mb-4">
+              <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
+            </div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+              Substitua sua planilha em 30 segundos.
+            </h2>
+            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
+              O módulo mais completo do CORE. Tudo que você precisa pra entender pra onde seu dinheiro vai — e fazer sobrar mais.
+            </p>
+            <div className="space-y-2.5">
+              {[
+                "Receitas, despesas fixas e variáveis em tabelas claras",
+                "Orçamento mensal e anual por categoria",
+                "Alertas inteligentes de contas a vencer",
+                "Rastreador de parcelas e investimentos",
+                "Metas financeiras com progresso visual",
+                "Relatórios mensais e virada de mês automática",
+              ].map((t) => (
+                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                  </div>
+                  {t}
                 </div>
-                
+              ))}
+            </div>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <div className="w-full max-w-[280px]">
+              <PhoneFrame><FinancePhone /></PhoneFrame>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SPOTLIGHT ROTINA */}
+      <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+          <div className="flex justify-center">
+            <div className="w-full max-w-[280px]">
+              <PhoneFrame><RoutinePhone /></PhoneFrame>
+            </div>
+          </div>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold tracking-wide mb-4">
+              <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
+            </div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+              Veja sua consistência crescer dia a dia.
+            </h2>
+            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
+              Hábitos não acontecem por motivação — acontecem por sistema. O módulo Rotina te dá esse sistema.
+            </p>
+            <div className="space-y-2.5">
+              {[
+                "Hábitos diários com checks rápidos por semana",
+                "Heatmap visual de consistência (estilo GitHub)",
+                "Visão semanal e mensal lado a lado",
+                "Streaks pra manter o ritmo",
+              ].map((t) => (
+                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                  </div>
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SPOTLIGHT DEV */}
+      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+          <div className="order-2 md:order-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-[11px] font-bold tracking-wide mb-4">
+              <Sparkles className="w-3 h-3" /> DESENVOLVIMENTO PESSOAL
+            </div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+              Seu coach de bolso, todo dia.
+            </h2>
+            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
+              Metas, diário, humor, afirmações e suas forças pessoais — pra você não esquecer pra onde tá indo.
+            </p>
+            <div className="space-y-2.5">
+              {[
+                "Metas com progresso e checkpoints",
+                "Diário e tracker de humor",
+                "Frase do dia e afirmações personalizadas",
+                "Suas forças e motivações sempre à vista",
+              ].map((t) => (
+                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                  </div>
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <div className="w-full max-w-[280px]">
+              <PhoneFrame><DevPhone /></PhoneFrame>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* GAMIFICAÇÃO */}
+      <section className="lp-enter bg-black text-white py-12 md:py-20">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
+          <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white/90 text-[11px] font-bold tracking-wide mb-4">
+                <Trophy className="w-3 h-3" /> GAMIFICAÇÃO
+              </div>
+              <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+                Cada hábito vira XP.<br />Cada meta vira conquista.
+              </h2>
+              <p className="text-[14px] md:text-base text-white/65 leading-relaxed mb-6">
+                Você não tá só "fazendo tarefas". Tá evoluindo um personagem real: você. Conquistas, badges e streaks pra manter a chama acesa.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["🔥 Streaks", "🏆 Conquistas", "⭐ Níveis", "🎯 Metas", "📊 Progresso"].map((b) => (
+                  <span key={b} className="px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-[12px]">{b}</span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
+                <Flame className="w-6 h-6 text-orange-400 mb-2" />
+                <div className="text-3xl font-bold">42</div>
+                <div className="text-[12px] text-white/60">dias seguidos</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
+                <Trophy className="w-6 h-6 text-amber-400 mb-2" />
+                <div className="text-3xl font-bold">18</div>
+                <div className="text-[12px] text-white/60">conquistas</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
+                <Zap className="w-6 h-6 text-yellow-300 mb-2" />
+                <div className="text-3xl font-bold">2.840</div>
+                <div className="text-[12px] text-white/60">XP total</div>
+              </div>
+              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
+                <Target className="w-6 h-6 text-emerald-400 mb-2" />
+                <div className="text-3xl font-bold">7/10</div>
+                <div className="text-[12px] text-white/60">metas no trimestre</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* BENEFÍCIOS CONCRETOS */}
+      <section id="beneficios" className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PENSADO PARA O MUNDO REAL</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+            Os detalhes que fazem diferença.
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {[
+            { icon: Lock, t: "Dados criptografados", s: "Supabase com RLS. Só você acessa o que é seu." },
+            { icon: Wifi, t: "Funciona offline", s: "Sem internet? Continua usando. Sincroniza depois." },
+            { icon: Moon, t: "Modo claro e escuro", s: "Adapta ao seu olho e ao seu humor do dia." },
+            { icon: Smartphone, t: "Roda sem instalar", s: "PWA: adiciona à tela inicial em 2 toques." },
+          ].map((b) => (
+            <div key={b.t} className="rounded-xl border border-black/10 bg-white p-4 md:p-5">
+              <div className="w-10 h-10 rounded-lg bg-black/[0.05] text-black flex items-center justify-center mb-3">
+                <b.icon className="w-5 h-5" />
+              </div>
+              <div className="font-bold text-[14px] mb-1">{b.t}</div>
+              <div className="text-[12.5px] text-black/55 leading-snug">{b.s}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PERSONAS */}
+      <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
+          <div className="text-center mb-10">
+            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PRA QUEM É O CORE</div>
+            <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+              Combine os módulos do seu jeito.
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4 md:gap-5">
+            {[
+              {
+                t: "Quem quer organizar a vida financeira",
+                emoji: "💰",
+                mods: ["FINANÇAS", "CARREIRA", "DESENVOLVIMENTO PESSOAL"],
+                color: "border-orange-200 bg-orange-50/40",
+              },
+              {
+                t: "Quem quer criar hábitos e cuidar de si",
+                emoji: "🌱",
+                mods: ["ROTINA", "SAÚDE", "TREINO", "DETOX"],
+                color: "border-emerald-200 bg-emerald-50/40",
+              },
+              {
+                t: "Quem quer evoluir profissionalmente",
+                emoji: "📈",
+                mods: ["CARREIRA", "ESTUDOS", "HIPERFOCO", "BIBLIOTECA"],
+                color: "border-indigo-200 bg-indigo-50/40",
+              },
+            ].map((p) => (
+              <div key={p.t} className={`rounded-2xl border ${p.color} p-5 md:p-6`}>
+                <div className="text-3xl mb-3">{p.emoji}</div>
+                <div className="font-bold text-[15px] mb-4 leading-snug">{p.t}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.mods.map((m) => (
+                    <span key={m} className="px-2 py-1 rounded-md bg-white border border-black/10 text-[10.5px] font-semibold text-black/70 tracking-wide">{m}</span>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
+      {/* ANTES X DEPOIS */}
+      <section className="lp-enter max-w-[900px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">ANTES × DEPOIS</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+            Troque 6 apps por 1.
+          </h2>
+        </div>
+        <div className="rounded-2xl border border-black/10 overflow-hidden bg-white">
+          <div className="grid grid-cols-2 bg-black/[0.03] border-b border-black/10">
+            <div className="px-4 md:px-6 py-3 text-[11px] font-bold tracking-widest text-black/50">ANTES</div>
+            <div className="px-4 md:px-6 py-3 text-[11px] font-bold tracking-widest text-black border-l border-black/10">COM CORE</div>
+          </div>
+          {[
+            ["Planilha de gastos no Excel", "Módulo Finanças completo"],
+            ["App pago de hábitos", "Módulo Rotina + Gamificação"],
+            ["Caderno de metas perdido", "Desenvolvimento Pessoal"],
+            ["Notas espalhadas no celular", "Módulo Hiperfoco"],
+            ["Lembrete da vacina do pet", "Módulo Pet"],
+            ["6 apps abertos ao mesmo tempo", "1 app, 1 senha, 1 lugar"],
+          ].map(([before, after], i) => (
+            <div key={i} className="grid grid-cols-2 border-b border-black/5 last:border-b-0">
+              <div className="px-4 md:px-6 py-3 text-[13px] md:text-[14px] text-black/55 flex items-center gap-2">
+                <XCircle className="w-3.5 h-3.5 text-black/30 shrink-0" />
+                <span className="truncate">{before}</span>
+              </div>
+              <div className="px-4 md:px-6 py-3 text-[13px] md:text-[14px] text-black font-medium flex items-center gap-2 border-l border-black/10">
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="truncate">{after}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-
-      {/* MOCKUP — Tudo no seu celular */}
+      {/* GALERIA */}
       <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center text-center">
-          <div>
-            <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
-            <p className="text-black/60 text-[15px]">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+          <div className="text-center mb-10">
+            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">GALERIA</div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-3">Tudo no seu celular</h2>
+            <p className="text-black/55 text-[14px] md:text-base max-w-xl mx-auto">
               Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 gap-3 md:gap-6 max-w-[900px] mx-auto">
             <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
             <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
             <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
@@ -680,16 +1013,66 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* DEPOIMENTOS */}
+      <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">QUEM JÁ USA</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+            O que estão dizendo.
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 md:gap-5">
+          {[
+            { n: "Marina S.", c: "São Paulo, SP", t: "Larguei a planilha de gastos depois de 4 anos. O módulo de Finanças do CORE faz tudo e ainda me avisa quando uma conta tá pra vencer.", a: "bg-rose-300" },
+            { n: "Pedro H.", c: "Curitiba, PR", t: "Eu juntava 7 apps diferentes. Agora é só o CORE. Treino, dieta, finanças, livros — tudo no mesmo lugar e conversando entre si.", a: "bg-indigo-300" },
+            { n: "Júlia M.", c: "Recife, PE", t: "O heatmap de consistência mudou meu jogo. Ver o mês inteiro pintado de verde vicia mais que rede social.", a: "bg-emerald-300" },
+          ].map((d) => (
+            <div key={d.n} className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">
+              <div className="flex gap-0.5 mb-3 text-amber-400">
+                {Array.from({ length: 5 }).map((_, i) => <span key={i}>★</span>)}
+              </div>
+              <p className="text-[14px] text-black/75 leading-relaxed mb-4">"{d.t}"</p>
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-full ${d.a}`} />
+                <div>
+                  <div className="font-semibold text-[13px]">{d.n}</div>
+                  <div className="text-[11.5px] text-black/50">{d.c}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* NÚMEROS */}
+      <section className="lp-enter bg-black text-white py-8 md:py-10">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-4 text-center">
+          {[
+            { n: "16", t: "módulos" },
+            { n: "+200", t: "funcionalidades" },
+            { n: "Semanais", t: "atualizações" },
+            { n: "100%", t: "dados seus" },
+          ].map((s) => (
+            <div key={s.t}>
+              <div className="text-3xl md:text-4xl font-bold mb-1">{s.n}</div>
+              <div className="text-[12px] text-white/55 tracking-wide">{s.t}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* PREÇOS */}
-      <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
-            <div className="text-center">
+            <div className="text-center md:text-left">
               <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
-              <p className="text-[13px] text-black/50">7 dias grátis · Cancele quando quiser</p>
+              <p className="text-[13px] text-black/50 mb-3">7 dias grátis · Cancele quando quiser</p>
+              <p className="text-[12px] text-black/60 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
+                <Check className="w-3 h-3" /> Inclui todos os 16 módulos
+              </p>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
-              {/* Anual */}
               <div className="relative rounded-xl border-2 border-black/80 bg-black/[0.03] p-5">
                 <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-black text-white text-[10px] font-semibold">
                   MELHOR CUSTO-BENEFÍCIO
@@ -709,7 +1092,6 @@ export default function LandingPage() {
                   Começar agora
                 </Link>
               </div>
-              {/* Mensal */}
               <div className="rounded-xl border border-black/10 bg-white p-5">
                 <div className="text-sm font-semibold mb-1">Mensal</div>
                 <div className="flex items-baseline gap-1 mb-1">
@@ -731,28 +1113,49 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+        <div className="text-center mb-8">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PERGUNTAS FREQUENTES</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">Ainda tem dúvida?</h2>
+        </div>
+        <div className="rounded-2xl border border-black/10 bg-white px-5 md:px-7">
+          {FAQ_ITEMS.map((f) => <FAQItem key={f.q} {...f} />)}
+        </div>
+      </section>
+
       {/* CTA FINAL */}
-      <section id="faq" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
-        <div className="rounded-2xl bg-black/[0.04] border border-black/10 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
+        <div className="rounded-2xl bg-black text-white p-6 md:p-10 flex flex-col md:flex-row md:items-center gap-5 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
-            <Sparkles className="w-6 h-6 text-black shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-white shrink-0 mt-1" />
             <div>
-              <div className="font-bold text-[18px] md:text-2xl leading-tight mb-1">
-                Pare de se perder entre mil<br className="hidden md:block" /> apps e anotações.
+              <div className="font-bold text-[20px] md:text-3xl leading-tight mb-2">
+                Comece organizando 1 área.<br className="hidden md:block" /> Em 1 semana, vai querer organizar todas.
               </div>
-              <div className="text-[13px] md:text-sm text-black/60">
-                Tenha clareza, foco e controle da sua vida em um só lugar com o CORE.
+              <div className="text-[13px] md:text-sm text-white/65">
+                7 dias grátis. Sem cartão. Sem compromisso.
               </div>
             </div>
           </div>
           <Link
             to="/auth"
-            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition whitespace-nowrap"
+            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-white text-black hover:bg-white/90 font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
+
+      {/* STICKY MOBILE CTA */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-black/10 px-4 py-3">
+        <Link
+          to="/auth"
+          className="btn-shine flex items-center justify-center gap-2 w-full py-3 rounded-md bg-black text-white font-semibold text-sm"
+        >
+          Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </div>
   );
 }

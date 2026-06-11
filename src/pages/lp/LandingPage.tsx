@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -772,7 +773,20 @@ export default function LandingPage() {
           </div>
           <div className="order-1 md:order-2 flex justify-center">
             <div className="w-full max-w-[280px]">
-              <PhoneFrame><FinancePhone /></PhoneFrame>
+              <div className="relative bg-black rounded-[2rem] p-[5px] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/10">
+                <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[34%] h-[18px] bg-black rounded-full z-20" />
+                <div className="relative bg-black rounded-[1.7rem] overflow-hidden aspect-[9/19.5]">
+                  <video
+                    src={financasPreviewVideo.url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

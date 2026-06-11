@@ -1087,6 +1087,47 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* FOOTER */}
+      <footer className="lp-enter bg-[#0a0a14] text-white/70 pt-14 pb-8">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+          <div className="grid md:grid-cols-[1.4fr_1fr_1fr] gap-10 md:gap-14">
+            <div>
+              <Link to="/lp" className="font-bold text-[22px] tracking-tight text-white inline-block mb-4">
+                CORE.
+              </Link>
+              <p className="text-[14px] leading-relaxed text-white/55 max-w-[380px]">
+                Sua vida inteira em um só app. 16 módulos pra organizar finanças, rotina, saúde, casa e tudo o que importa — sem precisar de 10 aplicativos.
+              </p>
+            </div>
+
+            <div>
+              <div className="font-semibold text-white mb-4 text-[14px]">Produto</div>
+              <ul className="space-y-3 text-[14px]">
+                <li><a href="#modulos" className="hover:text-white transition">Módulos</a></li>
+                <li><a href="#financas" className="hover:text-white transition">Finanças</a></li>
+                <li><a href="#beneficios" className="hover:text-white transition">Benefícios</a></li>
+                <li><a href="#precos" className="hover:text-white transition">Preços</a></li>
+                <li><a href="#faq" className="hover:text-white transition">Perguntas</a></li>
+              </ul>
+            </div>
+
+            <div>
+              <div className="font-semibold text-white mb-4 text-[14px]">Empresa</div>
+              <ul className="space-y-3 text-[14px]">
+                <li><Link to="/auth" className="hover:text-white transition">Entrar / Criar Conta</Link></li>
+                <li><Link to="/planos" className="hover:text-white transition">Planos</Link></li>
+                <li><a href="mailto:contato@coreaplicativo.com" className="hover:text-white transition">Fale Conosco</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-white/10 mt-12 pt-6 text-center text-[12.5px] text-white/45">
+            © {new Date().getFullYear()} CORE. Todos os direitos reservados.
+          </div>
+        </div>
+      </footer>
+
     </div>
   );
 }
+

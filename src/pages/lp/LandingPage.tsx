@@ -638,23 +638,6 @@ export default function LandingPage() {
       </section>
 
 
-      {/* MOCKUP — Tudo no seu celular */}
-      <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center">
-          <div>
-            <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
-            <p className="text-black/60 text-[15px]">
-              Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 md:gap-4">
-            <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
-            <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
-            <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
-          </div>
-        </div>
-      </section>
-
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
       <section id="beneficios" className="max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12">
@@ -674,6 +657,23 @@ export default function LandingPage() {
                 <div className="text-[12.5px] text-black/55 leading-snug">{f.s}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* MOCKUP — Tudo no seu celular */}
+      <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center">
+          <div>
+            <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
+            <p className="text-black/60 text-[15px]">
+              Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
+            <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
+            <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
+            <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
           </div>
         </div>
       </section>

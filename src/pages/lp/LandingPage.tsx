@@ -632,27 +632,34 @@ export default function LandingPage() {
 
 
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
-      <section id="beneficios" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12 text-center">
-          <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
-            {[
-              { icon: Check, bg: "bg-emerald-50", fg: "text-emerald-600", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
-              { icon: LayoutGrid, bg: "bg-violet-50", fg: "text-violet-600", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
-              { icon: Sun, bg: "bg-amber-50", fg: "text-amber-600", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
-              { icon: Heart, bg: "bg-rose-50", fg: "text-rose-600", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
-            ].map((f) => (
-              <div key={f.t} className="flex flex-col items-center text-center">
-                <div className={`w-9 h-9 rounded-md ${f.bg} ${f.fg} flex items-center justify-center mb-2`}>
-                  <f.icon className="w-4 h-4" />
-                </div>
-                <div className="font-semibold text-[14px] mb-1 leading-tight">{f.t}</div>
-                <div className="text-[12.5px] text-black/55 leading-snug">{f.s}</div>
+      <section id="beneficios" className="lp-enter max-w-[720px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <h2 className="text-[28px] md:text-4xl font-bold leading-tight text-center mb-8 md:mb-10">
+          Feito para o<br />seu dia a dia
+        </h2>
+        <div className="flex flex-col gap-4 md:gap-5">
+          {[
+            { icon: Check, t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar no dia a dia, sem complicação." },
+            { icon: LayoutGrid, t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
+            { icon: Sun, t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
+            { icon: Heart, t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
+          ].map((f, i) => (
+            <div
+              key={f.t}
+              className="relative rounded-2xl border border-black/10 bg-white p-5 md:p-6 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+            >
+              <span className="absolute top-4 right-5 text-[34px] md:text-[40px] font-bold text-emerald-500/15 leading-none tracking-tight">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+                <f.icon className="w-5 h-5" />
               </div>
-            ))}
-          </div>
+              <div className="font-bold text-[17px] md:text-[18px] text-black mb-1.5 leading-tight">{f.t}</div>
+              <div className="text-[14px] text-black/55 leading-relaxed max-w-md">{f.s}</div>
+            </div>
+          ))}
         </div>
       </section>
+
 
       {/* MOCKUP — Tudo no seu celular */}
       <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">

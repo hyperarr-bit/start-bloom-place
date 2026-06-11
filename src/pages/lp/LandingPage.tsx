@@ -583,7 +583,7 @@ export default function LandingPage() {
           <div className="text-center flex flex-col items-center">
             <motion.div
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-semibold tracking-wide mb-5"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
             >
               <Check className="w-3 h-3" /> TUDO PARA SUA VIDA. EM UM SÓ LUGAR.
             </motion.div>

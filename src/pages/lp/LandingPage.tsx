@@ -579,7 +579,7 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
+      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div className="text-center flex flex-col items-center">
             <motion.div
@@ -597,16 +597,10 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
               <Link
                 to="/auth"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
+                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
-              <a
-                href="#mockup"
-                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md border border-black/15 hover:border-black/30 text-sm font-semibold transition"
-              >
-                Ver como funciona <ArrowRight className="w-4 h-4" />
-              </a>
             </div>
             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
               {[
@@ -632,13 +626,13 @@ export default function LandingPage() {
       </section>
 
       {/* RECURSOS — carrossel de módulos */}
-      <section id="recursos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="recursos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
         <ModulesCarousel />
       </section>
 
 
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
-      <section id="beneficios" className="max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+      <section id="beneficios" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12 text-center">
           <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
@@ -661,7 +655,7 @@ export default function LandingPage() {
       </section>
 
       {/* MOCKUP — Tudo no seu celular */}
-      <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
+      <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center text-center">
           <div>
             <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
@@ -678,7 +672,7 @@ export default function LandingPage() {
       </section>
 
       {/* PREÇOS */}
-      <section id="precos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
         <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
             <div className="text-center">
@@ -701,7 +695,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth"
-                  className="block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
+                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition"
                 >
                   Começar agora
                 </Link>
@@ -729,7 +723,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA FINAL */}
-      <section id="faq" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
+      <section id="faq" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
         <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
             <Sparkles className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />
@@ -744,7 +738,7 @@ export default function LandingPage() {
           </div>
           <Link
             to="/auth"
-            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition whitespace-nowrap"
+            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />
           </Link>

@@ -959,23 +959,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* GALERIA */}
-      <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
-          <div className="text-center mb-10">
-            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">GALERIA</div>
-            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-3">Tudo no seu celular</h2>
-            <p className="text-black/55 text-[14px] md:text-base max-w-xl mx-auto">
-              Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 md:gap-6 max-w-[900px] mx-auto">
-            <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
-            <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
-            <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
-          </div>
-        </div>
-      </section>
 
       {/* DEPOIMENTOS */}
       <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">

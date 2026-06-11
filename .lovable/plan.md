@@ -1,45 +1,39 @@
-# Identidade da Landing: CORE preto e branco
+## Preview público dos módulos na landing
 
-Escopo: só a landing (`src/pages/lp/LandingPage.tsx`). Os cards de módulos (carrossel) e mini-mockups das telas continuam coloridos — só a "casca" da landing vira P&B.
+Adicionar botão "Ver demonstração" em cada card do carrossel "Veja cada área em detalhe". Ao clicar, abre uma rota pública `/preview/:moduloKey` que renderiza a página real do módulo, populada com dados fake e em modo somente-leitura (sem login, sem persistência).
 
-## 1. Logo (header)
-- Remover o círculo verde antes do texto (`<span className="w-6 h-6 rounded-full border-[3px] border-emerald-500 border-l-transparent" />`).
-- Deixar apenas o texto `CORE` em preto, negrito, tracking apertado (igual ao print).
+### O que muda
 
-## 2. Botão "Entrar" no header
-- Hoje: `bg-emerald-500 text-white`.
-- Vira: `bg-black text-white hover:bg-black/85`.
+**1. Rota pública `/preview/:moduloKey`** (em `App.tsx`)
+- Não passa por `ProtectedRoute`.
+- Renderiza um `<PreviewShell>` que:
+  - Envolve a página real (`Index`, `Rotina`, `Treino`, etc.) em um `PreviewUserDataProvider` que substitui o contexto de `useUserData` por uma versão **in-memory** com dados de demonstração pré-carregados. Nada vai para Supabase nem localStorage.
+  - Exibe um banner fino no topo: "Você está vendo uma demonstração — Criar minha conta grátis" (CTA fixo, link para `/auth`).
+  - Bloqueia navegação para outras rotas internas (qualquer link sai do preview e vai pra `/auth`).
 
-## 3. Badge do hero ("TUDO PARA SUA VIDA...")
-- Hoje: fundo verde claro com texto verde.
-- Vira: fundo `bg-black/[0.04]`, borda `border-black/10`, texto preto.
-- Ícone Check continua, mas em preto.
+**2. Provider de preview** (`src/hooks/use-preview-user-data.tsx`)
+- Exporta um `PreviewUserDataProvider` que reusa o mesmo `UserDataContext` exportado por `use-user-data.tsx`, mas com implementação local: `Map` em memória + seeds por módulo.
+- `setData`/`deleteData` viram no-op visual (atualizam o estado local mas com toast "Modo demonstração — crie sua conta para salvar"). Isso garante que clicar em qualquer ação não quebra.
 
-## 4. CTAs verdes → pretos
-Trocar `bg-emerald-500 hover:bg-emerald-600` por `bg-black hover:bg-black/85` nos quatro botões:
-- Hero "Testar grátis por 7 dias"
-- Preços "Começar agora" (anual)
-- Preços "Começar agora" (mensal)
-- CTA final "Quero testar o CORE"
+**3. Seeds de demonstração** (`src/lib/preview-seeds.ts`)
+- Um objeto por módulo com as chaves principais já preenchidas (despesas, hábitos, treinos, refeições, etc.). Cada módulo recebe um conjunto enxuto e realista para passar a sensação de app cheio.
 
-A classe `btn-shine` é mantida — o brilho passa por cima do preto também.
+**4. Botão "Ver demonstração" no card** (`LandingPage.tsx`)
+- Botão secundário abaixo da descrição do módulo no `ModulesCarousel`, abrindo `/preview/${m.key}` em nova aba.
+- Mapeia `dev → desenvolvimento` e `hiperfoco → hiperfoco` para casar com as rotas existentes.
 
-## 5. Card de preços "Anual" + selo "MELHOR CUSTO-BENEFÍCIO"
-- Borda do card: `border-emerald-200` → `border-black/80`.
-- Fundo do card: `bg-emerald-50/40` → `bg-black/[0.03]`.
-- Selo: `bg-emerald-500` → `bg-black`. Ícone `Leaf` removido do selo (fica só o texto).
+**5. Suporte a todos os 16 módulos**: financas, rotina, desenvolvimento, dieta, treino, saude, hiperfoco, estudos, carreira, biblioteca, casa, viagens, relacionamentos, pet, beleza, detox.
 
-## 6. Seção CTA final ("Pare de se perder…")
-- Container: `bg-emerald-50 border-emerald-100` → `bg-black/[0.04] border-black/10`.
-- Ícone `Sparkles` em verde → preto.
+### Detalhes técnicos
 
-## 7. Ícone "7 dias grátis" nos 3 cards de garantia (logo abaixo do CTA do hero)
-- `bg-emerald-50 text-emerald-600` → `bg-black/[0.05] text-black`.
+- **Sem alteração nas páginas de módulo.** Elas continuam usando `useUserData`; só muda quem fornece o contexto.
+- **Para tornar isso possível**, é preciso exportar `UserDataContext` de `use-user-data.tsx` (hoje provavelmente não exportado) para o preview provider poder fornecê-lo. Mudança mínima e segura.
+- **Componentes que chamam Supabase diretamente** (não via `useUserData`) ficam inertes no preview porque não há sessão — `RouteErrorBoundary` já cobre falhas. Os módulos centrais (financas/rotina/treino/dieta) usam `useUserData` para tudo, então funcionam bem.
+- **`ProtectedRoute` e `TrackedModule` ficam fora** do shell de preview — a página é renderizada direta.
+- **Seeds são determinísticos**, sem datas aleatórias que mudam a cada render.
 
-## O que NÃO muda
-- Carrossel de módulos (Rotina, Finanças, Detox, etc.) e mini-mockups: ícones e cores das telas continuam como estão.
-- Cards de "Feito para o seu dia a dia": ícones verde/violeta/âmbar/rosa permanecem.
-- Tokens globais do app (`index.css`) não são tocados — mudança restrita à landing.
+### Fora de escopo
 
-## Arquivo afetado
-- `src/pages/lp/LandingPage.tsx` (único arquivo).
+- Não alterar o design dos cards (só adicionar o botão).
+- Não criar variantes mobile-only de páginas — usar as páginas reais como estão.
+- Não tocar em copy, espaçamentos ou outros pontos da landing.

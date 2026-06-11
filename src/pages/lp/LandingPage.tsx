@@ -733,9 +733,9 @@ export default function LandingPage() {
 
       {/* CTA FINAL */}
       <section id="faq" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
-        <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+        <div className="rounded-2xl bg-black/[0.04] border border-black/10 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
-            <Sparkles className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-black shrink-0 mt-1" />
             <div>
               <div className="font-bold text-[18px] md:text-2xl leading-tight mb-1">
                 Pare de se perder entre mil<br className="hidden md:block" /> apps e anotações.

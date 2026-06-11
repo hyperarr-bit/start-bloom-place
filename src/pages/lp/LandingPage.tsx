@@ -3,9 +3,9 @@ import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
 import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
 import financasPreviewPoster from "@/assets/financas-preview-poster.jpg.asset.json";
 import rotinaPreviewPoster from "@/assets/rotina-preview-poster.jpg.asset.json";
-import testimonialMarina from "@/assets/testimonial-marina.png.asset.json";
-import testimonialPedro from "@/assets/testimonial-pedro.png.asset.json";
-import testimonialJulia from "@/assets/testimonial-julia.png.asset.json";
+import testimonialMarina from "@/assets/testimonial-marina.jpg.asset.json";
+import testimonialPedro from "@/assets/testimonial-pedro.jpg.asset.json";
+import testimonialJulia from "@/assets/testimonial-julia.jpg.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -991,7 +991,28 @@ export default function LandingPage() {
               </div>
               <p className="text-[14px] text-black/75 leading-relaxed mb-4">"{d.t}"</p>
               <div className="flex items-center gap-2.5">
-                <img src={d.img} alt={d.n} loading="lazy" className="w-9 h-9 rounded-full object-cover" />
+                <img
+                  src={d.img}
+                  alt={d.n}
+                  loading="lazy"
+                  decoding="async"
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-full object-cover bg-black/10"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    el.style.display = 'none';
+                    const fallback = el.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div
+                  aria-hidden
+                  style={{ display: 'none' }}
+                  className="w-9 h-9 rounded-full bg-black/10 text-black/60 items-center justify-center text-[12px] font-semibold"
+                >
+                  {d.n.charAt(0)}
+                </div>
                 <div>
                   <div className="font-semibold text-[13px]">{d.n}</div>
                   <div className="text-[11.5px] text-black/50">{d.c}</div>

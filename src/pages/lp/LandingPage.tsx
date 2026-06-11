@@ -787,9 +787,10 @@ export default function LandingPage() {
                 muted
                 loop
                 playsInline
-                preload="auto"
-                controls={false}
-                className="w-full h-auto rounded-[2rem]"
+                preload="metadata"
+                controls
+                onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                className="w-full h-auto rounded-[2rem] bg-black"
               />
             </div>
           </div>
@@ -807,9 +808,10 @@ export default function LandingPage() {
                 muted
                 loop
                 playsInline
-                preload="auto"
-                controls={false}
-                className="w-full h-auto rounded-[2rem]"
+                preload="metadata"
+                controls
+                onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                className="w-full h-auto rounded-[2rem] bg-black"
               />
             </div>
           </div>

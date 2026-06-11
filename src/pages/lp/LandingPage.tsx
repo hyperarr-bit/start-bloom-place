@@ -537,12 +537,12 @@ const PhoneTrio = () => (
     initial={{ opacity: 0, y: 30 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.7 }}
-    className="relative w-screen left-1/2 -translate-x-1/2"
+    className="w-full flex justify-center"
   >
     <img
       src={heroPhones.url}
       alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
-      className="w-full h-auto block"
+      className="w-full max-w-[640px] h-auto object-contain mx-auto"
       loading="eager"
     />
   </motion.div>
@@ -591,7 +591,7 @@ export default function LandingPage() {
             <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
               Organize sua vida<br />em um só lugar.
             </h1>
-            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
+            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md mx-auto">
               Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
@@ -639,7 +639,7 @@ export default function LandingPage() {
 
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
       <section id="beneficios" className="max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12">
+        <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12 text-center">
           <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {[
@@ -648,7 +648,7 @@ export default function LandingPage() {
               { icon: Sun, bg: "bg-amber-50", fg: "text-amber-600", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
               { icon: Heart, bg: "bg-rose-50", fg: "text-rose-600", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
             ].map((f) => (
-              <div key={f.t}>
+              <div key={f.t} className="flex flex-col items-center text-center">
                 <div className={`w-9 h-9 rounded-md ${f.bg} ${f.fg} flex items-center justify-center mb-2`}>
                   <f.icon className="w-4 h-4" />
                 </div>
@@ -662,7 +662,7 @@ export default function LandingPage() {
 
       {/* MOCKUP — Tudo no seu celular */}
       <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center text-center">
           <div>
             <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
             <p className="text-black/60 text-[15px]">
@@ -681,7 +681,7 @@ export default function LandingPage() {
       <section id="precos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
         <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
-            <div>
+            <div className="text-center">
               <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
               <p className="text-[13px] text-black/50">7 dias grátis · Cancele quando quiser</p>
             </div>

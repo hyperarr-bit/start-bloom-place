@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -736,6 +737,58 @@ export default function LandingPage() {
       <section id="recursos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8">
           <ModulesCarousel />
+        </div>
+      </section>
+
+      {/* SPOTLIGHT FINANÇAS */}
+      <section id="financas" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+          <div className="order-2 md:order-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-700 text-[11px] font-bold tracking-wide mb-4">
+              <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
+            </div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+              Substitua sua planilha em 30 segundos.
+            </h2>
+            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
+              O módulo mais completo do CORE. Tudo que você precisa pra entender pra onde seu dinheiro vai — e fazer sobrar mais.
+            </p>
+            <div className="space-y-2.5">
+              {[
+                "Receitas, despesas fixas e variáveis em tabelas claras",
+                "Orçamento mensal e anual por categoria",
+                "Alertas inteligentes de contas a vencer",
+                "Rastreador de parcelas e investimentos",
+                "Metas financeiras com progresso visual",
+                "Relatórios mensais e virada de mês automática",
+              ].map((t) => (
+                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                  </div>
+                  {t}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <div className="w-full max-w-[280px]">
+              <div className="relative bg-black rounded-[2rem] p-[5px] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/10">
+                <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[34%] h-[18px] bg-black rounded-full z-20" />
+                <div className="relative bg-black rounded-[1.7rem] overflow-hidden aspect-[9/19.5]">
+                  <video
+                    src={financasPreviewVideo.url}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="metadata"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

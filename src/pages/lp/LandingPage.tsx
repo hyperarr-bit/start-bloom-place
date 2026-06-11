@@ -586,6 +586,29 @@ const FAQItem = ({ q, a }: { q: string; a: string }) => {
    ========================================================= */
 
 export default function LandingPage() {
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>(".lp-enter");
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("lp-enter-in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" }
+    );
+    els.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.95) {
+        el.classList.add("lp-enter-in");
+      } else {
+        io.observe(el);
+      }
+    });
+    return () => io.disconnect();
+  }, []);
   return (
     <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground pb-20 md:pb-0">
       {/* HEADER */}

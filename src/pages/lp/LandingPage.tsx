@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -520,15 +520,24 @@ const PhoneTrio = () => (
     transition={{ duration: 0.7 }}
     className="w-full flex justify-center"
   >
-    <img
-      src="/hero-phones.png"
-      alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
-      className="w-full max-w-[640px] h-auto object-contain mx-auto"
-      loading="eager"
-      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-    />
+    <picture>
+      <source srcSet="/hero-phones.webp" type="image/webp" />
+      <img
+        src="/hero-phones.webp"
+        alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
+        className="w-full max-w-[640px] h-auto object-contain mx-auto"
+        loading="eager"
+        decoding="async"
+        // @ts-expect-error fetchpriority is a valid HTML attribute
+        fetchpriority="high"
+        width={1280}
+        height={960}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+    </picture>
   </motion.div>
 );
+
 
 /* =========================================================
    FAQ
@@ -577,6 +586,29 @@ const FAQItem = ({ q, a }: { q: string; a: string }) => {
    ========================================================= */
 
 export default function LandingPage() {
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>(".lp-enter");
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("lp-enter-in");
+            io.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -60px 0px" }
+    );
+    els.forEach((el) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight * 0.95) {
+        el.classList.add("lp-enter-in");
+      } else {
+        io.observe(el);
+      }
+    });
+    return () => io.disconnect();
+  }, []);
   return (
     <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground pb-20 md:pb-0">
       {/* HEADER */}

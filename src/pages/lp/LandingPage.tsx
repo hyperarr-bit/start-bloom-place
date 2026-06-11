@@ -428,13 +428,13 @@ export default function LandingPage() {
           <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
             {[
-              { icon: Check, color: "emerald", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
-              { icon: LayoutGrid, color: "violet", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
-              { icon: Sun, color: "amber", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
-              { icon: Heart, color: "rose", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
+              { icon: Check, bg: "bg-emerald-50", fg: "text-emerald-600", t: "Interface simples e intuitiva", s: "Navegação fácil que qualquer pessoa consegue usar." },
+              { icon: LayoutGrid, bg: "bg-violet-50", fg: "text-violet-600", t: "Módulos para diferentes áreas da vida", s: "Finanças, rotina, hábitos, metas e muito mais em um só app." },
+              { icon: Sun, bg: "bg-amber-50", fg: "text-amber-600", t: "Visual limpo e agradável", s: "Cores suaves, organização inteligente e foco no que realmente importa." },
+              { icon: Heart, bg: "bg-rose-50", fg: "text-rose-600", t: "Organização sem complicação", s: "Tudo que você precisa para ter mais clareza e consistência." },
             ].map((f) => (
               <div key={f.t}>
-                <div className={`w-9 h-9 rounded-md bg-${f.color}-50 text-${f.color}-600 flex items-center justify-center mb-2`}>
+                <div className={`w-9 h-9 rounded-md ${f.bg} ${f.fg} flex items-center justify-center mb-2`}>
                   <f.icon className="w-4 h-4" />
                 </div>
                 <div className="font-semibold text-[14px] mb-1 leading-tight">{f.t}</div>

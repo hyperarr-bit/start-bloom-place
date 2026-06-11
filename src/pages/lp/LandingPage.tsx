@@ -626,13 +626,13 @@ export default function LandingPage() {
       </section>
 
       {/* RECURSOS — carrossel de módulos */}
-      <section id="recursos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="recursos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
         <ModulesCarousel />
       </section>
 
 
       {/* BENEFÍCIOS — Feito para o seu dia a dia */}
-      <section id="beneficios" className="max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+      <section id="beneficios" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="grid md:grid-cols-[1fr_2fr] gap-8 md:gap-12 text-center">
           <h2 className="text-[28px] md:text-4xl font-bold leading-tight">Feito para o<br />seu dia a dia</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-6">
@@ -655,7 +655,7 @@ export default function LandingPage() {
       </section>
 
       {/* MOCKUP — Tudo no seu celular */}
-      <section id="mockup" className="bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
+      <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-[1fr_1.4fr] gap-8 md:gap-12 items-center text-center">
           <div>
             <h2 className="text-[28px] md:text-4xl font-bold mb-3">Tudo no seu celular</h2>
@@ -672,7 +672,7 @@ export default function LandingPage() {
       </section>
 
       {/* PREÇOS */}
-      <section id="precos" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
         <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
             <div className="text-center">
@@ -723,7 +723,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA FINAL */}
-      <section id="faq" className="max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
+      <section id="faq" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
         <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 md:p-7 flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
             <Sparkles className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />

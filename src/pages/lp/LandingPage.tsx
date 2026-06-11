@@ -807,42 +807,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SPOTLIGHT DEV */}
-      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-          <div className="order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-[11px] font-bold tracking-wide mb-4">
-              <Sparkles className="w-3 h-3" /> DESENVOLVIMENTO PESSOAL
-            </div>
-            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Seu coach de bolso, todo dia.
-            </h2>
-            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Metas, diário, humor, afirmações e suas forças pessoais — pra você não esquecer pra onde tá indo.
-            </p>
-            <div className="space-y-2.5">
-              {[
-                "Metas com progresso e checkpoints",
-                "Diário e tracker de humor",
-                "Frase do dia e afirmações personalizadas",
-                "Suas forças e motivações sempre à vista",
-              ].map((t) => (
-                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
-                  </div>
-                  {t}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="order-1 md:order-2 flex justify-center">
-            <div className="w-full max-w-[280px]">
-              <PhoneFrame><DevPhone /></PhoneFrame>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* GAMIFICAÇÃO */}
       <section className="lp-enter bg-black text-white py-12 md:py-20">

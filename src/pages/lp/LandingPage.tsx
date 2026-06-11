@@ -941,7 +941,7 @@ export default function LandingPage() {
             ["Planilha de gastos no Excel", "Módulo Finanças completo"],
             ["App pago de hábitos", "Módulo Rotina + Gamificação"],
             ["Caderno de metas perdido", "Desenvolvimento Pessoal"],
-            ["Notas espalhadas no celular", "Módulo Hiperfoco"],
+            ["Notas espalhadas no celular", "Módulo Mente"],
             ["Lembrete da vacina do pet", "Módulo Pet"],
             ["6 apps abertos ao mesmo tempo", "1 app, 1 senha, 1 lugar"],
           ].map(([before, after], i) => (

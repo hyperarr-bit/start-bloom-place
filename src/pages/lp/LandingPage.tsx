@@ -1,5 +1,4 @@
 import { Fragment, useState } from "react";
-import heroPhones from "@/assets/hero-phones-v2.png";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -513,10 +512,11 @@ const PhoneTrio = () => (
     className="w-full flex justify-center"
   >
     <img
-      src={heroPhones}
+      src="/hero-phones.png"
       alt="Três telas do app: Rotina, Finanças e Desenvolvimento Pessoal"
       className="w-full max-w-[640px] h-auto object-contain mx-auto"
       loading="eager"
+      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
     />
   </motion.div>
 );

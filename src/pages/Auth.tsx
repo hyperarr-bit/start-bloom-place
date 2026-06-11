@@ -303,7 +303,7 @@ const Auth = () => {
                 <ul className="text-xs text-muted-foreground space-y-1">
                   <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
                   <li>• Sem cartão de crédito · Cancele quando quiser</li>
-                  <li>• Dicas diárias por e-mail para você aproveitar ao máximo</li>
+                  
                 </ul>
               </div>
             </motion.div>

@@ -946,40 +946,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ANTES X DEPOIS */}
-      <section className="lp-enter max-w-[900px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="text-center mb-10">
-          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">ANTES × DEPOIS</div>
-          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
-            Troque 6 apps por 1.
-          </h2>
-        </div>
-        <div className="rounded-2xl border border-black/10 overflow-hidden bg-white">
-          <div className="grid grid-cols-2 bg-black/[0.03] border-b border-black/10">
-            <div className="px-4 md:px-6 py-3 text-[11px] font-bold tracking-widest text-black/50">ANTES</div>
-            <div className="px-4 md:px-6 py-3 text-[11px] font-bold tracking-widest text-black border-l border-black/10">COM CORE</div>
-          </div>
-          {[
-            ["Planilha de gastos no Excel", "Módulo Finanças completo"],
-            ["App pago de hábitos", "Módulo Rotina + Gamificação"],
-            ["Caderno de metas perdido", "Desenvolvimento Pessoal"],
-            ["Notas espalhadas no celular", "Módulo Mente"],
-            ["Lembrete da vacina do pet", "Módulo Pet"],
-            ["6 apps abertos ao mesmo tempo", "1 app, 1 senha, 1 lugar"],
-          ].map(([before, after], i) => (
-            <div key={i} className="grid grid-cols-2 border-b border-black/5 last:border-b-0">
-              <div className="px-4 md:px-6 py-3 text-[13px] md:text-[14px] text-black/55 flex items-center gap-2">
-                <XCircle className="w-3.5 h-3.5 text-black/30 shrink-0" />
-                <span className="truncate">{before}</span>
-              </div>
-              <div className="px-4 md:px-6 py-3 text-[13px] md:text-[14px] text-black font-medium flex items-center gap-2 border-l border-black/10">
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">{after}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ANTES X DEPOIS removido — redundante com hero e seção "Substitua sua planilha" */}
+
 
 
       {/* DEPOIMENTOS */}

@@ -1,79 +1,47 @@
-# Plano — Landing page /lp espelhando a referência
+# Carrossel de módulos no estilo da referência
 
-Vou substituir o conteúdo de `src/pages/lp/LandingPage.tsx` por uma landing que reproduz **exatamente** o layout da imagem enviada, ajustando proporções pra ficar excelente no mobile (430px) e responsiva até desktop.
+Manter um módulo por vez com setas (← →) e dots, mas redesenhar cada card para ficar **idêntico ao print enviado**.
 
-## Estrutura (na ordem da imagem)
+## Mudanças em `src/pages/lp/LandingPage.tsx`
 
-1. **Header fixo**
-   - Logo "◐ CORE" à esquerda
-   - Nav desktop: Recursos · Benefícios · Depoimentos · Preços · Perguntas
-   - Botão outline verde "Entrar" → `/auth`
-   - Mobile: apenas logo + botão Entrar (nav oculta)
+### 1. Visual do card (igual à referência)
+Cada slide do `ModulesCarousel` vira um card grande tipo "post-it" colorido:
+- Fundo tonal suave (ex.: `bg-orange-50`, `bg-emerald-50`, `bg-violet-50` …) com borda da mesma família mais escura (`border-orange-100`).
+- `rounded-2xl`, padding generoso (`p-6 md:p-8`), `min-h-[420px]`.
+- Header do card: ícone `Lucide` + **TÍTULO EM CAIXA ALTA** colorido (ex.: `text-orange-700`), tracking largo, peso bold. Sem círculo de fundo no ícone — só o ícone na cor do título, igual à imagem.
+- Abaixo: descrição em 2 linhas, texto cinza escuro (`text-black/70`), tamanho `text-[15px] md:text-base`.
+- Embaixo: **mini-mockup do módulo** (preview visual) dentro de um cartão branco `rounded-xl border` com sombra leve — replicando o estilo dos 3 exemplos da referência.
 
-2. **Hero**
-   - Pill verde claro: "✓ TUDO PARA SUA VIDA. EM UM SÓ LUGAR."
-   - H1 grande e bold: "Organize sua vida em um só lugar."
-   - Sub: "Finanças, rotina e desenvolvimento pessoal em um app simples, bonito e feito para o seu dia a dia."
-   - Dois CTAs: verde sólido "Testar grátis por 7 dias →" e outline "Ver como funciona →"
-   - 3 mini-trust badges (ícone + título + sub): "7 dias grátis / Sem compromisso", "Cancelamento fácil / Cancele quando quiser", "Seus dados seguros / Privacidade em primeiro lugar"
-   - **Trio de iPhones em leque**: phone esquerdo (Rotina) levemente atrás/abaixo, central (Finanças) à frente e maior, direito (Desenvolvimento Pessoal) atrás/abaixo — mockups de UI fiéis aos prints (header com hora, status bar, tabs, cards de receitas/despesas, donut de gastos, hábitos com checks verdes, frase do dia, etc.)
-   - **Mobile**: hero empilhado (texto em cima, phones embaixo); no mobile usar **1 iPhone central** com 2 laterais menores cortados nas bordas pra manter a sensação do leque sem espremer
+### 2. Mini-previews por módulo
+Componentes inline pequenos, sem dados reais, só visual:
+- **Finanças**: "Saldo do Mês +R$ 2.365" + donut colorido + 3 linhas de categoria (Moradia/Educação/Contas).
+- **Rotina**: tabela "HÁBITOS DIÁRIOS" com colunas (Beber 2L, Treinar, Ler 30min) e linhas SEG/TER com checkboxes verdes/vazios.
+- **Dev. Pessoal**: card "MINHAS FORÇAS" com 3 pills (Comunicação, Persistência, Curiosidade) e botãozinho ×.
+- **Dieta**: barra de macros (P/C/G) + "1.840 / 2.000 kcal".
+- **Treino**: lista de 3 exercícios com séries × reps.
+- **Saúde**: copo d'água 6/8 + barra de hidratação.
+- **Hiperfoco**: 3 "ideias capturadas" como sticky notes.
+- **Estudos**: matérias com barra de progresso.
+- **Carreira**: lista de metas com check.
+- **Biblioteca**: 3 lombadas de livro coloridas + título "Lendo agora".
+- **Casa**: checklist de tarefas + "Despensa".
+- **Viagens**: countdown "Faltam 12 dias" + bandeirinha de destino.
+- **Relacionamentos**: 3 avatares circulares + próxima data.
+- **Pet**: card pet com próxima vacina.
+- **Beleza**: rotina AM/PM com 3 passos.
+- **Detox**: "7 dias limpo" + barra de streak.
 
-3. **Trio de cards de módulos** (Finanças laranja, Rotina verde, Dev. Pessoal roxo)
-   - Cada card: ícone colorido + título + subtítulo + mini-preview (donut/saldos, tabela de hábitos, lista "Minhas forças")
-   - Desktop: 3 colunas. Mobile: stack vertical
+Cada mini-preview é uma função pequena que retorna JSX, mapeada por `key` do módulo.
 
-4. **"Tudo no seu celular"**
-   - Título + sub à esquerda, trio de 3 iPhones menores à direita mostrando 3 módulos
-   - Mobile: título em cima, phones em carrossel horizontal com snap
+### 3. Setas e dots
+- Setas continuam no topo direito (como já está).
+- Dots embaixo do card mostrando `idx` atual de 16.
+- Contador `1/16` no canto do card removido (a referência não tem).
 
-5. **"Feito para o seu dia a dia"**
-   - Título grande à esquerda
-   - 4 features com ícone colorido pequeno: Interface simples e intuitiva, Módulos para diferentes áreas, Visual limpo e agradável, Organização sem complicação
-   - Desktop: 4 colunas. Mobile: 2x2
+### 4. Sem mudanças em outras seções
+Hero, pricing, header e CTA final permanecem como estão.
 
-6. **Pricing "Escolha o plano ideal para você"**
-   - Título à esquerda + "7 dias grátis · Cancele quando quiser"
-   - 2 cards lado a lado: **Anual** (com badge "🌿 MELHOR CUSTO-BENEFÍCIO", R$ 3,90/mês, "Pago anualmente R$ 46,80/ano", CTA verde "Começar agora") e **Mensal** (R$ 14,90/mês, CTA outline)
-   - Mobile: stack vertical, Anual em cima
+## Arquivos afetados
+- `src/pages/lp/LandingPage.tsx` (único arquivo).
 
-7. **Faixa CTA final verde claro**
-   - "Pare de se perder entre mil apps e anotações." + sub + botão verde "Quero testar o CORE →"
-
-## Proporções mobile (viewport 430px)
-
-- Container `max-w-[1200px]` com padding `px-5 md:px-8`
-- Hero H1: `text-[34px] leading-[1.05] md:text-6xl`
-- Mockups iPhone: usar wrapper com `aspect-[9/19.5]`, largura ~62% no mobile pro central e ~38% pros laterais sobrepostos com `-mx-6` e leve `rotate-[-6deg]`/`rotate-[6deg]`. Bezel preto com `rounded-[2.2rem]` + notch.
-- Cards: `rounded-2xl border` com sombra suave. Padding `p-5 md:p-6`.
-- Pricing cards: full-width no mobile, 2 col desktop.
-- Espaçamento vertical entre seções: `py-14 md:py-24`.
-
-## Sistema de design
-
-- **Cores via tokens existentes** (`--background`, `--foreground`, `--muted-foreground`, `chart-1..5`, `success`, `primary`). O verde da referência mapeia pra `success` / `chart-1`. Laranja Finanças = `chart-2`, roxo Dev = `chart-4`. Sem hex hardcoded.
-- Fundo geral `bg-background`, seções alternadas usando `bg-muted/30`.
-- Fonte: Inter (já é a global).
-- Sem emojis em headers; ícones lucide nos títulos de seção e cards de feature, conforme regra do projeto.
-
-## Mockups iPhone (componentes internos no mesmo arquivo)
-
-- `PhoneFrame` reutilizável (bezel + notch + status bar 10:36)
-- 3 variantes de tela: `FinancePhone` (tabs, cards Receitas/Despesas/Saldo/Investimentos, alertas, donut Gastos por categoria), `RoutinePhone` (tabela Hábitos Diários com checks verdes + heatmap Consistência), `DevPhone` (frase do dia, "O que me motiva", afirmações). Tudo renderizado com Tailwind + tokens — sem imagens externas.
-
-## Animações
-
-- `framer-motion`: fade+slide nos blocos ao entrar (whileInView)
-- Phones do hero com stagger
-- Hover sutil nos cards de pricing
-
-## Arquivos
-
-- **Editar**: `src/pages/lp/LandingPage.tsx` (rewrite completo, mantendo a rota `/lp` já registrada em `App.tsx`)
-- Sem novos arquivos, sem mudar `App.tsx`.
-
-## Fora de escopo
-
-- Não mexer em backend, auth ou outros módulos
-- Não adicionar imagens externas / assets binários
-- Não alterar copy do app — só a landing
+Nada de backend, rotas ou tokens novos.

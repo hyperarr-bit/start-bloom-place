@@ -32,7 +32,7 @@ const MODULES: ModuleItem[] = [
   { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, bg: "bg-amber-50/70 border-amber-100", iconBg: "bg-amber-100", iconFg: "text-amber-600", titleColor: "text-amber-700" },
   { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, bg: "bg-blue-50/70 border-blue-100", iconBg: "bg-blue-100", iconFg: "text-blue-600", titleColor: "text-blue-700" },
   { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, bg: "bg-rose-50/70 border-rose-100", iconBg: "bg-rose-100", iconFg: "text-rose-600", titleColor: "text-rose-700" },
-  { key: "hiperfoco", title: "HIPERFOCO", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, bg: "bg-indigo-50/70 border-indigo-100", iconBg: "bg-indigo-100", iconFg: "text-indigo-600", titleColor: "text-indigo-700" },
+  { key: "hiperfoco", title: "MENTE", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, bg: "bg-indigo-50/70 border-indigo-100", iconBg: "bg-indigo-100", iconFg: "text-indigo-600", titleColor: "text-indigo-700" },
   { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, bg: "bg-yellow-50/70 border-yellow-100", iconBg: "bg-yellow-100", iconFg: "text-yellow-700", titleColor: "text-yellow-700" },
   { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, bg: "bg-slate-50/70 border-slate-200", iconBg: "bg-slate-100", iconFg: "text-slate-700", titleColor: "text-slate-700" },
   { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, bg: "bg-stone-50/70 border-stone-200", iconBg: "bg-stone-100", iconFg: "text-stone-700", titleColor: "text-stone-700" },
@@ -807,42 +807,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SPOTLIGHT DEV */}
-      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-          <div className="order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-[11px] font-bold tracking-wide mb-4">
-              <Sparkles className="w-3 h-3" /> DESENVOLVIMENTO PESSOAL
-            </div>
-            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Seu coach de bolso, todo dia.
-            </h2>
-            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Metas, diário, humor, afirmações e suas forças pessoais — pra você não esquecer pra onde tá indo.
-            </p>
-            <div className="space-y-2.5">
-              {[
-                "Metas com progresso e checkpoints",
-                "Diário e tracker de humor",
-                "Frase do dia e afirmações personalizadas",
-                "Suas forças e motivações sempre à vista",
-              ].map((t) => (
-                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
-                  </div>
-                  {t}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="order-1 md:order-2 flex justify-center">
-            <div className="w-full max-w-[280px]">
-              <PhoneFrame><DevPhone /></PhoneFrame>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* GAMIFICAÇÃO */}
       <section className="lp-enter bg-black text-white py-12 md:py-20">
@@ -942,7 +906,7 @@ export default function LandingPage() {
               {
                 t: "Quem quer evoluir profissionalmente",
                 emoji: "📈",
-                mods: ["CARREIRA", "ESTUDOS", "HIPERFOCO", "BIBLIOTECA"],
+                mods: ["CARREIRA", "ESTUDOS", "MENTE", "BIBLIOTECA"],
                 color: "border-indigo-200 bg-indigo-50/40",
               },
             ].map((p) => (
@@ -977,7 +941,7 @@ export default function LandingPage() {
             ["Planilha de gastos no Excel", "Módulo Finanças completo"],
             ["App pago de hábitos", "Módulo Rotina + Gamificação"],
             ["Caderno de metas perdido", "Desenvolvimento Pessoal"],
-            ["Notas espalhadas no celular", "Módulo Hiperfoco"],
+            ["Notas espalhadas no celular", "Módulo Mente"],
             ["Lembrete da vacina do pet", "Módulo Pet"],
             ["6 apps abertos ao mesmo tempo", "1 app, 1 senha, 1 lugar"],
           ].map(([before, after], i) => (
@@ -995,23 +959,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* GALERIA */}
-      <section id="mockup" className="lp-enter bg-[hsl(0_0%_97%)] py-12 md:py-20 border-y border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
-          <div className="text-center mb-10">
-            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">GALERIA</div>
-            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-3">Tudo no seu celular</h2>
-            <p className="text-black/55 text-[14px] md:text-base max-w-xl mx-auto">
-              Acesse seus dados de qualquer lugar e tenha sua vida organizada sempre à mão.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 md:gap-6 max-w-[900px] mx-auto">
-            <div className="scale-[0.95]"><PhoneFrame><FinancePhone /></PhoneFrame></div>
-            <div><PhoneFrame><RoutinePhone /></PhoneFrame></div>
-            <div className="scale-[0.95]"><PhoneFrame><DevPhone /></PhoneFrame></div>
-          </div>
-        </div>
-      </section>
 
       {/* DEPOIMENTOS */}
       <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
@@ -1023,9 +970,9 @@ export default function LandingPage() {
         </div>
         <div className="grid md:grid-cols-3 gap-4 md:gap-5">
           {[
-            { n: "Marina S.", c: "São Paulo, SP", t: "Larguei a planilha de gastos depois de 4 anos. O módulo de Finanças do CORE faz tudo e ainda me avisa quando uma conta tá pra vencer.", a: "bg-rose-300" },
-            { n: "Pedro H.", c: "Curitiba, PR", t: "Eu juntava 7 apps diferentes. Agora é só o CORE. Treino, dieta, finanças, livros — tudo no mesmo lugar e conversando entre si.", a: "bg-indigo-300" },
-            { n: "Júlia M.", c: "Recife, PE", t: "O heatmap de consistência mudou meu jogo. Ver o mês inteiro pintado de verde vicia mais que rede social.", a: "bg-emerald-300" },
+            { n: "Marina S.", c: "São Paulo, SP", t: "Comecei pelo módulo de Finanças só pra testar. Duas semanas depois já tava usando Rotina e Dieta também. É o tipo de app que vai te puxando.", a: "bg-rose-300" },
+            { n: "Pedro H.", c: "Curitiba, PR", t: "O que me pegou foi não precisar abrir 4 abas pra ver como tá minha semana. Tudo aparece junto, no lugar certo, sem firula.", a: "bg-indigo-300" },
+            { n: "Júlia M.", c: "Recife, PE", t: "No começo achei que ia ser mais uma coisa pra abandonar em uma semana. Tô há 3 meses e virou parte da rotina, abro toda manhã.", a: "bg-emerald-300" },
           ].map((d) => (
             <div key={d.n} className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">
               <div className="flex gap-0.5 mb-3 text-amber-400">

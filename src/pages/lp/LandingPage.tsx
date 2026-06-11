@@ -703,35 +703,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* MODULES GRID */}
-      <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="text-center mb-10">
-          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">TUDO QUE O CORE FAZ</div>
-          <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-3">
-            16 módulos. Uma vida inteira.
-          </h2>
-          <p className="text-[14px] md:text-base text-black/55 max-w-xl mx-auto">
-            Ative só o que importa pra você. Cada módulo é completo, integrado e pensado pro dia a dia.
-          </p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-          {MODULES.map((m) => {
-            const Icon = m.icon;
-            return (
-              <div
-                key={m.key}
-                className={`rounded-xl border ${m.bg} p-4 md:p-5 transition hover:shadow-md hover:-translate-y-0.5`}
-              >
-                <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-3`}>
-                  <Icon className="w-5 h-5" strokeWidth={2.2} />
-                </div>
-                <div className={`text-[12px] font-bold ${m.titleColor} tracking-wide mb-1`}>{m.title}</div>
-                <div className="text-[12px] text-black/55 leading-snug">{m.desc}</div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}
 
       {/* RECURSOS — carrossel (deep-dive) */}
       <section id="recursos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">

@@ -649,13 +649,8 @@ export default function LandingPage() {
       <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
         <div className="grid md:grid-cols-2 gap-10 items-center">
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <motion.div
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
-            >
-              <Check className="w-3 h-3" /> CORE · PERSONAL LIFE OS
-            </motion.div>
-            <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
+            <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4 mt-2">
+
               Sua vida no controle,<br />sem depender de 7 apps diferentes.
             </h1>
             <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">

@@ -56,18 +56,17 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     if (!loaded) return;
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
-    // Tutorial guiado (spotlight) só roda no modo convidado. Usuários já cadastrados
-    // que pularam passos NÃO devem ver o tutorial aparecer ao navegar para os módulos.
-    const shouldShow = isGuest && !done && (target === moduleKey || moduleKey === "financas");
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+    // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
+    const shouldShow = (isGuest || forceNewUser) && !done && (target === moduleKey || moduleKey === "financas");
     if (shouldShow) {
       setActive(true);
       trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
       trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
     } else {
       setActive(false);
-      // Para usuários logados, marca o módulo como concluído para não reaparecer
-      // em re-renders e para manter o estado consistente em todos os clientes.
-      if (!isGuest && !done) {
+      // Para usuários logados (sem flag de tutorial), marca como concluído para não reaparecer.
+      if (!isGuest && !forceNewUser && !done) {
         set(`spotlight-done-${moduleKey}`, "true");
       }
     }

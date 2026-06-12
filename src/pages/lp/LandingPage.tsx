@@ -1015,43 +1015,80 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="relative rounded-xl border-2 border-black/80 bg-black/[0.03] p-5">
-                <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-black text-white text-[10px] font-semibold">
-                  MELHOR CUSTO-BENEFÍCIO
-                </div>
-                <div className="text-sm font-semibold mb-1">Anual</div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-bold">R$ 3,90</span>
-                  <span className="text-sm text-black/50">/mês</span>
-                </div>
-                <div className="text-[12px] text-black/50 mb-4">
-                  Pago anualmente<br />R$ 46,80/ano
-                </div>
-                <Link
-                  to="/auth?signup=1"
-                  onClick={() => trackEvent("landing_cta_click", { cta: "pricing_anual" })}
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
-                >
-                  Começar agora
-                </Link>
-              </div>
-              <div className="rounded-xl border border-black/10 bg-white p-5">
-                <div className="text-sm font-semibold mb-1">Mensal</div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-3xl font-bold">R$ 14,90</span>
-                  <span className="text-sm text-black/50">/mês</span>
-                </div>
-                <div className="text-[12px] text-black/50 mb-4">
-                  Pago mensalmente<br />R$ 14,90/mês
-                </div>
-                <Link
-                  to="/auth?signup=1"
-                  onClick={() => trackEvent("landing_cta_click", { cta: "pricing_mensal" })}
-                  className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
-                >
-                  Começar agora
-                </Link>
-              </div>
+              {(() => {
+                const [selected, setSelected] = useState<"anual" | "mensal">("anual");
+                return (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSelected("anual")}
+                      className={`relative text-left rounded-xl p-5 transition-all ${
+                        selected === "anual"
+                          ? "border-2 border-black bg-black/[0.04] shadow-[0_4px_20px_-8px_rgba(0,0,0,0.25)]"
+                          : "border border-black/10 bg-white hover:border-black/30"
+                      }`}
+                    >
+                      <div className="absolute -top-2.5 left-4 px-2 py-0.5 rounded bg-black text-white text-[10px] font-semibold">
+                        MELHOR CUSTO-BENEFÍCIO
+                      </div>
+                      <div className="absolute top-3 right-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
+                          selected === "anual" ? "border-black bg-black" : "border-black/25 bg-white"
+                        }`}>
+                          {selected === "anual" && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold mb-1">Anual</div>
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="text-3xl font-bold">R$ 3,90</span>
+                        <span className="text-sm text-black/50">/mês</span>
+                      </div>
+                      <div className="text-[12px] text-black/50 mb-4">
+                        Pago anualmente<br />R$ 46,80/ano
+                      </div>
+                      <Link
+                        to="/auth?signup=1"
+                        onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_anual" }); }}
+                        className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
+                      >
+                        Começar agora
+                      </Link>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelected("mensal")}
+                      className={`relative text-left rounded-xl p-5 transition-all ${
+                        selected === "mensal"
+                          ? "border-2 border-black bg-black/[0.04] shadow-[0_4px_20px_-8px_rgba(0,0,0,0.25)]"
+                          : "border border-black/10 bg-white hover:border-black/30"
+                      }`}
+                    >
+                      <div className="absolute top-3 right-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition ${
+                          selected === "mensal" ? "border-black bg-black" : "border-black/25 bg-white"
+                        }`}>
+                          {selected === "mensal" && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                        </div>
+                      </div>
+                      <div className="text-sm font-semibold mb-1">Mensal</div>
+                      <div className="flex items-baseline gap-1 mb-1">
+                        <span className="text-3xl font-bold">R$ 14,90</span>
+                        <span className="text-sm text-black/50">/mês</span>
+                      </div>
+                      <div className="text-[12px] text-black/50 mb-4">
+                        Pago mensalmente<br />R$ 14,90/mês
+                      </div>
+                      <Link
+                        to="/auth?signup=1"
+                        onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_mensal" }); }}
+                        className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
+                      >
+                        Começar agora
+                      </Link>
+                    </button>
+                  </>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -1060,11 +1097,12 @@ export default function LandingPage() {
 
 
       {/* FAQ */}
-      <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pb-12 md:pb-20">
+      <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pt-16 md:pt-28 pb-12 md:pb-20">
         <div className="text-center mb-8">
           <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PERGUNTAS FREQUENTES</div>
           <h2 className="text-[26px] md:text-4xl font-bold leading-tight">Ainda tem dúvida?</h2>
         </div>
+
         <div className="rounded-2xl border border-black/10 bg-white px-5 md:px-7">
           {FAQ_ITEMS.map((f) => <FAQItem key={f.q} {...f} />)}
         </div>

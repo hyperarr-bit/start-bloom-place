@@ -816,18 +816,27 @@ export default function LandingPage() {
           <div className="flex justify-center">
             <div className="w-full max-w-[320px]">
               <video
-                src={rotinaPreviewVideo.url}
                 poster={rotinaPreviewPoster.url}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="auto"
+                preload="metadata"
                 disableRemotePlayback
                 onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
                 onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                onError={(e) => {
+                  const v = e.currentTarget;
+                  const img = document.createElement("img");
+                  img.src = rotinaPreviewPoster.url;
+                  img.alt = "Prévia do módulo de rotina";
+                  img.className = v.className;
+                  v.replaceWith(img);
+                }}
                 className="w-full h-auto rounded-[2rem] bg-black"
-              />
+              >
+                <source src={rotinaPreviewVideo.url} type="video/mp4" />
+              </video>
             </div>
           </div>
           <div>

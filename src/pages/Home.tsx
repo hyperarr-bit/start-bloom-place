@@ -174,7 +174,7 @@ const HomePage = () => {
   }
 
   if (showOnboarding) {
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     return (
       <AnimatePresence>
         <QuickStartOnboarding

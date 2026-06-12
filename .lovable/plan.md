@@ -1,45 +1,59 @@
-## Diagnóstico (testei agora, com prova)
+## Diagnóstico
 
-Abri **o site publicado** (`coreaplicativo.lovable.app/lp`) num iPhone 13 simulado real e tirei screenshots:
+Hoje, depois do cadastro pela landing:
 
-- ✅ Hero (3 iPhones) carrega
-- ✅ Vídeo de Finanças toca (vi o frame com tabela de despesas)
-- ✅ Vídeo de Rotina toca (vi 2 frames diferentes — calendário e rotina semanal — confirmando que tá rodando)
-- ✅ Os 3 depoimentos (Marina, Pedro, Júlia) aparecem com foto
-- ✅ Todos os arquivos no CDN respondem `200`, com `accept-ranges: bytes` (essencial pro Safari) e `cache-control: immutable`
+1. `src/pages/Auth.tsx` (linha 105) faz `navigate("/inicio")` após signup.
+2. `/inicio` renderiza `WelcomeScreen` — uma página de slides de marketing (Finanças, Categorias, Previsão…). **São esses slides que estão aparecendo "sem você pedir"**.
+3. O tutorial em passos (selecionar módulos) está em `QuickStartOnboarding`, montado dentro de `Home` (`/home`). Como o redirect vai pra `/inicio`, esse tutorial nunca dispara.
+4. Além disso, `QuickStartOnboarding` só lista **4 módulos** (Finanças, Hábitos, Dieta, Metas). Você quer **16**.
 
-**O site no ar tá correto.** O que você vê quebrado é o **navegador servindo a versão antiga do cache** — provavelmente um service worker que ficou registrado de uma versão passada do app (PWA "Roda sem instalar") e está interceptando as requisições e servindo arquivos velhos.
+## O que vou mudar
 
-Por isso "só funciona no preview": o preview é um domínio diferente (`id-preview--...lovable.app`), não tem service worker antigo. Já `coreaplicativo.lovable.app` tem visitantes que abriram o site antes, registraram o SW antigo, e ele continua servindo HTML/JS velho mesmo depois do republish.
+### 1. Redirect pós-signup
+`src/pages/Auth.tsx`: trocar `navigate("/inicio")` por `navigate("/home")`. A flag `force-new-user-tutorial=true` continua sendo gravada, então `Home` já abre o `QuickStartOnboarding` automaticamente (lógica que já existe em `Home.tsx`).
 
-## O que vou fazer
+Login (usuário existente) continua indo pra `/financas` como hoje. `/inicio` continua existindo (não removo nada), só não é mais o destino do cadastro.
 
-Adicionar um **service worker "kill-switch"** que se desregistra sozinho e limpa caches velhos. Quem visitar o site uma vez vai ter o navegador auto-curado, e visitas futuras passam a buscar sempre a versão nova.
+### 2. Expandir o tutorial pra 16 módulos
+`src/components/onboarding/QuickStartOnboarding.tsx`:
 
-### Passos
+- Ampliar o tipo `ModuleKey` e a constante `OPTIONS` para os 16 módulos do app, cada um com label curto, frase de benefício, ícone Lucide e tom de cor via tokens `--chart-*`:
 
-1. **Criar `public/sw.js`** — service worker mínimo que, na ativação:
-   - apaga todos os caches do próprio scope
-   - força `clients.claim()` e recarrega a aba
-   - `self.registration.unregister()` no `finally`
+  1. Finanças → `/financas`
+  2. Hábitos (rotina) → `/rotina`
+  3. Dieta → `/dieta`
+  4. Treino → `/treino`
+  5. Saúde → `/saude`
+  6. Metas (desenvolvimento) → `/desenvolvimento`
+  7. Hiperfoco → `/hiperfoco`
+  8. Estudos → `/estudos`
+  9. Carreira → `/carreira`
+  10. Biblioteca → `/biblioteca`
+  11. Casa → `/casa`
+  12. Beleza → `/beleza`
+  13. Viagens → `/viagens`
+  14. Relacionamentos → `/relacionamentos`
+  15. Pet → `/pet`
+  16. Detox → `/detox`
 
-2. **Atualizar `src/main.tsx`** — em produção (não só preview), sempre rodar `getRegistrations().then(r => r.forEach(x => x.unregister()))` + `caches.keys().then(k => k.forEach(caches.delete))` no boot. Isso garante que qualquer SW antigo é morto na primeira visita pós-deploy, mesmo que nunca registremos o `sw.js` novo.
+- Lista da etapa de seleção vira rolável (`max-h` + `overflow-y-auto`) pra caber 16 cards no mobile sem quebrar o layout.
+- Regra de **mínimo 1** já existe (`if (prev.length === 1) return prev`) — mantida. Botão "Continuar" continua desabilitado se nenhum estiver marcado.
+- Default inicial: todos os 16 marcados (usuário desmarca o que não quer).
 
-3. **Não registrar** nenhum service worker novo (você não pediu offline). O `sw.js` só existe pra ser servido como kill-switch caso o navegador ainda peça por ele.
+### 3. Sincronizar `Home.tsx` com os 16 módulos
+`src/pages/Home.tsx`: ampliar `ALL_MODULES` pra os mesmos 16 keys, pra que `computePending` e a marcação de "spotlight-done-*" funcionem com a nova lista. Sem isso, módulos não-Finanças/Rotina/Dieta/Metas nunca seriam considerados pendentes.
 
-### O que NÃO vou mexer
+## O que NÃO vou mexer
 
-- Nada de design, copy, layout, vídeos, fotos — todos já estão funcionando, comprovado por screenshot.
-- Nada nas tags `<video>` ou `<img>` — o código está correto.
+- Layout/copy/CTA da landing page.
+- Vídeos, imagens, depoimentos.
+- WelcomeScreen / `/inicio` (página continua existindo, só deixa de ser o destino do signup).
+- Lógica de QuickSignupModal pra convidados.
+- Spotlights / tooltips internos de cada módulo.
+- Nenhuma alteração de banco / RLS / edge function.
 
-### Como testar depois que eu fizer
+## Arquivos editados
 
-1. Republicar.
-2. No seu celular, abrir o site normalmente (sem modo anônimo). Vai parecer ainda quebrado **na primeira visita** — mas o kill-switch roda em background.
-3. Fechar a aba completamente e abrir de novo. Agora vai funcionar tudo.
-4. Como atalho pra confirmar AGORA que é cache: abre o site em **aba anônima/privada** do Safari/Chrome — vai funcionar de primeira, porque aba anônima não tem cache nem SW.
-
-## Arquivos alterados
-
-- `public/sw.js` (novo)
-- `src/main.tsx` (mudar guarda do unregister)
+- `src/pages/Auth.tsx` — 1 linha (redirect)
+- `src/components/onboarding/QuickStartOnboarding.tsx` — array `OPTIONS` + tipo `ModuleKey` + scroll na lista
+- `src/pages/Home.tsx` — array `ALL_MODULES`

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Wallet, CheckCircle2, Apple, Target, ArrowRight, Sparkles, Loader2, Check } from "lucide-react";
+import {
+  Wallet, CheckCircle2, Apple, Target, ArrowRight, Loader2, Check,
+  Dumbbell, Heart, Brain, GraduationCap, Briefcase, BookOpen, Home as HomeIcon,
+  Sparkles, Plane, Users, PawPrint, Smartphone,
+} from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import coreLogo from "@/assets/core-logo.png";
@@ -10,11 +14,14 @@ import { TutorialDonePopup } from "@/components/onboarding/TutorialDonePopup";
 
 
 
-export type ModuleKey = "financas" | "rotina" | "dieta" | "metas";
+export type ModuleKey =
+  | "financas" | "rotina" | "dieta" | "treino" | "saude" | "metas"
+  | "hiperfoco" | "estudos" | "carreira" | "biblioteca" | "casa"
+  | "beleza" | "viagens" | "relacionamentos" | "pet" | "detox";
 
 interface QuickStartOnboardingProps {
   onComplete: () => void;
-  /** Modules still pending. If undefined, all 4 are considered pending (first-time flow). */
+  /** Modules still pending. If undefined, all are considered pending (first-time flow). */
   pendingModules?: ModuleKey[];
   /** Skip the welcome step and go straight to module choice / celebration. */
   skipWelcome?: boolean;
@@ -30,10 +37,22 @@ const OPTIONS: Array<{
   Icon: typeof Wallet;
   tone: string;
 }> = [
-  { key: "financas", route: "/financas", label: "Finanças", benefit: "Saiba pra onde seu dinheiro vai", Icon: Wallet, tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
-  { key: "rotina", route: "/rotina", label: "Hábitos", benefit: "Construa rotina sem culpa", Icon: CheckCircle2, tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
-  { key: "dieta", route: "/dieta", label: "Dieta", benefit: "Coma sem se perder", Icon: Apple, tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
-  { key: "metas", route: "/desenvolvimento", label: "Metas", benefit: "Defina onde quer chegar", Icon: Target, tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
+  { key: "financas",        route: "/financas",        label: "Finanças",        benefit: "Saiba pra onde seu dinheiro vai",   Icon: Wallet,        tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
+  { key: "rotina",          route: "/rotina",          label: "Hábitos",         benefit: "Construa rotina sem culpa",          Icon: CheckCircle2,  tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
+  { key: "dieta",           route: "/dieta",           label: "Dieta",           benefit: "Coma sem se perder",                 Icon: Apple,         tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
+  { key: "treino",          route: "/treino",          label: "Treino",          benefit: "Treine com plano e progresso",       Icon: Dumbbell,      tone: "bg-[hsl(var(--chart-5)/0.15)] text-[hsl(var(--chart-5))]" },
+  { key: "saude",           route: "/saude",           label: "Saúde",           benefit: "Cuide do corpo no dia a dia",        Icon: Heart,         tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
+  { key: "metas",           route: "/desenvolvimento", label: "Metas",           benefit: "Defina onde quer chegar",            Icon: Target,        tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
+  { key: "hiperfoco",       route: "/hiperfoco",       label: "Hiperfoco",       benefit: "Bloco profundo de produtividade",    Icon: Brain,         tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
+  { key: "estudos",         route: "/estudos",         label: "Estudos",         benefit: "Organize matérias e revisões",       Icon: GraduationCap, tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
+  { key: "carreira",        route: "/carreira",        label: "Carreira",        benefit: "Evolua na sua trajetória",           Icon: Briefcase,     tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
+  { key: "biblioteca",      route: "/biblioteca",      label: "Biblioteca",      benefit: "Leia e guarde o que aprende",        Icon: BookOpen,      tone: "bg-[hsl(var(--chart-5)/0.15)] text-[hsl(var(--chart-5))]" },
+  { key: "casa",            route: "/casa",            label: "Casa",            benefit: "Tarefas e contas da casa em ordem",  Icon: HomeIcon,      tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
+  { key: "beleza",          route: "/beleza",          label: "Beleza",          benefit: "Cuidado pessoal sem esquecer nada",  Icon: Sparkles,      tone: "bg-[hsl(var(--chart-2)/0.15)] text-[hsl(var(--chart-2))]" },
+  { key: "viagens",         route: "/viagens",         label: "Viagens",         benefit: "Planeje cada viagem com calma",      Icon: Plane,         tone: "bg-[hsl(var(--chart-3)/0.15)] text-[hsl(var(--chart-3))]" },
+  { key: "relacionamentos", route: "/relacionamentos", label: "Relacionamentos", benefit: "Cuide das pessoas que importam",     Icon: Users,         tone: "bg-[hsl(var(--chart-4)/0.15)] text-[hsl(var(--chart-4))]" },
+  { key: "pet",             route: "/pet",             label: "Pet",             benefit: "Rotina e saúde do seu bichinho",     Icon: PawPrint,      tone: "bg-[hsl(var(--chart-5)/0.15)] text-[hsl(var(--chart-5))]" },
+  { key: "detox",           route: "/detox",           label: "Detox",           benefit: "Menos tela, mais presença",          Icon: Smartphone,    tone: "bg-[hsl(var(--chart-1)/0.15)] text-[hsl(var(--chart-1))]" },
 ];
 
 const ALL_KEYS: ModuleKey[] = OPTIONS.map(o => o.key);
@@ -249,7 +268,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 max-h-[55dvh] overflow-y-auto pr-1 -mr-1">
+
                 {OPTIONS.map((opt, i) => {
                   const checked = selectedModules.includes(opt.key);
                   return (
@@ -314,7 +334,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 max-h-[60dvh] overflow-y-auto pr-1 -mr-1">
                 {visibleOptions.map((opt, i) => (
                   <motion.button
                     key={opt.key}

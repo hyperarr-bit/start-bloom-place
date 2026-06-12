@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
-import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
-import financasPreviewPoster from "@/assets/financas-preview-poster.jpg.asset.json";
-import rotinaPreviewPoster from "@/assets/rotina-preview-poster.jpg.asset.json";
+const financasPreviewVideo = { url: "/videos/financas.mp4" };
+const rotinaPreviewVideo = { url: "/videos/rotina.mp4" };
+const financasPreviewPoster = { url: "/videos/financas-poster.jpg" };
+const rotinaPreviewPoster = { url: "/videos/rotina-poster.jpg" };
 import testimonialMarina from "@/assets/testimonial-marina.jpg.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.jpg.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.jpg.asset.json";
@@ -784,18 +784,27 @@ export default function LandingPage() {
           <div className="order-1 md:order-2 flex justify-center">
             <div className="w-full max-w-[320px]">
               <video
-                src={financasPreviewVideo.url}
                 poster={financasPreviewPoster.url}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="auto"
+                preload="metadata"
                 disableRemotePlayback
                 onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
                 onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                onError={(e) => {
+                  const v = e.currentTarget;
+                  const img = document.createElement("img");
+                  img.src = financasPreviewPoster.url;
+                  img.alt = "Prévia do módulo de finanças";
+                  img.className = v.className;
+                  v.replaceWith(img);
+                }}
                 className="w-full h-auto rounded-[2rem] bg-black"
-              />
+              >
+                <source src={financasPreviewVideo.url} type="video/mp4" />
+              </video>
             </div>
           </div>
         </div>
@@ -807,18 +816,27 @@ export default function LandingPage() {
           <div className="flex justify-center">
             <div className="w-full max-w-[320px]">
               <video
-                src={rotinaPreviewVideo.url}
                 poster={rotinaPreviewPoster.url}
                 autoPlay
                 muted
                 loop
                 playsInline
-                preload="auto"
+                preload="metadata"
                 disableRemotePlayback
                 onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
                 onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
+                onError={(e) => {
+                  const v = e.currentTarget;
+                  const img = document.createElement("img");
+                  img.src = rotinaPreviewPoster.url;
+                  img.alt = "Prévia do módulo de rotina";
+                  img.className = v.className;
+                  v.replaceWith(img);
+                }}
                 className="w-full h-auto rounded-[2rem] bg-black"
-              />
+              >
+                <source src={rotinaPreviewVideo.url} type="video/mp4" />
+              </video>
             </div>
           </div>
           <div>

@@ -46,7 +46,7 @@ const Casa = () => {
       <SpotlightOverlay
         moduleKey="casa"
         steps={[
-          { selector: '[data-spotlight="tab-comodos"]', label: "Esta é a aba Cômodos — cadastre os ambientes da casa. Toque pra continuar.", advanceOnClick: true },
+          
           { selector: '[data-spotlight="tab-rotina"]', label: "Aqui você monta a rotina de limpeza.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-mercado"]', label: "Lista de compras pronta pra usar.", advanceOnClick: true },
         ]}

@@ -156,6 +156,7 @@ const HomePage = () => {
   const handleOnboardingComplete = () => {
     setData("core-onboarding-done", "true");
     setData("force-new-user-tutorial", "");
+    try { localStorage.removeItem("force-new-user-tutorial"); } catch {}
     setShowOnboarding(false);
   };
 

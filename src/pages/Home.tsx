@@ -114,11 +114,11 @@ const HomePage = () => {
       }
     }
 
-    const pending = computePending();
+    const pending = forceNewUser ? [...ALL_MODULES] : computePending();
     setPendingModules(pending);
 
-    const onboardingDone = !!get<string>("core-onboarding-done", "");
-    const celebrated = !!get<string>("core-all-modules-celebrated", "");
+    const onboardingDone = forceNewUser ? false : !!get<string>("core-onboarding-done", "");
+    const celebrated = forceNewUser ? false : !!get<string>("core-all-modules-celebrated", "");
     const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
     setShowOnboarding(shouldShow);
     setOnboardingResolved(true);

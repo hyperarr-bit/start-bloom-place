@@ -828,45 +828,56 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white/90 text-[11px] font-bold tracking-wide mb-4">
-                <Trophy className="w-3 h-3" /> GAMIFICAÇÃO
+                <Trophy className="w-3 h-3" /> 🏆 PROGRESSO VISÍVEL
               </div>
               <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-                Cada hábito vira XP.<br />Cada meta vira conquista.
+                Seu progresso deixa de ser invisível.
               </h2>
-              <p className="text-[14px] md:text-base text-white/65 leading-relaxed mb-6">
-                Você não tá só "fazendo tarefas". Tá evoluindo um personagem real: você. Conquistas, badges e streaks pra manter a chama acesa.
+              <p className="text-[14px] md:text-base text-white/65 leading-relaxed mb-4">
+                Cada hábito marcado, meta concluída e rotina cumprida vira evolução dentro do CORE. Você acompanha sua constância e sente vontade de continuar.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {["🔥 Streaks", "🏆 Conquistas", "⭐ Níveis", "🎯 Metas", "📊 Progresso"].map((b) => (
-                  <span key={b} className="px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-[12px]">{b}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {["🔥 Streaks", "🏆 Conquistas", "🎯 Metas", "📊 Evolução"].map((b) => (
+                  <span
+                    key={b}
+                    className="inline-flex items-center h-7 px-3 rounded-full bg-white/[0.07] border border-white/10 text-[12px] leading-none text-white/85"
+                  >
+                    {b}
+                  </span>
                 ))}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
-                <Flame className="w-6 h-6 text-orange-400 mb-2" />
-                <div className="text-3xl font-bold">42</div>
-                <div className="text-[12px] text-white/60">dias seguidos</div>
+            <div>
+              <div className="grid grid-cols-2 gap-2.5 md:gap-3">
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Flame className="w-5 h-5 text-orange-400 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">42</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">dias mantendo sua rotina</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Trophy className="w-5 h-5 text-amber-300 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">18</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">conquistas desbloqueadas</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Zap className="w-5 h-5 text-yellow-300 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">2.840</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">pontos de evolução</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Target className="w-5 h-5 text-emerald-400 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">7/10</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">metas concluídas no trimestre</div>
+                </div>
               </div>
-              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
-                <Trophy className="w-6 h-6 text-amber-400 mb-2" />
-                <div className="text-3xl font-bold">18</div>
-                <div className="text-[12px] text-white/60">conquistas</div>
-              </div>
-              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
-                <Zap className="w-6 h-6 text-yellow-300 mb-2" />
-                <div className="text-3xl font-bold">2.840</div>
-                <div className="text-[12px] text-white/60">XP total</div>
-              </div>
-              <div className="rounded-xl bg-white/[0.06] border border-white/10 p-4">
-                <Target className="w-6 h-6 text-emerald-400 mb-2" />
-                <div className="text-3xl font-bold">7/10</div>
-                <div className="text-[12px] text-white/60">metas no trimestre</div>
-              </div>
+              <p className="text-center text-[12.5px] text-white/50 mt-4 leading-snug">
+                Pequenas ações todo dia. Progresso visível toda semana.
+              </p>
             </div>
           </div>
         </div>
       </section>
+
 
       {/* BENEFÍCIOS CONCRETOS */}
       <section id="beneficios" className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">

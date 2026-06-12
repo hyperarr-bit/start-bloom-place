@@ -16,6 +16,7 @@ import { CurrencyConverter } from "@/components/travel/CurrencyConverter";
 import { TravelDiary } from "@/components/travel/TravelDiary";
 import { TravelBudget } from "@/components/travel/TravelBudget";
 import { BucketList } from "@/components/travel/BucketList";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
   { id: "destinos", label: "Destinos", icon: "🧭" },
@@ -44,6 +45,14 @@ const Viagens = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <SpotlightOverlay
+        moduleKey="viagens"
+        steps={[
+          { selector: '[data-spotlight="tab-destinos"]', label: "Adicione destinos dos seus sonhos.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-mala"]', label: "Checklist da mala pra não esquecer nada.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-budget"]', label: "Controle o orçamento da viagem.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
@@ -60,6 +69,7 @@ const Viagens = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

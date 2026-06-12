@@ -12,6 +12,7 @@ import { HydrationTracker } from "@/components/saude/HydrationTracker";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -30,6 +31,14 @@ const Saude = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SpotlightOverlay
+        moduleKey="saude"
+        steps={[
+          { selector: '[data-spotlight="add-water"]', label: "Toque + Copo pra registrar 1 copo de água.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-evolucao"]', label: "Abra a aba Evolução pra anotar suas medidas.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-log"]', label: "Aqui você guarda consultas e exames.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
@@ -44,6 +53,7 @@ const Saude = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id} data-active={activeTab === tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

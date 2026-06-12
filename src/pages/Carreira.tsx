@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const genId = () => crypto.randomUUID();
 
@@ -568,6 +569,14 @@ const Carreira = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <SpotlightOverlay
+        moduleKey="carreira"
+        steps={[
+          { selector: '[data-spotlight="tab-jobs"]', label: "Acompanhe vagas e candidaturas.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-skills"]', label: "Mapeie suas skills e o nível alvo.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-portfolio"]', label: "Monte seu portfolio com cases.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
@@ -584,6 +593,7 @@ const Carreira = () => {
           {careerTabs.map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

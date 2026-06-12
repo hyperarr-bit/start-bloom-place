@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -302,6 +303,14 @@ const Biblioteca = () => {
   // ── RENDER ──
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
+      <SpotlightOverlay
+        moduleKey="biblioteca"
+        steps={[
+          { selector: '[data-spotlight="tab-lendo"]', label: "Marque o livro que está lendo agora.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-estante"]', label: "Toda sua estante fica organizada aqui.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-insights"]', label: "Salve citações e destaques marcantes.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
@@ -316,6 +325,7 @@ const Biblioteca = () => {
           {TABS.map((t) => (
             <button
               key={t.v}
+              data-spotlight={`tab-${t.v}`}
               onClick={() => setTab(t.v)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${tab === t.v ? "notion-tab-active" : "hover:bg-muted"}`}
             >

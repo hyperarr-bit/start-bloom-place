@@ -10,6 +10,7 @@ import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
   { id: "pets", label: "PETS", icon: "🐾" },
@@ -33,6 +34,14 @@ const Pet = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SpotlightOverlay
+        moduleKey="pet"
+        steps={[
+          { selector: '[data-spotlight="tab-pets"]', label: "Cadastre seus pets aqui.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-saude"]', label: "Registre vacinas e consultas.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-gastos"]', label: "Acompanhe os gastos com o pet.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
@@ -49,6 +58,7 @@ const Pet = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

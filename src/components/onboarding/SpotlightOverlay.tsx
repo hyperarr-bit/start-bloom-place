@@ -22,7 +22,7 @@ export interface SpotlightStep {
 }
 
 interface SpotlightOverlayProps {
-  moduleKey: "financas" | "rotina" | "dieta" | "treino" | "metas";
+  moduleKey: "financas" | "rotina" | "dieta" | "treino" | "metas" | "saude" | "hiperfoco" | "estudos" | "carreira" | "biblioteca" | "casa" | "beleza" | "viagens" | "relacionamentos" | "pet" | "detox";
   steps: SpotlightStep[];
   activationActions?: string[];
   /** Optional: called when the tutorial is fully completed (not dismissed). If provided, suppresses the default completion modal. */

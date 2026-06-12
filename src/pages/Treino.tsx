@@ -172,7 +172,8 @@ const Treino = () => {
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
   const { get: getUserData, isGuest } = useUserData();
   useEffect(() => {
-    if (!isGuest) return;
+    const forceNewUser = !!getUserData<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+    if (!isGuest && !forceNewUser) return;
     const target = getUserData<string>("quickstart-target-module", "");
     const done = getUserData<string>("spotlight-done-treino", "");
     if (target === "treino" && !done) setActiveTab("hoje");

@@ -114,7 +114,7 @@ const HomePage = () => {
       }
     }
 
-    const pending = forceNewUser ? [...ALL_MODULES] : computePending();
+    const pending = computePending();
     setPendingModules(pending);
 
     const onboardingDone = forceNewUser ? false : !!get<string>("core-onboarding-done", "");

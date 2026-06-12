@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
@@ -35,6 +36,7 @@ const PADDING = 8;
 
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onComplete }: SpotlightOverlayProps) => {
   const { get, set, isGuest, loaded } = useUserData();
+  const navigate = useNavigate();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -58,7 +60,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
-    const shouldShow = (isGuest || forceNewUser) && !done && (target === moduleKey || moduleKey === "financas");
+    const shouldShow = (isGuest || forceNewUser) && !done && target === moduleKey;
     if (shouldShow) {
       setActive(true);
       trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
@@ -98,8 +100,13 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       } else {
         setShowCompletion(true);
       }
+      // Volta pra Home pra o picker mostrar o próximo módulo escolhido.
+      const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+      if (isGuest || forceNewUser) {
+        setTimeout(() => navigate("/home"), 1200);
+      }
     }
-  }, [set, moduleKey, onComplete]);
+  }, [set, get, moduleKey, onComplete, isGuest, navigate]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;

@@ -183,12 +183,8 @@ export default function AdminUso() {
                 </tbody>
               </table>
             </div>
+          </section>
         </>
-      )}
-    </div>
-  );
-}
-
       )}
     </div>
   );

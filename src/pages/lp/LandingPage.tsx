@@ -1059,7 +1059,9 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+        </div>
       </section>
+
 
       {/* FAQ */}
       <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pb-12 md:pb-20">

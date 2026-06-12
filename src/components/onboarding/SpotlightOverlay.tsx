@@ -394,11 +394,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         {offScreen && (
           <motion.button
             key={`offscreen-${offScreen}`}
-            initial={{ opacity: 0, y: offScreen === "below" ? 20 : -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0, x: "-50%", y: offScreen === "below" ? 20 : -20 }}
+            animate={{ opacity: 1, x: "-50%", y: 0 }}
+            exit={{ opacity: 0, x: "-50%" }}
             onClick={scrollToTarget}
-            className={`fixed left-1/2 -translate-x-1/2 pointer-events-auto bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 text-xs font-bold z-[210] ${
+            className={`fixed left-1/2 pointer-events-auto bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2 flex items-center gap-2 text-xs font-bold z-[210] ${
               offScreen === "below" ? "bottom-6" : "top-6"
             }`}
           >
@@ -420,13 +420,14 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
           </motion.button>
         )}
 
+
         {!rect && showFallback && (
           <motion.div
             key="fallback-card"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="fixed left-1/2 -translate-x-1/2 bottom-6 pointer-events-auto bg-card border border-border rounded-xl shadow-2xl p-3 z-[210]"
+            initial={{ opacity: 0, x: "-50%", y: 20 }}
+            animate={{ opacity: 1, x: "-50%", y: 0 }}
+            exit={{ opacity: 0, x: "-50%" }}
+            className="fixed left-1/2 bottom-6 pointer-events-auto bg-card border border-border rounded-xl shadow-2xl p-3 z-[210]"
             style={{ width: "min(320px, calc(100vw - 24px))" }}
           >
             <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
@@ -448,6 +449,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             </div>
           </motion.div>
         )}
+
       </motion.div>
     </AnimatePresence>
   );

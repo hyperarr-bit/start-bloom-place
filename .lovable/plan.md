@@ -1,28 +1,45 @@
-# Corrigir os vídeos da landing page
+## Diagnóstico (testei agora, com prova)
 
-## O que está errado (análise técnica dos arquivos)
+Abri **o site publicado** (`coreaplicativo.lovable.app/lp`) num iPhone 13 simulado real e tirei screenshots:
 
-Analisei os dois arquivos de vídeo hospedados no CDN e encontrei problemas concretos:
+- ✅ Hero (3 iPhones) carrega
+- ✅ Vídeo de Finanças toca (vi o frame com tabela de despesas)
+- ✅ Vídeo de Rotina toca (vi 2 frames diferentes — calendário e rotina semanal — confirmando que tá rodando)
+- ✅ Os 3 depoimentos (Marina, Pedro, Júlia) aparecem com foto
+- ✅ Todos os arquivos no CDN respondem `200`, com `accept-ranges: bytes` (essencial pro Safari) e `cache-control: immutable`
 
-1. **Vídeo da Rotina (15 MB)**: o índice do vídeo (`moov atom`) está no **final do arquivo**. Isso significa que o navegador precisa baixar praticamente os 15 MB inteiros antes de conseguir começar a reproduzir. Em rede móvel (Safari, Chrome, navegador do TikTok) isso aparece como vídeo "morto"/preto que nunca toca. No preview do desktop com internet rápida ele funciona — por isso parecia OK antes.
-2. **Vídeo de Finanças**: usa perfil de cor `yuvj420p` (full-range) + profile High, que tem compatibilidade irregular em alguns players móveis (especialmente WebViews como o do TikTok).
-3. **Peso**: 15 MB é pesado demais para um card de landing page mobile.
+**O site no ar tá correto.** O que você vê quebrado é o **navegador servindo a versão antiga do cache** — provavelmente um service worker que ficou registrado de uma versão passada do app (PWA "Roda sem instalar") e está interceptando as requisições e servindo arquivos velhos.
+
+Por isso "só funciona no preview": o preview é um domínio diferente (`id-preview--...lovable.app`), não tem service worker antigo. Já `coreaplicativo.lovable.app` tem visitantes que abriram o site antes, registraram o SW antigo, e ele continua servindo HTML/JS velho mesmo depois do republish.
 
 ## O que vou fazer
 
-1. **Re-encodar os dois vídeos** com configuração universalmente compatível:
-   - H.264 profile Main, `yuv420p`, `+faststart` (índice no início → começa a tocar imediatamente, em streaming)
-   - Compressão para reduzir o vídeo da Rotina de 15 MB para algo em torno de 3–5 MB sem perda visível
-   - Remover faixa de áudio (os vídeos tocam mudos de qualquer forma — áudio bloqueia autoplay em WebViews)
-2. **Re-upload para o CDN** e atualizar os dois `.asset.json`
-3. **Ajustar as tags `<video>`** na landing page:
-   - Adicionar `poster` (primeiro frame como imagem) para nunca aparecer um quadrado preto enquanto carrega
-   - Manter `autoPlay + muted + playsInline + loop`
-4. **Verificar no navegador** (preview mobile 430px) que ambos os vídeos carregam e tocam
+Adicionar um **service worker "kill-switch"** que se desregistra sozinho e limpa caches velhos. Quem visitar o site uma vez vai ter o navegador auto-curado, e visitas futuras passam a buscar sempre a versão nova.
 
-## Detalhes técnicos
+### Passos
 
-- Re-encode com ffmpeg: `-c:v libx264 -profile:v main -pix_fmt yuv420p -movflags +faststart -an -crf 26`
-- Upload via `lovable-assets create`, sobrescrevendo os pointers `financas-preview.mp4.asset.json` e `rotina-preview.mp4.asset.json`
-- Extrair o primeiro frame de cada vídeo como JPG para usar de `poster`
-- Arquivo alterado: `src/pages/lp/LandingPage.tsx` (apenas os atributos das tags `<video>`)
+1. **Criar `public/sw.js`** — service worker mínimo que, na ativação:
+   - apaga todos os caches do próprio scope
+   - força `clients.claim()` e recarrega a aba
+   - `self.registration.unregister()` no `finally`
+
+2. **Atualizar `src/main.tsx`** — em produção (não só preview), sempre rodar `getRegistrations().then(r => r.forEach(x => x.unregister()))` + `caches.keys().then(k => k.forEach(caches.delete))` no boot. Isso garante que qualquer SW antigo é morto na primeira visita pós-deploy, mesmo que nunca registremos o `sw.js` novo.
+
+3. **Não registrar** nenhum service worker novo (você não pediu offline). O `sw.js` só existe pra ser servido como kill-switch caso o navegador ainda peça por ele.
+
+### O que NÃO vou mexer
+
+- Nada de design, copy, layout, vídeos, fotos — todos já estão funcionando, comprovado por screenshot.
+- Nada nas tags `<video>` ou `<img>` — o código está correto.
+
+### Como testar depois que eu fizer
+
+1. Republicar.
+2. No seu celular, abrir o site normalmente (sem modo anônimo). Vai parecer ainda quebrado **na primeira visita** — mas o kill-switch roda em background.
+3. Fechar a aba completamente e abrir de novo. Agora vai funcionar tudo.
+4. Como atalho pra confirmar AGORA que é cache: abre o site em **aba anônima/privada** do Safari/Chrome — vai funcionar de primeira, porque aba anônima não tem cache nem SW.
+
+## Arquivos alterados
+
+- `public/sw.js` (novo)
+- `src/main.tsx` (mudar guarda do unregister)

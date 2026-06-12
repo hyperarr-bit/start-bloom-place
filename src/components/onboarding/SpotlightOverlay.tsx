@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";

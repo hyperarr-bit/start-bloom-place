@@ -68,7 +68,7 @@ const HomePage = () => {
   const { get, set: setData, loaded, isGuest } = useUserData();
   const { user } = useAuth();
 
-  const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "metas"];
+  const ALL_MODULES: ModuleKey[] = ["financas", "rotina", "dieta", "treino", "saude", "metas", "hiperfoco", "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens", "relacionamentos", "pet", "detox"];
 
   const computePending = (): ModuleKey[] =>
     ALL_MODULES.filter(m => !get<string>(`spotlight-done-${m}`, ""));

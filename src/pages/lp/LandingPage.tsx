@@ -653,13 +653,13 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
             >
-              <Check className="w-3 h-3" /> 16 MÓDULOS · 1 ÚNICO APP
+              <Check className="w-3 h-3" /> CORE · PERSONAL LIFE OS
             </motion.div>
             <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
-              Organize sua vida<br />em um só lugar.
+              Sua vida no controle,<br />sem depender de 7 apps diferentes.
             </h1>
             <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
-              Substitui sua planilha de gastos, seu app de hábitos, seu caderno de metas e mais 13 coisas. Tudo num app simples e bonito.
+              Finanças, rotina, metas, estudos, treino, dieta e desenvolvimento pessoal em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link
@@ -667,14 +667,14 @@ export default function LandingPage() {
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
                 className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
               >
-                Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
+                Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="grid grid-cols-3 gap-3 w-full max-w-md">
               {[
                 { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
                 { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
-                { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade total" },
+                { icon: ShieldCheck, t: "Tudo conectado", s: "Rotina, metas e finanças juntas" },
               ].map((b) => (
                 <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
                   <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
@@ -685,6 +685,7 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+
           </div>
 
           <div className="-mx-2 md:mx-0">

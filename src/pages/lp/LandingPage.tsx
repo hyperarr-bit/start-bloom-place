@@ -692,60 +692,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Modules ticker */}
-        <div className="mt-10 pt-6 border-t border-black/5">
-          <div className="text-[10.5px] font-semibold text-black/40 tracking-widest text-center mb-3">
-            O QUE CABE NO CORE
-          </div>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[12.5px] text-black/55">
-            {MODULES.map((m, i) => (
-              <Fragment key={m.key}>
-                <span className="font-medium">{m.title}</span>
-                {i < MODULES.length - 1 && <span className="text-black/20">·</span>}
-              </Fragment>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* PROBLEM */}
-      <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
-        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
-          <div className="text-center mb-10">
-            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">O PROBLEMA</div>
-            <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
-              Sua vida tá espalhada em<br />6 apps e 3 cadernos.
-            </h2>
-          </div>
-          <div className="grid md:grid-cols-[1fr_auto_1fr] items-center gap-6 md:gap-8">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { icon: FileSpreadsheet, t: "Planilha de gastos" },
-                { icon: Check, t: "App de hábitos" },
-                { icon: StickyNote, t: "Caderno de metas" },
-                { icon: Bell, t: "Lembretes soltos" },
-                { icon: BookOpen, t: "Lista de livros" },
-                { icon: Dumbbell, t: "App de treino" },
-              ].map((b) => (
-                <div key={b.t} className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-white border border-black/10 text-[12.5px]">
-                  <b.icon className="w-4 h-4 text-black/40 shrink-0" />
-                  <span className="text-black/70 truncate">{b.t}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex md:flex-col items-center justify-center gap-2 text-black/30">
-              <ArrowRight className="w-8 h-8 hidden md:block rotate-0" />
-              <ArrowRight className="w-6 h-6 md:hidden rotate-90" />
-            </div>
-            <div className="rounded-2xl bg-black text-white p-6 md:p-8 text-center">
-              <div className="text-[11px] font-semibold tracking-widest text-white/60 mb-2">A SOLUÇÃO</div>
-              <div className="text-3xl md:text-4xl font-bold mb-2">CORE</div>
-              <div className="text-[13px] text-white/70 leading-relaxed">
-                Tudo num app só. Conversando entre si. Sem trocar de aba, sem perder dado.
-              </div>
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}

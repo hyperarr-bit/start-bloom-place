@@ -6,6 +6,7 @@ import rotinaPreviewPoster from "@/assets/rotina-preview-poster.jpg.asset.json";
 import testimonialMarina from "@/assets/testimonial-marina.jpg.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.jpg.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.jpg.asset.json";
+import { assetUrl } from "@/lib/assetUrl";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -784,8 +785,8 @@ export default function LandingPage() {
           <div className="order-1 md:order-2 flex justify-center">
             <div className="w-full max-w-[320px]">
               <video
-                src={financasPreviewVideo.url}
-                poster={financasPreviewPoster.url}
+                src={assetUrl(financasPreviewVideo.url)}
+                poster={assetUrl(financasPreviewPoster.url)}
                 autoPlay
                 muted
                 loop
@@ -807,8 +808,8 @@ export default function LandingPage() {
           <div className="flex justify-center">
             <div className="w-full max-w-[320px]">
               <video
-                src={rotinaPreviewVideo.url}
-                poster={rotinaPreviewPoster.url}
+                src={assetUrl(rotinaPreviewVideo.url)}
+                poster={assetUrl(rotinaPreviewPoster.url)}
                 autoPlay
                 muted
                 loop
@@ -981,9 +982,9 @@ export default function LandingPage() {
         </div>
         <div className="grid md:grid-cols-3 gap-4 md:gap-5">
           {[
-            { n: "Marina S.", c: "São Paulo, SP", t: "Entrei só pra organizar meus gastos do mês. Em poucos dias eu já sabia exatamente o que podia gastar, o que tinha vencendo e pra onde meu dinheiro estava indo. Virou meu painel diário.", img: testimonialMarina.url },
-            { n: "Pedro H.", c: "Curitiba, PR", t: "Antes eu abria banco, planilha, notas e calculadora pra entender minha semana. No CORE aparece tudo junto, simples e sem bagunça. Foi isso que me fez continuar usando.", img: testimonialPedro.url },
-            { n: "Júlia M.", c: "Recife, PE", t: "No começo achei que ia ser mais uma coisa pra abandonar em uma semana. Tô há 3 meses e virou parte da rotina, abro toda manhã.", img: testimonialJulia.url },
+            { n: "Marina S.", c: "São Paulo, SP", t: "Entrei só pra organizar meus gastos do mês. Em poucos dias eu já sabia exatamente o que podia gastar, o que tinha vencendo e pra onde meu dinheiro estava indo. Virou meu painel diário.", img: assetUrl(testimonialMarina.url) },
+            { n: "Pedro H.", c: "Curitiba, PR", t: "Antes eu abria banco, planilha, notas e calculadora pra entender minha semana. No CORE aparece tudo junto, simples e sem bagunça. Foi isso que me fez continuar usando.", img: assetUrl(testimonialPedro.url) },
+            { n: "Júlia M.", c: "Recife, PE", t: "No começo achei que ia ser mais uma coisa pra abandonar em uma semana. Tô há 3 meses e virou parte da rotina, abro toda manhã.", img: assetUrl(testimonialJulia.url) },
           ].map((d) => (
             <div key={d.n} className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">
               <div className="flex gap-0.5 mb-3 text-amber-400">

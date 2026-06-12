@@ -994,22 +994,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* NÚMEROS */}
-      <section className="lp-enter bg-black text-white py-8 md:py-10">
-        <div className="max-w-[1100px] mx-auto px-5 md:px-8 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-4 text-center">
-          {[
-            { n: "16", t: "módulos" },
-            { n: "+200", t: "funcionalidades" },
-            { n: "Semanais", t: "atualizações" },
-            { n: "100%", t: "dados seus" },
-          ].map((s) => (
-            <div key={s.t}>
-              <div className="text-3xl md:text-4xl font-bold mb-1">{s.n}</div>
-              <div className="text-[12px] text-white/55 tracking-wide">{s.t}</div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* PREÇOS */}
       <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">

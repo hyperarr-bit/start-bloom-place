@@ -7,6 +7,7 @@ const testimonialMarina = { url: "/images/testimonial-marina.jpg" };
 const testimonialPedro = { url: "/images/testimonial-pedro.jpg" };
 const testimonialJulia = { url: "/images/testimonial-julia.jpg" };
 import { Link } from "react-router-dom";
+import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, CalendarDays, ShieldCheck, XCircle,
@@ -593,6 +594,10 @@ const FAQItem = ({ q, a }: { q: string; a: string }) => {
 
 export default function LandingPage() {
   useEffect(() => {
+    captureLandingMeta();
+    trackEvent("landing_view", { source: "lp" });
+  }, []);
+  useEffect(() => {
     const els = document.querySelectorAll<HTMLElement>(".lp-enter");
     const io = new IntersectionObserver(
       (entries) => {
@@ -632,6 +637,7 @@ export default function LandingPage() {
           </nav>
           <Link
             to="/auth"
+            onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
             className="px-4 py-1.5 rounded-md bg-black hover:bg-black/85 text-white text-sm font-semibold transition"
           >
             Entrar
@@ -658,6 +664,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link
                 to="/auth?signup=1"
+                onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
                 className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
               >
                 Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
@@ -1084,6 +1091,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth?signup=1"
+                  onClick={() => trackEvent("landing_cta_click", { cta: "pricing_anual" })}
                   className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
@@ -1100,6 +1108,7 @@ export default function LandingPage() {
                 </div>
                 <Link
                   to="/auth?signup=1"
+                  onClick={() => trackEvent("landing_cta_click", { cta: "pricing_mensal" })}
                   className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
                 >
                   Começar agora
@@ -1137,6 +1146,7 @@ export default function LandingPage() {
           </div>
           <Link
             to="/auth?signup=1"
+            onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
             className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-white text-black hover:bg-white/90 font-semibold text-sm transition whitespace-nowrap"
           >
             Quero testar o CORE <ArrowRight className="w-4 h-4" />

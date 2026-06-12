@@ -54,7 +54,19 @@ const MODULE_LABELS: Record<string, string> = {
   financas: "Finanças",
   rotina: "Hábitos",
   dieta: "Dieta",
+  treino: "Treino",
   metas: "Metas",
+  saude: "Saúde",
+  hiperfoco: "Mente",
+  estudos: "Estudos",
+  carreira: "Carreira",
+  biblioteca: "Biblioteca",
+  casa: "Casa",
+  beleza: "Beleza",
+  viagens: "Viagens",
+  relacionamentos: "Relacionamentos",
+  pet: "Pet",
+  detox: "Detox",
 };
 
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : 0);

@@ -881,7 +881,7 @@ export default function LandingPage() {
             { icon: Lock, t: "Dados criptografados", s: "Supabase com RLS. Só você acessa o que é seu." },
             { icon: Wifi, t: "Funciona offline", s: "Sem internet? Continua usando. Sincroniza depois." },
             { icon: Moon, t: "Modo claro e escuro", s: "Adapta ao seu olho e ao seu humor do dia." },
-            { icon: Smartphone, t: "Roda sem instalar", s: "PWA: adiciona à tela inicial em 2 toques." },
+            { icon: Smartphone, t: "Funciona em todos os dispositivos", s: "Computador, notebook, tablet e celular." },
           ].map((b) => (
             <div key={b.t} className="rounded-xl border border-black/10 bg-white p-4 md:p-5">
               <div className="w-10 h-10 rounded-lg bg-black/[0.05] text-black flex items-center justify-center mb-3">

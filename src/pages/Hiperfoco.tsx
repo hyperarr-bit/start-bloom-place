@@ -12,6 +12,7 @@ import { DreamJournal } from "@/components/hiperfoco/DreamJournal";
 import { IdeasPanel } from "@/components/hiperfoco/IdeasPanel";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
   { id: "dia", label: "DIA", icon: "💭" },
@@ -37,6 +38,14 @@ const Hiperfoco = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <SpotlightOverlay
+        moduleKey="hiperfoco"
+        steps={[
+          { selector: '[data-spotlight="tab-dia"]', label: "Capture pensamentos rápidos do seu dia.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-metas"]', label: "Defina metas pra manter o foco.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-ideias"]', label: "Salve ideias pra não esquecer depois.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
@@ -54,6 +63,7 @@ const Hiperfoco = () => {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
+              data-spotlight={`tab-${tab.id}`}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
               <span>{tab.icon}</span>

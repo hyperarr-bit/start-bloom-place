@@ -161,9 +161,15 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     if (!step) return;
 
     const measure = () => {
-      const el = document.querySelector(step.selector);
+      const el = document.querySelector(step.selector) as HTMLElement | null;
       if (!el) { setRect(null); return; }
       const r = el.getBoundingClientRect();
+      // Auto-scroll horizontally when the target (e.g. a tab) is off-screen
+      // horizontally, so the user doesn't have to swipe to find it.
+      const vw = window.innerWidth;
+      if (r.right > vw - 8 || r.left < 8) {
+        try { el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); } catch {}
+      }
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
 

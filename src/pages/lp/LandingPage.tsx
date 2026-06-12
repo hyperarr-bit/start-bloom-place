@@ -646,52 +646,81 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div className="text-center md:text-left flex flex-col items-center md:items-start">
+      <section className="lp-enter max-w-[900px] mx-auto px-5 md:px-8 pt-10 md:pt-20 pb-12 md:pb-20">
+        <div className="flex flex-col items-center text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-black/10 text-black/70 text-[11px] font-medium tracking-wide mb-6 shadow-sm"
+          >
+            <Check className="w-3 h-3 text-emerald-600" /> 7 dias grátis · sem compromisso
+          </motion.div>
+
+          <h1 className="text-[36px] sm:text-[48px] md:text-[64px] leading-[1.05] font-bold tracking-tight mb-5 max-w-[820px]">
+            Sua vida organizada<br className="hidden sm:block" />
+            <span className="sm:hidden"> </span>sem depender de<br />
+            6 apps diferentes.
+          </h1>
+
+          <p className="text-[15px] md:text-lg text-black/60 mb-8 max-w-[560px] leading-relaxed">
+            O CORE reúne finanças, rotina, hábitos, metas e desenvolvimento pessoal em um app simples, bonito e feito pra usar todos os dias.
+          </p>
+
+          <Link
+            to="/auth?signup=1"
+            onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
+            className="inline-flex items-center justify-center gap-2 h-12 px-7 rounded-full bg-black hover:bg-black/85 text-white font-semibold text-[15px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] transition"
+          >
+            Começar teste grátis <ArrowRight className="w-4 h-4" />
+          </Link>
+          <p className="mt-3 text-[12px] text-black/45">
+            7 dias grátis · cancele quando quiser · sem compromisso
+          </p>
+
+          {/* Mockup area — central iPhone larger, two smaller behind */}
+          <div className="relative w-full mt-12 md:mt-16 flex justify-center items-end min-h-[420px] md:min-h-[560px]">
+            {/* Left phone */}
             <motion.div
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/[0.04] border border-black/10 text-black text-[11px] font-semibold tracking-wide mb-5"
+              initial={{ opacity: 0, x: 40, y: 20 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.15 }}
+              className="hidden sm:block absolute left-1/2 -translate-x-[125%] bottom-4 w-[28%] max-w-[200px] opacity-50 blur-[1.5px] -rotate-[8deg] origin-bottom-right pointer-events-none"
+              aria-hidden
             >
-              <Check className="w-3 h-3" /> 16 MÓDULOS · 1 ÚNICO APP
+              <PhoneFrame>
+                <RoutinePhone />
+              </PhoneFrame>
             </motion.div>
-            <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4">
-              Organize sua vida<br />em um só lugar.
-            </h1>
-            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
-              Substitui sua planilha de gastos, seu app de hábitos, seu caderno de metas e mais 13 coisas. Tudo num app simples e bonito.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-8">
-              <Link
-                to="/auth?signup=1"
-                onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
-                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
-              >
-                Testar grátis por 7 dias <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
-              {[
-                { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
-                { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
-                { icon: ShieldCheck, t: "Seus dados seguros", s: "Privacidade total" },
-              ].map((b) => (
-                <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
-                  <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
-                    <b.icon className="w-4 h-4" />
-                  </div>
-                  <div className="text-[12px] font-semibold leading-tight">{b.t}</div>
-                  <div className="text-[10.5px] text-black/50 leading-tight">{b.s}</div>
-                </div>
-              ))}
-            </div>
+
+            {/* Right phone */}
+            <motion.div
+              initial={{ opacity: 0, x: -40, y: 20 }}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.15 }}
+              className="hidden sm:block absolute left-1/2 translate-x-[25%] bottom-4 w-[28%] max-w-[200px] opacity-50 blur-[1.5px] rotate-[8deg] origin-bottom-left pointer-events-none"
+              aria-hidden
+            >
+              <PhoneFrame>
+                <DevPhone />
+              </PhoneFrame>
+            </motion.div>
+
+            {/* Center phone */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7 }}
+              className="relative z-10 w-[68%] sm:w-[44%] max-w-[300px]"
+            >
+              <PhoneFrame>
+                <FinancePhone />
+              </PhoneFrame>
+            </motion.div>
           </div>
 
-          <div className="-mx-2 md:mx-0">
-            <PhoneTrio />
-          </div>
+          <p className="mt-10 text-[12px] md:text-[13px] text-black/50 tracking-wide">
+            Finanças · Rotina · Metas · Hábitos · Estudos · Saúde · <span className="text-black/70 font-medium">+10 áreas</span>
+          </p>
         </div>
-
       </section>
 
       {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}

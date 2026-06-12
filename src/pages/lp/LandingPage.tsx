@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import financasPreviewVideo from "@/assets/financas-preview.mp4.asset.json";
-import rotinaPreviewVideo from "@/assets/rotina-preview.mp4.asset.json";
-import financasPreviewPoster from "@/assets/financas-preview-poster.jpg.asset.json";
-import rotinaPreviewPoster from "@/assets/rotina-preview-poster.jpg.asset.json";
+const financasPreviewVideo = { url: "/videos/financas.mp4" };
+const rotinaPreviewVideo = { url: "/videos/rotina.mp4" };
+const financasPreviewPoster = { url: "/videos/financas-poster.jpg" };
+const rotinaPreviewPoster = { url: "/videos/rotina-poster.jpg" };
 import testimonialMarina from "@/assets/testimonial-marina.jpg.asset.json";
 import testimonialPedro from "@/assets/testimonial-pedro.jpg.asset.json";
 import testimonialJulia from "@/assets/testimonial-julia.jpg.asset.json";

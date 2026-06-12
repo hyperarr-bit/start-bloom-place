@@ -35,7 +35,7 @@ const Beleza = () => {
       <SpotlightOverlay
         moduleKey="beleza"
         steps={[
-          { selector: '[data-spotlight="tab-routine"]', label: "Esta é a aba Rotina — monte sua rotina de skincare. Toque pra continuar.", advanceOnClick: true },
+          
           { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os produtos da sua bancada.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-diary"]', label: "Diário pra acompanhar a evolução da pele.", advanceOnClick: true },
         ]}

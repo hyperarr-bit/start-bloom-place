@@ -68,10 +68,12 @@ export const HydrationTracker = () => {
           {/* Add button */}
           <button
             onClick={addWater}
+            data-spotlight="add-water"
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--saude-blue)/0.12)] hover:bg-[hsl(var(--saude-blue)/0.2)] text-[hsl(var(--saude-blue))] text-xs font-bold transition-colors w-full justify-center border border-[hsl(var(--saude-blue)/0.2)]"
           >
             <Plus className="w-3.5 h-3.5" /> +250ml
           </button>
+
         </div>
       </div>
     </div>

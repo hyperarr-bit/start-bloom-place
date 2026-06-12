@@ -572,7 +572,7 @@ const Carreira = () => {
       <SpotlightOverlay
         moduleKey="carreira"
         steps={[
-          { selector: '[data-spotlight="tab-jobs"]', label: "Acompanhe vagas e candidaturas.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-jobs"]', label: "Esta é a aba Vagas — acompanhe candidaturas. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-skills"]', label: "Mapeie suas skills e o nível alvo.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-portfolio"]', label: "Monte seu portfolio com cases.", advanceOnClick: true },
         ]}

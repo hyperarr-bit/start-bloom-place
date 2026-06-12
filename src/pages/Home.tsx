@@ -102,17 +102,20 @@ const HomePage = () => {
       return;
     }
 
-    // Reset onboarding flags when this is a brand-new user OR a guest replay
+    // Reset onboarding flags only ONCE per activation (guest replay or new-user flag).
+    // Without this gate, every Home mount erased `spotlight-done-*`, so finished
+    // modules never disappeared from the picker.
     if (forceNewUser || isGuest) {
-      const resetKey = forceNewUser ? null : ONBOARDING_RESET_KEY;
-      const alreadyReset = resetKey ? !!get<string>(resetKey, "") : false;
-      if (forceNewUser || !alreadyReset) {
+      const resetKey = forceNewUser ? "force-new-user-reset-done" : ONBOARDING_RESET_KEY;
+      const alreadyReset = !!get<string>(resetKey, "");
+      if (!alreadyReset) {
         setData("core-onboarding-done", "");
         setData("core-all-modules-celebrated", "");
         ALL_MODULES.forEach(m => setData(`spotlight-done-${m}`, ""));
-        if (resetKey) setData(resetKey, "true");
+        setData(resetKey, "true");
       }
     }
+
 
     const pending = computePending();
     setPendingModules(pending);

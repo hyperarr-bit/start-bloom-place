@@ -1,40 +1,36 @@
-# Bugs encontrados no tutorial e correções
+# Correção dos bugs do tutorial guiado (spotlight)
 
-## 1. Convidado é deslogado ao escolher 10 módulos
-**Onde:** `src/App.tsx` linhas 95–107.
-**Problema:** Só `home`, `financas`, `rotina`, `desenvolvimento`, `treino`, `dieta` têm `allowGuest`. Se um convidado escolhe Saúde, Casa, Estudos, Biblioteca, Beleza, Viagens, Carreira, Hiperfoco, Relacionamentos, Pet ou Detox no picker, o `ProtectedRoute` joga ele em `/auth` e o tutorial morre.
-**Fix:** Adicionar `allowGuest` em todas as 10 rotas dos módulos do tutorial.
+## Bugs encontrados na varredura
 
-## 2. Spotlight de Finanças aparece mesmo sem ter sido escolhido
-**Onde:** `src/components/onboarding/SpotlightOverlay.tsx` linha 61.
-**Problema:** A condição `(target === moduleKey || moduleKey === "financas")` força o tutorial a sempre rodar em Finanças para usuário novo, mesmo se ele escolheu só "Rotina" ou outro.
-**Fix:** Remover o `|| moduleKey === "financas"`. O spotlight só dispara quando o módulo aberto bate exatamente com o `quickstart-target-module`.
+**1. Saúde — passo 1 quebrado (sua screenshot)**
+O passo 1 procura o elemento `add-water`, mas esse marcador só existe no módulo Rotina — no módulo Saúde ele não existe. Por isso aparece o card "Não estou encontrando este item na tela".
 
-## 3. Hiperfoco está no picker mas não tem tutorial
-**Onde:** `src/pages/Hiperfoco.tsx` — nenhum `SpotlightOverlay`.
-**Problema:** Usuário escolhe Hiperfoco no picker → navega pra `/hiperfoco` → não acontece nada, parece quebrado.
-**Fix:** Adicionar `<SpotlightOverlay moduleKey="hiperfoco" steps={[...]} />` com 2–3 passos nas tabs principais da página, no mesmo padrão dos outros módulos novos.
+**2. Card do tutorial cortado fora da tela (sua screenshot)**
+O card de fallback (e o botão "Role pra baixo/cima") usa centralização via classe CSS, mas a animação do framer-motion sobrescreve o transform — o card fica colado à direita e cortado. Bug visual em todos os módulos.
 
-## 4. Picker reabre com lista incoerente entre módulos (recém-cadastrado)
-**Onde:** `src/pages/Home.tsx` linha 117 + `SpotlightOverlay.tsx` `finish()`.
-**Problema:** Ao concluir um spotlight, `finish()` limpa `quickstart-target-module` mas **não** limpa `force-new-user-tutorial`. Voltando pra Home, `pending = forceNewUser ? [...ALL_MODULES] : computePending()` ignora o que já foi feito. Visualmente o módulo concluído ainda aparece na lista até o `allDone` final disparar.
-**Fix:** Trocar `pending = forceNewUser ? [...ALL_MODULES] : computePending()` por `pending = computePending()` (sempre). O `spotlight-done-{module}` já é zerado uma vez no início pra usuário novo (linha 112), então `computePending()` reflete corretamente o que falta.
+**3. Passo 1 manda clicar na aba que já está ativa**
+Acontece em 10 módulos: Hiperfoco, Beleza, Biblioteca, Casa, Detox, Pet, Relacionamentos, Viagens, Carreira e Estudos — o primeiro passo aponta pra aba padrão que já está aberta.
 
-## 5. Outros módulos não disparam tutorial depois do primeiro
-**Onde:** consequência do #2 + `SpotlightOverlay.tsx` linha 92.
-**Problema:** Depois de concluir o primeiro módulo escolhido, `finish()` faz `set("quickstart-target-module", "")`. Sem target, nenhum outro módulo dispara o tutorial — o usuário precisaria voltar pra Home e usar o picker de novo, mas o fluxo não direciona pra lá.
-**Fix:** Em vez de limpar o target ao concluir um módulo, redirecionar o usuário de volta pra `/home` para o picker reaparecer com o próximo módulo. Ou seja, em `finish("completed")`: limpar o target **e** navegar pra `/home`. Assim o ciclo escolher → tutorial → voltar pro picker funciona até completar todos os escolhidos.
+**4. Módulo concluído não sai da lista**
+Para usuário recém-cadastrado (flag de novo usuário), TODA vez que a Home abre ela reseta todos os marcadores `spotlight-done-*`. Então você termina o tutorial de um módulo, volta pra Home, e o progresso é apagado — o módulo nunca sai da lista.
 
-## 6. Treino: filtro de tutorial só considera convidado
-**Onde:** `src/pages/Treino.tsx` linhas 174–179.
-**Problema:** `if (!isGuest) return;` — pra usuário recém-cadastrado (`forceNewUser`) a aba "hoje" não é forçada, podendo deixar o spotlight sem alvo na tela.
-**Fix:** Incluir `forceNewUser` na condição, igual ao `SpotlightOverlay.tsx` faz.
+## Correções
 
-## Arquivos afetados
-- `src/App.tsx`
-- `src/components/onboarding/SpotlightOverlay.tsx`
-- `src/pages/Home.tsx`
-- `src/pages/Treino.tsx`
-- `src/pages/Hiperfoco.tsx`
+**SpotlightOverlay.tsx**
+- Corrigir a centralização do card de fallback e do botão "Role pra baixo/cima" usando o transform do próprio framer-motion (`x: "-50%"`), eliminando o corte fora da tela.
 
-Nada mais será mexido — só o que está acima.
+**Home.tsx**
+- Resetar o progresso do tutorial apenas UMA vez quando a flag de novo usuário é ativada (chave de controle), em vez de a cada abertura da Home. Assim módulos concluídos saem da lista corretamente.
+
+**Saúde**
+- Adicionar o marcador `add-water` no botão "+250ml" do HydrationTracker, fazendo o passo 1 destacar o botão certo.
+
+**Passo 1 dos 10 módulos com aba já ativa**
+- Apontar o passo 1 para o elemento principal do conteúdo da aba padrão (ex.: campo de captura de pensamento no Hiperfoco, cadastro de pet no Pet, adicionar pessoa em Relacionamentos, etc.), adicionando `data-spotlight` nesses elementos e ajustando o texto do passo. O passo avança quando o usuário interage com o elemento.
+
+## Detalhes técnicos
+
+- `SpotlightOverlay.tsx`: trocar `-translate-x-1/2` por `x: "-50%"` nas props do motion (fallback card + botão off-screen).
+- `Home.tsx`: gate do reset por chave única (ex.: `force-new-user-reset-done`), limpa junto com a flag.
+- Adição de `data-spotlight` em ~10 componentes filhos (input/botão principal da aba padrão) + atualização dos arrays `steps` nas páginas correspondentes.
+- Nenhuma mudança de backend, paleta ou outras seções.

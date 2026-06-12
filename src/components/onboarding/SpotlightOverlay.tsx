@@ -36,6 +36,7 @@ const PADDING = 8;
 
 export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onComplete }: SpotlightOverlayProps) => {
   const { get, set, isGuest, loaded } = useUserData();
+  const navigate = useNavigate();
   const [active, setActive] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -99,8 +100,13 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       } else {
         setShowCompletion(true);
       }
+      // Volta pra Home pra o picker mostrar o próximo módulo escolhido.
+      const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+      if (isGuest || forceNewUser) {
+        setTimeout(() => navigate("/home"), 1200);
+      }
     }
-  }, [set, moduleKey, onComplete]);
+  }, [set, get, moduleKey, onComplete, isGuest, navigate]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;

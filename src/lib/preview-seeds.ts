@@ -91,11 +91,11 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   },
   saude: {
     ...COMMON,
-    "core-saude-water-goal": 2500,
+    "core-saude-water-goal": 8,
     "core-saude-water": {
-      [iso(today)]: 1500,
-      [daysAgo(1)]: 2500,
-      [daysAgo(2)]: 2200,
+      [iso(today)]: 5,
+      [daysAgo(1)]: 8,
+      [daysAgo(2)]: 7,
     },
     "core-saude-sleep": {
       [daysAgo(0)]: 7.5,

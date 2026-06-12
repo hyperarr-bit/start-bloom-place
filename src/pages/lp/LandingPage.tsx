@@ -3,9 +3,9 @@ const financasPreviewVideo = { url: "/videos/financas.mp4" };
 const rotinaPreviewVideo = { url: "/videos/rotina.mp4" };
 const financasPreviewPoster = { url: "/videos/financas-poster.jpg" };
 const rotinaPreviewPoster = { url: "/videos/rotina-poster.jpg" };
-import testimonialMarina from "@/assets/testimonial-marina.jpg.asset.json";
-import testimonialPedro from "@/assets/testimonial-pedro.jpg.asset.json";
-import testimonialJulia from "@/assets/testimonial-julia.jpg.asset.json";
+const testimonialMarina = { url: "/images/testimonial-marina.jpg" };
+const testimonialPedro = { url: "/images/testimonial-pedro.jpg" };
+const testimonialJulia = { url: "/images/testimonial-julia.jpg" };
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {

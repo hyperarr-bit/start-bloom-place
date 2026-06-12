@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 
 // ── Types ──
@@ -145,6 +146,14 @@ const Estudos = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
+      <SpotlightOverlay
+        moduleKey="estudos"
+        steps={[
+          { selector: '[data-spotlight="tab-estudos"]', label: "Cadastre seus cursos em andamento.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-grade"]', label: "Monte sua grade horária semanal.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-tarefas"]', label: "Registre provas e trabalhos com prazos.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
@@ -161,6 +170,7 @@ const Estudos = () => {
           {TABS.map((tab) => (
             <button
               key={tab.v}
+              data-spotlight={`tab-${tab.v}`}
               onClick={() => handleTabChange(tab.v)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.v ? "notion-tab-active" : "hover:bg-muted"}`}
             >

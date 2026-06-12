@@ -37,7 +37,7 @@ const Relacionamentos = () => {
       <SpotlightOverlay
         moduleKey="relacionamentos"
         steps={[
-          { selector: '[data-spotlight="tab-pessoas"]', label: "Esta é a aba Pessoas — cadastre quem é importante. Toque pra continuar.", advanceOnClick: true },
+          
           { selector: '[data-spotlight="tab-agenda"]', label: "Agenda de aniversários e datas.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-presentes"]', label: "Salve ideias de presente pra cada pessoa.", advanceOnClick: true },
         ]}

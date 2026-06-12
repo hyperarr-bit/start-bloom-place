@@ -35,7 +35,7 @@ const Detox = () => {
       <SpotlightOverlay
         moduleKey="detox"
         steps={[
-          { selector: '[data-spotlight="tab-rastreador"]', label: "Adicione hábitos que quer largar.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-rastreador"]', label: "Esta é a aba Rastreador — adicione hábitos pra largar. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-diario"]', label: "Registre suas reflexões aqui.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-stats"]', label: "Veja seu progresso e streak.", advanceOnClick: true },
         ]}

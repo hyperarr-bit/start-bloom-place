@@ -41,7 +41,7 @@ const Hiperfoco = () => {
       <SpotlightOverlay
         moduleKey="hiperfoco"
         steps={[
-          { selector: '[data-spotlight="tab-dia"]', label: "Capture pensamentos rápidos do seu dia.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-dia"]', label: "Esta é a aba Dia — capture pensamentos rápidos. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-metas"]', label: "Defina metas pra manter o foco.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-ideias"]', label: "Salve ideias pra não esquecer depois.", advanceOnClick: true },
         ]}

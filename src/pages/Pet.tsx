@@ -37,7 +37,7 @@ const Pet = () => {
       <SpotlightOverlay
         moduleKey="pet"
         steps={[
-          { selector: '[data-spotlight="tab-pets"]', label: "Cadastre seus pets aqui.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-pets"]', label: "Esta é a aba Pets — cadastre seus bichinhos. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-saude"]', label: "Registre vacinas e consultas.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-gastos"]', label: "Acompanhe os gastos com o pet.", advanceOnClick: true },
         ]}

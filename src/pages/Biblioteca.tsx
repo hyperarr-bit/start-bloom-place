@@ -306,7 +306,7 @@ const Biblioteca = () => {
       <SpotlightOverlay
         moduleKey="biblioteca"
         steps={[
-          { selector: '[data-spotlight="tab-lendo"]', label: "Marque o livro que está lendo agora.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-lendo"]', label: "Esta é a aba Lendo — marque o livro do momento. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-estante"]', label: "Toda sua estante fica organizada aqui.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-insights"]', label: "Salve citações e destaques marcantes.", advanceOnClick: true },
         ]}

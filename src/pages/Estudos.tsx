@@ -149,7 +149,7 @@ const Estudos = () => {
       <SpotlightOverlay
         moduleKey="estudos"
         steps={[
-          { selector: '[data-spotlight="tab-estudos"]', label: "Cadastre seus cursos em andamento.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-estudos"]', label: "Esta é a aba Estudos — cadastre seus cursos. Toque pra continuar.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-grade"]', label: "Monte sua grade horária semanal.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-tarefas"]', label: "Registre provas e trabalhos com prazos.", advanceOnClick: true },
         ]}

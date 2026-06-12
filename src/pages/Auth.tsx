@@ -102,7 +102,7 @@ const Auth = () => {
         try { setUserData("user-name", name.trim()); } catch {}
         if (session) {
           try { setUserData("force-new-user-tutorial", "true"); } catch {}
-          navigate("/inicio");
+          navigate("/home");
         } else {
           // Email confirmation required by Supabase — fall back to confirm screen
           setConfirmationSent(true);

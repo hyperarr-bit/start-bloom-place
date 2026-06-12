@@ -268,7 +268,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-2.5 max-h-[55dvh] overflow-y-auto pr-1 -mr-1">
+
                 {OPTIONS.map((opt, i) => {
                   const checked = selectedModules.includes(opt.key);
                   return (

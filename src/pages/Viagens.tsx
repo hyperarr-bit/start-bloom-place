@@ -48,7 +48,7 @@ const Viagens = () => {
       <SpotlightOverlay
         moduleKey="viagens"
         steps={[
-          { selector: '[data-spotlight="tab-destinos"]', label: "Esta é a aba Destinos — adicione lugares dos sonhos. Toque pra continuar.", advanceOnClick: true },
+          
           { selector: '[data-spotlight="tab-mala"]', label: "Checklist da mala pra não esquecer nada.", advanceOnClick: true },
           { selector: '[data-spotlight="tab-budget"]', label: "Controle o orçamento da viagem.", advanceOnClick: true },
         ]}

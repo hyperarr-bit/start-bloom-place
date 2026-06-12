@@ -102,17 +102,15 @@ const HomePage = () => {
       return;
     }
 
-    // One-time reset (apenas para convidados): replay onboarding após bump da chave
-    if (isGuest) {
-      const alreadyReset = !!get<string>(ONBOARDING_RESET_KEY, "");
-      if (!alreadyReset) {
+    // Reset onboarding flags when this is a brand-new user OR a guest replay
+    if (forceNewUser || isGuest) {
+      const resetKey = forceNewUser ? null : ONBOARDING_RESET_KEY;
+      const alreadyReset = resetKey ? !!get<string>(resetKey, "") : false;
+      if (forceNewUser || !alreadyReset) {
         setData("core-onboarding-done", "");
-        setData("spotlight-done-financas", "");
-        setData("spotlight-done-rotina", "");
-        setData("spotlight-done-dieta", "");
-        setData("spotlight-done-metas", "");
         setData("core-all-modules-celebrated", "");
-        setData(ONBOARDING_RESET_KEY, "true");
+        ALL_MODULES.forEach(m => setData(`spotlight-done-${m}`, ""));
+        if (resetKey) setData(resetKey, "true");
       }
     }
 

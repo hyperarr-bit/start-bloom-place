@@ -56,20 +56,21 @@ const OPTIONS: Array<{
 ];
 
 const ALL_KEYS: ModuleKey[] = OPTIONS.map(o => o.key);
+const DEFAULT_SELECTED: ModuleKey[] = ["financas", "rotina", "dieta", "metas"];
 
 export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser }: QuickStartOnboardingProps) => {
   const pending = pendingModules ?? ALL_KEYS;
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
 
-  // Selected modules (persisted). If user já escolheu antes, recupera; senão default = todos.
+  // Selected modules (persisted). If user já escolheu antes, recupera; senão default = 4 essenciais.
   const storedSelection = get<ModuleKey[]>("tutorial-selected-modules", []);
   const hasStoredSelection = Array.isArray(storedSelection) && storedSelection.length > 0;
   const [selectedModules, setSelectedModules] = useState<ModuleKey[]>(
-    hasStoredSelection ? storedSelection.filter(k => ALL_KEYS.includes(k)) : ALL_KEYS
+    hasStoredSelection ? storedSelection.filter(k => ALL_KEYS.includes(k)) : [...DEFAULT_SELECTED]
   );
 
-  const effectiveSelected = hasStoredSelection ? selectedModules : ALL_KEYS;
+  const effectiveSelected = hasStoredSelection ? selectedModules : [...DEFAULT_SELECTED];
   const visibleOptions = OPTIONS.filter(o => pending.includes(o.key) && effectiveSelected.includes(o.key));
   const allDone = visibleOptions.length === 0;
 

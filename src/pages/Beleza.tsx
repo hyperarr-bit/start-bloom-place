@@ -10,6 +10,7 @@ import { ProductShelf } from "@/components/beleza/ProductShelf";
 import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
   { id: "routine", label: "Rotina", icon: "✨" },
@@ -31,6 +32,14 @@ const Beleza = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
+      <SpotlightOverlay
+        moduleKey="beleza"
+        steps={[
+          { selector: '[data-spotlight="tab-routine"]', label: "Monte sua rotina de skincare aqui.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-shelf"]', label: "Cadastre os produtos da sua bancada.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-diary"]', label: "Diário pra acompanhar a evolução da pele.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
@@ -47,6 +56,7 @@ const Beleza = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

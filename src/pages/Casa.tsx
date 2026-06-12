@@ -14,6 +14,7 @@ import HomeUtilities from "@/components/casa/HomeUtilities";
 import RoomManager from "@/components/casa/RoomManager";
 import GroceryList from "@/components/casa/GroceryList";
 import CleaningRoutine from "@/components/casa/CleaningRoutine";
+import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
 const tabs = [
   { id: "comodos", label: "CÔMODOS", icon: "🚪" },
@@ -42,6 +43,14 @@ const Casa = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SpotlightOverlay
+        moduleKey="casa"
+        steps={[
+          { selector: '[data-spotlight="tab-comodos"]', label: "Cadastre os cômodos da sua casa.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-rotina"]', label: "Aqui você monta a rotina de limpeza.", advanceOnClick: true },
+          { selector: '[data-spotlight="tab-mercado"]', label: "Lista de compras pronta pra usar.", advanceOnClick: true },
+        ]}
+      />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
@@ -58,6 +67,7 @@ const Casa = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => handleTabChange(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >

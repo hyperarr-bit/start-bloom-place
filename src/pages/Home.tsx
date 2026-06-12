@@ -86,7 +86,7 @@ const HomePage = () => {
       return;
     }
 
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
 
     // Tutorial roda no modo convidado OU para um usuário recém-cadastrado (force-new-user-tutorial).
     if (!isGuest && !forceNewUser) {

@@ -1007,8 +1007,9 @@ export default function LandingPage() {
 
 
       {/* PREÇOS */}
-      <section id="precos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="rounded-2xl border border-black/5 bg-white p-5 md:p-8">
+      <section id="precos" className="lp-enter bg-gradient-to-b from-amber-50 via-amber-100/60 to-amber-50 border-y border-amber-200/60 py-12 md:py-20">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+        <div className="rounded-2xl border border-amber-200 bg-white shadow-[0_8px_30px_-12px_rgba(180,120,0,0.25)] p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
             <div className="text-center md:text-left">
               <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
@@ -1058,7 +1059,9 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+        </div>
       </section>
+
 
       {/* FAQ */}
       <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pb-12 md:pb-20">

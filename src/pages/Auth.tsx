@@ -100,8 +100,9 @@ const Auth = () => {
       } else {
         trackEvent("signup_completed", { method: "password" });
         try { setUserData("user-name", name.trim()); } catch {}
+        try { setUserData("force-new-user-tutorial", "true"); } catch {}
+        try { localStorage.setItem("force-new-user-tutorial", "true"); } catch {}
         if (session) {
-          try { setUserData("force-new-user-tutorial", "true"); } catch {}
           navigate("/home");
         } else {
           // Email confirmation required by Supabase — fall back to confirm screen

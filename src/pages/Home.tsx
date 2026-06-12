@@ -86,7 +86,7 @@ const HomePage = () => {
       return;
     }
 
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
 
     // Tutorial roda no modo convidado OU para um usuário recém-cadastrado (force-new-user-tutorial).
     if (!isGuest && !forceNewUser) {
@@ -156,6 +156,7 @@ const HomePage = () => {
   const handleOnboardingComplete = () => {
     setData("core-onboarding-done", "true");
     setData("force-new-user-tutorial", "");
+    try { localStorage.removeItem("force-new-user-tutorial"); } catch {}
     setShowOnboarding(false);
   };
 
@@ -173,7 +174,7 @@ const HomePage = () => {
   }
 
   if (showOnboarding) {
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "");
+    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     return (
       <AnimatePresence>
         <QuickStartOnboarding

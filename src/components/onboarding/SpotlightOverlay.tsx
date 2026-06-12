@@ -58,7 +58,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
-    const shouldShow = (isGuest || forceNewUser) && !done && (target === moduleKey || moduleKey === "financas");
+    const shouldShow = (isGuest || forceNewUser) && !done && target === moduleKey;
     if (shouldShow) {
       setActive(true);
       trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });

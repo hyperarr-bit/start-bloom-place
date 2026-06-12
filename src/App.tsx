@@ -26,9 +26,10 @@ captureLeadSource();
 
 
 const RootGate = () => {
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
   if (loading) return null;
-  return <Navigate to="/home" replace />;
+  if (user) return <Navigate to="/home" replace />;
+  return <Navigate to="/lp" replace />;
 };
 
 

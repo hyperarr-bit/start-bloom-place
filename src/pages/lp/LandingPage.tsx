@@ -726,9 +726,9 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="lp-enter relative max-w-[1200px] mx-auto px-5 md:px-8 pt-4 md:pt-10 pb-8 md:pb-16">
-        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent via-black/[0.02] to-black/[0.04]" />
-        <div className="relative grid md:grid-cols-2 gap-4 md:gap-10 items-center">
+      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-4 md:pt-10 pb-8 md:pb-16">
+        <div className="grid md:grid-cols-2 gap-4 md:gap-10 items-center">
+
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
             <h1 className="text-[clamp(26px,7.5vw,52px)] leading-[1.05] tracking-[-0.02em] mb-5 mt-0 max-w-[18ch] md:max-w-[20ch] mx-auto md:mx-0">
               <span className="font-medium text-black/80">Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.</span>

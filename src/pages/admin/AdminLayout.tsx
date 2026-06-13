@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
+import ResetAnalyticsButton from "@/components/admin/ResetAnalyticsButton";
 import {
   Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, Filter, UserPlus, BarChart3, BookOpen, CreditCard, Megaphone, GitBranch
 } from "lucide-react";
@@ -54,6 +55,9 @@ export default function AdminLayout() {
         <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
           <Shield className="w-4 h-4 text-emerald-400" />
           <span className="text-xs font-bold tracking-widest uppercase">Admin</span>
+        </div>
+        <div className="p-3 border-b border-zinc-800">
+          <ResetAnalyticsButton onDone={() => window.location.reload()} />
         </div>
         <nav className="flex md:flex-col overflow-x-auto md:overflow-visible p-2 gap-1">
           {navItems.map(({ to, label, Icon }) => (

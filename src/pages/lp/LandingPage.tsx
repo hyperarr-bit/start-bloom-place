@@ -745,21 +745,6 @@ export default function LandingPage() {
                 Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="grid grid-cols-3 gap-3 w-full max-w-md">
-              {[
-                { icon: CalendarDays, t: "7 dias grátis", s: "Sem compromisso" },
-                { icon: XCircle, t: "Cancelamento fácil", s: "Cancele quando quiser" },
-                { icon: ShieldCheck, t: "Tudo conectado", s: "Rotina, metas e finanças juntas" },
-              ].map((b) => (
-                <div key={b.t} className="space-y-1 flex flex-col items-center text-center">
-                  <div className="w-8 h-8 rounded-md bg-black/[0.05] text-black flex items-center justify-center">
-                    <b.icon className="w-4 h-4" />
-                  </div>
-                  <div className="text-[12px] font-semibold leading-tight">{b.t}</div>
-                  <div className="text-[10.5px] text-black/50 leading-tight">{b.s}</div>
-                </div>
-              ))}
-            </div>
 
           </div>
 

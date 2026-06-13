@@ -625,6 +625,7 @@ export type Database = {
           utm_source: string
         }[]
       }
+      admin_lp_funnel: { Args: { _from?: string; _to?: string }; Returns: Json }
       admin_metrics_overview: { Args: never; Returns: Json }
       admin_module_funnel: {
         Args: never

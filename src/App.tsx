@@ -73,6 +73,7 @@ import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
 import AdminUso from "./pages/admin/AdminUso";
 import AdminPaying from "./pages/admin/AdminPaying";
 import AdminAquisicao from "./pages/admin/AdminAquisicao";
+import AdminFunilLP from "./pages/admin/AdminFunilLP";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -125,6 +126,7 @@ const AnimatedRoutes = () => {
           <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
           <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
           <Route path="aquisicao" element={<AdminAquisicao />} />
+          <Route path="funil-lp" element={<AdminFunilLP />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

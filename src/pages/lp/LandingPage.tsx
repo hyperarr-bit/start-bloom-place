@@ -703,8 +703,8 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground pb-20 md:pb-0">
       {/* HEADER */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur border-b border-black/5">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-black/5">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-12 md:h-14 flex items-center justify-between">
           <Link to="/lp" className="font-bold text-[17px] tracking-tight text-black">
             CORE
           </Link>
@@ -718,7 +718,7 @@ export default function LandingPage() {
           <Link
             to="/auth"
             onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
-            className="px-4 py-1.5 rounded-md bg-black hover:bg-black/85 text-white text-sm font-semibold transition"
+            className="px-4 py-2 rounded-lg bg-black hover:bg-black/85 text-white text-sm font-semibold shadow-sm transition"
           >
             Entrar
           </Link>
@@ -726,23 +726,24 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
-        <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-center">
+      <section className="lp-enter relative max-w-[1200px] mx-auto px-5 md:px-8 pt-4 md:pt-10 pb-8 md:pb-16">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-b from-transparent via-black/[0.02] to-black/[0.04]" />
+        <div className="relative grid md:grid-cols-2 gap-4 md:gap-10 items-center">
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <h1 className="text-[30px] md:text-[48px] leading-[1.1] tracking-tight mb-4 mt-2">
+            <h1 className="text-[clamp(26px,7.5vw,52px)] leading-[1.05] tracking-[-0.02em] mb-5 mt-0 max-w-[18ch] md:max-w-[20ch] mx-auto md:mx-0">
               <span className="font-medium text-black/80">Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.</span>
               <br />
               <span className="font-medium text-black/80">Agora, </span>
               <strong className="font-bold text-black">tudo em um só lugar.</strong>
             </h1>
-            <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
+            <p className="text-[15px] md:text-[17px] text-neutral-500 leading-[1.55] mb-7 max-w-[34ch] md:max-w-md mx-auto md:mx-0">
               Finanças, rotina, metas, estudos, treino, dieta, desenvolvimento pessoal e muito mais em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row gap-3 mb-6 w-full sm:w-auto">
               <Link
                 to="/auth?signup=1"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
-                className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm shadow-sm transition"
+                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-black hover:bg-black/90 text-white font-semibold text-[15px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] transition"
               >
                 Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
@@ -751,12 +752,13 @@ export default function LandingPage() {
 
           </div>
 
-          <div className="-mx-2 md:mx-0">
+          <div className="-mx-2 md:mx-0 -mt-2 md:mt-0 relative">
             <PhoneTrio />
           </div>
         </div>
 
       </section>
+
 
       {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}
 

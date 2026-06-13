@@ -727,16 +727,18 @@ export default function LandingPage() {
 
       {/* HERO */}
       <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pt-8 md:pt-16 pb-12 md:pb-20">
-        <div className="grid md:grid-cols-2 gap-10 items-center">
+        <div className="grid md:grid-cols-2 gap-6 md:gap-10 items-center">
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <h1 className="text-[34px] md:text-[56px] leading-[1.05] font-bold tracking-tight mb-4 mt-2">
-
-              Sua vida no controle,<br />sem depender de 7 apps diferentes.
+            <h1 className="text-[30px] md:text-[48px] leading-[1.1] tracking-tight mb-4 mt-2">
+              <span className="font-medium text-black/80">Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.</span>
+              <br />
+              <span className="font-medium text-black/80">Agora, </span>
+              <strong className="font-bold text-black">tudo em um só lugar.</strong>
             </h1>
             <p className="text-[15px] md:text-lg text-black/60 mb-6 max-w-md">
-              Finanças, rotina, metas, estudos, treino, dieta e desenvolvimento pessoal em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
+              Finanças, rotina, metas, estudos, treino, dieta, desenvolvimento pessoal e muito mais em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
               <Link
                 to="/auth?signup=1"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
@@ -745,6 +747,7 @@ export default function LandingPage() {
                 Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
+
 
           </div>
 

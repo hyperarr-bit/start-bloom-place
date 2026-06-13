@@ -56,6 +56,9 @@ export default function AdminLayout() {
           <Shield className="w-4 h-4 text-emerald-400" />
           <span className="text-xs font-bold tracking-widest uppercase">Admin</span>
         </div>
+        <div className="p-3 border-b border-zinc-800">
+          <ResetAnalyticsButton onDone={() => window.location.reload()} />
+        </div>
         <nav className="flex md:flex-col overflow-x-auto md:overflow-visible p-2 gap-1">
           {navItems.map(({ to, label, Icon }) => (
             <NavLink

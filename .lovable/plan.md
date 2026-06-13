@@ -1,36 +1,41 @@
-# Correção dos bugs do tutorial guiado (spotlight)
+## Objetivo
+Refazer o painel **Admin → Funil LP** pra refletir o funil novo (a partir de ~2 dias atrás):
 
-## Bugs encontrados na varredura
+```
+LP view → CTA click → Cadastro → Tutorial (módulo escolhido + concluído) → Trial
+```
 
-**1. Saúde — passo 1 quebrado (sua screenshot)**
-O passo 1 procura o elemento `add-water`, mas esse marcador só existe no módulo Rotina — no módulo Saúde ele não existe. Por isso aparece o card "Não estou encontrando este item na tela".
+O fluxo antigo (tutorial antes do cadastro) é descartado: a função só considera eventos a partir de uma data de corte (default = 2 dias atrás), então sessões anônimas que rodaram o tutorial sem ter passado pelo CTA somem do funil.
 
-**2. Card do tutorial cortado fora da tela (sua screenshot)**
-O card de fallback (e o botão "Role pra baixo/cima") usa centralização via classe CSS, mas a animação do framer-motion sobrescreve o transform — o card fica colado à direita e cortado. Bug visual em todos os módulos.
+## Mudanças
 
-**3. Passo 1 manda clicar na aba que já está ativa**
-Acontece em 10 módulos: Hiperfoco, Beleza, Biblioteca, Casa, Detox, Pet, Relacionamentos, Viagens, Carreira e Estudos — o primeiro passo aponta pra aba padrão que já está aberta.
+### 1. `admin_lp_funnel` (migration — substitui a versão atual)
+Recriar a função com:
 
-**4. Módulo concluído não sai da lista**
-Para usuário recém-cadastrado (flag de novo usuário), TODA vez que a Home abre ela reseta todos os marcadores `spotlight-done-*`. Então você termina o tutorial de um módulo, volta pra Home, e o progresso é apagado — o módulo nunca sai da lista.
+- **Parâmetros:** `_from` (default `now() - 2 days`), `_to` (default `now()`).  
+- **Sessões válidas:** somente `session_id` que tem pelo menos 1 `landing_view` ou `landing_cta_click` no intervalo. Tudo o resto é filtrado por esse set — assim eventos órfãos do fluxo antigo não contam.
+- **Estágios (contagem por sessão única):**
+  1. `visits` — `landing_view`
+  2. `cta_clicks` — `landing_cta_click`
+  3. `signups` — `signup_completed` **ou** `quicksignup_completed`
+  4. `tutorial_started` — `pre_signup_tutorial_started` **ou** `quickstart_module_chosen` ocorrendo depois do signup da sessão
+  5. `module_chosen` — `quickstart_module_chosen`
+  6. `tutorial_completed` — `pre_signup_tutorial_completed` **ou** `quickstart_completed`
+  7. `trials` — `trial_started` **ou** `trial_accepted`
+- **Breakdowns:** CTA (`cta` + clicks + sessões), módulos escolhidos, fontes (`utm_source`), daily (visits, cta, signups, tutorial_completed, trials).
+- Mantém `SECURITY DEFINER` + `has_role(auth.uid(),'admin')`; `GRANT EXECUTE TO authenticated`.
 
-## Correções
+### 2. `src/pages/admin/AdminFunilLP.tsx` (reescrita)
+- **Range default:** “Desde o novo funil” (a partir do corte; ~2 dias) + opções 7d / 30d.
+- **Lista de estágios reordenada** pra nova sequência (`Visitas → CTA → Cadastro → Tutorial iniciado → Módulo escolhido → Tutorial concluído → Trial`), com drop-off entre cada step (já existe).
+- **Novo bloco “Comparador de conversão” no final:**
+  - Visual de funil em camadas (divs com largura proporcional, cor de fundo via tokens, label + % à direita).
+  - Seletor “De → Para” com 2 dropdowns dos estágios → mostra a % calculada (`to / from`) em destaque grande.
+  - Atalhos: Visita→Trial, Visita→Cadastro, CTA→Cadastro, Cadastro→Trial.
+- **Daily** continua como tabela + adiciona mini sparkline simples (svg inline) de visitas vs cadastros vs trials por dia.
+- Sem mudanças em qualquer outra página/app — só admin.
 
-**SpotlightOverlay.tsx**
-- Corrigir a centralização do card de fallback e do botão "Role pra baixo/cima" usando o transform do próprio framer-motion (`x: "-50%"`), eliminando o corte fora da tela.
-
-**Home.tsx**
-- Resetar o progresso do tutorial apenas UMA vez quando a flag de novo usuário é ativada (chave de controle), em vez de a cada abertura da Home. Assim módulos concluídos saem da lista corretamente.
-
-**Saúde**
-- Adicionar o marcador `add-water` no botão "+250ml" do HydrationTracker, fazendo o passo 1 destacar o botão certo.
-
-**Passo 1 dos 10 módulos com aba já ativa**
-- Apontar o passo 1 para o elemento principal do conteúdo da aba padrão (ex.: campo de captura de pensamento no Hiperfoco, cadastro de pet no Pet, adicionar pessoa em Relacionamentos, etc.), adicionando `data-spotlight` nesses elementos e ajustando o texto do passo. O passo avança quando o usuário interage com o elemento.
-
-## Detalhes técnicos
-
-- `SpotlightOverlay.tsx`: trocar `-translate-x-1/2` por `x: "-50%"` nas props do motion (fallback card + botão off-screen).
-- `Home.tsx`: gate do reset por chave única (ex.: `force-new-user-reset-done`), limpa junto com a flag.
-- Adição de `data-spotlight` em ~10 componentes filhos (input/botão principal da aba padrão) + atualização dos arrays `steps` nas páginas correspondentes.
-- Nenhuma mudança de backend, paleta ou outras seções.
+### Detalhes técnicos
+- Migration: `DROP FUNCTION public.admin_lp_funnel(timestamptz, timestamptz);` e recriar.
+- Tipos: regenerados automaticamente após a migration; o componente usa `(supabase as any).rpc(...)` então não trava antes disso.
+- Sem deletar dados do banco — só ignorados no agregado via filtro por data + sessão válida.

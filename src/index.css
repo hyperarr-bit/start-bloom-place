@@ -602,7 +602,10 @@ body,
   max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
+  /* `clip` evita overflow horizontal SEM virar scroll container — `hidden`
+     forçaria overflow-y de `visible` para `auto`, criando 3 scrollers aninhados
+     (html/body/#root) e o efeito elástico de "não desce e volta" no mobile. */
+  overflow-x: clip;
   touch-action: auto;
   background-color: hsl(var(--background));
 }

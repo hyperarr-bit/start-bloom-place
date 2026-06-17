@@ -32,13 +32,22 @@ const fmtDate = (s: string) =>
   new Date(s + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 
 const CTA_LABELS: Record<string, string> = {
+  // Demo — testar antes de assinar
+  hero_demo: "Hero — Testar demo",
+  demo_band: "Faixa de demo — Abrir módulo",
+  grid_demo: "Grid de módulos — Abrir demo",
+  spotlight_demo: "Spotlight — Abrir demo",
+  final_demo: "CTA final — Ver demo",
+  mobile_demo: "Barra fixa — Testar demo",
+  // Assinar / conta
   header_entrar: "Header — Entrar",
-  header_signup: "Header — Começar grátis",
-  hero_signup: "Hero — Começar teste grátis",
+  header_signup: "Header — Assinar",
   pricing_anual: "Preços — Plano anual",
   pricing_mensal: "Preços — Plano mensal",
-  final_signup: "CTA final — Começar teste",
-  mobile_sticky: "Barra fixa mobile",
+  final_signup: "CTA final — Assinar",
+  mobile_sticky: "Barra fixa — Assinar",
+  // Legado (eventos antigos)
+  hero_signup: "Hero — Começar (legado)",
 };
 
 export default function AdminFunilLP() {
@@ -67,7 +76,7 @@ export default function AdminFunilLP() {
 
   const stages = useMemo(() => {
     if (!data) return [];
-    const t = data.totals ?? {};
+    const t: Partial<FunnelData["totals"]> = data.totals ?? {};
     return [
       { key: "visits",  label: "Visitas únicas (/lp)",           n: (t.visits     ?? 0), Icon: Eye },
       { key: "cta",     label: "Clicaram em algum CTA",           n: (t.cta_clicks ?? 0), Icon: MousePointerClick },
@@ -153,7 +162,7 @@ export default function AdminFunilLP() {
 
           {/* KPIs principais */}
           {(() => {
-            const t = data.totals ?? {};
+            const t: Partial<FunnelData["totals"]> = data.totals ?? {};
             const visits = t.visits ?? 0;
             const cta = t.cta_clicks ?? 0;
             const signups = t.signups ?? 0;

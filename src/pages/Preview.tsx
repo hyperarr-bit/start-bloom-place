@@ -50,10 +50,10 @@ const PreviewBanner = () => (
         </span>
       </div>
       <Link
-        to="/auth"
+        to="/auth?signup=1"
         className="shrink-0 bg-white text-violet-700 font-semibold px-3 py-1 rounded-md hover:bg-white/90 transition text-[11px] md:text-xs whitespace-nowrap"
       >
-        Criar conta grátis
+        Assinar
       </Link>
     </div>
   </div>

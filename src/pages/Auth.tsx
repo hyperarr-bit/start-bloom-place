@@ -103,7 +103,7 @@ const Auth = () => {
         try { setUserData("force-new-user-tutorial", "true"); } catch {}
         try { localStorage.setItem("force-new-user-tutorial", "true"); } catch {}
         if (session) {
-          navigate("/home");
+          navigate("/planos");
         } else {
           // Email confirmation required by Supabase — fall back to confirm screen
           setConfirmationSent(true);
@@ -141,7 +141,7 @@ const Auth = () => {
               Verifique sua caixa de entrada e clique no link para ativar sua conta.
             </p>
             <p className="text-xs text-muted-foreground">
-              Seu teste grátis de 7 dias começa assim que confirmar o e-mail.
+              Assim que confirmar o e-mail, é só escolher seu plano e começar — com garantia de 7 dias.
             </p>
           </div>
 
@@ -170,7 +170,7 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta — 7 dias grátis"}
+            {isLogin ? "Entre na sua conta" : "Crie sua conta e comece hoje"}
           </p>
         </div>
 
@@ -231,7 +231,7 @@ const Auth = () => {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                {isLogin ? "Entrar" : "Criar conta grátis"}
+                {isLogin ? "Entrar" : "Criar conta"}
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -277,7 +277,7 @@ const Auth = () => {
             <p className="text-sm">
               <span className="text-muted-foreground">Não tem conta? </span>
               <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie agora — 7 dias grátis
+                Crie sua conta
               </button>
             </p>
           ) : (
@@ -300,11 +300,10 @@ const Auth = () => {
               className="overflow-hidden"
             >
               <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
+                <p className="text-xs font-medium">✨ O que você leva:</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
-                  <li>• Sem cartão de crédito · Cancele quando quiser</li>
-                  
+                  <li>• Acesso completo aos <strong>16 módulos</strong>, sem upsell</li>
+                  <li>• Garantia de 7 dias · cancele quando quiser, sem fidelidade</li>
                 </ul>
               </div>
             </motion.div>

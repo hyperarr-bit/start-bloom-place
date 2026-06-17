@@ -727,5 +727,10 @@ header.sticky.top-0 {
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-enter { opacity: 1; transform: none; animation: none; }
+  .btn-shine::after { animation: none; display: none; }
 }
+
+/* Scroll horizontal sem barra (chips da faixa de demo no mobile) */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 

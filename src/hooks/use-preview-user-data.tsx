@@ -25,7 +25,7 @@ export const PreviewUserDataProvider = ({
     setStore((prev) => ({ ...prev, [key]: value }));
     if (!toastShown.current) {
       toastShown.current = true;
-      toast.info("Modo demonstração — crie sua conta grátis para salvar suas alterações.");
+      toast.info("Modo demonstração — crie sua conta para salvar suas alterações.");
       setTimeout(() => { toastShown.current = false; }, 6000);
     }
   }, []);

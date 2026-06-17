@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
@@ -31,13 +31,18 @@ export default function AdminLayout() {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) { navigate("/admin", { replace: true }); return; }
-    if (user.email !== ADMIN_EMAIL) { setAllowed(false); navigate("/admin", { replace: true }); return; }
+    if (!user) { setAllowed(false); return; }
+    if (user.email !== ADMIN_EMAIL) { setAllowed(false); return; }
+    const timeout = setTimeout(() => setAllowed(false), 6000);
     checkIsAdmin(user.id).then(ok => {
+      clearTimeout(timeout);
       setAllowed(ok);
-      if (!ok) navigate("/admin", { replace: true });
+    }).catch(() => {
+      clearTimeout(timeout);
+      setAllowed(false);
     });
-  }, [user, loading, navigate]);
+    return () => clearTimeout(timeout);
+  }, [user, loading]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -47,7 +52,7 @@ export default function AdminLayout() {
   if (loading || allowed === null) {
     return <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">Verificando…</div>;
   }
-  if (!allowed) return null;
+  if (!allowed) return <Navigate to="/admin" replace />;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row">

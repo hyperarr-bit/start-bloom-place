@@ -620,13 +620,16 @@ const PricingPlans = () => {
           <span className="text-3xl font-bold">R$ 3,90</span>
           <span className="text-sm text-black/50">/mês</span>
         </div>
-        <div className="text-[12px] text-black/50 mb-4">
-          Pago anualmente<br />R$ 46,80/ano
+        <div className="text-[12px] text-black/50 mb-2">
+          Pago anualmente · R$ 46,80/ano
+        </div>
+        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+          Economize R$ 132/ano
         </div>
         <Link
           to="/auth?signup=1"
           onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_anual" }); }}
-          className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
+          className="btn-shine block w-full text-center py-2.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition"
         >
           Começar agora
         </Link>
@@ -652,8 +655,8 @@ const PricingPlans = () => {
           <span className="text-3xl font-bold">R$ 14,90</span>
           <span className="text-sm text-black/50">/mês</span>
         </div>
-        <div className="text-[12px] text-black/50 mb-4">
-          Pago mensalmente<br />R$ 14,90/mês
+        <div className="text-[12px] text-black/50 mb-4 mt-[26px]">
+          Pago mensalmente · flexível
         </div>
         <Link
           to="/auth?signup=1"
@@ -666,6 +669,89 @@ const PricingPlans = () => {
     </div>
   );
 };
+
+/* =========================================================
+   COMO FUNCIONA — 3 passos
+   ========================================================= */
+
+const HOW_STEPS = [
+  { Icon: LayoutGrid, t: "Escolha uma área", s: "Comece pelo que mais te aperta hoje — finanças, rotina, saúde. Não precisa configurar tudo." },
+  { Icon: Zap, t: "Use em segundos", s: "Marque um hábito, lance um gasto, anote uma meta. Sem fricção, sem manual." },
+  { Icon: Trophy, t: "Veja o progresso", s: "Streaks, metas e evolução aparecem sozinhos. Bate vontade de continuar." },
+];
+
+const HowItWorks = () => (
+  <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
+    <div className="text-center mb-10">
+      <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">COMO FUNCIONA</div>
+      <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Simples desde o primeiro toque.</h2>
+    </div>
+    <div className="grid md:grid-cols-3 gap-4 md:gap-5">
+      {HOW_STEPS.map((step, i) => (
+        <div key={step.t} className="relative rounded-2xl border border-black/10 bg-white p-6">
+          <div className="absolute top-5 right-5 text-[34px] font-bold text-black/[0.06] leading-none">{i + 1}</div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+            <step.Icon className="w-5 h-5" strokeWidth={2.2} />
+          </div>
+          <div className="font-bold text-[16px] mb-1.5">{step.t}</div>
+          <div className="text-[13.5px] text-black/55 leading-snug">{step.s}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+);
+
+/* =========================================================
+   GRID DE MÓDULOS — amplitude num relance
+   ========================================================= */
+
+const ModulesGrid = () => (
+  <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+    <div className="text-center mb-10">
+      <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">16 MÓDULOS, 1 APP</div>
+      <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
+      <p className="text-[14px] md:text-[15px] text-black/55 mt-3 max-w-[52ch] mx-auto">
+        Ative só o que faz sentido pra você. O plano inclui todos — sem upsell escondido.
+      </p>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-3">
+      {MODULES.map((m) => {
+        const Icon = m.icon;
+        return (
+          <a
+            key={m.key}
+            href={`/preview/${m.key === "dev" ? "desenvolvimento" : m.key}`}
+            target="_blank"
+            rel="noopener"
+            className={`group rounded-xl border ${m.bg} p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]`}
+          >
+            <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
+              <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
+            </div>
+            <div className={`font-bold text-[12.5px] ${m.titleColor} tracking-wide leading-tight`}>{m.title}</div>
+            <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
+          </a>
+        );
+      })}
+    </div>
+  </section>
+);
+
+/* =========================================================
+   BARRA FIXA MOBILE — CTA sempre visível
+   ========================================================= */
+
+const StickyMobileCTA = () => (
+  <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white/85 backdrop-blur-md border-t border-black/10 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <Link
+      to="/auth?signup=1"
+      onClick={() => trackEvent("landing_cta_click", { cta: "mobile_sticky" })}
+      className="btn-shine flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[15px] shadow-[0_8px_24px_-10px_rgba(5,150,105,0.6)] transition"
+    >
+      Começar 7 dias grátis <ArrowRight className="w-4 h-4" />
+    </Link>
+  </div>
+);
 
 /* =========================================================
    PAGE
@@ -715,13 +801,22 @@ export default function LandingPage() {
             <a href="#precos" className="hover:text-black">Preços</a>
             <a href="#faq" className="hover:text-black">Perguntas</a>
           </nav>
-          <Link
-            to="/auth"
-            onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
-            className="px-4 py-2 rounded-lg bg-black hover:bg-black/85 text-white text-sm font-semibold shadow-sm transition"
-          >
-            Entrar
-          </Link>
+          <div className="flex items-center gap-2 md:gap-3">
+            <Link
+              to="/auth"
+              onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
+              className="text-sm font-semibold text-black/70 hover:text-black px-2 py-2 transition"
+            >
+              Entrar
+            </Link>
+            <Link
+              to="/auth?signup=1"
+              onClick={() => trackEvent("landing_cta_click", { cta: "header_signup" })}
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm transition"
+            >
+              Começar grátis
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -730,26 +825,44 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-4 md:gap-10 items-center">
 
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <h1 className="text-[clamp(26px,7.5vw,52px)] leading-[1.05] tracking-[-0.02em] mb-5 mt-0 max-w-[18ch] md:max-w-[20ch] mx-auto md:mx-0">
-              <span className="font-medium text-black/80">Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.</span>
-              <br />
-              <span className="font-medium text-black/80">Agora, </span>
-              <strong className="font-bold text-black">tudo em um só lugar.</strong>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[12px] font-semibold mb-5">
+              <Sparkles className="w-3.5 h-3.5" /> 16 módulos. 1 app. Sua vida toda.
+            </div>
+            <h1 className="text-[clamp(34px,8vw,64px)] font-bold leading-[1.02] tracking-[-0.03em] text-[#0a0a0a] mb-5 mt-0 max-w-[16ch] md:max-w-[15ch] mx-auto md:mx-0">
+              Sua vida inteira, organizada num só lugar.
             </h1>
-            <p className="text-[15px] md:text-[17px] text-neutral-500 leading-[1.55] mb-7 max-w-[34ch] md:max-w-md mx-auto md:mx-0">
-              Finanças, rotina, metas, estudos, treino, dieta, desenvolvimento pessoal e muito mais em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
+            <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[40ch] md:max-w-md mx-auto md:mx-0">
+              Finanças, rotina, saúde, metas e mais 12 áreas — num app simples que você abre todo dia, sem virar mais uma tarefa.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-6 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full sm:w-auto">
               <Link
                 to="/auth?signup=1"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
-                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-black hover:bg-black/90 text-white font-semibold text-[15px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] transition"
+                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(5,150,105,0.55)] transition"
               >
-                Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
+                Começar 7 dias grátis <ArrowRight className="w-4 h-4" />
               </Link>
+              <a
+                href="#financas"
+                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[15px] transition"
+              >
+                Ver demonstração
+              </a>
             </div>
-
-
+            <p className="text-[13px] text-neutral-500 mb-5">
+              Sem cartão de crédito · Cancele quando quiser
+            </p>
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5 text-[12.5px] text-black/60">
+              {[
+                { Icon: ShieldCheck, t: "Dados criptografados" },
+                { Icon: Wifi, t: "Funciona offline" },
+                { Icon: Smartphone, t: "Celular e desktop" },
+              ].map((b) => (
+                <span key={b.t} className="inline-flex items-center gap-1.5">
+                  <b.Icon className="w-3.5 h-3.5 text-emerald-600" /> {b.t}
+                </span>
+              ))}
+            </div>
           </div>
 
           <div className="-mx-2 md:mx-0 -mt-2 md:mt-0 relative">
@@ -760,7 +873,11 @@ export default function LandingPage() {
       </section>
 
 
-      {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}
+      {/* COMO FUNCIONA */}
+      <HowItWorks />
+
+      {/* GRID DE MÓDULOS — amplitude */}
+      <ModulesGrid />
 
       {/* RECURSOS — carrossel (deep-dive) */}
       <section id="recursos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
@@ -914,6 +1031,11 @@ export default function LandingPage() {
               </div>
             </div>
             <div>
+              <div className="flex justify-end mb-2.5">
+                <span className="inline-flex items-center gap-1 text-[10.5px] text-white/45 px-2 py-0.5 rounded-full border border-white/10">
+                  Exemplo ilustrativo
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-2.5 md:gap-3">
                 <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
                   <Flame className="w-5 h-5 text-orange-400 mb-2" strokeWidth={2} />
@@ -1022,8 +1144,8 @@ export default function LandingPage() {
       {/* DEPOIMENTOS */}
       <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="text-center mb-10">
-          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">QUEM JÁ USA</div>
-          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+          <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">PRIMEIROS USUÁRIOS</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">
             O que estão dizendo.
           </h2>
         </div>
@@ -1078,11 +1200,18 @@ export default function LandingPage() {
         <div className="rounded-2xl border border-amber-200 bg-white shadow-[0_8px_30px_-12px_rgba(180,120,0,0.25)] p-5 md:p-8">
           <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
             <div className="text-center md:text-left">
-              <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
-              <p className="text-[13px] text-black/50 mb-3">7 dias grátis · Cancele quando quiser</p>
-              <p className="text-[12px] text-black/60 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
-                <Check className="w-3 h-3" /> Inclui todos os 16 módulos
+              <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Um app no lugar<br />de dez.</h2>
+              <p className="text-[14px] text-black/60 mb-4 leading-relaxed">
+                Menos que um café por mês pra ter finanças, rotina, saúde e mais 13 áreas organizadas.
               </p>
+              <div className="flex flex-col items-center md:items-start gap-2">
+                <p className="text-[12px] text-black/70 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
+                  <Check className="w-3 h-3" /> Inclui todos os 16 módulos
+                </p>
+                <p className="text-[12px] text-black/70 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
+                  <ShieldCheck className="w-3 h-3" /> 7 dias grátis · sem cartão · cancele em 1 clique
+                </p>
+              </div>
             </div>
             <PricingPlans />
 
@@ -1121,9 +1250,9 @@ export default function LandingPage() {
           <Link
             to="/auth?signup=1"
             onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
-            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-white text-black hover:bg-white/90 font-semibold text-sm transition whitespace-nowrap"
+            className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(5,150,105,0.6)] transition whitespace-nowrap"
           >
-            Quero testar o CORE <ArrowRight className="w-4 h-4" />
+            Começar 7 dias grátis <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
@@ -1168,6 +1297,8 @@ export default function LandingPage() {
         </div>
       </footer>
 
+      {/* CTA FIXO MOBILE */}
+      <StickyMobileCTA />
     </div>
   );
 }

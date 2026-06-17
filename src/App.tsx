@@ -61,7 +61,6 @@ import Conquistas from "./pages/Conquistas";
 import LandingPage from "./pages/lp/LandingPage";
 import Preview from "./pages/Preview";
 
-import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminChurn from "./pages/admin/AdminChurn";
 import AdminUsers from "./pages/admin/AdminUsers";
@@ -107,7 +106,6 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="pet"><TrackedModule moduleId="pet"><PetPage /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="detox"><TrackedModule moduleId="detox"><Detox /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
-        <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="visao-geral" replace />} />
           <Route path="visao-geral" element={<AdminOverview />} />

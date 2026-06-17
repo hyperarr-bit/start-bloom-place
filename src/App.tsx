@@ -68,12 +68,12 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminTrials from "./pages/admin/AdminTrials";
 import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
 import AdminRetention from "./pages/admin/AdminRetention";
-import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
 import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
-import AdminUso from "./pages/admin/AdminUso";
 import AdminPaying from "./pages/admin/AdminPaying";
 import AdminAquisicao from "./pages/admin/AdminAquisicao";
 import AdminFunilLP from "./pages/admin/AdminFunilLP";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminEngajamento from "./pages/admin/AdminEngajamento";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -109,24 +109,28 @@ const AnimatedRoutes = () => {
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="funil" replace />} />
-          <Route path="funil" element={<AdminFinanceFunnel />} />
-          <Route path="pagantes" element={<AdminPaying />} />
-          <Route path="tutorial-inicial" element={<AdminTutorialInicial />} />
-          <Route path="usuarios" element={<AdminUsers />} />
+          <Route index element={<Navigate to="visao-geral" replace />} />
+          <Route path="visao-geral" element={<AdminOverview />} />
+          <Route path="funil-lp" element={<AdminFunilLP />} />
+          <Route path="onboarding" element={<AdminTutorialInicial />} />
+          <Route path="engajamento" element={<AdminEngajamento />} />
+          <Route path="receita" element={<AdminPaying />} />
+          <Route path="aquisicao" element={<AdminAquisicao />} />
           <Route path="trials" element={<AdminTrials />} />
-          <Route path="emails" element={<AdminEmailVariants />} />
+          <Route path="usuarios" element={<AdminUsers />} />
           <Route path="churn" element={<AdminChurn />} />
           <Route path="retention" element={<AdminRetention />} />
-          <Route path="uso" element={<AdminUso />} />
-          <Route path="dashboard" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="analytics" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="conversao" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="ativacao" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="aquisicao" element={<AdminAquisicao />} />
-          <Route path="funil-lp" element={<AdminFunilLP />} />
+          <Route path="emails" element={<AdminEmailVariants />} />
+          {/* redirecionamentos de rotas antigas */}
+          <Route path="pagantes" element={<Navigate to="/admin/receita" replace />} />
+          <Route path="tutorial-inicial" element={<Navigate to="/admin/onboarding" replace />} />
+          <Route path="uso" element={<Navigate to="/admin/engajamento" replace />} />
+          <Route path="funil" element={<Navigate to="/admin/funil-lp" replace />} />
+          <Route path="dashboard" element={<Navigate to="/admin/visao-geral" replace />} />
+          <Route path="analytics" element={<Navigate to="/admin/visao-geral" replace />} />
+          <Route path="conversao" element={<Navigate to="/admin/funil-lp" replace />} />
+          <Route path="ativacao" element={<Navigate to="/admin/engajamento" replace />} />
+          <Route path="tutorial-compare" element={<Navigate to="/admin/onboarding" replace />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

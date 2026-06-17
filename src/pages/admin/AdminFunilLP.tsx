@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { RefreshCw, ArrowDownRight, Eye, MousePointerClick, UserPlus, BookOpen, LayoutGrid, CheckCircle2, Rocket, ArrowRight } from "lucide-react";
+import { moduleLabel } from "./labels";
 
 type CtaRow = { cta: string; clicks: number; sessions: number };
 type ModRow = { module: string; chosen: number; unique_users: number };
@@ -216,7 +217,7 @@ export default function AdminFunilLP() {
                 <tbody>
                   {data.module_breakdown.map((r, i) => (
                     <tr key={i} className="border-t border-zinc-800/50">
-                      <td className="px-3 py-2 text-zinc-100 font-medium capitalize">{r.module}</td>
+                      <td className="px-3 py-2 text-zinc-100 font-medium">{moduleLabel(r.module)}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-zinc-200">{r.chosen}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-zinc-300">{r.unique_users}</td>
                     </tr>

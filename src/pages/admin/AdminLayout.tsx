@@ -5,23 +5,23 @@ import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
 import ResetAnalyticsButton from "@/components/admin/ResetAnalyticsButton";
 import {
-  Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, Filter, UserPlus, BarChart3, BookOpen, CreditCard, Megaphone, GitBranch
+  Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, UserPlus, BarChart3, BookOpen, CreditCard, Megaphone, GitBranch, LayoutDashboard
 } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
 
 const navItems = [
+  { to: "/admin/visao-geral", label: "Visão Geral", Icon: LayoutDashboard },
   { to: "/admin/funil-lp", label: "Funil LP", Icon: GitBranch },
-  { to: "/admin/funil", label: "Funil", Icon: Filter },
-  { to: "/admin/pagantes", label: "Pagantes", Icon: CreditCard },
+  { to: "/admin/onboarding", label: "Onboarding", Icon: BookOpen },
+  { to: "/admin/engajamento", label: "Engajamento", Icon: BarChart3 },
+  { to: "/admin/receita", label: "Receita", Icon: CreditCard },
   { to: "/admin/aquisicao", label: "Aquisição", Icon: Megaphone },
-  { to: "/admin/tutorial-inicial", label: "Tutorial Inicial", Icon: BookOpen },
-  { to: "/admin/uso", label: "Uso", Icon: BarChart3 },
   { to: "/admin/trials", label: "Trials", Icon: UserPlus },
   { to: "/admin/usuarios", label: "Usuários", Icon: Users },
-  { to: "/admin/emails", label: "E-mails", Icon: Mail },
   { to: "/admin/churn", label: "Churn", Icon: TrendingDown },
-  { to: "/admin/retention", label: "Retention", Icon: ShieldCheck },
+  { to: "/admin/retention", label: "Retenção", Icon: ShieldCheck },
+  { to: "/admin/emails", label: "E-mails", Icon: Mail },
 ];
 
 export default function AdminLayout() {

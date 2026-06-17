@@ -67,12 +67,12 @@ export default function AdminFunilLP() {
 
   const stages = useMemo(() => {
     if (!data) return [];
-    const t = data.totals;
+    const t = data.totals ?? {};
     return [
-      { key: "visits",  label: "Visitas únicas (/lp)",          n: t.visits,     Icon: Eye },
-      { key: "cta",     label: "Clicaram em algum CTA",          n: t.cta_clicks, Icon: MousePointerClick },
-      { key: "signup",  label: "Criaram conta (= trial iniciado)", n: t.signups,  Icon: UserPlus },
-      { key: "paid",    label: "Viraram pagantes",               n: t.paid,       Icon: CreditCard },
+      { key: "visits",  label: "Visitas únicas (/lp)",           n: (t.visits     ?? 0), Icon: Eye },
+      { key: "cta",     label: "Clicaram em algum CTA",           n: (t.cta_clicks ?? 0), Icon: MousePointerClick },
+      { key: "signup",  label: "Criaram conta (= trial iniciado)", n: (t.signups   ?? 0), Icon: UserPlus },
+      { key: "paid",    label: "Viraram pagantes",                n: (t.paid       ?? 0), Icon: CreditCard },
     ];
   }, [data]);
 
@@ -152,12 +152,21 @@ export default function AdminFunilLP() {
           </div>
 
           {/* KPIs principais */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KpiCard label="Visita → CTA"   value={fmtPct(data.totals.cta_clicks, data.totals.visits)} />
-            <KpiCard label="CTA → Cadastro" value={fmtPct(data.totals.signups, data.totals.cta_clicks)} />
-            <KpiCard label="Cadastro → Pagante" value={fmtPct(data.totals.paid, data.totals.signups)} />
-            <KpiCard label="Visita → Pagante" value={fmtPct(data.totals.paid, data.totals.visits)} />
-          </div>
+          {(() => {
+            const t = data.totals ?? {};
+            const visits = t.visits ?? 0;
+            const cta = t.cta_clicks ?? 0;
+            const signups = t.signups ?? 0;
+            const paid = t.paid ?? 0;
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KpiCard label="Visita → CTA"        value={fmtPct(cta,     visits)} />
+                <KpiCard label="CTA → Cadastro"      value={fmtPct(signups, cta)} />
+                <KpiCard label="Cadastro → Pagante"  value={fmtPct(paid,    signups)} />
+                <KpiCard label="Visita → Pagante"    value={fmtPct(paid,    visits)} />
+              </div>
+            );
+          })()}
 
           {/* CTA breakdown */}
           <Section title="Cliques por CTA" hint="Quem clicou em qual botão da /lp">

@@ -1,6 +1,7 @@
 // Seeds de demonstração para o modo /preview/:modulo.
 // Cada entrada é um snapshot in-memory pra dar a sensação de app cheio.
 // Adicionar mais chaves aqui = preview mais rico.
+import { FINANCAS_SEED } from "./preview-seeds-financas";
 
 const today = new Date();
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -20,31 +21,9 @@ const COMMON: Record<string, any> = {
 };
 
 export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
-  financas: {
-    ...COMMON,
-    "finance-incomes": [
-      { id: "1", source: "Salário", value: 5000, day: 5 },
-      { id: "2", source: "Freelance", value: 1200, day: 20 },
-    ],
-    "finance-fixed-expenses": [
-      { id: "1", name: "Aluguel", value: 1500, day: 10 },
-      { id: "2", name: "Internet", value: 120, day: 15 },
-      { id: "3", name: "Academia", value: 99, day: 5 },
-    ],
-    "finance-expenses": [
-      { id: "1", name: "Mercado", value: 420, category: "Alimentação", date: daysAgo(2) },
-      { id: "2", name: "Uber", value: 38, category: "Transporte", date: daysAgo(1) },
-      { id: "3", name: "Cinema", value: 60, category: "Lazer", date: daysAgo(4) },
-    ],
-    "finance-investments": [
-      { id: "1", name: "Tesouro Selic", value: 8000, type: "Renda Fixa" },
-      { id: "2", name: "ITSA4", value: 2500, type: "Ações" },
-    ],
-    "finance-goals": [
-      { id: "1", name: "Reserva de emergência", target: 15000, current: 6200 },
-      { id: "2", name: "Viagem Japão", target: 12000, current: 1800 },
-    ],
-  },
+  // Snapshot de conta real → formato 100% compatível com o módulo (sem NaN,
+  // sem Invalid Date, aba de Investimentos funcionando).
+  financas: { ...COMMON, ...FINANCAS_SEED },
   rotina: {
     ...COMMON,
     "core-rotina-habits": [

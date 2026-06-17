@@ -108,25 +108,80 @@ serve(async (req) => {
     const couponRaw = parsed.data.coupon?.trim().toUpperCase();
     const cfg = PRODUCT_CONFIG[billingPeriod];
 
-    // Validate coupon: WINBACK80 is annual-only and one-time per user
-    let couponValid = false;
-    if (couponRaw === "WINBACK80") {
-      if (billingPeriod !== "annual") {
-        logStep("Coupon WINBACK80 rejected: not annual");
+    // ---- Promo catalog -----------------------------------------------------
+    // Cada promo usa um PRODUTO separado pré-registrado na AbacatePay com o
+    // preço já com desconto, então a API cobra o valor promocional nativamente.
+    // A ativação no webhook usa metadata.user_id + billing_period, então o
+    // produto usado não afeta a liberação da assinatura.
+    type PromoProduct = { configKey: string; externalId: string; name: string; description: string; price: number };
+    type PromoDef = {
+      coupon: string;
+      offerType: string; // retention_offers_used.offer_type (anti-abuso 1x/usuário)
+      discountPct: number;
+      products: Partial<Record<BillingPeriod, PromoProduct>>;
+    };
+    const PROMOS: Record<string, PromoDef> = {
+      WINBACK80: {
+        coupon: "WINBACK80",
+        offerType: "winback80",
+        discountPct: 80,
+        products: {
+          annual: {
+            configKey: "abacatepay_product_annual_winback80_v2_id",
+            externalId: "core-pro-annual-winback80-v2",
+            name: "CORE Pro Anual — Oferta Winback",
+            description: "Oferta exclusiva de retenção — R$ 2,90/mês equivalente (R$ 34,80/ano)",
+            price: 3480,
+          },
+        },
+      },
+      DOWNSELL: {
+        coupon: "DOWNSELL",
+        offerType: "downsell",
+        discountPct: 0,
+        products: {
+          monthly: {
+            configKey: "abacatepay_product_monthly_downsell_v1_id",
+            externalId: "core-pro-monthly-downsell-v1",
+            name: "CORE Pro Mensal — Oferta",
+            description: "Oferta de saída — R$ 9,90/mês",
+            price: 990,
+          },
+          annual: {
+            configKey: "abacatepay_product_annual_downsell_v1_id",
+            externalId: "core-pro-annual-downsell-v1",
+            name: "CORE Pro Anual — Oferta",
+            description: "Oferta de saída — R$ 2,99/mês (R$ 35,88/ano)",
+            price: 3588,
+          },
+        },
+      },
+    };
+
+    // Valida cupom: precisa existir, ter produto pro billing escolhido e ser 1x/usuário.
+    let promo: PromoDef | null = null;
+    let promoProduct: PromoProduct | null = null;
+    if (couponRaw && PROMOS[couponRaw]) {
+      const candidate = PROMOS[couponRaw];
+      const prod = candidate.products[billingPeriod];
+      if (!prod) {
+        logStep(`Coupon ${couponRaw} rejected: billing '${billingPeriod}' not eligible`);
       } else {
         const { data: existing } = await supabaseAdmin
           .from("retention_offers_used")
           .select("id")
           .eq("user_id", userId)
-          .eq("offer_type", "winback80")
-          .maybeSingle();
-        if (existing) {
-          logStep("Coupon WINBACK80 rejected: already used");
+          .eq("offer_type", candidate.offerType)
+          .limit(1);
+        if (existing && existing.length > 0) {
+          logStep(`Coupon ${couponRaw} rejected: already used`);
         } else {
-          couponValid = true;
+          promo = candidate;
+          promoProduct = prod;
         }
       }
     }
+    const couponValid = !!promo && !!promoProduct;
 
     // Load product id from app_config
     const { data: configRow, error: configErr } = await supabaseAdmin
@@ -152,34 +207,24 @@ serve(async (req) => {
     const customerName = profile?.display_name || userEmail.split("@")[0];
     const baseUrl = getBaseUrl(req);
 
-    // When WINBACK80 is valid, use a SEPARATE promo product (R$ 34,80/year ≈ R$ 2,90/mês)
-    // pre-registered in AbacatePay so the API uses the discounted price natively.
-    // The webhook activates the subscription via metadata.user_id + billing_period,
-    // so the product used does not affect activation.
-    const PROMO_PRODUCT = {
-      configKey: "abacatepay_product_annual_winback80_v2_id",
-      externalId: "core-pro-annual-winback80-v2",
-      name: "CORE Pro Anual — Oferta Winback",
-      description: "Oferta exclusiva de retenção — R$ 2,90/mês equivalente (R$ 34,80/ano)",
-      price: 3480, // R$ 34,80
-    };
-
-    async function getOrCreatePromoProductId(): Promise<string> {
+    // Quando há cupom válido, usa um PRODUTO promocional separado (preço já com
+    // desconto) pré-registrado na AbacatePay, criando-o on-demand na 1ª vez.
+    async function getOrCreatePromoProductId(prod: PromoProduct): Promise<string> {
       const { data: row } = await supabaseAdmin
         .from("app_config")
         .select("value")
-        .eq("key", PROMO_PRODUCT.configKey)
+        .eq("key", prod.configKey)
         .maybeSingle();
       const existing = (row?.value as { id?: string } | null)?.id;
       if (existing) return existing;
 
-      logStep("Creating promo product on AbacatePay", { externalId: PROMO_PRODUCT.externalId });
+      logStep("Creating promo product on AbacatePay", { externalId: prod.externalId });
       const resp = await abacateRequest("/products/create", apiKey, {
-        name: PROMO_PRODUCT.name,
-        description: PROMO_PRODUCT.description,
-        price: PROMO_PRODUCT.price,
+        name: prod.name,
+        description: prod.description,
+        price: prod.price,
         currency: "BRL",
-        externalId: PROMO_PRODUCT.externalId,
+        externalId: prod.externalId,
       });
       const newId: string | undefined = resp?.data?.id || resp?.id;
       if (!newId) throw new Error(`Failed to create promo product: ${JSON.stringify(resp)}`);
@@ -187,14 +232,14 @@ serve(async (req) => {
       const { error: upErr } = await supabaseAdmin
         .from("app_config")
         .upsert({
-          key: PROMO_PRODUCT.configKey,
-          value: { id: newId, externalId: PROMO_PRODUCT.externalId, name: PROMO_PRODUCT.name },
+          key: prod.configKey,
+          value: { id: newId, externalId: prod.externalId, name: prod.name },
         });
       if (upErr) logStep("Failed to save promo product to app_config", { err: upErr.message });
       return newId;
     }
 
-    const productIdToUse = couponValid ? await getOrCreatePromoProductId() : productId;
+    const productIdToUse = couponValid ? await getOrCreatePromoProductId(promoProduct!) : productId;
     const lineItem: Record<string, unknown> = { id: productIdToUse, quantity: 1 };
 
     const checkoutBody: Record<string, unknown> = {
@@ -215,7 +260,15 @@ serve(async (req) => {
       metadata: {
         user_id: userId,
         billing_period: billingPeriod,
-        ...(couponValid ? { coupon: couponRaw, discount_pct: 80, original_price_cents: cfg.basePriceCents } : {}),
+        ...(couponValid
+          ? {
+              coupon: promo!.coupon,
+              offer_type: promo!.offerType,
+              discount_pct: promo!.discountPct,
+              original_price_cents: cfg.basePriceCents,
+              promo_price_cents: promoProduct!.price,
+            }
+          : {}),
       },
     };
 
@@ -227,29 +280,31 @@ serve(async (req) => {
       throw new Error("No checkout URL returned from AbacatePay");
     }
 
-    // Registra o uso do cupom para o apply-pending-discounts garantir aplicação nas renovações
+    // Registra o uso do cupom (anti-abuso 1x/usuário por tipo de oferta).
     if (couponValid) {
       const { error: insertErr } = await supabaseAdmin
         .from("retention_offers_used")
         .insert({
           user_id: userId,
-          offer_type: "winback80",
+          offer_type: promo!.offerType,
           status: "active",
-          metadata: { discount_pct: 80, billing: billingPeriod, coupon: couponRaw },
+          metadata: { billing: billingPeriod, coupon: promo!.coupon, promo_price_cents: promoProduct!.price },
         });
       if (insertErr) {
-        logStep("Failed to register winback80 in retention_offers_used", { err: insertErr.message });
+        logStep("Failed to register offer in retention_offers_used", { offerType: promo!.offerType, err: insertErr.message });
       }
 
-      // Marca o winback_attempts mais recente como aceito
-      const { error: updErr } = await supabaseAdmin
-        .from("winback_attempts")
-        .update({ accepted_at: new Date().toISOString() })
-        .eq("user_id", userId)
-        .is("accepted_at", null)
-        .gte("triggered_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-      if (updErr) {
-        logStep("Failed to update winback_attempts.accepted_at", { err: updErr.message });
+      // Winback marca o attempt mais recente como aceito (analytics de retenção).
+      if (promo!.offerType === "winback80") {
+        const { error: updErr } = await supabaseAdmin
+          .from("winback_attempts")
+          .update({ accepted_at: new Date().toISOString() })
+          .eq("user_id", userId)
+          .is("accepted_at", null)
+          .gte("triggered_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        if (updErr) {
+          logStep("Failed to update winback_attempts.accepted_at", { err: updErr.message });
+        }
       }
     }
 

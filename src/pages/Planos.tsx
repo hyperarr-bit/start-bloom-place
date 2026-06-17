@@ -32,6 +32,8 @@ import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
+import { DownsellDialog } from "@/components/retention/DownsellDialog";
+import { useExitDownsell } from "@/hooks/use-exit-downsell";
 
 const MODULE_GROUPS: Array<{
   icon: typeof Wallet;
@@ -139,6 +141,7 @@ const Planos = () => {
   }, []);
 
   const shouldOfferWinback = !!user && !isSubscribed;
+  const downsell = useExitDownsell(shouldOfferWinback);
 
   const exitToPrevious = useCallback(() => {
     if (shouldOfferWinback) winback.markIntent();
@@ -153,7 +156,11 @@ const Planos = () => {
     return () => window.removeEventListener("popstate", onPopState);
   }, [shouldOfferWinback, winback]);
 
-  const handleBack = useCallback(() => exitToPrevious(), [exitToPrevious]);
+  const handleBack = useCallback(() => {
+    // Tenta mostrar a oferta de saída; se mostrou, segura na página.
+    if (downsell.maybeIntercept()) return;
+    exitToPrevious();
+  }, [downsell, exitToPrevious]);
 
   const plans = {
     monthly: { price: "14,90", period: "/mês" },
@@ -192,6 +199,7 @@ const Planos = () => {
   return (
     <div className="min-h-screen bg-background">
       <PaymentStatus />
+      <DownsellDialog open={downsell.open} onClose={downsell.close} />
 
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">

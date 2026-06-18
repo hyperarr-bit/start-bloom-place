@@ -669,6 +669,31 @@ header.sticky.top-0 {
   z-index: 40;
 }
 
+/* ============================================================
+   Demo / Preview shell
+   O banner "Demonstração · Assinar" fica FIXO abaixo da safe-area, e os
+   headers sticky dos módulos descem a altura do banner. Sem isso, banner e
+   header empilhavam no mesmo top:0 e o banner (z maior) escondia a seta de
+   voltar — o usuário ficava preso na aba. Escopo .demo-shell não afeta o app.
+   ============================================================ */
+.demo-shell {
+  --demo-banner-h: 2.5rem;
+}
+.demo-banner {
+  position: fixed;
+  top: var(--app-safe-top, 0px);
+  left: var(--app-safe-left, 0px);
+  right: var(--app-safe-right, 0px);
+  height: var(--demo-banner-h);
+  z-index: 45;
+}
+.demo-content {
+  padding-top: var(--demo-banner-h);
+}
+.demo-shell header.sticky.top-0 {
+  top: calc(var(--app-safe-top, 0px) + var(--demo-banner-h));
+}
+
 
 
 
@@ -713,6 +738,12 @@ header.sticky.top-0 {
   0% { left: -150%; }
   60% { left: 150%; }
   100% { left: 150%; }
+}
+
+/* Seta da dica "arraste para ver mais" (grid horizontal de módulos) */
+@keyframes nudge-x {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
 }
 
 /* Entrada suave dos componentes da landing (reveal on scroll) */

@@ -9,8 +9,8 @@ import { MODULE_COMPONENTS } from "@/lib/preview-modules";
 import Home from "@/pages/Home";
 
 const DemoBanner = () => (
-  <div className="sticky top-0 z-[60] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
-    <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+  <div className="demo-banner bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
+    <div className="h-full max-w-5xl mx-auto px-4 flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         <Sparkles className="w-4 h-4 shrink-0" />
         <span className="truncate">
@@ -52,15 +52,17 @@ const Demo = () => {
   return (
     <DemoModeProvider>
       <PreviewUserDataProvider seeds={seeds}>
-        <div className="min-h-screen bg-background">
+        <div className="demo-shell min-h-screen bg-background">
           <DemoBanner />
-          <RouteErrorBoundary routeName="demo-home">
-            <Routes>
-              <Route index element={<Home />} />
-              <Route path=":moduleKey" element={<DemoModuleView />} />
-              <Route path="*" element={<Navigate to="/demo" replace />} />
-            </Routes>
-          </RouteErrorBoundary>
+          <div className="demo-content">
+            <RouteErrorBoundary routeName="demo-home">
+              <Routes>
+                <Route index element={<Home />} />
+                <Route path=":moduleKey" element={<DemoModuleView />} />
+                <Route path="*" element={<Navigate to="/demo" replace />} />
+              </Routes>
+            </RouteErrorBoundary>
+          </div>
         </div>
       </PreviewUserDataProvider>
     </DemoModeProvider>

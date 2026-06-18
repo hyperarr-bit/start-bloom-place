@@ -237,36 +237,47 @@ const HowItWorks = () => (
 
 const ModulesGrid = () => (
   <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-    <div className="text-center mb-10">
+    <div className="text-center mb-6 md:mb-8">
       <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
-      <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
+      <h2 className="text-[24px] sm:text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
       <p className="text-[14px] md:text-[15px] text-black/55 mt-3 max-w-[52ch] mx-auto">
         Combine os módulos do seu jeito — a assinatura inclui todos, sem upsell escondido. Toque em qualquer um pra abrir a demo.
       </p>
     </div>
-    <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory -mx-5 px-5 md:-mx-8 md:px-8 pb-2">
-      {MODULES.map((m) => {
-        const Icon = m.icon;
-        return (
-          <a
-            key={m.key}
-            href={previewPath(m.key)}
-            target="_blank"
-            rel="noopener"
-            onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
-            className="group shrink-0 w-[168px] md:w-[208px] snap-start rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
-          >
-            <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
-              <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
-            </div>
-            <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
-            <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
-            <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-black">
-              Abrir demo <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-            </span>
-          </a>
-        );
-      })}
+
+    {/* dica de arrastar (afford­ance de scroll horizontal) */}
+    <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-accent mb-3">
+      <span>Arraste para ver os 16 módulos</span>
+      <ArrowRight className="w-3.5 h-3.5 animate-[nudge-x_1.4s_ease-in-out_infinite]" />
+    </div>
+
+    <div className="relative">
+      <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 pl-0.5 -mr-5 pr-10 md:-mr-8 md:pr-12">
+        {MODULES.map((m) => {
+          const Icon = m.icon;
+          return (
+            <a
+              key={m.key}
+              href={previewPath(m.key)}
+              target="_blank"
+              rel="noopener"
+              onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
+              className="group shrink-0 w-[158px] sm:w-[176px] md:w-[208px] snap-start rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
+            >
+              <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
+                <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
+              </div>
+              <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
+              <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
+              <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-black">
+                Abrir demo <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </a>
+          );
+        })}
+      </div>
+      {/* fade na direita reforçando que há mais módulos pra rolar */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" aria-hidden />
     </div>
   </section>
 );

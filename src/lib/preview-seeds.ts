@@ -121,8 +121,30 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   detox: {
     ...COMMON,
     "detox-habits": [
-      { id: "1", name: "Reduzir açúcar", startDate: daysAgo(12), streak: 12 },
-      { id: "2", name: "Largar redes sociais à noite", startDate: daysAgo(5), streak: 5 },
+      {
+        id: "1",
+        name: "Largar redes sociais à noite",
+        icon: "📱",
+        startDate: daysAgo(12),
+        relapses: [],
+        record: 12,
+        checkins: [daysAgo(0), daysAgo(1), daysAgo(2), daysAgo(4)],
+        reasons: ["Pela minha saúde mental", "Mais tempo com quem eu amo"],
+      },
+      {
+        id: "2",
+        name: "Parar de fumar",
+        icon: "🚬",
+        startDate: daysAgo(5),
+        relapses: [daysAgo(5)],
+        record: 23,
+        checkins: [daysAgo(0), daysAgo(1), daysAgo(3)],
+        reasons: ["Pela minha respiração", "Economizar dinheiro"],
+      },
+    ],
+    "detox-diary": [
+      { id: "1", date: daysAgo(1), trigger: "Ansiedade no trabalho", difficulty: 4, note: "Resisti e fui caminhar." },
+      { id: "2", date: daysAgo(3), trigger: "Tédio à noite", difficulty: 2, note: "Li um livro no lugar." },
     ],
   },
 };

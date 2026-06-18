@@ -2,19 +2,11 @@ import { useUserData } from "@/hooks/use-user-data";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import { differenceInDays, format, subDays } from "date-fns";
 import { TrendingUp, Calendar, Target, Flame } from "lucide-react";
-
-interface DetoxHabit {
-  id: string;
-  name: string;
-  icon: string;
-  startDate: string;
-  relapses: string[];
-  record: number;
-}
+import { normalizeDetoxHabits, type DetoxHabit } from "./utils";
 
 export const DetoxStats = () => {
   const { get } = useUserData();
-  const habits = get<DetoxHabit[]>("detox-habits", []);
+  const habits = normalizeDetoxHabits(get<DetoxHabit[]>("detox-habits", []));
 
   if (habits.length === 0) {
     return (

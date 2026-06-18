@@ -22,25 +22,26 @@ type ModuleItem = {
   desc: string;
   icon: LucideIcon;
   iconFg: string;
+  iconBg: string;
 };
 
 const MODULES: ModuleItem[] = [
-  { key: "financas", title: "FINANÇAS", desc: "Entenda receitas, despesas e investimentos com clareza.", icon: Wallet, iconFg: "text-orange-600" },
-  { key: "rotina", title: "ROTINA", desc: "Organize hábitos, consistência e sua semana em poucos toques.", icon: CalendarIcon, iconFg: "text-emerald-600" },
-  { key: "dev", title: "DESENVOLVIMENTO PESSOAL", desc: "Acompanhe metas, forças, afirmações e evolução pessoal.", icon: Sparkles, iconFg: "text-violet-600" },
-  { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, iconFg: "text-amber-600" },
-  { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, iconFg: "text-blue-600" },
-  { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, iconFg: "text-rose-600" },
-  { key: "hiperfoco", title: "MENTE", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, iconFg: "text-indigo-600" },
-  { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, iconFg: "text-yellow-700" },
-  { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, iconFg: "text-slate-700" },
-  { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, iconFg: "text-stone-700" },
-  { key: "casa", title: "CASA", desc: "Limpeza, despensa, manutenções e rotinas do lar.", icon: HomeIcon, iconFg: "text-teal-600" },
-  { key: "viagens", title: "VIAGENS", desc: "Roteiros, malas, orçamento e bucket list em um só lugar.", icon: Plane, iconFg: "text-sky-600" },
-  { key: "relacionamentos", title: "RELACIONAMENTOS", desc: "Pessoas, datas importantes, presentes e momentos.", icon: Users, iconFg: "text-pink-600" },
-  { key: "pet", title: "PET", desc: "Saúde, rotina, gastos e diário do seu pet.", icon: PawPrint, iconFg: "text-lime-700" },
-  { key: "beleza", title: "BELEZA", desc: "Skincare, cabelo, produtos e cronogramas personalizados.", icon: Flower2, iconFg: "text-fuchsia-600" },
-  { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, iconFg: "text-green-600" },
+  { key: "financas", title: "FINANÇAS", desc: "Entenda receitas, despesas e investimentos com clareza.", icon: Wallet, iconFg: "text-orange-600", iconBg: "bg-orange-100" },
+  { key: "rotina", title: "ROTINA", desc: "Organize hábitos, consistência e sua semana em poucos toques.", icon: CalendarIcon, iconFg: "text-emerald-600", iconBg: "bg-emerald-100" },
+  { key: "dev", title: "DESENVOLVIMENTO PESSOAL", desc: "Acompanhe metas, forças, afirmações e evolução pessoal.", icon: Sparkles, iconFg: "text-violet-600", iconBg: "bg-violet-100" },
+  { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, iconFg: "text-amber-600", iconBg: "bg-amber-100" },
+  { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, iconFg: "text-blue-600", iconBg: "bg-blue-100" },
+  { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, iconFg: "text-rose-600", iconBg: "bg-rose-100" },
+  { key: "hiperfoco", title: "MENTE", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, iconFg: "text-indigo-600", iconBg: "bg-indigo-100" },
+  { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, iconFg: "text-yellow-700", iconBg: "bg-yellow-100" },
+  { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, iconFg: "text-slate-700", iconBg: "bg-slate-100" },
+  { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, iconFg: "text-stone-700", iconBg: "bg-stone-100" },
+  { key: "casa", title: "CASA", desc: "Limpeza, despensa, manutenções e rotinas do lar.", icon: HomeIcon, iconFg: "text-teal-600", iconBg: "bg-teal-100" },
+  { key: "viagens", title: "VIAGENS", desc: "Roteiros, malas, orçamento e bucket list em um só lugar.", icon: Plane, iconFg: "text-sky-600", iconBg: "bg-sky-100" },
+  { key: "relacionamentos", title: "RELACIONAMENTOS", desc: "Pessoas, datas importantes, presentes e momentos.", icon: Users, iconFg: "text-pink-600", iconBg: "bg-pink-100" },
+  { key: "pet", title: "PET", desc: "Saúde, rotina, gastos e diário do seu pet.", icon: PawPrint, iconFg: "text-lime-700", iconBg: "bg-lime-100" },
+  { key: "beleza", title: "BELEZA", desc: "Skincare, cabelo, produtos e cronogramas personalizados.", icon: Flower2, iconFg: "text-fuchsia-600", iconBg: "bg-fuchsia-100" },
+  { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, iconFg: "text-green-600", iconBg: "bg-green-100" },
 ];
 
 // Preview route param: só "dev" diverge da key (componente DesenvolvimentoPessoal)
@@ -152,13 +153,13 @@ const PricingPlans = () => {
         <div className="text-[12px] text-black/50 mb-2">
           Pago anualmente · R$ 46,80/ano
         </div>
-        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent text-[11px] font-semibold">
           Economize R$ 132/ano
         </div>
         <Link
           to="/auth?signup=1"
           onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_anual" }); }}
-          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition"
+          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-sm transition"
         >
           Assinar
         </Link>
@@ -212,14 +213,14 @@ const HOW_STEPS = [
 const HowItWorks = () => (
   <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
     <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">COMO FUNCIONA</div>
+      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">COMO FUNCIONA</div>
       <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Experimente antes de decidir.</h2>
     </div>
     <div className="grid md:grid-cols-3 gap-4 md:gap-5">
       {HOW_STEPS.map((step, i) => (
         <div key={step.t} className="relative rounded-2xl border border-black/10 bg-white p-6">
           <div className="absolute top-5 right-5 text-[34px] font-bold text-black/[0.06] leading-none">{i + 1}</div>
-          <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4">
+          <div className="w-11 h-11 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-4">
             <step.Icon className="w-5 h-5" strokeWidth={2.2} />
           </div>
           <div className="font-bold text-[16px] mb-1.5">{step.t}</div>
@@ -234,18 +235,18 @@ const HowItWorks = () => (
    FAIXA DE DEMO — peça central (testar antes de pagar)
    ========================================================= */
 
-const DEMO_BAND_KEYS = ["financas", "rotina", "saude", "treino", "dieta", "hiperfoco", "estudos", "carreira"];
+const DEMO_BAND_KEYS = ["financas", "rotina", "dev", "saude", "treino", "dieta", "hiperfoco", "estudos"];
 
 const DemoBand = () => (
-  <section id="demo" className="lp-enter relative overflow-hidden bg-[#04140e]">
+  <section id="demo" className="lp-enter relative overflow-hidden bg-[#0f1115]">
     <div
       aria-hidden
       className="pointer-events-none absolute inset-0 opacity-90"
-      style={{ background: "radial-gradient(60% 80% at 15% 0%, rgba(16,185,129,0.18), transparent 70%), radial-gradient(50% 70% at 100% 100%, rgba(16,185,129,0.12), transparent 70%)" }}
+      style={{ background: "radial-gradient(60% 80% at 15% 0%, hsl(330 65% 50% / 0.20), transparent 70%), radial-gradient(50% 70% at 100% 100%, hsl(330 65% 50% / 0.12), transparent 70%)" }}
     />
     <div className="relative max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
       <div className="max-w-[640px]">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-400/25 text-emerald-300 text-[12px] font-semibold mb-5">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[hsl(330_65%_50%/0.14)] border border-[hsl(330_70%_62%/0.3)] text-[hsl(330_85%_82%)] text-[12px] font-semibold mb-5">
           <PlayCircle className="w-3.5 h-3.5" /> DEMONSTRAÇÃO ABERTA
         </div>
         <h2 className="text-[28px] md:text-[44px] font-bold leading-[1.05] tracking-[-0.02em] text-white mb-4">
@@ -259,7 +260,7 @@ const DemoBand = () => (
           target="_blank"
           rel="noopener"
           onClick={() => trackEvent("landing_cta_click", { cta: "demo_band", module: "financas" })}
-          className="btn-shine inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-[#04140e] font-bold text-[15px] shadow-[0_12px_30px_-10px_rgba(16,185,129,0.6)] transition"
+          className="btn-shine inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-bold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
         >
           <PlayCircle className="w-5 h-5" /> Abrir demonstração
         </a>
@@ -280,7 +281,7 @@ const DemoBand = () => (
               className="shrink-0 inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full bg-white/[0.06] border border-white/12 text-white/85 text-[13px] font-medium hover:bg-white/[0.12] hover:border-white/25 transition"
             >
               <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
-                <Icon className="w-3.5 h-3.5 text-emerald-300" strokeWidth={2.2} />
+                <Icon className="w-3.5 h-3.5 text-[hsl(330_85%_80%)]" strokeWidth={2.2} />
               </span>
               {m.title}
             </a>
@@ -288,7 +289,7 @@ const DemoBand = () => (
         })}
         <a
           href="#modulos"
-          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-emerald-300/90 text-[13px] font-semibold hover:text-emerald-200 transition"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[hsl(330_85%_80%)] text-[13px] font-semibold hover:text-[hsl(330_90%_88%)] transition"
         >
           + 8 outros <ArrowRight className="w-3.5 h-3.5" />
         </a>
@@ -304,7 +305,7 @@ const DemoBand = () => (
 const ModulesGrid = () => (
   <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
     <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
+      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
       <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
       <p className="text-[14px] md:text-[15px] text-black/55 mt-3 max-w-[52ch] mx-auto">
         Combine os módulos do seu jeito — a assinatura inclui todos, sem upsell escondido. Toque em qualquer um pra abrir a demo.
@@ -322,12 +323,12 @@ const ModulesGrid = () => (
             onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
             className="group rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
           >
-            <div className={`w-9 h-9 rounded-lg bg-black/[0.04] ${m.iconFg} flex items-center justify-center mb-2.5`}>
+            <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
               <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
             </div>
             <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
             <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
-            <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+            <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-accent">
               Abrir demo <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
             </span>
           </a>
@@ -353,7 +354,7 @@ const PROOF = [
 const ProductProof = () => (
   <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
     <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-emerald-600 tracking-widest mb-2">POR QUE CONFIAR</div>
+      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">POR QUE CONFIAR</div>
       <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">
         Feito pra você confiar — e ficar.
       </h2>
@@ -361,7 +362,7 @@ const ProductProof = () => (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
       {PROOF.map((b) => (
         <div key={b.t} className="rounded-2xl border border-black/10 bg-white p-4 md:p-5">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3">
+          <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-3">
             <b.icon className="w-5 h-5" />
           </div>
           <div className="font-bold text-[14px] mb-1">{b.t}</div>
@@ -370,6 +371,47 @@ const ProductProof = () => (
       ))}
     </div>
   </section>
+);
+
+/* =========================================================
+   SCORECARD MOCK (visual do spotlight de Desenvolvimento)
+   ========================================================= */
+
+const SCORECARD = [
+  { area: "Saúde", v: 7 },
+  { area: "Finanças", v: 6 },
+  { area: "Relações", v: 8 },
+  { area: "Carreira", v: 7 },
+  { area: "Espiritual", v: 5 },
+  { area: "Lazer", v: 6 },
+  { area: "Intelectual", v: 9 },
+  { area: "Emocional", v: 7 },
+];
+
+const DevScorecardMock = () => (
+  <div className="w-full max-w-[360px] rounded-[1.5rem] border border-black/10 bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.25)] p-5">
+    <div className="flex items-center justify-between mb-4">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-violet-600">
+        <BarChart3 className="w-3.5 h-3.5" /> SCORECARD SEMANAL
+      </span>
+      <span className="text-[11px] text-black/40">2026 · W25</span>
+    </div>
+    <div className="space-y-2.5">
+      {SCORECARD.map((s) => (
+        <div key={s.area} className="flex items-center gap-3">
+          <span className="w-20 text-[12px] text-black/70 shrink-0">{s.area}</span>
+          <div className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden">
+            <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600" style={{ width: `${s.v * 10}%` }} />
+          </div>
+          <span className="w-9 text-right text-[12px] font-semibold text-black/70">{s.v}/10</span>
+        </div>
+      ))}
+    </div>
+    <div className="mt-4 pt-4 border-t border-black/10 flex items-center justify-between">
+      <span className="text-[12px] text-black/55">Média da semana</span>
+      <span className="text-[20px] font-bold text-violet-600">6.9<span className="text-[12px] text-black/40 font-medium">/10</span></span>
+    </div>
+  </div>
 );
 
 /* =========================================================
@@ -429,7 +471,7 @@ export default function LandingPage() {
             <Link
               to="/auth?signup=1"
               onClick={() => trackEvent("landing_cta_click", { cta: "header_signup" })}
-              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm transition"
+              className="px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-semibold shadow-sm transition"
             >
               Assinar
             </Link>
@@ -442,11 +484,11 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-4 md:gap-10 items-center">
 
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <h1 className="text-[clamp(32px,7.5vw,60px)] font-bold leading-[1.04] tracking-[-0.03em] text-[#0a0a0a] mb-5 mt-0 md:mt-2 max-w-[18ch] md:max-w-[16ch] mx-auto md:mx-0">
-              Tudo da sua vida, num só lugar — e finalmente sob controle.
+            <h1 className="text-[clamp(32px,7.5vw,58px)] font-bold leading-[1.05] tracking-[-0.03em] text-[#0a0a0a] mb-5 mt-0 md:mt-2 max-w-[20ch] md:max-w-[17ch] mx-auto md:mx-0">
+              O dinheiro some, a rotina desanda, as metas morrem.
             </h1>
-            <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[42ch] md:max-w-md mx-auto md:mx-0">
-              Finanças, rotina, saúde, metas e mais — num sistema simples e bonito que funciona até offline. Abra a demo e mexe agora, sem criar conta.
+            <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[44ch] md:max-w-md mx-auto md:mx-0">
+              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida num só lugar. Abra a demo e use agora, sem criar conta.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full sm:w-auto">
               <a
@@ -454,7 +496,7 @@ export default function LandingPage() {
                 target="_blank"
                 rel="noopener"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_demo", module: "financas" })}
-                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(5,150,105,0.55)] transition"
+                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
               >
                 <PlayCircle className="w-5 h-5" /> Testar agora — sem cadastro
               </a>
@@ -466,7 +508,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 mb-5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> Garantia de 7 dias · cancele quando quiser · sem fidelidade
+              <ShieldCheck className="w-3.5 h-3.5 text-accent" /> Garantia de 7 dias · cancele quando quiser · sem fidelidade
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5 text-[12.5px] text-black/60">
               {[
@@ -475,7 +517,7 @@ export default function LandingPage() {
                 { Icon: Smartphone, t: "Celular e desktop" },
               ].map((b) => (
                 <span key={b.t} className="inline-flex items-center gap-1.5">
-                  <b.Icon className="w-3.5 h-3.5 text-emerald-600" /> {b.t}
+                  <b.Icon className="w-3.5 h-3.5 text-accent" /> {b.t}
                 </span>
               ))}
             </div>
@@ -501,18 +543,18 @@ export default function LandingPage() {
               <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Substitua sua planilha em 30 segundos.
+              Saiba para onde vai cada real — e faça sobrar.
             </h2>
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              O módulo mais completo do CORE. Tudo que você precisa pra entender pra onde seu dinheiro vai — e fazer sobrar mais.
+              O módulo mais completo do CORE: um <strong className="font-semibold text-black/80">Score Financeiro de 0 a 100</strong> diz, num número, como anda sua vida financeira — e o que mexer pra melhorar.
             </p>
             <div className="space-y-2.5 mb-6">
               {[
-                "Receitas, despesas fixas e variáveis em tabelas claras",
-                "Orçamento mensal e anual por categoria",
-                "Alertas inteligentes de contas a vencer",
-                "Rastreador de parcelas e investimentos",
-                "Metas financeiras com progresso visual",
+                "Score Financeiro de 0 a 100 com dicas personalizadas",
+                "Dashboard: gastos por categoria e evolução do patrimônio",
+                "Simuladores de juros compostos e independência financeira",
+                "Limites por categoria e alertas de contas a vencer",
+                "Investimentos, parcelas e metas com progresso visual",
                 "Relatórios mensais e virada de mês automática",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
@@ -530,7 +572,7 @@ export default function LandingPage() {
               onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "financas" })}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
             >
-              <PlayCircle className="w-4 h-4 text-emerald-600" /> Abrir demo de Finanças
+              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Finanças
             </a>
           </div>
           <div className="order-1 md:order-2 flex justify-center">
@@ -599,17 +641,17 @@ export default function LandingPage() {
               <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Construa hábitos que ficam — sem depender de motivação.
+              Sua semana sob controle — não na sua cabeça.
             </h2>
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade.
+              Planeje a semana, marque hábitos em segundos e entre em foco. Sua constância vira um mapa que você vê crescer.
             </p>
             <div className="space-y-2.5 mb-6">
               {[
-                "Check rápido dos hábitos do dia, sem fricção",
-                "Visão semanal pra enxergar onde você travou",
-                "Streaks que mostram sua sequência crescendo",
-                "Calendário mensal pra acompanhar a evolução",
+                "Hábitos diários com mapa de consistência (estilo GitHub)",
+                "Agenda semanal por horário, do acordar ao dormir",
+                "Modo Foco com Pomodoro e blocos de tempo",
+                "Diário, revisão e nível de energia do dia",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
                   <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
@@ -626,36 +668,80 @@ export default function LandingPage() {
               onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "rotina" })}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
             >
-              <PlayCircle className="w-4 h-4 text-emerald-600" /> Abrir demo de Rotina
+              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Rotina
             </a>
           </div>
         </div>
       </section>
 
+      {/* SPOTLIGHT DESENVOLVIMENTO */}
+      <section id="desenvolvimento" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
+          <div className="order-2 md:order-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-[11px] font-bold tracking-wide mb-4">
+              <Sparkles className="w-3 h-3" /> MÓDULO DESENVOLVIMENTO
+            </div>
+            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
+              Evolua de verdade — com método, não com força de vontade.
+            </h2>
+            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
+              Metas, valores e hábitos mentais num lugar só — e um <strong className="font-semibold text-black/80">scorecard que pontua 8 áreas da sua vida</strong> toda semana. Evolução deixa de ser sentimento e vira número.
+            </p>
+            <div className="space-y-2.5 mb-6">
+              {[
+                "Scorecard semanal de vida — 8 áreas, uma nota",
+                "Metas e quadro de visão (bucket list)",
+                "Diário de humor com histórico dos últimos dias",
+                "Afirmações, forças, valores e desafios de 30 dias",
+              ].map((t) => (
+                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
+                  </div>
+                  {t}
+                </div>
+              ))}
+            </div>
+            <a
+              href={previewPath("dev")}
+              target="_blank"
+              rel="noopener"
+              onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "dev" })}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
+            >
+              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Desenvolvimento
+            </a>
+          </div>
+          <div className="order-1 md:order-2 flex justify-center">
+            <DevScorecardMock />
+          </div>
+        </div>
+      </section>
+
       {/* GAMIFICAÇÃO */}
-      <section className="lp-enter bg-black text-white py-12 md:py-20">
+      <section className="lp-enter bg-[#0f1115] text-white py-12 md:py-20">
         <div className="max-w-[1100px] mx-auto px-5 md:px-8">
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white/90 text-[11px] font-bold tracking-wide mb-4">
-                <Trophy className="w-3 h-3" /> PROGRESSO VISÍVEL
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[hsl(330_65%_50%/0.14)] border border-[hsl(330_70%_62%/0.3)] text-[hsl(330_85%_82%)] text-[11px] font-bold tracking-wide mb-4">
+                <Trophy className="w-3 h-3" /> PROGRESSO QUE VICIA
               </div>
               <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
                 Seu progresso deixa de ser invisível.
               </h2>
               <p className="text-[14px] md:text-base text-white/65 leading-relaxed">
-                Cada hábito marcado, meta concluída e rotina cumprida vira evolução dentro do CORE. Você acompanha sua constância e sente vontade de continuar.
+                Cada hábito marcado, meta batida e ação no app vira XP, streak e conquista. Você sobe de nível — e sente vontade de voltar amanhã.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2.5 md:gap-3">
               {[
-                { Icon: Flame, t: "Streaks", s: "Sua sequência de dias crescendo." },
-                { Icon: Trophy, t: "Conquistas", s: "Marcos que você desbloqueia no caminho." },
-                { Icon: Target, t: "Metas", s: "Defina objetivos e acompanhe o progresso." },
-                { Icon: BarChart3, t: "Evolução", s: "Sua constância, semana após semana." },
+                { Icon: Flame, t: "Streaks", s: "Sua sequência crescendo — e o medo gostoso de quebrar." },
+                { Icon: Sparkles, t: "XP & níveis", s: "Cada ação vira XP. Evolua de Prata a Ouro." },
+                { Icon: Trophy, t: "Conquistas", s: "Dezenas de marcos pra desbloquear em cada módulo." },
+                { Icon: BarChart3, t: "Evolução", s: "Seu score e sua constância, semana após semana." },
               ].map((c) => (
                 <div key={c.t} className="rounded-2xl bg-white/[0.05] border border-white/10 p-4">
-                  <c.Icon className="w-5 h-5 text-emerald-400 mb-2.5" strokeWidth={2} />
+                  <c.Icon className="w-5 h-5 text-[hsl(330_80%_70%)] mb-2.5" strokeWidth={2} />
                   <div className="font-bold text-[15px] mb-0.5">{c.t}</div>
                   <div className="text-[11.5px] text-white/55 leading-snug">{c.s}</div>
                 </div>
@@ -679,8 +765,8 @@ export default function LandingPage() {
                   Menos que um café por mês pra organizar finanças, rotina, saúde e mais 13 áreas.
                 </p>
                 <div className="flex flex-col items-center md:items-start gap-2">
-                  <p className="text-[12px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">
-                    <Check className="w-3 h-3" /> Inclui todos os 16 módulos
+                  <p className="text-[12px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10 text-black/70">
+                    <Check className="w-3 h-3 text-accent" /> Inclui todos os 16 módulos
                   </p>
                   <p className="text-[12px] text-black/70 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
                     <ShieldCheck className="w-3 h-3" /> Garantia de 7 dias · cancele em 1 clique · sem fidelidade
@@ -709,7 +795,7 @@ export default function LandingPage() {
       <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
         <div className="rounded-2xl bg-black text-white p-6 md:p-10 flex flex-col md:flex-row md:items-center gap-5 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
-            <Sparkles className="w-6 h-6 text-emerald-400 shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-[hsl(330_80%_70%)] shrink-0 mt-1" />
             <div>
               <div className="font-bold text-[20px] md:text-3xl leading-tight mb-2">
                 Comece hoje. Se não for pra você,<br className="hidden md:block" /> devolvemos em 7 dias.
@@ -723,7 +809,7 @@ export default function LandingPage() {
             <Link
               to="/auth?signup=1"
               onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
-              className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(5,150,105,0.6)] transition whitespace-nowrap"
+              className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_10px_28px_-8px_hsl(var(--accent)/0.6)] transition whitespace-nowrap"
             >
               Assinar agora <ArrowRight className="w-4 h-4" />
             </Link>

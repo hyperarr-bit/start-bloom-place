@@ -5,7 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -52,7 +52,7 @@ const vibrate = () => {
 export const QuickActions = () => {
   const { get, set } = useUserData();
   const lifeData = useLifeHubData();
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeAction, setActiveAction] = useState<ActionId | null>(null);
   const [waterSplash, setWaterSplash] = useState(false);
   const [successId, setSuccessId] = useState<ActionId | null>(null);

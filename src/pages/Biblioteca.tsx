@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,7 +101,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
 
 // ── Main Component ──
 const Biblioteca = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [books, setBooks] = usePersistedState<Book[]>("lib-books", []);
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
   const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);

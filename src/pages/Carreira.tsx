@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2, Briefcase } from "lucide-react";
@@ -547,7 +547,7 @@ const InterviewPrep = () => {
 
 // ============= MAIN =============
 const Carreira = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 

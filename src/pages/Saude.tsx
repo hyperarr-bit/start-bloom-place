@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { motion } from "framer-motion";
 import { ArrowLeft, AlertTriangle, Activity, Moon, Droplet, Phone, Heart } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ const tabs = [
 ];
 
 const Saude = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronRight, ChevronDown } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 
 interface NextHoursTimelineProps {
@@ -17,7 +17,7 @@ interface PendingItem {
 }
 
 export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const items: PendingItem[] = [];
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { ModuleTip } from "@/components/ModuleTip";
 import { 
   ArrowLeft, Plus, X, Trash2, AlertTriangle, Play, Pause, RotateCcw, 
@@ -999,7 +999,7 @@ const WeeklyReview = () => {
 
 // ============= MAIN ROTINA COMPONENT =============
 const Rotina = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("semana");
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);

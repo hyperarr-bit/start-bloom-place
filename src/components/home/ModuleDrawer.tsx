@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { motion } from "framer-motion";
 import { 
   DollarSign, CalendarCheck, Sparkles, Heart, Home, GraduationCap, 
@@ -27,7 +27,7 @@ const modules = [
 ];
 
 export const ModuleDrawer = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const { toggleFavorite, toggleHidden, isFavorite, isHidden } = useModulePreferences();
   const [editMode, setEditMode] = useState(false);
 

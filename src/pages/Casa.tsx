@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ModuleTip } from "@/components/ModuleTip";
@@ -30,7 +30,7 @@ const tabs = [
 ];
 
 const Casa = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("comodos");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

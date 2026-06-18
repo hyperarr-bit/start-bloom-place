@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
@@ -46,7 +46,7 @@ const defaultMealColors: Record<string, string> = {
 const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-Treino", "Pós-Treino", "Ceia", "Café da Tarde"];
 
 const Dieta = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("cardapio");
   const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);

@@ -60,6 +60,7 @@ import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
 import LandingPage from "./pages/lp/LandingPage";
 import Preview from "./pages/Preview";
+import Demo from "./pages/Demo";
 
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminChurn from "./pages/admin/AdminChurn";
@@ -162,6 +163,7 @@ const App = () => {
                   <Route path="/inicio" element={<Inicio />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
+                  <Route path="/demo/*" element={<Demo />} />
                   <Route path="*" element={<AnimatedRoutes />} />
                 </Routes>
                 <TrialBanner />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, PawPrint } from "lucide-react";
@@ -21,7 +21,7 @@ const tabs = [
 ];
 
 const Pet = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("pets");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

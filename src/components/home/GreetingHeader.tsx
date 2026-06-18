@@ -2,8 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sun, Moon, CloudSun, Sunset, Pencil } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
+import { useDemoMode } from "@/hooks/use-demo-mode";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { NameEditDialog } from "./NameEditDialog";
 import { AccountDrawer } from "./AccountDrawer";
@@ -68,6 +70,7 @@ const getContextualMessage = (data: LifeHubData): string => {
 export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: GreetingHeaderProps) => {
   const { user } = useAuth();
   const { get, set: setUserData } = useUserData();
+  const isDemo = useDemoMode();
   const { text: greeting, Icon: GreetingIcon } = getGreeting();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
@@ -113,7 +116,13 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
           <motion.button
-            onClick={() => setShowAccount(true)}
+            onClick={() => {
+              if (isDemo) {
+                toast.info("Isto é uma demonstração. Assine para criar sua conta e ter seu perfil.");
+                return;
+              }
+              setShowAccount(true);
+            }}
             className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden"
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"

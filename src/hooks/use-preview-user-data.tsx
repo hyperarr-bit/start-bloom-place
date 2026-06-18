@@ -9,12 +9,18 @@ import { toast } from "sonner";
  */
 export const PreviewUserDataProvider = ({
   moduleKey,
+  seeds,
   children,
 }: {
-  moduleKey: string;
+  /** Single-module preview: seeds come from getSeedsForModule(moduleKey). */
+  moduleKey?: string;
+  /** Full demo: explicit aggregated seeds shared across the whole shell. */
+  seeds?: Record<string, any>;
   children: ReactNode;
 }) => {
-  const [store, setStore] = useState<Record<string, any>>(() => getSeedsForModule(moduleKey));
+  const [store, setStore] = useState<Record<string, any>>(
+    () => seeds ?? getSeedsForModule(moduleKey ?? ""),
+  );
   const toastShown = useRef(false);
 
   const get = useCallback(<T,>(key: string, fallback: T): T => {

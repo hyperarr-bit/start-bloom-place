@@ -25,6 +25,7 @@ export const TrialBanner = () => {
     location.pathname === "/" ||
     location.pathname.startsWith("/lp") ||
     location.pathname.startsWith("/preview") ||
+    location.pathname.startsWith("/demo") ||
     location.pathname.startsWith("/planos") ||
     location.pathname.startsWith("/auth") ||
     location.pathname.startsWith("/reset-password") ||

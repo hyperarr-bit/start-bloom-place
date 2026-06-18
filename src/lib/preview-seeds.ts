@@ -152,3 +152,34 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
 export const getSeedsForModule = (moduleKey: string): Record<string, any> => {
   return PREVIEW_SEEDS[moduleKey] ?? { ...COMMON };
 };
+
+// Modules tracked by the Home onboarding (must match Home's ALL_MODULES so the
+// tutorial overlay stays suppressed in the demo).
+const HOME_ONBOARDING_MODULES = [
+  "financas", "rotina", "dieta", "treino", "saude", "metas", "hiperfoco",
+  "estudos", "carreira", "biblioteca", "casa", "beleza", "viagens",
+  "relacionamentos", "pet", "detox",
+];
+
+/**
+ * Seeds for the full navigable demo (/demo): every module's snapshot merged
+ * into one in-memory store so the Home widgets/score look alive and each
+ * module opens populated. Also pre-marks the onboarding flags so the Home
+ * tutorial overlay never hijacks the demo.
+ */
+export const getDemoSeeds = (): Record<string, any> => {
+  const merged: Record<string, any> = { ...COMMON };
+  for (const key of Object.keys(PREVIEW_SEEDS)) {
+    Object.assign(merged, PREVIEW_SEEDS[key]);
+  }
+  // Skip the guest reset that would wipe the flags below, then mark onboarding
+  // as fully done so Home renders straight to the dashboard.
+  merged["core-onboarding-reset-v2"] = "true";
+  merged["force-new-user-reset-done"] = "true";
+  merged["core-onboarding-done"] = "true";
+  merged["core-all-modules-celebrated"] = "true";
+  HOME_ONBOARDING_MODULES.forEach((m) => {
+    merged[`spotlight-done-${m}`] = "true";
+  });
+  return merged;
+};

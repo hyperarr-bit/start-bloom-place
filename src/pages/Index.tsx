@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, DollarSign } from "lucide-react";
 
@@ -40,7 +40,7 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 
 
 const Index = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
   const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useNavigate } from "react-router-dom";
+import { useAppNavigate } from "@/hooks/use-demo-mode";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -89,7 +89,7 @@ const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorCl
 
 
 const DesenvolvimentoPessoal = () => {
-  const navigate = useNavigate();
+  const navigate = useAppNavigate();
   const [activeTab, setActiveTab] = useState("sobre");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

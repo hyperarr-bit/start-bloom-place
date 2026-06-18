@@ -232,73 +232,6 @@ const HowItWorks = () => (
 );
 
 /* =========================================================
-   FAIXA DE DEMO — peça central (testar antes de pagar)
-   ========================================================= */
-
-const DEMO_BAND_KEYS = ["financas", "rotina", "dev", "saude", "treino", "dieta", "hiperfoco", "estudos"];
-
-const DemoBand = () => (
-  <section id="demo" className="lp-enter relative overflow-hidden bg-[#0f1115]">
-    <div
-      aria-hidden
-      className="pointer-events-none absolute inset-0 opacity-90"
-      style={{ background: "radial-gradient(60% 80% at 15% 0%, hsl(330 65% 50% / 0.20), transparent 70%), radial-gradient(50% 70% at 100% 100%, hsl(330 65% 50% / 0.12), transparent 70%)" }}
-    />
-    <div className="relative max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-      <div className="max-w-[640px]">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[hsl(330_65%_50%/0.14)] border border-[hsl(330_70%_62%/0.3)] text-[hsl(330_85%_82%)] text-[12px] font-semibold mb-5">
-          <PlayCircle className="w-3.5 h-3.5" /> DEMONSTRAÇÃO ABERTA
-        </div>
-        <h2 className="text-[28px] md:text-[44px] font-bold leading-[1.05] tracking-[-0.02em] text-white mb-4">
-          Não acredite na gente. Abra e use.
-        </h2>
-        <p className="text-[15px] md:text-[18px] text-white/65 leading-relaxed mb-7 max-w-[52ch]">
-          Demonstração real, com dados de exemplo — o app de verdade, não um vídeo. Nada é salvo até você assinar.
-        </p>
-        <a
-          href={previewPath("financas")}
-          target="_blank"
-          rel="noopener"
-          onClick={() => trackEvent("landing_cta_click", { cta: "demo_band", module: "financas" })}
-          className="btn-shine inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-bold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
-        >
-          <PlayCircle className="w-5 h-5" /> Abrir demonstração
-        </a>
-      </div>
-
-      <div className="mt-8 -mx-5 md:mx-0 px-5 md:px-0 flex md:flex-wrap gap-2.5 overflow-x-auto md:overflow-visible no-scrollbar">
-        {DEMO_BAND_KEYS.map((k) => {
-          const m = MODULES.find((x) => x.key === k);
-          if (!m) return null;
-          const Icon = m.icon;
-          return (
-            <a
-              key={k}
-              href={previewPath(k)}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "demo_band", module: k })}
-              className="shrink-0 inline-flex items-center gap-2 pl-2.5 pr-3.5 py-2 rounded-full bg-white/[0.06] border border-white/12 text-white/85 text-[13px] font-medium hover:bg-white/[0.12] hover:border-white/25 transition"
-            >
-              <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center">
-                <Icon className="w-3.5 h-3.5 text-[hsl(330_85%_80%)]" strokeWidth={2.2} />
-              </span>
-              {m.title}
-            </a>
-          );
-        })}
-        <a
-          href="#modulos"
-          className="shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[hsl(330_85%_80%)] text-[13px] font-semibold hover:text-[hsl(330_90%_88%)] transition"
-        >
-          + 8 outros <ArrowRight className="w-3.5 h-3.5" />
-        </a>
-      </div>
-    </div>
-  </section>
-);
-
-/* =========================================================
    GRID DE MÓDULOS — amplitude num relance (cada card abre a demo)
    ========================================================= */
 
@@ -311,7 +244,7 @@ const ModulesGrid = () => (
         Combine os módulos do seu jeito — a assinatura inclui todos, sem upsell escondido. Toque em qualquer um pra abrir a demo.
       </p>
     </div>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-3">
+    <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory -mx-5 px-5 md:-mx-8 md:px-8 pb-2">
       {MODULES.map((m) => {
         const Icon = m.icon;
         return (
@@ -321,14 +254,14 @@ const ModulesGrid = () => (
             target="_blank"
             rel="noopener"
             onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
-            className="group rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
+            className="group shrink-0 w-[168px] md:w-[208px] snap-start rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
           >
             <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
               <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
             </div>
             <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
             <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
-            <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-accent">
+            <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-black">
               Abrir demo <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
             </span>
           </a>
@@ -374,47 +307,6 @@ const ProductProof = () => (
 );
 
 /* =========================================================
-   SCORECARD MOCK (visual do spotlight de Desenvolvimento)
-   ========================================================= */
-
-const SCORECARD = [
-  { area: "Saúde", v: 7 },
-  { area: "Finanças", v: 6 },
-  { area: "Relações", v: 8 },
-  { area: "Carreira", v: 7 },
-  { area: "Espiritual", v: 5 },
-  { area: "Lazer", v: 6 },
-  { area: "Intelectual", v: 9 },
-  { area: "Emocional", v: 7 },
-];
-
-const DevScorecardMock = () => (
-  <div className="w-full max-w-[360px] rounded-[1.5rem] border border-black/10 bg-white shadow-[0_24px_60px_-24px_rgba(0,0,0,0.25)] p-5">
-    <div className="flex items-center justify-between mb-4">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider text-violet-600">
-        <BarChart3 className="w-3.5 h-3.5" /> SCORECARD SEMANAL
-      </span>
-      <span className="text-[11px] text-black/40">2026 · W25</span>
-    </div>
-    <div className="space-y-2.5">
-      {SCORECARD.map((s) => (
-        <div key={s.area} className="flex items-center gap-3">
-          <span className="w-20 text-[12px] text-black/70 shrink-0">{s.area}</span>
-          <div className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-violet-600" style={{ width: `${s.v * 10}%` }} />
-          </div>
-          <span className="w-9 text-right text-[12px] font-semibold text-black/70">{s.v}/10</span>
-        </div>
-      ))}
-    </div>
-    <div className="mt-4 pt-4 border-t border-black/10 flex items-center justify-between">
-      <span className="text-[12px] text-black/55">Média da semana</span>
-      <span className="text-[20px] font-bold text-violet-600">6.9<span className="text-[12px] text-black/40 font-medium">/10</span></span>
-    </div>
-  </div>
-);
-
-/* =========================================================
    PAGE
    ========================================================= */
 
@@ -455,7 +347,6 @@ export default function LandingPage() {
             CORE
           </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
-            <a href="#demo" className="hover:text-black">Demo</a>
             <a href="#modulos" className="hover:text-black">Módulos</a>
             <a href="#precos" className="hover:text-black">Preços</a>
             <a href="#faq" className="hover:text-black">Perguntas</a>
@@ -488,14 +379,14 @@ export default function LandingPage() {
               O dinheiro some, a rotina desanda, as metas morrem.
             </h1>
             <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[44ch] md:max-w-md mx-auto md:mx-0">
-              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida num só lugar. Abra a demo e use agora, sem criar conta.
+              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida em um só lugar. Abra a demo e use agora, sem criar conta.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full sm:w-auto">
               <a
-                href={previewPath("financas")}
+                href="/demo"
                 target="_blank"
                 rel="noopener"
-                onClick={() => trackEvent("landing_cta_click", { cta: "hero_demo", module: "financas" })}
+                onClick={() => trackEvent("landing_cta_click", { cta: "hero_demo", surface: "home" })}
                 className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
               >
                 <PlayCircle className="w-5 h-5" /> Testar agora — sem cadastro
@@ -529,9 +420,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FAIXA DE DEMO — peça central */}
-      <DemoBand />
-
       {/* COMO FUNCIONA */}
       <HowItWorks />
 
@@ -543,10 +431,10 @@ export default function LandingPage() {
               <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Saiba para onde vai cada real — e faça sobrar.
+              Substitua sua planilha em 30 segundos.
             </h2>
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              O módulo mais completo do CORE: um <strong className="font-semibold text-black/80">Score Financeiro de 0 a 100</strong> diz, num número, como anda sua vida financeira — e o que mexer pra melhorar.
+              O módulo mais completo do CORE. Tudo que você precisa pra entender pra onde seu dinheiro vai — e fazer sobrar mais.
             </p>
             <div className="space-y-2.5 mb-6">
               {[
@@ -572,7 +460,7 @@ export default function LandingPage() {
               onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "financas" })}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
             >
-              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Finanças
+              <PlayCircle className="w-4 h-4 text-black" /> Abrir demo de Finanças
             </a>
           </div>
           <div className="order-1 md:order-2 flex justify-center">
@@ -603,9 +491,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* GRID DE MÓDULOS — amplitude */}
-      <ModulesGrid />
 
       {/* SPOTLIGHT ROTINA */}
       <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
@@ -641,17 +526,17 @@ export default function LandingPage() {
               <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Sua semana sob controle — não na sua cabeça.
+              Construa hábitos que ficam — sem depender de motivação.
             </h2>
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Planeje a semana, marque hábitos em segundos e entre em foco. Sua constância vira um mapa que você vê crescer.
+              Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade.
             </p>
             <div className="space-y-2.5 mb-6">
               {[
-                "Hábitos diários com mapa de consistência (estilo GitHub)",
-                "Agenda semanal por horário, do acordar ao dormir",
-                "Modo Foco com Pomodoro e blocos de tempo",
-                "Diário, revisão e nível de energia do dia",
+                "Check rápido dos hábitos do dia, sem fricção",
+                "Visão semanal pra enxergar onde você travou",
+                "Streaks que mostram sua sequência crescendo",
+                "Calendário mensal pra acompanhar a evolução",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
                   <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
@@ -668,55 +553,14 @@ export default function LandingPage() {
               onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "rotina" })}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
             >
-              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Rotina
+              <PlayCircle className="w-4 h-4 text-black" /> Abrir demo de Rotina
             </a>
           </div>
         </div>
       </section>
 
-      {/* SPOTLIGHT DESENVOLVIMENTO */}
-      <section id="desenvolvimento" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-          <div className="order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 border border-violet-100 text-violet-700 text-[11px] font-bold tracking-wide mb-4">
-              <Sparkles className="w-3 h-3" /> MÓDULO DESENVOLVIMENTO
-            </div>
-            <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
-              Evolua de verdade — com método, não com força de vontade.
-            </h2>
-            <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
-              Metas, valores e hábitos mentais num lugar só — e um <strong className="font-semibold text-black/80">scorecard que pontua 8 áreas da sua vida</strong> toda semana. Evolução deixa de ser sentimento e vira número.
-            </p>
-            <div className="space-y-2.5 mb-6">
-              {[
-                "Scorecard semanal de vida — 8 áreas, uma nota",
-                "Metas e quadro de visão (bucket list)",
-                "Diário de humor com histórico dos últimos dias",
-                "Afirmações, forças, valores e desafios de 30 dias",
-              ].map((t) => (
-                <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5" strokeWidth={3} />
-                  </div>
-                  {t}
-                </div>
-              ))}
-            </div>
-            <a
-              href={previewPath("dev")}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "dev" })}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
-            >
-              <PlayCircle className="w-4 h-4 text-accent" /> Abrir demo de Desenvolvimento
-            </a>
-          </div>
-          <div className="order-1 md:order-2 flex justify-center">
-            <DevScorecardMock />
-          </div>
-        </div>
-      </section>
+      {/* GRID DE MÓDULOS — amplitude (horizontal) */}
+      <ModulesGrid />
 
       {/* GAMIFICAÇÃO */}
       <section className="lp-enter bg-[#0f1115] text-white py-12 md:py-20">
@@ -842,7 +686,6 @@ export default function LandingPage() {
             <div>
               <div className="font-semibold text-white mb-4 text-[14px]">Produto</div>
               <ul className="space-y-3 text-[14px]">
-                <li><a href="#demo" className="hover:text-white transition">Demonstração</a></li>
                 <li><a href="#modulos" className="hover:text-white transition">Módulos</a></li>
                 <li><a href="#financas" className="hover:text-white transition">Finanças</a></li>
                 <li><a href="#precos" className="hover:text-white transition">Preços</a></li>

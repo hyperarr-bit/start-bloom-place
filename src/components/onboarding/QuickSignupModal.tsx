@@ -16,6 +16,7 @@ export const QuickSignupModal = () => {
   const suppressOnRoute =
     location.pathname === "/" ||
     location.pathname.startsWith("/lp") ||
+    location.pathname.startsWith("/demo") ||
     location.pathname.startsWith("/planos") ||
     location.pathname.startsWith("/auth") ||
     location.pathname.startsWith("/reset-password") ||

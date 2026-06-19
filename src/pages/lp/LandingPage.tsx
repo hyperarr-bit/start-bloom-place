@@ -201,37 +201,6 @@ const PricingPlans = () => {
 };
 
 /* =========================================================
-   COMO FUNCIONA — 3 passos (demo → assinar)
-   ========================================================= */
-
-const HOW_STEPS = [
-  { Icon: PlayCircle, t: "Abra a demo", s: "Sem cadastro. Abra qualquer módulo e mexe agora mesmo, com dados de exemplo." },
-  { Icon: Zap, t: "Sinta em segundos", s: "Marque um hábito, lance um gasto, anote uma meta. Sem fricção, sem manual." },
-  { Icon: ShieldCheck, t: "Assine e leve junto", s: "Gostou? Assine e tudo fica salvo e sincronizado — com garantia de 7 dias." },
-];
-
-const HowItWorks = () => (
-  <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
-    <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">COMO FUNCIONA</div>
-      <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Experimente antes de decidir.</h2>
-    </div>
-    <div className="grid md:grid-cols-3 gap-4 md:gap-5">
-      {HOW_STEPS.map((step, i) => (
-        <div key={step.t} className="relative rounded-2xl border border-black/10 bg-white p-6">
-          <div className="absolute top-5 right-5 text-[34px] font-bold text-black/[0.06] leading-none">{i + 1}</div>
-          <div className="w-11 h-11 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-4">
-            <step.Icon className="w-5 h-5" strokeWidth={2.2} />
-          </div>
-          <div className="font-bold text-[16px] mb-1.5">{step.t}</div>
-          <div className="text-[13.5px] text-black/55 leading-snug">{step.s}</div>
-        </div>
-      ))}
-    </div>
-  </section>
-);
-
-/* =========================================================
    GRID DE MÓDULOS — amplitude num relance (cada card abre a demo)
    ========================================================= */
 
@@ -264,7 +233,7 @@ const ModulesGrid = () => (
               onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
               className="group shrink-0 w-[158px] sm:w-[176px] md:w-[208px] snap-start rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
             >
-              <div className={`w-9 h-9 rounded-lg ${m.iconBg} ${m.iconFg} flex items-center justify-center mb-2.5`}>
+              <div className="w-9 h-9 rounded-lg bg-neutral-100 text-neutral-900 flex items-center justify-center mb-2.5">
                 <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
               </div>
               <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
@@ -390,17 +359,15 @@ export default function LandingPage() {
               O dinheiro some, a rotina desanda, as metas morrem.
             </h1>
             <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[44ch] md:max-w-md mx-auto md:mx-0">
-              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida em um só lugar. Abra a demo e use agora, sem criar conta.
+              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida em um só lugar.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full sm:w-auto">
               <a
-                href="/demo"
-                target="_blank"
-                rel="noopener"
-                onClick={() => trackEvent("landing_cta_click", { cta: "hero_demo", surface: "home" })}
+                href="/auth?signup=1"
+                onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
                 className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
               >
-                <PlayCircle className="w-5 h-5" /> Testar agora — sem cadastro
+                Cadastre-se agora <ArrowRight className="w-5 h-5" />
               </a>
               <a
                 href="#precos"
@@ -430,9 +397,6 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* COMO FUNCIONA */}
-      <HowItWorks />
 
       {/* SPOTLIGHT FINANÇAS */}
       <section id="financas" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">

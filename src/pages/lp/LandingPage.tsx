@@ -153,13 +153,13 @@ const PricingPlans = () => {
         <div className="text-[12px] text-black/50 mb-2">
           Pago anualmente · R$ 46,80/ano
         </div>
-        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent text-[11px] font-semibold">
+        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-black/[0.06] border border-black/15 text-black text-[11px] font-semibold">
           Economize R$ 132/ano
         </div>
         <Link
           to="/auth?signup=1"
           onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_anual" }); }}
-          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-sm transition"
+          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-black hover:opacity-90 text-white font-semibold text-sm transition"
         >
           Assinar
         </Link>
@@ -207,7 +207,7 @@ const PricingPlans = () => {
 const ModulesGrid = () => (
   <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
     <div className="text-center mb-6 md:mb-8">
-      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
+      <div className="text-[11px] font-semibold text-neutral-500 tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
       <h2 className="text-[24px] sm:text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
       <p className="text-[14px] md:text-[15px] text-black/55 mt-3 max-w-[52ch] mx-auto">
         Combine os módulos do seu jeito — a assinatura inclui todos, sem upsell escondido. Toque em qualquer um pra abrir a demo.
@@ -215,7 +215,7 @@ const ModulesGrid = () => (
     </div>
 
     {/* dica de arrastar (afford­ance de scroll horizontal) */}
-    <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-accent mb-3">
+    <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-neutral-700 mb-3">
       <span>Arraste para ver os 16 módulos</span>
       <ArrowRight className="w-3.5 h-3.5 animate-[nudge-x_1.4s_ease-in-out_infinite]" />
     </div>
@@ -267,7 +267,7 @@ const PROOF = [
 const ProductProof = () => (
   <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
     <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-accent tracking-widest mb-2">POR QUE CONFIAR</div>
+      <div className="text-[11px] font-semibold text-neutral-500 tracking-widest mb-2">POR QUE CONFIAR</div>
       <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">
         Feito pra você confiar — e ficar.
       </h2>
@@ -275,7 +275,7 @@ const ProductProof = () => (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
       {PROOF.map((b) => (
         <div key={b.t} className="rounded-2xl border border-black/10 bg-white p-4 md:p-5">
-          <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-3">
+          <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-900 flex items-center justify-center mb-3">
             <b.icon className="w-5 h-5" />
           </div>
           <div className="font-bold text-[14px] mb-1">{b.t}</div>
@@ -342,7 +342,7 @@ export default function LandingPage() {
             <Link
               to="/auth?signup=1"
               onClick={() => trackEvent("landing_cta_click", { cta: "header_signup" })}
-              className="px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-semibold shadow-sm transition"
+              className="px-4 py-2 rounded-lg bg-black hover:opacity-90 text-white text-sm font-semibold shadow-sm transition"
             >
               Assinar
             </Link>
@@ -365,7 +365,7 @@ export default function LandingPage() {
               <a
                 href="/auth?signup=1"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
-                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_12px_30px_-10px_hsl(var(--accent)/0.6)] transition"
+                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-black hover:opacity-90 text-white font-semibold text-[15px] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.45)] transition"
               >
                 Cadastre-se agora <ArrowRight className="w-5 h-5" />
               </a>
@@ -377,7 +377,7 @@ export default function LandingPage() {
               </a>
             </div>
             <p className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 mb-5">
-              <ShieldCheck className="w-3.5 h-3.5 text-accent" /> Garantia de 7 dias · cancele quando quiser · sem fidelidade
+              <ShieldCheck className="w-3.5 h-3.5 text-black" /> Garantia de 7 dias · cancele quando quiser · sem fidelidade
             </p>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5 text-[12.5px] text-black/60">
               {[
@@ -386,7 +386,7 @@ export default function LandingPage() {
                 { Icon: Smartphone, t: "Celular e desktop" },
               ].map((b) => (
                 <span key={b.t} className="inline-flex items-center gap-1.5">
-                  <b.Icon className="w-3.5 h-3.5 text-accent" /> {b.t}
+                  <b.Icon className="w-3.5 h-3.5 text-black" /> {b.t}
                 </span>
               ))}
             </div>
@@ -402,7 +402,7 @@ export default function LandingPage() {
       <section id="financas" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div className="order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-700 text-[11px] font-bold tracking-wide mb-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 border border-black/10 text-neutral-700 text-[11px] font-bold tracking-wide mb-4">
               <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
@@ -421,7 +421,7 @@ export default function LandingPage() {
                 "Relatórios mensais e virada de mês automática",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5" strokeWidth={3} />
                   </div>
                   {t}
@@ -497,7 +497,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold tracking-wide mb-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 border border-black/10 text-neutral-700 text-[11px] font-bold tracking-wide mb-4">
               <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
@@ -514,7 +514,7 @@ export default function LandingPage() {
                 "Calendário mensal pra acompanhar a evolução",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5" strokeWidth={3} />
                   </div>
                   {t}
@@ -542,7 +542,7 @@ export default function LandingPage() {
         <div className="max-w-[1100px] mx-auto px-5 md:px-8">
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[hsl(330_65%_50%/0.14)] border border-[hsl(330_70%_62%/0.3)] text-[hsl(330_85%_82%)] text-[11px] font-bold tracking-wide mb-4">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-[11px] font-bold tracking-wide mb-4">
                 <Trophy className="w-3 h-3" /> PROGRESSO QUE VICIA
               </div>
               <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
@@ -560,7 +560,7 @@ export default function LandingPage() {
                 { Icon: BarChart3, t: "Evolução", s: "Seu score e sua constância, semana após semana." },
               ].map((c) => (
                 <div key={c.t} className="rounded-2xl bg-white/[0.05] border border-white/10 p-4">
-                  <c.Icon className="w-5 h-5 text-[hsl(330_80%_70%)] mb-2.5" strokeWidth={2} />
+                  <c.Icon className="w-5 h-5 text-white mb-2.5" strokeWidth={2} />
                   <div className="font-bold text-[15px] mb-0.5">{c.t}</div>
                   <div className="text-[11.5px] text-white/55 leading-snug">{c.s}</div>
                 </div>
@@ -585,7 +585,7 @@ export default function LandingPage() {
                 </p>
                 <div className="flex flex-col items-center md:items-start gap-2">
                   <p className="text-[12px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10 text-black/70">
-                    <Check className="w-3 h-3 text-accent" /> Inclui todos os 16 módulos
+                    <Check className="w-3 h-3 text-black" /> Inclui todos os 16 módulos
                   </p>
                   <p className="text-[12px] text-black/70 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
                     <ShieldCheck className="w-3 h-3" /> Garantia de 7 dias · cancele em 1 clique · sem fidelidade
@@ -614,7 +614,7 @@ export default function LandingPage() {
       <section className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 pb-16">
         <div className="rounded-2xl bg-black text-white p-6 md:p-10 flex flex-col md:flex-row md:items-center gap-5 md:gap-6">
           <div className="flex items-start gap-3 flex-1">
-            <Sparkles className="w-6 h-6 text-[hsl(330_80%_70%)] shrink-0 mt-1" />
+            <Sparkles className="w-6 h-6 text-white shrink-0 mt-1" />
             <div>
               <div className="font-bold text-[20px] md:text-3xl leading-tight mb-2">
                 Comece hoje. Se não for pra você,<br className="hidden md:block" /> devolvemos em 7 dias.
@@ -628,7 +628,7 @@ export default function LandingPage() {
             <Link
               to="/auth?signup=1"
               onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
-              className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-accent hover:opacity-90 text-accent-foreground font-semibold text-[15px] shadow-[0_10px_28px_-8px_hsl(var(--accent)/0.6)] transition whitespace-nowrap"
+              className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-white/90 text-black font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.5)] transition whitespace-nowrap"
             >
               Assinar agora <ArrowRight className="w-4 h-4" />
             </Link>

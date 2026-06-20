@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle, User as UserIcon } from "lucide-react";
+import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle, Check, User as UserIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
@@ -47,23 +47,6 @@ const Auth = () => {
     }
   };
 
-  // Show welcome screen only if user hasn't seen it before
-  const [showWelcome, setShowWelcome] = useState(() => {
-    return !localStorage.getItem("core-welcome-done");
-  });
-
-  const handleWelcomeComplete = () => {
-    localStorage.setItem("core-welcome-done", "true");
-    setShowWelcome(false);
-    setIsLogin(false); // Go to signup
-  };
-
-  const handleWelcomeLogin = () => {
-    localStorage.setItem("core-welcome-done", "true");
-    setShowWelcome(false);
-    setIsLogin(true); // Go to login
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) return;
@@ -71,7 +54,7 @@ const Auth = () => {
       toast({ title: "Informe seu nome", description: "Digite seu nome para criar a conta.", variant: "destructive" });
       return;
     }
-    
+
     // SECURITY: senha forte só no signup; no login mantém validação simples
     if (!isLogin) {
       if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
@@ -115,40 +98,33 @@ const Auth = () => {
 
   if (confirmationSent) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="lpx min-h-screen flex items-center justify-center px-5">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="w-full max-w-sm space-y-8"
+          className="w-full max-w-sm"
         >
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-6 text-center space-y-4">
+          <div className="font-display text-[24px] font-semibold text-center mb-6">core<span className="text-[#127A56]">.</span></div>
+          <div className="rounded-2xl border border-[#E9E1D6] bg-white p-7 text-center">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto"
+              className="w-14 h-14 rounded-full bg-[#E4F0EA] flex items-center justify-center mx-auto mb-4"
             >
-              <CheckCircle className="w-7 h-7 text-primary" />
+              <CheckCircle className="w-7 h-7 text-[#127A56]" />
             </motion.div>
-            <h2 className="text-xl font-bold">Confirme seu e-mail</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Enviamos um link de confirmação para <strong className="text-foreground">{email}</strong>. 
-              Verifique sua caixa de entrada e clique no link para ativar sua conta.
+            <h2 className="font-display text-[22px] font-semibold mb-2">Confirme seu e-mail</h2>
+            <p className="text-[#6B6259] text-[14px] leading-relaxed">
+              Enviamos um link de confirmação para <strong className="text-[#1B1714]">{email}</strong>. Confirme pra ativar sua conta.
             </p>
-            <p className="text-xs text-muted-foreground">
-              Assim que confirmar o e-mail, é só escolher seu plano e começar — com garantia de 7 dias.
+            <p className="text-[12.5px] text-[#6B6259] mt-3">
+              Depois é só escolher seu plano e começar — com 7 dias de garantia.
             </p>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card p-4 text-center">
             <button
               onClick={() => { setConfirmationSent(false); setIsLogin(true); }}
-              className="text-sm text-primary font-medium hover:underline"
+              className="mt-5 text-[14px] text-[#127A56] font-semibold hover:underline"
             >
               Já confirmei, fazer login
             </button>
@@ -159,157 +135,129 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-sm space-y-8"
-      >
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
-          <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta e comece hoje"}
-          </p>
+    <div className="lpx min-h-screen md:grid md:grid-cols-2">
+      {/* Painel de marca (desktop) */}
+      <div className="hidden md:flex flex-col justify-between bg-[#1B1714] text-white p-12 lg:p-16">
+        <div className="font-display text-[24px] font-semibold">core<span className="text-[#E8943B]">.</span></div>
+        <div>
+          <h2 className="font-display text-[34px] lg:text-[40px] font-semibold leading-[1.08] tracking-[-0.01em] max-w-[15ch]">
+            Comece a ver pra onde seu dinheiro vai.
+          </h2>
+          <ul className="mt-8 space-y-3.5">
+            {[
+              "16 módulos numa assinatura só",
+              "7 dias de garantia — sem risco",
+              "Cancele em 1 clique, sem fidelidade",
+            ].map((t) => (
+              <li key={t} className="flex items-center gap-3 text-white/85 text-[15px]">
+                <span className="w-5 h-5 rounded-full bg-[#127A56] flex items-center justify-center shrink-0">
+                  <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                </span>
+                {t}
+              </li>
+            ))}
+          </ul>
         </div>
+        <div className="text-white/45 text-[12px]">Seus dados são só seus · criptografados</div>
+      </div>
 
+      {/* Formulário */}
+      <div className="flex items-center justify-center px-5 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-sm"
+        >
+          <div className="md:hidden font-display text-[24px] font-semibold text-center mb-7">core<span className="text-[#127A56]">.</span></div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-3">
+          <h1 className="font-display text-[28px] font-semibold tracking-tight">
+            {isLogin ? "Bem-vindo de volta" : "Crie sua conta"}
+          </h1>
+          <p className="text-[14px] text-[#6B6259] mt-1 mb-6">
+            {isLogin ? "Entre pra continuar de onde parou." : "Comece hoje — com 7 dias de garantia."}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-3">
             {!isLogin && (
               <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Seu nome"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="pl-10"
-                  required
-                  autoComplete="name"
-                />
+                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6259]" />
+                <Input type="text" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} className="pl-10 bg-white border-[#DDD4C7]" required autoComplete="name" />
               </div>
             )}
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                type="email"
-                placeholder="seu@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
-                required
-                autoComplete="email"
-              />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6259]" />
+              <Input type="email" placeholder="seu@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} className="pl-10 bg-white border-[#DDD4C7]" required autoComplete="email" />
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6B6259]" />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="Sua senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 pr-10 bg-white border-[#DDD4C7]"
                 required
                 minLength={6}
                 autoComplete={isLogin ? "current-password" : "new-password"}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6259] hover:text-[#1B1714]">
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+
+            <Button type="submit" disabled={loading} className="w-full gap-2 mt-1 bg-[#127A56] hover:bg-[#0E5E42] text-white">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                <>{isLogin ? "Entrar" : "Criar conta"}<ArrowRight className="w-4 h-4" /></>
+              )}
+            </Button>
+          </form>
+
+          {/* Divider */}
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-[#E9E1D6]" /></div>
+            <div className="relative flex justify-center text-[11px] uppercase tracking-wide"><span className="bg-[#FAF6F0] px-2 text-[#6B6259]">ou</span></div>
           </div>
 
-          <Button type="submit" disabled={loading} className="w-full gap-2">
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                {isLogin ? "Entrar" : "Criar conta"}
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
+          {/* Google */}
+          <Button type="button" variant="outline" onClick={handleGoogleAuth} disabled={googleLoading || loading} className="w-full gap-2 bg-white border-[#DDD4C7] hover:bg-[#FBF8F3] text-[#1B1714]">
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (<><GoogleIcon />Continuar com Google</>)}
           </Button>
-        </form>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
+          {/* Forgot + Toggle */}
+          <div className="mt-5 text-center space-y-2">
+            {isLogin && (
+              <Link to="/reset-password" className="block text-[13px] text-[#6B6259] hover:text-[#1B1714]">Esqueci minha senha</Link>
+            )}
+            {isLogin ? (
+              <p className="text-[14px]">
+                <span className="text-[#6B6259]">Não tem conta? </span>
+                <button onClick={() => setIsLogin(false)} className="text-[#127A56] font-semibold hover:underline">Crie a sua</button>
+              </p>
+            ) : (
+              <p className="text-[14px]">
+                <span className="text-[#6B6259]">Já tem conta? </span>
+                <button onClick={() => setIsLogin(true)} className="text-[#127A56] font-semibold hover:underline">Faça login</button>
+              </p>
+            )}
           </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">ou</span>
-          </div>
-        </div>
 
-        {/* Google */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleGoogleAuth}
-          disabled={googleLoading || loading}
-          className="w-full gap-2"
-        >
-          {googleLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              <GoogleIcon />
-              Continuar com Google
-            </>
-          )}
-        </Button>
-
-        {/* Forgot password + Toggle */}
-        <div className="rounded-xl border border-border bg-card p-4 text-center space-y-2">
-          {isLogin && (
-            <Link to="/reset-password" className="text-sm text-primary font-medium hover:underline">
-              Esqueci minha senha
-            </Link>
-          )}
-          {isLogin ? (
-            <p className="text-sm">
-              <span className="text-muted-foreground">Não tem conta? </span>
-              <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie sua conta
-              </button>
-            </p>
-          ) : (
-            <p className="text-sm">
-              <span className="text-muted-foreground">Já tem conta? </span>
-              <button onClick={() => setIsLogin(true)} className="text-primary font-medium hover:underline">
-                Faça login
-              </button>
-            </p>
-          )}
-        </div>
-
-        {/* Trial info */}
-        <AnimatePresence>
-          {!isLogin && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="rounded-xl border border-border bg-card p-4 space-y-2">
-                <p className="text-xs font-medium">✨ O que você leva:</p>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso completo aos <strong>16 módulos</strong>, sem upsell</li>
-                  <li>• Garantia de 7 dias · cancele quando quiser, sem fidelidade</li>
-                </ul>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          {/* O que você leva (signup) */}
+          <AnimatePresence>
+            {!isLogin && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                <div className="mt-5 rounded-xl border border-[#E9E1D6] bg-white p-4">
+                  <p className="text-[12px] font-semibold mb-2">✨ O que você leva:</p>
+                  <ul className="text-[12.5px] text-[#6B6259] space-y-1.5">
+                    <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#127A56] shrink-0" strokeWidth={3} /> Acesso completo aos <strong className="text-[#1B1714] font-semibold">16 módulos</strong>, sem upsell</li>
+                    <li className="flex items-center gap-2"><Check className="w-3.5 h-3.5 text-[#127A56] shrink-0" strokeWidth={3} /> Garantia de 7 dias · cancele quando quiser</li>
+                  </ul>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </div>
     </div>
   );
 };

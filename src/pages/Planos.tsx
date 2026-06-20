@@ -197,34 +197,34 @@ const Planos = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="lpx min-h-screen">
       <PaymentStatus />
       <DownsellDialog open={downsell.open} onClose={downsell.close} />
 
-      <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-[#E9E1D6] bg-[#FAF6F0]/85 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center gap-3">
           <button
             onClick={handleBack}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            className="p-2 rounded-lg hover:bg-[#F1EBE1] transition-colors"
             aria-label="Voltar"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold">Escolha seu plano</h1>
+          <h1 className="font-display text-[20px] font-semibold">Escolha seu plano</h1>
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 sm:py-10 space-y-8 pb-32 sm:pb-10">
         {isSubscribed && (
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center space-y-3">
-            <p className="text-sm font-medium text-primary">
+          <div className="rounded-xl border border-[#127A56]/25 bg-[#E4F0EA] p-4 text-center space-y-3">
+            <p className="text-sm font-medium text-[#0E5E42]">
               Você já é assinante CORE PRO
             </p>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setCancelOpen(true)}
-              className="text-xs text-muted-foreground hover:text-destructive"
+              className="text-xs text-[#6B6259] hover:text-red-600"
             >
               Cancelar assinatura
             </Button>
@@ -234,23 +234,23 @@ const Planos = () => {
 
         {/* Hero */}
         <div className="text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary/60 shadow-lg shadow-primary/30">
-            <Crown className="w-7 h-7 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#127A56] shadow-lg shadow-[#127A56]/30">
+            <Crown className="w-7 h-7 text-white" />
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          <h2 className="font-display text-[26px] sm:text-[34px] font-semibold tracking-tight">
             Tudo da sua vida em um só app
           </h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          <p className="text-[14px] text-[#6B6259] max-w-md mx-auto">
             16 módulos para organizar finanças, saúde, rotina, metas e muito mais.
           </p>
         </div>
 
         {/* Billing toggle */}
-        <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">
+        <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-[#F4EEE5] max-w-sm mx-auto w-full">
           <button
             onClick={() => setBilling("monthly")}
             className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-              billing === "monthly" ? "bg-card shadow-sm" : "text-muted-foreground"
+              billing === "monthly" ? "bg-white shadow-sm text-[#1B1714]" : "text-[#6B6259]"
             }`}
           >
             Mensal
@@ -258,11 +258,11 @@ const Planos = () => {
           <button
             onClick={() => setBilling("annual")}
             className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all relative ${
-              billing === "annual" ? "bg-card shadow-sm" : "text-muted-foreground"
+              billing === "annual" ? "bg-white shadow-sm text-[#1B1714]" : "text-[#6B6259]"
             }`}
           >
             Anual
-            <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
+            <span className="absolute -top-2 -right-2 bg-[#127A56] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
               -74%
             </span>
           </button>
@@ -273,22 +273,22 @@ const Planos = () => {
           key={billing}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl border-2 border-primary/30 bg-card p-6 sm:p-8 space-y-5 shadow-xl shadow-primary/10 overflow-hidden"
+          className="relative rounded-2xl border border-[#E9E1D6] bg-white p-6 sm:p-8 space-y-5 shadow-[0_30px_70px_-40px_rgba(27,23,20,0.35)] overflow-hidden max-w-md mx-auto"
         >
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/40 via-primary to-primary/40" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-[#127A56]" />
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-primary" />
+              <div className="w-10 h-10 rounded-xl bg-[#E4F0EA] flex items-center justify-center">
+                <Crown className="w-5 h-5 text-[#127A56]" />
               </div>
               <div>
-                <h3 className="font-bold text-lg leading-tight">CORE PRO</h3>
-                <p className="text-xs text-muted-foreground">Acesso completo</p>
+                <h3 className="font-display font-semibold text-[18px] leading-tight">CORE PRO</h3>
+                <p className="text-xs text-[#6B6259]">Acesso completo</p>
               </div>
             </div>
             {billing === "annual" && (
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-1 rounded-md">
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-[#E4F0EA] text-[#0E5E42] px-2 py-1 rounded-md">
                 Mais escolhido
               </span>
             )}
@@ -296,25 +296,25 @@ const Planos = () => {
 
           <div className="space-y-1">
             {billing === "annual" && (
-              <p className="text-sm text-muted-foreground line-through">
+              <p className="text-sm text-[#6B6259] line-through">
                 R$ 14,90/mês
               </p>
             )}
             <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-bold tracking-tight">
+              <span className="font-display text-[48px] font-semibold tracking-tight text-[#0E5E42]">
                 R$ {currentPlan.price}
               </span>
-              <span className="text-muted-foreground">{currentPlan.period}</span>
+              <span className="text-[#6B6259]">{currentPlan.period}</span>
             </div>
             {billing === "annual" && (
-              <p className="text-xs text-primary font-medium">
+              <p className="text-xs text-[#127A56] font-medium">
                 {plans.annual.savings}
               </p>
             )}
           </div>
 
           <Button
-            className="w-full"
+            className="w-full bg-[#127A56] hover:bg-[#0E5E42] text-white"
             size="lg"
             onClick={handleCheckout}
             disabled={loading || isSubscribed}
@@ -330,17 +330,17 @@ const Planos = () => {
             )}
           </Button>
 
-          <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Cancele quando quiser · 7 dias grátis · Sem fidelidade</span>
+          <div className="flex items-center justify-center gap-2 text-[11px] text-[#6B6259]">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#127A56]" />
+            <span>Cancele quando quiser · 7 dias de garantia · Sem fidelidade</span>
           </div>
         </motion.div>
 
         {/* All modules benefits */}
         <section className="space-y-4">
           <div className="text-center space-y-1">
-            <h3 className="text-lg font-bold">O que está incluído</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="font-display text-[18px] font-semibold">O que está incluído</h3>
+            <p className="text-xs text-[#6B6259]">
               Todos os 16 módulos liberados, sem limites
             </p>
           </div>
@@ -351,11 +351,11 @@ const Planos = () => {
               return (
                 <div
                   key={group.title}
-                  className="rounded-xl border border-border bg-card p-4 space-y-2"
+                  className="rounded-xl border border-[#E9E1D6] bg-white p-4 space-y-2"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon className="w-4 h-4 text-primary" />
+                    <div className="w-8 h-8 rounded-lg bg-[#E4F0EA] flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-[#127A56]" />
                     </div>
                     <h4 className="font-semibold text-sm">{group.title}</h4>
                   </div>
@@ -363,9 +363,9 @@ const Planos = () => {
                     {group.items.map((item) => (
                       <li
                         key={item}
-                        className="flex items-start gap-2 text-xs text-muted-foreground"
+                        className="flex items-start gap-2 text-xs text-[#6B6259]"
                       >
-                        <Check className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                        <Check className="w-3.5 h-3.5 text-[#127A56] shrink-0 mt-0.5" />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -379,18 +379,18 @@ const Planos = () => {
 
       {/* Sticky CTA mobile */}
       {!isSubscribed && (
-        <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-[#E9E1D6] bg-[#FAF6F0]/95 backdrop-blur p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-3">
             <div className="leading-tight">
-              <p className="text-[11px] text-muted-foreground">A partir de</p>
+              <p className="text-[11px] text-[#6B6259]">A partir de</p>
               <p className="text-base font-bold">
                 R$ {currentPlan.price}
-                <span className="text-xs font-normal text-muted-foreground">
+                <span className="text-xs font-normal text-[#6B6259]">
                   {currentPlan.period}
                 </span>
               </p>
             </div>
-            <Button onClick={handleCheckout} disabled={loading} className="flex-1 max-w-[60%]">
+            <Button onClick={handleCheckout} disabled={loading} className="flex-1 max-w-[60%] bg-[#127A56] hover:bg-[#0E5E42] text-white">
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (

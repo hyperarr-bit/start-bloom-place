@@ -58,7 +58,7 @@ import Relacionamentos from "./pages/Relacionamentos";
 import PetPage from "./pages/Pet";
 import Detox from "./pages/Detox";
 import Conquistas from "./pages/Conquistas";
-import LandingPage from "./pages/lp/LandingPage";
+import LandingPage from "./pages/lp/Landing";
 import Preview from "./pages/Preview";
 import Demo from "./pages/Demo";
 

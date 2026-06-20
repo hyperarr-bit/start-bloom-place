@@ -768,3 +768,14 @@ header.sticky.top-0 {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* ============================================================
+   Nova Landing (rebuild 2026) — "Premium quente"
+   Identidade do zero: Fraunces (display) + Inter (corpo), base
+   creme, acento verde-dinheiro. NÃO reaproveita nada da LP antiga.
+   ============================================================ */
+.font-display { font-family: "Fraunces", Georgia, serif; font-optical-sizing: auto; }
+.lpx { background-color: #FAF6F0; color: #1B1714; font-family: "Inter", sans-serif; }
+.lpx ::selection { background: #127A56; color: #fff; }
+.lpx-noscroll { -ms-overflow-style: none; scrollbar-width: none; }
+.lpx-noscroll::-webkit-scrollbar { display: none; }
+

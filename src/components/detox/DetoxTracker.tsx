@@ -13,13 +13,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { normalizeDetoxHabits, type DetoxHabit } from "./utils";
+
+interface DetoxHabit {
+  id: string;
+  name: string;
+  icon: string;
+  startDate: string;
+  relapses: string[];
+  record: number;
+  checkins?: string[];
+  reasons?: string[];
+}
 
 const iconOptions = ["🚬", "🍺", "📱", "🍔", "🎮", "☕", "🍫", "💊", "🔞", "🎰"];
 
 export const DetoxTracker = () => {
   const { get, set } = useUserData();
-  const habits = normalizeDetoxHabits(get<DetoxHabit[]>("detox-habits", []));
+  const habits = get<DetoxHabit[]>("detox-habits", []);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("📱");
   const [selectedHabit, setSelectedHabit] = useState<string | null>(null);

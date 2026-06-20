@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useAppNavigate } from "@/hooks/use-demo-mode";
+import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -70,7 +70,7 @@ const TABS = [
 ];
 
 const Estudos = () => {
-  const navigate = useAppNavigate();
+  const navigate = useNavigate();
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 

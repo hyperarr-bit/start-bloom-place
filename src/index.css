@@ -602,9 +602,7 @@ body,
   max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  /* `clip` evita overflow horizontal SEM virar scroll container — `hidden`
-     forçaria overflow-y de `visible` para `auto`, criando 3 scrollers aninhados
-     (html/body/#root) e o efeito elástico de "não desce e volta" no mobile. */
+  /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no mobile */
   overflow-x: clip;
   touch-action: auto;
   background-color: hsl(var(--background));
@@ -669,31 +667,6 @@ header.sticky.top-0 {
   z-index: 40;
 }
 
-/* ============================================================
-   Demo / Preview shell
-   O banner "Demonstração · Assinar" fica FIXO abaixo da safe-area, e os
-   headers sticky dos módulos descem a altura do banner. Sem isso, banner e
-   header empilhavam no mesmo top:0 e o banner (z maior) escondia a seta de
-   voltar — o usuário ficava preso na aba. Escopo .demo-shell não afeta o app.
-   ============================================================ */
-.demo-shell {
-  --demo-banner-h: 2.5rem;
-}
-.demo-banner {
-  position: fixed;
-  top: var(--app-safe-top, 0px);
-  left: var(--app-safe-left, 0px);
-  right: var(--app-safe-right, 0px);
-  height: var(--demo-banner-h);
-  z-index: 45;
-}
-.demo-content {
-  padding-top: var(--demo-banner-h);
-}
-.demo-shell header.sticky.top-0 {
-  top: calc(var(--app-safe-top, 0px) + var(--demo-banner-h));
-}
-
 
 
 
@@ -740,12 +713,6 @@ header.sticky.top-0 {
   100% { left: 150%; }
 }
 
-/* Seta da dica "arraste para ver mais" (grid horizontal de módulos) */
-@keyframes nudge-x {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(5px); }
-}
-
 /* Entrada suave dos componentes da landing (reveal on scroll) */
 @keyframes lp-rise {
   0% { opacity: 0; transform: translateY(28px); }
@@ -761,21 +728,5 @@ header.sticky.top-0 {
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-enter { opacity: 1; transform: none; animation: none; }
-  .btn-shine::after { animation: none; display: none; }
 }
-
-/* Scroll horizontal sem barra (chips da faixa de demo no mobile) */
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
-
-/* ============================================================
-   Nova Landing (rebuild 2026) — "Premium quente"
-   Identidade do zero: Fraunces (display) + Inter (corpo), base
-   creme, acento verde-dinheiro. NÃO reaproveita nada da LP antiga.
-   ============================================================ */
-.font-display { font-family: "Fraunces", Georgia, serif; font-optical-sizing: auto; }
-.lpx { background-color: #FAF6F0; color: #1B1714; font-family: "Inter", sans-serif; }
-.lpx ::selection { background: #127A56; color: #fff; }
-.lpx-noscroll { -ms-overflow-style: none; scrollbar-width: none; }
-.lpx-noscroll::-webkit-scrollbar { display: none; }
 

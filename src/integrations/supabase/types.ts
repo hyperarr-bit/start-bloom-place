@@ -699,7 +699,7 @@ export type Database = {
           utm_source: string
         }[]
       }
-      admin_reset_analytics: { Args: never; Returns: Json }
+      admin_reset_analytics: { Args: never; Returns: string }
       admin_retention_offers_breakdown: {
         Args: never
         Returns: {

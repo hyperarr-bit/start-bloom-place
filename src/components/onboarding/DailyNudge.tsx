@@ -1,4 +1,4 @@
-import { useAppNavigate } from "@/hooks/use-demo-mode";
+import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Sparkles, Zap, Clock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ const TONE_STYLES = {
 export const DailyNudge = () => {
   const { nudge, open, dismiss, click } = useDailyNudge();
   const { trialDay } = useAuth();
-  const navigate = useAppNavigate();
+  const navigate = useNavigate();
 
   if (!nudge) return null;
 

@@ -2,7 +2,15 @@ import { motion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { Trophy, Lock } from "lucide-react";
 import { differenceInDays } from "date-fns";
-import { normalizeDetoxHabits, type DetoxHabit } from "./utils";
+
+interface DetoxHabit {
+  id: string;
+  name: string;
+  icon: string;
+  startDate: string;
+  relapses: string[];
+  record: number;
+}
 
 const milestones = [
   { days: 1, title: "Primeiro Dia", msg: "Toda jornada começa com um passo.", icon: "🌱" },
@@ -18,7 +26,7 @@ const milestones = [
 
 export const DetoxAchievements = () => {
   const { get } = useUserData();
-  const habits = normalizeDetoxHabits(get<DetoxHabit[]>("detox-habits", []));
+  const habits = get<DetoxHabit[]>("detox-habits", []);
 
   const getStreak = (h: DetoxHabit) => {
     const lastRelapse = h.relapses.length > 0 ? h.relapses[h.relapses.length - 1] : null;

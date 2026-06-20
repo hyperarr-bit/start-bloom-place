@@ -37,8 +37,6 @@ interface AuthContextType {
   loading: boolean;
   trialExpired: boolean;
   isSubscribed: boolean;
-  /** True once check-subscription has returned at least once for the current user. */
-  subscriptionChecked: boolean;
   trialDay: number;
   trialHoursLeft: number;
   inGracePeriod: boolean;
@@ -57,7 +55,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [trialExpired, setTrialExpired] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscriptionChecked, setSubscriptionChecked] = useState(false);
   const [trialDay, setTrialDay] = useState(1);
   const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
   const [inGracePeriod, setInGracePeriod] = useState(false);
@@ -76,7 +73,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           setTrialExpired(false);
           setIsSubscribed(false);
-          setSubscriptionChecked(false);
         }
         setLoading(false);
       }
@@ -118,9 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setPaymentMethod(data?.payment_method ?? null);
       if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
       if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
-      // Mark as checked only on a successful response — on error we fail open
-      // (never block paying users because of a backend hiccup).
-      setSubscriptionChecked(true);
     } catch (err) {
       console.error("check-subscription failed:", err);
     }
@@ -173,7 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, subscriptionChecked, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

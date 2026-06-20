@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useAppNavigate } from "@/hooks/use-demo-mode";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ArrowLeft, DollarSign } from "lucide-react";
 
@@ -40,7 +40,10 @@ const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Jul
 
 
 const Index = () => {
-  const navigate = useAppNavigate();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // No demo aberto (/preview/financas) o "voltar" deve sair pra LP, não pro app.
+  const isPreview = location.pathname.startsWith("/preview");
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
   const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
@@ -153,7 +156,7 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={() => navigate(isPreview ? "/lp" : "/home")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
 

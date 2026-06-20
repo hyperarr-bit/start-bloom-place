@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAppNavigate } from "@/hooks/use-demo-mode";
+import { useNavigate } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { ArrowLeft, Plane } from "lucide-react";
@@ -32,7 +32,7 @@ const tabs = [
 ];
 
 const Viagens = () => {
-  const navigate = useAppNavigate();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("destinos");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

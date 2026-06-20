@@ -1,29 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useLocation } from "react-router-dom";
 import { useUserData } from "@/hooks/use-user-data";
 import { QuickSignupStep } from "./QuickSignupStep";
 
 export const QuickSignupModal = () => {
   const { get, isGuest, loaded } = useUserData();
-  const location = useLocation();
   const pending = get<string>("quicksignup-pending", "") === "true";
-
-  // Nunca abrir (nem travar o scroll do body) nas superfícies de marketing,
-  // checkout, auth e admin. A conversão demo→cadastro acontece no /preview e em
-  // /home. Sem isso, um guest com `quicksignup-pending` que cai no /lp ou /planos
-  // ficava com o body em overflow:hidden e a página inteira travada.
-  const suppressOnRoute =
-    location.pathname === "/" ||
-    location.pathname.startsWith("/lp") ||
-    location.pathname.startsWith("/demo") ||
-    location.pathname.startsWith("/planos") ||
-    location.pathname.startsWith("/auth") ||
-    location.pathname.startsWith("/reset-password") ||
-    location.pathname.startsWith("/update-password") ||
-    location.pathname.startsWith("/admin");
-
-  const shouldOpen = loaded && isGuest && pending && !suppressOnRoute;
+  const shouldOpen = loaded && isGuest && pending;
   const [keepOpen, setKeepOpen] = useState(false);
 
   // Once opened, stay open until QuickSignupStep tells us it's done (success screen confirmed).
@@ -31,8 +14,7 @@ export const QuickSignupModal = () => {
     if (shouldOpen && !keepOpen) setKeepOpen(true);
   }, [shouldOpen, keepOpen]);
 
-  // Mesmo já aberto, sair para uma rota suprimida fecha o modal e libera o scroll.
-  const open = !suppressOnRoute && (keepOpen || shouldOpen);
+  const open = keepOpen || shouldOpen;
 
   useEffect(() => {
     if (!open) return;

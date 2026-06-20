@@ -5,14 +5,11 @@ import { RotateCcw } from "lucide-react";
 export default function ResetAnalyticsButton({ onDone }: { onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
   const handle = async () => {
-    if (!confirm("Zerar TODOS os contadores? Isso apaga permanentemente eventos, uso de módulos, ativações, winback e tentativas de cancelamento. Assinaturas e dados dos usuários NÃO são afetados.")) return;
+    if (!confirm("Zerar todos os contadores a partir de agora? Os dados antigos somem das telas (mas continuam no banco).")) return;
     setBusy(true);
-    const { data, error } = await (supabase as any).rpc("admin_reset_analytics");
+    const { error } = await (supabase as any).rpc("admin_reset_analytics");
     setBusy(false);
     if (error) { alert("Erro: " + error.message); return; }
-    const d = data?.deleted || {};
-    const total = Object.values(d).reduce((s: number, n: any) => s + Number(n || 0), 0);
-    alert(`Contadores zerados. ${total} registros apagados.`);
     onDone?.();
   };
   return (

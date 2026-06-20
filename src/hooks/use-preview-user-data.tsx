@@ -9,18 +9,12 @@ import { toast } from "sonner";
  */
 export const PreviewUserDataProvider = ({
   moduleKey,
-  seeds,
   children,
 }: {
-  /** Single-module preview: seeds come from getSeedsForModule(moduleKey). */
-  moduleKey?: string;
-  /** Full demo: explicit aggregated seeds shared across the whole shell. */
-  seeds?: Record<string, any>;
+  moduleKey: string;
   children: ReactNode;
 }) => {
-  const [store, setStore] = useState<Record<string, any>>(
-    () => seeds ?? getSeedsForModule(moduleKey ?? ""),
-  );
+  const [store, setStore] = useState<Record<string, any>>(() => getSeedsForModule(moduleKey));
   const toastShown = useRef(false);
 
   const get = useCallback(<T,>(key: string, fallback: T): T => {
@@ -31,7 +25,7 @@ export const PreviewUserDataProvider = ({
     setStore((prev) => ({ ...prev, [key]: value }));
     if (!toastShown.current) {
       toastShown.current = true;
-      toast.info("Modo demonstração — crie sua conta para salvar suas alterações.");
+      toast.info("Modo demonstração — crie sua conta grátis para salvar suas alterações.");
       setTimeout(() => { toastShown.current = false; }, 6000);
     }
   }, []);

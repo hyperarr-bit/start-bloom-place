@@ -3,7 +3,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
-import { useAppNavigate } from "@/hooks/use-demo-mode";
+import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Timer, Play, Pause, RotateCcw,
   Trophy, Flame, Dumbbell, TrendingUp, Target, Zap, BarChart3, Calendar,
@@ -161,7 +161,7 @@ function estimate1RM(weight: number, reps: number): number {
 }
 
 const Treino = () => {
-  const navigate = useAppNavigate();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();

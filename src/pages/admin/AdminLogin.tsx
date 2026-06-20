@@ -19,7 +19,7 @@ export default function AdminLogin() {
     if (loading || !user) return;
     if (user.email !== ADMIN_EMAIL) return;
     checkIsAdmin(user.id).then(ok => {
-      if (ok) navigate("/admin/visao-geral", { replace: true });
+      if (ok) navigate("/admin/dashboard", { replace: true });
     });
   }, [user, loading, navigate]);
 
@@ -53,7 +53,7 @@ export default function AdminLogin() {
       return;
     }
 
-    navigate("/admin/visao-geral", { replace: true });
+    navigate("/admin/dashboard", { replace: true });
   };
 
   return (

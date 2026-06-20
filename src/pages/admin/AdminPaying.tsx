@@ -25,15 +25,18 @@ interface Row {
 const fmtDT = (s: string | null) => s ? new Date(s).toLocaleString("pt-BR") : "—";
 const fmtD  = (s: string | null) => s ? new Date(s).toLocaleDateString("pt-BR") : "—";
 
-// MRR real (preços do app): mensal R$14,90 | anual R$46,80/ano = R$3,90/mês equiv.
-// O app só tem um plano ("core-pro"); o que varia é o billing_period.
-const PRICE_MONTHLY = 14.9;
-const PRICE_ANNUAL_PER_MONTH = 3.9;
+// MRR heurístico baseado em plano/período (ajuste se preços mudarem)
+const PRICE: Record<string, { monthly: number }> = {
+  "core-pro": { monthly: 19.9 },
+  "premium":  { monthly: 19.9 },
+};
 const mrrOf = (r: Row) => {
   if (r.status !== "active") return 0;
-  if (["annual", "yearly"].includes(r.billing_period || "")) return PRICE_ANNUAL_PER_MONTH;
+  const p = PRICE[r.plan || ""]?.monthly ?? 0;
+  if (!r.billing_period) return p;
+  if (["annual","yearly"].includes(r.billing_period)) return p; // tratamos como MRR mensal equiv.
   if (r.billing_period === "lifetime") return 0;
-  return PRICE_MONTHLY; // mensal (ou period nulo = assume mensal)
+  return p;
 };
 
 export default function AdminPaying() {

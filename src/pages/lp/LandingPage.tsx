@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 const financasPreviewVideo = { url: "/videos/financas.mp4" };
 const rotinaPreviewVideo = { url: "/videos/rotina.mp4" };
 const financasPreviewPoster = { url: "/videos/financas-poster.jpg" };
 const rotinaPreviewPoster = { url: "/videos/rotina-poster.jpg" };
+const testimonialMarina = { url: "/images/testimonial-marina.jpg" };
+const testimonialPedro = { url: "/images/testimonial-pedro.jpg" };
+const testimonialJulia = { url: "/images/testimonial-julia.jpg" };
 import { Link } from "react-router-dom";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, ShieldCheck, PlayCircle,
+  ArrowRight, Check, CalendarDays, ShieldCheck, XCircle,
   Wallet, Calendar as CalendarIcon, Sparkles, LayoutGrid,
-  ChevronDown, Leaf,
+  Sun, Heart, TrendingUp, TrendingDown, Leaf,
+  ChevronLeft, ChevronRight, ChevronDown,
   Utensils, Dumbbell, Brain, GraduationCap, Home as HomeIcon,
   PawPrint, Plane, Users, Briefcase, BookOpen, HeartPulse, Flower2,
-  Trophy, Flame, Wifi, Moon, Smartphone, Lock, Zap, Target, BarChart3,
+  Trophy, Flame, Wifi, Moon, Smartphone, Lock, Zap, Target,
+  FileSpreadsheet, StickyNote, Bell, BarChart3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,35 +26,572 @@ type ModuleItem = {
   title: string;
   desc: string;
   icon: LucideIcon;
-  iconFg: string;
+  bg: string;
   iconBg: string;
+  iconFg: string;
+  titleColor: string;
 };
 
 const MODULES: ModuleItem[] = [
-  { key: "financas", title: "FINANÇAS", desc: "Entenda receitas, despesas e investimentos com clareza.", icon: Wallet, iconFg: "text-orange-600", iconBg: "bg-orange-100" },
-  { key: "rotina", title: "ROTINA", desc: "Organize hábitos, consistência e sua semana em poucos toques.", icon: CalendarIcon, iconFg: "text-emerald-600", iconBg: "bg-emerald-100" },
-  { key: "dev", title: "DESENVOLVIMENTO PESSOAL", desc: "Acompanhe metas, forças, afirmações e evolução pessoal.", icon: Sparkles, iconFg: "text-violet-600", iconBg: "bg-violet-100" },
-  { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, iconFg: "text-amber-600", iconBg: "bg-amber-100" },
-  { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, iconFg: "text-blue-600", iconBg: "bg-blue-100" },
-  { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, iconFg: "text-rose-600", iconBg: "bg-rose-100" },
-  { key: "hiperfoco", title: "MENTE", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, iconFg: "text-indigo-600", iconBg: "bg-indigo-100" },
-  { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, iconFg: "text-yellow-700", iconBg: "bg-yellow-100" },
-  { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, iconFg: "text-slate-700", iconBg: "bg-slate-100" },
-  { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, iconFg: "text-stone-700", iconBg: "bg-stone-100" },
-  { key: "casa", title: "CASA", desc: "Limpeza, despensa, manutenções e rotinas do lar.", icon: HomeIcon, iconFg: "text-teal-600", iconBg: "bg-teal-100" },
-  { key: "viagens", title: "VIAGENS", desc: "Roteiros, malas, orçamento e bucket list em um só lugar.", icon: Plane, iconFg: "text-sky-600", iconBg: "bg-sky-100" },
-  { key: "relacionamentos", title: "RELACIONAMENTOS", desc: "Pessoas, datas importantes, presentes e momentos.", icon: Users, iconFg: "text-pink-600", iconBg: "bg-pink-100" },
-  { key: "pet", title: "PET", desc: "Saúde, rotina, gastos e diário do seu pet.", icon: PawPrint, iconFg: "text-lime-700", iconBg: "bg-lime-100" },
-  { key: "beleza", title: "BELEZA", desc: "Skincare, cabelo, produtos e cronogramas personalizados.", icon: Flower2, iconFg: "text-fuchsia-600", iconBg: "bg-fuchsia-100" },
-  { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, iconFg: "text-green-600", iconBg: "bg-green-100" },
+  { key: "financas", title: "FINANÇAS", desc: "Entenda receitas, despesas e investimentos com clareza.", icon: Wallet, bg: "bg-orange-50/70 border-orange-100", iconBg: "bg-orange-100", iconFg: "text-orange-600", titleColor: "text-orange-700" },
+  { key: "rotina", title: "ROTINA", desc: "Organize hábitos, consistência e sua semana em poucos toques.", icon: CalendarIcon, bg: "bg-emerald-50/70 border-emerald-100", iconBg: "bg-emerald-100", iconFg: "text-emerald-600", titleColor: "text-emerald-700" },
+  { key: "dev", title: "DESENVOLVIMENTO PESSOAL", desc: "Acompanhe metas, forças, afirmações e evolução pessoal.", icon: Sparkles, bg: "bg-violet-50/70 border-violet-100", iconBg: "bg-violet-100", iconFg: "text-violet-600", titleColor: "text-violet-700" },
+  { key: "dieta", title: "DIETA", desc: "Planeje refeições, calorias e macros sem complicação.", icon: Utensils, bg: "bg-amber-50/70 border-amber-100", iconBg: "bg-amber-100", iconFg: "text-amber-600", titleColor: "text-amber-700" },
+  { key: "treino", title: "TREINO", desc: "Monte e acompanhe seus treinos com clareza total.", icon: Dumbbell, bg: "bg-blue-50/70 border-blue-100", iconBg: "bg-blue-100", iconFg: "text-blue-600", titleColor: "text-blue-700" },
+  { key: "saude", title: "SAÚDE", desc: "Hidratação, jejum, exames e bem-estar no mesmo lugar.", icon: HeartPulse, bg: "bg-rose-50/70 border-rose-100", iconBg: "bg-rose-100", iconFg: "text-rose-600", titleColor: "text-rose-700" },
+  { key: "hiperfoco", title: "MENTE", desc: "Capture ideias, metas e estratégias antes que escapem.", icon: Brain, bg: "bg-indigo-50/70 border-indigo-100", iconBg: "bg-indigo-100", iconFg: "text-indigo-600", titleColor: "text-indigo-700" },
+  { key: "estudos", title: "ESTUDOS", desc: "Organize matérias, sessões e progresso de aprendizado.", icon: GraduationCap, bg: "bg-yellow-50/70 border-yellow-100", iconBg: "bg-yellow-100", iconFg: "text-yellow-700", titleColor: "text-yellow-700" },
+  { key: "carreira", title: "CARREIRA", desc: "Acompanhe metas profissionais, projetos e evolução.", icon: Briefcase, bg: "bg-slate-50/70 border-slate-200", iconBg: "bg-slate-100", iconFg: "text-slate-700", titleColor: "text-slate-700" },
+  { key: "biblioteca", title: "BIBLIOTECA", desc: "Sua estante digital com livros, leituras e resumos.", icon: BookOpen, bg: "bg-stone-50/70 border-stone-200", iconBg: "bg-stone-100", iconFg: "text-stone-700", titleColor: "text-stone-700" },
+  { key: "casa", title: "CASA", desc: "Limpeza, despensa, manutenções e rotinas do lar.", icon: HomeIcon, bg: "bg-teal-50/70 border-teal-100", iconBg: "bg-teal-100", iconFg: "text-teal-600", titleColor: "text-teal-700" },
+  { key: "viagens", title: "VIAGENS", desc: "Roteiros, malas, orçamento e bucket list em um só lugar.", icon: Plane, bg: "bg-sky-50/70 border-sky-100", iconBg: "bg-sky-100", iconFg: "text-sky-600", titleColor: "text-sky-700" },
+  { key: "relacionamentos", title: "RELACIONAMENTOS", desc: "Pessoas, datas importantes, presentes e momentos.", icon: Users, bg: "bg-pink-50/70 border-pink-100", iconBg: "bg-pink-100", iconFg: "text-pink-600", titleColor: "text-pink-700" },
+  { key: "pet", title: "PET", desc: "Saúde, rotina, gastos e diário do seu pet.", icon: PawPrint, bg: "bg-lime-50/70 border-lime-100", iconBg: "bg-lime-100", iconFg: "text-lime-700", titleColor: "text-lime-700" },
+  { key: "beleza", title: "BELEZA", desc: "Skincare, cabelo, produtos e cronogramas personalizados.", icon: Flower2, bg: "bg-fuchsia-50/70 border-fuchsia-100", iconBg: "bg-fuchsia-100", iconFg: "text-fuchsia-600", titleColor: "text-fuchsia-700" },
+  { key: "detox", title: "DETOX", desc: "Largue hábitos ruins com tracker, diário e conquistas.", icon: Leaf, bg: "bg-green-50/70 border-green-100", iconBg: "bg-green-100", iconFg: "text-green-600", titleColor: "text-green-700" },
 ];
 
-// Preview route param: só "dev" diverge da key (componente DesenvolvimentoPessoal)
-const previewPath = (key: string) => `/preview/${key === "dev" ? "desenvolvimento" : key}`;
+/* ---------- Mini previews per module ---------- */
+
+const PreviewCard = ({ title, titleIcon, children }: { title: string; titleIcon?: React.ReactNode; children: React.ReactNode }) => (
+  <div className="rounded-xl bg-white border border-black/10 shadow-sm p-3 md:p-4">
+    <div className="flex items-center gap-1.5 text-[11px] font-bold text-black/80 mb-2.5">
+      {titleIcon}
+      <span className="tracking-wide">{title}</span>
+    </div>
+    {children}
+  </div>
+);
+
+const FinancePreview = () => (
+  <PreviewCard title="">
+    <div className="text-[10px] text-black/50">Saldo do Mês</div>
+    <div className="flex items-center justify-between">
+      <div className="text-emerald-600 font-bold text-lg">+R$ 2.365</div>
+      <TrendingUp className="w-4 h-4 text-emerald-500" />
+    </div>
+    <div className="flex items-center gap-3 mt-2">
+      <div
+        className="w-14 h-14 rounded-full shrink-0"
+        style={{ background: "conic-gradient(#8b5cf6 0 55%, #ec4899 55% 75%, #f59e0b 75% 90%, #10b981 90% 100%)" }}
+      >
+        <div className="w-full h-full rounded-full grid place-items-center">
+          <div className="w-7 h-7 rounded-full bg-white" />
+        </div>
+      </div>
+      <div className="flex-1 space-y-1 text-[10px]">
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-violet-500" />Moradia</span><span className="font-semibold">R$ 1.300</span></div>
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-pink-500" />Educação</span><span className="font-semibold">R$ 450</span></div>
+        <div className="flex items-center justify-between"><span className="flex items-center gap-1"><i className="w-1.5 h-1.5 rounded-full bg-amber-500" />Contas da Casa</span><span className="font-semibold">R$ 225</span></div>
+      </div>
+    </div>
+  </PreviewCard>
+);
+
+const Check2 = ({ on }: { on: boolean }) => (
+  <div className={`w-4 h-4 rounded-[4px] flex items-center justify-center ${on ? "bg-emerald-500" : "border border-black/20"}`}>
+    {on && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+  </div>
+);
+
+const RotinaPreview = () => (
+  <PreviewCard title="HÁBITOS DIÁRIOS" titleIcon={<Check className="w-3 h-3 text-emerald-600" />}>
+    <div className="grid grid-cols-4 gap-y-1.5 text-[10px]">
+      <div className="text-black/50">DIA</div>
+      <div className="text-black/50 text-center">Beber 2L</div>
+      <div className="text-black/50 text-center">Treinar</div>
+      <div className="text-black/50 text-center">Ler 30min</div>
+      <div className="font-semibold">SEG</div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on={false} /></div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="font-semibold">TER</div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on /></div>
+      <div className="grid place-items-center"><Check2 on={false} /></div>
+    </div>
+  </PreviewCard>
+);
+
+const DevPreview = () => (
+  <PreviewCard title="MINHAS FORÇAS" titleIcon={<Sparkles className="w-3 h-3 text-violet-600" />}>
+    <div className="space-y-1.5">
+      {["Comunicação", "Persistência", "Curiosidade"].map((s) => (
+        <div key={s} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-md bg-violet-50 border border-violet-100">
+          <span>{s}</span>
+          <XCircle className="w-3 h-3 text-black/30" />
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const Bar = ({ pct, color }: { pct: number; color: string }) => (
+  <div className="h-1.5 rounded-full bg-black/5 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${pct}%` }} /></div>
+);
+
+const DietaPreview = () => (
+  <PreviewCard title="MACROS DE HOJE" titleIcon={<Utensils className="w-3 h-3 text-amber-600" />}>
+    <div className="flex items-end justify-between mb-2">
+      <div className="text-lg font-bold">1.840<span className="text-[10px] font-normal text-black/50"> / 2.000 kcal</span></div>
+    </div>
+    <div className="space-y-1.5 text-[10px]">
+      <div className="flex justify-between"><span>Proteína</span><span>92g</span></div><Bar pct={75} color="bg-rose-400" />
+      <div className="flex justify-between"><span>Carboidrato</span><span>210g</span></div><Bar pct={60} color="bg-amber-400" />
+      <div className="flex justify-between"><span>Gordura</span><span>48g</span></div><Bar pct={40} color="bg-blue-400" />
+    </div>
+  </PreviewCard>
+);
+
+const TreinoPreview = () => (
+  <PreviewCard title="TREINO A · PEITO" titleIcon={<Dumbbell className="w-3 h-3 text-blue-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Supino reto", "4 × 10"], ["Crucifixo", "3 × 12"], ["Crossover", "3 × 15"]].map(([n, s]) => (
+        <div key={n} className="flex items-center justify-between px-2 py-1.5 rounded-md bg-blue-50/60">
+          <span>{n}</span><span className="font-semibold text-blue-700">{s}</span>
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const SaudePreview = () => (
+  <PreviewCard title="HIDRATAÇÃO" titleIcon={<HeartPulse className="w-3 h-3 text-rose-600" />}>
+    <div className="flex items-end justify-between mb-2">
+      <div className="text-lg font-bold">6<span className="text-[10px] font-normal text-black/50"> / 8 copos</span></div>
+      <div className="text-[10px] text-rose-600 font-semibold">75%</div>
+    </div>
+    <div className="flex gap-1">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className={`flex-1 h-6 rounded-sm ${i < 6 ? "bg-rose-400" : "bg-black/5"}`} />
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const HiperfocoPreview = () => (
+  <PreviewCard title="IDEIAS CAPTURADAS" titleIcon={<Brain className="w-3 h-3 text-indigo-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {["Lançar newsletter semanal", "Estudar React Server Comp.", "Organizar reunião 1:1"].map((t) => (
+        <div key={t} className="px-2 py-1.5 rounded-md bg-indigo-50 border-l-2 border-indigo-400">{t}</div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const EstudosPreview = () => (
+  <PreviewCard title="MATÉRIAS" titleIcon={<GraduationCap className="w-3 h-3 text-yellow-700" />}>
+    <div className="space-y-2 text-[11px]">
+      {[["Matemática", 80, "bg-yellow-500"], ["História", 55, "bg-orange-400"], ["Inglês", 35, "bg-emerald-400"]].map(([n, p, c]) => (
+        <div key={n as string}>
+          <div className="flex justify-between mb-0.5"><span>{n}</span><span className="text-black/50">{p}%</span></div>
+          <Bar pct={p as number} color={c as string} />
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const CarreiraPreview = () => (
+  <PreviewCard title="METAS DO TRIMESTRE" titleIcon={<Briefcase className="w-3 h-3 text-slate-700" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Fechar projeto X", true], ["Promoção sênior", false], ["Curso de liderança", true]].map(([t, d]) => (
+        <div key={t as string} className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-slate-50">
+          <Check2 on={d as boolean} /><span className={d ? "line-through text-black/40" : ""}>{t}</span>
+        </div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const BibliotecaPreview = () => (
+  <PreviewCard title="LENDO AGORA" titleIcon={<BookOpen className="w-3 h-3 text-stone-700" />}>
+    <div className="flex gap-2 mb-2">
+      <div className="w-8 h-12 rounded-sm bg-rose-400" />
+      <div className="w-8 h-12 rounded-sm bg-indigo-500" />
+      <div className="w-8 h-12 rounded-sm bg-emerald-500" />
+      <div className="w-8 h-12 rounded-sm bg-amber-500" />
+    </div>
+    <div className="text-[11px]"><span className="font-semibold">Atomic Habits</span> · pág. 142 / 320</div>
+    <Bar pct={44} color="bg-stone-700" />
+  </PreviewCard>
+);
+
+const CasaPreview = () => (
+  <PreviewCard title="LIMPEZA DA SEMANA" titleIcon={<HomeIcon className="w-3 h-3 text-teal-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      {[["Aspirar sala", true], ["Trocar lençóis", false], ["Lavar banheiro", true], ["Regar plantas", false]].map(([t, d]) => (
+        <div key={t as string} className="flex items-center gap-2"><Check2 on={d as boolean} /><span className={d ? "line-through text-black/40" : ""}>{t}</span></div>
+      ))}
+    </div>
+  </PreviewCard>
+);
+
+const ViagensPreview = () => (
+  <PreviewCard title="PRÓXIMA VIAGEM" titleIcon={<Plane className="w-3 h-3 text-sky-600" />}>
+    <div className="flex items-center justify-between mb-2">
+      <div>
+        <div className="text-[10px] text-black/50">Lisboa, Portugal</div>
+        <div className="text-lg font-bold text-sky-700">Faltam 12 dias</div>
+      </div>
+      <div className="text-2xl">🇵🇹</div>
+    </div>
+    <div className="flex gap-1 text-[10px]">
+      <span className="px-2 py-1 rounded bg-sky-50 border border-sky-100">Mala 60%</span>
+      <span className="px-2 py-1 rounded bg-sky-50 border border-sky-100">Roteiro ok</span>
+    </div>
+  </PreviewCard>
+);
+
+const RelacionamentosPreview = () => (
+  <PreviewCard title="PESSOAS IMPORTANTES" titleIcon={<Users className="w-3 h-3 text-pink-600" />}>
+    <div className="flex -space-x-2 mb-2">
+      {["bg-rose-400", "bg-amber-400", "bg-violet-400", "bg-emerald-400"].map((c, i) => (
+        <div key={i} className={`w-8 h-8 rounded-full border-2 border-white ${c}`} />
+      ))}
+    </div>
+    <div className="text-[11px]"><span className="font-semibold">Aniversário do João</span> · em 5 dias</div>
+    <div className="text-[10px] text-black/50">Ideia de presente: livro favorito</div>
+  </PreviewCard>
+);
+
+const PetPreview = () => (
+  <PreviewCard title="MEU PET" titleIcon={<PawPrint className="w-3 h-3 text-lime-700" />}>
+    <div className="flex items-center gap-2 mb-2">
+      <div className="w-10 h-10 rounded-full bg-lime-200 grid place-items-center text-lg">🐶</div>
+      <div>
+        <div className="text-[11px] font-semibold">Thor · 3 anos</div>
+        <div className="text-[10px] text-black/50">Golden Retriever</div>
+      </div>
+    </div>
+    <div className="text-[10px] px-2 py-1.5 rounded-md bg-lime-50 border border-lime-100">💉 Próxima vacina em 8 dias</div>
+  </PreviewCard>
+);
+
+const BelezaPreview = () => (
+  <PreviewCard title="ROTINA DE HOJE" titleIcon={<Flower2 className="w-3 h-3 text-fuchsia-600" />}>
+    <div className="space-y-1.5 text-[11px]">
+      <div className="px-2 py-1.5 rounded-md bg-fuchsia-50 border border-fuchsia-100"><span className="font-semibold">AM</span> · Limpeza · Vit C · Protetor</div>
+      <div className="px-2 py-1.5 rounded-md bg-fuchsia-50 border border-fuchsia-100"><span className="font-semibold">PM</span> · Limpeza · Retinol · Hidratante</div>
+    </div>
+  </PreviewCard>
+);
+
+const DetoxPreview = () => (
+  <PreviewCard title="STREAK ATUAL" titleIcon={<Leaf className="w-3 h-3 text-green-600" />}>
+    <div className="text-lg font-bold text-green-700 mb-1">7 dias limpo 🔥</div>
+    <div className="flex gap-1 mb-2">
+      {Array.from({ length: 14 }).map((_, i) => (
+        <div key={i} className={`flex-1 h-5 rounded-sm ${i < 7 ? "bg-green-500" : "bg-black/5"}`} />
+      ))}
+    </div>
+    <div className="text-[10px] text-black/50">Recorde anterior: 12 dias</div>
+  </PreviewCard>
+);
+
+const PREVIEWS: Record<string, React.FC> = {
+  financas: FinancePreview, rotina: RotinaPreview, dev: DevPreview,
+  dieta: DietaPreview, treino: TreinoPreview, saude: SaudePreview,
+  hiperfoco: HiperfocoPreview, estudos: EstudosPreview, carreira: CarreiraPreview,
+  biblioteca: BibliotecaPreview, casa: CasaPreview, viagens: ViagensPreview,
+  relacionamentos: RelacionamentosPreview, pet: PetPreview, beleza: BelezaPreview,
+  detox: DetoxPreview,
+};
+
+const ModulesCarousel = () => {
+  const [idx, setIdx] = useState(0);
+  const go = (dir: 1 | -1) => setIdx((i) => (i + dir + MODULES.length) % MODULES.length);
+  // Swipe (arrastar) pra trocar de módulo — gesto básico de app. Funciona no
+  // toque e no mouse; só dispara em movimento horizontal (não atrapalha o
+  // scroll vertical da página).
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const swiped = useRef(false);
+  const onPointerDown = (e: React.PointerEvent) => { dragStart.current = { x: e.clientX, y: e.clientY }; };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const s = dragStart.current; dragStart.current = null;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) {
+      swiped.current = true;
+      setTimeout(() => { swiped.current = false; }, 60);
+      go(dx < 0 ? 1 : -1); // direita→esquerda = próximo; esquerda→direita = anterior
+    }
+  };
+  // Evita que o "soltar" depois de arrastar dispare o link/clique de dentro do card.
+  const onClickCapture = (e: React.MouseEvent) => { if (swiped.current) { e.preventDefault(); e.stopPropagation(); } };
+  const m = MODULES[idx];
+  const Icon = m.icon;
+  const Preview = PREVIEWS[m.key];
+  return (
+    <div className="relative">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[11px] font-semibold text-black/50 tracking-wider">EXPLORE POR MÓDULO</div>
+          <div className="text-[22px] md:text-3xl font-bold leading-tight">Veja cada área em detalhe</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => go(-1)} aria-label="Anterior" className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button onClick={() => go(1)} aria-label="Próximo" className="w-10 h-10 rounded-full border border-black/10 bg-white hover:border-black/30 flex items-center justify-center transition">
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="relative overflow-hidden touch-pan-y select-none cursor-grab active:cursor-grabbing"
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        onClickCapture={onClickCapture}
+      >
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={m.key}
+            initial={{ opacity: 0, x: 30 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -30 }}
+            transition={{ duration: 0.25 }}
+            className={`rounded-2xl border ${m.bg} p-6 md:p-8 max-w-2xl mx-auto`}
+          >
+            <div className="flex items-center gap-2.5 mb-2">
+              <Icon className={`w-5 h-5 ${m.iconFg}`} strokeWidth={2.2} />
+              <span className={`font-bold ${m.titleColor} text-[15px] tracking-wider`}>{m.title}</span>
+            </div>
+            <p className="text-[15px] md:text-base text-black/70 mb-3 leading-snug">{m.desc}</p>
+            <a
+              href={`/preview/${m.key === "dev" ? "desenvolvimento" : m.key}`}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-black hover:text-black/70 transition mb-5 underline underline-offset-4 decoration-black/30"
+            >
+              Ver demonstração ao vivo →
+            </a>
+            {Preview && <Preview />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="flex flex-wrap justify-center gap-1.5 mt-5">
+        {MODULES.map((mod, i) => (
+          <button
+            key={mod.key}
+            onClick={() => setIdx(i)}
+            aria-label={mod.title}
+            className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-black" : "w-1.5 bg-black/15 hover:bg-black/30"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /* =========================================================
-   PHONE MOCKUP (hero)
+   PHONE MOCKUPS
    ========================================================= */
+
+const PhoneFrame = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
+  <div
+    className={
+      "relative bg-black rounded-[2rem] p-[5px] shadow-[0_25px_60px_-20px_rgba(0,0,0,0.35)] " +
+      "ring-1 ring-black/10 " + className
+    }
+  >
+    <div className="absolute top-[10px] left-1/2 -translate-x-1/2 w-[34%] h-[18px] bg-black rounded-full z-20" />
+    <div className="relative bg-white rounded-[1.7rem] overflow-hidden aspect-[9/19.5]">
+      <div className="flex items-center justify-between px-4 pt-2 pb-1 text-[9px] font-semibold text-black/80">
+        <span>10:36</span>
+        <span className="opacity-60">••• 📶 🔋</span>
+      </div>
+      <div className="px-3 pb-3 text-black">{children}</div>
+    </div>
+  </div>
+);
+
+const FinancePhone = () => (
+  <div className="space-y-2 text-[8px]">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-1 font-bold">
+        <span>≡</span>
+        <span className="text-emerald-600">$</span>
+        <span>FINANÇAS</span>
+      </div>
+      <div className="text-[7px] text-black/60 flex items-center gap-1">
+        Maio De 2026 <Sun className="w-2 h-2" />
+      </div>
+    </div>
+    <div className="flex gap-1">
+      <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">DASHBOARD</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">MEU FINANCEIRO</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">INVESTIMENTOS</span>
+    </div>
+    <div className="grid grid-cols-2 gap-1.5">
+      <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-emerald-700">Receitas</span>
+          <span className="text-emerald-600 text-[7px]">$</span>
+        </div>
+        <div className="font-bold text-[9px] text-emerald-700">R$ 3.000</div>
+      </div>
+      <div className="rounded-md bg-rose-50 border border-rose-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-rose-700">Despesas</span>
+          <TrendingDown className="w-2 h-2 text-rose-600" />
+        </div>
+        <div className="font-bold text-[9px] text-rose-700">R$ 635</div>
+      </div>
+      <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-emerald-700">Saldo do Mês</span>
+          <TrendingUp className="w-2 h-2 text-emerald-600" />
+        </div>
+        <div className="font-bold text-[9px] text-emerald-700">+R$ 2.365</div>
+      </div>
+      <div className="rounded-md bg-violet-50 border border-violet-100 p-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[6.5px] text-violet-700">Investimentos</span>
+          <TrendingUp className="w-2 h-2 text-violet-600" />
+        </div>
+        <div className="font-bold text-[9px] text-violet-700">R$ 14.500</div>
+      </div>
+    </div>
+    <div className="rounded-md bg-amber-50 border border-amber-100 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold text-amber-700">⚠ ALERTAS INTELIGENTES</div>
+      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-amber-100">2 conta(s) vencem em 4 dia(s): Aluguel, Plano de Saúde</div>
+      <div className="text-[6px] bg-white rounded px-1 py-0.5 border border-emerald-100 text-emerald-700">Excelente! Você está poupando 78,8% da renda</div>
+    </div>
+  </div>
+);
+
+const RoutinePhone = () => {
+  const days = ["SEG", "TER", "QUA", "QUI", "SEX", "SAB", "DOM"];
+  return (
+    <div className="space-y-2 text-[8px]">
+      <div className="flex items-center justify-between font-bold">
+        <span>← ROTINA</span>
+        <span className="text-[7px] text-black/50">Junho</span>
+      </div>
+      <div className="flex gap-1">
+        <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">MINHA SEMANA</span>
+        <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">MEU MÊS</span>
+      </div>
+      <div className="rounded-md bg-emerald-50/60 border border-emerald-100 p-1.5">
+        <div className="text-[7px] font-semibold text-emerald-700 mb-1">HÁBITOS DIÁRIOS ✓</div>
+        <div className="grid grid-cols-[1fr_auto_auto] gap-1 text-[6.5px]">
+          <div className="font-semibold text-black/60">DIA</div>
+          <div className="font-semibold text-black/60 w-8 text-center">Beber 2L</div>
+          <div className="font-semibold text-black/60 w-8 text-center">Treinar</div>
+          {days.map((d, i) => (
+            <Fragment key={d}>
+              <div className="font-medium">{d}</div>
+              <div className="w-8 flex justify-center">
+                <div className={`w-3 h-3 rounded-sm ${i < 5 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
+                  {i < 5 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
+                </div>
+              </div>
+              <div className="w-8 flex justify-center">
+                <div className={`w-3 h-3 rounded-sm ${i % 2 === 0 ? "bg-emerald-500" : "border border-black/20"} flex items-center justify-center`}>
+                  {i % 2 === 0 && <Check className="w-2 h-2 text-white" strokeWidth={4} />}
+                </div>
+              </div>
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-md bg-white border border-black/10 p-1.5">
+        <div className="text-[7px] font-semibold mb-1">⌧ CONSISTÊNCIA</div>
+        <div className="grid gap-[2px]" style={{ gridTemplateColumns: "repeat(14, 1fr)" }}>
+          {Array.from({ length: 42 }).map((_, i) => (
+            <div key={i} className={`aspect-square rounded-[1px] ${Math.random() > 0.4 ? "bg-emerald-400" : "bg-black/5"}`} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DevPhone = () => (
+  <div className="space-y-2 text-[8px]">
+    <div className="flex items-center justify-between">
+      <span className="font-bold flex items-center gap-1">
+        <span className="text-violet-600">✦</span> DESENVOLVIMENTO PESSOAL
+      </span>
+      <span className="text-[6.5px] text-black/50">23/05</span>
+    </div>
+    <div className="flex gap-1">
+      <span className="px-1.5 py-0.5 rounded bg-black text-white text-[6.5px] font-semibold">METAS</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">DIÁRIO</span>
+      <span className="px-1.5 py-0.5 rounded bg-black/5 text-[6.5px]">HUMOR</span>
+    </div>
+    <div className="rounded-md bg-violet-50 border border-violet-100 p-2 text-center">
+      <div className="text-[6.5px] text-violet-700 font-semibold flex items-center justify-center gap-1 mb-0.5">
+        <Leaf className="w-2 h-2" /> Frase do dia
+      </div>
+      <div className="italic text-[8px]">"Grandes coisas nunca vieram de zonas de conforto."</div>
+    </div>
+    <div className="rounded-md bg-white border border-black/10 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold">O QUE ME MOTIVA?</div>
+      <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Ser exemplo pra família</div>
+      <div className="bg-yellow-100 rounded px-1.5 py-1 text-[6.5px]">Viajar pelo mundo</div>
+    </div>
+    <div className="rounded-md bg-emerald-50 border border-emerald-100 p-1.5 space-y-1">
+      <div className="text-[6.5px] font-semibold text-emerald-700 flex items-center gap-1">
+        <Sparkles className="w-2 h-2" /> AFIRMAÇÕES
+      </div>
+      <div className="bg-white rounded px-1.5 py-1 text-[6.5px]">Eu sou capaz de construir a vida que quero.</div>
+    </div>
+  </div>
+);
+
+/**
+ * Vídeo de prévia (Finanças/Rotina): autoplay em loop, mudo, otimizado.
+ * - Toca SÓ quando entra na tela (IntersectionObserver) e pausa fora →
+ *   economiza dados/bateria e deixa o autoplay mais confiável no mobile.
+ * - Respeita "reduzir movimento" (mantém só o poster).
+ * - Poster carrega instantâneo; fallback pra imagem se o vídeo falhar.
+ */
+const AutoplayVideo = ({ src, poster, label }: { src: string; poster: string; label: string }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) v.play().catch(() => {});
+          else v.pause();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <video
+      ref={ref}
+      poster={poster}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      aria-label={label}
+      onError={(e) => {
+        const v = e.currentTarget;
+        const img = document.createElement("img");
+        img.src = poster;
+        img.alt = label;
+        img.className = v.className;
+        v.replaceWith(img);
+      }}
+      className="w-full h-auto rounded-[2rem] bg-black"
+    >
+      <source src={src} type="video/mp4" />
+    </video>
+  );
+};
 
 const PhoneTrio = () => (
   <motion.div
@@ -76,18 +618,19 @@ const PhoneTrio = () => (
   </motion.div>
 );
 
+
 /* =========================================================
    FAQ
    ========================================================= */
 
 const FAQ_ITEMS = [
-  { q: "Dá pra testar antes de pagar?", a: "Dá sim — e sem cadastro. A demonstração é completa e aberta: abra qualquer módulo e use agora mesmo, com dados de exemplo. Quando assinar, ainda tem 7 dias de garantia." },
-  { q: "E se eu não gostar?", a: "Você tem garantia de 7 dias. Se não for pra você, devolvemos o valor — sem perguntas. E pode cancelar quando quiser, em 1 clique, sem fidelidade." },
   { q: "Funciona offline?", a: "Sim. O CORE foi feito como PWA, então continua funcionando mesmo sem internet — seus dados sincronizam quando você reconectar." },
   { q: "Meus dados ficam seguros?", a: "Sim. Usamos Supabase com Row Level Security: cada usuário só consegue acessar os próprios dados, com criptografia em trânsito e em repouso." },
   { q: "Preciso instalar algum app?", a: "Não. O CORE roda no navegador como aplicativo (PWA) — você pode adicionar à tela inicial do celular em 2 toques." },
-  { q: "Posso usar só alguns módulos?", a: "Pode. Ative só Finanças, só Rotina, ou os 16 — você escolhe. Não tem upsell escondido: a assinatura inclui tudo." },
-  { q: "Funciona no computador também?", a: "Sim, o CORE é responsivo e funciona perfeitamente no celular, tablet e desktop, com a mesma conta sincronizada." },
+  { q: "Tem versão grátis?", a: "Sim, 7 dias de teste completo, sem precisar cadastrar cartão de crédito." },
+  { q: "Posso usar só alguns módulos?", a: "Pode. Ative só Finanças, só Rotina, ou os 16 — você escolhe. Não tem upsell escondido: o plano inclui tudo." },
+  { q: "Posso cancelar quando quiser?", a: "Sim. Cancelamento é com 1 clique, sem fidelidade, sem ligação, sem burocracia." },
+  { q: "Funciona no computador também?", a: "Sim, o CORE é responsivo e funciona perfeitamente no celular, tablet e desktop." },
 ];
 
 const FAQItem = ({ q, a }: { q: string; a: string }) => {
@@ -119,7 +662,7 @@ const FAQItem = ({ q, a }: { q: string; a: string }) => {
 };
 
 /* =========================================================
-   PLANOS (selecionáveis)
+   PRICING PLANS (selectable)
    ========================================================= */
 
 const PricingPlans = () => {
@@ -129,7 +672,7 @@ const PricingPlans = () => {
       <button
         type="button"
         onClick={() => setSelected("anual")}
-        className={`relative text-left rounded-2xl p-5 transition-all ${
+        className={`relative text-left rounded-xl p-5 transition-all ${
           selected === "anual"
             ? "border-2 border-black bg-black/[0.04] shadow-[0_4px_20px_-8px_rgba(0,0,0,0.25)]"
             : "border border-black/10 bg-white hover:border-black/30"
@@ -150,24 +693,21 @@ const PricingPlans = () => {
           <span className="text-3xl font-bold">R$ 3,90</span>
           <span className="text-sm text-black/50">/mês</span>
         </div>
-        <div className="text-[12px] text-black/50 mb-2">
-          Pago anualmente · R$ 46,80/ano
-        </div>
-        <div className="inline-flex items-center gap-1 mb-4 px-2 py-0.5 rounded-full bg-black/[0.06] border border-black/15 text-black text-[11px] font-semibold">
-          Economize R$ 132/ano
+        <div className="text-[12px] text-black/50 mb-4">
+          Pago anualmente<br />R$ 46,80/ano
         </div>
         <Link
           to="/auth?signup=1"
           onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_anual" }); }}
-          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-black hover:opacity-90 text-white font-semibold text-sm transition"
+          className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
         >
-          Assinar
+          Começar agora
         </Link>
       </button>
       <button
         type="button"
         onClick={() => setSelected("mensal")}
-        className={`relative text-left rounded-2xl p-5 transition-all ${
+        className={`relative text-left rounded-xl p-5 transition-all ${
           selected === "mensal"
             ? "border-2 border-black bg-black/[0.04] shadow-[0_4px_20px_-8px_rgba(0,0,0,0.25)]"
             : "border border-black/10 bg-white hover:border-black/30"
@@ -185,15 +725,15 @@ const PricingPlans = () => {
           <span className="text-3xl font-bold">R$ 14,90</span>
           <span className="text-sm text-black/50">/mês</span>
         </div>
-        <div className="text-[12px] text-black/50 mb-4 mt-[26px]">
-          Pago mensalmente · flexível
+        <div className="text-[12px] text-black/50 mb-4">
+          Pago mensalmente<br />R$ 14,90/mês
         </div>
         <Link
           to="/auth?signup=1"
           onClick={(e) => { e.stopPropagation(); trackEvent("landing_cta_click", { cta: "pricing_mensal" }); }}
-          className="btn-shine block w-full text-center py-2.5 rounded-xl bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
+          className="btn-shine block w-full text-center py-2.5 rounded-md bg-black hover:bg-black/85 text-white font-semibold text-sm transition"
         >
-          Assinar
+          Começar agora
         </Link>
       </button>
     </div>
@@ -201,94 +741,9 @@ const PricingPlans = () => {
 };
 
 /* =========================================================
-   GRID DE MÓDULOS — amplitude num relance (cada card abre a demo)
-   ========================================================= */
-
-const ModulesGrid = () => (
-  <section id="modulos" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
-    <div className="text-center mb-6 md:mb-8">
-      <div className="text-[11px] font-semibold text-neutral-500 tracking-widest mb-2">16 MÓDULOS, 1 ASSINATURA</div>
-      <h2 className="text-[24px] sm:text-[26px] md:text-4xl font-bold leading-tight tracking-tight">Tudo que você organizaria em 10 apps.</h2>
-      <p className="text-[14px] md:text-[15px] text-black/55 mt-3 max-w-[52ch] mx-auto">
-        Combine os módulos do seu jeito — a assinatura inclui todos, sem upsell escondido. Toque em qualquer um pra abrir a demo.
-      </p>
-    </div>
-
-    {/* dica de arrastar (afford­ance de scroll horizontal) */}
-    <div className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-neutral-700 mb-3">
-      <span>Arraste para ver os 16 módulos</span>
-      <ArrowRight className="w-3.5 h-3.5 animate-[nudge-x_1.4s_ease-in-out_infinite]" />
-    </div>
-
-    <div className="relative">
-      <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-2 pl-0.5 -mr-5 pr-10 md:-mr-8 md:pr-12">
-        {MODULES.map((m) => {
-          const Icon = m.icon;
-          return (
-            <a
-              key={m.key}
-              href={previewPath(m.key)}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "grid_demo", module: m.key })}
-              className="group shrink-0 w-[158px] sm:w-[176px] md:w-[208px] snap-start rounded-2xl border border-black/10 bg-white p-3.5 md:p-4 transition-all hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_10px_30px_-12px_rgba(0,0,0,0.18)]"
-            >
-              <div className="w-9 h-9 rounded-lg bg-neutral-100 text-neutral-900 flex items-center justify-center mb-2.5">
-                <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
-              </div>
-              <div className="font-bold text-[12.5px] text-black tracking-wide leading-tight">{m.title}</div>
-              <div className="text-[11.5px] text-black/55 leading-snug mt-1 line-clamp-2">{m.desc}</div>
-              <span className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-semibold text-black">
-                Abrir demo <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </a>
-          );
-        })}
-      </div>
-      {/* fade na direita reforçando que há mais módulos pra rolar */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-white to-transparent" aria-hidden />
-    </div>
-  </section>
-);
-
-/* =========================================================
-   PROVA DE PRODUTO — substitui depoimentos (confiança honesta)
-   ========================================================= */
-
-const PROOF = [
-  { icon: Lock, t: "Seus dados são só seus", s: "Supabase com Row Level Security e criptografia em trânsito e em repouso." },
-  { icon: Wifi, t: "Funciona offline", s: "Sem internet? Continua usando. Sincroniza sozinho quando você reconectar." },
-  { icon: Smartphone, t: "Celular, tablet e desktop", s: "A mesma conta, sincronizada onde você estiver — instala como app (PWA)." },
-  { icon: LayoutGrid, t: "16 módulos inclusos", s: "Um preço, tudo liberado. Sem upsell, sem recurso bloqueado." },
-  { icon: Moon, t: "Claro e escuro", s: "Se adapta ao seu olho e ao ambiente, de dia ou de madrugada." },
-  { icon: ShieldCheck, t: "Garantia de 7 dias", s: "Não curtiu? Devolvemos. Cancele em 1 clique, sem fidelidade." },
-];
-
-const ProductProof = () => (
-  <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
-    <div className="text-center mb-10">
-      <div className="text-[11px] font-semibold text-neutral-500 tracking-widest mb-2">POR QUE CONFIAR</div>
-      <h2 className="text-[26px] md:text-4xl font-bold leading-tight tracking-tight">
-        Feito pra você confiar — e ficar.
-      </h2>
-    </div>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-      {PROOF.map((b) => (
-        <div key={b.t} className="rounded-2xl border border-black/10 bg-white p-4 md:p-5">
-          <div className="w-10 h-10 rounded-xl bg-neutral-100 text-neutral-900 flex items-center justify-center mb-3">
-            <b.icon className="w-5 h-5" />
-          </div>
-          <div className="font-bold text-[14px] mb-1">{b.t}</div>
-          <div className="text-[12.5px] text-black/55 leading-snug">{b.s}</div>
-        </div>
-      ))}
-    </div>
-  </section>
-);
-
-/* =========================================================
    PAGE
    ========================================================= */
+
 
 export default function LandingPage() {
   useEffect(() => {
@@ -319,7 +774,7 @@ export default function LandingPage() {
     return () => io.disconnect();
   }, []);
   return (
-    <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground">
+    <div className="min-h-screen bg-[hsl(0_0%_99%)] text-foreground pb-20 md:pb-0">
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-md border-b border-black/5">
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 h-12 md:h-14 flex items-center justify-between">
@@ -328,25 +783,18 @@ export default function LandingPage() {
           </Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-black/70">
             <a href="#modulos" className="hover:text-black">Módulos</a>
+            <a href="#financas" className="hover:text-black">Finanças</a>
+            <a href="#beneficios" className="hover:text-black">Benefícios</a>
             <a href="#precos" className="hover:text-black">Preços</a>
             <a href="#faq" className="hover:text-black">Perguntas</a>
           </nav>
-          <div className="flex items-center gap-2 md:gap-3">
-            <Link
-              to="/auth"
-              onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
-              className="text-sm font-semibold text-black/70 hover:text-black px-2 py-2 transition"
-            >
-              Entrar
-            </Link>
-            <Link
-              to="/auth?signup=1"
-              onClick={() => trackEvent("landing_cta_click", { cta: "header_signup" })}
-              className="px-4 py-2 rounded-lg bg-black hover:opacity-90 text-white text-sm font-semibold shadow-sm transition"
-            >
-              Assinar
-            </Link>
-          </div>
+          <Link
+            to="/auth"
+            onClick={() => trackEvent("landing_cta_click", { cta: "header_entrar" })}
+            className="px-4 py-2 rounded-lg bg-black hover:bg-black/85 text-white text-sm font-semibold shadow-sm transition"
+          >
+            Entrar
+          </Link>
         </div>
       </header>
 
@@ -355,46 +803,42 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-4 md:gap-10 items-center">
 
           <div className="text-center md:text-left flex flex-col items-center md:items-start">
-            <h1 className="text-[clamp(32px,7.5vw,58px)] font-bold leading-[1.05] tracking-[-0.03em] text-[#0a0a0a] mb-5 mt-0 md:mt-2 max-w-[20ch] md:max-w-[17ch] mx-auto md:mx-0">
-              O dinheiro some, a rotina desanda, as metas morrem.
+            <h1 className="text-[clamp(26px,7.5vw,52px)] leading-[1.05] tracking-[-0.02em] mb-5 mt-0 max-w-[18ch] md:max-w-[20ch] mx-auto md:mx-0">
+              <span className="font-medium text-black/80">Chega de perder tempo com mil cadernos, aplicativos, post-its e anotações espalhadas.</span>
+              <br />
+              <span className="font-medium text-black/80">Agora, </span>
+              <strong className="font-bold text-black">tudo em um só lugar.</strong>
             </h1>
-            <p className="text-[16px] md:text-[19px] text-neutral-600 leading-[1.5] mb-7 max-w-[44ch] md:max-w-md mx-auto md:mx-0">
-              Não é falta de disciplina — é sua vida espalhada em apps que não conversam. O CORE junta <strong className="font-semibold text-neutral-800">finanças, rotina, metas</strong> e mais 13 áreas da vida em um só lugar.
+            <p className="text-[15px] md:text-[17px] text-neutral-500 leading-[1.55] mb-7 max-w-[34ch] md:max-w-md mx-auto md:mx-0">
+              Finanças, rotina, metas, estudos, treino, dieta, desenvolvimento pessoal e muito mais em um app simples — feito pra organizar sua vida sem virar mais uma tarefa.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mb-4 w-full sm:w-auto">
-              <a
-                href="/auth?signup=1"
+            <div className="flex flex-col sm:flex-row gap-3 mb-6 w-full sm:w-auto">
+              <Link
+                to="/auth?signup=1"
                 onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}
-                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-black hover:opacity-90 text-white font-semibold text-[15px] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.45)] transition"
+                className="btn-shine inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl bg-black hover:bg-black/90 text-white font-semibold text-[15px] shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] transition"
               >
-                Cadastre-se agora <ArrowRight className="w-5 h-5" />
-              </a>
-              <a
-                href="#precos"
-                className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-7 py-4 rounded-2xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[15px] transition"
-              >
-                Ver planos
-              </a>
+                Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
-            <p className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 mb-5">
-              <ShieldCheck className="w-3.5 h-3.5 text-black" /> Garantia de 7 dias · cancele quando quiser · sem fidelidade
-            </p>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-1.5 text-[12.5px] text-black/60">
-              {[
-                { Icon: ShieldCheck, t: "Dados criptografados" },
-                { Icon: Wifi, t: "Funciona offline" },
-                { Icon: Smartphone, t: "Celular e desktop" },
-              ].map((b) => (
-                <span key={b.t} className="inline-flex items-center gap-1.5">
-                  <b.Icon className="w-3.5 h-3.5 text-black" /> {b.t}
-                </span>
-              ))}
-            </div>
+
+
           </div>
 
           <div className="-mx-2 md:mx-0 -mt-2 md:mt-0 relative">
             <PhoneTrio />
           </div>
+        </div>
+
+      </section>
+
+
+      {/* MODULES GRID removido — redundante com o carrossel "Veja cada área em detalhe" abaixo */}
+
+      {/* RECURSOS — carrossel (deep-dive) */}
+      <section id="recursos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+          <ModulesCarousel />
         </div>
       </section>
 
@@ -402,7 +846,7 @@ export default function LandingPage() {
       <section id="financas" className="lp-enter max-w-[1200px] mx-auto px-5 md:px-8 py-12 md:py-20">
         <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div className="order-2 md:order-1">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 border border-black/10 text-neutral-700 text-[11px] font-bold tracking-wide mb-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-700 text-[11px] font-bold tracking-wide mb-4">
               <Wallet className="w-3 h-3" /> MÓDULO FINANÇAS
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
@@ -411,57 +855,31 @@ export default function LandingPage() {
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
               O módulo mais completo do CORE. Tudo que você precisa pra entender pra onde seu dinheiro vai — e fazer sobrar mais.
             </p>
-            <div className="space-y-2.5 mb-6">
+            <div className="space-y-2.5">
               {[
-                "Score Financeiro de 0 a 100 com dicas personalizadas",
-                "Dashboard: gastos por categoria e evolução do patrimônio",
-                "Simuladores de juros compostos e independência financeira",
-                "Limites por categoria e alertas de contas a vencer",
-                "Investimentos, parcelas e metas com progresso visual",
+                "Receitas, despesas fixas e variáveis em tabelas claras",
+                "Orçamento mensal e anual por categoria",
+                "Alertas inteligentes de contas a vencer",
+                "Rastreador de parcelas e investimentos",
+                "Metas financeiras com progresso visual",
                 "Relatórios mensais e virada de mês automática",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5" strokeWidth={3} />
                   </div>
                   {t}
                 </div>
               ))}
             </div>
-            <a
-              href={previewPath("financas")}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "financas" })}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
-            >
-              <PlayCircle className="w-4 h-4 text-black" /> Abrir demo de Finanças
-            </a>
           </div>
           <div className="order-1 md:order-2 flex justify-center">
             <div className="w-full max-w-[320px]">
-              <video
+              <AutoplayVideo
+                src={financasPreviewVideo.url}
                 poster={financasPreviewPoster.url}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                disableRemotePlayback
-                onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
-                onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
-                onError={(e) => {
-                  const v = e.currentTarget;
-                  const img = document.createElement("img");
-                  img.src = financasPreviewPoster.url;
-                  img.alt = "Prévia do módulo de finanças";
-                  img.className = v.className;
-                  v.replaceWith(img);
-                }}
-                className="w-full h-auto rounded-[2rem] bg-black"
-              >
-                <source src={financasPreviewVideo.url} type="video/mp4" />
-              </video>
+                label="Prévia do módulo de finanças"
+              />
             </div>
           </div>
         </div>
@@ -472,32 +890,15 @@ export default function LandingPage() {
         <div className="max-w-[1200px] mx-auto px-5 md:px-8 grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div className="flex justify-center">
             <div className="w-full max-w-[320px]">
-              <video
+              <AutoplayVideo
+                src={rotinaPreviewVideo.url}
                 poster={rotinaPreviewPoster.url}
-                autoPlay
-                muted
-                loop
-                playsInline
-                preload="metadata"
-                disableRemotePlayback
-                onLoadedMetadata={(e) => { e.currentTarget.play().catch(() => {}); }}
-                onCanPlay={(e) => { e.currentTarget.play().catch(() => {}); }}
-                onError={(e) => {
-                  const v = e.currentTarget;
-                  const img = document.createElement("img");
-                  img.src = rotinaPreviewPoster.url;
-                  img.alt = "Prévia do módulo de rotina";
-                  img.className = v.className;
-                  v.replaceWith(img);
-                }}
-                className="w-full h-auto rounded-[2rem] bg-black"
-              >
-                <source src={rotinaPreviewVideo.url} type="video/mp4" />
-              </video>
+                label="Prévia do módulo de rotina"
+              />
             </div>
           </div>
           <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 border border-black/10 text-neutral-700 text-[11px] font-bold tracking-wide mb-4">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-700 text-[11px] font-bold tracking-wide mb-4">
               <CalendarIcon className="w-3 h-3" /> MÓDULO ROTINA
             </div>
             <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
@@ -506,7 +907,7 @@ export default function LandingPage() {
             <p className="text-[14px] md:text-base text-black/60 mb-6 leading-relaxed">
               Marque seus hábitos em segundos, acompanhe sua semana inteira e veja seu progresso virar rotina de verdade.
             </p>
-            <div className="space-y-2.5 mb-6">
+            <div className="space-y-2.5">
               {[
                 "Check rápido dos hábitos do dia, sem fricção",
                 "Visão semanal pra enxergar onde você travou",
@@ -514,89 +915,221 @@ export default function LandingPage() {
                 "Calendário mensal pra acompanhar a evolução",
               ].map((t) => (
                 <div key={t} className="flex items-start gap-2.5 text-[14px] text-black/75">
-                  <div className="mt-0.5 w-4 h-4 rounded-full bg-neutral-100 text-neutral-900 flex items-center justify-center shrink-0">
+                  <div className="mt-0.5 w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                     <Check className="w-2.5 h-2.5" strokeWidth={3} />
                   </div>
                   {t}
                 </div>
               ))}
             </div>
-            <a
-              href={previewPath("rotina")}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "spotlight_demo", module: "rotina" })}
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-black/15 bg-white hover:border-black/30 text-black font-semibold text-[14px] transition"
-            >
-              <PlayCircle className="w-4 h-4 text-black" /> Abrir demo de Rotina
-            </a>
           </div>
         </div>
       </section>
 
-      {/* GRID DE MÓDULOS — amplitude (horizontal) */}
-      <ModulesGrid />
 
       {/* GAMIFICAÇÃO */}
-      <section className="lp-enter bg-[#0f1115] text-white py-12 md:py-20">
+      <section className="lp-enter bg-black text-white py-12 md:py-20">
         <div className="max-w-[1100px] mx-auto px-5 md:px-8">
           <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/20 text-white/90 text-[11px] font-bold tracking-wide mb-4">
-                <Trophy className="w-3 h-3" /> PROGRESSO QUE VICIA
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-white/90 text-[11px] font-bold tracking-wide mb-4">
+                <Trophy className="w-3 h-3" /> 🏆 PROGRESSO VISÍVEL
               </div>
               <h2 className="text-[28px] md:text-4xl font-bold leading-tight mb-4">
                 Seu progresso deixa de ser invisível.
               </h2>
-              <p className="text-[14px] md:text-base text-white/65 leading-relaxed">
-                Cada hábito marcado, meta batida e ação no app vira XP, streak e conquista. Você sobe de nível — e sente vontade de voltar amanhã.
+              <p className="text-[14px] md:text-base text-white/65 leading-relaxed mb-4">
+                Cada hábito marcado, meta concluída e rotina cumprida vira evolução dentro do CORE. Você acompanha sua constância e sente vontade de continuar.
               </p>
+              <div className="flex flex-wrap gap-1.5">
+                {["🔥 Streaks", "🏆 Conquistas", "🎯 Metas", "📊 Evolução"].map((b) => (
+                  <span
+                    key={b}
+                    className="inline-flex items-center h-7 px-3 rounded-full bg-white/[0.07] border border-white/10 text-[12px] leading-none text-white/85"
+                  >
+                    {b}
+                  </span>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 md:gap-3">
-              {[
-                { Icon: Flame, t: "Streaks", s: "Sua sequência crescendo — e o medo gostoso de quebrar." },
-                { Icon: Sparkles, t: "XP & níveis", s: "Cada ação vira XP. Evolua de Prata a Ouro." },
-                { Icon: Trophy, t: "Conquistas", s: "Dezenas de marcos pra desbloquear em cada módulo." },
-                { Icon: BarChart3, t: "Evolução", s: "Seu score e sua constância, semana após semana." },
-              ].map((c) => (
-                <div key={c.t} className="rounded-2xl bg-white/[0.05] border border-white/10 p-4">
-                  <c.Icon className="w-5 h-5 text-white mb-2.5" strokeWidth={2} />
-                  <div className="font-bold text-[15px] mb-0.5">{c.t}</div>
-                  <div className="text-[11.5px] text-white/55 leading-snug">{c.s}</div>
+            <div>
+              <div className="grid grid-cols-2 gap-2.5 md:gap-3">
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Flame className="w-5 h-5 text-orange-400 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">42</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">dias mantendo sua rotina</div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* PROVA DE PRODUTO */}
-      <ProductProof />
-
-      {/* PREÇOS */}
-      <section id="precos" className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
-        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
-          <div className="rounded-2xl border border-black/10 bg-white shadow-[0_8px_30px_-16px_rgba(0,0,0,0.25)] p-5 md:p-8">
-            <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
-              <div className="text-center md:text-left">
-                <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Um app no lugar<br />de dez.</h2>
-                <p className="text-[14px] text-black/60 mb-4 leading-relaxed">
-                  Menos que um café por mês pra organizar finanças, rotina, saúde e mais 13 áreas.
-                </p>
-                <div className="flex flex-col items-center md:items-start gap-2">
-                  <p className="text-[12px] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10 text-black/70">
-                    <Check className="w-3 h-3 text-black" /> Inclui todos os 16 módulos
-                  </p>
-                  <p className="text-[12px] text-black/70 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
-                    <ShieldCheck className="w-3 h-3" /> Garantia de 7 dias · cancele em 1 clique · sem fidelidade
-                  </p>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Trophy className="w-5 h-5 text-amber-300 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">18</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">conquistas desbloqueadas</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Zap className="w-5 h-5 text-yellow-300 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">2.840</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">pontos de evolução</div>
+                </div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/10 p-3.5 md:p-4">
+                  <Target className="w-5 h-5 text-emerald-400 mb-2" strokeWidth={2} />
+                  <div className="text-2xl md:text-3xl font-bold tracking-tight">7/10</div>
+                  <div className="text-[11.5px] text-white/55 leading-snug mt-0.5">metas concluídas no trimestre</div>
                 </div>
               </div>
-              <PricingPlans />
+              <p className="text-center text-[12.5px] text-white/50 mt-4 leading-snug">
+                Pequenas ações todo dia. Progresso visível toda semana.
+              </p>
             </div>
           </div>
         </div>
       </section>
+
+
+      {/* BENEFÍCIOS CONCRETOS */}
+      <section id="beneficios" className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PENSADO PARA O MUNDO REAL</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+            Os detalhes que fazem diferença.
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          {[
+            { icon: Lock, t: "Dados criptografados", s: "Supabase com RLS. Só você acessa o que é seu." },
+            { icon: Wifi, t: "Funciona offline", s: "Sem internet? Continua usando. Sincroniza depois." },
+            { icon: Moon, t: "Modo claro e escuro", s: "Adapta ao seu olho e ao seu humor do dia." },
+            { icon: Smartphone, t: "Funciona em todos os dispositivos", s: "Computador, notebook, tablet e celular." },
+          ].map((b) => (
+            <div key={b.t} className="rounded-xl border border-black/10 bg-white p-4 md:p-5">
+              <div className="w-10 h-10 rounded-lg bg-black/[0.05] text-black flex items-center justify-center mb-3">
+                <b.icon className="w-5 h-5" />
+              </div>
+              <div className="font-bold text-[14px] mb-1">{b.t}</div>
+              <div className="text-[12.5px] text-black/55 leading-snug">{b.s}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* PERSONAS */}
+      <section className="lp-enter bg-[hsl(0_0%_97%)] border-y border-black/5 py-12 md:py-20">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
+          <div className="text-center mb-10">
+            <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">PRA QUEM É O CORE</div>
+            <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+              Combine os módulos do seu jeito.
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-4 md:gap-5">
+            {[
+              {
+                t: "Quem quer organizar a vida financeira",
+                emoji: "💰",
+                mods: ["FINANÇAS", "CARREIRA", "DESENVOLVIMENTO PESSOAL"],
+                color: "border-orange-200 bg-orange-50/40",
+              },
+              {
+                t: "Quem quer criar hábitos e cuidar de si",
+                emoji: "🌱",
+                mods: ["ROTINA", "SAÚDE", "TREINO", "DETOX"],
+                color: "border-emerald-200 bg-emerald-50/40",
+              },
+              {
+                t: "Quem quer evoluir profissionalmente",
+                emoji: "📈",
+                mods: ["CARREIRA", "ESTUDOS", "MENTE", "BIBLIOTECA"],
+                color: "border-indigo-200 bg-indigo-50/40",
+              },
+            ].map((p) => (
+              <div key={p.t} className={`rounded-2xl border ${p.color} p-5 md:p-6`}>
+                <div className="text-3xl mb-3">{p.emoji}</div>
+                <div className="font-bold text-[15px] mb-4 leading-snug">{p.t}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.mods.map((m) => (
+                    <span key={m} className="px-2 py-1 rounded-md bg-white border border-black/10 text-[10.5px] font-semibold text-black/70 tracking-wide">{m}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ANTES X DEPOIS removido — redundante com hero e seção "Substitua sua planilha" */}
+
+
+
+      {/* DEPOIMENTOS */}
+      <section className="lp-enter max-w-[1100px] mx-auto px-5 md:px-8 py-12 md:py-20">
+        <div className="text-center mb-10">
+          <div className="text-[11px] font-semibold text-black/50 tracking-widest mb-2">QUEM JÁ USA</div>
+          <h2 className="text-[26px] md:text-4xl font-bold leading-tight">
+            O que estão dizendo.
+          </h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 md:gap-5">
+          {[
+            { n: "Marina S.", c: "São Paulo, SP", t: "Entrei só pra organizar meus gastos do mês. Em poucos dias eu já sabia exatamente o que podia gastar, o que tinha vencendo e pra onde meu dinheiro estava indo. Virou meu painel diário.", img: testimonialMarina.url },
+            { n: "Pedro H.", c: "Curitiba, PR", t: "Antes eu abria banco, planilha, notas e calculadora pra entender minha semana. No CORE aparece tudo junto, simples e sem bagunça. Foi isso que me fez continuar usando.", img: testimonialPedro.url },
+            { n: "Júlia M.", c: "Recife, PE", t: "No começo achei que ia ser mais uma coisa pra abandonar em uma semana. Tô há 3 meses e virou parte da rotina, abro toda manhã.", img: testimonialJulia.url },
+          ].map((d) => (
+            <div key={d.n} className="rounded-2xl border border-black/10 bg-white p-5 md:p-6">
+              <div className="flex gap-0.5 mb-3 text-amber-400">
+                {Array.from({ length: 5 }).map((_, i) => <span key={i}>★</span>)}
+              </div>
+              <p className="text-[14px] text-black/75 leading-relaxed mb-4">"{d.t}"</p>
+              <div className="flex items-center gap-2.5">
+                <img
+                  src={d.img}
+                  alt={d.n}
+                  loading="lazy"
+                  decoding="async"
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-full object-cover bg-black/10"
+                  onError={(e) => {
+                    const el = e.currentTarget;
+                    el.style.display = 'none';
+                    const fallback = el.nextElementSibling as HTMLElement | null;
+                    if (fallback) fallback.style.display = 'flex';
+                  }}
+                />
+                <div
+                  aria-hidden
+                  style={{ display: 'none' }}
+                  className="w-9 h-9 rounded-full bg-black/10 text-black/60 items-center justify-center text-[12px] font-semibold"
+                >
+                  {d.n.charAt(0)}
+                </div>
+                <div>
+                  <div className="font-semibold text-[13px]">{d.n}</div>
+                  <div className="text-[11.5px] text-black/50">{d.c}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+
+      {/* PREÇOS */}
+      <section id="precos" className="lp-enter bg-gradient-to-b from-amber-50 via-amber-100/60 to-amber-50 border-y border-amber-200/60 py-12 md:py-20">
+        <div className="max-w-[1200px] mx-auto px-5 md:px-8">
+        <div className="rounded-2xl border border-amber-200 bg-white shadow-[0_8px_30px_-12px_rgba(180,120,0,0.25)] p-5 md:p-8">
+          <div className="grid md:grid-cols-[1fr_2fr] gap-6 md:gap-10 items-start">
+            <div className="text-center md:text-left">
+              <h2 className="text-[26px] md:text-4xl font-bold leading-tight mb-2">Escolha o plano<br />ideal para você</h2>
+              <p className="text-[13px] text-black/50 mb-3">7 dias grátis · Cancele quando quiser</p>
+              <p className="text-[12px] text-black/60 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/[0.04] border border-black/10">
+                <Check className="w-3 h-3" /> Inclui todos os 16 módulos
+              </p>
+            </div>
+            <PricingPlans />
+
+          </div>
+        </div>
+        </div>
+      </section>
+
 
       {/* FAQ */}
       <section id="faq" className="lp-enter max-w-[820px] mx-auto px-5 md:px-8 pt-16 md:pt-28 pb-12 md:pb-20">
@@ -617,31 +1150,20 @@ export default function LandingPage() {
             <Sparkles className="w-6 h-6 text-white shrink-0 mt-1" />
             <div>
               <div className="font-bold text-[20px] md:text-3xl leading-tight mb-2">
-                Comece hoje. Se não for pra você,<br className="hidden md:block" /> devolvemos em 7 dias.
+                Comece organizando 1 área.<br className="hidden md:block" /> Em 1 semana, vai querer organizar todas.
               </div>
               <div className="text-[13px] md:text-sm text-white/65">
-                Garantia de 7 dias · cancele quando quiser · sem fidelidade.
+                7 dias grátis. Sem cartão. Sem compromisso.
               </div>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 shrink-0">
-            <Link
-              to="/auth?signup=1"
-              onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
-              className="btn-shine inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-white/90 text-black font-semibold text-[15px] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.5)] transition whitespace-nowrap"
-            >
-              Assinar agora <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a
-              href={previewPath("financas")}
-              target="_blank"
-              rel="noopener"
-              onClick={() => trackEvent("landing_cta_click", { cta: "final_demo", module: "financas" })}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-white/20 bg-white/[0.04] hover:bg-white/[0.1] text-white font-semibold text-[15px] transition whitespace-nowrap"
-            >
-              <PlayCircle className="w-4 h-4" /> Ver demonstração
-            </a>
-          </div>
+          <Link
+            to="/auth?signup=1"
+            onClick={() => trackEvent("landing_cta_click", { cta: "final_signup" })}
+            className="btn-shine inline-flex items-center justify-center gap-2 px-5 py-3 rounded-md bg-white text-black hover:bg-white/90 font-semibold text-sm transition whitespace-nowrap"
+          >
+            Quero testar o CORE <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
 
@@ -663,6 +1185,7 @@ export default function LandingPage() {
               <ul className="space-y-3 text-[14px]">
                 <li><a href="#modulos" className="hover:text-white transition">Módulos</a></li>
                 <li><a href="#financas" className="hover:text-white transition">Finanças</a></li>
+                <li><a href="#beneficios" className="hover:text-white transition">Benefícios</a></li>
                 <li><a href="#precos" className="hover:text-white transition">Preços</a></li>
                 <li><a href="#faq" className="hover:text-white transition">Perguntas</a></li>
               </ul>
@@ -671,7 +1194,7 @@ export default function LandingPage() {
             <div>
               <div className="font-semibold text-white mb-4 text-[14px]">Empresa</div>
               <ul className="space-y-3 text-[14px]">
-                <li><Link to="/auth" className="hover:text-white transition">Entrar / Criar conta</Link></li>
+                <li><Link to="/auth" className="hover:text-white transition">Entrar / Criar Conta</Link></li>
                 <li><Link to="/planos" className="hover:text-white transition">Planos</Link></li>
                 <li><a href="mailto:contato@coreaplicativo.com" className="hover:text-white transition">Fale Conosco</a></li>
               </ul>
@@ -683,6 +1206,8 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
+

@@ -24,7 +24,9 @@
         max-width: 100%;
         min-height: 100vh;
         min-height: 100dvh;
-        overflow-x: hidden;
+        /* clip (não hidden): hidden força overflow-y:auto e cria um scroller
+           aninhado em html/body/#root → trava/elástico de scroll no mobile. */
+        overflow-x: clip;
         touch-action: auto;
         background-color: #ffffff;
         color: #1a1a1a;

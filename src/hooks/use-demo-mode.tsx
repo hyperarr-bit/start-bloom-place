@@ -40,8 +40,19 @@ export function useAppNavigate() {
   const isDemo = useContext(DemoModeContext);
   return useCallback(
     (to: To | number, options?: NavigateOptions) => {
-      if (isDemo && typeof to === "string") {
-        return navigate(remapDemoPath(to), options);
+      if (typeof to === "string") {
+        if (isDemo) {
+          return navigate(remapDemoPath(to), options);
+        }
+        // Demo de módulo único (/preview/:modulo): o "voltar" (que no app vai
+        // pra /home ou /) deve sair pra LP, não pro app real.
+        if (
+          (to === "/" || to === "/home") &&
+          typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/preview")
+        ) {
+          return navigate("/lp", options);
+        }
       }
       // Pass-through (number for navigate(-1), or To object).
       return navigate(to as To, options);

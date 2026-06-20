@@ -109,7 +109,6 @@ const AnimatedRoutes = () => {
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="funil" replace />} />
           <Route path="funil" element={<AdminFinanceFunnel />} />
           <Route path="pagantes" element={<AdminPaying />} />
           <Route path="tutorial-inicial" element={<AdminTutorialInicial />} />

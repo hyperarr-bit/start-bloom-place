@@ -63,15 +63,6 @@ function PreviewVideo({ src, poster, label }: { src: string; poster?: string; la
   );
 }
 
-/** Moldura de celular pro preview. */
-function PhoneFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-[290px] rounded-[2.2rem] border-[6px] border-foreground/90 bg-foreground/90 shadow-[0_24px_60px_-20px_hsl(var(--foreground)/0.35)] overflow-hidden">
-      <div className="rounded-[1.7rem] overflow-hidden bg-card">{children}</div>
-    </div>
-  );
-}
-
 const Eyebrow = ({ children }: { children: React.ReactNode }) => (
   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-accent mb-3">
     {children}
@@ -168,10 +159,8 @@ export default function LpFinancas() {
               </p>
             </motion.div>
 
-            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
-              <PhoneFrame>
-                <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" />
-              </PhoneFrame>
+            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="mx-auto w-full max-w-[320px]">
+              <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" />
             </motion.div>
           </div>
         </Container>
@@ -230,10 +219,8 @@ export default function LpFinancas() {
                 ))}
               </div>
             </div>
-            <motion.div {...fadeUp} className="order-1 md:order-2">
-              <PhoneFrame>
-                <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" />
-              </PhoneFrame>
+            <motion.div {...fadeUp} className="order-1 md:order-2 mx-auto w-full max-w-[320px]">
+              <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" />
             </motion.div>
           </div>
         </Container>

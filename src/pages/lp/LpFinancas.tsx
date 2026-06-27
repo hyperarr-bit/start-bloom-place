@@ -35,15 +35,23 @@ const fadeUp = {
 };
 
 /** Vídeo que toca sozinho quando entra na tela (mudo, em loop). */
-function PreviewVideo({ src, poster, label }: { src: string; poster?: string; label: string }) {
+function PreviewVideo({
+  src, poster, label, autoPlay = false, preload = "metadata",
+}: {
+  src: string; poster?: string; label: string;
+  autoPlay?: boolean; preload?: "none" | "metadata" | "auto";
+}) {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const io = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else v.pause(); },
-      { threshold: 0.4 }
+      ([e]) => {
+        if (e.isIntersecting) { const p = v.play(); if (p) p.catch(() => {}); }
+        else v.pause();
+      },
+      { threshold: 0.1 }
     );
     io.observe(v);
     return () => io.disconnect();
@@ -56,7 +64,8 @@ function PreviewVideo({ src, poster, label }: { src: string; poster?: string; la
       muted
       loop
       playsInline
-      preload="metadata"
+      autoPlay={autoPlay}
+      preload={preload}
       aria-label={label}
       className="w-full h-auto block"
     />
@@ -160,7 +169,7 @@ export default function LpFinancas() {
             </motion.div>
 
             <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="mx-auto w-full max-w-[320px]">
-              <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" />
+              <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" autoPlay preload="auto" />
             </motion.div>
           </div>
         </Container>
@@ -220,7 +229,7 @@ export default function LpFinancas() {
               </div>
             </div>
             <motion.div {...fadeUp} className="order-1 md:order-2 mx-auto w-full max-w-[320px]">
-              <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" />
+              <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" preload="none" />
             </motion.div>
           </div>
         </Container>

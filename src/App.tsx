@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -33,53 +34,58 @@ const RootGate = () => {
 };
 
 
+// Leves / necessários cedo (LP anônima, auth) — ficam no bundle inicial.
 import Acesso from "./pages/Acesso";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Inicio from "./pages/Inicio";
-import Planos from "./pages/Planos";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
-import Index from "./pages/Index";
-import Rotina from "./pages/Rotina";
-import DesenvolvimentoPessoal from "./pages/DesenvolvimentoPessoal";
-import Saude from "./pages/Saude";
-import Casa from "./pages/Casa";
-import Estudos from "./pages/Estudos";
-import Biblioteca from "./pages/Biblioteca";
-import Beleza from "./pages/Beleza";
-import Viagens from "./pages/Viagens";
-import Carreira from "./pages/Carreira";
-import Treino from "./pages/Treino";
-import Dieta from "./pages/Dieta";
-import Hiperfoco from "./pages/Hiperfoco";
-import Relacionamentos from "./pages/Relacionamentos";
-import PetPage from "./pages/Pet";
-import Detox from "./pages/Detox";
-import Conquistas from "./pages/Conquistas";
 import LandingPage from "./pages/lp/LpFinancas";
-import Preview from "./pages/Preview";
-
-import AdminLogin from "./pages/admin/AdminLogin";
-import AdminLayout from "./pages/admin/AdminLayout";
-import AdminChurn from "./pages/admin/AdminChurn";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminTrials from "./pages/admin/AdminTrials";
-import AdminEmailVariants from "./pages/admin/AdminEmailVariants";
-import AdminRetention from "./pages/admin/AdminRetention";
-import AdminFinanceFunnel from "./pages/admin/AdminFinanceFunnel";
-import AdminTutorialInicial from "./pages/admin/AdminTutorialInicial";
-import AdminUso from "./pages/admin/AdminUso";
-import AdminPaying from "./pages/admin/AdminPaying";
-import AdminAquisicao from "./pages/admin/AdminAquisicao";
-import AdminFunilLP from "./pages/admin/AdminFunilLP";
 import NotFound from "./pages/NotFound";
+
+// Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
+// bundle inicial e carregam sob demanda — a LP/anônimo carrega leve.
+const Planos = lazy(() => import("./pages/Planos"));
+const Index = lazy(() => import("./pages/Index"));
+const Rotina = lazy(() => import("./pages/Rotina"));
+const DesenvolvimentoPessoal = lazy(() => import("./pages/DesenvolvimentoPessoal"));
+const Saude = lazy(() => import("./pages/Saude"));
+const Casa = lazy(() => import("./pages/Casa"));
+const Estudos = lazy(() => import("./pages/Estudos"));
+const Biblioteca = lazy(() => import("./pages/Biblioteca"));
+const Beleza = lazy(() => import("./pages/Beleza"));
+const Viagens = lazy(() => import("./pages/Viagens"));
+const Carreira = lazy(() => import("./pages/Carreira"));
+const Treino = lazy(() => import("./pages/Treino"));
+const Dieta = lazy(() => import("./pages/Dieta"));
+const Hiperfoco = lazy(() => import("./pages/Hiperfoco"));
+const Relacionamentos = lazy(() => import("./pages/Relacionamentos"));
+const PetPage = lazy(() => import("./pages/Pet"));
+const Detox = lazy(() => import("./pages/Detox"));
+const Conquistas = lazy(() => import("./pages/Conquistas"));
+const Preview = lazy(() => import("./pages/Preview"));
+
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
+const AdminChurn = lazy(() => import("./pages/admin/AdminChurn"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminTrials = lazy(() => import("./pages/admin/AdminTrials"));
+const AdminEmailVariants = lazy(() => import("./pages/admin/AdminEmailVariants"));
+const AdminRetention = lazy(() => import("./pages/admin/AdminRetention"));
+const AdminFinanceFunnel = lazy(() => import("./pages/admin/AdminFinanceFunnel"));
+const AdminTutorialInicial = lazy(() => import("./pages/admin/AdminTutorialInicial"));
+const AdminUso = lazy(() => import("./pages/admin/AdminUso"));
+const AdminPaying = lazy(() => import("./pages/admin/AdminPaying"));
+const AdminAquisicao = lazy(() => import("./pages/admin/AdminAquisicao"));
+const AdminFunilLP = lazy(() => import("./pages/admin/AdminFunilLP"));
 
 const queryClient = new QueryClient();
 
 const AnimatedRoutes = () => {
   const location = useLocation();
   return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
@@ -130,6 +136,7 @@ const AnimatedRoutes = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AnimatePresence>
+    </Suspense>
   );
 };
 

@@ -45,17 +45,19 @@ function PreviewVideo({
   useEffect(() => {
     const v = ref.current;
     if (!v) return;
+    // O React não seta a *property* `muted` de forma confiável; sem ela o
+    // browser bloqueia o autoplay. Forçamos a property aqui.
+    v.muted = true;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const tryPlay = () => { const p = v.play(); if (p) p.catch(() => {}); };
+    if (autoPlay) tryPlay();
     const io = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) { const p = v.play(); if (p) p.catch(() => {}); }
-        else v.pause();
-      },
+      ([e]) => { if (e.isIntersecting) tryPlay(); else v.pause(); },
       { threshold: 0.1 }
     );
     io.observe(v);
     return () => io.disconnect();
-  }, []);
+  }, [autoPlay]);
   return (
     <video
       ref={ref}
@@ -149,7 +151,6 @@ export default function LpFinancas() {
           <div className="grid md:grid-cols-2 gap-y-8 gap-x-10 md:gap-x-12 items-center md:items-start">
             {/* Texto */}
             <motion.div {...fadeUp} className="order-1 md:col-start-1 md:row-start-1 text-center md:text-left flex flex-col items-center md:items-start md:pt-6">
-              <Eyebrow>Seu dinheiro, finalmente claro</Eyebrow>
               <h1 className="text-[clamp(30px,7vw,52px)] font-bold leading-[1.05] tracking-tight mb-5 max-w-[16ch]">
                 Você trabalha o mês todo.{" "}
                 <span className="text-accent">Pra onde foi o dinheiro?</span>

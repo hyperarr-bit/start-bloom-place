@@ -146,19 +146,40 @@ export default function LpFinancas() {
       {/* HERO */}
       <section className="overflow-hidden">
         <Container className="pt-10 md:pt-16 pb-12 md:pb-20">
-          <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center md:items-start">
-            <motion.div {...fadeUp} className="text-center md:text-left flex flex-col items-center md:items-start md:pt-6">
+          <div className="grid md:grid-cols-2 gap-y-8 gap-x-10 md:gap-x-12 items-center md:items-start">
+            {/* Texto */}
+            <motion.div {...fadeUp} className="order-1 md:col-start-1 md:row-start-1 text-center md:text-left flex flex-col items-center md:items-start md:pt-6">
               <Eyebrow>Seu dinheiro, finalmente claro</Eyebrow>
               <h1 className="text-[clamp(30px,7vw,52px)] font-bold leading-[1.05] tracking-tight mb-5 max-w-[16ch]">
                 Você trabalha o mês todo.{" "}
                 <span className="text-accent">Pra onde foi o dinheiro?</span>
               </h1>
-              <p className="text-[15px] md:text-[17px] text-muted-foreground leading-relaxed mb-7 max-w-[42ch]">
+              <p className="text-[15px] md:text-[17px] text-muted-foreground leading-relaxed max-w-[42ch]">
                 O CORE organiza seu dinheiro em minutos — receitas, contas, dívidas e metas
                 num lugar só — e te mostra exatamente quanto dá pra gastar sem aperto.
                 Sem planilha, sem culpa.
               </p>
-              <Button asChild size="lg" className="w-full sm:w-auto text-[15px] h-12 px-7">
+              {/* CTA no desktop fica aqui, embaixo do texto */}
+              <div className="hidden md:flex flex-col items-start mt-7">
+                <Button asChild size="lg" className="text-[15px] h-12 px-7">
+                  <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}>
+                    Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </Button>
+                <p className="text-xs text-muted-foreground mt-3">
+                  7 dias grátis · sem cartão · cancele quando quiser
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Primeiro mockup */}
+            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="order-2 md:col-start-2 md:row-start-1 md:row-span-2 self-start mx-auto w-full max-w-[320px]">
+              <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" autoPlay preload="auto" />
+            </motion.div>
+
+            {/* CTA no mobile aparece só depois do primeiro mockup */}
+            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.15 }} className="order-3 md:hidden flex flex-col items-center w-full">
+              <Button asChild size="lg" className="w-full text-[15px] h-12 px-7">
                 <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "hero_signup" })}>
                   Começar teste grátis por 7 dias <ArrowRight className="w-4 h-4" />
                 </Link>
@@ -166,10 +187,6 @@ export default function LpFinancas() {
               <p className="text-xs text-muted-foreground mt-3">
                 7 dias grátis · sem cartão · cancele quando quiser
               </p>
-            </motion.div>
-
-            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="mx-auto w-full max-w-[320px]">
-              <PreviewVideo src={FINANCAS_VIDEO} poster={FINANCAS_POSTER} label="Prévia do app de finanças do CORE" autoPlay preload="auto" />
             </motion.div>
           </div>
         </Container>
@@ -229,7 +246,7 @@ export default function LpFinancas() {
               </div>
             </div>
             <motion.div {...fadeUp} className="order-1 md:order-2 mx-auto w-full max-w-[320px]">
-              <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" preload="none" />
+              <PreviewVideo src={FINANCAS2_VIDEO} label="Painel de finanças do CORE em uso" preload="metadata" />
             </motion.div>
           </div>
         </Container>

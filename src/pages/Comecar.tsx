@@ -130,11 +130,12 @@ function QuizScreen({ onDone, onBack }: { onDone: (a: Record<string, string>) =>
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const q = QUIZ[idx];
+  useEffect(() => { trackEvent("funnel_view", { step: `quiz_${idx + 1}` }); }, [idx]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const pick = (label: string) => {
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
-    trackEvent("funnel_quiz_answer", { q: q.key });
+    trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
     if (idx < QUIZ.length - 1) setIdx((i) => i + 1);
     else onDone(next);
   };
@@ -243,7 +244,7 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
           </motion.div>
         ))}
       </Card>
-      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_demo_open", {}); onDone(); }}>
+      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result" }); onDone(); }}>
         Ver meu painel <ArrowRight className="w-4 h-4" />
       </Button>
       <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
@@ -266,7 +267,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     if (!valid || loading) return;
     setErr(null);
     setLoading(true);
-    trackEvent("funnel_signup_submit", {});
+    trackEvent("funnel_click", { cta: "signup_submit" });
     const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
     if (error) {
       setErr(error.message || "Não consegui criar a conta. Tente outro e-mail.");
@@ -275,7 +276,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     }
     try { setUserData("user-name", name.trim()); } catch { /* noop */ }
     try { setUserData("force-new-user-tutorial", "true"); localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
-    trackEvent("funnel_signup_success", { instant: !!session });
+    trackEvent("funnel_click", { cta: "signup_success", instant: !!session });
     setLoading(false);
     if (session) onSession();
     else onConfirm(email.trim().toLowerCase());
@@ -333,7 +334,7 @@ function TrialScreen() {
       <Button
         size="lg"
         className="w-full h-12 text-base"
-        onClick={() => { trackEvent("funnel_trial_accept", {}); navigate("/financas"); }}
+        onClick={() => { trackEvent("funnel_click", { cta: "trial_accept" }); navigate("/financas"); }}
       >
         Aceitar e começar <ArrowRight className="w-4 h-4" />
       </Button>
@@ -371,12 +372,17 @@ export default function Comecar() {
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
+  // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro).
+  useEffect(() => {
+    if (step !== "quiz") trackEvent("funnel_view", { step });
+  }, [step]);
+
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-5 py-12">
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className="w-full">
-            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_start", {}); setStep("quiz"); }} />}
+            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_click", { cta: "start" }); setStep("quiz"); }} />}
             {step === "quiz" && <QuizScreen onBack={() => setStep("start")} onDone={(a) => { setAnswers(a); setStep("progress"); }} />}
             {step === "progress" && <ProgressScreen onDone={() => setStep("result")} />}
             {step === "result" && <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}

@@ -81,6 +81,7 @@ const AdminUso = lazy(() => import("./pages/admin/AdminUso"));
 const AdminPaying = lazy(() => import("./pages/admin/AdminPaying"));
 const AdminAquisicao = lazy(() => import("./pages/admin/AdminAquisicao"));
 const AdminFunilLP = lazy(() => import("./pages/admin/AdminFunilLP"));
+const AdminFunil = lazy(() => import("./pages/admin/AdminFunil"));
 
 const queryClient = new QueryClient();
 
@@ -120,6 +121,7 @@ const AnimatedRoutes = () => {
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
+          <Route path="funnel" element={<AdminFunil />} />
           <Route path="funil" element={<AdminFinanceFunnel />} />
           <Route path="pagantes" element={<AdminPaying />} />
           <Route path="tutorial-inicial" element={<AdminTutorialInicial />} />
@@ -129,12 +131,12 @@ const AnimatedRoutes = () => {
           <Route path="churn" element={<AdminChurn />} />
           <Route path="retention" element={<AdminRetention />} />
           <Route path="uso" element={<AdminUso />} />
-          <Route path="dashboard" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="analytics" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="conversao" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="ativacao" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="onboarding" element={<Navigate to="/admin/funil" replace />} />
-          <Route path="tutorial-compare" element={<Navigate to="/admin/funil" replace />} />
+          <Route path="dashboard" element={<Navigate to="/admin/funnel" replace />} />
+          <Route path="analytics" element={<Navigate to="/admin/funnel" replace />} />
+          <Route path="conversao" element={<Navigate to="/admin/funnel" replace />} />
+          <Route path="ativacao" element={<Navigate to="/admin/funnel" replace />} />
+          <Route path="onboarding" element={<Navigate to="/admin/funnel" replace />} />
+          <Route path="tutorial-compare" element={<Navigate to="/admin/funnel" replace />} />
           <Route path="aquisicao" element={<AdminAquisicao />} />
           <Route path="funil-lp" element={<AdminFunilLP />} />
         </Route>

@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { Sparkles, ArrowRight } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 import Index from "@/pages/Index";
 import Rotina from "@/pages/Rotina";
@@ -75,6 +77,7 @@ const FunnelCta = () => (
       </p>
       <Link
         to="/comecar?step=signup"
+        onClick={() => trackEvent("funnel_click", { cta: "demo_quase_la" })}
         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
       >
         Quase lá <ArrowRight className="w-4 h-4" />
@@ -89,6 +92,11 @@ const Preview = () => {
   const funnel = params.get("funnel") === "1";
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
+
+  // Telemetria do funil: a demo (app real) é um passo do funil.
+  useEffect(() => {
+    if (funnel) trackEvent("funnel_view", { step: "demo" });
+  }, [funnel]);
 
   if (!Component) {
     return <Navigate to="/lp" replace />;

@@ -43,6 +43,7 @@ import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import LandingPage from "./pages/lp/LpFinancas";
 import Comecar from "./pages/Comecar";
+import TutorialLab from "./pages/TutorialLab";
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -95,6 +96,7 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<RootGate />} />
         <Route path="/lp" element={<PageTransition><LandingPage /></PageTransition>} />
         <Route path="/comecar" element={<PageTransition><Comecar /></PageTransition>} />
+        <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
         {/* Pivot "só finanças": a Home (hub multi-módulo) foi aposentada — entra direto no Finanças. */}
         <Route path="/home" element={<Navigate to="/financas" replace />} />

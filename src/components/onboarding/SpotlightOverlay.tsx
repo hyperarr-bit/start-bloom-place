@@ -60,7 +60,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
     // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
-    const shouldShow = (isGuest || forceNewUser) && !done && target === moduleKey;
+    // App é só finanças: pro novo usuário (forceNewUser) não exigimos quickstart-target-module
+    // (que não cruza a fronteira guest→logado), basta ser o módulo financas.
+    const shouldShow =
+      (isGuest || forceNewUser) && !done && (target === moduleKey || (forceNewUser && moduleKey === "financas"));
     if (shouldShow) {
       setActive(true);
       trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
@@ -92,6 +95,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   const finish = useCallback((reason: "completed" | "dismissed") => {
     set(`spotlight-done-${moduleKey}`, "true");
     if (reason === "completed") set("quickstart-target-module", "");
+    // App só finanças: ao terminar OU pular, limpa o flag de novo usuário pra não reabrir
+    // e mantém o usuário no Finanças (sem o bounce legado pra /home).
+    try { set("force-new-user-tutorial", ""); localStorage.removeItem("force-new-user-tutorial"); } catch {}
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
     setActive(false);
     if (reason === "completed") {
@@ -100,13 +106,8 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       } else {
         setShowCompletion(true);
       }
-      // Volta pra Home pra o picker mostrar o próximo módulo escolhido.
-      const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
-      if (isGuest || forceNewUser) {
-        setTimeout(() => navigate("/home"), 1200);
-      }
     }
-  }, [set, get, moduleKey, onComplete, isGuest, navigate]);
+  }, [set, moduleKey, onComplete]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -361,9 +362,17 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 </motion.div>
               )}
               <div className="bg-card border border-border rounded-xl shadow-xl p-3 pointer-events-auto">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-                  Passo {stepIdx + 1} de {steps.length}
-                </p>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                    Passo {stepIdx + 1} de {steps.length}
+                  </p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); finishRef.current("dismissed"); }}
+                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                  >
+                    Pular tutorial
+                  </button>
+                </div>
                 <p className="text-sm font-semibold text-foreground leading-snug">
                   {step.label}
                 </p>

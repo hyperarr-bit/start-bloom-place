@@ -7,7 +7,8 @@ import { trackEvent } from "@/lib/analytics";
 
 export type CoreModuleKey = "financas" | "rotina" | "dieta" | "metas";
 
-const ALL_MODULES: CoreModuleKey[] = ["financas", "rotina", "dieta", "metas"];
+// App é só finanças: o tutorial conclui com um único módulo.
+const ALL_MODULES: CoreModuleKey[] = ["financas"];
 
 const LABELS: Record<CoreModuleKey, string> = {
   financas: "Finanças",
@@ -92,8 +93,8 @@ export const useModuleCompletionFlow = (currentModule: CoreModuleKey) => {
                 </h3>
                 <p className="relative text-sm text-muted-foreground leading-relaxed mb-5">
                   {isGuest
-                    ? "Você completou os 4 módulos. Vamos liberar seu teste grátis de 7 dias."
-                    : "Você completou todos os módulos do tutorial."}
+                    ? "Tudo pronto! Vamos liberar seu teste grátis de 7 dias."
+                    : "Seu painel está montado. É só começar a usar. 🎉"}
                 </p>
                 <button
                   onClick={handleClose}

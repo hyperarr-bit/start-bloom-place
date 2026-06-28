@@ -30,7 +30,7 @@ const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
   if (user) return <Navigate to="/financas" replace />;
-  return <Navigate to="/lp" replace />;
+  return <Navigate to="/comecar" replace />;
 };
 
 
@@ -94,7 +94,8 @@ const AnimatedRoutes = () => {
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
         <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
         <Route path="/" element={<RootGate />} />
-        <Route path="/lp" element={<PageTransition><LandingPage /></PageTransition>} />
+        {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
+        <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><Comecar /></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />

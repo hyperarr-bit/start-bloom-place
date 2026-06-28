@@ -238,20 +238,32 @@ export const Dashboard = ({
     const today = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
+    // Contas: separa as ATRASADAS (dia já passou e não pagas) das próximas a vencer.
+    const overdueNames: string[] = [];
+    const upcomingAlerts: { type: "warning"; icon: typeof AlertTriangle; text: string }[] = [];
     dueDays.forEach((d) => {
       const billsArr = Array.isArray(d?.bills) ? d.bills : [];
       const unpaidBills = billsArr.filter((b) => !b?.paid);
       if (unpaidBills.length === 0) return;
-      const daysUntilDue = d.day >= today ? d.day - today : daysInMonth - today + d.day;
+      if (d.day < today) {
+        unpaidBills.forEach((b) => overdueNames.push(b.name));
+        return;
+      }
+      const daysUntilDue = d.day - today;
       if (daysUntilDue > 5) return;
       const names = unpaidBills.map((b) => b.name).join(", ");
       const when = daysUntilDue === 0 ? "vencem hoje" : daysUntilDue === 1 ? "vencem amanhã" : `vencem em ${daysUntilDue} dias`;
+      upcomingAlerts.push({ type: "warning", icon: Calendar, text: `${unpaidBills.length} conta(s) ${when}: ${names}` });
+    });
+    // Atrasadas primeiro (mais urgente), depois as próximas a vencer.
+    if (overdueNames.length > 0) {
       list.push({
         type: "warning",
-        icon: Calendar,
-        text: `${unpaidBills.length} conta(s) ${when}: ${names}`,
+        icon: AlertTriangle,
+        text: `${overdueNames.length} conta(s) atrasada(s): ${overdueNames.join(", ")}`,
       });
-    });
+    }
+    upcomingAlerts.forEach((a) => list.push(a));
 
     // Ritmo de gasto: só alerta quando as despesas ainda NÃO passaram a renda
     // (esse caso já tem alerta próprio) e o gasto está bem à frente do ritmo do mês.

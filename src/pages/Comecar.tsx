@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, Eye, Sparkles, PartyPopper, ShieldCheck,
-  Lock, MailCheck, Loader2, TrendingUp,
+  ArrowRight, Check, Sparkles, PartyPopper, ShieldCheck,
+  Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,7 +20,7 @@ import { trackEvent } from "@/lib/analytics";
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "insight" | "signup" | "trial" | "confirm";
+type Step = "start" | "quiz" | "progress" | "result" | "signup" | "trial" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
 
@@ -30,6 +30,28 @@ const fade = {
   exit: { opacity: 0, y: -16 },
   transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
+
+const slide = {
+  initial: { opacity: 0, x: 28 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -28 },
+  transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const },
+};
+
+const PREP_STEPS = [
+  "Identificando seu perfil financeiro",
+  "Montando seu painel inicial",
+  "Separando os recursos mais importantes",
+  "Preparando seus próximos 7 dias",
+];
+
+const RESULT_ITEMS = [
+  "Ver para onde seu dinheiro está indo",
+  "Organizar contas e vencimentos",
+  "Acompanhar saldo disponível",
+  "Criar metas e desejos",
+  "Testar um painel financeiro simples no dia a dia",
+];
 
 const TrustRow = () => (
   <div className="flex items-center justify-center gap-x-4 gap-y-1 flex-wrap text-[11px] text-muted-foreground">
@@ -41,11 +63,42 @@ const TrustRow = () => (
 
 /* ------------------------------------------------------------------- quiz */
 
-type Q = { key: string; q: string; opts: string[] };
+type Opt = { emoji: string; label: string };
+type Q = { key: string; q: string; opts: Opt[] };
 const QUIZ: Q[] = [
-  { key: "renda", q: "Quanto entra por mês, mais ou menos?", opts: ["Até R$ 2 mil", "R$ 2 a 5 mil", "R$ 5 a 10 mil", "Mais de R$ 10 mil"] },
-  { key: "vaza", q: "Pra onde some a maior parte?", opts: ["Comida e delivery", "Contas e boletos", "Compras por impulso", "Sinceramente, não sei"] },
-  { key: "dor", q: "Qual o seu maior perrengue hoje?", opts: ["Nunca sobra nada", "Vivo no limite do cartão", "Não consigo poupar", "Esqueço de pagar contas"] },
+  {
+    key: "atrapalha",
+    q: "O que mais te atrapalha hoje?",
+    opts: [
+      { emoji: "💸", label: "Gasto sem perceber" },
+      { emoji: "📅", label: "Esqueço contas" },
+      { emoji: "🏦", label: "Não consigo guardar dinheiro" },
+      { emoji: "🤷", label: "Não sei pra onde meu dinheiro vai" },
+      { emoji: "🧹", label: "Quero organizar tudo" },
+    ],
+  },
+  {
+    key: "controle",
+    q: "Como você controla seu dinheiro hoje?",
+    opts: [
+      { emoji: "🙈", label: "Não controlo" },
+      { emoji: "📝", label: "Bloco de notas" },
+      { emoji: "📊", label: "Planilha" },
+      { emoji: "🏛️", label: "App de banco" },
+      { emoji: "📱", label: "Outro app" },
+    ],
+  },
+  {
+    key: "vitoria",
+    q: "Qual seria uma vitória nos próximos 7 dias?",
+    opts: [
+      { emoji: "🔍", label: "Entender meus gastos" },
+      { emoji: "✅", label: "Parar de esquecer contas" },
+      { emoji: "🎯", label: "Criar minha primeira meta" },
+      { emoji: "💰", label: "Saber quanto posso gastar" },
+      { emoji: "📋", label: "Organizar tudo em um painel" },
+    ],
+  },
 ];
 
 /* ---------------------------------------------------------------- screens */
@@ -53,55 +106,67 @@ const QUIZ: Q[] = [
 function StartScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="flex flex-col items-center text-center max-w-md mx-auto">
-      <div className="font-bold text-xl tracking-tight mb-8">CORE<span className="text-accent">.</span></div>
+      <div className="font-bold text-xl tracking-tight mb-9">CORE<span className="text-accent">.</span></div>
       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-5">
-        <Sparkles className="w-3.5 h-3.5" /> Controle do seu dinheiro
+        <Sparkles className="w-3.5 h-3.5" /> 7 dias grátis · sem cartão
       </div>
-      <h1 className="text-[clamp(30px,8.5vw,46px)] font-bold leading-[1.06] tracking-tight mb-4 max-w-[15ch]">
-        Saiba pra onde vai cada real — e <span className="text-accent">finalmente sobre.</span>
+      <h1 className="text-[clamp(30px,8vw,44px)] font-bold leading-[1.08] tracking-tight mb-4 max-w-[16ch]">
+        Sua vida financeira organizada em poucos minutos
       </h1>
-      <p className="text-muted-foreground leading-relaxed mb-9 max-w-xs">
-        Em 1 minuto você vê tudo numa tela só. Sem planilha, sem app de banco confuso.
+      <p className="text-muted-foreground leading-relaxed mb-9 max-w-sm">
+        Responda algumas perguntas rápidas e comece seu teste grátis de 7 dias com um app feito para
+        organizar e entender exatamente para onde seu dinheiro vai.
       </p>
       <Button size="lg" className="w-full max-w-xs h-12 text-base" onClick={onStart}>
-        Começar agora <ArrowRight className="w-4 h-4" />
+        Começar meu teste grátis <ArrowRight className="w-4 h-4" />
       </Button>
-      <p className="text-xs text-muted-foreground mt-3 mb-6">7 dias grátis · sem cartão · leva 1 minuto</p>
+      <p className="text-xs text-muted-foreground mt-3 mb-6">Leva 1 minuto · cancele quando quiser</p>
       <TrustRow />
     </div>
   );
 }
 
-function QuizScreen({ onDone }: { onDone: (a: Record<string, string>) => void }) {
+function QuizScreen({ onDone, onBack }: { onDone: (a: Record<string, string>) => void; onBack: () => void }) {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const q = QUIZ[idx];
-  const pick = (opt: string) => {
-    const next = { ...answers, [q.key]: opt };
+  const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
+  const pick = (label: string) => {
+    const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key });
-    if (idx < QUIZ.length - 1) setIdx(idx + 1);
+    if (idx < QUIZ.length - 1) setIdx((i) => i + 1);
     else onDone(next);
   };
   return (
-    <div className="w-full max-w-sm mx-auto">
-      <div className="flex gap-1.5 mb-8 justify-center">
-        {QUIZ.map((_, i) => (
-          <span key={i} className={`h-1.5 rounded-full transition-all ${i <= idx ? "w-6 bg-accent" : "w-1.5 bg-border"}`} />
-        ))}
+    <div className="w-full max-w-md mx-auto">
+      {/* topo: voltar + progresso */}
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={back} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <motion.div className="h-full bg-accent rounded-full" initial={false}
+            animate={{ width: `${((idx + 1) / QUIZ.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+        </div>
+        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{QUIZ.length}</span>
       </div>
+
       <AnimatePresence mode="wait">
-        <motion.div key={q.key} {...fade}>
-          <h2 className="text-[26px] font-bold tracking-tight leading-tight text-center mb-7">{q.q}</h2>
-          <div className="space-y-2.5">
-            {q.opts.map((opt) => (
+        <motion.div key={q.key} {...slide}>
+          <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q.q}</h2>
+          <div className="space-y-3">
+            {q.opts.map((o) => (
               <button
-                key={opt}
-                onClick={() => pick(opt)}
-                className="w-full text-left rounded-xl border border-border bg-card hover:border-accent hover:bg-accent/5 transition-colors px-4 py-3.5 text-[15px] font-medium flex items-center justify-between group"
+                key={o.label}
+                onClick={() => pick(o.label)}
+                className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
               >
-                {opt}
-                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+                <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+                <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+                <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+                </span>
               </button>
             ))}
           </div>
@@ -111,31 +176,75 @@ function QuizScreen({ onDone }: { onDone: (a: Record<string, string>) => void })
   );
 }
 
-function InsightScreen({ answers, onDone }: { answers: Record<string, string>; onDone: () => void }) {
-  const naoSabe = answers.vaza === "Sinceramente, não sei";
+function ProgressScreen({ onDone }: { onDone: () => void }) {
+  const [done, setDone] = useState(0);
+  useEffect(() => {
+    if (done >= PREP_STEPS.length) {
+      const t = setTimeout(onDone, 650);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setDone((d) => d + 1), done === 0 ? 500 : 850);
+    return () => clearTimeout(t);
+  }, [done, onDone]);
+  const pct = Math.round((done / PREP_STEPS.length) * 100);
+  const C = 2 * Math.PI * 44;
   return (
     <div className="w-full max-w-sm mx-auto text-center">
-      <div className="w-16 h-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto mb-5">
-        <Sparkles className="w-8 h-8" />
+      <div className="relative w-28 h-28 mx-auto mb-7">
+        <svg viewBox="0 0 100 100" className="w-28 h-28 -rotate-90">
+          <circle cx="50" cy="50" r="44" fill="none" stroke="hsl(var(--muted))" strokeWidth="8" />
+          <motion.circle cx="50" cy="50" r="44" fill="none" stroke="hsl(var(--accent))" strokeWidth="8" strokeLinecap="round"
+            strokeDasharray={C} initial={false} animate={{ strokeDashoffset: C * (1 - pct / 100) }} transition={{ duration: 0.5, ease: "easeOut" }} />
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-2xl font-bold tabular-nums">{pct}%</div>
       </div>
-      <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-3">
-        {naoSabe ? "Esse é exatamente o problema." : "Já entendi seu caso."}
-      </h2>
-      <p className="text-muted-foreground leading-relaxed mb-5">
-        Quem {(answers.dor || "vive no aperto").toLowerCase()} normalmente perde de vista{" "}
-        <strong className="text-foreground">R$ 300–600 por mês</strong> em gastos que parecem pequenos.
-        Olha como o CORE coloca isso na sua frente:
-      </p>
-      <Card className="p-4 text-left space-y-2 mb-7">
-        {[["Renda", answers.renda], ["Onde vaza", answers.vaza], ["Maior perrengue", answers.dor]].map(([k, v]) => (
-          <div key={k} className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">{k}</span>
-            <span className="font-medium text-right">{v || "—"}</span>
-          </div>
+      <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu teste grátis…</h2>
+      <p className="text-muted-foreground text-sm mb-8">Isso leva só alguns segundos.</p>
+      <div className="space-y-3 text-left max-w-xs mx-auto">
+        {PREP_STEPS.map((s, i) => {
+          const state = i < done ? "done" : i === done ? "active" : "pending";
+          return (
+            <div key={s} className="flex items-center gap-3">
+              {state === "done" ? <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />
+                : state === "active" ? <Loader2 className="w-5 h-5 text-accent animate-spin shrink-0" />
+                : <Circle className="w-5 h-5 text-muted-foreground/40 shrink-0" />}
+              <span className={`text-sm ${state === "pending" ? "text-muted-foreground/60" : "text-foreground"}`}>{s}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ResultScreen({ answers, onDone }: { answers: Record<string, string>; onDone: () => void }) {
+  // Coloca a "vitória" escolhida em primeiro, pra parecer feito pra ela.
+  const items = answers.vitoria
+    ? [answers.vitoria, ...RESULT_ITEMS.filter((r) => r !== answers.vitoria)].slice(0, 5)
+    : RESULT_ITEMS;
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 14 }}
+        className="w-16 h-16 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-4">
+        <Sparkles className="w-8 h-8" />
+      </motion.div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Seu plano está pronto</div>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Seu plano de 7 dias está pronto</h2>
+      <p className="text-muted-foreground leading-relaxed mb-6">Nos próximos 7 dias, o CORE vai te ajudar a:</p>
+      <Card className="p-4 text-left space-y-3 mb-7">
+        {items.map((r, i) => (
+          <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.08 }}
+            className="flex items-start gap-2.5 text-[14px]">
+            <span className="mt-0.5 w-5 h-5 rounded-full bg-accent/15 text-accent grid place-items-center shrink-0">
+              <Check className="w-3 h-3" strokeWidth={3} />
+            </span>
+            {r}
+          </motion.div>
         ))}
       </Card>
       <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_demo_open", {}); onDone(); }}>
-        Ver no app, com dados reais <ArrowRight className="w-4 h-4" />
+        Ver meu painel <ArrowRight className="w-4 h-4" />
       </Button>
       <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
     </div>
@@ -268,8 +377,9 @@ export default function Comecar() {
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className="w-full">
             {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_start", {}); setStep("quiz"); }} />}
-            {step === "quiz" && <QuizScreen onDone={(a) => { setAnswers(a); setStep("insight"); }} />}
-            {step === "insight" && <InsightScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}
+            {step === "quiz" && <QuizScreen onBack={() => setStep("start")} onDone={(a) => { setAnswers(a); setStep("progress"); }} />}
+            {step === "progress" && <ProgressScreen onDone={() => setStep("result")} />}
+            {step === "result" && <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}
             {step === "signup" && (
               <SignupScreen
                 onSession={() => setStep("trial")}

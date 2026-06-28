@@ -141,7 +141,7 @@ function HeroVideo() {
       playsInline
       autoPlay
       preload="auto"
-      className="max-w-[250px] max-h-[48vh] w-auto h-auto object-contain block drop-shadow-2xl"
+      className="max-w-[250px] max-h-[48vh] w-auto h-auto object-contain block"
     />
   );
 }
@@ -423,7 +423,7 @@ export default function Comecar() {
   }, [step]);
 
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh bg-background text-foreground flex flex-col">
+    <div style={LIGHT_VARS} className="min-h-dvh bg-white text-foreground flex flex-col">
       <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>

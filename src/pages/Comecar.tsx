@@ -1,56 +1,88 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, ArrowLeft, Check, Wallet, TrendingUp, Target,
-  PartyPopper, Plus, Eye, ShieldCheck, Sparkles,
+  ArrowRight, Check, Eye, Sparkles, PartyPopper, ShieldCheck,
+  Lock, MailCheck, Loader2, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { useUserData } from "@/hooks/use-user-data";
+import { trackEvent } from "@/lib/analytics";
 
 /**
- * PROTÓTIPO do novo funil "sem LP":
- *   início (botão Começar) → tutorial → "só falta 1 passo" (form) → "ganhou 7 dias" (aceitar) → app
- * O tutorial tem 3 variações (slides / demo / mix) pra comparar. O seletor do topo
- * é só do protótipo. Quando escolhermos a variação, a gente liga o signUp real e
- * remove o seletor.
+ * Funil "sem LP" (mobile-first, tráfego frio):
+ *   início → 2 slides (dor → solução) → DEMO no app real (/preview/financas)
+ *   → "só falta 1 passo" (cadastro real) → "ganhou 7 dias" → app.
+ * A demo é o app de verdade: o slide final manda pra /preview/financas?funnel=1,
+ * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Variant = "slides" | "demo" | "mix";
-type Step = "start" | "tutorial" | "signup" | "trial";
+type Step = "start" | "slides" | "signup" | "trial" | "confirm";
+
+const DEMO_URL = "/preview/financas?funnel=1";
 
 const fade = {
-  initial: { opacity: 0, y: 14 },
+  initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -14 },
-  transition: { duration: 0.3 },
+  exit: { opacity: 0, y: -16 },
+  transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as const },
 };
 
-/* ---------------------------------------------------------------- slides */
+const TrustRow = () => (
+  <div className="flex items-center justify-center gap-x-4 gap-y-1 flex-wrap text-[11px] text-muted-foreground">
+    <span className="inline-flex items-center gap-1"><Lock className="w-3 h-3" /> Dados criptografados</span>
+    <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Sem cartão agora</span>
+    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Cancele quando quiser</span>
+  </div>
+);
+
+/* ----------------------------------------------------------------- slides */
 
 const SLIDES = [
   {
     key: "dor",
-    Icon: Wallet,
-    title: "Pra onde foi o seu dinheiro?",
-    subtitle: "Você trabalha o mês todo e no fim não sobra nada — e não sabe explicar por quê.",
+    Icon: Eye,
+    kicker: "Todo fim de mês, a mesma pergunta:",
+    title: "Cadê o dinheiro?",
+    body: "Boleto, pix, cartão, aquela assinatura esquecida. Some e você nem sabe explicar pra onde foi.",
   },
   {
     key: "solucao",
-    Icon: Eye,
-    title: "O CORE te mostra tudo, claro.",
-    subtitle: "Receitas, contas, dívidas e metas num lugar só. Atualizado em segundos, sem planilha.",
-  },
-  {
-    key: "ganho",
-    Icon: Target,
-    title: "Saiba quanto dá pra gastar.",
-    subtitle: "Sem culpa, sem susto no fim do mês. Você no controle do seu dinheiro.",
+    Icon: TrendingUp,
+    kicker: "O CORE responde isso por você.",
+    title: "Tudo numa tela só.",
+    body: "O que entra, o que sai e quanto dá pra gastar hoje — sem planilha, sem culpa, atualizado em segundos.",
   },
 ];
 
-function Slides({ onDone }: { onDone: () => void }) {
+/* ---------------------------------------------------------------- screens */
+
+function StartScreen({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="flex flex-col items-center text-center max-w-md mx-auto">
+      <div className="font-bold text-xl tracking-tight mb-8">CORE<span className="text-accent">.</span></div>
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-5">
+        <Sparkles className="w-3.5 h-3.5" /> Controle do seu dinheiro
+      </div>
+      <h1 className="text-[clamp(30px,8.5vw,46px)] font-bold leading-[1.06] tracking-tight mb-4 max-w-[15ch]">
+        Saiba pra onde vai cada real — e <span className="text-accent">finalmente sobre.</span>
+      </h1>
+      <p className="text-muted-foreground leading-relaxed mb-9 max-w-xs">
+        Em 1 minuto você vê tudo numa tela só. Sem planilha, sem app de banco confuso.
+      </p>
+      <Button size="lg" className="w-full max-w-xs h-12 text-base" onClick={onStart}>
+        Começar agora <ArrowRight className="w-4 h-4" />
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3 mb-6">7 dias grátis · sem cartão · leva 1 minuto</p>
+      <TrustRow />
+    </div>
+  );
+}
+
+function SlidesScreen({ onDone }: { onDone: () => void }) {
   const [i, setI] = useState(0);
   const last = i === SLIDES.length - 1;
   const s = SLIDES[i];
@@ -59,10 +91,11 @@ function Slides({ onDone }: { onDone: () => void }) {
       <AnimatePresence mode="wait">
         <motion.div key={s.key} {...fade} className="flex flex-col items-center">
           <div className="w-24 h-24 rounded-3xl bg-accent/10 text-accent flex items-center justify-center mb-7">
-            <s.Icon className="w-11 h-11" />
+            <s.Icon className="w-11 h-11" strokeWidth={1.8} />
           </div>
-          <h2 className="text-3xl font-bold tracking-tight mb-3">{s.title}</h2>
-          <p className="text-muted-foreground leading-relaxed">{s.subtitle}</p>
+          <p className="text-sm font-medium text-muted-foreground mb-2">{s.kicker}</p>
+          <h2 className="text-[32px] font-bold tracking-tight leading-[1.1] mb-4">{s.title}</h2>
+          <p className="text-muted-foreground leading-relaxed max-w-xs">{s.body}</p>
         </motion.div>
       </AnimatePresence>
 
@@ -72,198 +105,77 @@ function Slides({ onDone }: { onDone: () => void }) {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 w-full justify-center">
-        {i > 0 && (
-          <Button variant="ghost" size="lg" onClick={() => setI(i - 1)} className="text-muted-foreground">
-            <ArrowLeft className="w-4 h-4" /> Voltar
-          </Button>
-        )}
-        <Button size="lg" className="px-7 h-12" onClick={() => (last ? onDone() : setI(i + 1))}>
-          {last ? "Quase lá" : "Continuar"} <ArrowRight className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ interação */
-
-const SAMPLE_EXPENSES = [
-  { label: "iFood", value: 48 },
-  { label: "Uber", value: 22 },
-  { label: "Mercado", value: 137 },
-  { label: "Assinatura", value: 29 },
-];
-
-/** Mini-interação: a pessoa lança gastos e vê "quanto sobra" cair na hora. */
-function DemoInteraction({ onReady }: { onReady: () => void }) {
-  const income = 3000;
-  const [added, setAdded] = useState<number[]>([]);
-  const spent = useMemo(() => added.reduce((s, idx) => s + SAMPLE_EXPENSES[idx].value, 0), [added]);
-  const left = income - spent;
-  const nextIdx = added.length;
-  const canAdd = nextIdx < SAMPLE_EXPENSES.length;
-
-  return (
-    <Card className="w-full max-w-sm mx-auto p-5">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quanto dá pra gastar</span>
-        <Wallet className="w-4 h-4 text-accent" />
-      </div>
-      <motion.div
-        key={left}
-        initial={{ scale: 1.06 }}
-        animate={{ scale: 1 }}
-        className="text-4xl font-bold tracking-tight mb-4"
+      <Button
+        size="lg"
+        className="w-full max-w-xs h-12 text-base"
+        onClick={() => {
+          if (last) { trackEvent("funnel_demo_open", {}); onDone(); }
+          else { setI(i + 1); trackEvent("funnel_slide", { slide: i + 2 }); }
+        }}
       >
-        R$ {left.toLocaleString("pt-BR")}
-      </motion.div>
-
-      <div className="space-y-1.5 mb-4 min-h-[44px]">
-        <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Entrou</span>
-          <span className="font-medium text-emerald-600">+ R$ {income.toLocaleString("pt-BR")}</span>
-        </div>
-        <AnimatePresence>
-          {added.map((idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex justify-between text-sm"
-            >
-              <span className="text-muted-foreground">{SAMPLE_EXPENSES[idx].label}</span>
-              <span className="font-medium text-foreground/70">− R$ {SAMPLE_EXPENSES[idx].value}</span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {canAdd ? (
-        <Button
-          variant="secondary"
-          className="w-full"
-          onClick={() => {
-            const next = [...added, nextIdx];
-            setAdded(next);
-            if (next.length >= 1) onReady();
-          }}
-        >
-          <Plus className="w-4 h-4" /> Lançar um gasto
-        </Button>
-      ) : (
-        <p className="text-center text-sm text-accent font-medium py-2">É só isso. Seu mês, sempre claro. ✨</p>
-      )}
-
-      {added.length >= 1 && canAdd && (
-        <p className="text-center text-xs text-muted-foreground mt-3">Viu como o saldo se ajusta na hora?</p>
-      )}
-    </Card>
-  );
-}
-
-function DemoTutorial({ onDone }: { onDone: () => void }) {
-  const [ready, setReady] = useState(false);
-  return (
-    <div className="flex flex-col items-center text-center max-w-md mx-auto">
-      <div className="w-16 h-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mb-5">
-        <TrendingUp className="w-8 h-8" />
-      </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-2">Experimente agora.</h2>
-      <p className="text-muted-foreground leading-relaxed mb-7 max-w-sm">
-        Toque em <strong>"Lançar um gasto"</strong> e veja quanto sobra mudar na hora. É assim que o CORE funciona.
-      </p>
-      <DemoInteraction onReady={() => setReady(true)} />
-      <Button size="lg" className="px-7 h-12 mt-8" disabled={!ready} onClick={onDone}>
-        Quase lá <ArrowRight className="w-4 h-4" />
+        {last ? "Ver funcionando" : "Continuar"} <ArrowRight className="w-4 h-4" />
       </Button>
-      {!ready && <p className="text-xs text-muted-foreground mt-3">Lance pelo menos 1 gasto pra continuar</p>}
+      {last && <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>}
     </div>
   );
 }
 
-function MixTutorial({ onDone }: { onDone: () => void }) {
-  // 2 slides curtos + 1 interação
-  const [phase, setPhase] = useState<0 | 1 | 2>(0);
-  const [ready, setReady] = useState(false);
-  const mini = SLIDES.slice(0, 2);
-  if (phase < 2) {
-    const s = mini[phase];
-    return (
-      <div className="flex flex-col items-center text-center max-w-md mx-auto">
-        <AnimatePresence mode="wait">
-          <motion.div key={s.key} {...fade} className="flex flex-col items-center">
-            <div className="w-24 h-24 rounded-3xl bg-accent/10 text-accent flex items-center justify-center mb-7">
-              <s.Icon className="w-11 h-11" />
-            </div>
-            <h2 className="text-3xl font-bold tracking-tight mb-3">{s.title}</h2>
-            <p className="text-muted-foreground leading-relaxed">{s.subtitle}</p>
-          </motion.div>
-        </AnimatePresence>
-        <div className="flex gap-1.5 mt-9 mb-7">
-          {[0, 1, 2].map((idx) => (
-            <span key={idx} className={`h-1.5 rounded-full transition-all ${idx === phase ? "w-6 bg-accent" : "w-1.5 bg-border"}`} />
-          ))}
-        </div>
-        <Button size="lg" className="px-7 h-12" onClick={() => setPhase((phase + 1) as 0 | 1 | 2)}>
-          Continuar <ArrowRight className="w-4 h-4" />
-        </Button>
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col items-center text-center max-w-md mx-auto">
-      <h2 className="text-2xl font-bold tracking-tight mb-2">Agora experimente.</h2>
-      <p className="text-muted-foreground leading-relaxed mb-7 max-w-sm">
-        Toque em <strong>"Lançar um gasto"</strong> e veja quanto sobra mudar na hora.
-      </p>
-      <DemoInteraction onReady={() => setReady(true)} />
-      <Button size="lg" className="px-7 h-12 mt-8" disabled={!ready} onClick={onDone}>
-        Quase lá <ArrowRight className="w-4 h-4" />
-      </Button>
-      {!ready && <p className="text-xs text-muted-foreground mt-3">Lance pelo menos 1 gasto pra continuar</p>}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------- signup */
-
-function SignupStep({ onDone }: { onDone: () => void }) {
+function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
+  const { signUp } = useAuth();
+  const { set: setUserData } = useUserData();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const valid = name.trim() && /\S+@\S+\.\S+/.test(email) && password.length >= 6;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid || loading) return;
+    setErr(null);
+    setLoading(true);
+    trackEvent("funnel_signup_submit", {});
+    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
+    if (error) {
+      setErr(error.message || "Não consegui criar a conta. Tente outro e-mail.");
+      setLoading(false);
+      return;
+    }
+    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
+    try { setUserData("force-new-user-tutorial", "true"); localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
+    trackEvent("funnel_signup_success", { instant: !!session });
+    setLoading(false);
+    if (session) onSession();
+    else onConfirm(email.trim().toLowerCase());
+  };
+
   return (
     <div className="w-full max-w-sm mx-auto">
       <div className="text-center mb-7">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
           <Sparkles className="w-3.5 h-3.5" /> Último passo
         </div>
-        <h2 className="text-2xl font-bold tracking-tight leading-tight">
+        <h2 className="text-[26px] font-bold tracking-tight leading-tight">
           Só falta 1 passo pra você<br />começar a usar o CORE.
         </h2>
+        <p className="text-muted-foreground text-sm mt-2">Crie sua conta e libere seus 7 dias grátis.</p>
       </div>
-      <form
-        onSubmit={(e) => { e.preventDefault(); if (valid) onDone(); }}
-        className="space-y-3"
-      >
-        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        <Input type="password" placeholder="Crie uma senha (mín. 6)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-        <Button type="submit" size="lg" className="w-full h-12" disabled={!valid}>
-          Criar minha conta <ArrowRight className="w-4 h-4" />
+      <form onSubmit={submit} className="space-y-3">
+        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="h-12" />
+        <Input type="password" placeholder="Crie uma senha (mín. 6)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="h-12" />
+        {err && <p className="text-sm text-destructive">{err}</p>}
+        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Criar conta e liberar acesso <ArrowRight className="w-4 h-4" /></>}
         </Button>
       </form>
-      <p className="text-center text-xs text-muted-foreground mt-4">
-        Protótipo — aqui ainda não cria conta de verdade.
-      </p>
+      <div className="mt-5"><TrustRow /></div>
     </div>
   );
 }
 
-/* -------------------------------------------------------------- trial */
-
-function TrialStep() {
+function TrialScreen() {
   const navigate = useNavigate();
   return (
     <div className="w-full max-w-sm mx-auto text-center">
@@ -275,12 +187,10 @@ function TrialStep() {
       >
         <PartyPopper className="w-10 h-10" />
       </motion.div>
-      <h2 className="text-3xl font-bold tracking-tight mb-2">Você ganhou 7 dias grátis!</h2>
-      <p className="text-muted-foreground leading-relaxed mb-6">
-        Acesso completo ao CORE por 7 dias. Sem cartão agora, cancele quando quiser.
-      </p>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Pronto! Seus 7 dias<br />grátis estão liberados.</h2>
+      <p className="text-muted-foreground leading-relaxed mb-6">Acesso completo ao CORE. Sem cartão agora — você só decide se continua no fim.</p>
       <Card className="p-4 text-left space-y-2.5 mb-7">
-        {["Tudo o que você acabou de ver, com seus dados", "Contas a vencer, metas e saúde financeira", "Cancele em 1 clique, sem burocracia"].map((b) => (
+        {["Tudo o que você viu, agora com os seus números", "Contas a vencer, metas e saúde financeira", "Cancele em 1 clique, sem burocracia"].map((b) => (
           <div key={b} className="flex items-start gap-2.5 text-sm">
             <span className="mt-0.5 w-4 h-4 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
               <Check className="w-2.5 h-2.5" strokeWidth={3} />
@@ -289,70 +199,61 @@ function TrialStep() {
           </div>
         ))}
       </Card>
-      <Button size="lg" className="w-full h-12" onClick={() => navigate("/financas")}>
+      <Button
+        size="lg"
+        className="w-full h-12 text-base"
+        onClick={() => { trackEvent("funnel_trial_accept", {}); navigate("/financas"); }}
+      >
         Aceitar e começar <ArrowRight className="w-4 h-4" />
       </Button>
-      <p className="text-center text-xs text-muted-foreground mt-3 inline-flex items-center gap-1.5 justify-center">
+      <p className="text-xs text-muted-foreground mt-3 inline-flex items-center gap-1.5 justify-center">
         <ShieldCheck className="w-3.5 h-3.5" /> 7 dias grátis · sem compromisso
       </p>
     </div>
   );
 }
 
-/* --------------------------------------------------------------- shell */
+function ConfirmScreen({ email }: { email: string }) {
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <div className="w-20 h-20 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto mb-5">
+        <MailCheck className="w-10 h-10" />
+      </div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Falta 1 clique: confirme<br />seu e-mail.</h2>
+      <p className="text-muted-foreground leading-relaxed mb-6">
+        Mandamos um link pra <strong className="text-foreground">{email}</strong>. Confirme e seus <strong>7 dias grátis</strong> começam na hora.
+      </p>
+      <Button asChild size="lg" className="w-full h-12 text-base">
+        <Link to="/auth">Já confirmei — entrar</Link>
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3">Não chegou? Veja o spam ou aguarde 1 minuto.</p>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------------- shell */
 
 export default function Comecar() {
-  const [variant, setVariant] = useState<Variant>("mix");
-  const [step, setStep] = useState<Step>("start");
-
-  const reset = (v: Variant) => { setVariant(v); setStep("start"); };
+  const [params] = useSearchParams();
+  // Volta da demo (/preview/financas?funnel=1) cai direto no cadastro.
+  const [step, setStep] = useState<Step>(params.get("step") === "signup" ? "signup" : "start");
+  const [confirmEmail, setConfirmEmail] = useState("");
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
-      {/* Seletor de protótipo (só pra comparar — sai na versão final) */}
-      <div className="sticky top-0 z-50 bg-card/80 backdrop-blur border-b border-border">
-        <div className="max-w-3xl mx-auto px-4 h-12 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Protótipo do funil</span>
-          <div className="flex items-center gap-1 text-xs">
-            {(["slides", "demo", "mix"] as Variant[]).map((v) => (
-              <button
-                key={v}
-                onClick={() => reset(v)}
-                className={`px-3 py-1.5 rounded-md font-medium capitalize transition-colors ${
-                  variant === v ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center justify-center px-5 py-10">
+      <div className="flex-1 flex flex-col items-center justify-center px-5 py-12">
         <AnimatePresence mode="wait">
-          <motion.div key={`${variant}-${step}`} {...fade} className="w-full">
-            {step === "start" && (
-              <div className="flex flex-col items-center text-center max-w-md mx-auto">
-                <div className="font-bold text-2xl tracking-tight mb-1">CORE<span className="text-accent">.</span></div>
-                <h1 className="text-[clamp(28px,8vw,44px)] font-bold leading-[1.08] tracking-tight mt-6 mb-4 max-w-[14ch]">
-                  Assuma o controle do seu dinheiro.
-                </h1>
-                <p className="text-muted-foreground leading-relaxed mb-9 max-w-xs">
-                  Em 1 minuto você entende pra onde seu dinheiro vai — e quanto dá pra gastar.
-                </p>
-                <Button size="lg" className="px-10 h-12 text-base" onClick={() => setStep("tutorial")}>
-                  Começar <ArrowRight className="w-4 h-4" />
-                </Button>
-              </div>
+          <motion.div key={step} {...fade} className="w-full">
+            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_start", {}); setStep("slides"); }} />}
+            {step === "slides" && <SlidesScreen onDone={() => { window.location.href = DEMO_URL; }} />}
+            {step === "signup" && (
+              <SignupScreen
+                onSession={() => setStep("trial")}
+                onConfirm={(e) => { setConfirmEmail(e); setStep("confirm"); }}
+              />
             )}
-
-            {step === "tutorial" && variant === "slides" && <Slides onDone={() => setStep("signup")} />}
-            {step === "tutorial" && variant === "demo" && <DemoTutorial onDone={() => setStep("signup")} />}
-            {step === "tutorial" && variant === "mix" && <MixTutorial onDone={() => setStep("signup")} />}
-
-            {step === "signup" && <SignupStep onDone={() => setStep("trial")} />}
-            {step === "trial" && <TrialStep />}
+            {step === "trial" && <TrialScreen />}
+            {step === "confirm" && <ConfirmScreen email={confirmEmail} />}
           </motion.div>
         </AnimatePresence>
       </div>

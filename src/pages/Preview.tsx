@@ -1,7 +1,7 @@
-import { useParams, Link, Navigate } from "react-router-dom";
+import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
-import { Sparkles } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
 
 import Index from "@/pages/Index";
 import Rotina from "@/pages/Rotina";
@@ -40,20 +40,44 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   detox: Detox,
 };
 
-const PreviewBanner = () => (
+const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
   <div className="sticky top-0 z-[60] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
     <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         <Sparkles className="w-4 h-4 shrink-0" />
         <span className="truncate">
-          <strong>Demonstração</strong> — dados fictícios, nada é salvo.
+          {funnel
+            ? <><strong>Experimente à vontade</strong> — dados de exemplo.</>
+            : <><strong>Demonstração</strong> — dados fictícios, nada é salvo.</>}
         </span>
       </div>
+      {!funnel && (
+        <Link
+          to="/auth"
+          className="shrink-0 bg-white text-violet-700 font-semibold px-3 py-1 rounded-md hover:bg-white/90 transition text-[11px] md:text-xs whitespace-nowrap"
+        >
+          Criar conta grátis
+        </Link>
+      )}
+    </div>
+  </div>
+);
+
+/** CTA fixo quando a demo é o passo do funil (/comecar). Volta pro cadastro. */
+const FunnelCta = () => (
+  <div
+    className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
+    style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+  >
+    <div className="max-w-md mx-auto px-4 pt-3 flex items-center gap-3">
+      <p className="text-xs text-muted-foreground leading-tight flex-1">
+        Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.
+      </p>
       <Link
-        to="/auth"
-        className="shrink-0 bg-white text-violet-700 font-semibold px-3 py-1 rounded-md hover:bg-white/90 transition text-[11px] md:text-xs whitespace-nowrap"
+        to="/comecar?step=signup"
+        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
       >
-        Criar conta grátis
+        Quase lá <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
   </div>
@@ -61,6 +85,8 @@ const PreviewBanner = () => (
 
 const Preview = () => {
   const { moduleKey } = useParams<{ moduleKey: string }>();
+  const [params] = useSearchParams();
+  const funnel = params.get("funnel") === "1";
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
 
@@ -69,13 +95,14 @@ const Preview = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <PreviewBanner />
+    <div className={`min-h-screen bg-background ${funnel ? "pb-20" : ""}`}>
+      <PreviewBanner funnel={funnel} />
       <PreviewUserDataProvider moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
+      {funnel && <FunnelCta />}
     </div>
   );
 };

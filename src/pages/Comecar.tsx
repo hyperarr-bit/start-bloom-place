@@ -141,20 +141,17 @@ function HeroVideo() {
       playsInline
       autoPlay
       preload="auto"
-      className="w-[250px] max-w-[68%] h-auto block drop-shadow-2xl"
+      className="max-w-[250px] max-h-[48vh] w-auto h-auto object-contain block drop-shadow-2xl"
     />
   );
 }
 
 function StartScreen({ onStart }: { onStart: () => void }) {
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto text-center">
-      <div className="pt-1">
-        <span className="font-bold text-lg tracking-tight">CORE<span className="text-accent">.</span></span>
-      </div>
-
-      {/* Vídeo do app (já vem com a moldura do iPhone). Estilo Cal AI: visual primeiro. */}
-      <div className="flex-1 flex items-end justify-center pt-4 pb-5 overflow-hidden">
+    <div className="flex-1 flex flex-col w-full max-w-md mx-auto text-center [@media(max-height:520px)]:justify-center">
+      {/* Vídeo do app (já vem com a moldura do iPhone). Estilo Cal AI: visual primeiro.
+          Em telas baixas (paisagem) o vídeo some pra o CTA caber. */}
+      <div className="flex-1 flex items-end justify-center pt-4 pb-5 overflow-hidden [@media(max-height:520px)]:hidden">
         <HeroVideo />
       </div>
 

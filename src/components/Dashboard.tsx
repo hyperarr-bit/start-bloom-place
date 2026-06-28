@@ -234,29 +234,34 @@ export const Dashboard = ({
   // Smart alerts
   const alerts = useMemo(() => {
     const list: { type: "warning" | "info" | "success"; icon: typeof AlertTriangle; text: string }[] = [];
-    const today = new Date().getDate();
+    const now = new Date();
+    const today = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
     dueDays.forEach((d) => {
       const billsArr = Array.isArray(d?.bills) ? d.bills : [];
       const unpaidBills = billsArr.filter((b) => !b?.paid);
-      const daysUntilDue = d.day >= today ? d.day - today : 30 - today + d.day;
-      if (unpaidBills.length > 0 && daysUntilDue <= 5 && daysUntilDue >= 0) {
-        list.push({
-          type: "warning",
-          icon: Calendar,
-          text: `${unpaidBills.length} conta(s) vencem em ${daysUntilDue} dia(s): ${unpaidBills.map((b) => b.name).join(", ")}`,
-        });
-      }
+      if (unpaidBills.length === 0) return;
+      const daysUntilDue = d.day >= today ? d.day - today : daysInMonth - today + d.day;
+      if (daysUntilDue > 5) return;
+      const names = unpaidBills.map((b) => b.name).join(", ");
+      const when = daysUntilDue === 0 ? "vencem hoje" : daysUntilDue === 1 ? "vencem amanhã" : `vencem em ${daysUntilDue} dias`;
+      list.push({
+        type: "warning",
+        icon: Calendar,
+        text: `${unpaidBills.length} conta(s) ${when}: ${names}`,
+      });
     });
 
-    const budgetUsed = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
-    const dayOfMonth = today;
-    const expectedUsage = (dayOfMonth / 30) * 100;
-    if (budgetUsed > expectedUsage + 20) {
+    // Ritmo de gasto: só alerta quando as despesas ainda NÃO passaram a renda
+    // (esse caso já tem alerta próprio) e o gasto está bem à frente do ritmo do mês.
+    const incomeUsedPct = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+    const monthProgress = (today / daysInMonth) * 100;
+    if (totalExpenses <= totalIncome && incomeUsedPct > monthProgress + 25 && today < daysInMonth - 2) {
       list.push({
         type: "warning",
         icon: AlertTriangle,
-        text: `Você já gastou ${budgetUsed.toFixed(0)}% do orçamento, mas estamos apenas no dia ${dayOfMonth}!`,
+        text: `Você já usou ${incomeUsedPct.toFixed(0)}% da sua renda e o mês está só ${monthProgress.toFixed(0)}% completo. Segura o ritmo!`,
       });
     }
 

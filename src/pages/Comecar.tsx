@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -23,6 +23,25 @@ import { trackEvent } from "@/lib/analytics";
 type Step = "start" | "quiz" | "progress" | "result" | "signup" | "trial" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
+
+// Funil sempre em tema claro (fundo branco), mesmo se o visitante estiver no dark.
+const LIGHT_VARS = {
+  "--background": "0 0% 100%",
+  "--foreground": "0 0% 15%",
+  "--card": "0 0% 100%",
+  "--card-foreground": "0 0% 15%",
+  "--primary": "0 0% 20%",
+  "--primary-foreground": "0 0% 100%",
+  "--secondary": "40 20% 96%",
+  "--secondary-foreground": "0 0% 15%",
+  "--muted": "40 15% 95%",
+  "--muted-foreground": "0 0% 45%",
+  "--accent": "330 65% 50%",
+  "--accent-foreground": "0 0% 100%",
+  "--border": "0 0% 90%",
+  "--input": "0 0% 90%",
+  "--ring": "0 0% 20%",
+} as CSSProperties;
 
 const fade = {
   initial: { opacity: 0, y: 16 },
@@ -103,23 +122,40 @@ const QUIZ: Q[] = [
 
 /* ---------------------------------------------------------------- screens */
 
+function HeroVideo() {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v) return;
+    v.muted = true; // garante autoplay (a property muted do React não é confiável)
+    const p = v.play();
+    if (p) p.catch(() => {});
+  }, []);
+  return (
+    <video
+      ref={ref}
+      src="/videos/financas.mp4"
+      poster="/videos/financas-poster.jpg"
+      muted
+      loop
+      playsInline
+      autoPlay
+      preload="auto"
+      className="w-[250px] max-w-[68%] h-auto block drop-shadow-2xl"
+    />
+  );
+}
+
 function StartScreen({ onStart }: { onStart: () => void }) {
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
+    <div className="flex-1 flex flex-col w-full max-w-md mx-auto text-center">
       <div className="pt-1">
         <span className="font-bold text-lg tracking-tight">CORE<span className="text-accent">.</span></span>
       </div>
 
-      {/* Mockup do app (a imagem já vem com a moldura do iPhone). Estilo Cal AI: visual primeiro. */}
+      {/* Vídeo do app (já vem com a moldura do iPhone). Estilo Cal AI: visual primeiro. */}
       <div className="flex-1 flex items-end justify-center pt-4 pb-5 overflow-hidden">
-        <img
-          src="/videos/financas-poster.jpg"
-          alt="App de finanças do CORE"
-          className="w-[250px] max-w-[68%] h-auto block drop-shadow-2xl"
-          loading="eager"
-          decoding="async"
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0"; }}
-        />
+        <HeroVideo />
       </div>
 
       {/* Headline + CTA (fixos embaixo) */}
@@ -130,7 +166,7 @@ function StartScreen({ onStart }: { onStart: () => void }) {
         <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
           Começar
         </Button>
-        <p className="text-center text-sm text-muted-foreground mt-4">
+        <p className="text-sm text-muted-foreground mt-4">
           Já tem uma conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
         </p>
       </div>
@@ -390,7 +426,7 @@ export default function Comecar() {
   }, [step]);
 
   return (
-    <div className="min-h-dvh bg-background text-foreground flex flex-col">
+    <div style={LIGHT_VARS} className="min-h-dvh bg-background text-foreground flex flex-col">
       <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>

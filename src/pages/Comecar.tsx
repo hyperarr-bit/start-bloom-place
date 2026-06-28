@@ -20,7 +20,7 @@ import { trackEvent } from "@/lib/analytics";
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "slides" | "signup" | "trial" | "confirm";
+type Step = "start" | "quiz" | "insight" | "signup" | "trial" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
 
@@ -39,23 +39,13 @@ const TrustRow = () => (
   </div>
 );
 
-/* ----------------------------------------------------------------- slides */
+/* ------------------------------------------------------------------- quiz */
 
-const SLIDES = [
-  {
-    key: "dor",
-    Icon: Eye,
-    kicker: "Todo fim de mês, a mesma pergunta:",
-    title: "Cadê o dinheiro?",
-    body: "Boleto, pix, cartão, aquela assinatura esquecida. Some e você nem sabe explicar pra onde foi.",
-  },
-  {
-    key: "solucao",
-    Icon: TrendingUp,
-    kicker: "O CORE responde isso por você.",
-    title: "Tudo numa tela só.",
-    body: "O que entra, o que sai e quanto dá pra gastar hoje — sem planilha, sem culpa, atualizado em segundos.",
-  },
+type Q = { key: string; q: string; opts: string[] };
+const QUIZ: Q[] = [
+  { key: "renda", q: "Quanto entra por mês, mais ou menos?", opts: ["Até R$ 2 mil", "R$ 2 a 5 mil", "R$ 5 a 10 mil", "Mais de R$ 10 mil"] },
+  { key: "vaza", q: "Pra onde some a maior parte?", opts: ["Comida e delivery", "Contas e boletos", "Compras por impulso", "Sinceramente, não sei"] },
+  { key: "dor", q: "Qual o seu maior perrengue hoje?", opts: ["Nunca sobra nada", "Vivo no limite do cartão", "Não consigo poupar", "Esqueço de pagar contas"] },
 ];
 
 /* ---------------------------------------------------------------- screens */
@@ -82,40 +72,72 @@ function StartScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
-function SlidesScreen({ onDone }: { onDone: () => void }) {
-  const [i, setI] = useState(0);
-  const last = i === SLIDES.length - 1;
-  const s = SLIDES[i];
+function QuizScreen({ onDone }: { onDone: (a: Record<string, string>) => void }) {
+  const [idx, setIdx] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const q = QUIZ[idx];
+  const pick = (opt: string) => {
+    const next = { ...answers, [q.key]: opt };
+    setAnswers(next);
+    trackEvent("funnel_quiz_answer", { q: q.key });
+    if (idx < QUIZ.length - 1) setIdx(idx + 1);
+    else onDone(next);
+  };
   return (
-    <div className="flex flex-col items-center text-center max-w-md mx-auto">
-      <AnimatePresence mode="wait">
-        <motion.div key={s.key} {...fade} className="flex flex-col items-center">
-          <div className="w-24 h-24 rounded-3xl bg-accent/10 text-accent flex items-center justify-center mb-7">
-            <s.Icon className="w-11 h-11" strokeWidth={1.8} />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground mb-2">{s.kicker}</p>
-          <h2 className="text-[32px] font-bold tracking-tight leading-[1.1] mb-4">{s.title}</h2>
-          <p className="text-muted-foreground leading-relaxed max-w-xs">{s.body}</p>
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="flex gap-1.5 mt-9 mb-7">
-        {SLIDES.map((_, idx) => (
-          <span key={idx} className={`h-1.5 rounded-full transition-all ${idx === i ? "w-6 bg-accent" : "w-1.5 bg-border"}`} />
+    <div className="w-full max-w-sm mx-auto">
+      <div className="flex gap-1.5 mb-8 justify-center">
+        {QUIZ.map((_, i) => (
+          <span key={i} className={`h-1.5 rounded-full transition-all ${i <= idx ? "w-6 bg-accent" : "w-1.5 bg-border"}`} />
         ))}
       </div>
+      <AnimatePresence mode="wait">
+        <motion.div key={q.key} {...fade}>
+          <h2 className="text-[26px] font-bold tracking-tight leading-tight text-center mb-7">{q.q}</h2>
+          <div className="space-y-2.5">
+            {q.opts.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => pick(opt)}
+                className="w-full text-left rounded-xl border border-border bg-card hover:border-accent hover:bg-accent/5 transition-colors px-4 py-3.5 text-[15px] font-medium flex items-center justify-between group"
+              >
+                {opt}
+                <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-accent transition-colors" />
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
 
-      <Button
-        size="lg"
-        className="w-full max-w-xs h-12 text-base"
-        onClick={() => {
-          if (last) { trackEvent("funnel_demo_open", {}); onDone(); }
-          else { setI(i + 1); trackEvent("funnel_slide", { slide: i + 2 }); }
-        }}
-      >
-        {last ? "Ver funcionando" : "Continuar"} <ArrowRight className="w-4 h-4" />
+function InsightScreen({ answers, onDone }: { answers: Record<string, string>; onDone: () => void }) {
+  const naoSabe = answers.vaza === "Sinceramente, não sei";
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <div className="w-16 h-16 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto mb-5">
+        <Sparkles className="w-8 h-8" />
+      </div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-3">
+        {naoSabe ? "Esse é exatamente o problema." : "Já entendi seu caso."}
+      </h2>
+      <p className="text-muted-foreground leading-relaxed mb-5">
+        Quem {(answers.dor || "vive no aperto").toLowerCase()} normalmente perde de vista{" "}
+        <strong className="text-foreground">R$ 300–600 por mês</strong> em gastos que parecem pequenos.
+        Olha como o CORE coloca isso na sua frente:
+      </p>
+      <Card className="p-4 text-left space-y-2 mb-7">
+        {[["Renda", answers.renda], ["Onde vaza", answers.vaza], ["Maior perrengue", answers.dor]].map(([k, v]) => (
+          <div key={k} className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{k}</span>
+            <span className="font-medium text-right">{v || "—"}</span>
+          </div>
+        ))}
+      </Card>
+      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_demo_open", {}); onDone(); }}>
+        Ver no app, com dados reais <ArrowRight className="w-4 h-4" />
       </Button>
-      {last && <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>}
+      <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
     </div>
   );
 }
@@ -238,14 +260,16 @@ export default function Comecar() {
   // Volta da demo (/preview/financas?funnel=1) cai direto no cadastro.
   const [step, setStep] = useState<Step>(params.get("step") === "signup" ? "signup" : "start");
   const [confirmEmail, setConfirmEmail] = useState("");
+  const [answers, setAnswers] = useState<Record<string, string>>({});
 
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-5 py-12">
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className="w-full">
-            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_start", {}); setStep("slides"); }} />}
-            {step === "slides" && <SlidesScreen onDone={() => { window.location.href = DEMO_URL; }} />}
+            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_start", {}); setStep("quiz"); }} />}
+            {step === "quiz" && <QuizScreen onDone={(a) => { setAnswers(a); setStep("insight"); }} />}
+            {step === "insight" && <InsightScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}
             {step === "signup" && (
               <SignupScreen
                 onSession={() => setStep("trial")}

@@ -52,7 +52,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         .eq("id", attemptId);
     }
     try {
-      const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
+      const { data, error } = await supabase.functions.invoke("cakto-checkout", {
         body: { billing: "annual", coupon: "WINBACK80" },
       });
       if (error) throw error;

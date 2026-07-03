@@ -171,7 +171,7 @@ const Planos = () => {
     setLoading(true);
     winback.markIntent();
     try {
-      const { data, error } = await supabase.functions.invoke("abacatepay-checkout", {
+      const { data, error } = await supabase.functions.invoke("cakto-checkout", {
         body: { billing },
       });
       if (error) throw error;

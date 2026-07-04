@@ -3,8 +3,9 @@ import { Check, ChevronDown, TrendingDown, AlertTriangle } from "lucide-react";
 
 /* ---------------------------------------------------------------- range */
 
-export type RangeKey = "7d" | "30d" | "90d" | "all";
+export type RangeKey = "today" | "7d" | "30d" | "90d" | "all";
 const RANGE_LABELS: Record<RangeKey, string> = {
+  today: "Hoje",
   "7d": "Últimos 7 dias",
   "30d": "Últimos 30 dias",
   "90d": "Últimos 90 dias",
@@ -14,11 +15,32 @@ const RANGE_LABELS: Record<RangeKey, string> = {
 export function rangeToDates(key: RangeKey): { from: string; to: string } {
   const to = new Date();
   const from = new Date();
-  if (key === "7d") from.setDate(from.getDate() - 7);
+  if (key === "today") from.setHours(0, 0, 0, 0);
+  else if (key === "7d") from.setDate(from.getDate() - 7);
   else if (key === "30d") from.setDate(from.getDate() - 30);
   else if (key === "90d") from.setDate(from.getDate() - 90);
   else from.setFullYear(2026, 0, 1);
   return { from: from.toISOString(), to: to.toISOString() };
+}
+
+export type Granularity = "day" | "hour";
+
+export function GranularityToggle({ value, onChange }: { value: Granularity; onChange: (v: Granularity) => void }) {
+  return (
+    <div className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+      {(["day", "hour"] as Granularity[]).map((g) => (
+        <button
+          key={g}
+          onClick={() => onChange(g)}
+          className={`px-2.5 py-1 rounded-md text-[12px] font-medium transition-colors ${
+            value === g ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {g === "day" ? "Dia" : "Hora"}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function RangePicker({ value, onChange }: { value: RangeKey; onChange: (v: RangeKey) => void }) {

@@ -4,6 +4,7 @@ import { Loader2, Gift, RotateCw, Users2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   RangePicker, rangeToDates, type RangeKey,
+  GranularityToggle, type Granularity,
   Panel, StatTile, EmptyState, RankedBars, FunnelChart, WorstDropCallout,
   type FunnelStep,
 } from "./components";
@@ -16,6 +17,7 @@ interface FunnelData {
   cta_clicks: { cta: string; clicks: number; sessions: number }[];
   quiz_answers: Record<string, { answer: string; count: number }[]>;
   utm_breakdown: { source: string; sessions: number; paid: number }[];
+  granularity: "day" | "hour";
   daily: { day: string; sessions: number; accounts: number; paid: number }[];
 }
 
@@ -25,16 +27,18 @@ const QUIZ_LABELS: Record<string, string> = {
   vitoria: "Vitória em 7 dias",
 };
 
-const fmtDay = (d: string) => {
-  const dt = new Date(`${d}T12:00:00`);
-  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+const fmtBucket = (d: string, granularity: "day" | "hour") => {
+  const dt = new Date(d);
+  return granularity === "hour"
+    ? dt.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    : dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 };
 
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label, granularity }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 shadow-lg text-[12px]">
-      <div className="font-semibold mb-1">{fmtDay(label)}</div>
+      <div className="font-semibold mb-1">{fmtBucket(label, granularity)}</div>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
@@ -48,21 +52,31 @@ function ChartTooltip({ active, payload, label }: any) {
 
 export default function AdminFunnel() {
   const [range, setRange] = useState<RangeKey>("30d");
+  const [granularity, setGranularity] = useState<Granularity>("day");
   const [data, setData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (r: RangeKey) => {
+  const load = useCallback(async (r: RangeKey, g: Granularity) => {
     setLoading(true);
     setError(null);
     const { from, to } = rangeToDates(r);
-    const { data: res, error: err } = await supabase.rpc("admin_acquisition_funnel", { _from: from, _to: to });
+    const { data: res, error: err } = await supabase.rpc("admin_acquisition_funnel", {
+      _from: from, _to: to, _granularity: g,
+    });
     if (err) setError(err.message);
     else setData(res as unknown as FunnelData);
     setLoading(false);
   }, []);
 
-  useEffect(() => { load(range); }, [range, load]);
+  useEffect(() => { load(range, granularity); }, [range, granularity, load]);
+
+  // "Hoje" com granularidade diária vira 1 ponto só (inútil) — troca pra hora.
+  const handleRangeChange = (r: RangeKey) => {
+    setRange(r);
+    if (r === "today") setGranularity("hour");
+    else if (r !== "today" && granularity === "hour") setGranularity("day");
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto w-full space-y-5">
@@ -71,7 +85,7 @@ export default function AdminFunnel() {
           <h1 className="text-xl font-bold tracking-tight">Funil de aquisição</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">/comecar — do primeiro clique até assinar</p>
         </div>
-        <RangePicker value={range} onChange={setRange} />
+        <RangePicker value={range} onChange={handleRangeChange} />
       </div>
 
       {error && (
@@ -179,7 +193,16 @@ export default function AdminFunnel() {
                 )}
               </Panel>
 
-              <Panel title="Tendência diária" sub="Sessões, contas criadas e assinaturas por dia">
+              <Panel>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h3 className="text-[13px] font-bold">Tendência</h3>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">
+                      Sessões, contas criadas e assinaturas por {granularity === "hour" ? "hora" : "dia"}
+                    </p>
+                  </div>
+                  <GranularityToggle value={granularity} onChange={setGranularity} />
+                </div>
                 {data.daily.length === 0 ? (
                   <EmptyState label="Sem dados nesse período" />
                 ) : (
@@ -188,7 +211,7 @@ export default function AdminFunnel() {
                       <LineChart data={data.daily} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="0" vertical={false} stroke="hsl(var(--border))" />
                         <XAxis
-                          dataKey="day" tickFormatter={fmtDay}
+                          dataKey="day" tickFormatter={(d) => fmtBucket(d, data.granularity)}
                           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                           axisLine={{ stroke: "hsl(var(--border))" }} tickLine={false}
                         />
@@ -197,7 +220,7 @@ export default function AdminFunnel() {
                           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                           axisLine={false} tickLine={false} width={28}
                         />
-                        <Tooltip content={<ChartTooltip />} />
+                        <Tooltip content={<ChartTooltip granularity={data.granularity} />} />
                         <Legend
                           iconType="plainline" iconSize={14}
                           wrapperStyle={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}

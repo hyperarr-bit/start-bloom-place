@@ -6,6 +6,7 @@ import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
+import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 
 export const TrialBanner = () => {
   const { user, trialExpired, noTrial, isSubscribed, trialDay, trialHoursLeft } = useAuth();
@@ -43,7 +44,21 @@ export const TrialBanner = () => {
   if (isSubscribed || !user) return null;
   if (suppressOnRoute) return null;
 
-  // Trial expired — blocking screen (mantido)
+  // Conta pós-paywall (sem trial): paywall completo estilo Cal AI,
+  // autocontido (planos + checkout + roleta/downsell), sem sair da tela.
+  if (noTrial) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 z-50 overflow-y-auto bg-white"
+      >
+        <PaywallFlow context="app" />
+      </motion.div>
+    );
+  }
+
+  // Trial expirado (contas antigas) — blocking screen (mantido)
   if (trialExpired) {
     return (
       <motion.div
@@ -56,16 +71,12 @@ export const TrialBanner = () => {
             <Lock className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">
-              {noTrial ? "Destrave o CORE completo" : "Seu trial de 7 dias terminou"}
-            </h2>
+            <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {noTrial
-                ? "Assine pra começar a usar com os seus números. Garantia de 7 dias: não curtiu, devolvemos 100%."
-                : "Continue de onde parou com acesso completo ao módulo de Finanças."}
+              Continue de onde parou com acesso completo ao módulo de Finanças.
             </p>
           </div>
-          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos(noTrial ? "no_trial" : "expired")}>
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>
             Ver planos
           </Button>
         </div>

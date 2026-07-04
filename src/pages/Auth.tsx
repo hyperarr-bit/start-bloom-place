@@ -231,7 +231,7 @@ const Auth = () => {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                {isLogin ? "Entrar" : "Criar conta grátis"}
+                {isLogin ? "Entrar" : "Criar conta"}
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

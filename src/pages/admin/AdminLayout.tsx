@@ -3,25 +3,13 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
-import {
-  Users, LogOut, Shield, Mail, ShieldCheck, TrendingDown, Filter, UserPlus, BarChart3, BookOpen, CreditCard, Megaphone, GitBranch, Rocket
-} from "lucide-react";
+import { Filter, Users, LogOut, ShieldCheck, Loader2 } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
 
 const navItems = [
-  { to: "/admin/funnel", label: "Funil (novo)", Icon: Rocket },
-  { to: "/admin/funil-lp", label: "Funil LP", Icon: GitBranch },
   { to: "/admin/funil", label: "Funil", Icon: Filter },
-  { to: "/admin/pagantes", label: "Pagantes", Icon: CreditCard },
-  { to: "/admin/aquisicao", label: "Aquisição", Icon: Megaphone },
-  { to: "/admin/tutorial-inicial", label: "Tutorial Inicial", Icon: BookOpen },
-  { to: "/admin/uso", label: "Uso", Icon: BarChart3 },
-  { to: "/admin/trials", label: "Trials", Icon: UserPlus },
-  { to: "/admin/usuarios", label: "Usuários", Icon: Users },
-  { to: "/admin/emails", label: "E-mails", Icon: Mail },
-  { to: "/admin/churn", label: "Churn", Icon: TrendingDown },
-  { to: "/admin/retention", label: "Retention", Icon: ShieldCheck },
+  { to: "/admin/assinantes", label: "Assinantes", Icon: Users },
 ];
 
 export default function AdminLayout() {
@@ -45,16 +33,25 @@ export default function AdminLayout() {
   };
 
   if (loading || allowed === null) {
-    return <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-400 text-sm">Verificando…</div>;
+    return (
+      <div className="min-h-screen grid place-items-center bg-background">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
   if (!allowed) return null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col md:flex-row">
-      <aside className="md:w-60 md:min-h-screen md:border-r border-zinc-800 bg-zinc-900/50">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
-          <Shield className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-bold tracking-widest uppercase">Admin</span>
+    <div className="min-h-screen bg-background text-foreground flex flex-col md:flex-row">
+      <aside className="md:w-56 shrink-0 md:min-h-screen md:border-r border-border bg-card">
+        <div className="p-4 border-b border-border flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground grid place-items-center text-[13px] font-extrabold tracking-tight">
+            C
+          </div>
+          <div className="leading-none">
+            <div className="text-[13px] font-bold tracking-tight">CORE</div>
+            <div className="text-[10px] text-muted-foreground">Admin</div>
+          </div>
         </div>
         <nav className="flex md:flex-col overflow-x-auto md:overflow-visible p-2 gap-1">
           {navItems.map(({ to, label, Icon }) => (
@@ -62,25 +59,28 @@ export default function AdminLayout() {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-2 px-3 py-2 rounded-lg text-xs whitespace-nowrap transition-colors ${
-                  isActive ? "bg-emerald-500/10 text-emerald-400" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
+                `flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors ${
+                  isActive ? "bg-accent/10 text-accent" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`
               }
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4" />
               {label}
             </NavLink>
           ))}
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors mt-auto md:mt-4"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium text-muted-foreground/70 hover:text-destructive hover:bg-destructive/5 transition-colors mt-auto md:mt-4"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
             Sair
           </button>
         </nav>
+        <div className="hidden md:flex items-center gap-1.5 px-4 py-3 mt-auto text-[10px] text-muted-foreground/60">
+          <ShieldCheck className="w-3 h-3" /> Área restrita
+        </div>
       </aside>
-      <main className="flex-1 p-4 md:p-8 max-w-6xl mx-auto w-full">
+      <main className="flex-1 min-w-0">
         <Outlet />
       </main>
     </div>

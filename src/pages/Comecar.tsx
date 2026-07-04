@@ -11,7 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 
@@ -429,6 +429,10 @@ export default function Comecar() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
+  // qual campanha/origem trouxe cada sessão.
+  useEffect(() => { captureLandingMeta(); }, []);
 
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
   // e o paywall emite offer/wheel/downsell por conta própria).

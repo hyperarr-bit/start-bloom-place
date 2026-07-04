@@ -70,18 +70,8 @@ const Preview = lazy(() => import("./pages/Preview"));
 
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
-const AdminChurn = lazy(() => import("./pages/admin/AdminChurn"));
-const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
-const AdminTrials = lazy(() => import("./pages/admin/AdminTrials"));
-const AdminEmailVariants = lazy(() => import("./pages/admin/AdminEmailVariants"));
-const AdminRetention = lazy(() => import("./pages/admin/AdminRetention"));
-const AdminFinanceFunnel = lazy(() => import("./pages/admin/AdminFinanceFunnel"));
-const AdminTutorialInicial = lazy(() => import("./pages/admin/AdminTutorialInicial"));
-const AdminUso = lazy(() => import("./pages/admin/AdminUso"));
-const AdminPaying = lazy(() => import("./pages/admin/AdminPaying"));
-const AdminAquisicao = lazy(() => import("./pages/admin/AdminAquisicao"));
-const AdminFunilLP = lazy(() => import("./pages/admin/AdminFunilLP"));
-const AdminFunil = lazy(() => import("./pages/admin/AdminFunil"));
+const AdminFunnel = lazy(() => import("./pages/admin/AdminFunnel"));
+const AdminSubscribers = lazy(() => import("./pages/admin/AdminSubscribers"));
 
 const queryClient = new QueryClient();
 
@@ -121,24 +111,10 @@ const AnimatedRoutes = () => {
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route path="funnel" element={<AdminFunil />} />
-          <Route path="funil" element={<AdminFinanceFunnel />} />
-          <Route path="pagantes" element={<AdminPaying />} />
-          <Route path="tutorial-inicial" element={<AdminTutorialInicial />} />
-          <Route path="usuarios" element={<AdminUsers />} />
-          <Route path="trials" element={<AdminTrials />} />
-          <Route path="emails" element={<AdminEmailVariants />} />
-          <Route path="churn" element={<AdminChurn />} />
-          <Route path="retention" element={<AdminRetention />} />
-          <Route path="uso" element={<AdminUso />} />
-          <Route path="dashboard" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="analytics" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="conversao" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="ativacao" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="onboarding" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="tutorial-compare" element={<Navigate to="/admin/funnel" replace />} />
-          <Route path="aquisicao" element={<AdminAquisicao />} />
-          <Route path="funil-lp" element={<AdminFunilLP />} />
+          <Route path="funil" element={<AdminFunnel />} />
+          <Route path="assinantes" element={<AdminSubscribers />} />
+          {/* Compat: qualquer rota antiga do admin cai no funil novo. */}
+          <Route path="*" element={<Navigate to="/admin/funil" replace />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

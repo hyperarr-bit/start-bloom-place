@@ -2,9 +2,11 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, Sparkles, PartyPopper, ShieldCheck,
+  ArrowRight, Check, Sparkles, ShieldCheck, Gift, Zap,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
+import { WinbackWheel } from "@/components/retention/WinbackWheel";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
-// usuário NOVO pra tela "ganhou 7 dias" (em vez de pular direto pro app).
+// usuário NOVO pro paywall do funil (em vez de pular direto pro app).
 export const FUNNEL_OAUTH_KEY = "funnel-oauth-pending";
 
 const GoogleIcon = () => (
@@ -28,16 +30,28 @@ const GoogleIcon = () => (
 );
 
 /**
- * Funil "sem LP" (mobile-first, tráfego frio):
- *   início → 2 slides (dor → solução) → DEMO no app real (/preview/financas)
- *   → "só falta 1 passo" (cadastro real) → "ganhou 7 dias" → app.
+ * Funil "sem LP" (mobile-first, tráfego frio) — modelo PAGO com paywall:
+ *   início → quiz → DEMO no app real (/preview/financas, dados de exemplo)
+ *   → cadastro → PAYWALL (assinar) → checkout Cakto → app ativo.
+ * Se o lead tenta sair do paywall: roleta → downsell (ofertas limitadas).
  * A demo é o app de verdade: o slide final manda pra /preview/financas?funnel=1,
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "signup" | "trial" | "confirm";
+type Step =
+  | "start" | "quiz" | "progress" | "result" | "signup"
+  | "offer" | "wheel" | "downsell" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
+
+// Preços — TÊM que bater com as ofertas configuradas na Cakto
+// (regular: 6g8iiak/xs9s7ws_914041 · limitada: 37pjpm8/6a3owem).
+const PRICING = {
+  monthly: { perMonth: "14,90" },
+  annual: { perMonth: "3,90", total: "46,80", offPct: 74 },
+  downsellMonthly: { perMonth: "9,90", offPct: 33 },
+  downsellAnnual: { perMonth: "2,90", total: "34,80", offPct: 80 },
+};
 
 // Funil sempre em tema claro (fundo branco), mesmo se o visitante estiver no dark.
 const LIGHT_VARS = {
@@ -76,7 +90,7 @@ const PREP_STEPS = [
   "Identificando seu perfil financeiro",
   "Montando seu painel inicial",
   "Separando os recursos mais importantes",
-  "Preparando seus próximos 7 dias",
+  "Finalizando seu plano personalizado",
 ];
 
 const RESULT_ITEMS = [
@@ -259,7 +273,7 @@ function ProgressScreen({ onDone }: { onDone: () => void }) {
         </svg>
         <div className="absolute inset-0 grid place-items-center text-2xl font-bold tabular-nums">{pct}%</div>
       </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu teste grátis…</h2>
+      <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu plano…</h2>
       <p className="text-muted-foreground text-sm mb-8">Isso leva só alguns segundos.</p>
       <div className="space-y-3 text-left max-w-xs mx-auto">
         {PREP_STEPS.map((s, i) => {
@@ -290,9 +304,9 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
         className="w-16 h-16 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-4">
         <Sparkles className="w-8 h-8" />
       </motion.div>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Seu plano está pronto</div>
-      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Seu plano de 7 dias está pronto</h2>
-      <p className="text-muted-foreground leading-relaxed mb-6">Nos próximos 7 dias, o CORE vai te ajudar a:</p>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Análise concluída</div>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Seu plano personalizado<br />está pronto</h2>
+      <p className="text-muted-foreground leading-relaxed mb-6">Com o CORE, você vai:</p>
       <Card className="p-4 text-left space-y-3 mb-7">
         {items.map((r, i) => (
           <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.08 }}
@@ -369,7 +383,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <h2 className="text-[26px] font-bold tracking-tight leading-tight">
           Só falta 1 passo pra você<br />começar a usar o CORE.
         </h2>
-        <p className="text-muted-foreground text-sm mt-2">Crie sua conta e libere seus 7 dias grátis.</p>
+        <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
       </div>
 
       <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
@@ -388,7 +402,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <Input type="password" placeholder="Crie uma senha (mín. 6)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Criar conta e liberar acesso <ArrowRight className="w-4 h-4" /></>}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
       </form>
       <div className="mt-5"><TrustRow /></div>
@@ -396,40 +410,228 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   );
 }
 
-function TrialScreen() {
-  const navigate = useNavigate();
+/* --------------------------------------------------------------- paywall */
+
+// Redireciona pro checkout da Cakto (link com e-mail pré-preenchido).
+async function startCheckout(
+  body: { billing: "monthly" | "annual"; offer?: "regular" | "limited" },
+  cta: string,
+  setLoading: (v: boolean) => void,
+) {
+  trackEvent("funnel_click", { cta });
+  setLoading(true);
+  try {
+    const { data, error } = await supabase.functions.invoke("cakto-checkout", { body });
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    if (data?.url) { window.location.href = data.url; return; }
+    throw new Error("Checkout indisponível. Tente de novo.");
+  } catch (err: any) {
+    toast.error(err?.message || "Erro ao iniciar checkout");
+    setLoading(false);
+  }
+}
+
+const STACK = [
+  "Painel de Finanças completo — o que você testou na demo",
+  "Contas a vencer com lembretes (chega de juros bobos)",
+  "Metas, desejos e sua saúde financeira num lugar só",
+  "+15 módulos inclusos: rotina, treino, dieta, casa…",
+];
+
+function PaywallScreen({ onEscape }: { onEscape: () => void }) {
+  const [billing, setBilling] = useState<"monthly" | "annual">("annual");
+  const [loading, setLoading] = useState(false);
+  const escapeRef = useRef(onEscape);
+  escapeRef.current = onEscape;
+
+  // Botão "voltar" do celular = tentativa de saída → downsell (roleta)
+  useEffect(() => {
+    window.history.pushState({ paywall: true }, "");
+    const onPop = () => escapeRef.current();
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   return (
     <div className="w-full max-w-sm mx-auto text-center">
-      <motion.div
-        initial={{ scale: 0.6, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 200, damping: 14 }}
-        className="w-20 h-20 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto mb-5"
-      >
-        <PartyPopper className="w-10 h-10" />
-      </motion.div>
-      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Pronto! Seus 7 dias<br />grátis estão liberados.</h2>
-      <p className="text-muted-foreground leading-relaxed mb-6">Acesso completo ao CORE. Sem cartão agora — você só decide se continua no fim.</p>
-      <Card className="p-4 text-left space-y-2.5 mb-7">
-        {["Tudo o que você viu, agora com os seus números", "Contas a vencer, metas e saúde financeira", "Cancele em 1 clique, sem burocracia"].map((b) => (
-          <div key={b} className="flex items-start gap-2.5 text-sm">
-            <span className="mt-0.5 w-4 h-4 rounded-full bg-accent/15 text-accent flex items-center justify-center shrink-0">
-              <Check className="w-2.5 h-2.5" strokeWidth={3} />
+      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold mb-3">
+        <Zap className="w-3.5 h-3.5" /> SEU PLANO ESTÁ PRONTO
+      </div>
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
+        Comece hoje a ver pra<br />onde seu dinheiro vai
+      </h2>
+      <p className="text-muted-foreground text-sm leading-relaxed mb-5">
+        Tudo o que você viu na demo, com os seus números de verdade.
+      </p>
+
+      <Card className="p-4 text-left space-y-2.5 mb-5">
+        {STACK.map((b) => (
+          <div key={b} className="flex items-start gap-2.5 text-[13.5px] leading-snug">
+            <span className="mt-0.5 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-accent/15 text-accent grid place-items-center shrink-0">
+              <Check className="w-3 h-3" strokeWidth={3} />
             </span>
             {b}
           </div>
         ))}
       </Card>
+
+      {/* Planos */}
+      <div className="space-y-2.5 mb-4 text-left">
+        <button
+          onClick={() => setBilling("annual")}
+          className={`relative w-full rounded-2xl border-2 p-4 transition-all ${
+            billing === "annual" ? "border-accent bg-accent/[0.05]" : "border-border bg-card"
+          }`}
+        >
+          <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
+            MELHOR VALOR · -{PRICING.annual.offPct}%
+          </span>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="font-bold text-[15px]">Anual</div>
+              <div className="text-[11px] text-muted-foreground">R$ {PRICING.annual.total} cobrado 1x ao ano</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.monthly.perMonth}</div>
+              <div className="font-extrabold text-lg leading-none">
+                R$ {PRICING.annual.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
+              </div>
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => setBilling("monthly")}
+          className={`w-full rounded-2xl border-2 p-4 transition-all ${
+            billing === "monthly" ? "border-accent bg-accent/[0.05]" : "border-border bg-card"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="font-bold text-[15px]">Mensal</div>
+              <div className="text-[11px] text-muted-foreground">Sem fidelidade</div>
+            </div>
+            <div className="font-extrabold text-lg leading-none">
+              R$ {PRICING.monthly.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {/* Reversão de risco */}
+      <div className="flex items-start gap-2.5 rounded-xl bg-secondary p-3 text-left mb-5">
+        <ShieldCheck className="w-4.5 h-4.5 w-[18px] h-[18px] text-accent shrink-0 mt-0.5" />
+        <p className="text-[12.5px] leading-snug text-foreground">
+          <strong>Garantia incondicional de 7 dias.</strong> Não curtiu? A gente devolve 100%, sem perguntas.
+        </p>
+      </div>
+
       <Button
         size="lg"
-        className="w-full h-12 text-base"
-        onClick={() => { trackEvent("funnel_click", { cta: "trial_accept" }); navigate("/financas"); }}
+        disabled={loading}
+        className="w-full h-14 rounded-full text-base font-semibold"
+        onClick={() => startCheckout({ billing }, `paywall_${billing}`, setLoading)}
       >
-        Aceitar e começar <ArrowRight className="w-4 h-4" />
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Desbloquear meu acesso <ArrowRight className="w-4 h-4" /></>}
       </Button>
-      <p className="text-xs text-muted-foreground mt-3 inline-flex items-center gap-1.5 justify-center">
-        <ShieldCheck className="w-3.5 h-3.5" /> 7 dias grátis · sem compromisso
+      <p className="text-[11px] text-muted-foreground mt-2.5">Pix ou cartão · acesso na hora · cancele quando quiser</p>
+
+      <button
+        onClick={onEscape}
+        className="mt-4 text-xs text-muted-foreground/70 underline underline-offset-2 hover:text-muted-foreground transition-colors"
+      >
+        Agora não
+      </button>
+    </div>
+  );
+}
+
+function WheelScreen({ onDone }: { onDone: () => void }) {
+  return (
+    <div className="w-full max-w-sm mx-auto">
+      <WinbackWheel attemptId={null} onSpinComplete={onDone} />
+    </div>
+  );
+}
+
+function DownsellScreen() {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(10 * 60);
+  useEffect(() => {
+    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 12 }}
+        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-accent-foreground text-xs font-bold tracking-wide mb-3"
+      >
+        <Gift className="w-3.5 h-3.5" /> PRÊMIO DA ROLETA: {PRICING.downsellAnnual.offPct}% OFF
+      </motion.div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2">
+        CORE Anual por<br />
+        <span className="text-accent">R$ {PRICING.downsellAnnual.perMonth}/mês</span>
+      </h2>
+      <p className="text-muted-foreground text-sm leading-relaxed mb-4">
+        Oferta única de boas-vindas — vale só nesta tela.
       </p>
+
+      <div className="inline-flex items-center gap-1.5 text-[13px] font-semibold tabular-nums text-foreground bg-secondary rounded-full px-3.5 py-1.5 mb-5">
+        ⏳ Expira em {mm}:{ss}
+      </div>
+
+      <Card className="p-4 mb-3 border-2 border-accent bg-accent/[0.04] text-left">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="font-bold text-[15px]">Anual com prêmio</div>
+            <div className="text-[11px] text-muted-foreground">R$ {PRICING.downsellAnnual.total} cobrado 1x ao ano</div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.monthly.perMonth}</div>
+            <div className="font-extrabold text-xl leading-none text-accent">
+              R$ {PRICING.downsellAnnual.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
+            </div>
+          </div>
+        </div>
+        <Button
+          size="lg"
+          disabled={loading}
+          className="w-full h-12 text-base mt-3"
+          onClick={() => startCheckout({ billing: "annual", offer: "limited" }, "downsell_annual", setLoading)}
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Resgatar meu prêmio <ArrowRight className="w-4 h-4" /></>}
+        </Button>
+      </Card>
+
+      <Button
+        variant="outline"
+        disabled={loading}
+        className="w-full h-11 text-sm font-semibold mb-4"
+        onClick={() => startCheckout({ billing: "monthly", offer: "limited" }, "downsell_monthly", setLoading)}
+      >
+        Prefiro mensal: R$ {PRICING.downsellMonthly.perMonth}/mês (-{PRICING.downsellMonthly.offPct}%)
+      </Button>
+
+      <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5 justify-center mb-4">
+        <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · Pix ou cartão · cancele quando quiser
+      </p>
+
+      <div>
+        <button
+          onClick={() => { trackEvent("funnel_click", { cta: "downsell_dismiss" }); navigate("/financas"); }}
+          className="text-xs text-muted-foreground/70 underline underline-offset-2 hover:text-muted-foreground transition-colors"
+        >
+          Continuar sem desconto
+        </button>
+      </div>
     </div>
   );
 }
@@ -442,7 +644,7 @@ function ConfirmScreen({ email }: { email: string }) {
       </div>
       <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Falta 1 clique: confirme<br />seu e-mail.</h2>
       <p className="text-muted-foreground leading-relaxed mb-6">
-        Mandamos um link pra <strong className="text-foreground">{email}</strong>. Confirme e seus <strong>7 dias grátis</strong> começam na hora.
+        Mandamos um link pra <strong className="text-foreground">{email}</strong>. Confirme e <strong>seu plano te espera</strong> do outro lado.
       </p>
       <Button asChild size="lg" className="w-full h-12 text-base">
         <Link to="/auth">Já confirmei — entrar</Link>
@@ -457,10 +659,11 @@ function ConfirmScreen({ email }: { email: string }) {
 export default function Comecar() {
   const [params] = useSearchParams();
   // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
-  // (?step=trial, via /auth/callback) cai na tela "ganhou 7 dias".
+  // (?step=offer, via /auth/callback) cai direto no paywall.
+  // ("trial" é aceito por compat com links antigos.)
   const [step, setStep] = useState<Step>(() => {
     const s = params.get("step");
-    return s === "signup" ? "signup" : s === "trial" ? "trial" : "start";
+    return s === "signup" ? "signup" : s === "offer" || s === "trial" ? "offer" : "start";
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -481,11 +684,13 @@ export default function Comecar() {
             {step === "result" && <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}
             {step === "signup" && (
               <SignupScreen
-                onSession={() => setStep("trial")}
+                onSession={() => setStep("offer")}
                 onConfirm={(e) => { setConfirmEmail(e); setStep("confirm"); }}
               />
             )}
-            {step === "trial" && <TrialScreen />}
+            {step === "offer" && <PaywallScreen onEscape={() => setStep("wheel")} />}
+            {step === "wheel" && <WheelScreen onDone={() => setStep("downsell")} />}
+            {step === "downsell" && <DownsellScreen />}
             {step === "confirm" && <ConfirmScreen email={confirmEmail} />}
           </motion.div>
         </AnimatePresence>

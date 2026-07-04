@@ -36,6 +36,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   trialExpired: boolean;
+  noTrial: boolean;
   isSubscribed: boolean;
   trialDay: number;
   trialHoursLeft: number;
@@ -54,6 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [trialExpired, setTrialExpired] = useState(false);
+  const [noTrial, setNoTrial] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [trialDay, setTrialDay] = useState(1);
   const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
@@ -72,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(() => checkSubscriptionStatus(), 0);
         } else {
           setTrialExpired(false);
+          setNoTrial(false);
           setIsSubscribed(false);
         }
         setLoading(false);
@@ -109,6 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
+      setNoTrial(data?.no_trial ?? false);
       setInGracePeriod(data?.in_grace_period ?? false);
       setGraceDaysLeft(typeof data?.grace_days_left === "number" ? data.grace_days_left : null);
       setPaymentMethod(data?.payment_method ?? null);
@@ -166,7 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, isSubscribed, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, noTrial, isSubscribed, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

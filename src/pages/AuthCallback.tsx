@@ -35,8 +35,8 @@ const AuthCallback = () => {
           }
         }
 
-        // Veio do funil (/comecar → Google)? Usuário NOVO volta pra tela
-        // "ganhou 7 dias" com o tutorial armado; usuário antigo segue pro app.
+        // Veio do funil (/comecar → Google)? Usuário NOVO volta pro paywall
+        // do funil com o tutorial armado; usuário antigo segue pro app.
         let fromFunnel = false;
         try {
           fromFunnel = localStorage.getItem("funnel-oauth-pending") === "true";
@@ -50,8 +50,8 @@ const AuthCallback = () => {
             trackEvent("signup_completed", { method: "google" });
             trackEvent("funnel_click", { cta: "signup_success", method: "google" });
             try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
-            window.history.replaceState({}, "", "/comecar?step=trial");
-            navigate("/comecar?step=trial", { replace: true });
+            window.history.replaceState({}, "", "/comecar?step=offer");
+            navigate("/comecar?step=offer", { replace: true });
             return;
           }
         }

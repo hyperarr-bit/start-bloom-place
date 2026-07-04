@@ -8,7 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const TrialBanner = () => {
-  const { user, trialExpired, isSubscribed, trialDay, trialHoursLeft } = useAuth();
+  const { user, trialExpired, noTrial, isSubscribed, trialDay, trialHoursLeft } = useAuth();
   const { get, loaded } = useUserData();
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,18 +25,18 @@ export const TrialBanner = () => {
   useEffect(() => {
     if (!user || isSubscribed) return;
     if (!trialExpired && !tutorialDone) return;
-    const key = trialExpired ? "expired" : `mini-${trialDay}`;
+    const key = noTrial ? "no_trial" : trialExpired ? "expired" : `mini-${trialDay}`;
     if (viewedRef.current === key) return;
     viewedRef.current = key;
     trackEvent(
       trialExpired ? "paywall_view" : "trial_banner_view",
-      { phase: trialExpired ? "expired" : "mini", trial_day: trialDay },
+      { phase: noTrial ? "no_trial" : trialExpired ? "expired" : "mini", trial_day: trialDay },
       { trialDay },
     );
-  }, [user, isSubscribed, trialDay, trialExpired, tutorialDone]);
+  }, [user, isSubscribed, trialDay, trialExpired, noTrial, tutorialDone]);
 
   const goToPlanos = (cta: string) => {
-    trackEvent("trial_banner_click", { phase: trialExpired ? "expired" : "mini", trial_day: trialDay, cta }, { trialDay });
+    trackEvent("trial_banner_click", { phase: noTrial ? "no_trial" : trialExpired ? "expired" : "mini", trial_day: trialDay, cta }, { trialDay });
     navigate("/planos");
   };
 
@@ -56,12 +56,16 @@ export const TrialBanner = () => {
             <Lock className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
+            <h2 className="text-2xl font-bold">
+              {noTrial ? "Destrave o CORE completo" : "Seu trial de 7 dias terminou"}
+            </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Continue de onde parou com acesso completo ao módulo de Finanças.
+              {noTrial
+                ? "Assine pra começar a usar com os seus números. Garantia de 7 dias: não curtiu, devolvemos 100%."
+                : "Continue de onde parou com acesso completo ao módulo de Finanças."}
             </p>
           </div>
-          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>
+          <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos(noTrial ? "no_trial" : "expired")}>
             Ver planos
           </Button>
         </div>

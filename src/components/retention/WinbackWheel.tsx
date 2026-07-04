@@ -58,7 +58,9 @@ export function WinbackWheel({ attemptId, onSpinComplete }: Props) {
     startedRef.current = true;
 
     (async () => {
-      trackEvent("winback_wheel_spun", { auto: true });
+      // Sem attemptId = roleta reutilizada fora do winback (ex.: funil) — quem
+      // chama emite o próprio evento; não polui as métricas de winback.
+      if (attemptId) trackEvent("winback_wheel_spun", { auto: true });
       const targetCenter = WIN_INDEX * SLICE_DEG + SLICE_DEG / 2;
       const fullSpins = 6 * 360;
       const jitter = (Math.random() - 0.5) * (SLICE_DEG * 0.25);

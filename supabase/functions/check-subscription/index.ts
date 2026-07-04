@@ -15,6 +15,10 @@ const logStep = (step: string, details?: unknown) => {
 const GRACE_PERIOD_DAYS = 7;
 const TRIAL_DAYS = 7;
 
+// Paywall no funil: contas criadas a partir deste corte NÃO têm trial —
+// entram bloqueadas até assinar. Contas antigas mantêm o trial de 7 dias.
+const PAYWALL_CUTOFF = new Date("2026-07-04T18:00:00Z");
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -110,6 +114,7 @@ serve(async (req) => {
       JSON.stringify({
         subscribed: false,
         trial_expired: trialState.expired,
+        no_trial: trialState.noTrial,
         trial_day: trialState.day,
         trial_hours_left: trialState.hoursLeft,
         in_grace_period: false,
@@ -130,12 +135,19 @@ serve(async (req) => {
 });
 
 function computeTrialState(createdAt: string | null | undefined) {
-  if (!createdAt) return { expired: false, day: 1, hoursLeft: TRIAL_DAYS * 24 };
-  const ms = Date.now() - new Date(createdAt).getTime();
+  if (!createdAt) return { expired: false, noTrial: false, day: 1, hoursLeft: TRIAL_DAYS * 24 };
+  const created = new Date(createdAt);
+
+  // Conta pós-paywall: sem trial — bloqueada até assinar
+  if (created >= PAYWALL_CUTOFF) {
+    return { expired: true, noTrial: true, day: 0, hoursLeft: 0 };
+  }
+
+  const ms = Date.now() - created.getTime();
   const totalHours = ms / (1000 * 60 * 60);
   const totalDays = totalHours / 24;
   const expired = totalDays > TRIAL_DAYS;
   const day = Math.min(TRIAL_DAYS, Math.max(1, Math.ceil(totalDays === 0 ? 1 : totalDays)));
   const hoursLeft = Math.max(0, TRIAL_DAYS * 24 - totalHours);
-  return { expired, day, hoursLeft };
+  return { expired, noTrial: false, day, hoursLeft };
 }

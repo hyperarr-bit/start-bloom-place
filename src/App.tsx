@@ -71,7 +71,9 @@ const Preview = lazy(() => import("./pages/Preview"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminFunnel = lazy(() => import("./pages/admin/AdminFunnel"));
+const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
 const AdminSubscribers = lazy(() => import("./pages/admin/AdminSubscribers"));
+const AdminPagantes = lazy(() => import("./pages/admin/AdminPagantes"));
 
 const queryClient = new QueryClient();
 
@@ -112,7 +114,9 @@ const AnimatedRoutes = () => {
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="funil" element={<AdminFunnel />} />
+          <Route path="usuarios" element={<AdminUsuarios />} />
           <Route path="assinantes" element={<AdminSubscribers />} />
+          <Route path="pagantes" element={<AdminPagantes />} />
           {/* Compat: qualquer rota antiga do admin cai no funil novo. */}
           <Route path="*" element={<Navigate to="/admin/funil" replace />} />
         </Route>

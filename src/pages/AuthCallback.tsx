@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
+import { persistLeadSource } from "@/lib/lead-source";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -42,18 +43,19 @@ const AuthCallback = () => {
           fromFunnel = localStorage.getItem("funnel-oauth-pending") === "true";
           localStorage.removeItem("funnel-oauth-pending");
         } catch { /* noop */ }
-        if (fromFunnel) {
-          const { data: u } = await supabase.auth.getUser();
-          const createdAt = u?.user?.created_at ? new Date(u.user.created_at).getTime() : 0;
-          const isNewUser = createdAt > 0 && Date.now() - createdAt < 10 * 60 * 1000;
-          if (isNewUser) {
-            trackEvent("signup_completed", { method: "google" });
-            trackEvent("funnel_click", { cta: "signup_success", method: "google" });
-            try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
-            window.history.replaceState({}, "", "/comecar?step=offer");
-            navigate("/comecar?step=offer", { replace: true });
-            return;
-          }
+
+        const { data: u } = await supabase.auth.getUser();
+        const createdAt = u?.user?.created_at ? new Date(u.user.created_at).getTime() : 0;
+        const isNewUser = createdAt > 0 && Date.now() - createdAt < 10 * 60 * 1000;
+        if (isNewUser && u?.user?.id) await persistLeadSource(supabase, u.user.id);
+
+        if (fromFunnel && isNewUser) {
+          trackEvent("signup_completed", { method: "google" });
+          trackEvent("funnel_click", { cta: "signup_success", method: "google" });
+          try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
+          window.history.replaceState({}, "", "/comecar?step=offer");
+          navigate("/comecar?step=offer", { replace: true });
+          return;
         }
 
         // Limpa o hash e vai pra Home

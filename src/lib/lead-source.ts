@@ -74,6 +74,27 @@ export function getLeadSource(): LeadSource | null {
   return readStored();
 }
 
+/** Persists the captured lead source to a user's profile (best-effort). */
+export async function persistLeadSource(
+  supabase: { from: (table: string) => { update: (v: object) => { eq: (col: string, val: string) => Promise<unknown> } } },
+  userId: string
+) {
+  const src = getLeadSource();
+  if (!src) return;
+  try {
+    await supabase.from("profiles").update({
+      utm_source: src.utm_source,
+      utm_medium: src.utm_medium,
+      utm_campaign: src.utm_campaign,
+      utm_content: src.utm_content,
+      utm_term: src.utm_term,
+      referrer: src.referrer,
+      landing_path: src.landing_path,
+      source_captured_at: src.source_captured_at,
+    }).eq("id", userId);
+  } catch { /* noop */ }
+}
+
 export function clearLeadSource() {
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
 }

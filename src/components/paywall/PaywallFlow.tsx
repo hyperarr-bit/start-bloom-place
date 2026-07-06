@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 
@@ -66,7 +66,9 @@ async function startCheckout(
   trackEvent("funnel_click", { cta, context });
   setLoading(true);
   try {
-    const { data, error } = await supabase.functions.invoke("cakto-checkout", { body });
+    const { data, error } = await supabase.functions.invoke("cakto-checkout", {
+      body: { ...body, attribution: getAttributionParams() },
+    });
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
     if (data?.url) { window.location.href = data.url; return; }

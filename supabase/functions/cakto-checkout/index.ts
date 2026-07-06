@@ -73,6 +73,18 @@ serve(async (req) => {
       coupon: z.string().optional(),
       // "limited" força a oferta promocional (usado pelo funil / ofertas relâmpago)
       offer: z.enum(["regular", "limited"]).optional(),
+      // Atribuição: repassados na URL do checkout — o pixel da Cakto lê o
+      // fbclid e fecha o match compra↔anúncio; os UTMs aparecem no relatório
+      // de vendas da Cakto.
+      attribution: z
+        .object({
+          fbclid: z.string().max(500).optional(),
+          utm_source: z.string().max(200).optional(),
+          utm_medium: z.string().max(200).optional(),
+          utm_campaign: z.string().max(200).optional(),
+          utm_content: z.string().max(200).optional(),
+        })
+        .optional(),
     });
     let rawBody: unknown;
     try {
@@ -147,7 +159,16 @@ serve(async (req) => {
     const cpf = sanitizeDigits(profile?.tax_id);
     if (cpf) url.searchParams.set("cpf", cpf);
 
-    logStep("Checkout link ready", { billingPeriod, variant, coupon: couponValid ? couponRaw : null });
+    const attribution = parsed.data.attribution ?? {};
+    for (const [key, value] of Object.entries(attribution)) {
+      if (value) url.searchParams.set(key, value);
+    }
+
+    logStep("Checkout link ready", {
+      billingPeriod, variant,
+      coupon: couponValid ? couponRaw : null,
+      fbclid: attribution.fbclid ? "yes" : "no",
+    });
     return jsonResponse({ url: url.toString() });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

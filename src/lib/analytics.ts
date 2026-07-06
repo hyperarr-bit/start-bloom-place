@@ -24,15 +24,33 @@ export const captureLandingMeta = () => {
       utm_medium: params.get("utm_medium") || "",
       utm_campaign: params.get("utm_campaign") || "",
       utm_content: params.get("utm_content") || "",
+      // ID do clique do Meta Ads — repassado até o checkout da Cakto pra
+      // fechar a atribuição da compra com o anúncio exato.
+      fbclid: params.get("fbclid") || "",
       referrer: document.referrer || "",
       path: window.location.pathname,
     };
     // Só persiste se vier algo de novo (não sobrescreve UTM original com vazio)
     const existing = localStorage.getItem(UTM_KEY);
-    if (!existing || utm.utm_source) {
+    if (!existing || utm.utm_source || utm.fbclid) {
       localStorage.setItem(UTM_KEY, JSON.stringify(utm));
     }
     return utm;
+  } catch {
+    return {};
+  }
+};
+
+/** Parâmetros de atribuição (fbclid + utm) pra repassar ao link de checkout. */
+export const getAttributionParams = (): Record<string, string> => {
+  if (typeof window === "undefined") return {};
+  try {
+    const m = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
+    const out: Record<string, string> = {};
+    for (const k of ["fbclid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+      if (m[k]) out[k] = m[k];
+    }
+    return out;
   } catch {
     return {};
   }

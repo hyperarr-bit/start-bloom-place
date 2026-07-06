@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -111,7 +111,7 @@ const Planos = () => {
     winback.markIntent();
     try {
       const { data, error } = await supabase.functions.invoke("cakto-checkout", {
-        body: { billing },
+        body: { billing, attribution: getAttributionParams() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

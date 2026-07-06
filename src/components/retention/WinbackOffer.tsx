@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Check, Loader2, Crown, Timer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { toast } from "sonner";
 
 const FULL_MONTHLY = 14.90;
@@ -53,7 +53,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
     }
     try {
       const { data, error } = await supabase.functions.invoke("cakto-checkout", {
-        body: { billing: "annual", coupon: "WINBACK80" },
+        body: { billing: "annual", coupon: "WINBACK80", attribution: getAttributionParams() },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

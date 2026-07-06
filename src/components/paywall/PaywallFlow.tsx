@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, X, ShieldCheck, Loader2, Gift,
-  Wallet, BellRing, Target, LayoutGrid, Unlock, MessageCircleHeart, TrendingUp,
+  Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -154,7 +154,7 @@ const STACK = [
   { Icon: Wallet, tile: "bg-amber-100 text-amber-700", title: "Finanças completo", sub: "gastos, saldo e visão do mês" },
   { Icon: BellRing, tile: "bg-rose-100 text-rose-600", title: "Contas a vencer", sub: "lembretes antes do juros" },
   { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas e desejos", sub: "progresso que dá vontade" },
-  { Icon: LayoutGrid, tile: "bg-violet-100 text-violet-700", title: "+15 módulos", sub: "rotina, treino, dieta, casa…" },
+  { Icon: BarChart3, tile: "bg-violet-100 text-violet-700", title: "Saúde financeira", sub: "score, relatórios e simuladores" },
 ];
 
 function ValueStack() {
@@ -174,7 +174,7 @@ function ValueStack() {
 }
 
 const TIMELINE = [
-  { Icon: Unlock, title: "Hoje", sub: "Acesso total, na hora. Todos os módulos, sem limite." },
+  { Icon: Unlock, title: "Hoje", sub: "Acesso total, na hora. Todas as funções, sem limite." },
   { Icon: ShieldCheck, title: "Até o dia 7", sub: "Não curtiu? Reembolso de 100% em 1 mensagem. Sem perguntas." },
   { Icon: MessageCircleHeart, title: "Do dia 8 em diante", sub: "Você só continua se estiver funcionando pra você." },
 ];

@@ -73,7 +73,7 @@ export const TrialBanner = () => {
           <div className="space-y-2">
             <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Continue de onde parou com acesso completo ao módulo de Finanças.
+              Continue de onde parou com acesso completo ao CORE.
             </p>
           </div>
           <Button className="w-full h-12 text-base font-semibold" onClick={() => goToPlanos("expired")}>

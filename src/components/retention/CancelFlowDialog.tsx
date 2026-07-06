@@ -475,7 +475,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
             </DialogHeader>
 
             <Textarea
-              placeholder="Ex: tentei salvar uma despesa no módulo financeiro e o app travou..."
+              placeholder="Ex: tentei salvar uma despesa e o app travou..."
               value={supportMessage}
               onChange={(e) => setSupportMessage(e.target.value.slice(0, 4000))}
               maxLength={4000}

@@ -6,21 +6,9 @@ import {
   Crown,
   Loader2,
   Wallet,
-  Utensils,
-  Dumbbell,
-  CalendarCheck,
   Target,
-  Home as HomeIcon,
-  Plane,
-  GraduationCap,
-  Brain,
-  Briefcase,
-  Heart,
-  PawPrint,
-  Sparkles,
-  Trophy,
-  HeartPulse,
-  Smartphone,
+  TrendingUp,
+  BarChart3,
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,88 +28,39 @@ const MODULE_GROUPS: Array<{
 }> = [
   {
     icon: Wallet,
-    title: "Finanças",
+    title: "Controle do dia a dia",
     items: [
       "Receitas, despesas e contas fixas",
-      "Dívidas, parcelamentos e investimentos",
-      "Limites por categoria e relatórios",
-      "Desejos, metas e saúde financeira",
+      "Contas a vencer com lembretes",
+      "Dívidas e parcelamentos",
     ],
   },
   {
-    icon: Utensils,
-    title: "Dieta",
-    items: ["Plano alimentar, calorias e macros", "Receitas e lista de compras"],
-  },
-  {
-    icon: Dumbbell,
-    title: "Treino",
-    items: ["Rotinas, séries e progressão de cargas"],
-  },
-  {
-    icon: CalendarCheck,
-    title: "Rotina",
-    items: ["Hábitos, agenda e lembretes diários"],
-  },
-  {
     icon: Target,
-    title: "Metas & Desenvolvimento",
-    items: ["Motivações diárias e metas pessoais"],
+    title: "Metas e desejos",
+    items: [
+      "Metas de economia com progresso",
+      "Lista de desejos planejada",
+      "Orçamento mensal e anual",
+    ],
   },
   {
-    icon: HomeIcon,
-    title: "Casa",
-    items: ["Inventário, manutenção e contas da casa"],
+    icon: TrendingUp,
+    title: "Crescer o patrimônio",
+    items: [
+      "Investimentos acompanhados",
+      "Saúde financeira com score",
+      "Simuladores de juros e metas",
+    ],
   },
   {
-    icon: Plane,
-    title: "Viagens",
-    items: ["Planejamento, orçamento e checklist"],
-  },
-  {
-    icon: GraduationCap,
-    title: "Estudos & Biblioteca",
-    items: ["Matérias, livros e leituras"],
-  },
-  {
-    icon: Brain,
-    title: "Hiperfoco",
-    items: ["Sessões de foco e priorização"],
-  },
-  {
-    icon: Briefcase,
-    title: "Carreira",
-    items: ["Objetivos profissionais e progresso"],
-  },
-  {
-    icon: Heart,
-    title: "Relacionamentos",
-    items: ["Pessoas importantes, datas e contatos"],
-  },
-  {
-    icon: PawPrint,
-    title: "Pet",
-    items: ["Vacinas, ração e cuidados"],
-  },
-  {
-    icon: Sparkles,
-    title: "Beleza",
-    items: ["Rotina de skincare e cuidados"],
-  },
-  {
-    icon: HeartPulse,
-    title: "Saúde",
-    items: ["Consultas, exames e medicamentos"],
-  },
-  {
-    icon: Smartphone,
-    title: "Detox digital",
-    items: ["Limites de tela e foco offline"],
-  },
-  {
-    icon: Trophy,
-    title: "Conquistas",
-    items: ["Acompanhe suas vitórias e evolução"],
+    icon: BarChart3,
+    title: "Visão clara",
+    items: [
+      "Painel com saldo do mês",
+      "Relatórios por categoria",
+      "Limites de gasto por categoria",
+    ],
   },
 ];
 
@@ -230,10 +169,10 @@ const Planos = () => {
             <Crown className="w-7 h-7 text-primary-foreground" />
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Tudo da sua vida em um só app
+            Seu dinheiro, finalmente sob controle
           </h2>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            16 módulos para organizar finanças, saúde, rotina, metas e muito mais.
+            Gastos, contas a vencer, metas, investimentos e sua saúde financeira — num painel só.
           </p>
         </div>
 
@@ -324,7 +263,7 @@ const Planos = () => {
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Cancele quando quiser · 7 dias grátis · Sem fidelidade</span>
+            <span>Cancele quando quiser · Garantia de 7 dias · Sem fidelidade</span>
           </div>
         </motion.div>
 
@@ -333,7 +272,7 @@ const Planos = () => {
           <div className="text-center space-y-1">
             <h3 className="text-lg font-bold">O que está incluído</h3>
             <p className="text-xs text-muted-foreground">
-              Todos os 16 módulos liberados, sem limites
+              Finanças completo, sem limites
             </p>
           </div>
 

@@ -125,7 +125,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
 
         <ul className="space-y-2">
           {[
-            "Todos os 16 módulos desbloqueados",
+            "Finanças completo desbloqueado, sem limites",
             "Acesso por 12 meses",
             "Sem fidelidade — cancele quando quiser",
             "Pix ou Cartão na próxima tela",

@@ -54,12 +54,14 @@ function ChartTooltip({ active, payload, label, granularity }: any) {
 }
 
 export default function AdminFunnel() {
-  const [range, setRange] = useState<RangeKey>("30d");
-  const [granularity, setGranularity] = useState<Granularity>("day");
+  // Se existe um marco de reset salvo, abre já em "Desde o reset" — senão o
+  // reload voltava pra "30 dias" e os números "voltavam".
+  const [resetAt, setResetAt] = useState<string | null>(() => getCounterReset());
+  const [range, setRange] = useState<RangeKey>(() => (getCounterReset() ? "reset" : "30d"));
+  const [granularity, setGranularity] = useState<Granularity>(() => (getCounterReset() ? "hour" : "day"));
   const [data, setData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [resetAt, setResetAt] = useState<string | null>(() => getCounterReset());
 
   // Zerar: salva o marco AGORA e passa a contar desde ali (não apaga dado).
   const handleReset = () => {

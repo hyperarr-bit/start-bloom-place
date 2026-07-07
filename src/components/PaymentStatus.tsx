@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Loader2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { firePurchaseConversion } from "@/lib/google-ads";
 
 type Status = "pending" | "confirmed" | "failed" | "canceled";
 
@@ -38,6 +39,12 @@ export const PaymentStatus = () => {
 
         if (!error && data?.subscribed) {
           setStatus("confirmed");
+          // Conversão de Compra do Google Ads — aqui é o único ponto em que
+          // temos pagamento confirmado pelo servidor + retorno real do checkout.
+          firePurchaseConversion({
+            billingPeriod: data.billing_period,
+            transactionId: data.subscription_end,
+          });
           return;
         }
 

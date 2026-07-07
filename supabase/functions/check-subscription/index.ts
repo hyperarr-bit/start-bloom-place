@@ -76,6 +76,7 @@ serve(async (req) => {
             in_grace_period: false,
             grace_days_left: null,
             payment_method: localSub.payment_method ?? null,
+            billing_period: localSub.billing_period ?? null,
             subscription_end: localSub.current_period_end,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
@@ -96,6 +97,7 @@ serve(async (req) => {
             in_grace_period: true,
             grace_days_left: graceDaysLeft,
             payment_method: localSub.payment_method ?? null,
+            billing_period: localSub.billing_period ?? null,
             subscription_end: localSub.current_period_end,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }

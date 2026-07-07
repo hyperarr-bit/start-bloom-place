@@ -112,8 +112,27 @@ function HeroVideo() {
     const v = ref.current;
     if (!v) return;
     v.muted = true; // garante autoplay (a property muted do React não é confiável)
-    const p = v.play();
-    if (p) p.catch(() => {});
+    const tryPlay = () => {
+      if (!v.paused) return;
+      const p = v.play();
+      if (p) p.catch(() => {});
+    };
+    tryPlay();
+    // O vídeo NUNCA pode ficar parado: iOS pausa em low power / voltar de
+    // background / troca de aba — religa em qualquer um desses casos e no
+    // primeiro toque (gesto libera autoplay quando o iOS bloqueou).
+    v.addEventListener("pause", tryPlay);
+    v.addEventListener("canplay", tryPlay);
+    document.addEventListener("visibilitychange", tryPlay);
+    window.addEventListener("touchstart", tryPlay, { passive: true });
+    window.addEventListener("click", tryPlay, { passive: true });
+    return () => {
+      v.removeEventListener("pause", tryPlay);
+      v.removeEventListener("canplay", tryPlay);
+      document.removeEventListener("visibilitychange", tryPlay);
+      window.removeEventListener("touchstart", tryPlay);
+      window.removeEventListener("click", tryPlay);
+    };
   }, []);
   return (
     <video
@@ -143,11 +162,13 @@ function StartScreen({ onStart }: { onStart: () => void }) {
           do anúncio, confirmada), vídeo como prova, botão como próximo passo.
           Nada de processo ("X perguntas") nem sinal de pagamento na tela 1. */}
       <div className="pb-2">
-        <h1 className="text-[clamp(30px,8.4vw,44px)] font-bold leading-[1.04] tracking-tight mb-3">
-          Descubra pra onde<br />seu dinheiro some
+        {/* Linha da marca — a mesma do hero do /planos e das artes de share.
+            Promessa de resultado, curta, funciona com qualquer anúncio. */}
+        <h1 className="text-[clamp(28px,7.8vw,42px)] font-bold leading-[1.06] tracking-tight mb-3">
+          Seu dinheiro,<br />finalmente sob controle
         </h1>
         <p className="text-[15px] text-muted-foreground leading-snug mb-6">
-          Um plano pro seu dinheiro em 1 minuto.
+          Sem planilha, sem complicação.
         </p>
         <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
           Começar

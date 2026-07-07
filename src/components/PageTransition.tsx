@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
 import { ReactNode } from "react";
 
+// Sem animação de exit de propósito: animar a saída de uma página grande
+// (Finanças tem milhares de nós) segura o AnimatePresence mode="wait" por
+// 300ms desmontando uma árvore pesada — era a "travada" ao navegar pelo menu.
+// Entrada só com opacidade, curta: barata de compor na GPU.
 export const PageTransition = ({ children }: { children: ReactNode }) => (
   <motion.div
-    initial={{ opacity: 0, y: 12 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -8 }}
-    transition={{ duration: 0.3, ease: "easeOut" }}
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    transition={{ duration: 0.18, ease: "easeOut" }}
   >
     {children}
   </motion.div>

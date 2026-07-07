@@ -5,7 +5,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserData } from "@/hooks/use-user-data";
 import { LevelProgress } from "./LevelProgress";
 import { BadgesGrid } from "./BadgesGrid";
-import { UnlockModal } from "./UnlockModal";
+import { BadgeDetailSheet } from "./BadgeDetailSheet";
+import { BadgeMedallion } from "./BadgeMedallion";
 import { Badge } from "./types";
 
 const XP = 50;
@@ -86,7 +87,7 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
 export const AchievementsPage = () => {
   const navigate = useNavigate();
   const { get } = useUserData();
-  const [justUnlocked, setJustUnlocked] = useState<Badge | null>(null);
+  const [selected, setSelected] = useState<Badge | null>(null);
 
   const badges = useMemo(() => buildBadges(get), [get]);
 
@@ -130,7 +131,7 @@ export const AchievementsPage = () => {
           </div>
         </div>
 
-        <BadgesGrid badges={finalBadges} />
+        <BadgesGrid badges={finalBadges} onSelect={setSelected} />
 
         {nextBadges.length > 0 && (
           <div className="bg-card rounded-lg border border-border p-4">
@@ -140,23 +141,25 @@ export const AchievementsPage = () => {
             </h4>
             <div className="space-y-2">
               {nextBadges.map(badge => (
-                <div key={badge.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                  <span className="text-lg opacity-40">{badge.icon}</span>
+                <button
+                  key={badge.id}
+                  onClick={() => setSelected(badge)}
+                  className="w-full flex items-center gap-3 p-2 rounded-lg bg-muted/30 text-left hover:bg-muted/60 transition-colors"
+                >
+                  <BadgeMedallion emoji={badge.icon} xp={badge.xp} unlocked={false} size={36} />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold">{badge.name}</p>
                     <p className="text-[10px] text-muted-foreground">{badge.description}</p>
                   </div>
                   <span className="text-[10px] font-bold text-yellow-400/60">+{badge.xp} XP</span>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         )}
       </main>
 
-      {justUnlocked && (
-        <UnlockModal badge={justUnlocked} onClose={() => setJustUnlocked(null)} />
-      )}
+      <BadgeDetailSheet badge={selected} onClose={() => setSelected(null)} />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -13,7 +13,7 @@ import { toast } from "sonner";
 interface AccountDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  displayName: string;
+  displayName?: string;
   onNameChange?: (name: string) => void;
   onReplayTutorial?: () => void;
 }
@@ -21,7 +21,7 @@ interface AccountDrawerProps {
 export const AccountDrawer = ({
   open,
   onOpenChange,
-  displayName,
+  displayName = "",
   onNameChange,
   onReplayTutorial,
 }: AccountDrawerProps) => {
@@ -34,6 +34,21 @@ export const AccountDrawer = ({
   useEffect(() => {
     if (!open) setView("menu");
   }, [open]);
+
+  // Aquece os chunks lazy dos destinos do menu enquanto o drawer abre — sem
+  // isso, clicar em "Conquistas"/"Assinatura" ainda baixa o chunk na hora e
+  // trava junto com a animação de fechar.
+  useEffect(() => {
+    if (!open) return;
+    import("@/pages/Conquistas");
+    import("@/pages/Planos");
+  }, [open]);
+
+  // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame
+  const go = (path: string) => {
+    onOpenChange(false);
+    startTransition(() => navigate(path));
+  };
 
   const initials = displayName
     ? displayName.slice(0, 2).toUpperCase()
@@ -56,10 +71,7 @@ export const AccountDrawer = ({
     }
   };
 
-  const handleManageSubscription = () => {
-    onOpenChange(false);
-    navigate("/planos");
-  };
+  const handleManageSubscription = () => go("/planos");
 
   const handleReplayTutorial = () => {
     localStorage.removeItem("core-welcome-done");
@@ -84,7 +96,7 @@ export const AccountDrawer = ({
     : [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
         { icon: CreditCard, label: "Assinatura", onClick: handleManageSubscription },
-        { icon: Trophy, label: "Conquistas", onClick: () => { onOpenChange(false); navigate("/conquistas"); } },
+        { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 

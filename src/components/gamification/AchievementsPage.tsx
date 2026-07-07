@@ -45,6 +45,9 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
 
   const acquiredWish = wishlist.some((w: any) => w.acquired || w.purchased);
 
+  const challenges = get<{ history?: { result: string }[] }>("finance-challenges", { history: [] });
+  const challengeWins = (challenges.history ?? []).filter((h) => h.result === "win").length;
+
   return [
     // Receitas / Despesas
     { id: "first-income", name: "Primeiro Salário", description: "Registre sua 1ª receita", icon: "💵", category: "finance", unlocked: incomes.length > 0, color: "green", xp: XP },
@@ -78,6 +81,11 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
     // Wishlist
     { id: "wishlist", name: "Lista de Desejos", description: "1+ item na lista", icon: "📝", category: "finance", unlocked: wishlist.length > 0, color: "green", xp: XP },
     { id: "conscious-buyer", name: "Comprador Consciente", description: "Adquira item da lista", icon: "🛍️", category: "finance", unlocked: acquiredWish, color: "green", xp: XP },
+
+    // Desafios semanais
+    { id: "challenger", name: "Desafiante", description: "Vença 1 desafio semanal", icon: "🎯", category: "finance", unlocked: challengeWins >= 1, color: "green", xp: XP },
+    { id: "challenger-5", name: "Imbatível", description: "Vença 5 desafios semanais", icon: "🥊", category: "finance", unlocked: challengeWins >= 5, color: "green", xp: XP_HI },
+    { id: "challenger-15", name: "Lenda da Semana", description: "Vença 15 desafios semanais", icon: "🐐", category: "finance", unlocked: challengeWins >= 15, color: "green", xp: XP_TOP },
 
     // Mestre
     { id: "master", name: "Mestre Financeiro", description: "Atinja nível Diamante", icon: "👑", category: "finance", unlocked: false, color: "green", xp: XP_TOP },

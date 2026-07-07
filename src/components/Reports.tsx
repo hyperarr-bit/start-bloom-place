@@ -1,8 +1,7 @@
-import { useState, useRef } from "react";
-import { FileText, Download, Upload, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { FileText, Download, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
+import { ImportExtrato } from "@/components/finance/ImportExtrato";
 
 interface Income {
   id: string;
@@ -54,9 +53,6 @@ export const Reports = ({
   setIncomes,
   setExpenses,
 }: ReportsProps) => {
-  const [importType, setImportType] = useState<"income" | "expense">("expense");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   // totalExpenses aqui já é a saída mensal completa (fixas + variáveis + parcelas),
   // calculada uma vez no Index — mesma base da Saúde Financeira e do Dashboard.
@@ -94,55 +90,6 @@ export const Reports = ({
     link.href = URL.createObjectURL(blob);
     link.download = `financas_${type}_${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
-  };
-
-  // Import CSV
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split("\n").filter((line) => line.trim());
-      
-      if (importType === "income") {
-        const newIncomes: Income[] = [];
-        lines.forEach((line, index) => {
-          if (index === 0) return; // Skip header
-          const [description, value, date] = line.split(",").map((s) => s.replace(/"/g, "").trim());
-          if (description && value) {
-            newIncomes.push({
-              id: Date.now().toString() + index,
-              description,
-              value: parseFloat(value) || 0,
-              date: date || new Date().toISOString().split("T")[0],
-            });
-          }
-        });
-        setIncomes([...incomes, ...newIncomes]);
-      } else {
-        const newExpenses: Expense[] = [];
-        lines.forEach((line, index) => {
-          if (index === 0) return; // Skip header
-          const parts = line.split(",").map((s) => s.replace(/"/g, "").trim());
-          const [description, category, value, date, paymentMethod] = parts;
-          if (description && value) {
-            newExpenses.push({
-              id: Date.now().toString() + index,
-              description,
-              category: category || "outros",
-              value: parseFloat(value) || 0,
-              date: date || new Date().toISOString().split("T")[0],
-              paymentMethod: paymentMethod || "Outros",
-            });
-          }
-        });
-        setExpenses([...expenses, ...newExpenses]);
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = "";
   };
 
   // Print report
@@ -186,24 +133,13 @@ export const Reports = ({
         <h3 className="text-xs font-bold mb-3">📥 IMPORTAR / EXPORTAR DADOS</h3>
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <select
-              value={importType}
-              onChange={(e) => setImportType(e.target.value as any)}
-              className="h-9 text-xs rounded-md border border-input bg-background px-2"
-            >
-              <option value="expense">Despesas</option>
-              <option value="income">Receitas</option>
-            </select>
-            <input
-              type="file"
-              accept=".csv"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              className="hidden"
+            {/* Extrato do banco (OFX/CSV) com auto-categorização e revisão */}
+            <ImportExtrato
+              expenses={expenses}
+              incomes={incomes}
+              setExpenses={setExpenses}
+              setIncomes={setIncomes}
             />
-            <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="w-4 h-4 mr-1" /> Importar CSV
-            </Button>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => exportToCSV("incomes")}>
@@ -337,18 +273,12 @@ export const Reports = ({
 
       {/* Import Guide */}
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-        <h4 className="text-xs font-bold mb-2">📋 FORMATO DO CSV PARA IMPORTAÇÃO</h4>
-        <div className="text-xs text-muted-foreground space-y-2">
-          <p><strong>Receitas:</strong> Descrição, Valor, Data</p>
-          <code className="block bg-muted/30 p-2 rounded text-[10px]">
-            Salário,5000,2025-03-05<br />
-            Freelance,1500,2025-03-10
-          </code>
-          <p className="mt-2"><strong>Despesas:</strong> Descrição, Categoria, Valor, Data, Forma de Pagamento</p>
-          <code className="block bg-muted/30 p-2 rounded text-[10px]">
-            Almoço,restaurante,45.90,2025-03-06,Cartão de Crédito<br />
-            Uber,transporte,25.00,2025-03-06,Pix
-          </code>
+        <h4 className="text-xs font-bold mb-2">📋 COMO IMPORTAR SEU EXTRATO</h4>
+        <div className="text-xs text-muted-foreground space-y-1.5 leading-relaxed">
+          <p>1. No app do seu banco, abra o extrato e toque em <strong>exportar</strong> (todo banco tem — Nubank, Inter, Itaú, BB...).</p>
+          <p>2. Escolha o formato <strong>OFX</strong> (de preferência) ou <strong>CSV</strong>.</p>
+          <p>3. Volte aqui, toque em <strong>Importar extrato</strong> e selecione o arquivo.</p>
+          <p>O CORE categoriza sozinho (iFood → Delivery, Uber → Transporte...) e aprende com as suas correções. Lançamentos repetidos são detectados e desmarcados.</p>
         </div>
       </div>
     </div>

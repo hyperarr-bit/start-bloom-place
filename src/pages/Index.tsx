@@ -38,6 +38,7 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
+import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -233,6 +234,9 @@ const Index = () => {
         {activeTab === "dashboard" && (
           <>
             <WrappedBanner />
+            <TrackedCard cardKey="weekly-challenge" tab="dashboard">
+              <WeeklyChallenge expenses={expenses} />
+            </TrackedCard>
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
                 totalIncome={totalIncome}

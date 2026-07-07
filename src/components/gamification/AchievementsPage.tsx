@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Award, Zap } from "lucide-react";
+import { ArrowLeft, Zap } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserData } from "@/hooks/use-user-data";
 import { LevelProgress } from "./LevelProgress";
 import { BadgesGrid } from "./BadgesGrid";
 import { BadgeDetailSheet } from "./BadgeDetailSheet";
 import { BadgeMedallion } from "./BadgeMedallion";
+import { ProfileCard } from "./ProfileCard";
 import { Badge } from "./types";
 
 const XP = 50;
@@ -106,7 +107,6 @@ export const AchievementsPage = () => {
     [badges, totalXP]
   );
 
-  const unlockedCount = finalBadges.filter(b => b.unlocked).length;
   const nextBadges = finalBadges.filter(b => !b.unlocked).slice(0, 3);
 
   return (
@@ -124,20 +124,11 @@ export const AchievementsPage = () => {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-5 space-y-4">
-        <LevelProgress xp={totalXP} />
+        {/* Cartão do membro: nível, streak e melhores insígnias — compartilhável.
+            (Os cards de contagem antigos moram dentro dele agora.) */}
+        <ProfileCard badges={finalBadges} totalXP={totalXP} />
 
-        <div className="grid grid-cols-2 gap-2">
-          <div className="bg-card rounded-lg border border-border p-3 text-center">
-            <Award className="w-4 h-4 mx-auto mb-1 text-yellow-400" />
-            <p className="text-lg font-bold">{unlockedCount}/{finalBadges.length}</p>
-            <p className="text-[10px] text-muted-foreground">Conquistas</p>
-          </div>
-          <div className="bg-card rounded-lg border border-border p-3 text-center">
-            <Zap className="w-4 h-4 mx-auto mb-1 text-purple-400" />
-            <p className="text-lg font-bold">{totalXP}</p>
-            <p className="text-[10px] text-muted-foreground">XP total</p>
-          </div>
-        </div>
+        <LevelProgress xp={totalXP} />
 
         <BadgesGrid badges={finalBadges} onSelect={setSelected} />
 

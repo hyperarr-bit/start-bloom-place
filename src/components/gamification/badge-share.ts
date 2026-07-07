@@ -1,11 +1,12 @@
 import { Badge } from "./types";
 import { tierOf, TIER_META } from "./BadgeMedallion";
+import { drawEmoji } from "@/lib/canvas-emoji";
 
 /**
- * Gera a arte de compartilhamento da insígnia (1080×1350, formato de feed) e
- * abre o share nativo do celular; sem suporte, baixa o PNG. Desenho 100% em
- * canvas — mesma linguagem do medalhão SVG (metal por raridade + emoji),
- * fundo grafite premium com glow da marca.
+ * Arte de compartilhamento da insígnia (1080×1350, formato de feed).
+ * Fundo grafite neutro (sem glow colorido), a cor fica por conta do metal do
+ * medalhão — a estrela é a insígnia. Sem XP na imagem: quem vê de fora não
+ * conhece o sistema de pontos; raridade comunica sozinha.
  */
 
 const W = 1080;
@@ -14,11 +15,12 @@ const H = 1350;
 const drawMedallion = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, badge: Badge) => {
   const meta = TIER_META[tierOf(badge.xp)];
 
-  // serrilhado
   const ringGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
   ringGrad.addColorStop(0, meta.ring[0]);
   ringGrad.addColorStop(0.5, meta.ring[1]);
   ringGrad.addColorStop(1, meta.ring[2]);
+
+  // serrilhado
   for (let i = 0; i < 24; i++) {
     const a = (i / 24) * Math.PI * 2;
     ctx.beginPath();
@@ -27,12 +29,11 @@ const drawMedallion = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r:
     ctx.fill();
   }
 
-  // glow
+  // anel com sombra suave neutra
   ctx.save();
-  ctx.shadowColor = meta.glow === "none" ? "rgba(0,0,0,0.35)" : meta.ring[1];
-  ctx.shadowBlur = 60;
-
-  // anel
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 18;
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.87, 0, Math.PI * 2);
   ctx.fillStyle = ringGrad;
@@ -56,11 +57,8 @@ const drawMedallion = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r:
   ctx.fill();
   ctx.restore();
 
-  // emoji
-  ctx.font = `${Math.round(r * 0.72)}px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(badge.icon, cx, cy + r * 0.03);
+  // emoji — via offscreen (ver canvas-emoji.ts; direto some no iOS)
+  drawEmoji(ctx, badge.icon, cx, cy + r * 0.02, r * 0.95);
 };
 
 export const renderBadgeImage = (badge: Badge): Promise<Blob | null> => {
@@ -72,64 +70,55 @@ export const renderBadgeImage = (badge: Badge): Promise<Blob | null> => {
 
   const meta = TIER_META[tierOf(badge.xp)];
 
-  // fundo grafite + glow da marca
+  // fundo grafite neutro com vinheta sutil
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#1c1917");
-  bg.addColorStop(1, "#292524");
+  bg.addColorStop(0, "#181512");
+  bg.addColorStop(1, "#26221e");
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  const glow = ctx.createRadialGradient(W / 2, 430, 60, W / 2, 430, 600);
-  glow.addColorStop(0, "rgba(210,45,128,0.22)");
-  glow.addColorStop(1, "rgba(210,45,128,0)");
-  ctx.fillStyle = glow;
+  const vign = ctx.createRadialGradient(W / 2, H * 0.42, 200, W / 2, H * 0.42, 900);
+  vign.addColorStop(0, "rgba(255,255,255,0.05)");
+  vign.addColorStop(1, "rgba(0,0,0,0.25)");
+  ctx.fillStyle = vign;
   ctx.fillRect(0, 0, W, H);
 
-  // eyebrow
-  ctx.fillStyle = "#D22D80";
-  ctx.font = "bold 34px -apple-system, 'Segoe UI', Roboto, sans-serif";
+  const font = (weight: string, size: number) =>
+    `${weight} ${size}px -apple-system, 'Segoe UI', Roboto, sans-serif`;
   ctx.textAlign = "center";
-  ctx.letterSpacing = "8px";
-  ctx.fillText("CONQUISTA DESBLOQUEADA", W / 2, 160);
+
+  // eyebrow na cor do metal da insígnia
+  ctx.fillStyle = meta.ring[1];
+  ctx.font = font("bold", 34);
+  ctx.letterSpacing = "9px";
+  ctx.fillText("CONQUISTA DESBLOQUEADA", W / 2, 170);
   ctx.letterSpacing = "0px";
 
-  drawMedallion(ctx, W / 2, 460, 240, badge);
+  drawMedallion(ctx, W / 2, 500, 250, badge);
 
-  // raridade
+  // raridade (sem XP — quem vê de fora não conhece o sistema de pontos)
   ctx.fillStyle = meta.ring[1];
-  ctx.font = "bold 32px -apple-system, 'Segoe UI', Roboto, sans-serif";
-  ctx.letterSpacing = "6px";
-  ctx.fillText(`INSÍGNIA ${meta.label.toUpperCase()} · +${badge.xp} XP`, W / 2, 790);
+  ctx.font = font("bold", 30);
+  ctx.letterSpacing = "7px";
+  ctx.fillText(`INSÍGNIA ${meta.label.toUpperCase()}`, W / 2, 850);
   ctx.letterSpacing = "0px";
 
   // nome + descrição
-  ctx.fillStyle = "#fafaf9";
-  ctx.font = "bold 84px -apple-system, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText(badge.name, W / 2, 900);
+  ctx.fillStyle = "#faf8f5";
+  ctx.font = font("800", 88);
+  ctx.fillText(badge.name, W / 2, 960);
   ctx.fillStyle = "#a8a29e";
-  ctx.font = "42px -apple-system, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText(badge.description, W / 2, 970);
+  ctx.font = font("normal", 42);
+  ctx.fillText(badge.description, W / 2, 1030);
 
-  // rodapé: wordmark + data
-  ctx.font = "bold 64px -apple-system, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillStyle = "#fafaf9";
-  const word = "core";
-  const wWord = ctx.measureText(word).width;
-  const x0 = W / 2 - wWord / 2;
-  ctx.textAlign = "left";
-  ctx.fillText("c", x0, 1200);
-  const wC = ctx.measureText("c").width;
-  ctx.fillStyle = "#D22D80";
-  ctx.fillText("o", x0 + wC, 1200);
-  const wO = ctx.measureText("o").width;
-  ctx.fillStyle = "#fafaf9";
-  ctx.fillText("re", x0 + wC + wO, 1200);
-
-  ctx.textAlign = "center";
+  // rodapé: wordmark neutro + data
+  ctx.fillStyle = "#e7e5e4";
+  ctx.font = font("800", 60);
+  ctx.fillText("core", W / 2, 1210);
   ctx.fillStyle = "#78716c";
-  ctx.font = "32px -apple-system, 'Segoe UI', Roboto, sans-serif";
+  ctx.font = font("normal", 30);
   const date = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  ctx.fillText(date, W / 2, 1260);
+  ctx.fillText(date, W / 2, 1265);
 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 };

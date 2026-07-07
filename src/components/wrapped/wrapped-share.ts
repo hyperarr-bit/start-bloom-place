@@ -1,4 +1,5 @@
 import type { WrappedData } from "./MonthlyWrapped";
+import { drawEmoji } from "@/lib/canvas-emoji";
 
 /**
  * Arte de compartilhamento da retrospectiva (1080×1920, formato story).
@@ -47,9 +48,8 @@ export const renderWrappedImage = async (d: WrappedData): Promise<"shared" | "do
   ctx.font = font("800", 96);
   ctx.fillText(d.month, W / 2, 330);
 
-  // perfil
-  ctx.font = `140px "Apple Color Emoji", "Segoe UI Emoji", sans-serif`;
-  ctx.fillText(d.profile.emoji, W / 2, 620);
+  // perfil — emoji via offscreen (direto em fonte grande some no iOS)
+  drawEmoji(ctx, d.profile.emoji, W / 2, 570, 180);
   ctx.fillStyle = "#ffffff";
   ctx.font = font("800", 88);
   ctx.fillText(d.profile.name, W / 2, 790);

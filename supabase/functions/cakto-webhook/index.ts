@@ -164,6 +164,57 @@ serve(async (req) => {
       return null;
     }
 
+    // Indique e ganhe: 1ª compra de um indicado → +30 dias pros dois.
+    // referral_rewards tem UNIQUE(referred_id): reprocessar webhook não paga 2x.
+    async function applyReferralReward(userId: string) {
+      try {
+        const { data: me } = await supabaseClient
+          .from("profiles").select("referred_by_code").eq("id", userId).maybeSingle();
+        const code = (me as any)?.referred_by_code?.trim();
+        if (!code) return;
+
+        const { data: referrer } = await supabaseClient
+          .from("profiles").select("id").eq("referral_code", code).maybeSingle();
+        if (!referrer || (referrer as any).id === userId) return;
+        const referrerId = (referrer as any).id as string;
+
+        const { error: rewardErr } = await supabaseClient
+          .from("referral_rewards").insert({ referrer_id: referrerId, referred_id: userId });
+        if (rewardErr) {
+          logStep("Referral reward skipped (already rewarded?)", { message: rewardErr.message });
+          return;
+        }
+
+        const extend30 = async (uid: string) => {
+          const { data: s } = await supabaseClient
+            .from("subscriptions")
+            .select("id, current_period_end, plan, status")
+            .eq("user_id", uid)
+            .maybeSingle();
+          if (!s?.current_period_end || s.plan === "lifetime") return;
+          const base = new Date(s.current_period_end);
+          const from = base > new Date() ? base : new Date();
+          from.setDate(from.getDate() + 30);
+          await supabaseClient
+            .from("subscriptions")
+            .update({ current_period_end: from.toISOString() })
+            .eq("id", s.id);
+        };
+
+        await extend30(userId);      // indicado: +30 dias na assinatura nova
+        await extend30(referrerId);  // indicador: +30 dias na dele (se tiver)
+
+        await supabaseClient.from("analytics_events").insert({
+          user_id: referrerId,
+          event_name: "referral_reward",
+          event_data: { referred_id: userId, days: 30 },
+        });
+        logStep("Referral reward applied", { referrer: referrerId, referred: userId });
+      } catch (e) {
+        logStep("Referral reward failed", { message: (e as Error).message });
+      }
+    }
+
     async function saveActiveSubscription(userId: string, emitConversion: boolean) {
       // Fim do período: usa next_payment_date da Cakto quando vier; senão calcula
       let periodEnd = new Date(now);
@@ -240,6 +291,9 @@ serve(async (req) => {
         } catch (e) {
           logStep("Event emit failed", { message: (e as Error).message });
         }
+
+        // Indique e ganhe (só na 1ª compra — renovação não premia de novo)
+        await applyReferralReward(userId);
       }
 
       // Compra da oferta winback → registra uso e marca conversão da tentativa

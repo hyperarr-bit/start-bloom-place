@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound } from "lucide-react";
+import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, Gift } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,6 +8,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { NameEditDialog } from "./NameEditDialog";
+import { ReferralSheet } from "./ReferralSheet";
 import { toast } from "sonner";
 
 interface AccountDrawerProps {
@@ -29,6 +30,7 @@ export const AccountDrawer = ({
   const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showReferral, setShowReferral] = useState(false);
   const [view, setView] = useState<"menu" | "account">("menu");
 
   useEffect(() => {
@@ -97,6 +99,7 @@ export const AccountDrawer = ({
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
         { icon: CreditCard, label: "Assinatura", onClick: handleManageSubscription },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
+        { icon: Gift, label: "Indique e ganhe", onClick: () => { onOpenChange(false); setShowReferral(true); } },
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 
@@ -211,6 +214,8 @@ export const AccountDrawer = ({
         currentName={displayName}
         onSave={handleNameSave}
       />
+
+      <ReferralSheet open={showReferral} onOpenChange={setShowReferral} />
     </>
   );
 };

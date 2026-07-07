@@ -12,6 +12,8 @@ export interface LeadSource {
   referrer: string | null;
   landing_path: string | null;
   source_captured_at: string;
+  /** Código de indicação (?ref=CODE) — vira profiles.referred_by_code no cadastro. */
+  ref: string | null;
 }
 
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
@@ -50,10 +52,11 @@ export function captureLeadSource() {
     // Ignore internal referrers (same origin)
     const cleanReferrer = referrer && !referrer.startsWith(window.location.origin) ? referrer : null;
 
+    const ref = params.get("ref");
     const existing = readStored();
 
-    // Skip if we already have data AND no new UTM present
-    if (existing && !hasUtm) return;
+    // Skip if we already have data AND no new signal (UTM or ref) present
+    if (existing && !hasUtm && !ref) return;
 
     const data: LeadSource = {
       utm_source: utm.utm_source ?? existing?.utm_source ?? null,
@@ -64,6 +67,7 @@ export function captureLeadSource() {
       referrer: cleanReferrer ?? existing?.referrer ?? null,
       landing_path: window.location.pathname + window.location.search,
       source_captured_at: new Date().toISOString(),
+      ref: ref ?? existing?.ref ?? null,
     };
 
     writeStored(data);
@@ -91,6 +95,7 @@ export async function persistLeadSource(
       referrer: src.referrer,
       landing_path: src.landing_path,
       source_captured_at: src.source_captured_at,
+      referred_by_code: src.ref,
     }).eq("id", userId);
   } catch { /* noop */ }
 }

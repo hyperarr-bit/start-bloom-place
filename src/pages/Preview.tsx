@@ -42,8 +42,10 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   detox: Detox,
 };
 
+// Estático de propósito: sticky aqui brigava com o header sticky do módulo e
+// cobria títulos de cards no scroll do celular. O CTA persistente é o de baixo.
 const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
-  <div className="sticky top-0 z-[60] bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
+  <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
     <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         <Sparkles className="w-4 h-4 shrink-0" />
@@ -65,8 +67,8 @@ const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
   </div>
 );
 
-/** CTA fixo quando a demo é o passo do funil (/comecar). Volta pro cadastro. */
-const FunnelCta = () => (
+/** CTA fixo no rodapé da demo — no funil volta pro cadastro; fora dele, cria conta. */
+const DemoCta = ({ funnel }: { funnel?: boolean }) => (
   <div
     className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
     style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
@@ -76,11 +78,11 @@ const FunnelCta = () => (
         Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.
       </p>
       <Link
-        to="/comecar?step=signup"
-        onClick={() => trackEvent("funnel_click", { cta: "demo_quase_la" })}
+        to={funnel ? "/comecar?step=signup" : "/comecar"}
+        onClick={() => trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" })}
         className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
       >
-        Quase lá <ArrowRight className="w-4 h-4" />
+        {funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
   </div>
@@ -103,14 +105,14 @@ const Preview = () => {
   }
 
   return (
-    <div className={`min-h-screen bg-background ${funnel ? "pb-20" : ""}`}>
+    <div className="min-h-screen bg-background pb-20">
       <PreviewBanner funnel={funnel} />
       <PreviewUserDataProvider moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
-      {funnel && <FunnelCta />}
+      <DemoCta funnel={funnel} />
     </div>
   );
 };

@@ -158,18 +158,11 @@ function StartScreen({ onStart }: { onStart: () => void }) {
         <HeroVideo />
       </div>
 
-      {/* Headline + CTA (fixos embaixo) — padrão Cal AI: UMA ideia (a promessa
-          do anúncio, confirmada), vídeo como prova, botão como próximo passo.
-          Nada de processo ("X perguntas") nem sinal de pagamento na tela 1. */}
+      {/* Headline + CTA (fixos embaixo) */}
       <div className="pb-2">
-        {/* Linha da marca — a mesma do hero do /planos e das artes de share.
-            Promessa de resultado, curta, funciona com qualquer anúncio. */}
-        <h1 className="text-[clamp(28px,7.8vw,42px)] font-bold leading-[1.06] tracking-tight mb-3">
-          Seu dinheiro,<br />finalmente sob controle
+        <h1 className="text-[clamp(32px,9vw,46px)] font-bold leading-[1.04] tracking-tight mb-5">
+          Organize sua<br />vida financeira
         </h1>
-        <p className="text-[15px] text-muted-foreground leading-snug mb-6">
-          Sem planilha, sem complicação.
-        </p>
         <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
           Começar
         </Button>

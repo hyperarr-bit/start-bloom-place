@@ -3,8 +3,8 @@ import { Check, ChevronDown, TrendingDown, AlertTriangle } from "lucide-react";
 
 /* ---------------------------------------------------------------- range */
 
-export type RangeKey = "today" | "7d" | "30d" | "90d" | "all";
-const RANGE_LABELS: Record<RangeKey, string> = {
+export type RangeKey = "today" | "7d" | "30d" | "90d" | "all" | "reset";
+const RANGE_LABELS: Record<Exclude<RangeKey, "reset">, string> = {
   today: "Hoje",
   "7d": "Últimos 7 dias",
   "30d": "Últimos 30 dias",
@@ -12,9 +12,31 @@ const RANGE_LABELS: Record<RangeKey, string> = {
   all: "Desde o início",
 };
 
+// "Zerar contador": marco de tempo salvo localmente. Não apaga dado nenhum —
+// só move o início da janela "Desde o reset" pra quando o dono apertou zerar
+// (útil pra assistir uma campanha nova subir do zero).
+const RESET_KEY = "admin-counter-reset";
+export const getCounterReset = (): string | null => {
+  try { return localStorage.getItem(RESET_KEY); } catch { return null; }
+};
+export const setCounterReset = (iso: string | null) => {
+  try {
+    if (iso) localStorage.setItem(RESET_KEY, iso);
+    else localStorage.removeItem(RESET_KEY);
+  } catch { /* noop */ }
+};
+
+export const rangeLabel = (key: RangeKey): string =>
+  key === "reset" ? "Desde o reset" : RANGE_LABELS[key];
+
 export function rangeToDates(key: RangeKey): { from: string; to: string } {
   const to = new Date();
   const from = new Date();
+  if (key === "reset") {
+    const marker = getCounterReset();
+    // Sem marco salvo, cai pro começo do dia (nunca quebra).
+    return { from: marker ?? new Date(new Date().setHours(0, 0, 0, 0)).toISOString(), to: to.toISOString() };
+  }
   if (key === "today") from.setHours(0, 0, 0, 0);
   else if (key === "7d") from.setDate(from.getDate() - 7);
   else if (key === "30d") from.setDate(from.getDate() - 30);
@@ -61,18 +83,19 @@ export function RangePicker({ value, onChange }: { value: RangeKey; onChange: (v
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium hover:bg-muted transition-colors"
       >
-        {RANGE_LABELS[value]}
+        {rangeLabel(value)}
         <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
       </button>
       {open && (
         <div className="absolute right-0 md:left-0 mt-1.5 w-48 rounded-xl border border-border bg-card shadow-lg py-1 z-20">
-          {(Object.keys(RANGE_LABELS) as RangeKey[]).map((k) => (
+          {/* "Desde o reset" só aparece quando existe um marco salvo */}
+          {(getCounterReset() ? ([...Object.keys(RANGE_LABELS), "reset"] as RangeKey[]) : (Object.keys(RANGE_LABELS) as RangeKey[])).map((k) => (
             <button
               key={k}
               onClick={() => { onChange(k); setOpen(false); }}
               className="w-full flex items-center justify-between gap-2 px-3 py-2 text-[13px] hover:bg-muted transition-colors text-left"
             >
-              {RANGE_LABELS[k]}
+              {rangeLabel(k)}
               {value === k && <Check className="w-4 h-4 text-accent" strokeWidth={2.5} />}
             </button>
           ))}

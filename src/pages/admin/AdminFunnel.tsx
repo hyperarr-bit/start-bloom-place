@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Loader2, Gift, RotateCw, Users2, XCircle } from "lucide-react";
+import { Loader2, Gift, RotateCw, Users2, XCircle, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   RangePicker, rangeToDates, type RangeKey,
   GranularityToggle, type Granularity,
   Panel, StatTile, EmptyState, RankedBars, FunnelChart, WorstDropCallout,
+  getCounterReset, setCounterReset,
   type FunnelStep,
 } from "./components";
 
@@ -58,6 +59,24 @@ export default function AdminFunnel() {
   const [data, setData] = useState<FunnelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resetAt, setResetAt] = useState<string | null>(() => getCounterReset());
+
+  // Zerar: salva o marco AGORA e passa a contar desde ali (não apaga dado).
+  const handleReset = () => {
+    if (!confirm("Zerar o contador? Os números passam a contar a partir de agora.\n\nNada é apagado — dá pra voltar pra qualquer período depois.")) return;
+    const now = new Date().toISOString();
+    setCounterReset(now);
+    setResetAt(now);
+    setRange("reset");
+    setGranularity("hour");
+  };
+
+  const handleUndoReset = () => {
+    setCounterReset(null);
+    setResetAt(null);
+    setRange("30d");
+    setGranularity("day");
+  };
 
   const load = useCallback(async (r: RangeKey, g: Granularity) => {
     setLoading(true);
@@ -87,8 +106,33 @@ export default function AdminFunnel() {
           <h1 className="text-xl font-bold tracking-tight">Funil de aquisição</h1>
           <p className="text-[13px] text-muted-foreground mt-0.5">/comecar — do primeiro clique até assinar</p>
         </div>
-        <RangePicker value={range} onChange={handleRangeChange} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium hover:bg-muted transition-colors"
+            title="Zerar o contador a partir de agora"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+            Zerar
+          </button>
+          <RangePicker value={range} onChange={handleRangeChange} />
+        </div>
       </div>
+
+      {resetAt && (
+        <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-accent/30 bg-accent/5 px-4 py-2.5 text-[13px]">
+          <span className="text-muted-foreground">
+            {range === "reset" ? "Contando" : "Contador zerado"} desde{" "}
+            <span className="font-semibold text-foreground">
+              {new Date(resetAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </span>
+            {range !== "reset" && " — selecione \"Desde o reset\" no período pra ver."}
+          </span>
+          <button onClick={handleUndoReset} className="font-semibold text-accent hover:underline shrink-0">
+            Desfazer
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-[13px] text-destructive">

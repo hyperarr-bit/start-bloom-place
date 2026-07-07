@@ -119,7 +119,7 @@ export const PayingUserFunnelSheet = ({ userId, email, onClose }: Props) => {
 
             {/* Abas usadas */}
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2">Abas usadas no trial ({data.tabs.length})</div>
+              <div className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-2">Abas usadas no app ({data.tabs.length})</div>
               {data.tabs.length === 0 ? (
                 <div className="text-xs text-zinc-600">Nenhuma aba registrada.</div>
               ) : (

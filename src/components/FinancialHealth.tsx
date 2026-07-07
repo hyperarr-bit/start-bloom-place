@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle, TrendingUp, Shield, Target, Lightbulb, CreditCard, Heart, Plane, PiggyBank } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 
 interface Goal {
   id: string;
@@ -89,9 +90,11 @@ export const FinancialHealth = ({
   trips,
   investments,
 }: FinancialHealthProps) => {
-  // === METRICS (usando despesa real total) ===
-  const totalRealExpenses = totalExpenses + totalFixedExpenses + monthlyInstallments;
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalRealExpenses) / totalIncome) * 100 : 0;
+  // === METRICS ===
+  // Mesmas funções do Index/Relatórios (lib/finance-totals) — a taxa daqui TEM
+  // que bater com a do resto do app.
+  const totalRealExpenses = computeMonthlyOutflow(totalExpenses, totalFixedExpenses, monthlyInstallments);
+  const savingsRate = computeSavingsRate(totalIncome, totalRealExpenses);
   const debtToIncome = totalIncome > 0 ? (totalDebts / (totalIncome * 12)) * 100 : 0;
   const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * 6 : emergencyFundGoal;
   const emergencyProgress = realEmergencyGoal > 0 ? (emergencyFund / realEmergencyGoal) * 100 : 0;
@@ -176,7 +179,7 @@ export const FinancialHealth = ({
   }
 
   if (emergencyProgress < 100) {
-    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${realEmergencyGoal.toLocaleString("pt-BR")}).`, type: "info" });
+    tips.push({ icon: Shield, text: `Reserva de emergência: ${emergencyProgress.toFixed(0)}% completa. Meta: 6 meses de despesas reais (R$ ${realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}).`, type: "info" });
   } else {
     tips.push({ icon: CheckCircle, text: "Reserva de emergência completa! 🎉", type: "success" });
   }
@@ -192,7 +195,7 @@ export const FinancialHealth = ({
   }
 
   if (wishlistTotal > totalIncome * 3 && wishlistItems.length > 0) {
-    tips.push({ icon: Heart, text: `Seus desejos somam R$ ${wishlistTotal.toLocaleString("pt-BR")} — ${(wishlistTotal / totalIncome).toFixed(1)}x sua renda. Priorize os mais importantes.`, type: "warning" });
+    tips.push({ icon: Heart, text: `Seus desejos somam R$ ${wishlistTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} — ${(wishlistTotal / totalIncome).toFixed(1)}x sua renda. Priorize os mais importantes.`, type: "warning" });
   }
 
   const monthlyBalance = totalIncome - totalRealExpenses;
@@ -273,14 +276,14 @@ export const FinancialHealth = ({
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Saldo Real Mensal</p>
           <p className={`text-lg font-bold ${realMonthlyBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {realMonthlyBalance >= 0 ? "+" : ""}R$ {realMonthlyBalance.toLocaleString("pt-BR")}
+            {realMonthlyBalance >= 0 ? "+" : ""}R$ {realMonthlyBalance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </p>
           <p className="text-[10px] text-muted-foreground">Inclui fixas + parcelas</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <p className="text-[10px] text-muted-foreground mb-1">Projeção Anual</p>
           <p className={`text-lg font-bold ${yearlyProjection >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {yearlyProjection >= 0 ? "+" : ""}R$ {yearlyProjection.toLocaleString("pt-BR")}
+            {yearlyProjection >= 0 ? "+" : ""}R$ {yearlyProjection.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </p>
           <p className="text-[10px] text-muted-foreground">Economia em 12 meses</p>
         </div>
@@ -390,21 +393,21 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-green-500/20 to-green-600/10 rounded-lg border border-green-500/30 p-3 cursor-pointer hover:border-green-500/50 transition-colors">
           <p className="text-xs font-bold text-green-400 mb-1">🎯 Regra 50/30/20</p>
           <p className="text-[10px] text-muted-foreground">
-            Necessidades: R$ {(totalIncome * 0.5).toLocaleString("pt-BR")} | 
-            Desejos: R$ {(totalIncome * 0.3).toLocaleString("pt-BR")} | 
-            Poupança: R$ {(totalIncome * 0.2).toLocaleString("pt-BR")}
+            Necessidades: R$ {(totalIncome * 0.5).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} | 
+            Desejos: R$ {(totalIncome * 0.3).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} | 
+            Poupança: R$ {(totalIncome * 0.2).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {emergencyFund.toLocaleString("pt-BR")} de R$ {realEmergencyGoal.toLocaleString("pt-BR")} ({emergencyProgress.toFixed(0)}%)
+            R$ {emergencyFund.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">
           <p className="text-xs font-bold text-purple-400 mb-1">📈 Renda Passiva</p>
           <p className="text-[10px] text-muted-foreground">
-            Potencial: R$ {((totalInvestments * 0.06) / 12).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}/mês com seus investimentos atuais
+            Potencial: R$ {((totalInvestments * 0.06) / 12).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mês com seus investimentos atuais
           </p>
         </div>
       </div>

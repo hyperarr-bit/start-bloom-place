@@ -70,7 +70,7 @@ export const FinancialSummary = ({
             </div>
           </div>
           <p className={`text-xs ${card.textColor} opacity-80`}>
-            {card.label} - R$ {card.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            {card.label} - R$ {card.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
       ))}

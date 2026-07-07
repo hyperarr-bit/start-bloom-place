@@ -55,7 +55,7 @@ const getExpensesByCategory = (month: string, userId: string | null): Record<str
   return grouped;
 };
 
-const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR")}`;
+const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
 
 export const MonthComparison = () => {
   const { user } = useAuth();

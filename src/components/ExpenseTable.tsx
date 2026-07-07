@@ -212,7 +212,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
                   </div>
                 </div>
                 <span className="text-sm tabular-nums font-medium whitespace-nowrap">
-                  R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
@@ -226,7 +226,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
       {/* Total */}
       <div className="px-3 py-2 border-t border-border flex items-center justify-between">
         <span className="text-xs text-muted-foreground">TOTAL</span>
-        <span className="text-sm font-bold tabular-nums">R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+        <span className="text-sm font-bold tabular-nums">R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
   );

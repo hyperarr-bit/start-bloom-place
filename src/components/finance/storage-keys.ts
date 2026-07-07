@@ -108,6 +108,14 @@ export const userKeyOf = (userId: string | null | undefined, logicalKey: string)
 };
 
 const readJsonForUser = (userId: string | null | undefined, logicalKey: string): any => {
+  // Demo (/preview/:module): não há usuário e os dados moram num store em
+  // memória exposto pelo PreviewUserDataProvider. Sem este fallback, os
+  // leitores diretos de localStorage (gráficos do Dashboard, comparação de
+  // meses, virada de mês) renderizam vazios na demo.
+  if (!userId && typeof window !== "undefined" && (window as any).__PREVIEW_SEEDS__) {
+    const v = (window as any).__PREVIEW_SEEDS__[logicalKey];
+    return v === undefined ? null : v;
+  }
   const k = userKeyOf(userId, logicalKey);
   if (!k) return null;
   try {

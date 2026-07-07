@@ -65,13 +65,13 @@ export const MonthlySheet = ({ month, onClose }: MonthlySheetProps) => {
         <div className="rounded-lg p-3 border bg-card-receitas border-card-receitas-border">
           <span className="text-[10px] font-bold text-card-receitas-text">RECEITAS</span>
           <p className="text-sm font-bold text-card-receitas-text mt-1">
-            R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R$ {totalIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="rounded-lg p-3 border bg-card-despesas border-card-despesas-border">
           <span className="text-[10px] font-bold text-card-despesas-text">DESPESAS</span>
           <p className="text-sm font-bold text-card-despesas-text mt-1">
-            R$ {(totalExpenses + totalFixed).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R$ {(totalExpenses + totalFixed).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export const MonthlySheet = ({ month, onClose }: MonthlySheetProps) => {
       }`}>
         <span className="text-[10px] font-bold text-muted-foreground">BALANÇO DO MÊS</span>
         <p className={`text-lg font-bold ${balance >= 0 ? "text-success" : "text-destructive"}`}>
-          R$ {balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          R$ {balance.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
 

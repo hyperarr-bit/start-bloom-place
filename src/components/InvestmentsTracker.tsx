@@ -127,7 +127,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <Wallet className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-muted-foreground">Total Investido</span>
           </div>
-          <p className="text-lg font-bold">R$ {totalInvested.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-lg font-bold">R$ {totalInvested.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -135,7 +135,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <span className="text-xs text-muted-foreground">Valor Atual</span>
           </div>
           <p className="text-lg font-bold text-purple-400">
-            R$ {totalCurrentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R$ {totalCurrentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
@@ -148,7 +148,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <span className="text-xs text-muted-foreground">Rentabilidade</span>
           </div>
           <p className={`text-lg font-bold ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {totalReturn >= 0 ? "+" : ""}R$ {totalReturn.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            {totalReturn >= 0 ? "+" : ""}R$ {totalReturn.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           <p className={`text-[10px] ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
             {returnPercentage >= 0 ? "+" : ""}{returnPercentage.toFixed(2)}%
@@ -160,7 +160,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
             <span className="text-xs text-muted-foreground">Aportes Mensais</span>
           </div>
           <p className="text-lg font-bold text-orange-400">
-            R$ {monthlyContributions.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            R$ {monthlyContributions.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
       </div>
@@ -185,7 +185,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                     <Progress value={percentage} className="h-1.5" />
                   </div>
                   <span className={`text-xs w-24 text-right ${returnVal >= 0 ? "text-green-400" : "text-red-400"}`}>
-                    {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               );
@@ -309,16 +309,16 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                       <p className="text-sm font-medium">{inv.name}</p>
                       <div className="flex items-center gap-4 mt-1 text-xs flex-wrap">
                         <span className="text-muted-foreground">
-                          Investido: R$ {(inv.investedAmount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          Investido: R$ {(inv.investedAmount || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                         <span className={returnVal >= 0 ? "text-green-400" : "text-red-400"}>
-                          Retorno: {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} ({returnPct.toFixed(2)}%)
+                          Retorno: {returnVal >= 0 ? "+" : ""}R$ {returnVal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({returnPct.toFixed(2)}%)
                         </span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-sm font-bold">
-                        R$ {inv.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {inv.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
                         Desde {new Date(inv.startDate).toLocaleDateString("pt-BR")}
@@ -379,25 +379,25 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Se continuar aportando</p>
-            <p className="text-sm font-bold">R$ {monthlyContributions.toLocaleString("pt-BR")}/mês</p>
+            <p className="text-sm font-bold">R$ {monthlyContributions.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/mês</p>
             <p className="text-[10px] text-muted-foreground">Taxa média: {weightedRate.toFixed(1)}% a.a.</p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 5 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {projection5y.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              R$ {projection5y.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Em 10 anos terá</p>
             <p className="text-sm font-bold text-green-400">
-              R$ {projection10y.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              R$ {projection10y.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div>
             <p className="text-[10px] text-muted-foreground mb-1">Renda passiva potencial</p>
             <p className="text-sm font-bold text-purple-400">
-              R$ {passiveIncome.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}/mês
+              R$ {passiveIncome.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mês
             </p>
             <p className="text-[10px] text-muted-foreground">({weightedRate.toFixed(1)}% a.a.)</p>
           </div>

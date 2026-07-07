@@ -51,19 +51,19 @@ export const AnnualBudget = () => {
                     {row.isCurrent && <span className="text-[8px] ml-1 text-primary">●</span>}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
-                    {row.receitas > 0 ? row.receitas.toLocaleString("pt-BR") : ""}
+                    {row.receitas > 0 ? row.receitas.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : ""}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
-                    {row.custosFixos > 0 ? row.custosFixos.toLocaleString("pt-BR") : ""}
+                    {row.custosFixos > 0 ? row.custosFixos.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : ""}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
-                    {row.custosVariaveis > 0 ? row.custosVariaveis.toLocaleString("pt-BR") : ""}
+                    {row.custosVariaveis > 0 ? row.custosVariaveis.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : ""}
                   </td>
                   <td className="px-3 py-1.5 text-right tabular-nums">
-                    {row.dividas > 0 ? row.dividas.toLocaleString("pt-BR") : ""}
+                    {row.dividas > 0 ? row.dividas.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : ""}
                   </td>
                   <td className={`px-3 py-1.5 text-right font-medium tabular-nums ${balance >= 0 ? "text-success" : "text-destructive"}`}>
-                    {balance !== 0 ? `${balance >= 0 ? "+" : ""}${balance.toLocaleString("pt-BR")}` : ""}
+                    {balance !== 0 ? `${balance >= 0 ? "+" : ""}${balance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}` : ""}
                   </td>
                 </tr>
               );
@@ -72,12 +72,12 @@ export const AnnualBudget = () => {
           <tfoot>
             <tr className="border-t-2 border-border bg-muted/30">
               <td className="px-3 py-2 font-medium text-muted-foreground">TOTAL</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("receitas").toLocaleString("pt-BR")}</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("custosFixos").toLocaleString("pt-BR")}</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("custosVariaveis").toLocaleString("pt-BR")}</td>
-              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("dividas").toLocaleString("pt-BR")}</td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("receitas").toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("custosFixos").toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("custosVariaveis").toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums">{sumCol("dividas").toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
               <td className={`px-3 py-2 text-right font-bold tabular-nums ${(sumCol("receitas") - sumCol("custosFixos") - sumCol("custosVariaveis") - sumCol("dividas")) >= 0 ? "text-success" : "text-destructive"}`}>
-                {(sumCol("receitas") - sumCol("custosFixos") - sumCol("custosVariaveis") - sumCol("dividas")).toLocaleString("pt-BR")}
+                {(sumCol("receitas") - sumCol("custosFixos") - sumCol("custosVariaveis") - sumCol("dividas")).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
               </td>
             </tr>
           </tfoot>

@@ -235,7 +235,7 @@ export const FinancialGoals = ({ goals, setGoals, actionBlocks, setActionBlocks 
                 <div>
                   <div className="flex justify-between text-xs font-semibold mb-1.5">
                     <span className="text-muted-foreground">
-                      R$ {goal.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {goal.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className={isComplete ? "text-emerald-500" : "text-foreground"}>
                       {progress.toFixed(0)}%
@@ -259,7 +259,7 @@ export const FinancialGoals = ({ goals, setGoals, actionBlocks, setActionBlocks 
                 <div className="space-y-1.5">
                   <p className="text-sm">
                     <span className="font-bold text-muted-foreground">META:</span>{" "}
-                    <span className="font-black">R$ {goal.targetValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                    <span className="font-black">R$ {goal.targetValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </p>
                   {goal.deadline && (
                     <p className="text-sm flex items-center gap-1.5">
@@ -271,7 +271,7 @@ export const FinancialGoals = ({ goals, setGoals, actionBlocks, setActionBlocks 
                   <p className="text-sm">
                     <span className="font-bold text-muted-foreground">FALTAM:</span>{" "}
                     <span className="font-black text-orange-500 dark:text-orange-400">
-                      R$ {Math.max(0, goal.targetValue - goal.currentValue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {Math.max(0, goal.targetValue - goal.currentValue).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </p>
                 </div>

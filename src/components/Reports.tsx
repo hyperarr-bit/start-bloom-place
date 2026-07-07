@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { FileText, Download, Upload, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 
 interface Income {
   id: string;
@@ -57,8 +58,10 @@ export const Reports = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const balance = totalIncome - totalExpenses;
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+  // totalExpenses aqui já é a saída mensal completa (fixas + variáveis + parcelas),
+  // calculada uma vez no Index — mesma base da Saúde Financeira e do Dashboard.
+  const balance = computeMonthlyBalance(totalIncome, totalExpenses);
+  const savingsRate = computeSavingsRate(totalIncome, totalExpenses);
 
   // Group expenses by category
   const expensesByCategory = expenses.reduce((acc, e) => {
@@ -233,16 +236,16 @@ export const Reports = ({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
             <p className="text-xs text-muted-foreground">Receitas</p>
-            <p className="text-lg font-bold text-green-400">R$ {totalIncome.toLocaleString("pt-BR")}</p>
+            <p className="text-lg font-bold text-green-400">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
           </div>
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
             <p className="text-xs text-muted-foreground">Despesas</p>
-            <p className="text-lg font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR")}</p>
+            <p className="text-lg font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
           </div>
           <div className={`${balance >= 0 ? "bg-blue-500/10 border-blue-500/30" : "bg-orange-500/10 border-orange-500/30"} border rounded-lg p-3`}>
             <p className="text-xs text-muted-foreground">Saldo</p>
             <p className={`text-lg font-bold ${balance >= 0 ? "text-blue-400" : "text-orange-400"}`}>
-              {balance >= 0 ? "+" : ""}R$ {balance.toLocaleString("pt-BR")}
+              {balance >= 0 ? "+" : ""}R$ {balance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
             </p>
           </div>
           <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
@@ -263,7 +266,7 @@ export const Reports = ({
               .map(([cat, value]) => (
                 <div key={cat} className="flex items-center justify-between bg-muted/30 rounded p-2">
                   <span className="text-xs">{categoryLabels[cat] || cat}</span>
-                  <span className="text-xs font-medium">R$ {value.toLocaleString("pt-BR")}</span>
+                  <span className="text-xs font-medium">R$ {value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
           </div>
@@ -289,7 +292,7 @@ export const Reports = ({
                   {incomes.slice(0, 10).map((i) => (
                     <tr key={i.id} className="border-t border-border/50">
                       <td className="p-2">{i.description}</td>
-                      <td className="p-2 text-right text-green-400">R$ {i.value.toLocaleString("pt-BR")}</td>
+                      <td className="p-2 text-right text-green-400">R$ {i.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -317,7 +320,7 @@ export const Reports = ({
                     <tr key={e.id} className="border-t border-border/50">
                       <td className="p-2">{e.description}</td>
                       <td className="p-2 text-muted-foreground">{categoryLabels[e.category] || e.category}</td>
-                      <td className="p-2 text-right text-red-400">R$ {e.value.toLocaleString("pt-BR")}</td>
+                      <td className="p-2 text-right text-red-400">R$ {e.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>

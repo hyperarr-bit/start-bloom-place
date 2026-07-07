@@ -123,15 +123,15 @@ export const Simulators = () => {
           <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 space-y-1">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Total investido:</span>
-              <span>R$ {compoundResult.invested.toLocaleString("pt-BR")}</span>
+              <span>R$ {compoundResult.invested.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Rendimento:</span>
-              <span className="text-green-400">+R$ {compoundResult.profit.toLocaleString("pt-BR")}</span>
+              <span className="text-green-400">+R$ {compoundResult.profit.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm font-bold pt-1 border-t border-green-500/20">
               <span>Montante final:</span>
-              <span className="text-green-400">R$ {compoundResult.total.toLocaleString("pt-BR")}</span>
+              <span className="text-green-400">R$ {compoundResult.total.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
@@ -228,15 +228,15 @@ export const Simulators = () => {
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 space-y-1">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Parcela mensal:</span>
-              <span>R$ {financeResult.pmt.toLocaleString("pt-BR")}</span>
+              <span>R$ {financeResult.pmt.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Total pago:</span>
-              <span>R$ {financeResult.totalPaid.toLocaleString("pt-BR")}</span>
+              <span>R$ {financeResult.totalPaid.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm font-bold pt-1 border-t border-orange-500/20">
               <span>Custo dos juros:</span>
-              <span className="text-red-400">+R$ {financeResult.interest.toLocaleString("pt-BR")}</span>
+              <span className="text-red-400">+R$ {financeResult.interest.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             {financing.price > 0 && financeResult.totalPaid > 0 && (
               <p className="text-[10px] text-muted-foreground mt-2">
@@ -293,7 +293,7 @@ export const Simulators = () => {
           <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 space-y-2">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Meta (regra 4%):</span>
-              <span>R$ {independenceResult.targetAmount.toLocaleString("pt-BR")}</span>
+              <span>R$ {independenceResult.targetAmount.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <Progress value={independenceResult.currentProgress} className="h-2" />
             <p className="text-xs text-center">
@@ -303,7 +303,7 @@ export const Simulators = () => {
               </span>
             </p>
             <p className="text-[10px] text-muted-foreground text-center">
-              Renda passiva projetada: R$ {independenceResult.passiveIncome.toLocaleString("pt-BR")}/mês
+              Renda passiva projetada: R$ {independenceResult.passiveIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/mês
             </p>
           </div>
         </div>

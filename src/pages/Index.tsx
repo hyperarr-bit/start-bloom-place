@@ -36,6 +36,7 @@ import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
+import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -113,9 +114,13 @@ const Index = () => {
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
   const totalInvestments = investments.reduce((sum: number, i: any) => sum + i.currentValue, 0);
   const monthlyInstallments = installments.reduce((sum: number, i: any) => i.paidInstallments < i.totalInstallments ? sum + i.installmentValue : sum, 0);
+  // "Despesas do mês" oficial (fixas + variáveis + parcelas) — é o número que
+  // Dashboard, Relatórios, Saúde e a barra de resumo mostram. Fonte única em
+  // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
+  const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments);
+  const savingsRate = computeSavingsRate(totalIncome, monthlyOutflow);
   const emergencyFund = goals.find((g: any) => g.name.toLowerCase().includes("emergência"))?.currentValue || 0;
-  const emergencyFundGoal = goals.find((g: any) => g.name.toLowerCase().includes("emergência"))?.targetValue || totalExpenses * 6;
-  const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
+  const emergencyFundGoal = goals.find((g: any) => g.name.toLowerCase().includes("emergência"))?.targetValue || monthlyOutflow * 6;
 
   // Bills paid rate
   const allBills = dueDays.flatMap((d: any) => Array.isArray(d?.bills) ? d.bills : []);
@@ -204,22 +209,22 @@ const Index = () => {
           <div className="bg-card rounded-lg border border-border px-4 py-2 flex items-center justify-between gap-3 overflow-x-auto">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[10px] text-muted-foreground">Receitas</span>
-              <span className="text-xs font-bold text-green-500">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+              <span className="text-xs font-bold text-green-500">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="w-px h-4 bg-border flex-shrink-0" />
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[10px] text-muted-foreground">Despesas</span>
-              <span className="text-xs font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR")}</span>
+              <span className="text-xs font-bold text-red-400">R$ {monthlyOutflow.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="w-px h-4 bg-border flex-shrink-0" />
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[10px] text-muted-foreground">Dívidas</span>
-              <span className="text-xs font-bold text-orange-400">R$ {totalDebts.toLocaleString("pt-BR")}</span>
+              <span className="text-xs font-bold text-orange-400">R$ {totalDebts.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="w-px h-4 bg-border flex-shrink-0" />
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-[10px] text-muted-foreground">Invest.</span>
-              <span className="text-xs font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR")}</span>
+              <span className="text-xs font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         )}
@@ -229,7 +234,8 @@ const Index = () => {
             <TrackedCard cardKey="dashboard" tab="dashboard">
               <Dashboard
                 totalIncome={totalIncome}
-                totalExpenses={totalExpenses}
+                totalExpenses={monthlyOutflow}
+                monthlyInstallments={monthlyInstallments}
                 totalDebts={totalDebts}
                 totalInvestments={totalInvestments}
                 expenses={expenses}
@@ -258,7 +264,7 @@ const Index = () => {
                 <TrackedCard cardKey="summary" tab="financeiro">
                   <FinancialSummary
                     totalIncome={totalIncome}
-                    totalExpenses={totalExpenses}
+                    totalExpenses={monthlyOutflow}
                     totalDebts={totalDebts}
                     totalInvestments={totalInvestments}
                   />
@@ -353,7 +359,7 @@ const Index = () => {
               incomes={incomes}
               expenses={expenses}
               totalIncome={totalIncome}
-              totalExpenses={totalExpenses}
+              totalExpenses={monthlyOutflow}
               totalDebts={totalDebts}
               totalInvestments={totalInvestments}
               setIncomes={setIncomes}

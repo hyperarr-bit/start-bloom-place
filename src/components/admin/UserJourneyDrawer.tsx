@@ -119,7 +119,7 @@ export default function UserJourneyDrawer({
                         </p>
                       )}
                       <p className="text-[10px] text-zinc-600 mt-0.5">
-                        {new Date(e.created_at).toLocaleString("pt-BR")}
+                        {new Date(e.created_at).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   );

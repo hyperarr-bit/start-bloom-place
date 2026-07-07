@@ -87,8 +87,8 @@ export const TrialJourneySheet = ({ userId, email, onClose }: Props) => {
             </div>
 
             <div className="text-[10px] text-zinc-500">
-              Signup: {new Date(journey.signup_at).toLocaleString("pt-BR")}
-              {journey.last_active_at && ` · Último uso: ${new Date(journey.last_active_at).toLocaleString("pt-BR")}`}
+              Signup: {new Date(journey.signup_at).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+              {journey.last_active_at && ` · Último uso: ${new Date(journey.last_active_at).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`}
             </div>
 
             {/* Timeline */}

@@ -46,6 +46,9 @@ interface DashboardProps {
   dueDays: DueDay[];
   savingsRate: number;
   incomes: Income[];
+  /** Parcelas do mês — já dentro de totalExpenses; a previsão precisa do valor
+   *  separado pra não projetar parcela fixa como gasto variável diário. */
+  monthlyInstallments?: number;
   onNavigate?: (tab: string) => void;
 }
 
@@ -124,6 +127,7 @@ export const Dashboard = ({
   dueDays,
   savingsRate,
   incomes,
+  monthlyInstallments = 0,
   onNavigate,
 }: DashboardProps) => {
   const { user } = useAuth();
@@ -288,7 +292,7 @@ export const Dashboard = ({
     }
 
     if (totalDebts > totalIncome * 2) {
-      list.push({ type: "warning", icon: AlertTriangle, text: `Suas dívidas (R$ ${totalDebts.toLocaleString("pt-BR")}) são mais que o dobro da sua renda mensal.` });
+      list.push({ type: "warning", icon: AlertTriangle, text: `Suas dívidas (R$ ${totalDebts.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}) são mais que o dobro da sua renda mensal.` });
     }
 
     return list.slice(0, 4);
@@ -308,16 +312,20 @@ export const Dashboard = ({
     // Fixed costs already recorded (these are already inside totalExpenses)
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
-    // Variable expenses = totalExpenses minus the fixed costs already recorded
-    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded);
+    // Variable expenses = totalExpenses minus fixed costs and installments
+    // (parcelas são valor fixo do mês — não entram no ritmo diário projetado)
+    const variableSpent = Math.max(0, totalExpenses - fixedCostsRecorded - monthlyInstallments);
     const dailyVariableRate = day > 0 ? variableSpent / day : 0;
     const projectedVariableRemaining = dailyVariableRate * remainingDays;
 
-    // Unpaid bills: these are future obligations NOT yet in totalExpenses
-    // Count unpaid bills and estimate their value from avg fixed cost
-    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + (Array.isArray(d?.bills) ? d.bills.filter(b => !b?.paid).length : 0), 0);
+    // Unpaid bills: these are future obligations NOT yet in totalExpenses.
+    // Usa o VALOR REAL da conta quando cadastrado; a média dos fixos é só
+    // fallback pra conta sem valor (antes estimava tudo pela média e o número
+    // não batia com a soma real das contas em aberto).
+    const unpaidBills = dueDays.flatMap((d) => (Array.isArray(d?.bills) ? d.bills.filter((b) => !b?.paid) : []));
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+    const unpaidBillsEstimate = unpaidBills.reduce(
+      (s: number, b: any) => s + (typeof b?.value === "number" && b.value > 0 ? b.value : avgBillValue), 0);
 
     // Projected balance = income - what's already spent - future bills - future variable
     const projectedBalance = totalIncome - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
@@ -327,7 +335,7 @@ export const Dashboard = ({
       fixedCostsRecorded, unpaidBillsEstimate, variableSpent, projectedVariableRemaining,
       totalAlreadySpent: totalExpenses,
     };
-  }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
+  }, [totalIncome, totalExpenses, fixedExpenses, dueDays, monthlyInstallments]);
 
   // Daily budget: how much you can spend per day
   // Logic: saldo atual = income - totalExpenses (already spent, includes fixed recorded)
@@ -340,10 +348,12 @@ export const Dashboard = ({
 
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
 
-    // Unpaid bills: future obligations not yet recorded
-    const unpaidBillsCount = dueDays.reduce((sum, d) => sum + (Array.isArray(d?.bills) ? d.bills.filter(b => !b?.paid).length : 0), 0);
+    // Unpaid bills: valor real quando cadastrado, média dos fixos como fallback
+    // (mesma regra do forecast acima — os dois cards têm que bater).
+    const unpaidBills = dueDays.flatMap((d) => (Array.isArray(d?.bills) ? d.bills.filter((b) => !b?.paid) : []));
     const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBillsCount * avgBillValue;
+    const unpaidBillsEstimate = unpaidBills.reduce(
+      (s: number, b: any) => s + (typeof b?.value === "number" && b.value > 0 ? b.value : avgBillValue), 0);
 
     // Saldo atual = income - everything already spent
     const currentBalance = totalIncome - totalExpenses;
@@ -414,7 +424,7 @@ export const Dashboard = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground">Receitas</p>
-              <p className="text-xl font-bold text-green-400">R$ {totalIncome.toLocaleString("pt-BR")}</p>
+              <p className="text-xl font-bold text-green-400">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
             <DollarSign className="w-8 h-8 text-green-400/30" />
           </div>
@@ -423,7 +433,7 @@ export const Dashboard = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground">Despesas</p>
-              <p className="text-xl font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR")}</p>
+              <p className="text-xl font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
             <TrendingDown className="w-8 h-8 text-red-400/30" />
           </div>
@@ -433,7 +443,7 @@ export const Dashboard = ({
             <div>
               <p className="text-xs text-muted-foreground">Saldo do Mês</p>
               <p className={`text-xl font-bold ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
-                {balance >= 0 ? "+" : ""}R$ {balance.toLocaleString("pt-BR")}
+                {balance >= 0 ? "+" : ""}R$ {balance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
               </p>
             </div>
             {balance >= 0 ? <TrendingUp className="w-8 h-8 text-green-400/30" /> : <TrendingDown className="w-8 h-8 text-red-400/30" />}
@@ -443,7 +453,7 @@ export const Dashboard = ({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-muted-foreground">Investimentos</p>
-              <p className="text-xl font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR")}</p>
+              <p className="text-xl font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
             <TrendingUp className="w-8 h-8 text-purple-400/30" />
           </div>
@@ -496,7 +506,7 @@ export const Dashboard = ({
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
+                  <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-1">
@@ -504,7 +514,7 @@ export const Dashboard = ({
                   <div key={cat.name} className="flex items-center gap-2 text-xs">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                     <span className="flex-1 truncate">{cat.name}</span>
-                    <span className="text-muted-foreground">R$ {cat.value.toLocaleString("pt-BR")}</span>
+                    <span className="text-muted-foreground">R$ {cat.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   </div>
                 ))}
               </div>
@@ -522,7 +532,7 @@ export const Dashboard = ({
               <BarChart data={monthlyBarData}>
                 <XAxis dataKey="month" tick={{ fontSize: 10 }} />
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
+                <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
                 <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -548,7 +558,7 @@ export const Dashboard = ({
               </defs>
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR")}`} />
+              <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
               <Area type="monotone" dataKey="Patrimônio" stroke="#8b5cf6" fill="url(#colorPatrimony)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
@@ -596,7 +606,7 @@ export const Dashboard = ({
                       <span className="text-xs">{paymentMethodLabels[pm.method] || pm.method}</span>
                     </div>
                     <span className="text-[10px] tabular-nums text-muted-foreground">
-                      R$ {pm.value.toLocaleString("pt-BR")} ({pm.percent}%)
+                      R$ {pm.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({pm.percent}%)
                     </span>
                   </div>
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -621,7 +631,7 @@ export const Dashboard = ({
           <div>
             <p className="text-[10px] text-muted-foreground uppercase mb-1">Custos Fixos</p>
             <p className="text-lg font-bold tabular-nums text-orange-400">
-              R$ {fixedTotal.toLocaleString("pt-BR")}
+              R$ {fixedTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-muted-foreground">
               {totalCosts > 0 ? Math.round((fixedTotal / totalCosts) * 100) : 0}% do total
@@ -630,7 +640,7 @@ export const Dashboard = ({
           <div>
             <p className="text-[10px] text-muted-foreground uppercase mb-1">Custos Variáveis</p>
             <p className="text-lg font-bold tabular-nums text-blue-400">
-              R$ {variableTotal.toLocaleString("pt-BR")}
+              R$ {variableTotal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
             </p>
             <p className="text-[10px] text-muted-foreground">
               {totalCosts > 0 ? Math.round((variableTotal / totalCosts) * 100) : 0}% do total
@@ -661,7 +671,7 @@ export const Dashboard = ({
                       {item.description}
                     </span>
                     <span className={`text-xs tabular-nums font-semibold flex-shrink-0 ${textColor}`}>
-                      R$ {item.value.toLocaleString("pt-BR")}
+                      R$ {item.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
@@ -689,7 +699,7 @@ export const Dashboard = ({
                 <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0" />
                 <span className="text-xs flex-1 truncate">{t.description}</span>
                 <span className="text-xs tabular-nums text-red-400 font-medium">
-                  -R$ {t.value.toLocaleString("pt-BR")}
+                  -R$ {t.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-[10px] text-muted-foreground w-12 text-right">
                   {t.date.slice(8, 10)}/{t.date.slice(5, 7)}
@@ -719,7 +729,7 @@ export const Dashboard = ({
             PREVISÃO FIM DO MÊS
           </h3>
           <p className={`text-2xl font-bold tabular-nums ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+            {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">
             Custos fixos reservados integralmente. Projeção baseada no ritmo de gastos variáveis.
@@ -728,14 +738,14 @@ export const Dashboard = ({
             <div className="text-[10px]">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Receita total</span>
-                <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR")}</span>
+                <span className="text-green-400 tabular-nums">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">Soma de todos os ganhos registrados no mês</p>
             </div>
             <div className="text-[10px]">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Já gasto (fixos + variáveis)</span>
-                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR")}</span>
+                <span className="text-red-400 tabular-nums">-R$ {Math.round(forecast.totalAlreadySpent).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">Tudo que já saiu da conta: contas pagas, compras, etc.</p>
             </div>
@@ -743,15 +753,15 @@ export const Dashboard = ({
               <div className="text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Contas pendentes (estimativa)</span>
-                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                 </div>
                 <p className="text-[9px] text-muted-foreground/60">Contas nos vencimentos que ainda não foram marcadas como pagas</p>
               </div>
             )}
             <div className="text-[10px]">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR")})</span>
-                <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+                <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d × R$ {Math.round(forecast.dailyVariableRate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })})</span>
+                <span className="text-yellow-400 tabular-nums">-R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">Estimativa do que você ainda vai gastar baseado no seu ritmo atual</p>
             </div>
@@ -759,7 +769,7 @@ export const Dashboard = ({
               <div className="flex justify-between">
                 <span className="text-muted-foreground font-medium">Saldo projetado</span>
                 <span className={`tabular-nums font-bold ${forecast.projectedBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+                  {forecast.projectedBalance >= 0 ? "+" : ""}R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                 </span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">O que deve sobrar (ou faltar) no fim do mês</p>
@@ -791,7 +801,7 @@ export const Dashboard = ({
               dailyBudget.status === "warning" ? "text-orange-400" :
               "text-red-400"
             }`}>
-              R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}
+              R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
             </p>
           )}
           <p className="text-[10px] text-muted-foreground mt-1">
@@ -801,7 +811,7 @@ export const Dashboard = ({
             <div className="text-[10px]">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Saldo atual</span>
-                <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR")}</span>
+                <span className="tabular-nums">R$ {Math.round(dailyBudget.currentBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">Receita menos tudo que já foi gasto até agora</p>
             </div>
@@ -809,7 +819,7 @@ export const Dashboard = ({
               <div className="text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Contas pendentes (reserva)</span>
-                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                  <span className="text-orange-400 tabular-nums">-R$ {Math.round(dailyBudget.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                 </div>
                 <p className="text-[9px] text-muted-foreground/60">Valor reservado para contas que ainda vão vencer este mês</p>
               </div>
@@ -818,7 +828,7 @@ export const Dashboard = ({
               <div className="flex justify-between">
                 <span className="text-muted-foreground font-medium">Disponível livre</span>
                 <span className={`tabular-nums font-medium ${dailyBudget.availableReal >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  R$ {Math.round(Math.max(0, dailyBudget.availableReal)).toLocaleString("pt-BR")}
+                  R$ {Math.round(Math.max(0, dailyBudget.availableReal)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                 </span>
               </div>
               <p className="text-[9px] text-muted-foreground/60">O que sobra depois de reservar para contas futuras</p>
@@ -827,7 +837,7 @@ export const Dashboard = ({
               <div className="text-[10px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">÷ {dailyBudget.remainingDays} dias</span>
-                  <span className="tabular-nums">= R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR")}/dia</span>
+                  <span className="tabular-nums">= R$ {Math.round(dailyBudget.perDay).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/dia</span>
                 </div>
                 <p className="text-[9px] text-muted-foreground/60">Disponível livre dividido pelos dias que faltam no mês</p>
               </div>

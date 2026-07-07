@@ -182,15 +182,15 @@ export const TravelPlanner = ({ trips, setTrips }: TravelPlannerProps) => {
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Orçamento:</span>
-                    <span>R$ {trip.budget.toLocaleString("pt-BR")}</span>
+                    <span>R$ {trip.budget.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Guardado:</span>
-                    <span className="text-green-400">R$ {trip.savedAmount.toLocaleString("pt-BR")}</span>
+                    <span className="text-green-400">R$ {trip.savedAmount.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Custos estimados:</span>
-                    <span className="text-orange-400">R$ {totalEstimated.toLocaleString("pt-BR")}</span>
+                    <span className="text-orange-400">R$ {totalEstimated.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
@@ -343,11 +343,11 @@ export const TravelPlanner = ({ trips, setTrips }: TravelPlannerProps) => {
                       {categoryLabels[expense.category]}
                     </span>
                     <span className="text-xs text-right w-24">
-                      R$ {expense.estimatedCost.toLocaleString("pt-BR")}
+                      R$ {expense.estimatedCost.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                     </span>
                     {expense.actualCost && (
                       <span className="text-xs text-green-400 w-24 text-right">
-                        Real: R$ {expense.actualCost.toLocaleString("pt-BR")}
+                        Real: R$ {expense.actualCost.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                       </span>
                     )}
                     <Button
@@ -379,7 +379,7 @@ export const TravelPlanner = ({ trips, setTrips }: TravelPlannerProps) => {
                     <div key={key} className="text-center">
                       <Icon className="w-4 h-4 mx-auto text-muted-foreground mb-1" />
                       <p className="text-[10px] text-muted-foreground">{label}</p>
-                      <p className="text-xs font-bold">R$ {total.toLocaleString("pt-BR")}</p>
+                      <p className="text-xs font-bold">R$ {total.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
                     </div>
                   );
                 })}

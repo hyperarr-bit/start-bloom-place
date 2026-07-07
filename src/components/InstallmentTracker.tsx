@@ -170,7 +170,7 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium">
-                      R$ {inst.installmentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {inst.installmentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-3 py-2 flex items-center gap-1">
                       {!isDone && (
@@ -192,7 +192,7 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
               <tr className="border-t border-border">
                 <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={5}>TOTAL MENSAL</td>
                 <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={2}>
-                  R$ {totalMonthly.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  R$ {totalMonthly.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>
             </tfoot>
@@ -264,13 +264,13 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-xs text-muted-foreground">
-                        {(cardTotals[card] || 0) > 0 ? `R$ ${(cardTotals[card] || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                        {(cardTotals[card] || 0) > 0 ? `R$ ${(cardTotals[card] || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-xs text-muted-foreground">
-                        {(variableCardSpending[card] || 0) > 0 ? `R$ ${(variableCardSpending[card] || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"}
+                        {(variableCardSpending[card] || 0) > 0 ? `R$ ${(variableCardSpending[card] || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-bold">
-                        R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                     </tr>
                   ))}
@@ -279,13 +279,13 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
                 <tr className="border-t border-border">
                   <td className="px-3 py-2 text-xs font-bold">TOTAL CARTÕES</td>
                   <td className="px-3 py-2 text-right tabular-nums text-xs font-medium">
-                    R$ {Object.values(cardTotals).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {Object.values(cardTotals).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-xs font-medium">
-                    R$ {(Object.values(variableCardSpending) as number[]).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {(Object.values(variableCardSpending) as number[]).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-2 text-right font-bold tabular-nums">
-                    R$ {Object.values(allCardTotals).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {Object.values(allCardTotals).reduce((a, b) => a + b, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               </tfoot>

@@ -178,21 +178,21 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <Heart className="w-4 h-4 text-pink-400" />
             <p className="text-[10px] text-muted-foreground">Total de Desejos</p>
           </div>
-          <p className="text-lg font-bold">R$ {totalWishlistValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-lg font-bold">R$ {totalWishlistValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-card rounded-xl border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <p className="text-[10px] text-muted-foreground">Já Guardado</p>
           </div>
-          <p className="text-lg font-bold text-emerald-400">R$ {totalSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-lg font-bold text-emerald-400">R$ {totalSaved.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-card rounded-xl border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
             <ShoppingCart className="w-4 h-4 text-orange-400" />
             <p className="text-[10px] text-muted-foreground">Falta Guardar</p>
           </div>
-          <p className="text-lg font-bold text-orange-400">R$ {remainingToSave.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+          <p className="text-lg font-bold text-orange-400">R$ {remainingToSave.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="bg-card rounded-xl border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -216,30 +216,30 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <div className="w-full">
               <p className="text-xs font-semibold">✅ Seus desejos cabem no orçamento!</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR")}/mês para desejos (30%)
+                Previsão fim do mês: R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} → R$ {Math.round(savingsForWishlist).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}/mês para desejos (30%)
               </p>
               <div className="mt-2 pt-2 border-t border-emerald-500/20 space-y-1">
                 <p className="text-[10px] text-muted-foreground font-medium">Como chegamos nesse valor:</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                   <span className="text-muted-foreground">Receita</span>
-                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR")}</span>
+                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   <span className="text-muted-foreground">Gastos atuais</span>
-                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR")}</span>
+                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   {forecast.unpaidBillsCount > 0 && (
                     <>
                       <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                     </>
                   )}
                   {forecast.projectedVariableRemaining > 0 && (
                     <>
                       <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                     </>
                   )}
                   <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
                   <span className={`text-right font-semibold border-t border-border pt-0.5 mt-0.5 ${forecast.projectedBalance >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR")}
+                    R$ {Math.round(forecast.projectedBalance).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -253,30 +253,30 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <div className="w-full">
               <p className="text-xs font-semibold">⚠️ Previsão aponta saldo negativo no fim do mês</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}. Foque em reduzir gastos primeiro.
+                Saldo projetado: -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}. Foque em reduzir gastos primeiro.
               </p>
               <div className="mt-2 pt-2 border-t border-destructive/20 space-y-1">
                 <p className="text-[10px] text-muted-foreground font-medium">Detalhamento:</p>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
                   <span className="text-muted-foreground">Receita</span>
-                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR")}</span>
+                  <span className="text-right text-emerald-400">+ R$ {monthlyBudget.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   <span className="text-muted-foreground">Gastos atuais</span>
-                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR")}</span>
+                  <span className="text-right text-red-400">- R$ {forecast.totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                   {forecast.unpaidBillsCount > 0 && (
                     <>
                       <span className="text-muted-foreground">Contas pendentes ({forecast.unpaidBillsCount})</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR")}</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.unpaidBillsEstimate).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                     </>
                   )}
                   {forecast.projectedVariableRemaining > 0 && (
                     <>
                       <span className="text-muted-foreground">Projeção variável ({forecast.remainingDays}d)</span>
-                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR")}</span>
+                      <span className="text-right text-orange-400">- R$ {Math.round(forecast.projectedVariableRemaining).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                     </>
                   )}
                   <span className="text-muted-foreground font-semibold border-t border-border pt-0.5 mt-0.5">Saldo projetado</span>
                   <span className="text-right font-semibold border-t border-border pt-0.5 mt-0.5 text-red-400">
-                    -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR")}
+                    -R$ {Math.abs(Math.round(forecast.projectedBalance)).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -450,7 +450,7 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                   {/* Price + Progress */}
                   <div>
                     <div className="flex items-baseline justify-between mb-1">
-                      <span className="text-base font-bold">R$ {item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                      <span className="text-base font-bold">R$ {item.price.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       <span className="text-[10px] font-medium text-muted-foreground">{progress.toFixed(0)}%</span>
                     </div>
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -462,8 +462,8 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                       />
                     </div>
                     <div className="flex justify-between mt-1 text-[10px]">
-                      <span className="text-emerald-400">Guardado: R$ {item.savedAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
-                      {remaining > 0 && <span className="text-orange-400">Falta: R$ {remaining.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>}
+                      <span className="text-emerald-400">Guardado: R$ {item.savedAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      {remaining > 0 && <span className="text-orange-400">Falta: R$ {remaining.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                     </div>
                   </div>
 

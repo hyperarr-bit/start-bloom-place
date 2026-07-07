@@ -223,16 +223,16 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <p className="text-[10px] text-muted-foreground">Receitas</p>
-                <p className="text-xs font-bold tabular-nums text-green-400">R$ {prevData.receitas.toLocaleString("pt-BR")}</p>
+                <p className="text-xs font-bold tabular-nums text-green-400">R$ {prevData.receitas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Despesas</p>
-                <p className="text-xs font-bold tabular-nums text-red-400">R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR")}</p>
+                <p className="text-xs font-bold tabular-nums text-red-400">R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
               </div>
               <div>
                 <p className="text-[10px] text-muted-foreground">Saldo</p>
                 <p className={`text-xs font-bold tabular-nums ${prevBalance >= 0 ? "text-green-400" : "text-red-400"}`}>
-                  {prevBalance >= 0 ? "+" : ""}R$ {prevBalance.toLocaleString("pt-BR")}
+                  {prevBalance >= 0 ? "+" : ""}R$ {prevBalance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                 </p>
               </div>
             </div>
@@ -271,13 +271,13 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                   <div className="rounded-lg p-3 bg-card-receitas border border-card-receitas-border">
                     <span className="text-[10px] text-card-receitas-text font-medium">Receitas</span>
                     <p className="text-sm font-bold text-card-receitas-text">
-                      R$ {prevData.receitas.toLocaleString("pt-BR")}
+                      R$ {prevData.receitas.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="rounded-lg p-3 bg-card-despesas border border-card-despesas-border">
                     <span className="text-[10px] text-card-despesas-text font-medium">Despesas</span>
                     <p className="text-sm font-bold text-card-despesas-text">
-                      R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR")}
+                      R$ {(prevData.custosVariaveis + prevData.custosFixos).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                     </p>
                   </div>
                 </div>
@@ -293,7 +293,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
                     <span className="text-[10px] font-bold text-muted-foreground">SALDO</span>
                   </div>
                   <p className={`text-xl font-bold ${prevBalance >= 0 ? "text-success" : "text-destructive"}`}>
-                    R$ {prevBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {prevBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
 

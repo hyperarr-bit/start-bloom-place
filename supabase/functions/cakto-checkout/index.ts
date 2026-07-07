@@ -73,12 +73,15 @@ serve(async (req) => {
       coupon: z.string().optional(),
       // "limited" força a oferta promocional (usado pelo funil / ofertas relâmpago)
       offer: z.enum(["regular", "limited"]).optional(),
-      // Atribuição: repassados na URL do checkout — o pixel da Cakto lê o
-      // fbclid e fecha o match compra↔anúncio; os UTMs aparecem no relatório
-      // de vendas da Cakto.
+      // Atribuição: repassados na URL do checkout — os pixels da Cakto leem o
+      // fbclid/gclid e fecham o match compra↔anúncio; os UTMs aparecem no
+      // relatório de vendas da Cakto.
       attribution: z
         .object({
           fbclid: z.string().max(500).optional(),
+          gclid: z.string().max(500).optional(),
+          gbraid: z.string().max(500).optional(),
+          wbraid: z.string().max(500).optional(),
           utm_source: z.string().max(200).optional(),
           utm_medium: z.string().max(200).optional(),
           utm_campaign: z.string().max(200).optional(),

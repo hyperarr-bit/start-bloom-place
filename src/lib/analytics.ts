@@ -27,12 +27,17 @@ export const captureLandingMeta = () => {
       // ID do clique do Meta Ads — repassado até o checkout da Cakto pra
       // fechar a atribuição da compra com o anúncio exato.
       fbclid: params.get("fbclid") || "",
+      // IDs de clique do Google Ads. gclid é o padrão; gbraid/wbraid são os
+      // equivalentes que o Google manda no iOS/Safari quando não pode usar gclid.
+      gclid: params.get("gclid") || "",
+      gbraid: params.get("gbraid") || "",
+      wbraid: params.get("wbraid") || "",
       referrer: document.referrer || "",
       path: window.location.pathname,
     };
     // Só persiste se vier algo de novo (não sobrescreve UTM original com vazio)
     const existing = localStorage.getItem(UTM_KEY);
-    if (!existing || utm.utm_source || utm.fbclid) {
+    if (!existing || utm.utm_source || utm.fbclid || utm.gclid || utm.gbraid || utm.wbraid) {
       localStorage.setItem(UTM_KEY, JSON.stringify(utm));
     }
     return utm;
@@ -41,13 +46,13 @@ export const captureLandingMeta = () => {
   }
 };
 
-/** Parâmetros de atribuição (fbclid + utm) pra repassar ao link de checkout. */
+/** Parâmetros de atribuição (fbclid + gclid + utm) pra repassar ao checkout. */
 export const getAttributionParams = (): Record<string, string> => {
   if (typeof window === "undefined") return {};
   try {
     const m = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
     const out: Record<string, string> = {};
-    for (const k of ["fbclid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+    for (const k of ["fbclid", "gclid", "gbraid", "wbraid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
       if (m[k]) out[k] = m[k];
     }
     return out;

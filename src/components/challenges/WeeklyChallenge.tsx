@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Target, ChevronRight, RotateCcw } from "lucide-react";
+import { Target, ChevronRight, RotateCcw, X } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 import {
   CHALLENGES, challengeByKey, mondayOf, weekDates,
@@ -21,6 +22,8 @@ interface Props {
  */
 export const WeeklyChallenge = ({ expenses }: Props) => {
   const [state, setState] = usePersistedState<ChallengesState>("finance-challenges", EMPTY_CHALLENGES);
+  // Opt-out: quem não curte a mecânica esconde de vez (reativa em Conquistas)
+  const [hidden, setHidden] = usePersistedState<boolean>("finance-challenges-hidden", false);
 
   const thisMonday = mondayOf(new Date());
 
@@ -82,7 +85,15 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
 
   const wins = state.history.filter((h) => h.result === "win").length;
 
+  const hide = () => {
+    trackEvent("challenge_optout", {});
+    setHidden(true);
+    toast("Desafios ocultos. Reative quando quiser na página de Conquistas.");
+  };
+
   /* ------------------------------------------------------------- render */
+
+  if (hidden) return null;
 
   if (!active || !def) {
     return (
@@ -91,7 +102,12 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
           <h4 className="text-xs font-bold flex items-center gap-2">
             <Target className="w-3.5 h-3.5 text-accent" /> DESAFIO DA SEMANA
           </h4>
-          {wins > 0 && <span className="text-[10px] text-muted-foreground font-semibold">{wins} vencido{wins > 1 ? "s" : ""} 🏆</span>}
+          <div className="flex items-center gap-2">
+            {wins > 0 && <span className="text-[10px] text-muted-foreground font-semibold">{wins} vencido{wins > 1 ? "s" : ""} 🏆</span>}
+            <button onClick={hide} aria-label="Ocultar desafios" className="grid place-items-center w-6 h-6 rounded-full hover:bg-muted transition-colors">
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
         <div className="space-y-2">
           {CHALLENGES.map((c) => (
@@ -122,7 +138,12 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
         <h4 className="text-xs font-bold flex items-center gap-2">
           <Target className="w-3.5 h-3.5 text-accent" /> DESAFIO DA SEMANA
         </h4>
-        {wins > 0 && <span className="text-[10px] text-muted-foreground font-semibold">{wins} 🏆</span>}
+        <div className="flex items-center gap-2">
+          {wins > 0 && <span className="text-[10px] text-muted-foreground font-semibold">{wins} 🏆</span>}
+          <button onClick={hide} aria-label="Ocultar desafios" className="grid place-items-center w-6 h-6 rounded-full hover:bg-muted transition-colors">
+            <X className="w-3.5 h-3.5 text-muted-foreground" />
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">

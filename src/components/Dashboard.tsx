@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
+import { computeDailyBudget, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
 import { Progress } from "@/components/ui/progress";
 
@@ -318,14 +319,9 @@ export const Dashboard = ({
     const dailyVariableRate = day > 0 ? variableSpent / day : 0;
     const projectedVariableRemaining = dailyVariableRate * remainingDays;
 
-    // Unpaid bills: these are future obligations NOT yet in totalExpenses.
-    // Usa o VALOR REAL da conta quando cadastrado; a média dos fixos é só
-    // fallback pra conta sem valor (antes estimava tudo pela média e o número
-    // não batia com a soma real das contas em aberto).
-    const unpaidBills = dueDays.flatMap((d) => (Array.isArray(d?.bills) ? d.bills.filter((b) => !b?.paid) : []));
-    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBills.reduce(
-      (s: number, b: any) => s + (typeof b?.value === "number" && b.value > 0 ? b.value : avgBillValue), 0);
+    // Unpaid bills: obrigações futuras ainda fora de totalExpenses — cálculo
+    // compartilhado em lib/finance-totals (mesmo número no Pergunte ao CORE).
+    const unpaidBillsEstimate = computeUnpaidBillsEstimate(dueDays, fixedExpenses);
 
     // Projected balance = income - what's already spent - future bills - future variable
     const projectedBalance = totalIncome - totalExpenses - unpaidBillsEstimate - projectedVariableRemaining;
@@ -341,34 +337,19 @@ export const Dashboard = ({
   // Logic: saldo atual = income - totalExpenses (already spent, includes fixed recorded)
   // Only reserve future unpaid bills (NOT fixed costs already recorded/spent)
   const dailyBudget = useMemo(() => {
+    // Cálculo compartilhado (lib/finance-totals) — o Pergunte ao CORE responde
+    // com exatamente este número.
+    const base = computeDailyBudget(totalIncome, totalExpenses, dueDays, fixedExpenses);
     const now = new Date();
-    const day = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const remainingDays = daysInMonth - day;
-
     const fixedCostsRecorded = fixedExpenses.reduce((s, e) => s + e.value, 0);
-
-    // Unpaid bills: valor real quando cadastrado, média dos fixos como fallback
-    // (mesma regra do forecast acima — os dois cards têm que bater).
-    const unpaidBills = dueDays.flatMap((d) => (Array.isArray(d?.bills) ? d.bills.filter((b) => !b?.paid) : []));
-    const avgBillValue = fixedExpenses.length > 0 ? fixedCostsRecorded / fixedExpenses.length : 0;
-    const unpaidBillsEstimate = unpaidBills.reduce(
-      (s: number, b: any) => s + (typeof b?.value === "number" && b.value > 0 ? b.value : avgBillValue), 0);
-
-    // Saldo atual = income - everything already spent
-    const currentBalance = totalIncome - totalExpenses;
-    // Available = saldo atual - future unpaid bills only (no double-counting fixed costs)
-    const availableReal = currentBalance - unpaidBillsEstimate;
-    const perDay = remainingDays > 0 ? availableReal / remainingDays : availableReal;
-    const cantSpend = availableReal <= 0;
     const idealPerDay = totalIncome > 0 ? (totalIncome - fixedCostsRecorded) / daysInMonth : 0;
-    const status: "good" | "warning" | "danger" = cantSpend
+    const status: "good" | "warning" | "danger" = base.cantSpend
       ? "danger"
-      : perDay > idealPerDay * 0.8
+      : base.perDay > idealPerDay * 0.8
       ? "good"
       : "warning";
-
-    return { availableReal, unpaidBillsEstimate, perDay, remainingDays, status, cantSpend, currentBalance, fixedCostsRecorded };
+    return { ...base, status, fixedCostsRecorded };
   }, [totalIncome, totalExpenses, fixedExpenses, dueDays]);
 
   // Top 5 largest expenses

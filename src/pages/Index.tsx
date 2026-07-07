@@ -4,8 +4,9 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, DollarSign, Menu } from "lucide-react";
+import { ArrowLeft, DollarSign, Menu, Sparkles } from "lucide-react";
 import { AccountDrawer } from "@/components/home/AccountDrawer";
+import { AskCore } from "@/components/ask/AskCore";
 
 import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -60,6 +61,7 @@ const Index = () => {
   // Finanças virou a tela-raiz do app (pivot "só finanças"): o header dá acesso à
   // conta/assinatura/sair via AccountDrawer (antes isso vivia na Home, aposentada).
   const [accountOpen, setAccountOpen] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
 
   const handleReplayFinanceTutorial = () => {
     setUserData("spotlight-done-financas", "");
@@ -187,6 +189,14 @@ const Index = () => {
           <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
           <div className="flex items-center gap-2 ml-auto">
             <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            {/* Pergunte ao CORE — disponível em qualquer aba */}
+            <button
+              onClick={() => setAskOpen(true)}
+              aria-label="Pergunte ao CORE"
+              className="grid place-items-center w-8 h-8 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
             <ThemeToggle />
           </div>
         </div>
@@ -403,6 +413,24 @@ const Index = () => {
           onReplayTutorial={handleReplayFinanceTutorial}
         />
       )}
+
+      <AskCore
+        open={askOpen}
+        onOpenChange={setAskOpen}
+        ctx={{
+          totalIncome,
+          monthlyOutflow,
+          savingsRate,
+          monthlyInstallments,
+          totalInvestments,
+          totalDebts,
+          expenses,
+          fixedExpenses,
+          dueDays,
+          goals,
+          investments,
+        }}
+      />
     </div>
   );
 };

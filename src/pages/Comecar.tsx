@@ -141,13 +141,23 @@ function StartScreen({ onStart }: { onStart: () => void }) {
 
       {/* Headline + CTA (fixos embaixo) */}
       <div className="pb-2">
-        <h1 className="text-[clamp(32px,9vw,46px)] font-bold leading-[1.04] tracking-tight mb-5">
+        <h1 className="text-[clamp(30px,8.4vw,44px)] font-bold leading-[1.04] tracking-tight mb-3">
           Descubra pra onde<br />seu dinheiro some
         </h1>
+        {/* Expectativa clara do que vem: quiz curto → plano. Sem isso, "Começar"
+            é um salto no escuro — com isso, é um passo pequeno e concreto. */}
+        <p className="text-[15px] text-muted-foreground leading-snug mb-5 max-w-[300px] mx-auto">
+          Responda <strong className="text-foreground">5 perguntas rápidas</strong> e receba um plano personalizado pro seu dinheiro.
+        </p>
         <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
-          Começar
+          Começar <ArrowRight className="w-4 h-4" />
         </Button>
-        <p className="text-sm text-muted-foreground mt-4">
+        <p className="text-xs text-muted-foreground mt-3 flex items-center justify-center gap-1.5">
+          <span>⏱️ Leva 1 minuto</span>
+          <span className="text-border">·</span>
+          <span>sem cartão</span>
+        </p>
+        <p className="text-sm text-muted-foreground mt-3">
           Já tem uma conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
         </p>
       </div>

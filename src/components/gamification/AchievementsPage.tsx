@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Zap } from "lucide-react";
+import { ArrowLeft, Zap, Target } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserData } from "@/hooks/use-user-data";
+import { usePersistedState } from "@/hooks/use-persisted-state";
+import { toast } from "sonner";
 import { LevelProgress } from "./LevelProgress";
 import { BadgesGrid } from "./BadgesGrid";
 import { BadgeDetailSheet } from "./BadgeDetailSheet";
@@ -97,6 +99,7 @@ export const AchievementsPage = () => {
   const navigate = useNavigate();
   const { get } = useUserData();
   const [selected, setSelected] = useState<Badge | null>(null);
+  const [challengesHidden, setChallengesHidden] = usePersistedState<boolean>("finance-challenges-hidden", false);
 
   const badges = useMemo(() => buildBadges(get), [get]);
 
@@ -155,6 +158,16 @@ export const AchievementsPage = () => {
               ))}
             </div>
           </div>
+        )}
+        {/* Quem escondeu os desafios semanais reativa por aqui (as insígnias
+            de desafio dependem deles) */}
+        {challengesHidden && (
+          <button
+            onClick={() => { setChallengesHidden(false); toast.success("Desafios semanais de volta no Dashboard! 🎯"); }}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed border-border py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+          >
+            <Target className="w-3.5 h-3.5" /> Reativar desafios semanais
+          </button>
         )}
       </main>
 

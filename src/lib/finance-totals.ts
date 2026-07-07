@@ -22,3 +22,33 @@ export const computeSavingsRate = (totalIncome: number, monthlyOutflow: number):
 /** Saldo do mês: renda − saída mensal total. */
 export const computeMonthlyBalance = (totalIncome: number, monthlyOutflow: number): number =>
   totalIncome - monthlyOutflow;
+
+/** Contas em aberto: valor real quando cadastrado; média dos fixos como
+ *  fallback pra conta sem valor. Usado pelo Dashboard E pelo Pergunte ao CORE
+ *  — os dois têm que falar o mesmo número. */
+export const computeUnpaidBillsEstimate = (dueDays: any[], fixedExpenses: any[]): number => {
+  const fixedTotal = fixedExpenses.reduce((s: number, e: any) => s + (e.value || 0), 0);
+  const avgBillValue = fixedExpenses.length > 0 ? fixedTotal / fixedExpenses.length : 0;
+  const unpaid = (dueDays ?? []).flatMap((d: any) => (Array.isArray(d?.bills) ? d.bills.filter((b: any) => !b?.paid) : []));
+  return unpaid.reduce(
+    (s: number, b: any) => s + (typeof b?.value === "number" && b.value > 0 ? b.value : avgBillValue), 0);
+};
+
+/** "Quanto posso gastar hoje": saldo atual − contas em aberto, dividido pelos
+ *  dias restantes do mês. */
+export const computeDailyBudget = (
+  totalIncome: number,
+  monthlyOutflow: number,
+  dueDays: any[],
+  fixedExpenses: any[],
+) => {
+  const now = new Date();
+  const day = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const remainingDays = daysInMonth - day;
+  const unpaidBillsEstimate = computeUnpaidBillsEstimate(dueDays, fixedExpenses);
+  const currentBalance = totalIncome - monthlyOutflow;
+  const availableReal = currentBalance - unpaidBillsEstimate;
+  const perDay = remainingDays > 0 ? availableReal / remainingDays : availableReal;
+  return { availableReal, perDay, remainingDays, unpaidBillsEstimate, currentBalance, cantSpend: availableReal <= 0 };
+};

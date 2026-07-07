@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
+import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 
 /**
  * Paywall autocontido (padrão Cal AI: hook → âncora → desconto → backup).
@@ -48,14 +49,7 @@ const LIGHT_VARS = {
   "--ring": "0 0% 20%",
 } as CSSProperties;
 
-// "Vitória" do quiz → promessa personalizada no headline
-const VICTORY_PHRASE: Record<string, string> = {
-  "Entender meus gastos": "entender seus gastos",
-  "Parar de esquecer contas": "nunca mais esquecer uma conta",
-  "Criar minha primeira meta": "criar sua primeira meta",
-  "Saber quanto posso gastar": "saber quanto pode gastar",
-  "Organizar tudo em um painel": "organizar tudo num painel só",
-};
+// VICTORY_PHRASE e GASTO_ANCHOR vêm de src/lib/funnel.ts (compartilhados com o quiz).
 
 async function startCheckout(
   body: { billing: "monthly" | "annual"; offer?: "regular" | "limited" },
@@ -207,6 +201,45 @@ function GuaranteeTimeline() {
   );
 }
 
+/** Contraste "o que some por ano" vs "o que o CORE custa" — usa a estimativa
+ *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
+function AnchorCard({ gasto }: { gasto: string }) {
+  const anchor = GASTO_ANCHOR[gasto] ?? null;
+  if (!anchor) return null;
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="grid grid-cols-2 divide-x divide-border">
+        <div className="pr-3 text-center">
+          <p className="text-[11px] text-muted-foreground leading-tight mb-1">Somem por ano,<br />pela sua estimativa</p>
+          <p className="text-xl font-extrabold text-destructive/80 tracking-tight">{anchor.year}</p>
+        </div>
+        <div className="pl-3 text-center">
+          <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE Anual,<br />pra enxergar tudo</p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.annual.total}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const TRUST_CHIPS = [
+  { emoji: "🇧🇷", label: "Pix aceito" },
+  { emoji: "🛡️", label: "Garantia de 7 dias" },
+  { emoji: "✌️", label: "Sem fidelidade" },
+];
+
+function TrustChips() {
+  return (
+    <div className="flex items-center justify-center gap-2 flex-wrap">
+      {TRUST_CHIPS.map((c) => (
+        <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
+          <span>{c.emoji}</span> {c.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 const COMPARE_ROWS: Array<{ label: string; core: boolean; sheet: boolean; bank: boolean }> = [
   { label: "Tudo num lugar só", core: true, sheet: false, bank: false },
   { label: "Avisa antes da conta vencer", core: true, sheet: false, bank: false },
@@ -306,6 +339,7 @@ function OfferScreen({
   const [billing, setBilling] = useState<"monthly" | "annual">("annual");
   const [loading, setLoading] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [showGift, setShowGift] = useState(false);
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -316,6 +350,29 @@ function OfferScreen({
     const onPop = () => escapeRef.current();
     window.addEventListener("popstate", onPop);
     return () => { clearTimeout(t); window.removeEventListener("popstate", onPop); };
+  }, []);
+
+  // Quem para de interagir na oferta ia embora sem ver a roleta (fechar a aba
+  // não dispara popstate). 40s parado → banner-presente que leva pro downsell.
+  useEffect(() => {
+    let idle: ReturnType<typeof setTimeout>;
+    let fired = false;
+    const arm = () => {
+      if (fired) return;
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        fired = true;
+        setShowGift(true);
+        trackEvent("funnel_view", { step: "idle_gift" });
+      }, 40_000);
+    };
+    const events = ["scroll", "touchstart", "pointerdown", "keydown"] as const;
+    events.forEach((e) => window.addEventListener(e, arm, { passive: true }));
+    arm();
+    return () => {
+      clearTimeout(idle);
+      events.forEach((e) => window.removeEventListener(e, arm));
+    };
   }, []);
 
   const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? "ver pra onde seu dinheiro vai";
@@ -354,12 +411,35 @@ function OfferScreen({
       </motion.p>
 
       <div className="space-y-4">
-        <motion.div {...stagger(2)}><TransformChart /></motion.div>
+        <motion.div {...stagger(2)}><AnchorCard gasto={answers?.gasto ?? ""} /></motion.div>
+        <motion.div {...stagger(3)}><TransformChart /></motion.div>
         <ValueStack />
         <GuaranteeTimeline />
         <motion.div {...stagger(9)}><CompareTable /></motion.div>
         <motion.div {...stagger(10)}><PlanPicker billing={billing} setBilling={setBilling} /></motion.div>
+        <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
+
+      {/* Presente por inatividade → roleta/downsell */}
+      <AnimatePresence>
+        {showGift && (
+          <motion.button
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", stiffness: 260, damping: 22 }}
+            onClick={() => { trackEvent("funnel_click", { cta: "idle_gift", context }); onEscape(); }}
+            className="fixed inset-x-5 bottom-[104px] z-[76] max-w-sm mx-auto flex items-center gap-3 rounded-2xl border-2 border-accent bg-white p-3 text-left shadow-[0_14px_40px_-10px_hsl(var(--accent)/0.55)]"
+          >
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground text-xl shrink-0">🎁</span>
+            <span className="flex-1 leading-tight">
+              <span className="block text-[13.5px] font-bold">Espera — você ganhou um giro</span>
+              <span className="block text-[11.5px] text-muted-foreground">Roleta de boas-vindas com até 80% OFF</span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-accent shrink-0" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* CTA sticky */}
       <div
@@ -376,7 +456,7 @@ function OfferScreen({
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Desbloquear meu acesso <ArrowRight className="w-4 h-4" /></>}
           </Button>
           <p className="text-[11px] text-muted-foreground text-center mt-2 inline-flex w-full items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Garantia de 7 dias · Pix ou cartão · cancele quando quiser
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Pix ou cartão · Garantia de 7 dias: reembolso em 1 mensagem
           </p>
         </div>
       </div>

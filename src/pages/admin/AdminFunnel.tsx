@@ -24,6 +24,8 @@ interface FunnelData {
 const QUIZ_LABELS: Record<string, string> = {
   atrapalha: "O que mais atrapalha",
   controle: "Como controla hoje",
+  gasto: "Quanto some por mês",
+  compromisso: "Compromisso 5 min/dia",
   vitoria: "Vitória em 7 dias",
 };
 

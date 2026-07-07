@@ -8,6 +8,7 @@ import { Mail, Lock, ArrowRight, Eye, EyeOff, Loader2, CheckCircle, User as User
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { isInAppBrowser } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 
@@ -170,7 +171,7 @@ const Auth = () => {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">CORE</h1>
           <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta — 7 dias grátis"}
+            {isLogin ? "Entre na sua conta" : "Crie sua conta"}
           </p>
         </div>
 
@@ -238,33 +239,36 @@ const Auth = () => {
           </Button>
         </form>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">ou</span>
-          </div>
-        </div>
+        {/* Google — escondido em webview do Instagram/Facebook (OAuth bloqueado lá) */}
+        {!isInAppBrowser() && (
+          <>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">ou</span>
+              </div>
+            </div>
 
-        {/* Google */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleGoogleAuth}
-          disabled={googleLoading || loading}
-          className="w-full gap-2"
-        >
-          {googleLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <>
-              <GoogleIcon />
-              Continuar com Google
-            </>
-          )}
-        </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleAuth}
+              disabled={googleLoading || loading}
+              className="w-full gap-2"
+            >
+              {googleLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <GoogleIcon />
+                  Continuar com Google
+                </>
+              )}
+            </Button>
+          </>
+        )}
 
         {/* Forgot password + Toggle */}
         <div className="rounded-xl border border-border bg-card p-4 text-center space-y-2">
@@ -277,7 +281,7 @@ const Auth = () => {
             <p className="text-sm">
               <span className="text-muted-foreground">Não tem conta? </span>
               <button onClick={() => setIsLogin(false)} className="text-primary font-medium hover:underline">
-                Crie agora — 7 dias grátis
+                Crie agora
               </button>
             </p>
           ) : (

@@ -14,6 +14,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { QUIZ, GASTO_ANCHOR, isInAppBrowser } from "@/lib/funnel";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -99,43 +100,9 @@ const TrustRow = () => (
 
 /* ------------------------------------------------------------------- quiz */
 
-type Opt = { emoji: string; label: string };
-type Q = { key: string; q: string; opts: Opt[] };
-const QUIZ: Q[] = [
-  {
-    key: "atrapalha",
-    q: "O que mais te atrapalha hoje?",
-    opts: [
-      { emoji: "💸", label: "Gasto sem perceber" },
-      { emoji: "📅", label: "Esqueço contas" },
-      { emoji: "🏦", label: "Não consigo guardar dinheiro" },
-      { emoji: "🤷", label: "Não sei pra onde meu dinheiro vai" },
-      { emoji: "🧹", label: "Quero organizar tudo" },
-    ],
-  },
-  {
-    key: "controle",
-    q: "Como você controla seu dinheiro hoje?",
-    opts: [
-      { emoji: "🙈", label: "Não controlo" },
-      { emoji: "📝", label: "Bloco de notas" },
-      { emoji: "📊", label: "Planilha" },
-      { emoji: "🏛️", label: "App de banco" },
-      { emoji: "📱", label: "Outro app" },
-    ],
-  },
-  {
-    key: "vitoria",
-    q: "Qual seria uma vitória nos próximos 7 dias?",
-    opts: [
-      { emoji: "🔍", label: "Entender meus gastos" },
-      { emoji: "✅", label: "Parar de esquecer contas" },
-      { emoji: "🎯", label: "Criar minha primeira meta" },
-      { emoji: "💰", label: "Saber quanto posso gastar" },
-      { emoji: "📋", label: "Organizar tudo em um painel" },
-    ],
-  },
-];
+// Perguntas em QUIZ (src/lib/funnel.ts). A tela de impacto entra depois da
+// pergunta de "gasto" — usa a resposta da pessoa como âncora de dor em R$.
+const PROOF_AFTER_KEY = "gasto";
 
 /* ---------------------------------------------------------------- screens */
 
@@ -175,7 +142,7 @@ function StartScreen({ onStart }: { onStart: () => void }) {
       {/* Headline + CTA (fixos embaixo) */}
       <div className="pb-2">
         <h1 className="text-[clamp(32px,9vw,46px)] font-bold leading-[1.04] tracking-tight mb-5">
-          Organize sua<br />vida financeira
+          Descubra pra onde<br />seu dinheiro some
         </h1>
         <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
           Começar
@@ -188,18 +155,85 @@ function StartScreen({ onStart }: { onStart: () => void }) {
   );
 }
 
+/** Tela de impacto: devolve a estimativa da própria pessoa, anualizada.
+ *  É o momento "isso é sério" antes das duas últimas perguntas. */
+function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
+  const anchor = GASTO_ANCHOR[gasto] ?? null;
+  return (
+    <div className="text-center pt-2">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 14 }}
+        className="w-14 h-14 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-5 text-2xl"
+      >
+        💡
+      </motion.div>
+      {anchor ? (
+        <>
+          <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-4">
+            Pela sua estimativa,<br />
+            <span className="text-accent">{anchor.month} somem por mês</span><br />
+            sem você ver.
+          </h2>
+          <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
+            <p className="text-[13px] text-muted-foreground mb-1">Em um ano, isso vira</p>
+            <p className="text-4xl font-extrabold text-accent tracking-tight">{anchor.year}</p>
+          </div>
+        </>
+      ) : (
+        <>
+          <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-4">
+            A maioria das pessoas<br />
+            <span className="text-accent">não faz ideia</span> —<br />
+            e é assim que o dinheiro some.
+          </h2>
+          <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
+            <p className="text-[14px] leading-relaxed">
+              Sem registro, cada gasto pequeno fica invisível. E o que é invisível não dá pra controlar.
+            </p>
+          </div>
+        </>
+      )}
+      <p className="text-sm text-muted-foreground leading-relaxed mb-7">
+        Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>.
+        Registrar no CORE leva segundos.
+      </p>
+      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
+        Quero ver pra onde vai <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+// Fluxo do quiz: perguntas + a tela de impacto logo após a pergunta de gasto.
+type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
+const QUIZ_ITEMS: QuizItem[] = QUIZ.flatMap((q, i) => {
+  const item: QuizItem[] = [{ kind: "q", qIdx: i }];
+  if (q.key === PROOF_AFTER_KEY) item.push({ kind: "proof" });
+  return item;
+});
+
 function QuizScreen({ onDone, onBack }: { onDone: (a: Record<string, string>) => void; onBack: () => void }) {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const q = QUIZ[idx];
-  useEffect(() => { trackEvent("funnel_view", { step: `quiz_${idx + 1}` }); }, [idx]);
+  const item = QUIZ_ITEMS[idx];
+  const q = item.kind === "q" ? QUIZ[item.qIdx] : null;
+  useEffect(() => {
+    const it = QUIZ_ITEMS[idx];
+    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : "quiz_proof" });
+  }, [idx]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
+  const advance = (next: Record<string, string>) => {
+    if (idx < QUIZ_ITEMS.length - 1) setIdx((i) => i + 1);
+    else onDone(next);
+  };
   const pick = (label: string) => {
+    if (!q) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
-    if (idx < QUIZ.length - 1) setIdx((i) => i + 1);
-    else onDone(next);
+    advance(next);
   };
   return (
     <div className="w-full max-w-md mx-auto">
@@ -210,29 +244,35 @@ function QuizScreen({ onDone, onBack }: { onDone: (a: Record<string, string>) =>
         </button>
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${((idx + 1) / QUIZ.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+            animate={{ width: `${((idx + 1) / QUIZ_ITEMS.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{QUIZ.length}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{QUIZ_ITEMS.length}</span>
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={q.key} {...slide}>
-          <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q.q}</h2>
-          <div className="space-y-3">
-            {q.opts.map((o) => (
-              <button
-                key={o.label}
-                onClick={() => pick(o.label)}
-                className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
-              >
-                <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
-                <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
-                <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
-                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
-                </span>
-              </button>
-            ))}
-          </div>
+        <motion.div key={item.kind === "q" ? q!.key : "proof"} {...slide}>
+          {item.kind === "proof" ? (
+            <ProofSlide gasto={answers.gasto ?? ""} onNext={() => advance(answers)} />
+          ) : (
+            <>
+              <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q!.q}</h2>
+              <div className="space-y-3">
+                {q!.opts.map((o) => (
+                  <button
+                    key={o.label}
+                    onClick={() => pick(o.label)}
+                    className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+                  >
+                    <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+                    <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+                    <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -280,11 +320,42 @@ function ProgressScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** Diagnóstico derivado das respostas — barras que dão o momento "isso sou eu". */
+function DiagnosisCard({ answers }: { answers: Record<string, string> }) {
+  const semControle = answers.controle === "Não controlo" || answers.controle === "Bloco de notas";
+  const rows = [
+    { label: "Visibilidade dos gastos", pct: semControle ? 18 : 38, level: "Baixa", tone: "bg-destructive/70" },
+    { label: "Organização das contas", pct: answers.atrapalha === "Esqueço contas" ? 22 : 42, level: semControle ? "Baixa" : "Média", tone: "bg-amber-500/80" },
+    { label: "Potencial de economia", pct: 88, level: "Alto", tone: "bg-accent" },
+  ];
+  return (
+    <Card className="p-4 text-left space-y-3.5 mb-4">
+      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Seu diagnóstico</div>
+      {rows.map((r, i) => (
+        <div key={r.label}>
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-[13px] font-semibold">{r.label}</span>
+            <span className={`text-[11px] font-bold ${r.pct >= 60 ? "text-accent" : "text-muted-foreground"}`}>{r.level}</span>
+          </div>
+          <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${r.tone}`}
+              initial={{ width: 0 }}
+              animate={{ width: `${r.pct}%` }}
+              transition={{ delay: 0.3 + i * 0.15, duration: 0.7, ease: "easeOut" }}
+            />
+          </div>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 function ResultScreen({ answers, onDone }: { answers: Record<string, string>; onDone: () => void }) {
   // Coloca a "vitória" escolhida em primeiro, pra parecer feito pra ela.
   const items = answers.vitoria
-    ? [answers.vitoria, ...RESULT_ITEMS.filter((r) => r !== answers.vitoria)].slice(0, 5)
-    : RESULT_ITEMS;
+    ? [answers.vitoria, ...RESULT_ITEMS.filter((r) => r !== answers.vitoria)].slice(0, 4)
+    : RESULT_ITEMS.slice(0, 4);
   return (
     <div className="w-full max-w-sm mx-auto text-center">
       <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
@@ -293,11 +364,12 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
         <Sparkles className="w-8 h-8" />
       </motion.div>
       <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Análise concluída</div>
-      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-2">Seu plano personalizado<br />está pronto</h2>
-      <p className="text-muted-foreground leading-relaxed mb-6">Com o CORE, você vai:</p>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-5">Seu plano personalizado<br />está pronto</h2>
+      <DiagnosisCard answers={answers} />
       <Card className="p-4 text-left space-y-3 mb-7">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Com o CORE, você vai</div>
         {items.map((r, i) => (
-          <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 + i * 0.08 }}
+          <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 + i * 0.08 }}
             className="flex items-start gap-2.5 text-[14px]">
             <span className="mt-0.5 w-5 h-5 rounded-full bg-accent/15 text-accent grid place-items-center shrink-0">
               <Check className="w-3 h-3" strokeWidth={3} />
@@ -324,6 +396,12 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   const [googleLoading, setGoogleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const valid = name.trim() && /\S+@\S+\.\S+/.test(email) && password.length >= 6;
+  // Webview do Instagram/Facebook: o Google bloqueia OAuth ali — esconder o
+  // botão evita que o caminho mais chamativo do cadastro seja um beco sem saída.
+  const [inApp] = useState(isInAppBrowser);
+  useEffect(() => {
+    if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
+  }, [inApp]);
 
   const handleGoogle = async () => {
     if (loading || googleLoading) return;
@@ -374,15 +452,19 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
       </div>
 
-      <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
-        {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
-      </Button>
+      {!inApp && (
+        <>
+          <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
+          </Button>
 
-      <div className="flex items-center gap-3 my-4">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+        </>
+      )}
 
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />

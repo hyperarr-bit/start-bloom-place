@@ -538,7 +538,17 @@ export default function Comecar() {
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
   // e o paywall emite offer/wheel/downsell por conta própria).
   useEffect(() => {
-    if (step !== "quiz" && step !== "offer") trackEvent("funnel_view", { step });
+    if (step !== "quiz" && step !== "offer") {
+      trackEvent("funnel_view", {
+        step,
+        // Só na 1ª tela: sinal pra distinguir visita real de pré-carregamento
+        // do webview (Instagram/TikTok pré-abrem a página antes do tap real —
+        // isso chega com visibilityState "hidden"/"prerender").
+        ...(step === "start"
+          ? { visibility: document.visibilityState, ua: navigator.userAgent.slice(0, 200) }
+          : {}),
+      });
+    }
   }, [step]);
 
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)

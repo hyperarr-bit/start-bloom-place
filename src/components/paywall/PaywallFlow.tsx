@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, X, ShieldCheck, Loader2, Gift,
-  Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp,
+  Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -163,16 +163,30 @@ const STACK = [
 
 function ValueStack() {
   return (
-    <div className="grid grid-cols-2 gap-2.5">
-      {STACK.map((s, i) => (
-        <motion.div key={s.title} {...stagger(2 + i)} className="rounded-2xl border border-border bg-card p-3 text-left">
-          <span className={`inline-grid place-items-center w-9 h-9 rounded-xl ${s.tile} mb-2`}>
-            <s.Icon className="w-[18px] h-[18px]" />
-          </span>
-          <div className="text-[13px] font-bold leading-tight">{s.title}</div>
-          <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">{s.sub}</div>
-        </motion.div>
-      ))}
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-2 gap-2.5">
+        {STACK.map((s, i) => (
+          <motion.div key={s.title} {...stagger(2 + i)} className="rounded-2xl border border-border bg-card p-3 text-left">
+            <span className={`inline-grid place-items-center w-9 h-9 rounded-xl ${s.tile} mb-2`}>
+              <s.Icon className="w-[18px] h-[18px]" />
+            </span>
+            <div className="text-[13px] font-bold leading-tight">{s.title}</div>
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">{s.sub}</div>
+          </motion.div>
+        ))}
+      </div>
+      {/* Mata a objeção nº 1 ("vou ter que digitar tudo?") — destaque próprio */}
+      <motion.div {...stagger(6)} className="flex items-center gap-3 rounded-2xl border border-accent/25 bg-accent/[0.05] p-3 text-left">
+        <span className="grid place-items-center w-9 h-9 rounded-xl bg-accent text-accent-foreground shrink-0">
+          <FileDown className="w-[18px] h-[18px]" />
+        </span>
+        <div>
+          <div className="text-[13px] font-bold leading-tight">Importa o extrato do seu banco</div>
+          <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+            Exporta do app do banco, importa aqui — o mês inteiro categorizado sem digitar nada.
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -250,6 +264,7 @@ function TrustChips() {
 
 const COMPARE_ROWS: Array<{ label: string; core: boolean; sheet: boolean; bank: boolean }> = [
   { label: "Tudo num lugar só", core: true, sheet: false, bank: false },
+  { label: "Extrato importado e categorizado", core: true, sheet: false, bank: false },
   { label: "Avisa antes da conta vencer", core: true, sheet: false, bank: false },
   { label: "Metas com progresso visual", core: true, sheet: true, bank: false },
   { label: "Dá vontade de abrir todo dia", core: true, sheet: false, bank: false },

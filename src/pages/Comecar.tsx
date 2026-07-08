@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
+import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { QUIZ, GASTO_ANCHOR, isInAppBrowser } from "@/lib/funnel";
@@ -454,6 +455,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     try { setUserData("user-name", name.trim()); } catch { /* noop */ }
     try { setUserData("force-new-user-tutorial", "true"); localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
     trackEvent("funnel_click", { cta: "signup_success", instant: !!session });
+    fireMetaEvent("CompleteRegistration", { content_name: "signup" });
     setLoading(false);
     if (session) onSession();
     else onConfirm(email.trim().toLowerCase());
@@ -533,7 +535,11 @@ export default function Comecar() {
 
   // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
   // qual campanha/origem trouxe cada sessão.
-  useEffect(() => { captureLandingMeta(); }, []);
+  useEffect(() => {
+    captureLandingMeta();
+    // Meta Pixel: visitante entrou no funil (topo). A Compra vem da Cakto.
+    fireMetaEvent("ViewContent", { content_name: "funil_comecar" });
+  }, []);
 
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
   // e o paywall emite offer/wheel/downsell por conta própria).

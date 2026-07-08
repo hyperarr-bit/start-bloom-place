@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
+import { fireMetaEvent } from "@/lib/meta-pixel";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
@@ -58,6 +59,13 @@ async function startCheckout(
   setLoading: (v: boolean) => void,
 ) {
   trackEvent("funnel_click", { cta, context });
+  // Meta Pixel: intenção de compra (clicou pra assinar). A Compra em si vem
+  // server-side da Cakto — aqui é só o sinal de checkout iniciado.
+  fireMetaEvent("InitiateCheckout", {
+    content_name: body.billing,
+    value: body.billing === "annual" ? 46.8 : 14.9,
+    currency: "BRL",
+  });
   setLoading(true);
   try {
     const { data, error } = await supabase.functions.invoke("cakto-checkout", {

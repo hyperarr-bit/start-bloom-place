@@ -307,8 +307,9 @@ function PlanPicker({
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="font-bold text-[15px]">Anual</div>
-            <div className="text-[11px] text-muted-foreground leading-tight">
-              R$ {PRICING.annual.total}/ano · sai R$ {PRICING.annual.perDay} por dia
+            <div className="text-[12px] leading-tight">
+              <span className="font-semibold text-foreground">R$ {PRICING.annual.total} hoje, 1x no ano</span>
+              <span className="text-muted-foreground"> · R$ {PRICING.annual.perDay}/dia</span>
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -321,16 +322,18 @@ function PlanPicker({
       </button>
       <button
         onClick={() => setBilling("monthly")}
-        className={`w-full rounded-2xl border-2 p-3.5 transition-all ${
+        className={`w-full rounded-2xl border-2 p-4 transition-all ${
           billing === "monthly" ? "border-accent bg-accent/[0.05]" : "border-border bg-card"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="font-bold text-[14px]">Mensal</div>
-            <div className="text-[11px] text-muted-foreground">Sem fidelidade</div>
+            <div className="font-bold text-[15px]">Mensal</div>
+            <div className="text-[12px] text-muted-foreground leading-tight">
+              Começa leve · cancela quando quiser
+            </div>
           </div>
-          <div className="font-extrabold text-lg leading-none">
+          <div className="font-extrabold text-xl leading-none">
             R$ {PRICING.monthly.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
           </div>
         </div>
@@ -463,8 +466,13 @@ function OfferScreen({
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Desbloquear meu acesso <ArrowRight className="w-4 h-4" /></>}
           </Button>
-          <p className="text-[11px] text-muted-foreground text-center mt-2 inline-flex w-full items-center justify-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> Pix ou cartão · Garantia de 7 dias: reembolso em 1 mensagem
+          <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+            <span>
+              {billing === "annual"
+                ? <>Hoje: <strong className="text-foreground font-semibold whitespace-nowrap">R$ {PRICING.annual.total}</strong> (1x no ano) · Pix ou cartão · Garantia de 7 dias</>
+                : <>Hoje: <strong className="text-foreground font-semibold whitespace-nowrap">R$ {PRICING.monthly.perMonth}</strong> por mês · Pix ou cartão · Garantia de 7 dias</>}
+            </span>
           </p>
         </div>
       </div>

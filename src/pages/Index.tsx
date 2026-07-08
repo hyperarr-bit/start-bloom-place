@@ -39,7 +39,8 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
-import { QuizWelcome } from "@/components/onboarding/QuizWelcome";
+import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
+import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 
@@ -281,7 +282,21 @@ const Index = () => {
               <MonthlySheet month={openMonth} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
-                {getUserData<string>("spotlight-done-financas", "") !== "true" && <QuizWelcome />}
+                {getUserData<string>("spotlight-done-financas", "") !== "true" && (
+                  <>
+                    <QuizWelcome />
+                    <ImportStarterHint
+                      action={
+                        <ImportExtrato
+                          expenses={expenses}
+                          incomes={incomes}
+                          setExpenses={setExpenses}
+                          setIncomes={setIncomes}
+                        />
+                      }
+                    />
+                  </>
+                )}
                 <TrackedCard cardKey="month-turnover" tab="financeiro">
                   <MonthTurnover onOpenMonth={setOpenMonth} />
                 </TrackedCard>

@@ -38,6 +38,8 @@ interface AuthContextType {
   trialExpired: boolean;
   noTrial: boolean;
   isSubscribed: boolean;
+  /** true depois da 1ª resposta do check-subscription — antes disso o status é desconhecido */
+  subLoaded: boolean;
   trialDay: number;
   trialHoursLeft: number;
   inGracePeriod: boolean;
@@ -57,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [trialExpired, setTrialExpired] = useState(false);
   const [noTrial, setNoTrial] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subLoaded, setSubLoaded] = useState(false);
   const [trialDay, setTrialDay] = useState(1);
   const [trialHoursLeft, setTrialHoursLeft] = useState(7 * 24);
   const [inGracePeriod, setInGracePeriod] = useState(false);
@@ -76,6 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setTrialExpired(false);
           setNoTrial(false);
           setIsSubscribed(false);
+          setSubLoaded(false);
         }
         setLoading(false);
       }
@@ -97,9 +101,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }, 60000);
 
+    // Re-checa na volta do foco: quem acabou de pagar na Cakto e voltou pro app
+    // não pode esperar o próximo ciclo de 60s encarando o paywall.
+    const onFocus = () => {
+      if (document.visibilityState === "hidden") return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) checkSubscriptionStatus();
+      });
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
     return () => {
       subscription.unsubscribe();
       if (intervalRef.current) clearInterval(intervalRef.current);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
     };
   }, []);
 
@@ -118,6 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setPaymentMethod(data?.payment_method ?? null);
       if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
       if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
+      setSubLoaded(true);
     } catch (err) {
       console.error("check-subscription failed:", err);
     }
@@ -154,7 +172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, noTrial, isSubscribed, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

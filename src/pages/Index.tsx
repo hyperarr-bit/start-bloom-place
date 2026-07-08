@@ -39,6 +39,8 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
+import { QuizWelcome } from "@/components/onboarding/QuizWelcome";
+import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -51,6 +53,11 @@ const Index = () => {
   const isPreview = location.pathname.startsWith("/preview");
   const { user } = useAuth();
   const { get: getUserData, set: setUserData, isGuest } = useUserData();
+  // Quem veio do funil chega com as respostas do quiz no aparelho — a 1ª
+  // sessão usa isso (card de plano + copy do tutorial com o R$ da pessoa).
+  const quiz = getQuizAnswers();
+  const quizAnchor = GASTO_ANCHOR[quiz.gasto ?? ""] ?? null;
+  const quizVictory = VICTORY_PHRASE[quiz.vitoria ?? ""];
   const { onModuleComplete: onFinanceTutorialComplete, CompletionDialog: FinanceCompletionDialog } = useModuleCompletionFlow("financas");
   const [activeTab, setActiveTab] = useState(
     getUserData<string>("spotlight-done-financas", "") !== "true" ? "financeiro" : "dashboard"
@@ -158,7 +165,7 @@ const Index = () => {
         onComplete={onFinanceTutorialComplete}
         steps={[
           
-          { selector: '[data-spotlight="add-income"]', label: 'Bora montar seu painel! Comece pela sua renda — salário, freela, o que entra no mês.', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-income"]', label: quizAnchor ? `Você disse que uns ${quizAnchor.month} somem todo mês. Bora achar esse dinheiro — comece pela sua renda: salário, freela, o que entra.` : 'Bora montar seu painel! Comece pela sua renda — salário, freela, o que entra no mês.', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-fixed"]', label: 'Agora um gasto fixo: aluguel, internet, aquela assinatura — o que se repete todo mês.', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
 
           { selector: '[data-spotlight="add-bill"]', label: 'Tem conta com data pra vencer? Toque em "Editar" e adicione uma — o CORE te lembra.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
@@ -169,7 +176,7 @@ const Index = () => {
           { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES — defina um teto de gasto por categoria.', onEnter: () => { setActiveTab("itens"); setTimeout(() => document.querySelector('[data-spotlight="tab-limites"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="add-limit"]', label: 'Crie um limite pra uma categoria (ex: comida, lazer).', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, placement: "below", onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Seus relatórios do mês saem prontos aqui — dá uma olhada.', onEnter: () => { setActiveTab("limites"); setTimeout(() => document.querySelector('[data-spotlight="tab-relatorios"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
-          { selector: '[data-spotlight="tab-saude"]', label: 'E sua saúde financeira vira um índice simples. Pronto — seu painel tá montado! 🎉', onEnter: () => { setActiveTab("relatorios"); setTimeout(() => document.querySelector('[data-spotlight="tab-saude"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
+          { selector: '[data-spotlight="tab-saude"]', label: `E sua saúde financeira vira um índice simples. Pronto — seu painel pra ${quizVictory ?? "cuidar do seu dinheiro"} tá montado! 🎉`, onEnter: () => { setActiveTab("relatorios"); setTimeout(() => document.querySelector('[data-spotlight="tab-saude"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
         ]}
       />
       {/* Header */}
@@ -274,6 +281,7 @@ const Index = () => {
               <MonthlySheet month={openMonth} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
+                {getUserData<string>("spotlight-done-financas", "") !== "true" && <QuizWelcome />}
                 <TrackedCard cardKey="month-turnover" tab="financeiro">
                   <MonthTurnover onOpenMonth={setOpenMonth} />
                 </TrackedCard>

@@ -9,7 +9,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 
 export const TrialBanner = () => {
-  const { user, trialExpired, noTrial, isSubscribed, trialDay, trialHoursLeft } = useAuth();
+  const { user, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft } = useAuth();
   const { get, loaded } = useUserData();
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,7 +24,10 @@ export const TrialBanner = () => {
   const viewedRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!user || isSubscribed) return;
+    // Antes da 1ª resposta do check-subscription o status é DESCONHECIDO —
+    // sem isso, assinante pago via "Trial • 1d restante" piscando a cada
+    // navegação (e a analytics registrava trial_banner_view fantasma).
+    if (!subLoaded || !user || isSubscribed) return;
     if (!trialExpired && !tutorialDone) return;
     const key = noTrial ? "no_trial" : trialExpired ? "expired" : `mini-${trialDay}`;
     if (viewedRef.current === key) return;
@@ -34,14 +37,14 @@ export const TrialBanner = () => {
       { phase: noTrial ? "no_trial" : trialExpired ? "expired" : "mini", trial_day: trialDay },
       { trialDay },
     );
-  }, [user, isSubscribed, trialDay, trialExpired, noTrial, tutorialDone]);
+  }, [subLoaded, user, isSubscribed, trialDay, trialExpired, noTrial, tutorialDone]);
 
   const goToPlanos = (cta: string) => {
     trackEvent("trial_banner_click", { phase: noTrial ? "no_trial" : trialExpired ? "expired" : "mini", trial_day: trialDay, cta }, { trialDay });
     navigate("/planos");
   };
 
-  if (isSubscribed || !user) return null;
+  if (!subLoaded || isSubscribed || !user) return null;
   if (suppressOnRoute) return null;
 
   // Conta pós-paywall (sem trial): paywall completo estilo Cal AI,

@@ -91,3 +91,16 @@ export const VICTORY_PHRASE: Record<string, string> = {
   "Saber quanto posso gastar": "saber quanto pode gastar",
   "Organizar tudo em um painel": "organizar tudo num painel só",
 };
+
+/**
+ * Respostas do quiz salvas no aparelho (Comecar grava em "funnel-quiz-answers").
+ * É o que liga o funil à 1ª sessão no app: quem veio pelo quiz não pode cair
+ * num app genérico — o painel abre falando da meta e do R$ que a pessoa citou.
+ */
+export const getQuizAnswers = (): Record<string, string> => {
+  try {
+    return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}");
+  } catch {
+    return {};
+  }
+};

@@ -117,6 +117,7 @@ export default function AdminFunnel() {
             <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
             Zerar
           </button>
+          <GranularityToggle value={granularity} onChange={setGranularity} />
           <RangePicker value={range} onChange={handleRangeChange} />
         </div>
       </div>
@@ -242,14 +243,11 @@ export default function AdminFunnel() {
               </Panel>
 
               <Panel>
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <div>
-                    <h3 className="text-[13px] font-bold">Tendência</h3>
-                    <p className="text-[12px] text-muted-foreground mt-0.5">
-                      Sessões, contas criadas e assinaturas por {granularity === "hour" ? "hora" : "dia"}
-                    </p>
-                  </div>
-                  <GranularityToggle value={granularity} onChange={setGranularity} />
+                <div className="mb-4">
+                  <h3 className="text-[13px] font-bold">Tendência</h3>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    Sessões, contas criadas e assinaturas por {granularity === "hour" ? "hora" : "dia"}
+                  </p>
                 </div>
                 {data.daily.length === 0 ? (
                   <EmptyState label="Sem dados nesse período" />

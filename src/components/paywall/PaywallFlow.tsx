@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
+import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
@@ -21,6 +22,12 @@ import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
  * Exit (voltar do celular ou X) → roleta → downsell com as ofertas limitadas.
  * Tudo interno: quem usa só renderiza <PaywallFlow context=... />.
  */
+
+// Marca "saiu pro checkout": se voltar sem pagar, o paywall abre a roleta em
+// vez de ficar mudo. Dado que motivou (desde o reset de 07/07): 15 cliques em
+// "assinar" → só 3 geraram Pix — 12 pessoas recuaram no formulário da Cakto e
+// voltaram pra um paywall idêntico, sem nenhuma reação da nossa parte.
+const CHECKOUT_PENDING_KEY = "core_checkout_pending";
 
 // Preços — TÊM que bater com as ofertas da Cakto
 // (regular: 6g8iiak/xs9s7ws_914041 · limitada: 37pjpm8/6a3owem).
@@ -73,7 +80,11 @@ async function startCheckout(
     });
     if (error) throw error;
     if (data?.error) throw new Error(data.error);
-    if (data?.url) { window.location.href = data.url; return; }
+    if (data?.url) {
+      try { localStorage.setItem(CHECKOUT_PENDING_KEY, JSON.stringify({ at: Date.now(), cta })); } catch { /* noop */ }
+      window.location.href = data.url;
+      return;
+    }
     throw new Error("Checkout indisponível. Tente de novo.");
   } catch (err: any) {
     toast.error(err?.message || "Erro ao iniciar checkout");
@@ -597,6 +608,10 @@ export function PaywallFlow({
 }) {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<"offer" | "wheel" | "downsell">("offer");
+  const { isSubscribed } = useAuth();
+  const subRef = useRef(isSubscribed);
+  subRef.current = isSubscribed;
+  const rescueDone = useRef(false);
 
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).
@@ -604,6 +619,39 @@ export function PaywallFlow({
     if (answers && Object.keys(answers).length) return answers;
     try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
   });
+
+  // Resgate do "voltei do checkout sem pagar": clicou em assinar, foi pra
+  // Cakto e voltou → abre a roleta (→ downsell) em vez do mesmo paywall mudo.
+  // Espera 2,5s antes de disparar: dá tempo do check-subscription do focus
+  // confirmar — quem PAGOU e voltou nunca vê a roleta.
+  useEffect(() => {
+    const tryRescue = () => {
+      if (rescueDone.current) return;
+      let marker: { at?: number } | null = null;
+      try { marker = JSON.parse(localStorage.getItem(CHECKOUT_PENDING_KEY) || "null"); } catch { marker = null; }
+      if (!marker?.at) return;
+      const ageMs = Date.now() - marker.at;
+      if (ageMs > 6 * 60 * 60 * 1000) {
+        try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
+        return;
+      }
+      setTimeout(() => {
+        if (rescueDone.current || subRef.current) return;
+        rescueDone.current = true;
+        try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
+        trackEvent("funnel_click", { cta: "checkout_return", context, mins: Math.round(ageMs / 60000) });
+        setPhase("wheel");
+      }, 2500);
+    };
+    tryRescue();
+    const onVis = () => { if (document.visibilityState === "visible") tryRescue(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onVis);
+    };
+  }, [context]);
 
   useEffect(() => {
     const name = context === "funnel" ? "funnel_view" : "paywall_view";

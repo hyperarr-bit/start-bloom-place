@@ -416,8 +416,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   const [googleLoading, setGoogleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const valid = name.trim() && /\S+@\S+\.\S+/.test(email) && password.length >= 6;
-  // Webview do Instagram/Facebook: o Google bloqueia OAuth ali — esconder o
-  // botão evita que o caminho mais chamativo do cadastro seja um beco sem saída.
+  // Webview do Instagram/Facebook: o Google PODE bloquear OAuth ali (iOS
+  // principalmente), mas os dados mostraram 9 de 14 cliques virando conta —
+  // então o botão fica visível com um aviso honesto, em vez de escondido.
   const [inApp] = useState(isInAppBrowser);
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
@@ -427,7 +428,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     if (loading || googleLoading) return;
     setErr(null);
     setGoogleLoading(true);
-    trackEvent("funnel_click", { cta: "signup_google" });
+    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp });
     try { localStorage.setItem(FUNNEL_OAUTH_KEY, "true"); } catch { /* noop */ }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -435,6 +436,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     });
     if (error) {
       try { localStorage.removeItem(FUNNEL_OAUTH_KEY); } catch { /* noop */ }
+      trackEvent("funnel_error", { where: "signup_google", inapp: inApp, message: (error.message || "").slice(0, 200) });
       setErr(error.message || "Não consegui abrir o Google. Tente de novo.");
       setGoogleLoading(false);
     }
@@ -448,6 +450,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     trackEvent("funnel_click", { cta: "signup_submit" });
     const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
     if (error) {
+      // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
+      // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
+      trackEvent("funnel_error", { where: "signup_submit", inapp: inApp, message: (error.message || "").slice(0, 200) });
       setErr(error.message || "Não consegui criar a conta. Tente outro e-mail.");
       setLoading(false);
       return;
@@ -473,19 +478,20 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
       </div>
 
-      {!inApp && (
-        <>
-          <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
-            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
-          </Button>
-
-          <div className="flex items-center gap-3 my-4">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-        </>
+      <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
+        {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
+      </Button>
+      {inApp && (
+        <p className="text-[12px] text-muted-foreground leading-snug bg-muted/60 rounded-lg px-3 py-2 mt-2">
+          Se o login do Google falhar no navegador do Instagram, crie com e-mail e senha — leva 10 segundos.
+        </p>
       )}
+
+      <div className="flex items-center gap-3 my-4">
+        <div className="flex-1 h-px bg-border" />
+        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
+        <div className="flex-1 h-px bg-border" />
+      </div>
 
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />

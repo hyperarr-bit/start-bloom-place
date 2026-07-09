@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Check, ChevronDown, TrendingDown, AlertTriangle } from "lucide-react";
+import { Check, ChevronDown, TrendingDown, AlertTriangle, CalendarClock, X } from "lucide-react";
 
 /* ---------------------------------------------------------------- range */
 
@@ -43,6 +43,134 @@ export function rangeToDates(key: RangeKey): { from: string; to: string } {
   else if (key === "90d") from.setDate(from.getDate() - 90);
   else from.setFullYear(2026, 0, 1);
   return { from: from.toISOString(), to: to.toISOString() };
+}
+
+/* --------------------------------------------------- janela customizada */
+
+export interface CustomWindow {
+  from: string;   // ISO
+  to: string;     // ISO (exclusivo)
+  label: string;  // ex.: "09/07" ou "09/07 · 10h–14h"
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const todayLocalISODate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/**
+ * Escolhe um DIA específico (e opcionalmente uma faixa de horas) e devolve a
+ * janela exata em ISO. Tudo em horário local (BRT) — o admin pensa em "dia 9,
+ * 10h às 14h", não em UTC. As horas são inclusivas nas duas pontas: 10h–14h
+ * cobre das 10:00:00 até 14:59:59.
+ */
+export function CustomRangePicker({
+  active, onApply, onClear,
+}: { active: CustomWindow | null; onApply: (w: CustomWindow) => void; onClear: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState<string>(todayLocalISODate());
+  const [wholeDay, setWholeDay] = useState(true);
+  const [fromHour, setFromHour] = useState(0);
+  const [toHour, setToHour] = useState(23);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, []);
+
+  const apply = () => {
+    const [y, m, d] = date.split("-").map(Number);
+    const fh = wholeDay ? 0 : fromHour;
+    const th = wholeDay ? 23 : toHour;
+    // Fim exclusivo = hora final + 1 (th=23 → 00:00 do dia seguinte).
+    const from = new Date(y, m - 1, d, fh, 0, 0, 0);
+    const to = new Date(y, m - 1, d, th + 1, 0, 0, 0);
+    const dLabel = `${pad(d)}/${pad(m)}`;
+    const label = wholeDay ? dLabel : `${dLabel} · ${fh}h–${th}h`;
+    onApply({ from: from.toISOString(), to: to.toISOString(), label });
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors ${
+          active ? "border-accent/40 bg-accent/5 text-foreground" : "border-border bg-card hover:bg-muted"
+        }`}
+      >
+        <CalendarClock className="w-3.5 h-3.5 text-muted-foreground" />
+        {active ? active.label : "Dia/hora específico"}
+        {active && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            className="grid place-items-center rounded hover:bg-muted -mr-1"
+            aria-label="Limpar período"
+          >
+            <X className="w-3.5 h-3.5 text-muted-foreground" />
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 md:left-0 mt-1.5 w-64 rounded-xl border border-border bg-card shadow-lg p-3 z-30 space-y-3">
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dia</label>
+            <input
+              type="date"
+              value={date}
+              max={todayLocalISODate()}
+              onChange={(e) => setDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-2.5 py-2 text-[13px]"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-[13px] cursor-pointer select-none">
+            <input type="checkbox" checked={wholeDay} onChange={(e) => setWholeDay(e.target.checked)} className="accent-[hsl(var(--accent))]" />
+            Dia inteiro
+          </label>
+
+          {!wholeDay && (
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="text-[11px] text-muted-foreground">De</label>
+                <select
+                  value={fromHour}
+                  onChange={(e) => setFromHour(Math.min(Number(e.target.value), toHour))}
+                  className="mt-0.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-[13px]"
+                >
+                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h</option>)}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-[11px] text-muted-foreground">Até</label>
+                <select
+                  value={toHour}
+                  onChange={(e) => setToHour(Math.max(Number(e.target.value), fromHour))}
+                  className="mt-0.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-[13px]"
+                >
+                  {Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{h}h</option>)}
+                </select>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={apply}
+            className="w-full rounded-lg bg-foreground text-background py-2 text-[13px] font-semibold hover:opacity-90 transition-opacity"
+          >
+            Ver esse período
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export type Granularity = "day" | "hour";

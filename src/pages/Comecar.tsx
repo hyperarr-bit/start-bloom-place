@@ -150,27 +150,45 @@ function HeroVideo() {
   );
 }
 
-function StartScreen({ onStart }: { onStart: () => void }) {
+function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
+  // Item 3 (RCD/Schwartz): público problem-aware → a 1ª tela já é o diagnóstico.
+  // O 1º toque responde a pergunta em vez de um botão neutro — encurta o
+  // caminho até a prova. Headline e vídeo (provados nas vendas) preservados.
+  const q0 = QUIZ[0]; // "O que mais te atrapalha hoje?"
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto text-center [@media(max-height:520px)]:justify-center">
-      {/* Vídeo do app (já vem com a moldura do iPhone). Estilo Cal AI: visual primeiro.
-          Em telas baixas (paisagem) o vídeo some pra o CTA caber. */}
-      <div className="flex-1 flex items-end justify-center pt-4 pb-5 overflow-hidden [@media(max-height:520px)]:hidden">
+    <div className="flex-1 flex flex-col w-full max-w-md mx-auto [@media(max-height:640px)]:justify-center">
+      {/* Vídeo do app — some em telas baixas pra as opções caberem. */}
+      <div className="flex items-end justify-center pt-2 pb-4 overflow-hidden max-h-[30vh] [@media(max-height:700px)]:hidden">
         <HeroVideo />
       </div>
 
-      {/* Headline + CTA (fixos embaixo) */}
-      <div className="pb-2">
-        <h1 className="text-[clamp(32px,9vw,46px)] font-bold leading-[1.04] tracking-tight mb-5">
-          Organize sua<br />vida financeira
-        </h1>
-        <Button onClick={onStart} className="w-full h-14 rounded-full text-base font-semibold">
-          Começar
-        </Button>
-        <p className="text-sm text-muted-foreground mt-4">
-          Já tem uma conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
-        </p>
+      <h1 className="text-[clamp(26px,7.5vw,38px)] font-bold leading-[1.06] tracking-tight mb-1 text-center">
+        Organize sua vida financeira
+      </h1>
+      <p className="text-[15px] text-muted-foreground text-center mb-5">{q0.q}</p>
+
+      <div className="space-y-2.5">
+        {q0.opts.map((o) => (
+          <button
+            key={o.label}
+            onClick={() => onPick(o.label)}
+            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+          >
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{o.emoji}</span>
+            <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+            <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+            </span>
+          </button>
+        ))}
       </div>
+
+      <p className="text-[12px] text-muted-foreground mt-4 text-center">
+        5 perguntas rápidas · sem cadastro agora
+      </p>
+      <p className="text-sm text-muted-foreground mt-2 text-center">
+        Já tem uma conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
+      </p>
     </div>
   );
 }
@@ -234,9 +252,14 @@ const QUIZ_ITEMS: QuizItem[] = QUIZ.flatMap((q, i) => {
   return item;
 });
 
-function QuizScreen({ onDone, onBack }: { onDone: (a: Record<string, string>) => void; onBack: () => void }) {
-  const [idx, setIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+function QuizScreen({ onDone, onBack, initialAnswers }: { onDone: (a: Record<string, string>) => void; onBack: () => void; initialAnswers?: Record<string, string> }) {
+  // A 1ª pergunta ("atrapalha") é respondida na tela inicial (item 3): se veio
+  // com resposta, pula direto pro item seguinte do quiz.
+  const startIdx = initialAnswers && QUIZ.length > 0 && initialAnswers[QUIZ[0].key]
+    ? QUIZ_ITEMS.findIndex((it) => it.kind === "q" && it.qIdx === 1)
+    : 0;
+  const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
+  const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
   const item = QUIZ_ITEMS[idx];
   const q = item.kind === "q" ? QUIZ[item.qIdx] : null;
   useEffect(() => {
@@ -407,7 +430,7 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
 }
 
 function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
-  const { signUp } = useAuth();
+  const { signUp, signIn } = useAuth();
   const { set: setUserData } = useUserData();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -415,7 +438,10 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const valid = name.trim() && /\S+@\S+\.\S+/.test(email) && password.length >= 6;
+  // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
+  // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
+  const [existingAccount, setExistingAccount] = useState(false);
+  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
   // Webview do Instagram/Facebook: o Google PODE bloquear OAuth ali (iOS
   // principalmente), mas os dados mostraram 9 de 14 cliques virando conta —
   // então o botão fica visível com um aviso honesto, em vez de escondido.
@@ -442,17 +468,62 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!/\S+@\S+\.\S+/.test(email)) { setErr("Digite seu e-mail pra receber o link."); return; }
+    setErr(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: getAuthRedirectUrl("/update-password"),
+    });
+    trackEvent("funnel_click", { cta: "signup_reset_password" });
+    if (error) setErr(error.message);
+    else setErr("Enviamos um link de recuperação pro seu e-mail. ✓");
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid || loading) return;
     setErr(null);
     setLoading(true);
+
+    // Modo "entrar" (e-mail já tinha conta): loga direto, sem tentar criar.
+    if (existingAccount) {
+      trackEvent("funnel_click", { cta: "existing_login_submit" });
+      const { error: signInErr } = await signIn(email.trim().toLowerCase(), password);
+      if (signInErr) {
+        setErr("Senha incorreta. Tente de novo ou recupere abaixo.");
+        setLoading(false);
+        return;
+      }
+      trackEvent("funnel_click", { cta: "signup_success", via: "existing_login" });
+      setLoading(false);
+      onSession();
+      return;
+    }
+
     trackEvent("funnel_click", { cta: "signup_submit" });
     const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
       // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
       trackEvent("funnel_error", { where: "signup_submit", inapp: inApp, message: (error.message || "").slice(0, 200) });
+      const already = /already registered|already been registered|user already/i.test(error.message || "");
+      if (already) {
+        // Já tem conta: tenta logar com a senha que ela ACABOU de digitar
+        // (o caminho mais curto — se acertou, entra direto no paywall).
+        const { error: signInErr } = await signIn(email.trim().toLowerCase(), password);
+        if (!signInErr) {
+          // Login de conta existente: NÃO força tutorial (pode já ter feito).
+          trackEvent("funnel_click", { cta: "signup_success", via: "existing_login" });
+          setLoading(false);
+          onSession();
+          return;
+        }
+        // Senha não bateu: mostra o caminho de recuperação, sem beco sem saída.
+        setExistingAccount(true);
+        setErr("Esse e-mail já tem conta. Entre com sua senha — ou recupere abaixo.");
+        setLoading(false);
+        return;
+      }
       setErr(error.message || "Não consegui criar a conta. Tente outro e-mail.");
       setLoading(false);
       return;
@@ -495,12 +566,17 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" className="h-12" />
-        <Input type="password" placeholder="Crie uma senha (mín. 6)" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" className="h-12" />
+        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
+        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
+        {existingAccount && (
+          <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
+            Esqueci minha senha
+          </button>
+        )}
       </form>
       <div className="mt-5"><TrustRow /></div>
     </div>
@@ -571,9 +647,24 @@ export default function Comecar() {
       <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
-            {step === "start" && <StartScreen onStart={() => { trackEvent("funnel_click", { cta: "start" }); setStep("quiz"); }} />}
+            {step === "start" && (
+              <StartScreen
+                onPick={(firstAnswer) => {
+                  const first = { [QUIZ[0].key]: firstAnswer };
+                  setAnswers(first);
+                  trackEvent("funnel_click", { cta: "start" });
+                  // A 1ª pergunta virou a tela inicial: emite quiz_1 aqui pra o
+                  // passo "Quiz 1" do admin continuar contando (o QuizScreen
+                  // agora começa no quiz_2).
+                  trackEvent("funnel_view", { step: "quiz_1" });
+                  trackEvent("funnel_quiz_answer", { q: QUIZ[0].key, answer: firstAnswer });
+                  setStep("quiz");
+                }}
+              />
+            )}
             {step === "quiz" && (
               <QuizScreen
+                initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {
                   setAnswers(a);

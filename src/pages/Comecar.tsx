@@ -107,65 +107,17 @@ const PROOF_AFTER_KEY = "gasto";
 
 /* ---------------------------------------------------------------- screens */
 
-function HeroVideo() {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    v.muted = true; // garante autoplay (a property muted do React não é confiável)
-    const tryPlay = () => {
-      if (!v.paused) return;
-      const p = v.play();
-      if (p) p.catch(() => {});
-    };
-    tryPlay();
-    // O vídeo NUNCA pode ficar parado: iOS pausa em low power / voltar de
-    // background / troca de aba — religa em qualquer um desses casos e no
-    // primeiro toque (gesto libera autoplay quando o iOS bloqueou).
-    v.addEventListener("pause", tryPlay);
-    v.addEventListener("canplay", tryPlay);
-    document.addEventListener("visibilitychange", tryPlay);
-    window.addEventListener("touchstart", tryPlay, { passive: true });
-    window.addEventListener("click", tryPlay, { passive: true });
-    return () => {
-      v.removeEventListener("pause", tryPlay);
-      v.removeEventListener("canplay", tryPlay);
-      document.removeEventListener("visibilitychange", tryPlay);
-      window.removeEventListener("touchstart", tryPlay);
-      window.removeEventListener("click", tryPlay);
-    };
-  }, []);
-  return (
-    <video
-      ref={ref}
-      src="/videos/financas.mp4"
-      poster="/videos/financas-poster.jpg"
-      muted
-      loop
-      playsInline
-      autoPlay
-      preload="auto"
-      className="max-w-[250px] max-h-[48vh] w-auto h-auto object-contain block"
-    />
-  );
-}
-
 function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
   // Item 3 (RCD/Schwartz): público problem-aware → a 1ª tela já é o diagnóstico.
   // O 1º toque responde a pergunta em vez de um botão neutro — encurta o
-  // caminho até a prova. Headline e vídeo (provados nas vendas) preservados.
+  // caminho até a prova. Sem vídeo (bugado) — headline + pergunta são o hero.
   const q0 = QUIZ[0]; // "O que mais te atrapalha hoje?"
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto [@media(max-height:640px)]:justify-center">
-      {/* Vídeo do app — some em telas baixas pra as opções caberem. */}
-      <div className="flex items-end justify-center pt-2 pb-4 overflow-hidden max-h-[30vh] [@media(max-height:700px)]:hidden">
-        <HeroVideo />
-      </div>
-
-      <h1 className="text-[clamp(26px,7.5vw,38px)] font-bold leading-[1.06] tracking-tight mb-1 text-center">
+    <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
+      <h1 className="text-[clamp(28px,8vw,42px)] font-bold leading-[1.05] tracking-tight mb-2 text-center">
         Organize sua vida financeira
       </h1>
-      <p className="text-[15px] text-muted-foreground text-center mb-5">{q0.q}</p>
+      <p className="text-[15px] text-muted-foreground text-center mb-6">{q0.q}</p>
 
       <div className="space-y-2.5">
         {q0.opts.map((o) => (

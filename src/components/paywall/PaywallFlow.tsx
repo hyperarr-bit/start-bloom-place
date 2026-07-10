@@ -622,8 +622,10 @@ export function PaywallFlow({
 
   // Resgate do "voltei do checkout sem pagar": clicou em assinar, foi pra
   // Cakto e voltou → abre a roleta (→ downsell) em vez do mesmo paywall mudo.
-  // Espera 2,5s antes de disparar: dá tempo do check-subscription do focus
-  // confirmar — quem PAGOU e voltou nunca vê a roleta.
+  // Antes de disparar, CONFIRMA no servidor que não pagou. A espera cega de
+  // 2,5s perdeu a corrida na venda de 10/07 (webhook chegou junto do retorno
+  // e a pagante viu a roleta) — agora o check-subscription é consultado na
+  // hora e a roleta só abre com "subscribed: false" fresco.
   useEffect(() => {
     const tryRescue = () => {
       if (rescueDone.current) return;
@@ -635,7 +637,16 @@ export function PaywallFlow({
         try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
         return;
       }
-      setTimeout(() => {
+      setTimeout(async () => {
+        if (rescueDone.current || subRef.current) return;
+        try {
+          const { data } = await supabase.functions.invoke("check-subscription");
+          if (data?.subscribed) {
+            // Pagou — some com o marcador e nada de roleta.
+            try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
+            return;
+          }
+        } catch { /* servidor indisponível: segue com o estado local */ }
         if (rescueDone.current || subRef.current) return;
         rescueDone.current = true;
         try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }

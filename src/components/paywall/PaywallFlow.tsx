@@ -627,6 +627,9 @@ export function PaywallFlow({
   // e a pagante viu a roleta) — agora o check-subscription é consultado na
   // hora e a roleta só abre com "subscribed: false" fresco.
   useEffect(() => {
+    // Timer PRECISA morrer com o componente: em 10/07 ele sobreviveu ao
+    // desmonte do gate e registrou um checkout_return fantasma de uma pagante.
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const tryRescue = () => {
       if (rescueDone.current) return;
       let marker: { at?: number } | null = null;
@@ -637,8 +640,14 @@ export function PaywallFlow({
         try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
         return;
       }
-      setTimeout(async () => {
-        if (rescueDone.current || subRef.current) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        if (rescueDone.current) return;
+        if (subRef.current) {
+          // Já sabemos que pagou: marcador morre aqui, sem roleta.
+          try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
+          return;
+        }
         try {
           const { data } = await supabase.functions.invoke("check-subscription");
           if (data?.subscribed) {
@@ -659,6 +668,7 @@ export function PaywallFlow({
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onVis);
     return () => {
+      if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVis);
       window.removeEventListener("focus", onVis);
     };

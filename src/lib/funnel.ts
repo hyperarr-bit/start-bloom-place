@@ -18,6 +18,178 @@ export const isInAppBrowser = (): boolean => {
 export type QuizOpt = { emoji: string; label: string };
 export type QuizQ = { key: string; q: string; opts: QuizOpt[] };
 
+/* ------------------------------------------------------------------ áreas */
+
+/** Funil vitrine (?porta=vida): o criativo vende o app completo ("vida
+ *  organizada"), a porta faz a pessoa escolher UMA área — amplitude no
+ *  anúncio, especificidade no primeiro toque. `financas` continua sendo o
+ *  funil padrão (porta antiga, sem ?porta=vida). */
+export type AreaKey = "dinheiro" | "rotina" | "corpo" | "saude";
+
+export const AREAS: Record<AreaKey, {
+  emoji: string;
+  label: string;        // opção na porta
+  nome: string;         // nome curto ("Rotina") usado em copy
+  module: string;       // módulo do app que a demo/1ª sessão abre
+  color: string;        // acento visual (radar/central)
+}> = {
+  dinheiro: { emoji: "💸", label: "Meu dinheiro", nome: "Dinheiro", module: "financas", color: "hsl(45 85% 45%)" },
+  rotina: { emoji: "📅", label: "Minha rotina", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
+  corpo: { emoji: "💪", label: "Treino e dieta", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
+  saude: { emoji: "❤️", label: "Minha saúde", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
+};
+
+/** Os 5 módulos da demo curada (os mesmos que aparecem no criativo). */
+export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> = [
+  { key: "rotina", emoji: "📅", label: "Rotina" },
+  { key: "financas", emoji: "💸", label: "Finanças" },
+  { key: "treino", emoji: "💪", label: "Treino" },
+  { key: "dieta", emoji: "🥗", label: "Dieta" },
+  { key: "saude", emoji: "❤️", label: "Saúde" },
+];
+
+/** Grade de 16 usada no "vislumbre da central" (só visual, não navega). */
+export const ALL_MODULE_ICONS: Array<{ emoji: string; label: string }> = [
+  { emoji: "💸", label: "Finanças" }, { emoji: "📅", label: "Rotina" },
+  { emoji: "💪", label: "Treino" }, { emoji: "🥗", label: "Dieta" },
+  { emoji: "❤️", label: "Saúde" }, { emoji: "🎯", label: "Metas" },
+  { emoji: "🧠", label: "Foco" }, { emoji: "📚", label: "Estudos" },
+  { emoji: "💼", label: "Carreira" }, { emoji: "📖", label: "Leitura" },
+  { emoji: "🏠", label: "Casa" }, { emoji: "✨", label: "Beleza" },
+  { emoji: "✈️", label: "Viagens" }, { emoji: "🤝", label: "Relações" },
+  { emoji: "🐶", label: "Pet" }, { emoji: "🚭", label: "Detox" },
+];
+
+/** Trilhas do quiz por área (funil vitrine). A trilha de dinheiro é o QUIZ
+ *  padrão abaixo (5 perguntas + tela de impacto). As demais: 4 perguntas —
+ *  2 da área + compromisso + vitória (chaves iguais em todas as trilhas pra
+ *  personalização do paywall/app funcionar igual). */
+export const AREA_TRACKS: Record<Exclude<AreaKey, "dinheiro">, QuizQ[]> = {
+  rotina: [
+    {
+      key: "atrapalha",
+      q: "O que mais bagunça sua rotina hoje?",
+      opts: [
+        { emoji: "😴", label: "Acordo sem plano nenhum" },
+        { emoji: "📱", label: "Perco horas no celular" },
+        { emoji: "🌀", label: "Começo mil coisas e não termino" },
+        { emoji: "📅", label: "Esqueço tarefas e compromissos" },
+        { emoji: "🧹", label: "Quero organizar tudo" },
+      ],
+    },
+    {
+      key: "consistencia",
+      q: "Quanto tempo você costuma manter um hábito novo?",
+      opts: [
+        { emoji: "🫠", label: "Uns 3 dias" },
+        { emoji: "📆", label: "Uma semana" },
+        { emoji: "🌗", label: "Um mês, aí largo" },
+        { emoji: "🤷", label: "Nunca consegui manter" },
+      ],
+    },
+    {
+      key: "compromisso",
+      q: "Topa dedicar 5 minutos por dia pra sua rotina?",
+      opts: [
+        { emoji: "💪", label: "Sim, topo" },
+        { emoji: "🙂", label: "Topo, se for bem simples" },
+      ],
+    },
+    {
+      key: "vitoria",
+      q: "Qual seria uma vitória nos próximos 7 dias?",
+      opts: [
+        { emoji: "🔥", label: "Manter um hábito 7 dias seguidos" },
+        { emoji: "🌅", label: "Acordar sabendo o que fazer" },
+        { emoji: "✅", label: "Uma semana sem esquecer nada" },
+        { emoji: "📋", label: "Minha semana inteira num painel" },
+      ],
+    },
+  ],
+  corpo: [
+    {
+      key: "atrapalha",
+      q: "O que mais te trava hoje?",
+      opts: [
+        { emoji: "🏋️", label: "Começo a treinar e desisto" },
+        { emoji: "🍔", label: "Como mal e nem percebo" },
+        { emoji: "📋", label: "Não tenho plano de treino nem dieta" },
+        { emoji: "😩", label: "Falta constância, não vontade" },
+        { emoji: "🧹", label: "Quero organizar tudo" },
+      ],
+    },
+    {
+      key: "consistencia",
+      q: "Quantas vezes você já recomeçou treino ou dieta?",
+      opts: [
+        { emoji: "🌱", label: "Essa vai ser a primeira" },
+        { emoji: "✌️", label: "Umas 2 ou 3" },
+        { emoji: "😅", label: "Perdi a conta" },
+        { emoji: "🏃", label: "Tô na ativa, mas sem controle" },
+      ],
+    },
+    {
+      key: "compromisso",
+      q: "Topa dedicar 5 minutos por dia pro seu corpo?",
+      opts: [
+        { emoji: "💪", label: "Sim, topo" },
+        { emoji: "🙂", label: "Topo, se for bem simples" },
+      ],
+    },
+    {
+      key: "vitoria",
+      q: "Qual seria uma vitória nos próximos 7 dias?",
+      opts: [
+        { emoji: "🏋️", label: "Treinar a semana sem furar" },
+        { emoji: "🥗", label: "Seguir o cardápio por 7 dias" },
+        { emoji: "📈", label: "Ver meu progresso registrado" },
+        { emoji: "📋", label: "Treino e dieta num lugar só" },
+      ],
+    },
+  ],
+  saude: [
+    {
+      key: "atrapalha",
+      q: "O que você mais negligencia hoje?",
+      opts: [
+        { emoji: "💧", label: "Beber água" },
+        { emoji: "😴", label: "Dormir direito" },
+        { emoji: "💊", label: "Vitaminas e remédios na hora" },
+        { emoji: "🩺", label: "Exames e check-ups" },
+        { emoji: "🧹", label: "Um pouco de tudo" },
+      ],
+    },
+    {
+      key: "consistencia",
+      q: "Como seu corpo anda te avisando?",
+      opts: [
+        { emoji: "🪫", label: "Cansaço o dia todo" },
+        { emoji: "🌙", label: "Sono ruim" },
+        { emoji: "😰", label: "Ansiedade e estresse" },
+        { emoji: "🛡️", label: "Tô bem — quero prevenir" },
+      ],
+    },
+    {
+      key: "compromisso",
+      q: "Topa dedicar 5 minutos por dia pra sua saúde?",
+      opts: [
+        { emoji: "💪", label: "Sim, topo" },
+        { emoji: "🙂", label: "Topo, se for bem simples" },
+      ],
+    },
+    {
+      key: "vitoria",
+      q: "Qual seria uma vitória nos próximos 7 dias?",
+      opts: [
+        { emoji: "🌙", label: "Dormir melhor essa semana" },
+        { emoji: "💧", label: "Bater a meta de água todo dia" },
+        { emoji: "💊", label: "Não esquecer nenhuma vitamina" },
+        { emoji: "📋", label: "Minha saúde inteira num painel" },
+      ],
+    },
+  ],
+};
+
 export const QUIZ: QuizQ[] = [
   {
     key: "atrapalha",
@@ -90,6 +262,33 @@ export const VICTORY_PHRASE: Record<string, string> = {
   "Criar minha primeira meta": "criar sua primeira meta",
   "Saber quanto posso gastar": "saber quanto pode gastar",
   "Organizar tudo em um painel": "organizar tudo num painel só",
+  // Trilha rotina
+  "Manter um hábito 7 dias seguidos": "manter um hábito 7 dias seguidos",
+  "Acordar sabendo o que fazer": "acordar sabendo o que fazer",
+  "Uma semana sem esquecer nada": "passar a semana sem esquecer nada",
+  "Minha semana inteira num painel": "ver sua semana inteira num painel",
+  // Trilha corpo
+  "Treinar a semana sem furar": "treinar a semana inteira sem furar",
+  "Seguir o cardápio por 7 dias": "seguir o cardápio por 7 dias",
+  "Ver meu progresso registrado": "ver seu progresso registrado",
+  "Treino e dieta num lugar só": "ter treino e dieta num lugar só",
+  // Trilha saúde
+  "Dormir melhor essa semana": "dormir melhor essa semana",
+  "Bater a meta de água todo dia": "bater a meta de água todo dia",
+  "Não esquecer nenhuma vitamina": "nunca mais esquecer uma vitamina",
+  "Minha saúde inteira num painel": "ver sua saúde inteira num painel",
+};
+
+/** Área escolhida na porta vitrine (persistida pro app abrir nela na 1ª sessão). */
+export const FUNNEL_AREA_KEY = "core-funnel-area";
+
+export const getFunnelArea = (): AreaKey | null => {
+  try {
+    const a = localStorage.getItem(FUNNEL_AREA_KEY);
+    return a && a in AREAS ? (a as AreaKey) : null;
+  } catch {
+    return null;
+  }
 };
 
 /**

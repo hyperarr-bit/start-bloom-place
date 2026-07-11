@@ -4,6 +4,7 @@ import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { Sparkles, ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { DEMO_MODULES } from "@/lib/funnel";
 
 import Index from "@/pages/Index";
 import Rotina from "@/pages/Rotina";
@@ -67,6 +68,35 @@ const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
   </div>
 );
 
+/** Demo guiada do funil vitrine (tour=vida): navegação curada entre os 5
+ *  módulos do criativo — liberdade com corrimão, não os 16 de uma vez. */
+const DemoTourNav = ({ current }: { current: string }) => (
+  <div className="sticky top-0 z-[60] bg-background/95 backdrop-blur border-b border-border">
+    <div className="max-w-5xl mx-auto px-3 py-2 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+      {DEMO_MODULES.map((m) => {
+        const active = m.key === current;
+        return (
+          <Link
+            key={m.key}
+            to={`/preview/${m.key}?funnel=1&tour=vida`}
+            onClick={() => trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key })}
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+              active
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-foreground hover:bg-secondary/70"
+            }`}
+          >
+            <span>{m.emoji}</span> {m.label}
+          </Link>
+        );
+      })}
+      <span className="shrink-0 inline-flex items-center rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground border border-dashed border-border">
+        +11 no app completo
+      </span>
+    </div>
+  </div>
+);
+
 /** CTA fixo no rodapé da demo — no funil volta pro cadastro; fora dele, cria conta. */
 const DemoCta = ({ funnel }: { funnel?: boolean }) => (
   <div
@@ -92,13 +122,15 @@ const Preview = () => {
   const { moduleKey } = useParams<{ moduleKey: string }>();
   const [params] = useSearchParams();
   const funnel = params.get("funnel") === "1";
+  const tour = params.get("tour") === "vida";
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
 
   // Telemetria do funil: a demo (app real) é um passo do funil.
+  // No tour, cada módulo visitado conta — mede quantos cômodos a pessoa abre.
   useEffect(() => {
-    if (funnel) trackEvent("funnel_view", { step: "demo" });
-  }, [funnel]);
+    if (funnel) trackEvent("funnel_view", { step: "demo", ...(tour ? { tour: "vida", module: key } : {}) });
+  }, [funnel, tour, key]);
 
   if (!Component) {
     return <Navigate to="/lp" replace />;
@@ -107,7 +139,8 @@ const Preview = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <PreviewBanner funnel={funnel} />
-      <PreviewUserDataProvider moduleKey={key}>
+      {tour && <DemoTourNav current={key} />}
+      <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />
         </RouteErrorBoundary>

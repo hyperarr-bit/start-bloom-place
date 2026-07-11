@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, X, ShieldCheck, Loader2, Gift,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
+  CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
-import { GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
+import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 /**
  * Paywall autocontido (padrão Cal AI: hook → âncora → desconto → backup).
@@ -103,11 +104,18 @@ const stagger = (i: number) => ({
 
 /* ------------------------------------------------------ transformação (SVG) */
 
-function TransformChart() {
+const CHART_LABEL: Record<AreaKey, string> = {
+  dinheiro: "Seu controle do dinheiro",
+  rotina: "Sua consistência",
+  corpo: "Sua evolução",
+  saude: "Seu cuidado com você",
+};
+
+function TransformChart({ label = CHART_LABEL.dinheiro }: { label?: string }) {
   return (
     <div className="relative rounded-2xl border border-border bg-card p-4 overflow-hidden">
       <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-        <TrendingUp className="w-3.5 h-3.5 text-accent" /> Seu controle do dinheiro
+        <TrendingUp className="w-3.5 h-3.5 text-accent" /> {label}
       </div>
       <svg viewBox="0 0 320 150" className="w-full h-auto" aria-hidden>
         {/* grade sutil */}
@@ -168,18 +176,41 @@ function TransformChart() {
 
 /* ---------------------------------------------------------------- seções */
 
-const STACK = [
-  { Icon: Wallet, tile: "bg-amber-100 text-amber-700", title: "Finanças completo", sub: "gastos, saldo e visão do mês" },
-  { Icon: BellRing, tile: "bg-rose-100 text-rose-600", title: "Contas a vencer", sub: "lembretes antes do juros" },
-  { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas e desejos", sub: "progresso que dá vontade" },
-  { Icon: BarChart3, tile: "bg-violet-100 text-violet-700", title: "Saúde financeira", sub: "score, relatórios e simuladores" },
-];
+// Value stack por área de entrada (funil vitrine): a killer feature da dor
+// escolhida vem primeiro (serial position); a amplitude é bônus, não promessa.
+const STACKS: Record<AreaKey, Array<{ Icon: typeof Wallet; tile: string; title: string; sub: string }>> = {
+  dinheiro: [
+    { Icon: Wallet, tile: "bg-amber-100 text-amber-700", title: "Finanças completo", sub: "gastos, saldo e visão do mês" },
+    { Icon: BellRing, tile: "bg-rose-100 text-rose-600", title: "Contas a vencer", sub: "lembretes antes do juros" },
+    { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas e desejos", sub: "progresso que dá vontade" },
+    { Icon: BarChart3, tile: "bg-violet-100 text-violet-700", title: "Saúde financeira", sub: "score, relatórios e simuladores" },
+  ],
+  rotina: [
+    { Icon: CalendarDays, tile: "bg-rose-100 text-rose-600", title: "Rotina semanal", sub: "sua semana inteira, hora a hora" },
+    { Icon: Flame, tile: "bg-amber-100 text-amber-700", title: "Hábitos e streaks", sub: "consistência que dá orgulho" },
+    { Icon: BellRing, tile: "bg-violet-100 text-violet-700", title: "Tarefas e urgências", sub: "nada mais esquecido" },
+    { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas e desejos", sub: "progresso que dá vontade" },
+  ],
+  corpo: [
+    { Icon: Dumbbell, tile: "bg-violet-100 text-violet-700", title: "Treino completo", sub: "plano, cargas e progressão" },
+    { Icon: Salad, tile: "bg-emerald-100 text-emerald-700", title: "Dieta e cardápio", sub: "refeição por refeição" },
+    { Icon: BarChart3, tile: "bg-amber-100 text-amber-700", title: "Progresso visível", sub: "cada treino registrado" },
+    { Icon: Flame, tile: "bg-rose-100 text-rose-600", title: "Constância", sub: "streaks que te seguram firme" },
+  ],
+  saude: [
+    { Icon: HeartPulse, tile: "bg-rose-100 text-rose-600", title: "Saúde no dia a dia", sub: "água, sono e energia" },
+    { Icon: BellRing, tile: "bg-amber-100 text-amber-700", title: "Vitaminas na hora", sub: "lembrete + controle de estoque" },
+    { Icon: BarChart3, tile: "bg-violet-100 text-violet-700", title: "Evolução do corpo", sub: "peso, medidas e exames" },
+    { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Autocuidado", sub: "pequenas vitórias diárias" },
+  ],
+};
 
-function ValueStack() {
+function ValueStack({ area }: { area: AreaKey }) {
+  const stack = STACKS[area] ?? STACKS.dinheiro;
   return (
     <div className="space-y-2.5">
       <div className="grid grid-cols-2 gap-2.5">
-        {STACK.map((s, i) => (
+        {stack.map((s, i) => (
           <motion.div key={s.title} {...stagger(2 + i)} className="rounded-2xl border border-border bg-card p-3 text-left">
             <span className={`inline-grid place-items-center w-9 h-9 rounded-xl ${s.tile} mb-2`}>
               <s.Icon className="w-[18px] h-[18px]" />
@@ -189,18 +220,57 @@ function ValueStack() {
           </motion.div>
         ))}
       </div>
-      {/* Mata a objeção nº 1 ("vou ter que digitar tudo?") — destaque próprio */}
-      <motion.div {...stagger(6)} className="flex items-center gap-3 rounded-2xl border border-accent/25 bg-accent/[0.05] p-3 text-left">
-        <span className="grid place-items-center w-9 h-9 rounded-xl bg-accent text-accent-foreground shrink-0">
-          <FileDown className="w-[18px] h-[18px]" />
-        </span>
-        <div>
-          <div className="text-[13px] font-bold leading-tight">Importa o extrato do seu banco</div>
-          <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
-            Exporta do app do banco, importa aqui — o mês inteiro categorizado sem digitar nada.
+      {area === "dinheiro" ? (
+        /* Mata a objeção nº 1 ("vou ter que digitar tudo?") — destaque próprio */
+        <motion.div {...stagger(6)} className="flex items-center gap-3 rounded-2xl border border-accent/25 bg-accent/[0.05] p-3 text-left">
+          <span className="grid place-items-center w-9 h-9 rounded-xl bg-accent text-accent-foreground shrink-0">
+            <FileDown className="w-[18px] h-[18px]" />
+          </span>
+          <div>
+            <div className="text-[13px] font-bold leading-tight">Importa o extrato do seu banco</div>
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+              Exporta do app do banco, importa aqui — o mês inteiro categorizado sem digitar nada.
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      ) : (
+        /* Funil vitrine: a amplitude entra como bônus concreto, em 1 linha */
+        <motion.div {...stagger(6)} className="flex items-center gap-3 rounded-2xl border border-accent/25 bg-accent/[0.05] p-3 text-left">
+          <span className="grid place-items-center w-9 h-9 rounded-xl bg-accent text-accent-foreground shrink-0">
+            <LayoutGrid className="w-[18px] h-[18px]" />
+          </span>
+          <div>
+            <div className="text-[13px] font-bold leading-tight">16 módulos inclusos, sem pagar mais</div>
+            <div className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+              Finanças, estudos, casa, leitura, pet… a vida inteira no mesmo app.
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+/** Funil vitrine: no lugar da comparação com planilha (que é de finanças),
+ *  a prova de amplitude — os 16 módulos, com os 5 da demo em destaque. */
+function ModulesIncludedCard() {
+  const highlighted = new Set(["Finanças", "Rotina", "Treino", "Dieta", "Saúde"]);
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-left">
+        Tudo isso incluso
+      </div>
+      <div className="grid grid-cols-4 gap-1.5">
+        {ALL_MODULE_ICONS.map((m) => {
+          const on = highlighted.has(m.label);
+          return (
+            <div key={m.label} className={`rounded-xl border p-1.5 flex flex-col items-center gap-0.5 ${on ? "border-accent/40 bg-accent/[0.06]" : "border-border/60 opacity-75"}`}>
+              <span className="text-base leading-none">{m.emoji}</span>
+              <span className="text-[9px] font-semibold text-muted-foreground leading-none">{m.label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -415,7 +485,10 @@ function OfferScreen({
     };
   }, []);
 
-  const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? "ver pra onde seu dinheiro vai";
+  // Área de entrada (funil vitrine); sem área = funil padrão de finanças.
+  const area: AreaKey = answers?.area && answers.area in AREAS ? (answers.area as AreaKey) : "dinheiro";
+  const victory = VICTORY_PHRASE[answers?.vitoria ?? ""]
+    ?? (area === "dinheiro" ? "ver pra onde seu dinheiro vai" : `organizar sua ${AREAS[area].nome.toLowerCase()}`);
 
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10">
@@ -452,10 +525,10 @@ function OfferScreen({
 
       <div className="space-y-4">
         <motion.div {...stagger(2)}><AnchorCard gasto={answers?.gasto ?? ""} /></motion.div>
-        <motion.div {...stagger(3)}><TransformChart /></motion.div>
-        <ValueStack />
+        <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
+        <ValueStack area={area} />
         <GuaranteeTimeline />
-        <motion.div {...stagger(9)}><CompareTable /></motion.div>
+        <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
         <motion.div {...stagger(10)}><PlanPicker billing={billing} setBilling={setBilling} /></motion.div>
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
@@ -706,9 +779,14 @@ export function PaywallFlow({
               <div className="min-h-dvh grid place-items-center">
                 <DownsellScreen
                   context={context}
-                  // Recusou o downsell: no funil entra no app (bloqueado);
-                  // no gate in-app volta pra oferta (continua bloqueado).
-                  onDismiss={() => { if (context === "funnel") navigate("/financas"); else setPhase("offer"); }}
+                  // Recusou o downsell: no funil entra no app (bloqueado) — na
+                  // ÁREA que escolheu, se veio do funil vitrine; no gate in-app
+                  // volta pra oferta (continua bloqueado).
+                  onDismiss={() => {
+                    if (context !== "funnel") { setPhase("offer"); return; }
+                    const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
+                    navigate(`/${AREAS[a].module}`);
+                  }}
                 />
               </div>
             )}

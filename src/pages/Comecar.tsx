@@ -15,7 +15,11 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
-import { QUIZ, GASTO_ANCHOR, isInAppBrowser } from "@/lib/funnel";
+import {
+  QUIZ, GASTO_ANCHOR, isInAppBrowser,
+  AREAS, AREA_TRACKS, ALL_MODULE_ICONS, FUNNEL_AREA_KEY,
+  type AreaKey, type QuizQ,
+} from "@/lib/funnel";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -39,9 +43,12 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "signup" | "offer" | "confirm";
+type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
+/** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
+ *  navegação entre os 5 módulos do criativo (tour=vida). */
+const demoUrlFor = (area: AreaKey) => `/preview/${AREAS[area].module}?funnel=1&tour=vida`;
 
 // Funil sempre em tema claro (fundo branco), mesmo se o visitante estiver no dark.
 const LIGHT_VARS = {
@@ -145,6 +152,226 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
   );
 }
 
+/* ------------------------------------------------- porta vitrine (?porta=vida) */
+
+/** Porta do criativo "vida inteira": o vídeo vendeu a casa, a porta faz a
+ *  pessoa escolher um cômodo — amplitude vira especificidade em 1 toque. */
+function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
+  const options: Array<{ area: AreaKey; emoji: string; label: string }> = [
+    ...(Object.entries(AREAS) as Array<[AreaKey, (typeof AREAS)[AreaKey]]>).map(([key, a]) => ({
+      area: key, emoji: a.emoji, label: a.label,
+    })),
+    // "Tudo" não é uma trilha — é pedido de priorização. Começa pelo que
+    // custa mais caro (dinheiro), e a central mostra o resto junto.
+    { area: "dinheiro" as AreaKey, emoji: "😵", label: "Tudo, sinceramente" },
+  ];
+  return (
+    <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
+      {/* Prova visual da amplitude: os 16 módulos como pano de fundo, sem virar menu */}
+      <div className="grid grid-cols-8 gap-1.5 mb-5 opacity-90">
+        {ALL_MODULE_ICONS.map((m) => (
+          <span key={m.label} className="grid place-items-center aspect-square rounded-lg bg-secondary text-[15px]">
+            {m.emoji}
+          </span>
+        ))}
+      </div>
+      <h1 className="text-[clamp(27px,7.5vw,40px)] font-bold leading-[1.06] tracking-tight mb-2 text-center">
+        Um app pra<br />vida inteira
+      </h1>
+      <p className="text-[15px] text-muted-foreground text-center mb-6">
+        Qual área tá mais fora de controle hoje?
+      </p>
+
+      <div className="space-y-2.5">
+        {options.map((o) => (
+          <button
+            key={o.label}
+            onClick={() => onPickArea(o.area, o.label)}
+            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+          >
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{o.emoji}</span>
+            <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+            <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <p className="text-[12px] text-muted-foreground mt-4 text-center">
+        4 perguntas rápidas · sem cadastro agora
+      </p>
+      <p className="text-sm text-muted-foreground mt-2 text-center">
+        Já tem uma conta? <Link to="/auth" className="font-semibold text-foreground">Entrar</Link>
+      </p>
+    </div>
+  );
+}
+
+/** Radar da vida (funil vitrine): a área escolhida em baixa, o potencial
+ *  mapeado — o momento "isso sou eu" da trilha de vida. */
+function LifeRadar({ area }: { area: AreaKey }) {
+  const axes = [
+    { key: "dinheiro", label: "Dinheiro" },
+    { key: "rotina", label: "Rotina" },
+    { key: "corpo", label: "Corpo" },
+    { key: "saude", label: "Saúde" },
+    { key: "foco", label: "Foco" },
+  ];
+  // Escolhida = baixa (foi o que a pessoa DISSE); demais = meio-termo neutro.
+  const value = (k: string) => (k === area ? 0.3 : 0.58);
+  const C = 100; // centro
+  const R = 72;
+  const pt = (i: number, r: number) => {
+    const ang = (i * (360 / axes.length) - 90) * (Math.PI / 180);
+    return [C + r * Math.cos(ang), C + r * Math.sin(ang)] as const;
+  };
+  const poly = (rFor: (i: number) => number) =>
+    axes.map((_, i) => pt(i, rFor(i)).join(",")).join(" ");
+  return (
+    <div className="relative mx-auto w-64 h-56">
+      <svg viewBox="0 0 200 190" className="w-full h-full">
+        {[0.33, 0.66, 1].map((f) => (
+          <polygon key={f} points={poly(() => R * f)} fill="none" stroke="hsl(var(--border))" strokeWidth="1" />
+        ))}
+        {axes.map((_, i) => {
+          const [x, y] = pt(i, R);
+          return <line key={i} x1={C} y1={C} x2={x} y2={y} stroke="hsl(var(--border))" strokeWidth="1" />;
+        })}
+        <motion.polygon
+          points={poly((i) => R * value(axes[i].key))}
+          fill="hsl(var(--accent) / 0.18)"
+          stroke="hsl(var(--accent))"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.35, duration: 0.6, ease: "easeOut" }}
+          style={{ transformOrigin: "100px 100px" }}
+        />
+        {axes.map((a, i) => {
+          const [x, y] = pt(i, R * value(a.key));
+          const chosen = a.key === area;
+          return (
+            <motion.circle
+              key={a.key} cx={x} cy={y} r={chosen ? 5 : 3.5}
+              fill={chosen ? "hsl(var(--destructive))" : "hsl(var(--accent))"}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 + i * 0.06 }}
+            />
+          );
+        })}
+        {axes.map((a, i) => {
+          const [x, y] = pt(i, R + 16);
+          const chosen = a.key === area;
+          return (
+            <text key={a.key} x={x} y={y} textAnchor="middle" dominantBaseline="middle"
+              fontSize="11" fontWeight={chosen ? 800 : 600}
+              fill={chosen ? "hsl(var(--destructive))" : "hsl(var(--muted-foreground))"}>
+              {a.label}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
+  dinheiro: RESULT_ITEMS,
+  rotina: [
+    "Montar sua rotina semanal, hora a hora",
+    "Manter hábitos com streaks que dão orgulho",
+    "Nunca mais esquecer tarefa ou compromisso",
+    "Ver sua consistência crescer no calendário",
+  ],
+  corpo: [
+    "Montar seu plano de treino da semana",
+    "Seguir um cardápio simples, refeição por refeição",
+    "Registrar cargas e ver a progressão",
+    "Treino e dieta finalmente no mesmo lugar",
+  ],
+  saude: [
+    "Bater sua meta de água todo dia",
+    "Vitaminas e remédios com lembrete e estoque",
+    "Acompanhar sono, peso e evolução",
+    "Sua saúde inteira num painel só",
+  ],
+};
+
+function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
+  const a = AREAS[area];
+  const items = answers.vitoria
+    ? [answers.vitoria, ...AREA_RESULT_ITEMS[area].filter((r) => r !== answers.vitoria)].slice(0, 4)
+    : AREA_RESULT_ITEMS[area].slice(0, 4);
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Análise concluída</div>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-1">Seu mapa da vida<br />está pronto</h2>
+      <LifeRadar area={area} />
+      <Card className="p-3.5 text-left mb-4 border-destructive/30 bg-destructive/[0.04]">
+        <p className="text-[13.5px] leading-snug">
+          <strong>Seu ponto de partida: {a.nome}.</strong> Foi o que você disse que mais dói — é por onde seu plano começa.
+        </p>
+      </Card>
+      <Card className="p-4 text-left space-y-3 mb-7">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Com o CORE, você vai</div>
+        {items.map((r, i) => (
+          <motion.div key={r} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8 + i * 0.08 }}
+            className="flex items-start gap-2.5 text-[14px]">
+            <span className="mt-0.5 w-5 h-5 rounded-full bg-accent/15 text-accent grid place-items-center shrink-0">
+              <Check className="w-3 h-3" strokeWidth={3} />
+            </span>
+            {r}
+          </motion.div>
+        ))}
+      </Card>
+      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}>
+        Ver minha central <ArrowRight className="w-4 h-4" />
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
+    </div>
+  );
+}
+
+/** Vislumbre da central: prova a amplitude (16 módulos) por 3 segundos de
+ *  tela — trailer, não mapa. A demo continua guiada (5 módulos do vídeo). */
+function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
+  const a = AREAS[area];
+  const highlighted = new Set(["Finanças", "Rotina", "Treino", "Dieta", "Saúde"]);
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Sua central tá pronta</h2>
+      <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+        Começando por onde mais dói: <strong className="text-foreground">{a.nome}</strong>.
+        O resto entra com você, no seu ritmo.
+      </p>
+      <div className="grid grid-cols-4 gap-2 mb-7">
+        {ALL_MODULE_ICONS.map((m, i) => {
+          const on = highlighted.has(m.label);
+          return (
+            <motion.div
+              key={m.label}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.08 + i * 0.035, duration: 0.3 }}
+              className={`rounded-2xl border-2 p-2.5 flex flex-col items-center gap-1 ${
+                on ? "border-accent/50 bg-accent/[0.06]" : "border-border bg-card opacity-70"
+              }`}
+            >
+              <span className="text-xl">{m.emoji}</span>
+              <span className={`text-[10px] font-semibold leading-none ${on ? "text-foreground" : "text-muted-foreground"}`}>{m.label}</span>
+            </motion.div>
+          );
+        })}
+      </div>
+      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "central_open", area }); onOpen(); }}>
+        Abrir minha central <ArrowRight className="w-4 h-4" />
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3">Explore à vontade — dados de exemplo</p>
+    </div>
+  );
+}
+
 /** Tela de impacto: devolve a estimativa da própria pessoa, anualizada.
  *  É o momento "isso é sério" antes das duas últimas perguntas. */
 function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
@@ -196,31 +423,40 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
   );
 }
 
-// Fluxo do quiz: perguntas + a tela de impacto logo após a pergunta de gasto.
+// Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
+// após a pergunta de gasto. As trilhas das outras áreas não têm proof.
 type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
-const QUIZ_ITEMS: QuizItem[] = QUIZ.flatMap((q, i) => {
-  const item: QuizItem[] = [{ kind: "q", qIdx: i }];
-  if (q.key === PROOF_AFTER_KEY) item.push({ kind: "proof" });
-  return item;
-});
+const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
+  questions.flatMap((q, i) => {
+    const item: QuizItem[] = [{ kind: "q", qIdx: i }];
+    if (proofAfterKey && q.key === proofAfterKey) item.push({ kind: "proof" });
+    return item;
+  });
+const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-function QuizScreen({ onDone, onBack, initialAnswers }: { onDone: (a: Record<string, string>) => void; onBack: () => void; initialAnswers?: Record<string, string> }) {
-  // A 1ª pergunta ("atrapalha") é respondida na tela inicial (item 3): se veio
-  // com resposta, pula direto pro item seguinte do quiz.
-  const startIdx = initialAnswers && QUIZ.length > 0 && initialAnswers[QUIZ[0].key]
-    ? QUIZ_ITEMS.findIndex((it) => it.kind === "q" && it.qIdx === 1)
+function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered }: {
+  questions: QuizQ[];
+  items: QuizItem[];
+  onDone: (a: Record<string, string>) => void;
+  onBack: () => void;
+  initialAnswers?: Record<string, string>;
+  /** Porta de finanças responde a 1ª pergunta na tela inicial: começa da 2ª. */
+  skipFirstAnswered?: boolean;
+}) {
+  const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
+    ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
     : 0;
   const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
-  const item = QUIZ_ITEMS[idx];
-  const q = item.kind === "q" ? QUIZ[item.qIdx] : null;
+  const item = items[idx];
+  const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
-    const it = QUIZ_ITEMS[idx];
+    const it = items[idx];
     trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : "quiz_proof" });
-  }, [idx]);
+  }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
-    if (idx < QUIZ_ITEMS.length - 1) setIdx((i) => i + 1);
+    if (idx < items.length - 1) setIdx((i) => i + 1);
     else onDone(next);
   };
   const pick = (label: string) => {
@@ -239,9 +475,9 @@ function QuizScreen({ onDone, onBack, initialAnswers }: { onDone: (a: Record<str
         </button>
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${((idx + 1) / QUIZ_ITEMS.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+            animate={{ width: `${((idx + 1) / items.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{QUIZ_ITEMS.length}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{items.length}</span>
       </div>
 
       <AnimatePresence mode="wait">
@@ -274,17 +510,17 @@ function QuizScreen({ onDone, onBack, initialAnswers }: { onDone: (a: Record<str
   );
 }
 
-function ProgressScreen({ onDone }: { onDone: () => void }) {
+function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
-    if (done >= PREP_STEPS.length) {
+    if (done >= steps.length) {
       const t = setTimeout(onDone, 650);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setDone((d) => d + 1), done === 0 ? 500 : 850);
     return () => clearTimeout(t);
-  }, [done, onDone]);
-  const pct = Math.round((done / PREP_STEPS.length) * 100);
+  }, [done, onDone, steps.length]);
+  const pct = Math.round((done / steps.length) * 100);
   const C = 2 * Math.PI * 44;
   return (
     <div className="w-full max-w-sm mx-auto text-center">
@@ -299,7 +535,7 @@ function ProgressScreen({ onDone }: { onDone: () => void }) {
       <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu plano…</h2>
       <p className="text-muted-foreground text-sm mb-8">Isso leva só alguns segundos.</p>
       <div className="space-y-3 text-left max-w-xs mx-auto">
-        {PREP_STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const state = i < done ? "done" : i === done ? "active" : "pending";
           return (
             <div key={s} className="flex items-center gap-3">
@@ -481,7 +717,16 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       return;
     }
     try { setUserData("user-name", name.trim()); } catch { /* noop */ }
-    try { setUserData("force-new-user-tutorial", "true"); localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
+    // Tutorial forçado é o de FINANÇAS (spotlight do Index) e o wizard da Home.
+    // Quem veio do funil vitrine com outra área cai no módulo dela — o flag
+    // aqui sequestraria a 1ª visita à Home com o wizard multi-módulo.
+    try {
+      const vidaArea = localStorage.getItem(FUNNEL_AREA_KEY);
+      if (!vidaArea || vidaArea === "dinheiro") {
+        setUserData("force-new-user-tutorial", "true");
+        localStorage.setItem("force-new-user-tutorial", "true");
+      }
+    } catch { /* noop */ }
     trackEvent("funnel_click", { cta: "signup_success", instant: !!session });
     fireMetaEvent("CompleteRegistration", { content_name: "signup" });
     setLoading(false);
@@ -566,6 +811,22 @@ export default function Comecar() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Funil vitrine: ?porta=vida (criativo "app pra vida inteira"). A área
+  // escolhida persiste — quem volta da demo (?step=signup) segue na trilha.
+  const vitrine = params.get("porta") === "vida";
+  const [area, setArea] = useState<AreaKey | null>(() => {
+    try {
+      const a = localStorage.getItem(FUNNEL_AREA_KEY);
+      return a && a in AREAS ? (a as AreaKey) : null;
+    } catch { return null; }
+  });
+  const track: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
+  const trackItems = vitrine && area && area !== "dinheiro"
+    ? buildQuizItems(track)
+    : QUIZ_ITEMS;
+  const vidaPrepSteps = area
+    ? ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
+    : PREP_STEPS;
 
   // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
   // qual campanha/origem trouxe cada sessão.
@@ -581,6 +842,8 @@ export default function Comecar() {
     if (step !== "quiz" && step !== "offer") {
       trackEvent("funnel_view", {
         step,
+        // Segmenta o funil vitrine ("vida") do funil padrão (finanças) no admin.
+        ...(vitrine ? { porta: "vida" } : {}),
         // Só na 1ª tela: sinal pra distinguir visita real de pré-carregamento
         // do webview (Instagram/TikTok pré-abrem a página antes do tap real —
         // isso chega com visibilityState "hidden"/"prerender").
@@ -599,7 +862,19 @@ export default function Comecar() {
       <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
-            {step === "start" && (
+            {step === "start" && (vitrine ? (
+              <VitrineStartScreen
+                onPickArea={(picked, label) => {
+                  setArea(picked);
+                  const first = { area: picked };
+                  setAnswers(first);
+                  try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
+                  trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked });
+                  trackEvent("funnel_quiz_answer", { q: "area", answer: label });
+                  setStep("quiz");
+                }}
+              />
+            ) : (
               <StartScreen
                 onPick={(firstAnswer) => {
                   const first = { [QUIZ[0].key]: firstAnswer };
@@ -613,9 +888,12 @@ export default function Comecar() {
                   setStep("quiz");
                 }}
               />
-            )}
+            ))}
             {step === "quiz" && (
               <QuizScreen
+                questions={track}
+                items={trackItems}
+                skipFirstAnswered={!vitrine}
                 initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {
@@ -626,8 +904,15 @@ export default function Comecar() {
                 }}
               />
             )}
-            {step === "progress" && <ProgressScreen onDone={() => setStep("result")} />}
-            {step === "result" && <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />}
+            {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
+            {step === "result" && (vitrine && area ? (
+              <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />
+            ) : (
+              <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
+            ))}
+            {step === "central" && area && (
+              <CentralScreen area={area} onOpen={() => { window.location.href = demoUrlFor(area); }} />
+            )}
             {step === "signup" && (
               <SignupScreen
                 onSession={() => setStep("offer")}

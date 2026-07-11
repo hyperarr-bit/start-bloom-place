@@ -19,6 +19,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { QuickSignupModal } from "@/components/onboarding/QuickSignupModal";
 import { captureLeadSource } from "@/lib/lead-source";
+import { getFunnelArea, AREAS } from "@/lib/funnel";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -29,7 +30,13 @@ captureLeadSource();
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/financas" replace />;
+  if (user) {
+    // Quem veio do funil vitrine (?porta=vida) escolheu uma área — o app abre
+    // NELA (a promessa da porta continua na 1ª sessão). Funil padrão → finanças.
+    const area = getFunnelArea();
+    if (area && area !== "dinheiro") return <Navigate to={`/${AREAS[area].module}`} replace />;
+    return <Navigate to="/financas" replace />;
+  }
   return <Navigate to="/comecar" replace />;
 };
 
@@ -50,6 +57,7 @@ import NotFound from "./pages/NotFound";
 // bundle inicial e carregam sob demanda — a LP/anônimo carrega leve.
 const Planos = lazy(() => import("./pages/Planos"));
 const Index = lazy(() => import("./pages/Index"));
+const Home = lazy(() => import("./pages/Home"));
 const Rotina = lazy(() => import("./pages/Rotina"));
 const DesenvolvimentoPessoal = lazy(() => import("./pages/DesenvolvimentoPessoal"));
 const Saude = lazy(() => import("./pages/Saude"));
@@ -92,8 +100,8 @@ const AnimatedRoutes = () => {
         <Route path="/comecar" element={<PageTransition><Comecar /></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
-        {/* Pivot "só finanças": a Home (hub multi-módulo) foi aposentada — entra direto no Finanças. */}
-        <Route path="/home" element={<Navigate to="/financas" replace />} />
+        {/* Volta dos 16 módulos (funil vitrine, jul/2026): a Home hub reabriu. */}
+        <Route path="/home" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="home"><Home /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/financas" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="financas"><TrackedModule moduleId="financas"><Index /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/rotina" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="rotina"><TrackedModule moduleId="rotina"><Rotina /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/desenvolvimento" element={<ProtectedRoute allowGuest><PageTransition><RouteErrorBoundary routeName="desenvolvimento"><TrackedModule moduleId="desenvolvimento"><DesenvolvimentoPessoal /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />

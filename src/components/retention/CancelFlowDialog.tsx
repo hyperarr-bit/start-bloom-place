@@ -103,16 +103,19 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
   };
 
   const handleReasonNext = async () => {
-    if (!reason) return;
     setLoading(true);
     try {
       const id = await ensureAttempt();
-      await invoke({
-        action: "log_reason",
-        attemptId: id,
-        reason,
-        reasonDetail: reasonDetail || undefined,
-      });
+      // Motivo é OPCIONAL: forçar a escolha só suja o dado (a pessoa marca
+      // qualquer coisa pra sair). Sem motivo, segue direto pra oferta.
+      if (reason) {
+        await invoke({
+          action: "log_reason",
+          attemptId: id,
+          reason,
+          reasonDetail: reasonDetail || undefined,
+        });
+      }
       setStep("offer");
     } catch (e) {
       toast({ title: "Erro", description: "Tente novamente.", variant: "destructive" });
@@ -273,7 +276,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
             <DialogHeader>
               <DialogTitle>Antes de você ir...</DialogTitle>
               <DialogDescription>
-                Pode me contar o motivo? Isso me ajuda a melhorar o app pra você.
+                Se quiser, me conta o motivo — ajuda a melhorar o app. Mas é opcional.
               </DialogDescription>
             </DialogHeader>
 
@@ -305,7 +308,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
               <Button variant="ghost" onClick={() => handleOpenChange(false)}>
                 Voltar
               </Button>
-              <Button onClick={handleReasonNext} disabled={!reason || loading}>
+              <Button onClick={handleReasonNext} disabled={loading}>
                 {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Continuar
               </Button>

@@ -252,25 +252,33 @@ function ValueStack({ area }: { area: AreaKey }) {
 }
 
 /** Funil vitrine: no lugar da comparação com planilha (que é de finanças),
- *  a prova de amplitude — os 16 módulos, com os 5 da demo em destaque. */
+ *  a prova de amplitude — os 16 módulos. TODOS lêem como inclusos (check em
+ *  cada): destacar só 5 fazia o lead achar que os cinza eram bloqueados. */
 function ModulesIncludedCard() {
-  const highlighted = new Set(["Finanças", "Rotina", "Treino", "Dieta", "Saúde"]);
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
-      <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-left">
-        Tudo isso incluso
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground text-left">
+          Tudo isso incluso
+        </div>
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-accent bg-accent/10 rounded-full px-2 py-0.5">
+          <Check className="w-3 h-3" strokeWidth={3.5} /> 16/16
+        </span>
       </div>
       <div className="grid grid-cols-4 gap-1.5">
-        {ALL_MODULE_ICONS.map((m) => {
-          const on = highlighted.has(m.label);
-          return (
-            <div key={m.label} className={`rounded-xl border p-1.5 flex flex-col items-center gap-0.5 ${on ? "border-accent/40 bg-accent/[0.06]" : "border-border/60 opacity-75"}`}>
-              <span className="text-base leading-none">{m.emoji}</span>
-              <span className="text-[9px] font-semibold text-muted-foreground leading-none">{m.label}</span>
-            </div>
-          );
-        })}
+        {ALL_MODULE_ICONS.map((m) => (
+          <div key={m.label} className="relative rounded-xl border border-accent/30 bg-accent/[0.05] p-1.5 flex flex-col items-center gap-0.5">
+            <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-accent text-accent-foreground grid place-items-center shadow-sm">
+              <Check className="w-2 h-2" strokeWidth={4} />
+            </span>
+            <span className="text-base leading-none">{m.emoji}</span>
+            <span className="text-[9px] font-semibold text-foreground leading-none">{m.label}</span>
+          </div>
+        ))}
       </div>
+      <p className="text-[11px] text-muted-foreground text-center mt-3">
+        Acesso completo a todos — nada é cobrado à parte.
+      </p>
     </div>
   );
 }

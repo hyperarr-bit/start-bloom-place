@@ -337,33 +337,43 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
  *  tela — trailer, não mapa. A demo continua guiada (5 módulos do vídeo). */
 function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
   const a = AREAS[area];
-  const highlighted = new Set(["Finanças", "Rotina", "Treino", "Dieta", "Saúde"]);
+  // Só o módulo da área tem anel "começa aqui" (bate com a copy). Os outros
+  // 15 são cards sólidos — NADA apagado, senão o lead acha que estão bloqueados.
+  const startLabel: Record<string, string> = { financas: "Finanças", rotina: "Rotina", treino: "Treino", saude: "Saúde" };
+  const startHere = startLabel[a.module];
   return (
     <div className="w-full max-w-sm mx-auto text-center">
       <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Sua central tá pronta</h2>
-      <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-        Começando por onde mais dói: <strong className="text-foreground">{a.nome}</strong>.
-        O resto entra com você, no seu ritmo.
+      <p className="text-muted-foreground text-sm leading-relaxed mb-5">
+        Os 16 módulos já são seus. <strong className="text-foreground">Começamos por {a.nome}</strong> — o resto entra no seu ritmo.
       </p>
-      <div className="grid grid-cols-4 gap-2 mb-7">
+      <div className="grid grid-cols-4 gap-2 mb-3">
         {ALL_MODULE_ICONS.map((m, i) => {
-          const on = highlighted.has(m.label);
+          const on = m.label === startHere;
           return (
             <motion.div
               key={m.label}
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.08 + i * 0.035, duration: 0.3 }}
-              className={`rounded-2xl border-2 p-2.5 flex flex-col items-center gap-1 ${
-                on ? "border-accent/50 bg-accent/[0.06]" : "border-border bg-card opacity-70"
+              className={`relative rounded-2xl border-2 p-2.5 flex flex-col items-center gap-1 bg-card ${
+                on ? "border-accent bg-accent/[0.07]" : "border-border"
               }`}
             >
+              {on && (
+                <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[8px] font-bold uppercase tracking-wide bg-accent text-accent-foreground rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                  começa aqui
+                </span>
+              )}
               <span className="text-xl">{m.emoji}</span>
-              <span className={`text-[10px] font-semibold leading-none ${on ? "text-foreground" : "text-muted-foreground"}`}>{m.label}</span>
+              <span className="text-[10px] font-semibold leading-none text-foreground">{m.label}</span>
             </motion.div>
           );
         })}
       </div>
+      <p className="text-[11px] text-accent font-semibold mb-6 inline-flex items-center justify-center gap-1 w-full">
+        <Check className="w-3.5 h-3.5" strokeWidth={3} /> Todos os 16 inclusos, sem pagar à parte
+      </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "central_open", area }); onOpen(); }}>
         Abrir minha central <ArrowRight className="w-4 h-4" />
       </Button>

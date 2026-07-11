@@ -45,7 +45,6 @@ const RootGate = () => {
 import Acesso from "./pages/Acesso";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
-import Inicio from "./pages/Inicio";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import LandingPage from "./pages/lp/LpFinancas";
@@ -158,7 +157,9 @@ const App = () => {
                 <GracePeriodBanner />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
-                  <Route path="/inicio" element={<Inicio />} />
+                  {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
+                      A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
+                  <Route path="/inicio" element={<Comecar />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="*" element={<AnimatedRoutes />} />

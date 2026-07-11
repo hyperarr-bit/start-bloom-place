@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, useLocation, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
@@ -811,9 +811,11 @@ export default function Comecar() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  // Funil vitrine: ?porta=vida (criativo "app pra vida inteira"). A área
-  // escolhida persiste — quem volta da demo (?step=signup) segue na trilha.
-  const vitrine = params.get("porta") === "vida";
+  // Funil vitrine: /inicio (URL limpa dos anúncios) ou ?porta=vida (compat).
+  // Criativo "app pra vida inteira". A área escolhida persiste — quem volta
+  // da demo (?step=signup) segue na trilha.
+  const { pathname } = useLocation();
+  const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
       const a = localStorage.getItem(FUNNEL_AREA_KEY);

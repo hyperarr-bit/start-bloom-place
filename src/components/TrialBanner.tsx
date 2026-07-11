@@ -18,7 +18,12 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/auth") ||
     location.pathname.startsWith("/reset-password") ||
     location.pathname.startsWith("/update-password") ||
-    location.pathname.startsWith("/admin");
+    location.pathname.startsWith("/admin") ||
+    // O funil tem o PRÓPRIO paywall (passo offer). Sem isso, a conta
+    // recém-criada (sem trial) ganhava DOIS paywalls empilhados no /comecar:
+    // o do funil + este gate por cima — eventos duplicados, voltar bugado.
+    location.pathname.startsWith("/comecar") ||
+    location.pathname.startsWith("/preview");
 
   const tutorialDone = loaded && get<string>("spotlight-done-financas", "") === "true";
   const viewedRef = useRef<string | null>(null);

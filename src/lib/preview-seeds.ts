@@ -202,7 +202,79 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
     "saude-bmi-height": "178",
     "saude-bmi-weight": "76.4",
   },
-  desenvolvimento: { ...COMMON },
+  desenvolvimento: {
+    ...COMMON,
+    "spotlight-done-desenvolvimento": "true",
+    "dp-motivations": [
+      "Dar uma vida melhor pra minha família",
+      "Provar pra mim que eu consigo",
+      "Ter liberdade de horário",
+    ],
+    "dp-affirmations": ["Eu termino o que eu começo", "Um passo por dia me basta"],
+    "dp-strengths": ["Criatividade", "Não desisto fácil"],
+    "dp-weaknesses": ["Procrastino quando é difícil"],
+    "dp-skills": ["Vender", "Escrever bem"],
+    "dp-skills-learn": ["Gestão financeira", "Inglês"],
+    "dp-values": ["Família", "Honestidade", "Liberdade"],
+    "dp-can-control": ["Minha rotina", "Meu esforço"],
+    "dp-cant-control": ["A opinião dos outros"],
+    "dp-wheel": {
+      saude: 7, financas: 5, relacionamentos: 8, carreira: 6,
+      espiritualidade: 7, lazer: 4, intelectual: 6, emocional: 6,
+    },
+    // A meta VIVA: visão + plano com passos (alguns feitos) + pedra no caminho
+    "goals-board-v2": [
+      {
+        id: "g1",
+        title: "Abrir meu negócio próprio",
+        actionGroups: [
+          {
+            id: "g1-a", label: "Definir as bases:", tasks: [
+              { id: "t1", text: "Validar a ideia com 10 clientes", done: true },
+              { id: "t2", text: "Separar R$ 3.000 de capital inicial", done: true },
+              { id: "t3", text: "Abrir o MEI", done: false },
+            ],
+          },
+          {
+            id: "g1-b", label: "Estruturar o plano:", tasks: [
+              { id: "t4", text: "Criar o Instagram do negócio", done: false },
+              { id: "t5", text: "Fazer a primeira venda", done: false },
+            ],
+          },
+        ],
+        referenceLinks: [], referenceImages: [],
+        vision: { meta: "Faturar R$ 5.000/mês", objetivo: "Sair do CLT com segurança", tempo: "12 meses" },
+        problems: [{ id: "p1", problem: "Medo de largar a renda fixa", solution: "Validar vendendo enquanto ainda trabalho" }],
+      },
+      {
+        id: "g2",
+        title: "Viajar pro Nordeste em dezembro",
+        actionGroups: [
+          {
+            id: "g2-a", label: "Definir as bases:", tasks: [
+              { id: "t6", text: "Pesquisar passagens e época", done: true },
+              { id: "t7", text: "Guardar R$ 400/mês", done: true },
+            ],
+          },
+        ],
+        referenceLinks: [], referenceImages: [],
+        vision: { meta: "7 dias em Jericoacoara", objetivo: "Descansar de verdade", tempo: "5 meses" },
+        problems: [{ id: "p2", problem: "", solution: "" }],
+      },
+    ],
+    "goals-timeline": {
+      "6meses": { items: [{ id: "tl1", text: "Negócio validado e vendendo", done: false }, { id: "tl2", text: "R$ 5.000 guardados", done: false }] },
+      "1ano": { items: [{ id: "tl3", text: "Sair do CLT", done: false }] },
+      "3anos": { items: [{ id: "tl4", text: "Equipe de 2 pessoas", done: false }] },
+      "5anos": { items: [{ id: "tl5", text: "Viver 100% do meu negócio", done: false }] },
+    },
+    "goals-home": { quote: "Um passo por dia chega em qualquer lugar.", dreamBoard: [] },
+    "dp-gratitude": {
+      [iso(today)]: ["Acordei cedo e treinei", "Café com minha mãe"],
+      [daysAgo(1)]: ["Primeiro 'sim' de um cliente 🎉"],
+    },
+    "dp-mood-log": { [iso(today)]: 4, [daysAgo(1)]: 5, [daysAgo(2)]: 3, [daysAgo(3)]: 4 },
+  },
   hiperfoco: {
     ...COMMON,
     "mente-dreams": [

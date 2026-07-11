@@ -24,7 +24,7 @@ export type QuizQ = { key: string; q: string; opts: QuizOpt[] };
  *  organizada"), a porta faz a pessoa escolher UMA área — amplitude no
  *  anúncio, especificidade no primeiro toque. `financas` continua sendo o
  *  funil padrão (porta antiga, sem ?porta=vida). */
-export type AreaKey = "dinheiro" | "rotina" | "corpo" | "saude";
+export type AreaKey = "dinheiro" | "rotina" | "corpo" | "saude" | "metas";
 
 export const AREAS: Record<AreaKey, {
   emoji: string;
@@ -37,15 +37,19 @@ export const AREAS: Record<AreaKey, {
   rotina: { emoji: "📅", label: "Minha rotina", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
   corpo: { emoji: "💪", label: "Treino e dieta", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
   saude: { emoji: "❤️", label: "Minha saúde", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
+  // Rotulada pela DOR ("metas paradas"), nunca "Desenvolvimento pessoal" —
+  // categoria vaga não abre porta. O módulo é o desenvolvimento (aba Metas).
+  metas: { emoji: "🎯", label: "Minhas metas", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
 };
 
-/** Os 5 módulos da demo curada (os mesmos que aparecem no criativo). */
+/** Os módulos da demo curada (os 5 do criativo + Metas). */
 export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> = [
   { key: "rotina", emoji: "📅", label: "Rotina" },
   { key: "financas", emoji: "💸", label: "Finanças" },
   { key: "treino", emoji: "💪", label: "Treino" },
   { key: "dieta", emoji: "🥗", label: "Dieta" },
   { key: "saude", emoji: "❤️", label: "Saúde" },
+  { key: "desenvolvimento", emoji: "🎯", label: "Metas" },
 ];
 
 /** Grade de 16 usada no "vislumbre da central" (só visual, não navega). */
@@ -188,6 +192,47 @@ export const AREA_TRACKS: Record<Exclude<AreaKey, "dinheiro">, QuizQ[]> = {
       ],
     },
   ],
+  metas: [
+    {
+      key: "atrapalha",
+      q: "O que acontece com as suas metas?",
+      opts: [
+        { emoji: "📝", label: "Ficam na cabeça, nunca no papel" },
+        { emoji: "🎆", label: "Empolgo em janeiro, esqueço em março" },
+        { emoji: "🌀", label: "Tenho tantas que não sei por onde começar" },
+        { emoji: "🫥", label: "Sei o que quero, não sei o caminho" },
+        { emoji: "🧹", label: "Quero organizar tudo" },
+      ],
+    },
+    {
+      key: "consistencia",
+      q: "Quanto tempo faz que essa meta te espera?",
+      opts: [
+        { emoji: "🌱", label: "Surgiu agora" },
+        { emoji: "📆", label: "Uns meses" },
+        { emoji: "🗓️", label: "Mais de um ano" },
+        { emoji: "😔", label: "Anos… nem conto mais" },
+      ],
+    },
+    {
+      key: "compromisso",
+      q: "Topa dedicar 5 minutos por dia pras suas metas?",
+      opts: [
+        { emoji: "💪", label: "Sim, topo" },
+        { emoji: "🙂", label: "Topo, se for bem simples" },
+      ],
+    },
+    {
+      key: "vitoria",
+      q: "Qual seria uma vitória nos próximos 7 dias?",
+      opts: [
+        { emoji: "🗺️", label: "Minha meta com um plano de verdade" },
+        { emoji: "✅", label: "Dar o primeiro passo, finalmente" },
+        { emoji: "🧭", label: "Saber o que fazer essa semana" },
+        { emoji: "📋", label: "Minhas metas todas num painel" },
+      ],
+    },
+  ],
 };
 
 /** Tela de PICO das trilhas (funil vitrine), depois da pergunta de
@@ -232,6 +277,17 @@ export const AREA_PROOF: Record<Exclude<AreaKey, "dinheiro">, {
     card: "Água, sono, vitaminas na hora. Coisas pequenas que, juntas e no automático, mudam como você se sente todo dia.",
     cta: "Quero me cuidar de verdade",
   },
+  metas: {
+    echo: {
+      "Surgiu agora": "Ainda dá tempo de começar certo.",
+      "Uns meses": "Meses esperando na fila.",
+      "Mais de um ano": "Mais de um ano parada.",
+      "Anos… nem conto mais": "Anos vendo ela de longe.",
+    },
+    reframe: "Meta sem plano visível é só um desejo.",
+    card: "A distância entre você e ela não é talento — é um plano que você VÊ todo dia: visão, passos e linha do tempo num lugar só.",
+    cta: "Quero tirar do papel",
+  },
 };
 
 /** Âncora de custo do paywall (funil vitrine): o custo de CONTINUAR ASSIM
@@ -240,6 +296,7 @@ export const AREA_ANCHOR: Record<Exclude<AreaKey, "dinheiro">, { pain: string; p
   rotina: { pain: "Recomeçar do zero", painSub: "de novo, e de novo" },
   corpo: { pain: "Mais um recomeço", painSub: "largado no meio" },
   saude: { pain: "O corpo cobrando", painSub: "a conta lá na frente" },
+  metas: { pain: "Mais um ano igual", painSub: "com a meta no mesmo lugar" },
 };
 
 export const QUIZ: QuizQ[] = [
@@ -329,6 +386,11 @@ export const VICTORY_PHRASE: Record<string, string> = {
   "Bater a meta de água todo dia": "bater a meta de água todo dia",
   "Não esquecer nenhuma vitamina": "nunca mais esquecer uma vitamina",
   "Minha saúde inteira num painel": "ver sua saúde inteira num painel",
+  // Trilha metas
+  "Minha meta com um plano de verdade": "dar um plano de verdade pra sua meta",
+  "Dar o primeiro passo, finalmente": "dar o primeiro passo, finalmente",
+  "Saber o que fazer essa semana": "saber o que fazer essa semana",
+  "Minhas metas todas num painel": "ver suas metas todas num painel",
 };
 
 /** Área escolhida na porta vitrine (persistida pro app abrir nela na 1ª sessão). */

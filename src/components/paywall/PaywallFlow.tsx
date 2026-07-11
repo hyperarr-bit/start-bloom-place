@@ -109,6 +109,7 @@ const CHART_LABEL: Record<AreaKey, string> = {
   rotina: "Sua consistência",
   corpo: "Sua evolução",
   saude: "Seu cuidado com você",
+  metas: "Sua distância até a meta",
 };
 
 function TransformChart({ label = CHART_LABEL.dinheiro }: { label?: string }) {
@@ -202,6 +203,12 @@ const STACKS: Record<AreaKey, Array<{ Icon: typeof Wallet; tile: string; title: 
     { Icon: BellRing, tile: "bg-amber-100 text-amber-700", title: "Vitaminas na hora", sub: "lembrete + controle de estoque" },
     { Icon: BarChart3, tile: "bg-violet-100 text-violet-700", title: "Evolução do corpo", sub: "peso, medidas e exames" },
     { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Autocuidado", sub: "pequenas vitórias diárias" },
+  ],
+  metas: [
+    { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas com plano", sub: "visão, passos e prazo" },
+    { Icon: CalendarDays, tile: "bg-violet-100 text-violet-700", title: "Linha do tempo", sub: "6 meses, 1, 3 e 5 anos" },
+    { Icon: BarChart3, tile: "bg-amber-100 text-amber-700", title: "Progresso visível", sub: "cada passo marcado" },
+    { Icon: Flame, tile: "bg-rose-100 text-rose-600", title: "Motivação diária", sub: "diário, humor e gratidão" },
   ],
 };
 

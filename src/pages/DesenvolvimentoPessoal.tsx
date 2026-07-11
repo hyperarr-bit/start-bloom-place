@@ -90,7 +90,13 @@ const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorCl
 
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("sobre");
+  // ?tab= permite deep-link (a demo do funil de metas abre direto na aba Metas)
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      return t && ["sobre", "metas", "diario", "humor", "respiracao", "gratidao", "carta", "desafios"].includes(t) ? t : "sobre";
+    } catch { return "sobre"; }
+  });
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const { set: setUserData, isGuest } = useUserData();

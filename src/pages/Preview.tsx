@@ -96,7 +96,7 @@ const DemoTourNav = ({ current }: { current: string }) => (
         );
       })}
       <span className="shrink-0 inline-flex items-center rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-muted-foreground border border-dashed border-border">
-        +11 no app completo
+        +10 no app completo
       </span>
     </div>
   </div>

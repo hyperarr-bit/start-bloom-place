@@ -47,8 +47,10 @@ type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "o
 
 const DEMO_URL = "/preview/financas?funnel=1";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
- *  navegação entre os 5 módulos do criativo (tour=vida). */
-const demoUrlFor = (area: AreaKey) => `/preview/${AREAS[area].module}?funnel=1&tour=vida`;
+ *  navegação entre os módulos do criativo (tour=vida). A área de metas cai
+ *  direto na aba Metas — a promessa da porta, não o "Sobre mim". */
+const demoUrlFor = (area: AreaKey) =>
+  `/preview/${AREAS[area].module}?funnel=1&tour=vida${area === "metas" ? "&tab=metas" : ""}`;
 
 // Funil sempre em tema claro (fundo branco), mesmo se o visitante estiver no dark.
 const LIGHT_VARS = {
@@ -211,12 +213,13 @@ function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label:
 /** Radar da vida (funil vitrine): a área escolhida em baixa, o potencial
  *  mapeado — o momento "isso sou eu" da trilha de vida. */
 function LifeRadar({ area }: { area: AreaKey }) {
+  // Os 5 eixos mapeiam 1:1 com as 5 áreas da porta.
   const axes = [
     { key: "dinheiro", label: "Dinheiro" },
     { key: "rotina", label: "Rotina" },
     { key: "corpo", label: "Corpo" },
     { key: "saude", label: "Saúde" },
-    { key: "foco", label: "Foco" },
+    { key: "metas", label: "Metas" },
   ];
   // Escolhida = baixa (foi o que a pessoa DISSE); demais = meio-termo neutro.
   const value = (k: string) => (k === area ? 0.3 : 0.58);
@@ -296,6 +299,12 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
     "Acompanhar sono, peso e evolução",
     "Sua saúde inteira num painel só",
   ],
+  metas: [
+    "Transformar sua meta num plano com passos",
+    "Ver sua linha do tempo: 6 meses, 1, 3, 5 anos",
+    "Dar o primeiro passo ainda essa semana",
+    "Todas as suas metas num painel só",
+  ],
 };
 
 function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
@@ -339,7 +348,7 @@ function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) 
   const a = AREAS[area];
   // Só o módulo da área tem anel "começa aqui" (bate com a copy). Os outros
   // 15 são cards sólidos — NADA apagado, senão o lead acha que estão bloqueados.
-  const startLabel: Record<string, string> = { financas: "Finanças", rotina: "Rotina", treino: "Treino", saude: "Saúde" };
+  const startLabel: Record<string, string> = { financas: "Finanças", rotina: "Rotina", treino: "Treino", saude: "Saúde", desenvolvimento: "Metas" };
   const startHere = startLabel[a.module];
   return (
     <div className="w-full max-w-sm mx-auto text-center">

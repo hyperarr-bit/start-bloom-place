@@ -162,7 +162,7 @@ export function pickDailyNudge(
           ? "Amanhã é o último dia"
           : "Garanta seu acesso antes que expire",
         description: engaged
-          ? "Continue com tudo que você já configurou. A partir de R$14,90/mês."
+          ? "Continue com tudo que você já configurou. A partir de R$ 5,82/mês no anual."
           : "Assine agora e mantenha tudo organizado.",
         ctaLabel: "Assinar agora",
         ctaRoute: "/planos",

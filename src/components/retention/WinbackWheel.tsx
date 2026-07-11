@@ -9,10 +9,10 @@ const SLICES = [
   { label: "Tente +", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
   { label: "30% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
   { label: "Quase!", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
-  { label: "50% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
+  { label: "5% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
   { label: "Vazio", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
   { label: "20% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
-  { label: "80% OFF", from: "hsl(var(--primary))", to: "hsl(var(--primary) / 0.78)", text: "hsl(var(--primary-foreground))", winning: true },
+  { label: "50% OFF", from: "hsl(var(--primary))", to: "hsl(var(--primary) / 0.78)", text: "hsl(var(--primary-foreground))", winning: true },
 ];
 
 const SLICE_DEG = 360 / SLICES.length;
@@ -36,9 +36,12 @@ function slicePath(index: number) {
 interface Props {
   attemptId: string | null;
   onSpinComplete: () => void;
+  /** Texto da fatia vencedora. Default = winback de cancelamento (anual 50% OFF);
+   *  o paywall passa o prêmio dele (1º mês do mensal por R$9,90). */
+  prizeLabel?: string;
 }
 
-export function WinbackWheel({ attemptId, onSpinComplete }: Props) {
+export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel }: Props) {
   const controls = useAnimation();
   const [phase, setPhase] = useState<"spinning" | "done">("spinning");
   const startedRef = useRef(false);
@@ -205,7 +208,7 @@ export function WinbackWheel({ attemptId, onSpinComplete }: Props) {
                   transform={`rotate(${rotate} ${tx} ${ty})`}
                   style={{ letterSpacing: 0.3 }}
                 >
-                  {s.label}
+                  {s.winning && prizeLabel ? prizeLabel : s.label}
                 </text>
               );
             })}

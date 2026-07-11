@@ -95,8 +95,8 @@ const Planos = () => {
   const handleBack = useCallback(() => exitToPrevious(), [exitToPrevious]);
 
   const plans = {
-    monthly: { price: "14,90", period: "/mês" },
-    annual: { price: "3,90", period: "/mês", savings: "Economia de R$ 132/ano" },
+    monthly: { price: "19,90", period: "/mês" },
+    annual: { price: "5,82", period: "/mês", savings: "R$ 69,90 no ano (em até 12x ou Pix) · economia de R$ 168,90" },
   };
   const currentPlan = plans[billing];
 
@@ -194,7 +194,7 @@ const Planos = () => {
           >
             Anual
             <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
-              -74%
+              −R$169
             </span>
           </button>
         </div>
@@ -228,7 +228,7 @@ const Planos = () => {
           <div className="space-y-1">
             {billing === "annual" && (
               <p className="text-sm text-muted-foreground line-through">
-                R$ 14,90/mês
+                R$ 19,90/mês
               </p>
             )}
             <div className="flex items-baseline gap-1">

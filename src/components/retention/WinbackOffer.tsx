@@ -6,11 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { toast } from "sonner";
 
-const FULL_MONTHLY = 14.90;
-const FULL_ANNUAL = 178.80; // 12 × 14,90 — preço cheio percebido
-const OFFER_ANNUAL = 34.80; // ~80% off
+// Âncora honesta: compara com o preço real do anual (R$69,90), não com
+// 12× o mensal — desconto crível segura o preço cheio de pé.
+const FULL_ANNUAL_EQUIV = 5.82; // 69,90 / 12
+const FULL_ANNUAL = 69.90;
+const OFFER_ANNUAL = 34.80; // 50% off (oferta limitada da Cakto)
 const OFFER_MONTHLY_EQUIV = 2.90;
-const SAVINGS = 144.00;
+const SAVINGS = 35.10;
 
 const COUNTDOWN_SECONDS = 10 * 60;
 
@@ -30,7 +32,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         .update({ offer_shown_at: new Date().toISOString() })
         .eq("id", attemptId)
         .then(() => {});
-      trackEvent("winback_offer_shown", { discount_pct: 80 });
+      trackEvent("winback_offer_shown", { discount_pct: 50 });
     }
   }, [attemptId]);
 
@@ -44,7 +46,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
 
   const accept = async () => {
     setLoading(true);
-    trackEvent("winback_offer_accepted", { discount_pct: 80 });
+    trackEvent("winback_offer_accepted", { discount_pct: 50 });
     if (attemptId) {
       await supabase
         .from("winback_attempts")
@@ -81,7 +83,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
           transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
           className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold tracking-wide"
         >
-          <Crown className="w-3 h-3" /> VOCÊ GANHOU 80% OFF
+          <Crown className="w-3 h-3" /> VOCÊ GANHOU 50% OFF
         </motion.div>
         <h2 className="text-2xl font-bold leading-tight">
           Sua oferta exclusiva<br />no plano <span className="text-primary">Anual</span>
@@ -95,7 +97,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">CORE PRO Anual</p>
             <div className="mt-1 space-y-0.5">
               <p className="text-xs text-muted-foreground line-through">
-                De R$ {FULL_MONTHLY.toFixed(2).replace(".", ",")}/mês
+                De R$ {FULL_ANNUAL_EQUIV.toFixed(2).replace(".", ",")}/mês
                 {" · "}R$ {FULL_ANNUAL.toFixed(2).replace(".", ",")}/ano
               </p>
               <div className="flex items-baseline gap-1">
@@ -111,7 +113,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
           </div>
           <div className="text-right">
             <div className="px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-lg font-bold">
-              -80%
+              -50%
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">só agora</p>
           </div>
@@ -152,7 +154,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         {loading ? (
           <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...</>
         ) : (
-          "GARANTIR 80% OFF AGORA"
+          "GARANTIR 50% OFF AGORA"
         )}
       </Button>
 

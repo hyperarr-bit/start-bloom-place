@@ -17,11 +17,21 @@ serve(async () => {
     const cutoff = new Date(Date.now() - GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000).toISOString();
     log("Cutoff", { cutoff });
 
+    // "cancel_scheduled" (renovação cancelada no app) também vira "canceled"
+    // quando o período pago passa — mas sem os dias de grace (não renova).
+    const nowIso = new Date().toISOString();
     const { data: expired, error: selErr } = await supabase
       .from("subscriptions")
       .select("id, user_id, current_period_end, status")
       .in("status", ["active", "past_due"])
       .lt("current_period_end", cutoff);
+
+    const { data: schedExpired } = await supabase
+      .from("subscriptions")
+      .select("id, user_id, current_period_end, status")
+      .eq("status", "cancel_scheduled")
+      .lt("current_period_end", nowIso);
+    if (schedExpired?.length) expired?.push(...schedExpired);
 
     if (selErr) {
       log("Select error", { msg: selErr.message });

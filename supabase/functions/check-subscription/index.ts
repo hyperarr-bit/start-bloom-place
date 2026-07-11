@@ -49,13 +49,15 @@ serve(async (req) => {
       .eq("id", user.id)
       .single();
 
-    // Pega a assinatura mais recente que ainda pode dar acesso
-    // (active, past_due ou canceled recente para checar grace)
+    // Pega a assinatura mais recente que ainda pode dar acesso.
+    // "cancel_scheduled" = cancelou a RENOVAÇÃO dentro do app, mas o período
+    // está pago — acesso continua até current_period_end (padrão SaaS).
+    // "canceled" puro = reembolso/chargeback/fim de período → sem acesso.
     const { data: localSub } = await supabaseClient
       .from("subscriptions")
       .select("status, current_period_end, plan, billing_period, payment_method")
       .eq("user_id", user.id)
-      .in("status", ["active", "past_due"])
+      .in("status", ["active", "past_due", "cancel_scheduled"])
       .order("current_period_end", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
@@ -83,11 +85,12 @@ serve(async (req) => {
         );
       }
 
-      // Vencido: checa se ainda está no grace period (7 dias)
+      // Vencido: checa se ainda está no grace period (7 dias).
+      // Renovação cancelada não tem grace — o período pago acabou, acabou.
       const msSinceExpiry = now.getTime() - endDate.getTime();
       const daysSinceExpiry = msSinceExpiry / (1000 * 60 * 60 * 24);
 
-      if (daysSinceExpiry <= GRACE_PERIOD_DAYS) {
+      if (localSub.status !== "cancel_scheduled" && daysSinceExpiry <= GRACE_PERIOD_DAYS) {
         const graceDaysLeft = Math.max(0, Math.ceil(GRACE_PERIOD_DAYS - daysSinceExpiry));
         logStep("In grace period", { daysSinceExpiry, graceDaysLeft });
         return new Response(

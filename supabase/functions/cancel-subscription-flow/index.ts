@@ -338,10 +338,12 @@ serve(async (req) => {
 
     if (body.action === "confirm_cancel") {
       if (sub) {
-        // Mark canceled; access remains until current_period_end
+        // Cancela a RENOVAÇÃO; o acesso continua até current_period_end
+        // (check-subscription honra "cancel_scheduled" até lá; o cron
+        // grace-cleanup vira pra "canceled" quando o período acabar).
         await admin
           .from("subscriptions")
-          .update({ status: "canceled" })
+          .update({ status: "cancel_scheduled" })
           .eq("id", sub.id);
 
         // Best-effort cancel at AbacatePay (if API key + subscription id present)

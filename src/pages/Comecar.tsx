@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
-  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY,
+  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 
@@ -160,9 +160,7 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
  *  pessoa escolher um cômodo — amplitude vira especificidade em 1 toque. */
 function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
   const options: Array<{ area: AreaKey; emoji: string; label: string }> = [
-    ...(Object.entries(AREAS) as Array<[AreaKey, (typeof AREAS)[AreaKey]]>).map(([key, a]) => ({
-      area: key, emoji: a.emoji, label: a.label,
-    })),
+    ...DOOR_AREAS.map((key) => ({ area: key, emoji: AREAS[key].emoji, label: AREAS[key].label })),
     // "Tudo" não é uma trilha — é pedido de priorização. Começa pelo que
     // custa mais caro (dinheiro), e a central mostra o resto junto.
     { area: "dinheiro" as AreaKey, emoji: "😵", label: "Tudo, sinceramente" },

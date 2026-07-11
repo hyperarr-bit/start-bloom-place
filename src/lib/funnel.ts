@@ -37,10 +37,15 @@ export const AREAS: Record<AreaKey, {
   rotina: { emoji: "📅", label: "Minha rotina", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
   corpo: { emoji: "💪", label: "Treino e dieta", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
   saude: { emoji: "❤️", label: "Minha saúde", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
-  // Rotulada pela DOR ("metas paradas"), nunca "Desenvolvimento pessoal" —
-  // categoria vaga não abre porta. O módulo é o desenvolvimento (aba Metas).
-  metas: { emoji: "🎯", label: "Minhas metas", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
+  // Metas + desenvolvimento pessoal juntos (mesmo módulo). A dor lidera o
+  // rótulo ("metas"); "evolução pessoal" é a identidade do criativo.
+  metas: { emoji: "🎯", label: "Metas e evolução pessoal", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
 };
+
+/** Áreas que aparecem na PORTA vitrine, nesta ordem. Saúde saiu da porta
+ *  (dor de prevenção não abre porta fria) mas segue viva em todo o resto:
+ *  chips da demo, eixo do radar e trilha (quem tem area=saude salvo funciona). */
+export const DOOR_AREAS: AreaKey[] = ["dinheiro", "rotina", "corpo", "metas"];
 
 /** Os módulos da demo curada (os 5 do criativo + Metas). */
 export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> = [

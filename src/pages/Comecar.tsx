@@ -300,8 +300,8 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
   metas: [
     "Transformar sua meta num plano com passos",
     "Ver sua linha do tempo: 6 meses, 1, 3, 5 anos",
-    "Dar o primeiro passo ainda essa semana",
-    "Todas as suas metas num painel só",
+    "Diário, humor e gratidão pra manter o pique",
+    "Ver sua evolução na roda da vida",
   ],
 };
 

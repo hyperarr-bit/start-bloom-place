@@ -207,8 +207,8 @@ const STACKS: Record<AreaKey, Array<{ Icon: typeof Wallet; tile: string; title: 
   metas: [
     { Icon: Target, tile: "bg-emerald-100 text-emerald-700", title: "Metas com plano", sub: "visão, passos e prazo" },
     { Icon: CalendarDays, tile: "bg-violet-100 text-violet-700", title: "Linha do tempo", sub: "6 meses, 1, 3 e 5 anos" },
-    { Icon: BarChart3, tile: "bg-amber-100 text-amber-700", title: "Progresso visível", sub: "cada passo marcado" },
-    { Icon: Flame, tile: "bg-rose-100 text-rose-600", title: "Motivação diária", sub: "diário, humor e gratidão" },
+    { Icon: BarChart3, tile: "bg-amber-100 text-amber-700", title: "Sua evolução visível", sub: "roda da vida + progresso" },
+    { Icon: MessageCircleHeart, tile: "bg-rose-100 text-rose-600", title: "Diário e humor", sub: "gratidão pra manter o pique" },
   ],
 };
 
@@ -524,8 +524,14 @@ function OfferScreen({
 
   // Área de entrada (funil vitrine); sem área = funil padrão de finanças.
   const area: AreaKey = answers?.area && answers.area in AREAS ? (answers.area as AreaKey) : "dinheiro";
-  const victory = VICTORY_PHRASE[answers?.vitoria ?? ""]
-    ?? (area === "dinheiro" ? "ver pra onde seu dinheiro vai" : `organizar sua ${AREAS[area].nome.toLowerCase()}`);
+  const AREA_VICTORY_FALLBACK: Record<AreaKey, string> = {
+    dinheiro: "ver pra onde seu dinheiro vai",
+    rotina: "organizar sua rotina",
+    corpo: "cuidar do seu corpo com constância",
+    saude: "cuidar da sua saúde todo dia",
+    metas: "tirar suas metas do papel",
+  };
+  const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
 
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10">

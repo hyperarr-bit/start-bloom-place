@@ -205,7 +205,7 @@ export const AREA_TRACKS: Record<Exclude<AreaKey, "dinheiro">, QuizQ[]> = {
         { emoji: "📝", label: "Ficam na cabeça, nunca no papel" },
         { emoji: "🎆", label: "Empolgo em janeiro, esqueço em março" },
         { emoji: "🌀", label: "Tenho tantas que não sei por onde começar" },
-        { emoji: "🫥", label: "Sei o que quero, não sei o caminho" },
+        { emoji: "🪞", label: "Sinto que não saio do lugar" },
         { emoji: "🧹", label: "Quero organizar tudo" },
       ],
     },
@@ -233,7 +233,7 @@ export const AREA_TRACKS: Record<Exclude<AreaKey, "dinheiro">, QuizQ[]> = {
       opts: [
         { emoji: "🗺️", label: "Minha meta com um plano de verdade" },
         { emoji: "✅", label: "Dar o primeiro passo, finalmente" },
-        { emoji: "🧭", label: "Saber o que fazer essa semana" },
+        { emoji: "🌱", label: "Sentir que tô evoluindo de novo" },
         { emoji: "📋", label: "Minhas metas todas num painel" },
       ],
     },
@@ -391,10 +391,10 @@ export const VICTORY_PHRASE: Record<string, string> = {
   "Bater a meta de água todo dia": "bater a meta de água todo dia",
   "Não esquecer nenhuma vitamina": "nunca mais esquecer uma vitamina",
   "Minha saúde inteira num painel": "ver sua saúde inteira num painel",
-  // Trilha metas
+  // Trilha metas + evolução pessoal
   "Minha meta com um plano de verdade": "dar um plano de verdade pra sua meta",
   "Dar o primeiro passo, finalmente": "dar o primeiro passo, finalmente",
-  "Saber o que fazer essa semana": "saber o que fazer essa semana",
+  "Sentir que tô evoluindo de novo": "sentir que tá evoluindo de novo",
   "Minhas metas todas num painel": "ver suas metas todas num painel",
 };
 

@@ -13,7 +13,7 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
-import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
+import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 /**
  * Paywall autocontido (padrão Cal AI: hook → âncora → desconto → backup).
@@ -336,6 +336,28 @@ function AnchorCard({ gasto }: { gasto: string }) {
   );
 }
 
+/** Âncora de custo das trilhas de vida: o custo de CONTINUAR ASSIM
+ *  (recomeços/sintomas) vs o preço por mês. Espelha o AnchorCard de finanças. */
+function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
+  const anchor = AREA_ANCHOR[area];
+  if (!anchor) return null;
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <div className="grid grid-cols-2 divide-x divide-border">
+        <div className="pr-3 text-center">
+          <p className="text-[11px] text-muted-foreground leading-tight mb-1">Continuar assim<br />custa</p>
+          <p className="text-lg font-extrabold text-destructive/80 tracking-tight leading-tight">{anchor.pain}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">{anchor.painSub}</p>
+        </div>
+        <div className="pl-3 text-center">
+          <p className="text-[11px] text-muted-foreground leading-tight mb-1">Com o CORE,<br />sai por</p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.annual.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span></p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TRUST_CHIPS = [
   { emoji: "🇧🇷", label: "Pix aceito" },
   { emoji: "🛡️", label: "Garantia de 7 dias" },
@@ -532,7 +554,11 @@ function OfferScreen({
       </motion.p>
 
       <div className="space-y-4">
-        <motion.div {...stagger(2)}><AnchorCard gasto={answers?.gasto ?? ""} /></motion.div>
+        <motion.div {...stagger(2)}>
+          {area === "dinheiro"
+            ? <AnchorCard gasto={answers?.gasto ?? ""} />
+            : <AreaAnchorCard area={area} />}
+        </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
         <GuaranteeTimeline />

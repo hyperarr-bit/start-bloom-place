@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
-  AREAS, AREA_TRACKS, ALL_MODULE_ICONS, FUNNEL_AREA_KEY,
+  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 
@@ -433,6 +433,35 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
   );
 }
 
+/** Pico das trilhas de vida (funil vitrine): a resposta de consistência vira
+ *  a confissão — "não é força de vontade, é falta de sistema". */
+function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: string; onNext: () => void }) {
+  const proof = AREA_PROOF[area as Exclude<AreaKey, "dinheiro">];
+  const echo = proof?.echo[answer] ?? "É sempre a mesma história.";
+  return (
+    <div className="text-center pt-2">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 14 }}
+        className="w-14 h-14 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-5 text-2xl"
+      >
+        💡
+      </motion.div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-4">
+        <span className="text-accent">{echo}</span><br />
+        {proof.reframe}
+      </h2>
+      <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
+        <p className="text-[14px] leading-relaxed">{proof.card}</p>
+      </div>
+      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
+        {proof.cta} <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
 // Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
 // após a pergunta de gasto. As trilhas das outras áreas não têm proof.
 type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
@@ -444,7 +473,7 @@ const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] 
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered }: {
+function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -452,6 +481,8 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   initialAnswers?: Record<string, string>;
   /** Porta de finanças responde a 1ª pergunta na tela inicial: começa da 2ª. */
   skipFirstAnswered?: boolean;
+  /** Trilha de vida: renderiza o pico de área (senão, o proof de gasto). */
+  proofArea?: AreaKey;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -493,7 +524,11 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
       <AnimatePresence mode="wait">
         <motion.div key={item.kind === "q" ? q!.key : "proof"} {...slide}>
           {item.kind === "proof" ? (
-            <ProofSlide gasto={answers.gasto ?? ""} onNext={() => advance(answers)} />
+            proofArea && proofArea !== "dinheiro" ? (
+              <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} onNext={() => advance(answers)} />
+            ) : (
+              <ProofSlide gasto={answers.gasto ?? ""} onNext={() => advance(answers)} />
+            )
           ) : (
             <>
               <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q!.q}</h2>
@@ -833,8 +868,9 @@ export default function Comecar() {
     } catch { return null; }
   });
   const track: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
+  // Trilhas de vida ganham a tela de PICO depois da pergunta de consistência.
   const trackItems = vitrine && area && area !== "dinheiro"
-    ? buildQuizItems(track)
+    ? buildQuizItems(track, "consistencia")
     : QUIZ_ITEMS;
   const vidaPrepSteps = area
     ? ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
@@ -906,6 +942,7 @@ export default function Comecar() {
                 questions={track}
                 items={trackItems}
                 skipFirstAnswered={!vitrine}
+                proofArea={vitrine && area ? area : undefined}
                 initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {

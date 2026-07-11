@@ -190,6 +190,58 @@ export const AREA_TRACKS: Record<Exclude<AreaKey, "dinheiro">, QuizQ[]> = {
   ],
 };
 
+/** Tela de PICO das trilhas (funil vitrine), depois da pergunta de
+ *  "consistencia" — o equivalente ao "R$6.000 somem por ano" de finanças.
+ *  `echo` reage à resposta; `reframe` é a virada; `card` aprofunda. */
+export const AREA_PROOF: Record<Exclude<AreaKey, "dinheiro">, {
+  echo: Record<string, string>;
+  reframe: string;
+  card: string;
+  cta: string;
+}> = {
+  rotina: {
+    echo: {
+      "Uns 3 dias": "3 dias e o hábito morre.",
+      "Uma semana": "Uma semana, e some.",
+      "Um mês, aí largo": "Um mês, e do zero de novo.",
+      "Nunca consegui manter": "Nunca deu pra manter.",
+    },
+    reframe: "Não é falta de força de vontade — é falta de sistema.",
+    card: "Quem tem 100 dias de streak não é mais disciplinado que você. Só tem onde marcar — e não aguenta quebrar a sequência.",
+    cta: "Quero meu sistema",
+  },
+  corpo: {
+    echo: {
+      "Essa vai ser a primeira": "Começar do zero de novo.",
+      "Umas 2 ou 3": "2, 3 recomeços já.",
+      "Perdi a conta": "Perdeu a conta dos recomeços.",
+      "Tô na ativa, mas sem controle": "Treinando no escuro.",
+    },
+    reframe: "Recomeçar do zero cansa mais que treinar.",
+    card: "O problema nunca foi disciplina. Foi não ter treino e dieta no mesmo lugar, com o progresso batendo na sua frente.",
+    cta: "Quero parar de recomeçar",
+  },
+  saude: {
+    echo: {
+      "Cansaço o dia todo": "Cansaço o dia inteiro.",
+      "Sono ruim": "Sono ruim, toda noite.",
+      "Ansiedade e estresse": "Ansiedade sem trégua.",
+      "Tô bem — quero prevenir": "Bem hoje — e quer continuar.",
+    },
+    reframe: "O corpo cobra o que a rotina não cuida.",
+    card: "Água, sono, vitaminas na hora. Coisas pequenas que, juntas e no automático, mudam como você se sente todo dia.",
+    cta: "Quero me cuidar de verdade",
+  },
+};
+
+/** Âncora de custo do paywall (funil vitrine): o custo de CONTINUAR ASSIM
+ *  (recomeços/sintomas) vs o preço. Espelha o AnchorCard de finanças. */
+export const AREA_ANCHOR: Record<Exclude<AreaKey, "dinheiro">, { pain: string; painSub: string }> = {
+  rotina: { pain: "Recomeçar do zero", painSub: "de novo, e de novo" },
+  corpo: { pain: "Mais um recomeço", painSub: "largado no meio" },
+  saude: { pain: "O corpo cobrando", painSub: "a conta lá na frente" },
+};
+
 export const QUIZ: QuizQ[] = [
   {
     key: "atrapalha",

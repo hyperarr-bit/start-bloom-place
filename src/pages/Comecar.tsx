@@ -682,9 +682,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
   const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
-  // Webview do Instagram/Facebook: o Google PODE bloquear OAuth ali (iOS
-  // principalmente), mas os dados mostraram 9 de 14 cliques virando conta —
-  // então o botão fica visível com um aviso honesto, em vez de escondido.
+  // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
+  // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
+  // botão nesse ambiente e vai direto pro e-mail — igual o Auth.tsx já faz.
   const [inApp] = useState(isInAppBrowser);
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
@@ -798,20 +798,25 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
       </div>
 
-      <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
-        {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
-      </Button>
-      {inApp && (
-        <p className="text-[12px] text-muted-foreground leading-snug bg-muted/60 rounded-lg px-3 py-2 mt-2">
-          Se o login do Google falhar no navegador do Instagram, crie com e-mail e senha — leva 10 segundos.
+      {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
+          o OAuth trava, então nem mostra — e-mail vira o único caminho. */}
+      {!inApp ? (
+        <>
+          <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
+            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
+          </Button>
+
+          <div className="flex items-center gap-3 my-4">
+            <div className="flex-1 h-px bg-border" />
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+        </>
+      ) : (
+        <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4">
+          Crie sua conta com e-mail e senha — leva 10 segundos.
         </p>
       )}
-
-      <div className="flex items-center gap-3 my-4">
-        <div className="flex-1 h-px bg-border" />
-        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">ou com e-mail</span>
-        <div className="flex-1 h-px bg-border" />
-      </div>
 
       <form onSubmit={submit} className="space-y-3">
         <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />

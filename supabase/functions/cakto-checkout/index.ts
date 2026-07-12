@@ -137,17 +137,14 @@ serve(async (req) => {
       couponValid || parsed.data.offer === "limited" ? "limited" : "regular";
     const baseLink = CHECKOUT_LINKS[billingPeriod][variant];
 
-    // Prefill MÍNIMO do checkout: só o e-mail. Ele é o que volta no webhook
-    // (data.customer.email) e é como associamos a compra ao usuário — sem ele,
-    // quem digitar outro e-mail paga e fica sem acesso. Nome/telefone/CPF NÃO
-    // são pré-preenchidos: o CPF pronto deixava a geração do Pix lenta (a Cakto
-    // valida/registra o pagador), então a pessoa preenche no fluxo normal.
+    // Checkout CRU: NÃO pré-preenchemos NADA do cliente (nem e-mail). A pessoa
+    // digita tudo no fluxo normal — que é o mais rápido pro Pix (e-mail/CPF
+    // prontos faziam a Cakto validar/registrar o pagador antes de gerar). A
+    // associação compra→conta é pelo e-mail que o cliente digita: um banner no
+    // checkout pede o MESMO e-mail do cadastro, e o webhook casa por ele.
+    // Mantemos só os parâmetros INVISÍVEIS de atribuição (fbclid/utm): não
+    // afetam a velocidade e são o que casa a venda com o anúncio no Meta.
     const url = new URL(baseLink);
-    if (userEmail) {
-      url.searchParams.set("email", userEmail);
-      url.searchParams.set("confirmEmail", userEmail);
-    }
-
     const attribution = parsed.data.attribution ?? {};
     for (const [key, value] of Object.entries(attribution)) {
       if (value) url.searchParams.set(key, value);

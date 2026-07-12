@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, Gift } from "lucide-react";
+import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, Gift, LayoutGrid } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -44,6 +44,7 @@ export const AccountDrawer = ({
     if (!open) return;
     import("@/pages/Conquistas");
     import("@/pages/Planos");
+    import("@/pages/Home");
   }, [open]);
 
   // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame
@@ -96,6 +97,10 @@ export const AccountDrawer = ({
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
       ]
     : [
+        // Todos os 16 módulos são da assinatura — mas quem entrou pelo funil
+        // de finanças não tinha NENHUM caminho até eles (caso real 12/07:
+        // pagante anual pediu rotina/treino e o app "era só finanças").
+        { icon: LayoutGrid, label: "Todos os módulos", onClick: () => go("/home") },
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
         { icon: CreditCard, label: "Assinatura", onClick: handleManageSubscription },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },

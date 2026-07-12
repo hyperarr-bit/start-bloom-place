@@ -135,28 +135,41 @@ export const MonthCalendar = ({
   };
 
   return (
-    <div data-spotlight="add-bill" className="bg-card rounded-lg border border-border overflow-hidden animate-fade-in">
-      <div className="table-header-dark py-2 px-4 flex items-center justify-between gap-2">
-        <span>MEU MÊS — {monthLabel.toUpperCase()}</span>
-        <span className="normal-case tracking-normal font-semibold text-[11px] opacity-80">
-          lançou, apareceu no dia
-        </span>
+    <div
+      data-spotlight="add-bill"
+      className="rounded-2xl border border-sky-100 dark:border-sky-900/40 overflow-hidden animate-fade-in bg-gradient-to-b from-sky-50 via-white to-white dark:from-sky-950/60 dark:via-slate-950 dark:to-slate-950"
+    >
+      {/* céu do header: azul bebê + nuvens (chá revelação ☁️) */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-sky-300 via-sky-400 to-sky-300 dark:from-sky-900 dark:via-sky-800 dark:to-sky-900 py-3 px-4">
+        {/* nuvens decorativas — blobs brancos borrados, baratos e sem imagem */}
+        <div aria-hidden className="absolute -top-3 left-6 w-16 h-8 rounded-full bg-white/70 dark:bg-white/15 blur-[2px]" />
+        <div aria-hidden className="absolute -top-1 left-12 w-10 h-6 rounded-full bg-white/60 dark:bg-white/10 blur-[3px]" />
+        <div aria-hidden className="absolute -bottom-3 right-8 w-20 h-9 rounded-full bg-white/60 dark:bg-white/10 blur-[2px]" />
+        <div aria-hidden className="absolute top-1 right-24 w-8 h-5 rounded-full bg-white/50 dark:bg-white/10 blur-[3px]" />
+        <div className="relative flex items-center justify-between gap-2">
+          <span className="font-bold text-sm tracking-widest text-white drop-shadow-sm">
+            ☁️ MEU MÊS — {monthLabel.toUpperCase()}
+          </span>
+          <span className="font-semibold text-[11px] text-sky-50/90">
+            lançou, apareceu no dia
+          </span>
+        </div>
       </div>
 
       {/* resumo do mês — mesmos números do Dashboard (fonte única) */}
       <div className="flex flex-wrap gap-2 px-3 pt-3 text-[11px] font-semibold">
-        <span className="px-2 py-1 rounded-md bg-card-receitas text-card-receitas-text border border-card-receitas-border">
-          Entrou {brl(totalIncome)}
+        <span className="px-2.5 py-1 rounded-full bg-white text-emerald-600 border border-sky-100 shadow-sm dark:bg-slate-900 dark:text-emerald-400 dark:border-sky-900/40">
+          ↑ Entrou {brl(totalIncome)}
         </span>
-        <span className="px-2 py-1 rounded-md bg-card-despesas text-card-despesas-text border border-card-despesas-border">
-          Saiu {brl(monthlyOutflow)}
+        <span className="px-2.5 py-1 rounded-full bg-white text-sky-700 border border-sky-100 shadow-sm dark:bg-slate-900 dark:text-sky-300 dark:border-sky-900/40">
+          ↓ Saiu {brl(monthlyOutflow)}
         </span>
         {unpaidEstimate > 0 && (
-          <span className="px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900/50">
-            A vencer {brl(unpaidEstimate)}
+          <span className="px-2.5 py-1 rounded-full bg-white text-amber-600 border border-sky-100 shadow-sm dark:bg-slate-900 dark:text-amber-300 dark:border-sky-900/40">
+            ⏳ A vencer {brl(unpaidEstimate)}
           </span>
         )}
-        <span className={`px-2 py-1 rounded-md border ${balance >= 0 ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50" : "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900/50"}`}>
+        <span className={`px-2.5 py-1 rounded-full bg-white border border-sky-100 shadow-sm dark:bg-slate-900 dark:border-sky-900/40 ${balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
           Saldo {brl(balance)}
         </span>
       </div>
@@ -165,7 +178,7 @@ export const MonthCalendar = ({
       <div className="p-3">
         <div className="grid grid-cols-7 gap-1 mb-1">
           {WEEKDAYS.map((w, i) => (
-            <div key={i} className="text-center text-[10px] font-bold text-muted-foreground">{w}</div>
+            <div key={i} className="text-center text-[10px] font-bold text-sky-400 dark:text-sky-500">{w}</div>
           ))}
         </div>
         <div className="grid grid-cols-7 gap-1">
@@ -180,18 +193,18 @@ export const MonthCalendar = ({
                 key={day}
                 onClick={() => setSelectedDay(day)}
                 className={[
-                  "relative h-11 rounded-lg border text-[12px] font-semibold transition-colors",
+                  "relative h-11 rounded-xl border text-[12px] font-semibold transition-colors shadow-sm",
                   status === "overdue"
-                    ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/50"
+                    ? "bg-rose-50 border-rose-200 dark:bg-rose-950/30 dark:border-rose-900/50"
                     : status === "due"
                       ? "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/50"
-                      : "bg-background border-border hover:bg-muted",
-                  isSel ? "border-foreground/50" : "",
-                  isToday ? "ring-2 ring-accent ring-offset-1 ring-offset-card" : "",
+                      : "bg-white border-sky-100 hover:bg-sky-50 dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-sky-950/40",
+                  isSel ? "border-sky-400 dark:border-sky-500" : "",
+                  isToday ? "ring-2 ring-sky-400 ring-offset-1 ring-offset-white dark:ring-sky-500 dark:ring-offset-slate-950" : "",
                 ].join(" ")}
                 aria-label={`Dia ${day}`}
               >
-                <span className={day < today && !isToday ? "text-muted-foreground" : ""}>{day}</span>
+                <span className={day < today && !isToday ? "text-muted-foreground" : "text-slate-700 dark:text-slate-200"}>{day}</span>
                 {/* indicadores: conta (✓/⚠) + pontos de despesa/renda */}
                 <span className="absolute inset-x-0 bottom-1 flex items-center justify-center gap-0.5">
                   {status === "paid" && <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" strokeWidth={4} />}
@@ -208,7 +221,7 @@ export const MonthCalendar = ({
         </div>
 
         {/* detalhe do dia selecionado */}
-        <div className="mt-3 rounded-lg border border-border bg-muted/30 p-3">
+        <div className="mt-3 rounded-xl border border-sky-100 bg-white/80 dark:bg-slate-900/60 dark:border-sky-900/40 p-3 shadow-sm">
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-sm font-bold">
               Dia {selectedDay}{selectedDay === today ? " · hoje" : ""}
@@ -263,11 +276,11 @@ export const MonthCalendar = ({
               onChange={(e) => setNewBill(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addBill(selectedDay); }}
               placeholder={`Conta que vence dia ${selectedDay} (ex: luz)`}
-              className="h-9 text-[13px]"
+              className="h-9 text-[13px] rounded-full border-sky-200 focus-visible:ring-sky-400 dark:border-sky-900/50"
             />
             <button
               onClick={() => addBill(selectedDay)}
-              className="h-9 px-3 rounded-md bg-foreground text-background grid place-items-center shrink-0 hover:opacity-90 transition-opacity"
+              className="h-9 w-9 rounded-full bg-sky-500 text-white grid place-items-center shrink-0 hover:bg-sky-600 transition-colors shadow-sm"
               aria-label="Adicionar conta"
             >
               <Plus className="w-4 h-4" />

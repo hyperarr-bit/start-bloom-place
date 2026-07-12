@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
-import { BillsDueCards } from "@/components/BillsDueCards";
+import { MonthCalendar } from "@/components/finance/MonthCalendar";
 import { Calculator } from "@/components/Calculator";
 import { Notes } from "@/components/Notes";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
@@ -169,7 +169,7 @@ const Index = () => {
           { selector: '[data-spotlight="add-income"]', label: quizAnchor ? `Você disse que uns ${quizAnchor.month} somem todo mês. Bora achar esse dinheiro — comece pela sua renda: salário, freela, o que entra.` : 'Bora montar seu painel! Comece pela sua renda — salário, freela, o que entra no mês.', advanceOnAction: "first_income", checkKey: "finance-incomes", onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="add-fixed"]', label: 'Agora um gasto fixo: aluguel, internet, aquela assinatura — o que se repete todo mês.', advanceOnAction: "first_fixed_expense", checkKey: "finance-fixed-expenses", onEnter: () => setActiveTab("financeiro") },
 
-          { selector: '[data-spotlight="add-bill"]', label: 'Tem conta com data pra vencer? Toque em "Editar" e adicione uma — o CORE te lembra.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
+          { selector: '[data-spotlight="add-bill"]', label: 'Esse é o MEU MÊS: o que você lança aparece no dia. Toque num dia e adicione uma conta que vence — o CORE te lembra.', advanceOnAction: "first_bill", checkKey: "finance-dueDays", checkValue: (v: any) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0), onEnter: () => setActiveTab("financeiro") },
           { selector: '[data-spotlight="tab-investimentos"]', label: 'Guarda ou investe algo? Você acompanha por aqui.', onEnter: () => { setActiveTab("financeiro"); setTimeout(() => document.querySelector('[data-spotlight="tab-investimentos"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="add-investment"]', label: 'Cadastre seu primeiro aporte (pode pular se ainda não tiver).', advanceOnAction: "first_investment", checkKey: "finance-investments", skippable: true, placement: "above", onEnter: () => setActiveTab("investimentos") },
           { selector: '[data-spotlight="tab-itens"]', label: 'Quer comprar algo? Liste seus desejos e veja se cabe no bolso.', onEnter: () => { setActiveTab("investimentos"); setTimeout(() => document.querySelector('[data-spotlight="tab-itens"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
@@ -333,8 +333,20 @@ const Index = () => {
                     <Notes notes={notes} setNotes={setNotes} />
                   </TrackedCard>
                 </div>
-                <TrackedCard cardKey="bills-due" tab="financeiro">
-                  <BillsDueCards dueDays={dueDays} setDueDays={setDueDays} />
+                {/* MEU MÊS absorve os cards de "Contas a Vencer": mesma chave
+                    finance-dueDays, mas integrada com despesas/rendas datadas
+                    (feedback escrito da assinante de 11/07). */}
+                <TrackedCard cardKey="month-calendar" tab="financeiro">
+                  <MonthCalendar
+                    incomes={incomes}
+                    expenses={expenses}
+                    fixedExpenses={fixedExpenses}
+                    dueDays={dueDays}
+                    setDueDays={setDueDays}
+                    installments={installments}
+                    totalIncome={totalIncome}
+                    monthlyOutflow={monthlyOutflow}
+                  />
                 </TrackedCard>
                 <TrackedCard cardKey="installments" tab="financeiro">
                   <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />

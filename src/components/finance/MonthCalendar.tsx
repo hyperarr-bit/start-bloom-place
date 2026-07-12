@@ -103,6 +103,29 @@ export const MonthCalendar = ({
   const unpaidEstimate = computeUnpaidBillsEstimate(dueDays ?? [], fixedExpenses ?? []);
   const balance = computeMonthlyBalance(totalIncome, monthlyOutflow);
 
+  // Mini-alerta do header: mesma lógica dos alertas inteligentes do Dashboard
+  // (mesma fonte finance-dueDays) — atrasadas > próxima a vencer > tudo pago.
+  const headerAlert = useMemo(() => {
+    let overdue = 0;
+    let next: { name: string; inDays: number } | null = null;
+    let totalBills = 0;
+    for (const d of dueDays ?? []) {
+      const unpaid = (Array.isArray(d?.bills) ? d.bills : []).filter((b) => !b?.paid);
+      totalBills += Array.isArray(d?.bills) ? d.bills.length : 0;
+      if (!unpaid.length) continue;
+      if (d.day < today) { overdue += unpaid.length; continue; }
+      const inDays = d.day - today;
+      if (!next || inDays < next.inDays) next = { name: unpaid[0].name, inDays };
+    }
+    if (overdue > 0) return { tone: "alert" as const, text: `⚠ ${overdue} conta${overdue > 1 ? "s" : ""} atrasada${overdue > 1 ? "s" : ""}` };
+    if (next) return {
+      tone: "warn" as const,
+      text: next.inDays === 0 ? `${next.name} vence hoje` : next.inDays === 1 ? `${next.name} vence amanhã` : `${next.name} vence em ${next.inDays} dias`,
+    };
+    if (totalBills > 0) return { tone: "ok" as const, text: "✓ contas em dia" };
+    return null;
+  }, [dueDays, today]);
+
   // escreve no MESMO shape DueDay[] — cria o dia se ainda não existir
   const setBillsForDay = (day: number, mutate: (bills: Bill[]) => Bill[]) => {
     const exists = (dueDays ?? []).some((d) => d.day === day);
@@ -150,9 +173,17 @@ export const MonthCalendar = ({
           <span className="font-bold text-sm tracking-widest text-white drop-shadow-sm">
             ☁️ MEU MÊS — {monthLabel.toUpperCase()}
           </span>
-          <span className="font-semibold text-[11px] text-sky-50/90">
-            lançou, apareceu no dia
-          </span>
+          {headerAlert && (
+            <span className={`font-semibold text-[11px] px-2 py-0.5 rounded-full ${
+              headerAlert.tone === "alert"
+                ? "bg-rose-500/90 text-white"
+                : headerAlert.tone === "warn"
+                  ? "bg-white/90 text-amber-600"
+                  : "bg-white/25 text-white"
+            }`}>
+              {headerAlert.text}
+            </span>
+          )}
         </div>
       </div>
 

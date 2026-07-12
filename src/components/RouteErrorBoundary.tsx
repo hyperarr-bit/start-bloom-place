@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -9,28 +9,63 @@ interface Props {
 
 interface State {
   error: Error | null;
+  reloading: boolean;
 }
+
+// Deploy troca o hash dos chunks: aba aberta com o index.html antigo tenta
+// carregar um JS que não existe mais e o lazy import explode. Caso real de
+// 12/07: o dono (e possivelmente um pagante às 16:20, que marcou "problema
+// técnico" e cancelou) viu a tela de erro em /financas logo após deploys.
+const isChunkError = (error: Error | null) =>
+  !!error && /dynamically imported module|module script failed|ChunkLoadError|Loading chunk .* failed|Loading CSS chunk/i.test(
+    `${error.name} ${error.message}`,
+  );
+
+const RELOAD_GUARD_KEY = "core-chunk-reload-at";
 
 /**
  * ErrorBoundary por rota: contém crashes em uma única página
  * para que o app inteiro não fique em tela branca.
+ * Erro de chunk (build novo no ar, aba velha) recarrega sozinho — 1x por
+ * minuto no máximo, pra nunca virar loop de reload.
  */
 export class RouteErrorBoundary extends React.Component<Props, State> {
-  state: State = { error: null };
+  state: State = { error: null, reloading: false };
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // eslint-disable-next-line no-console
     console.error(`[RouteErrorBoundary:${this.props.routeName ?? "?"}]`, error, info);
+    if (isChunkError(error)) {
+      let last = 0;
+      try { last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0); } catch { /* noop */ }
+      if (Date.now() - last > 60_000) {
+        try { sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now())); } catch { /* noop */ }
+        this.setState({ reloading: true });
+        window.location.reload();
+      }
+    }
   }
 
-  reset = () => this.setState({ error: null });
+  reset = () => this.setState({ error: null, reloading: false });
 
   render() {
     if (!this.state.error) return this.props.children;
+
+    // Recarregando pra pegar o build novo: spinner discreto, não tela de erro.
+    if (this.state.reloading) {
+      return (
+        <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 p-6">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Atualizando o app…</p>
+        </div>
+      );
+    }
+
+    const chunk = isChunkError(this.state.error);
 
     return (
       <div className="min-h-[60vh] flex items-center justify-center p-6">
@@ -39,24 +74,36 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
             <AlertTriangle className="w-6 h-6 text-destructive" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">Algo deu errado nesta seção</h2>
+            <h2 className="text-lg font-semibold">
+              {chunk ? "Nova versão do app disponível" : "Algo deu errado nesta seção"}
+            </h2>
             <p className="text-sm text-muted-foreground">
-              Tivemos um problema ao carregar este módulo. Suas outras abas continuam funcionando normalmente.
+              {chunk
+                ? "Atualizamos o CORE enquanto essa tela estava aberta. Recarregue pra pegar a versão nova — seus dados estão salvos."
+                : "Tivemos um problema ao carregar este módulo. Suas outras abas continuam funcionando normalmente."}
             </p>
           </div>
-          {this.state.error?.message && (
+          {!chunk && this.state.error?.message && (
             <details className="text-left text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
               <summary className="cursor-pointer">Detalhes técnicos</summary>
               <pre className="whitespace-pre-wrap break-words mt-2">{this.state.error.message}</pre>
             </details>
           )}
           <div className="flex gap-2 justify-center pt-2">
-            <Button variant="outline" size="sm" onClick={this.reset}>
-              <RefreshCw className="w-4 h-4 mr-1" /> Tentar novamente
-            </Button>
-            <Button size="sm" onClick={() => (window.location.href = "/")}>
-              Voltar ao início
-            </Button>
+            {chunk ? (
+              <Button size="sm" onClick={() => window.location.reload()}>
+                <RefreshCw className="w-4 h-4 mr-1" /> Recarregar agora
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={this.reset}>
+                  <RefreshCw className="w-4 h-4 mr-1" /> Tentar novamente
+                </Button>
+                <Button size="sm" onClick={() => (window.location.href = "/")}>
+                  Voltar ao início
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>

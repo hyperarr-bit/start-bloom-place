@@ -131,7 +131,7 @@ export const renderProfileImage = (
   ctx.fillText("core", W / 2, 1120);
   ctx.fillStyle = "#78716c";
   ctx.font = font("normal", 30);
-  ctx.fillText("app de finanças pessoais", W / 2, 1172);
+  ctx.fillText("organize sua vida num só app", W / 2, 1172);
 
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 };

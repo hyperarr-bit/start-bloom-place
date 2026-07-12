@@ -4,7 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, DollarSign, Menu, Sparkles } from "lucide-react";
+import { ArrowLeft, DollarSign, Menu, Sparkles, LayoutGrid } from "lucide-react";
 import { AccountDrawer } from "@/components/home/AccountDrawer";
 import { AskCore } from "@/components/ask/AskCore";
 
@@ -216,6 +216,16 @@ const Index = () => {
             >
               <Sparkles className="w-4 h-4" />
             </button>
+            {/* App completo: atalho de 1 toque pros 16 módulos (Home hub) */}
+            {!isPreview && (
+              <button
+                onClick={() => navigate("/home")}
+                aria-label="Todos os módulos"
+                className="grid place-items-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            )}
             <ThemeToggle />
           </div>
         </div>

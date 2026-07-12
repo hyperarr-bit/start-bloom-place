@@ -27,17 +27,34 @@ captureLeadSource();
 
 
 
+/** O app é o COMPLETO de 16 módulos (decisão de 12/07): a raiz do logado é a
+ *  HOME HUB. Duas exceções de primeira sessão, ambas promessas de funil:
+ *  1. Vitrine: quem escolheu uma área pousa NELA — mas só na 1ª abertura
+ *     (flag core-area-landed); depois a raiz vira a Home.
+ *  2. Funil finanças: novo usuário com tutorial pendente cai em /financas
+ *     até concluir/pular o spotlight (que limpa o force-new-user-tutorial).
+ *  Bônus: o "voltar" dos 15 módulos é navigate("/") — passa por aqui, então
+ *  voltar de qualquer módulo agora leva à Home (era Finanças, loop torto). */
+const AREA_LANDED_KEY = "core-area-landed";
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
-  if (user) {
-    // Quem veio do funil vitrine (?porta=vida) escolheu uma área — o app abre
-    // NELA (a promessa da porta continua na 1ª sessão). Funil padrão → finanças.
-    const area = getFunnelArea();
-    if (area && area !== "dinheiro") return <Navigate to={`/${AREAS[area].module}`} replace />;
-    return <Navigate to="/financas" replace />;
+  if (!user) return <Navigate to="/comecar" replace />;
+
+  const area = getFunnelArea();
+  let landed = true;
+  let forceNew = false;
+  try {
+    landed = !!localStorage.getItem(AREA_LANDED_KEY);
+    forceNew = localStorage.getItem("force-new-user-tutorial") === "true";
+  } catch { /* noop */ }
+
+  if (area && !landed) {
+    try { localStorage.setItem(AREA_LANDED_KEY, "true"); } catch { /* noop */ }
+    return <Navigate to={area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
   }
-  return <Navigate to="/comecar" replace />;
+  if (!area && forceNew) return <Navigate to="/financas" replace />;
+  return <Navigate to="/home" replace />;
 };
 
 

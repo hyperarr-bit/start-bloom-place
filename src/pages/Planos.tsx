@@ -7,9 +7,9 @@ import {
   Loader2,
   Wallet,
   Target,
-  TrendingUp,
-  BarChart3,
   ShieldCheck,
+  CalendarCheck,
+  Dumbbell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -21,6 +21,8 @@ import { PaymentStatus } from "@/components/PaymentStatus";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
+// A assinatura é o app COMPLETO (16 módulos) — a página de assinatura tem
+// que vender o mesmo produto que o paywall promete ("16/16 inclusos").
 const MODULE_GROUPS: Array<{
   icon: typeof Wallet;
   title: string;
@@ -28,38 +30,38 @@ const MODULE_GROUPS: Array<{
 }> = [
   {
     icon: Wallet,
-    title: "Controle do dia a dia",
+    title: "💰 Dinheiro",
     items: [
-      "Receitas, despesas e contas fixas",
-      "Contas a vencer com lembretes",
-      "Dívidas e parcelamentos",
+      "Finanças completas com calendário Meu Mês",
+      "Investimentos, dívidas e limites",
+      "Relatórios e saúde financeira com score",
+    ],
+  },
+  {
+    icon: CalendarCheck,
+    title: "📅 Rotina e produtividade",
+    items: [
+      "Hábitos, agenda e rituais de manhã/noite",
+      "Hiperfoco e sessões de estudo",
+      "Carreira e biblioteca de leituras",
+    ],
+  },
+  {
+    icon: Dumbbell,
+    title: "💪 Corpo e saúde",
+    items: [
+      "Treino com fichas prontas",
+      "Dieta, saúde e autocuidado",
+      "Beleza e detox das telas",
     ],
   },
   {
     icon: Target,
-    title: "Metas e desejos",
+    title: "🎯 Metas e vida",
     items: [
-      "Metas de economia com progresso",
-      "Lista de desejos planejada",
-      "Orçamento mensal e anual",
-    ],
-  },
-  {
-    icon: TrendingUp,
-    title: "Crescer o patrimônio",
-    items: [
-      "Investimentos acompanhados",
-      "Saúde financeira com score",
-      "Simuladores de juros e metas",
-    ],
-  },
-  {
-    icon: BarChart3,
-    title: "Visão clara",
-    items: [
-      "Painel com saldo do mês",
-      "Relatórios por categoria",
-      "Limites de gasto por categoria",
+      "Metas e evolução pessoal",
+      "Casa, viagens, pet e relacionamentos",
+      "Conquistas e sequências (streaks)",
     ],
   },
 ];
@@ -384,7 +386,7 @@ const Planos = () => {
           <div className="text-center space-y-1">
             <h3 className="text-lg font-bold">O que está incluído</h3>
             <p className="text-xs text-muted-foreground">
-              Finanças completo, sem limites
+              Todos os 16 módulos, sem limites — uma assinatura, sua vida inteira
             </p>
           </div>
 

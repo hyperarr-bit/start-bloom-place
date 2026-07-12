@@ -38,6 +38,7 @@ import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -53,7 +54,7 @@ const Index = () => {
   // No demo aberto (/preview/financas) o "voltar" deve sair pra LP, não pro app.
   const isPreview = location.pathname.startsWith("/preview");
   const { user } = useAuth();
-  const { get: getUserData, set: setUserData, isGuest } = useUserData();
+  const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
   // Quem veio do funil chega com as respostas do quiz no aparelho — a 1ª
   // sessão usa isso (card de plano + copy do tutorial com o R$ da pessoa).
   const quiz = getQuizAnswers();
@@ -96,6 +97,16 @@ const Index = () => {
   const [goals] = usePersistedState("finance-goals", [] as any[]);
 
   const [installments, setInstallments] = usePersistedState("finance-installments", [] as any[]);
+
+  // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
+  // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
+  // O sync devolve null quando nada mudou — sem loop de render.
+  useEffect(() => {
+    if (!userDataLoaded) return;
+    const synced = syncFixedExpensesToBills(fixedExpenses, dueDays);
+    if (synced) setDueDays(synced);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userDataLoaded, fixedExpenses, dueDays]);
 
   const [annualData, setAnnualData] = usePersistedState("finance-annual", 
     months.map((m) => ({

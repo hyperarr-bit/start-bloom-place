@@ -75,8 +75,8 @@ export const MonthCalendar = ({
 
   // mapa dia → itens (recalcula só quando os dados mudam)
   const byDay = useMemo(() => {
-    const map: Record<number, { expenses: any[]; incomes: any[]; bills: Bill[]; installments: any[]; fixed: any[] }> = {};
-    const get = (d: number) => (map[d] ??= { expenses: [], incomes: [], bills: [], installments: [], fixed: [] });
+    const map: Record<number, { expenses: any[]; incomes: any[]; bills: Bill[]; installments: any[] }> = {};
+    const get = (d: number) => (map[d] ??= { expenses: [], incomes: [], bills: [], installments: [] });
     for (const e of expenses) {
       const d = dayInCurrentMonth(e?.date, now);
       if (d) get(d).expenses.push(e);
@@ -87,10 +87,8 @@ export const MonthCalendar = ({
       const d = dayInCurrentMonth(i?.date, now) ?? Number(String(i?.date ?? "").slice(8, 10));
       if (d >= 1) get(Math.min(d, daysInMonth)).incomes.push(i);
     }
-    for (const f of fixedExpenses ?? []) {
-      // Custo fixo com "dia" preenchido entra no calendário como recorrente.
-      if (f?.day >= 1 && f.day <= 31) get(Math.min(f.day, daysInMonth)).fixed.push(f);
-    }
+    // Custo fixo com "dia" NÃO entra direto: o sync (finance-sync.ts) já o
+    // transformou em conta do dia — com checkbox de pago e alertas.
     for (const dd of dueDays ?? []) {
       if (dd?.day >= 1 && dd.day <= 31 && Array.isArray(dd.bills) && dd.bills.length)
         get(Math.min(dd.day, daysInMonth)).bills.push(...dd.bills);
@@ -152,9 +150,8 @@ export const MonthCalendar = ({
   const removeBill = (day: number, billId: string) =>
     setBillsForDay(day, (bills) => bills.filter((b) => b.id !== billId));
 
-  const sel = byDay[selectedDay] ?? { expenses: [], incomes: [], bills: [], installments: [], fixed: [] };
-  const selSpent = sel.expenses.reduce((s, e) => s + (e.value || 0), 0)
-    + sel.fixed.reduce((s, f) => s + (f.value || 0), 0);
+  const sel = byDay[selectedDay] ?? { expenses: [], incomes: [], bills: [], installments: [] };
+  const selSpent = sel.expenses.reduce((s, e) => s + (e.value || 0), 0);
 
   const cellStatus = (day: number) => {
     const d = byDay[day];
@@ -252,7 +249,7 @@ export const MonthCalendar = ({
                   {(status === "due" || status === "overdue") && (
                     <span className={`text-[9px] font-black leading-none ${status === "overdue" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>!</span>
                   )}
-                  {d?.expenses?.length || d?.fixed?.length ? <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
+                  {d?.expenses?.length ? <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
                   {d?.incomes?.length ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> : null}
                   {d?.installments?.length ? <span className="w-1.5 h-1.5 rounded-full bg-sky-500" /> : null}
                 </span>
@@ -277,15 +274,6 @@ export const MonthCalendar = ({
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">+{brl(i.value || 0)}</span>
               </div>
             ))}
-            {sel.fixed.map((f: any) => (
-              <div key={f.id} className="flex items-center justify-between gap-2 text-[13px]">
-                <span className="truncate">📌 {f.description}</span>
-                <span className="flex items-center gap-1.5 shrink-0">
-                  <span className="category-badge">fixo</span>
-                  <span className="font-semibold">−{brl(f.value || 0)}</span>
-                </span>
-              </div>
-            ))}
             {sel.expenses.map((e: any) => (
               <div key={e.id} className="flex items-center justify-between gap-2 text-[13px]">
                 <span className="truncate">{e.description}</span>
@@ -308,13 +296,22 @@ export const MonthCalendar = ({
                   <span className={`truncate ${b.paid ? "line-through text-muted-foreground" : ""}`}>
                     {b.name}{!b.paid && selectedDay < today ? " · venceu" : !b.paid && selectedDay === today ? " · vence hoje" : ""}
                   </span>
+                  {b.fixedId && <span className="category-badge shrink-0">fixo</span>}
                 </label>
-                <button onClick={() => removeBill(selectedDay, b.id)} className="text-muted-foreground hover:text-destructive shrink-0" aria-label={`Remover ${b.name}`}>
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  {typeof b.value === "number" && b.value > 0 && (
+                    <span className={`font-semibold ${b.paid ? "text-muted-foreground" : ""}`}>−{brl(b.value)}</span>
+                  )}
+                  {/* conta vinda de fixo se gerencia lá — só a manual tem X */}
+                  {!b.fixedId && (
+                    <button onClick={() => removeBill(selectedDay, b.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover ${b.name}`}>
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </span>
               </div>
             ))}
-            {!sel.incomes.length && !sel.expenses.length && !sel.bills.length && !sel.installments.length && !sel.fixed.length && (
+            {!sel.incomes.length && !sel.expenses.length && !sel.bills.length && !sel.installments.length && (
               <p className="text-xs text-muted-foreground">Nada neste dia ainda.</p>
             )}
           </div>
@@ -337,7 +334,7 @@ export const MonthCalendar = ({
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1.5">
-            Despesas, rendas e custos fixos com dia de vencimento aparecem aqui sozinhos.
+            Despesas e rendas aparecem no dia sozinhas. Custo fixo com dia vira conta aqui automaticamente.
           </p>
         </div>
       </div>

@@ -11,6 +11,10 @@ interface FixedExpense {
   value: number;
   paymentMethod: string;
   cardName?: string;
+  /** Dia do mês em que vence (1-31, opcional) — faz o fixo aparecer no
+   *  calendário MEU MÊS. Pedido do dono em 12/07 ("custos fixos não
+   *  aparecem, provavelmente pq não botamos data"). */
+  day?: number;
 }
 
 interface FixedExpensesTableProps {
@@ -64,7 +68,7 @@ const isCardPayment = (method: string) => method === "credito" || method === "de
 
 export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTableProps) => {
   const [newExpense, setNewExpense] = useState({
-    description: "", category: "", value: "", paymentMethod: "", cardName: "",
+    description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
   const [showMore, setShowMore] = useState(expenses.length === 0);
 
@@ -81,6 +85,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
       toast.error("Informe o valor");
       return;
     }
+    const dayNum = Math.min(31, Math.max(1, parseInt(newExpense.day, 10) || 0));
     setExpenses([
       ...expenses,
       {
@@ -90,9 +95,10 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         value: parseFloat(newExpense.value),
         paymentMethod: newExpense.paymentMethod || "boleto",
         cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+        day: dayNum >= 1 ? dayNum : undefined,
       },
     ]);
-    setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "" });
+    setNewExpense({ description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "" });
   };
 
   const deleteExpense = (id: string) => {
@@ -147,6 +153,17 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
             value={newExpense.value}
             onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })}
             className="h-9 text-xs w-20 text-right"
+          />
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={31}
+            placeholder="Dia"
+            title="Dia do vencimento (opcional) — aparece no calendário Meu Mês"
+            value={newExpense.day}
+            onChange={(e) => setNewExpense({ ...newExpense, day: e.target.value })}
+            className="h-9 text-xs w-14 text-right"
           />
           <button
             onClick={addExpense}
@@ -206,6 +223,12 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                    {expense.day ? (
+                      <>
+                        <span>vence dia {expense.day}</span>
+                        <span>·</span>
+                      </>
+                    ) : null}
                     <span>{getPaymentLabel(expense.paymentMethod)}</span>
                     {expense.cardName && (
                       <>

@@ -75,15 +75,21 @@ export const MonthCalendar = ({
 
   // mapa dia → itens (recalcula só quando os dados mudam)
   const byDay = useMemo(() => {
-    const map: Record<number, { expenses: any[]; incomes: any[]; bills: Bill[]; installments: any[] }> = {};
-    const get = (d: number) => (map[d] ??= { expenses: [], incomes: [], bills: [], installments: [] });
+    const map: Record<number, { expenses: any[]; incomes: any[]; bills: Bill[]; installments: any[]; fixed: any[] }> = {};
+    const get = (d: number) => (map[d] ??= { expenses: [], incomes: [], bills: [], installments: [], fixed: [] });
     for (const e of expenses) {
       const d = dayInCurrentMonth(e?.date, now);
       if (d) get(d).expenses.push(e);
     }
     for (const i of incomes) {
-      const d = dayInCurrentMonth(i?.date, now);
-      if (d) get(d).incomes.push(i);
+      // Renda é recorrente (salário): se a data for de outro mês, usa o DIA
+      // dela — "Salário dia 5" aparece todo mês, não só no mês do cadastro.
+      const d = dayInCurrentMonth(i?.date, now) ?? Number(String(i?.date ?? "").slice(8, 10));
+      if (d >= 1) get(Math.min(d, daysInMonth)).incomes.push(i);
+    }
+    for (const f of fixedExpenses ?? []) {
+      // Custo fixo com "dia" preenchido entra no calendário como recorrente.
+      if (f?.day >= 1 && f.day <= 31) get(Math.min(f.day, daysInMonth)).fixed.push(f);
     }
     for (const dd of dueDays ?? []) {
       if (dd?.day >= 1 && dd.day <= 31 && Array.isArray(dd.bills) && dd.bills.length)
@@ -98,7 +104,7 @@ export const MonthCalendar = ({
     }
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenses, incomes, dueDays, installments, daysInMonth]);
+  }, [expenses, incomes, fixedExpenses, dueDays, installments, daysInMonth]);
 
   const unpaidEstimate = computeUnpaidBillsEstimate(dueDays ?? [], fixedExpenses ?? []);
   const balance = computeMonthlyBalance(totalIncome, monthlyOutflow);
@@ -146,8 +152,9 @@ export const MonthCalendar = ({
   const removeBill = (day: number, billId: string) =>
     setBillsForDay(day, (bills) => bills.filter((b) => b.id !== billId));
 
-  const sel = byDay[selectedDay] ?? { expenses: [], incomes: [], bills: [], installments: [] };
-  const selSpent = sel.expenses.reduce((s, e) => s + (e.value || 0), 0);
+  const sel = byDay[selectedDay] ?? { expenses: [], incomes: [], bills: [], installments: [], fixed: [] };
+  const selSpent = sel.expenses.reduce((s, e) => s + (e.value || 0), 0)
+    + sel.fixed.reduce((s, f) => s + (f.value || 0), 0);
 
   const cellStatus = (day: number) => {
     const d = byDay[day];
@@ -170,8 +177,11 @@ export const MonthCalendar = ({
         <div aria-hidden className="absolute -bottom-3 right-8 w-20 h-9 rounded-full bg-white/60 dark:bg-white/10 blur-[2px]" />
         <div aria-hidden className="absolute top-1 right-24 w-8 h-5 rounded-full bg-white/50 dark:bg-white/10 blur-[3px]" />
         <div className="relative flex items-center justify-between gap-2">
-          <span className="font-bold text-sm tracking-widest text-white drop-shadow-sm">
-            ☁️ MEU MÊS — {monthLabel.toUpperCase()}
+          <span
+            className="font-bold text-sm tracking-widest text-white"
+            style={{ WebkitTextStroke: "0.6px rgba(0,0,0,0.45)", textShadow: "0 1px 2px rgba(0,0,0,0.15)" }}
+          >
+            MEU MÊS — {monthLabel.toUpperCase()}
           </span>
           {headerAlert && (
             <span className={`font-semibold text-[11px] px-2 py-0.5 rounded-full ${
@@ -242,7 +252,7 @@ export const MonthCalendar = ({
                   {(status === "due" || status === "overdue") && (
                     <span className={`text-[9px] font-black leading-none ${status === "overdue" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>!</span>
                   )}
-                  {d?.expenses?.length ? <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
+                  {d?.expenses?.length || d?.fixed?.length ? <span className="w-1.5 h-1.5 rounded-full bg-violet-500" /> : null}
                   {d?.incomes?.length ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> : null}
                   {d?.installments?.length ? <span className="w-1.5 h-1.5 rounded-full bg-sky-500" /> : null}
                 </span>
@@ -265,6 +275,15 @@ export const MonthCalendar = ({
               <div key={i.id} className="flex items-center justify-between text-[13px]">
                 <span className="truncate">💵 {i.description}</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400 shrink-0">+{brl(i.value || 0)}</span>
+              </div>
+            ))}
+            {sel.fixed.map((f: any) => (
+              <div key={f.id} className="flex items-center justify-between gap-2 text-[13px]">
+                <span className="truncate">📌 {f.description}</span>
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <span className="category-badge">fixo</span>
+                  <span className="font-semibold">−{brl(f.value || 0)}</span>
+                </span>
               </div>
             ))}
             {sel.expenses.map((e: any) => (
@@ -295,7 +314,7 @@ export const MonthCalendar = ({
                 </button>
               </div>
             ))}
-            {!sel.incomes.length && !sel.expenses.length && !sel.bills.length && !sel.installments.length && (
+            {!sel.incomes.length && !sel.expenses.length && !sel.bills.length && !sel.installments.length && !sel.fixed.length && (
               <p className="text-xs text-muted-foreground">Nada neste dia ainda.</p>
             )}
           </div>
@@ -318,7 +337,7 @@ export const MonthCalendar = ({
             </button>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1.5">
-            Despesas e rendas lançadas nas tabelas acima aparecem aqui sozinhas, no dia delas.
+            Despesas, rendas e custos fixos com dia de vencimento aparecem aqui sozinhos.
           </p>
         </div>
       </div>

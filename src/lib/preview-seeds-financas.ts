@@ -13,15 +13,16 @@
 /* eslint-disable */
 
 // Custos fixos do mês (mesma lista replicada nos meses passados) — total R$ 3.104
+// `day` = dia do vencimento: faz o fixo aparecer no calendário MEU MÊS.
 const FIXED = (prefix: string) => [
-  { id: `${prefix}-f1`, value: 1850, cardName: "inter", category: "moradia", description: "Aluguel", paymentMethod: "debito" },
-  { id: `${prefix}-f2`, value: 420, category: "plano_saude", description: "Plano de saúde", paymentMethod: "boleto" },
-  { id: `${prefix}-f3`, value: 320, category: "educacao", description: "Curso de inglês", paymentMethod: "pix" },
-  { id: `${prefix}-f4`, value: 178, category: "contas_casa", description: "Energia elétrica", paymentMethod: "pix" },
-  { id: `${prefix}-f5`, value: 120, category: "academia", description: "Academia", paymentMethod: "pix" },
-  { id: `${prefix}-f6`, value: 99, category: "internet_telefone", description: "Internet", paymentMethod: "boleto" },
-  { id: `${prefix}-f7`, value: 62, category: "contas_casa", description: "Água", paymentMethod: "pix" },
-  { id: `${prefix}-f8`, value: 55, category: "assinaturas", description: "Streaming", paymentMethod: "credito", cardName: "nubank" },
+  { id: `${prefix}-f1`, value: 1850, cardName: "inter", category: "moradia", description: "Aluguel", paymentMethod: "debito", day: 5 },
+  { id: `${prefix}-f2`, value: 420, category: "plano_saude", description: "Plano de saúde", paymentMethod: "boleto", day: 8 },
+  { id: `${prefix}-f3`, value: 320, category: "educacao", description: "Curso de inglês", paymentMethod: "pix", day: 15 },
+  { id: `${prefix}-f4`, value: 178, category: "contas_casa", description: "Energia elétrica", paymentMethod: "pix", day: 10 },
+  { id: `${prefix}-f5`, value: 120, category: "academia", description: "Academia", paymentMethod: "pix", day: 3 },
+  { id: `${prefix}-f6`, value: 99, category: "internet_telefone", description: "Internet", paymentMethod: "boleto", day: 10 },
+  { id: `${prefix}-f7`, value: 62, category: "contas_casa", description: "Água", paymentMethod: "pix", day: 18 },
+  { id: `${prefix}-f8`, value: 55, category: "assinaturas", description: "Streaming", paymentMethod: "credito", cardName: "nubank", day: 20 },
 ];
 
 // Parcelamento único e pequeno (demonstra o recurso sem afundar o saldo)

@@ -40,7 +40,7 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
     : "Última chamada: sua condição de boas-vindas";
   const intro = stage === "h1"
     ? `Você criou sua conta no CORE e seu plano ficou pronto. Pra começar, sua condição de boas-vindas está ativa:`
-    : `Sua condição de boas-vindas do CORE ainda está de pé — mas ela é da sua primeira semana. Depois, vale o preço normal (R$ 19,90/mês).`;
+    : `Sua condição de boas-vindas do CORE ainda está de pé — mas ela é da sua primeira semana. Depois, vale o preço normal (R$ 14,90/mês).`;
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f6f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#262626;">
@@ -52,10 +52,10 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
       <div style="border:2px solid #D22D80;border-radius:14px;padding:18px;margin-bottom:14px;">
         <div style="font-size:12px;font-weight:700;color:#D22D80;letter-spacing:0.5px;margin-bottom:6px;">BOAS-VINDAS · 1º MÊS</div>
         <div style="font-size:28px;font-weight:800;">R$ 9,90<span style="font-size:14px;font-weight:600;color:#888;"> no 1º mês</span></div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">Depois R$ 19,90/mês · cancele quando quiser</div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">Depois R$ 14,90/mês · cancele quando quiser</div>
         <a href="${monthlyUrl}" style="display:block;background:#262626;color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:999px;margin-top:14px;">Ativar meu 1º mês por R$ 9,90</a>
       </div>
-      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">Quer o melhor preço? <a href="${annualUrl}" style="color:#D22D80;font-weight:600;">Anual: R$ 5,82/mês (R$ 69,90 no ano, em até 12x)</a></p>
+      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">Quer o melhor preço? <a href="${annualUrl}" style="color:#D22D80;font-weight:600;">Anual: R$ 3,90/mês (R$ 46,80 no ano, em até 12x)</a></p>
       <p style="font-size:12px;line-height:1.6;color:#888;margin:0;text-align:center;">🛡️ Garantia de 7 dias — não curtiu, devolvemos 100% em 1 mensagem.<br>Pix ou cartão · sem fidelidade · cancele quando quiser.</p>
     </div>
     <p style="font-size:11px;color:#aaa;line-height:1.6;margin:20px 4px 0;text-align:center;">Você recebeu este e-mail porque criou uma conta no CORE.<br>Não quer mais receber? Responda com "sair".</p>

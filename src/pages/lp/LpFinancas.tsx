@@ -336,14 +336,14 @@ export default function LpFinancas() {
             <motion.div {...fadeUp}>
               <Card className="relative h-full p-6 ring-2 ring-accent">
                 <Badge className="absolute -top-2.5 left-6 bg-accent text-accent-foreground border-transparent">
-                  mais popular · economiza R$ 169/ano
+                  mais popular · economiza R$ 132/ano
                 </Badge>
                 <div className="text-sm font-semibold mb-1">Anual</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">R$ 5,82</span>
+                  <span className="text-4xl font-bold tracking-tight">R$ 3,90</span>
                   <span className="text-sm text-muted-foreground">/mês</span>
                 </div>
-                <div className="text-xs text-muted-foreground mb-5">R$ 69,90/ano · em até 12x no cartão ou Pix</div>
+                <div className="text-xs text-muted-foreground mb-5">R$ 46,80/ano · em até 12x no cartão ou Pix</div>
                 <Button asChild className="w-full" size="lg">
                   <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "pricing_anual" })}>
                     Começar agora
@@ -357,7 +357,7 @@ export default function LpFinancas() {
               <Card className="h-full p-6">
                 <div className="text-sm font-semibold mb-1">Mensal</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">R$ 19,90</span>
+                  <span className="text-4xl font-bold tracking-tight">R$ 14,90</span>
                   <span className="text-sm text-muted-foreground">/mês</span>
                 </div>
                 <div className="text-xs text-muted-foreground mb-5">Pago mensalmente · sem compromisso</div>

@@ -33,13 +33,14 @@ const CHECKOUT_PENDING_KEY = "core_checkout_pending";
 
 // Preços — TÊM que bater com as ofertas da Cakto
 // (regular: 6g8iiak/xs9s7ws_914041 · limitada: 6a3owem).
-// Reprecificação 11/07: anual R$69,90 (12x ou Pix, preço único), mensal
-// R$19,90. O anual NUNCA é descontado — a roleta premia o 1º mês do mensal.
-// "74% OFF"/"R$0,13/dia" morreram: desconto gigante desmentia o preço cheio.
+// Preço 12/07: anual R$46,80 (12x ou Pix, preço único), mensal R$14,90 —
+// revertido ao patamar antigo (R$69,90 travava tráfego frio). O anual NUNCA é
+// descontado — a roleta premia o 1º mês do mensal. Comunicação segue honesta
+// (sem "74% OFF"/"R$0,13/dia" fake); a cobrança real vive no painel da Cakto.
 const PRICING = {
-  monthly: { perMonth: "19,90" },
-  annual: { perMonth: "5,82", total: "69,90", savePerYear: "168,90" },
-  downsell: { firstMonth: "9,90", after: "19,90" },
+  monthly: { perMonth: "14,90" },
+  annual: { perMonth: "3,90", total: "46,80", savePerYear: "132" },
+  downsell: { firstMonth: "9,90", after: "14,90" },
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -74,7 +75,7 @@ async function startCheckout(
   // server-side da Cakto — aqui é só o sinal de checkout iniciado.
   fireMetaEvent("InitiateCheckout", {
     content_name: body.billing,
-    value: body.billing === "annual" ? 69.9 : 19.9,
+    value: body.billing === "annual" ? 46.8 : 14.9,
     currency: "BRL",
   });
   setLoading(true);

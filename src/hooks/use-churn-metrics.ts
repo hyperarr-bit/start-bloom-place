@@ -47,7 +47,7 @@ export interface ChurnDeepMetrics {
   mrr_lost_30d: number;
 }
 
-const PRICE_PER_SUB = 19.9;
+const PRICE_PER_SUB = 14.9;
 const DAY_MS = 86400_000;
 
 function dayDiff(a: Date, b: Date) {

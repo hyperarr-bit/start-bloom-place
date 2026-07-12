@@ -34,11 +34,6 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
     status,
   });
 
-const sanitizeDigits = (value?: string | null) => {
-  const digits = value?.replace(/\D/g, "") ?? "";
-  return digits || undefined;
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -142,25 +137,16 @@ serve(async (req) => {
       couponValid || parsed.data.offer === "limited" ? "limited" : "regular";
     const baseLink = CHECKOUT_LINKS[billingPeriod][variant];
 
-    // Prefill do checkout da Cakto via query string — o e-mail pré-preenchido é o que
-    // volta no webhook (data.customer.email) e é como associamos a compra ao usuário.
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("display_name, phone, tax_id")
-      .eq("id", userId)
-      .maybeSingle();
-
+    // Prefill MÍNIMO do checkout: só o e-mail. Ele é o que volta no webhook
+    // (data.customer.email) e é como associamos a compra ao usuário — sem ele,
+    // quem digitar outro e-mail paga e fica sem acesso. Nome/telefone/CPF NÃO
+    // são pré-preenchidos: o CPF pronto deixava a geração do Pix lenta (a Cakto
+    // valida/registra o pagador), então a pessoa preenche no fluxo normal.
     const url = new URL(baseLink);
     if (userEmail) {
       url.searchParams.set("email", userEmail);
       url.searchParams.set("confirmEmail", userEmail);
     }
-    const customerName = profile?.display_name || userEmail.split("@")[0];
-    if (customerName) url.searchParams.set("name", customerName);
-    const phone = sanitizeDigits(profile?.phone);
-    if (phone) url.searchParams.set("phone", phone.startsWith("55") ? phone : `55${phone}`);
-    const cpf = sanitizeDigits(profile?.tax_id);
-    if (cpf) url.searchParams.set("cpf", cpf);
 
     const attribution = parsed.data.attribution ?? {};
     for (const [key, value] of Object.entries(attribution)) {

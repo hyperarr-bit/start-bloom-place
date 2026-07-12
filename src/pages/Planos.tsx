@@ -12,7 +12,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -64,6 +64,112 @@ const MODULE_GROUPS: Array<{
   },
 ];
 
+/** Tela pós-checkout (?success=true — URL de retorno configurada na Cakto).
+ *  Antes o param era IGNORADO: quem pagava voltava pra página de PREÇOS sem
+ *  nenhuma confirmação — e se o webhook atrasasse, via os botões de assinar
+ *  de novo. Caso real de 12/07: pagante concluiu "problema técnico" e
+ *  cancelou a renovação 14min depois de pagar. Esta tela confirma no
+ *  servidor (com polling, o webhook pode levar segundos) e celebra. */
+function PaymentSuccess() {
+  const { isSubscribed } = useAuth();
+  const [status, setStatus] = useState<"checking" | "confirmed" | "waiting">("checking");
+  const [round, setRound] = useState(0);
+  const startRef = useRef(Date.now());
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    trackEvent("purchase_success_view", {});
+  }, []);
+
+  useEffect(() => {
+    if (doneRef.current) return;
+    let stopped = false;
+    const confirm = () => {
+      if (stopped || doneRef.current) return;
+      doneRef.current = true;
+      // Marcador de checkout morre aqui: sem ele, o resgate do paywall não
+      // tem como abrir roleta fantasma pra quem acabou de pagar.
+      try { localStorage.removeItem("core_checkout_pending"); } catch { /* noop */ }
+      trackEvent("purchase_success_confirmed", { secs: Math.round((Date.now() - startRef.current) / 1000) });
+      setStatus("confirmed");
+    };
+    if (isSubscribed) { confirm(); return; }
+    const tick = async (attempt: number) => {
+      if (stopped || doneRef.current) return;
+      try {
+        const { data } = await supabase.functions.invoke("check-subscription");
+        if (data?.subscribed) { confirm(); return; }
+      } catch { /* rede/função indisponível: tenta de novo */ }
+      if (stopped || doneRef.current) return;
+      if (attempt >= 14) {
+        // ~45s sem confirmação: Pix pode levar 1-2min. Sê honesto, não trava.
+        trackEvent("purchase_success_timeout", {});
+        setStatus("waiting");
+        return;
+      }
+      setTimeout(() => tick(attempt + 1), 3000);
+    };
+    tick(0);
+    return () => { stopped = true; };
+  }, [isSubscribed, round]);
+
+  // Hard navigation de propósito: recarrega o app com o estado de assinatura
+  // fresco (evita o gate de trial piscar pra quem acabou de pagar).
+  const enterApp = () => { window.location.href = "/"; };
+
+  return (
+    <div className="min-h-dvh bg-background flex flex-col items-center justify-center px-6 text-center">
+      {status === "checking" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-sm">
+          <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-5" />
+          <h1 className="text-xl font-bold tracking-tight mb-2">Confirmando seu pagamento…</h1>
+          <p className="text-sm text-muted-foreground">Leva só alguns segundos. Não fecha essa tela.</p>
+        </motion.div>
+      )}
+      {status === "confirmed" && (
+        <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }} className="max-w-sm">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 220, damping: 14, delay: 0.1 }}
+            className="w-20 h-20 rounded-full bg-primary/10 text-primary grid place-items-center mx-auto mb-6"
+          >
+            <Check className="w-10 h-10" strokeWidth={3} />
+          </motion.div>
+          <h1 className="text-2xl font-bold tracking-tight mb-2">Pagamento confirmado 🎉</h1>
+          <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">
+            Seu CORE está liberado — todos os módulos, tudo teu.<br />Bora montar sua vida organizada?
+          </p>
+          <Button size="lg" className="w-full h-12 text-base" onClick={enterApp}>
+            Entrar no app
+          </Button>
+          <p className="text-xs text-muted-foreground mt-4 flex items-center justify-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · cancele quando quiser
+          </p>
+        </motion.div>
+      )}
+      {status === "waiting" && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-sm">
+          <div className="w-16 h-16 rounded-full bg-muted grid place-items-center mx-auto mb-5">
+            <Crown className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight mb-2">Pagamento em processamento</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+            Pix e cartão podem levar 1–2 minutos pra compensar. Assim que cair, seu acesso
+            libera sozinho — pode deixar essa tela aberta ou voltar depois.
+          </p>
+          <Button size="lg" variant="outline" className="w-full h-11 mb-3"
+            onClick={() => { setStatus("checking"); setRound((r) => r + 1); }}>
+            Já paguei — verificar de novo
+          </Button>
+          <button onClick={enterApp} className="text-sm text-muted-foreground underline underline-offset-2">
+            Entrar no app mesmo assim
+          </button>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 const Planos = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -72,8 +178,12 @@ const Planos = () => {
   const [loading, setLoading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
+  // Retorno do checkout da Cakto (?success=true): tela de confirmação, não
+  // a página de preços.
+  const paymentReturn = searchParams.get("success") === "true";
 
   useEffect(() => {
+    if (paymentReturn) return; // não conta como visita à página de planos
     trackEvent("planos_view", { source: searchParams.get("from") ?? "direct" });
   }, []);
 
@@ -127,6 +237,8 @@ const Planos = () => {
       setLoading(false);
     }
   };
+
+  if (paymentReturn) return <PaymentSuccess />;
 
   return (
     <div className="min-h-screen bg-background">

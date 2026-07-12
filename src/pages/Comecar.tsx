@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { useSearchParams, useLocation, Link } from "react-router-dom";
+import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
@@ -859,6 +859,7 @@ function ConfirmScreen({ email }: { email: string }) {
 
 export default function Comecar() {
   const [params] = useSearchParams();
+  const { user, isSubscribed, subLoaded } = useAuth();
   // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
   // (?step=offer, via /auth/callback) cai direto no paywall.
   // ("trial" é aceito por compat com links antigos.)
@@ -913,6 +914,14 @@ export default function Comecar() {
       });
     }
   }, [step]);
+
+  // Assinante logado não tem nada a fazer no funil — manda pro app, na área
+  // que ele escolheu. Caso real de 12/07: pagante voltou pro /inicio pelo
+  // link do anúncio, reviu o quiz, tentou recriar a conta ("User already
+  // registered") e cancelou achando que era problema técnico.
+  if (user && subLoaded && isSubscribed) {
+    return <Navigate to={area && area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
+  }
 
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
   if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;

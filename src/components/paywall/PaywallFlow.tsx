@@ -20,8 +20,9 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
  * Usado em 2 contextos:
  *   - "funnel": passo `offer` do /comecar (depois do cadastro)
  *   - "app": gate de quem entrou sem pagar (TrialBanner, contas sem trial)
- * Exit (voltar do celular ou X) → roleta → downsell (1º mês do mensal por
- * R$9,90 — o anual nunca é descontado, pra não desmentir o preço cheio).
+ * Exit (voltar do celular ou X) → roleta → downsell: ANUAL R$34,80
+ * (oferta limitada 6a3owem, a mesma do winback de cancelamento — um único
+ * preço promocional na Cakto). Mensal segue a preço cheio como alternativa.
  * Tudo interno: quem usa só renderiza <PaywallFlow context=... />.
  */
 
@@ -40,7 +41,10 @@ const CHECKOUT_PENDING_KEY = "core_checkout_pending";
 const PRICING = {
   monthly: { perMonth: "14,90" },
   annual: { perMonth: "3,90", total: "46,80", savePerYear: "132" },
-  downsell: { firstMonth: "9,90", after: "14,90" },
+  // Downsell 13/07: prêmio da roleta voltou a ser o ANUAL com desconto
+  // (R$34,80 = oferta limitada 6a3owem na Cakto, mesma do winback) — o
+  // "1º mês R$9,90" morreu. Mensal a preço cheio fica como alternativa.
+  downsell: { perMonth: "2,90", total: "34,80" },
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -661,10 +665,10 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
         PRÊMIO DA ROLETA
       </motion.div>
       <motion.h2 {...stagger(1)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
-        Seu 1º mês por<br /><span className="text-accent">R$ {PRICING.downsell.firstMonth}</span>
+        CORE Anual por<br /><span className="text-accent">R$ {PRICING.downsell.perMonth}/mês</span>
       </motion.h2>
       <motion.p {...stagger(2)} className="text-muted-foreground text-sm leading-relaxed mb-4">
-        Testa um mês inteiro quase de graça. Depois, R$ {PRICING.downsell.after}/mês — e a garantia de 7 dias vale do mesmo jeito.
+        R$ {PRICING.downsell.total} cobrado 1x no ano — o ano inteiro pelo preço de 2 meses do mensal. Garantia de 7 dias.
       </motion.p>
 
       <motion.div {...stagger(3)} className="inline-flex items-center gap-1.5 text-[13px] font-bold tabular-nums text-accent bg-accent/10 rounded-full px-4 py-1.5 mb-5">
@@ -674,13 +678,13 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
       <motion.div {...stagger(4)} className="rounded-2xl border-2 border-accent bg-accent/[0.04] p-4 mb-3 text-left shadow-[0_10px_34px_-12px_hsl(var(--accent)/0.5)]">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="font-bold text-[15px]">Mensal com prêmio</div>
-            <div className="text-[11px] text-muted-foreground">1º mês por R$ {PRICING.downsell.firstMonth} · depois R$ {PRICING.downsell.after}/mês</div>
+            <div className="font-bold text-[15px]">Anual com prêmio</div>
+            <div className="text-[11px] text-muted-foreground">R$ {PRICING.downsell.total} no ano · economiza R$ 144 vs mensal</div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.monthly.perMonth}</div>
+            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.annual.total}</div>
             <div className="font-extrabold text-2xl leading-none text-accent">
-              R$ {PRICING.downsell.firstMonth}<span className="text-xs font-semibold text-muted-foreground">/1º mês</span>
+              R$ {PRICING.downsell.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
             </div>
           </div>
         </div>
@@ -688,7 +692,7 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
           size="lg"
           disabled={loading}
           className="w-full h-[52px] text-base font-bold mt-3 rounded-full"
-          onClick={() => startCheckout({ billing: "monthly", offer: "limited" }, "downsell_monthly", context, setLoading)}
+          onClick={() => startCheckout({ billing: "annual", offer: "limited" }, "downsell_annual", context, setLoading)}
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Resgatar meu prêmio <ArrowRight className="w-4 h-4" /></>}
         </Button>
@@ -699,9 +703,9 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
           variant="outline"
           disabled={loading}
           className="w-full h-11 text-sm font-semibold mb-4 rounded-full"
-          onClick={() => startCheckout({ billing: "annual" }, "downsell_annual_full", context, setLoading)}
+          onClick={() => startCheckout({ billing: "monthly" }, "downsell_monthly_full", context, setLoading)}
         >
-          Prefiro o melhor preço: Anual R$ {PRICING.annual.perMonth}/mês
+          Prefiro mensal: R$ {PRICING.monthly.perMonth}/mês
         </Button>
 
         <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5 justify-center mb-5">
@@ -820,7 +824,7 @@ export function PaywallFlow({
             )}
             {phase === "wheel" && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">
-                <WinbackWheel attemptId={null} prizeLabel="MÊS R$9,90" onSpinComplete={() => setPhase("downsell")} />
+                <WinbackWheel attemptId={null} prizeLabel="ANUAL R$2,90/mês" onSpinComplete={() => setPhase("downsell")} />
               </div>
             )}
             {phase === "downsell" && (

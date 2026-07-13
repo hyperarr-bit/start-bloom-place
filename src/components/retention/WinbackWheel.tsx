@@ -36,8 +36,8 @@ function slicePath(index: number) {
 interface Props {
   attemptId: string | null;
   onSpinComplete: () => void;
-  /** Texto da fatia vencedora. Default = winback de cancelamento (anual 50% OFF);
-   *  o paywall passa o prêmio dele (1º mês do mensal por R$9,90). */
+  /** Texto da fatia vencedora. Default = winback de cancelamento; o paywall
+   *  passa o prêmio dele (hoje ambos = ANUAL R$34,80, oferta 6a3owem). */
   prizeLabel?: string;
 }
 

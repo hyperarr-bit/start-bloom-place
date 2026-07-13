@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, Copy, Loader2, ShieldCheck, X, Zap } from "lucide-react";
+import { Check, Copy, Fingerprint, Loader2, ShieldCheck, Smartphone, User, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +57,22 @@ const maskCpf = (raw: string) =>
     .replace(/(\d{3})(\d)/, "$1.$2")
     .replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
     .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+
+// A API devolve amount como "27.9" — sem isso a tela mostrava "R$ 27.9".
+const fmtBRL = (v: string | number) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2).replace(".", ",") : String(v);
+};
+
+/** Input com ícone à esquerda (form curto de checkout — reduz cara de cadastro) */
+function IconInput({ Icon, ...props }: { Icon: typeof User } & React.ComponentProps<typeof Input>) {
+  return (
+    <div className="relative">
+      <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+      <Input {...props} className="h-12 pl-10 rounded-xl" />
+    </div>
+  );
+}
 
 export function PixCheckout({ offer, onClose, context }: Props) {
   const [step, setStep] = useState<Step>("form");
@@ -203,29 +219,51 @@ export function PixCheckout({ offer, onClose, context }: Props) {
         <AnimatePresence mode="wait">
           {step === "form" && (
             <motion.div key="form" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold mb-3">
-                  <Zap className="w-3.5 h-3.5" /> ACESSO VITALÍCIO · R$ {price}
-                </div>
+              <div className="text-center mb-5">
                 <h2 className="text-[24px] font-bold tracking-tight leading-tight">Falta só o Pix.</h2>
                 <p className="text-sm text-muted-foreground mt-1.5">Pagamento único — sem mensalidade, nunca.</p>
               </div>
-              <div className="space-y-3">
-                <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-                <Input
-                  type="tel" inputMode="tel" placeholder="WhatsApp com DDD (ex: 11 91234-5678)"
-                  value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className="h-12"
-                />
-                <div>
-                  <Input
-                    inputMode="numeric" placeholder="CPF"
-                    value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))} className="h-12"
-                  />
-                  <p className="text-[11px] text-muted-foreground mt-1 ml-1">
-                    O banco exige CPF e telefone pra emitir o Pix — não usamos pra mais nada.
-                  </p>
+
+              {/* Resumo do pedido estilo recibo — a pessoa vê O QUE está pagando */}
+              <div className="rounded-2xl border border-border bg-card p-4 mb-5 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-left">
+                    <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground shrink-0">
+                      <Zap className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-[11px] text-muted-foreground line-through">
+                      R$ {offer === "lifetime" ? "99,90" : PIX_PRICES.lifetime}
+                    </div>
+                    <div className="text-xl font-extrabold text-accent leading-none">R$ {price}</div>
+                  </div>
                 </div>
-                {errMsg && <p className="text-sm text-destructive">{errMsg}</p>}
+                <div className="flex items-center justify-center gap-2.5 border-t border-dashed border-border mt-3.5 pt-3 text-[11px] font-semibold text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-accent" /> Pix na hora</span>
+                  <span aria-hidden>·</span>
+                  <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-accent" /> Garantia de 7 dias</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+                <IconInput
+                  Icon={Fingerprint} inputMode="numeric" placeholder="CPF"
+                  value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))}
+                />
+                <IconInput
+                  Icon={Smartphone} type="tel" inputMode="tel" placeholder="WhatsApp com DDD"
+                  value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
+                />
+                <p className="text-[11px] text-muted-foreground text-center leading-snug px-2">
+                  🔒 O banco exige CPF e telefone pra emitir o Pix — não usamos pra mais nada.
+                </p>
+                {errMsg && <p className="text-sm text-destructive text-center">{errMsg}</p>}
                 <Button
                   size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
                   disabled={!phoneLooksValid(phone) || !cpfLooksValid(cpf)}
@@ -233,9 +271,6 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                 >
                   Gerar meu Pix de R$ {price}
                 </Button>
-                <p className="text-[11px] text-muted-foreground text-center inline-flex items-center gap-1.5 w-full justify-center">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · devolvemos 100%
-                </p>
               </div>
             </motion.div>
           )}
@@ -249,7 +284,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
 
           {step === "qr" && pix && (
             <motion.div key="qr" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full max-w-sm text-center">
-              <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {pix.amount} no Pix</h2>
+              <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
               <p className="text-[13px] text-muted-foreground mb-4">
                 Assim que o Pix cair, seu acesso libera <strong className="text-foreground">sozinho nesta tela</strong>.
               </p>
@@ -278,8 +313,12 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                 <p><strong className="text-foreground">3.</strong> Confirme e volte aqui — libera na hora ✨</p>
               </div>
 
-              <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin" /> Aguardando seu pagamento…
+              <p className="text-[12px] font-semibold text-muted-foreground inline-flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                Aguardando seu pagamento…
               </p>
             </motion.div>
           )}

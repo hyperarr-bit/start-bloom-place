@@ -397,28 +397,34 @@ function FragmentRow({ row, Mark }: { row: (typeof COMPARE_ROWS)[number]; Mark: 
   );
 }
 
-/** Card único do VITALÍCIO: pagamento 1x no Pix, sem mensalidade nunca.
- *  Âncora honesta = o antigo mensal (2 meses dele > o vitalício inteiro). */
+/** Card único do VITALÍCIO: a estrela visual da oferta — borda gradiente,
+ *  glow e preço grande centralizado (padrão dos paywalls mobile premium). */
 function LifetimeCard() {
   return (
-    <div className="relative w-full rounded-2xl border-2 border-accent bg-accent/[0.05] p-4 text-left shadow-[0_4px_20px_-8px_hsl(var(--accent)/0.45)]">
-      <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
-        ACESSO VITALÍCIO
-      </span>
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="font-bold text-[15px]">Pague 1x. Seu pra sempre.</div>
-          <div className="text-[12px] leading-tight mt-0.5">
-            <span className="font-semibold text-foreground">Todos os 16 módulos · Pix na hora</span>
-            <span className="block text-accent font-semibold mt-0.5">Sem mensalidade. Nunca.</span>
-          </div>
-        </div>
-        <div className="text-right shrink-0">
-          <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.anchor}</div>
-          <div className="font-extrabold text-2xl leading-none text-accent">
+    <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
+      <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-14 left-1/2 -translate-x-1/2 w-60 h-28 rounded-full"
+          style={{ background: "hsl(var(--accent) / 0.14)", filter: "blur(28px)" }}
+        />
+        <span className="relative inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-widest mb-3">
+          ACESSO VITALÍCIO
+        </span>
+        <div className="relative font-bold text-[15px] leading-tight mb-2">Pague 1x. Seu pra sempre.</div>
+        <div className="relative flex items-end justify-center gap-2">
+          <span className="text-[13px] text-muted-foreground line-through mb-[7px]">R$ {PRICING.anchor}</span>
+          <span className="text-[42px] leading-none font-extrabold tracking-tight text-accent">
             R$ {PRICING.lifetime.total}
-          </div>
-          <div className="text-[10px] font-semibold text-muted-foreground mt-0.5">pagamento único</div>
+          </span>
+        </div>
+        <div className="relative text-[12px] font-semibold text-muted-foreground mt-1.5">pagamento único no Pix</div>
+        <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
+          {["16 módulos", "Sem mensalidade", "Garantia 7 dias"].map((c) => (
+            <span key={c} className="rounded-full bg-secondary px-1 py-1.5 text-[10px] font-bold leading-tight">
+              {c}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -552,13 +558,16 @@ function OfferScreen({
         style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
-          <Button
-            size="lg"
-            className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-            onClick={() => openPixIntent("lifetime", "paywall_lifetime", context, onBuy)}
-          >
-            Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
-          </Button>
+          {/* Pulso sutil (padrão Cal AI): chama o olho sem parecer erro */}
+          <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
+            <Button
+              size="lg"
+              className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+              onClick={() => openPixIntent("lifetime", "paywall_lifetime", context, onBuy)}
+            >
+              Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
+            </Button>
+          </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>

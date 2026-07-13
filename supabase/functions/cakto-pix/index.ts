@@ -165,13 +165,13 @@ serve(async (req) => {
         name,
         email: user.email, // e-mail da CONTA — o vínculo do webhook
         phone,
-        // Antifraude é fluxo de cartão na doc; pra Pix mandamos o que o SDK
-        // der (ou UUID). Se a API exigir mais, o log abaixo mostra o erro.
+        // fingerprint é OBRIGATÓRIO (confirmado no teto real 13/07) mas aceita
+        // qualquer string não-vazia; antifraudProfilingAttemptReference NÃO
+        // existe no contrato público (a doc mentia — 400 se enviado).
         fingerprint: body.fingerprint || crypto.randomUUID(),
         ...(docNumber ? { docType: "cpf", docNumber } : {}),
       },
       items: [{ offerId, quantity: 1, offerType: "main" }],
-      antifraudProfilingAttemptReference: body.antifraudRef || crypto.randomUUID(),
       metadata: {
         sck: user.id, // rastro extra do vínculo
         ...(attribution.utm_source ? { utm_source: attribution.utm_source } : {}),

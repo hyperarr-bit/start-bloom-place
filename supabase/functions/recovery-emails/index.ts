@@ -18,20 +18,11 @@ const log = (step: string, details?: unknown) => {
   console.log(`[RECOVERY-EMAILS] ${step}${d}`);
 };
 
-// Links da Cakto (fonte oficial: CAKTO_OFFERS no cakto-webhook). O link
-// direto funciona sem login — o webhook casa a compra pelo e-mail.
-// Oferta do e-mail = downsell ANUAL R$34,80 (oferta limitada 6a3owem, a
-// mesma da roleta/winback); mensal a preço cheio como alternativa.
-// (Bug corrigido 13/07: constantes anteriores chamavam 6a3owem de "mensal
-// limitado" e usavam 6g8iiak — que é o MENSAL regular — como anual.)
-const LIMITED_ANNUAL = "https://pay.cakto.com.br/6a3owem";
-const REGULAR_MONTHLY = "https://pay.cakto.com.br/6g8iiak";
-
-const checkoutLink = (base: string, email: string, name: string) => {
-  const url = new URL(base);
-  url.searchParams.set("email", email);
-  url.searchParams.set("confirmEmail", email);
-  if (name) url.searchParams.set("name", name);
+// VITALÍCIO (13/07): a compra agora é Pix DENTRO do app (PixCheckout) —
+// o e-mail leva pro /planos logado, onde a pessoa gera o Pix em 2 toques.
+const checkoutLink = (_base: string, _email: string, _name: string) => {
+  const url = new URL("https://www.coreaplicativo.com.br/planos");
+  url.searchParams.set("from", "recovery_email");
   url.searchParams.set("utm_source", "recovery_email");
   return url.toString();
 };
@@ -42,7 +33,7 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
     : "Última chamada: sua condição de boas-vindas";
   const intro = stage === "h1"
     ? `Você criou sua conta no CORE e seu plano ficou pronto. Pra começar, sua condição de boas-vindas está ativa:`
-    : `Sua condição de boas-vindas do CORE ainda está de pé — mas ela é da sua primeira semana. Depois, vale o preço normal (R$ 46,80/ano).`;
+    : `Sua condição de boas-vindas do CORE ainda está de pé — mas ela é da sua primeira semana. Aproveita enquanto vale.`;
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f6f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#262626;">
@@ -52,13 +43,13 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
       <h1 style="font-size:22px;line-height:1.25;margin:0 0 12px;">${headline}</h1>
       <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 20px;">Oi ${name},<br>${intro}</p>
       <div style="border:2px solid #D22D80;border-radius:14px;padding:18px;margin-bottom:14px;">
-        <div style="font-size:12px;font-weight:700;color:#D22D80;letter-spacing:0.5px;margin-bottom:6px;">BOAS-VINDAS · ANUAL</div>
-        <div style="font-size:28px;font-weight:800;">R$ 2,90<span style="font-size:14px;font-weight:600;color:#888;">/mês</span></div>
-        <div style="font-size:12px;color:#888;margin-top:2px;">R$ 34,80 cobrado 1x no ano (de R$ 46,80) · cancele quando quiser</div>
-        <a href="${annualUrl}" style="display:block;background:#262626;color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:999px;margin-top:14px;">Ativar meu ano por R$ 34,80</a>
+        <div style="font-size:12px;font-weight:700;color:#D22D80;letter-spacing:0.5px;margin-bottom:6px;">ACESSO VITALÍCIO</div>
+        <div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span></div>
+        <div style="font-size:12px;color:#888;margin-top:2px;">Pague 1x no Pix · todos os 16 módulos · sem mensalidade, nunca</div>
+        <a href="${annualUrl}" style="display:block;background:#262626;color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:999px;margin-top:14px;">Garantir meu acesso vitalício</a>
       </div>
-      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">Prefere mensal? <a href="${monthlyUrl}" style="color:#D22D80;font-weight:600;">R$ 14,90/mês, sem compromisso</a></p>
-      <p style="font-size:12px;line-height:1.6;color:#888;margin:0;text-align:center;">🛡️ Garantia de 7 dias — não curtiu, devolvemos 100% em 1 mensagem.<br>Pix ou cartão · sem fidelidade · cancele quando quiser.</p>
+      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">Leva 1 minuto: entra no app, toca em gerar Pix e pronto.</p>
+      <p style="font-size:12px;line-height:1.6;color:#888;margin:0;text-align:center;">🛡️ Garantia de 7 dias — não curtiu, devolvemos 100% em 1 mensagem.<br>Pix na hora · pagamento único · sem mensalidade.</p>
     </div>
     <p style="font-size:11px;color:#aaa;line-height:1.6;margin:20px 4px 0;text-align:center;">Você recebeu este e-mail porque criou uma conta no CORE.<br>Não quer mais receber? Responda com "sair".</p>
   </div>
@@ -66,8 +57,8 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
 };
 
 const SUBJECTS: Record<"h1" | "h24", string> = {
-  h1: "Seu plano está pronto — e seu ano sai por R$ 2,90/mês 🎁",
-  h24: "Última chamada: anual por R$ 34,80 expira com sua 1ª semana",
+  h1: "Seu plano está pronto — CORE vitalício por R$ 27,90, 1x só 🎁",
+  h24: "Última chamada: pague 1x, use pra sempre (R$ 27,90)",
 };
 
 serve(async (req) => {
@@ -107,8 +98,8 @@ serve(async (req) => {
     for (const c of candidates) {
       try {
         const stage = c.stage as "h1" | "h24";
-        const annualUrl = checkoutLink(LIMITED_ANNUAL, c.email, c.display_name);
-        const monthlyUrl = checkoutLink(REGULAR_MONTHLY, c.email, c.display_name);
+        const annualUrl = checkoutLink("", c.email, c.display_name);
+        const monthlyUrl = annualUrl;
 
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",

@@ -37,7 +37,7 @@ interface Props {
   attemptId: string | null;
   onSpinComplete: () => void;
   /** Texto da fatia vencedora. Default = winback de cancelamento; o paywall
-   *  passa o prêmio dele (hoje ambos = ANUAL R$34,80, oferta 6a3owem). */
+   *  passa o prêmio dele (hoje ambos = VITALÍCIO R$14,90 via PixCheckout). */
   prizeLabel?: string;
 }
 

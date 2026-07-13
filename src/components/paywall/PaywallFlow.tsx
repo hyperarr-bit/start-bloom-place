@@ -2,17 +2,15 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, X, ShieldCheck, Loader2, Gift,
+  ArrowRight, Check, X, ShieldCheck, Gift,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { trackEvent, getAttributionParams } from "@/lib/analytics";
+import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { useAuth } from "@/hooks/use-auth";
-import { toast } from "sonner";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
+import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 /**
@@ -20,31 +18,20 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
  * Usado em 2 contextos:
  *   - "funnel": passo `offer` do /comecar (depois do cadastro)
  *   - "app": gate de quem entrou sem pagar (TrialBanner, contas sem trial)
- * Exit (voltar do celular ou X) → roleta → downsell: ANUAL R$34,80
- * (oferta limitada 6a3owem, a mesma do winback de cancelamento — um único
- * preço promocional na Cakto). Mensal segue a preço cheio como alternativa.
+ * Exit (voltar do celular ou X) → roleta → downsell: VITALÍCIO R$14,90.
+ * Compra acontece DENTRO do app (PixCheckout — QR + copia-e-cola + polling);
+ * não existe mais redirect pra checkout externo.
  * Tudo interno: quem usa só renderiza <PaywallFlow context=... />.
  */
 
-// Marca "saiu pro checkout": se voltar sem pagar, o paywall abre a roleta em
-// vez de ficar mudo. Dado que motivou (desde o reset de 07/07): 15 cliques em
-// "assinar" → só 3 geraram Pix — 12 pessoas recuaram no formulário da Cakto e
-// voltaram pra um paywall idêntico, sem nenhuma reação da nossa parte.
-const CHECKOUT_PENDING_KEY = "core_checkout_pending";
-
-// Preços — TÊM que bater com as ofertas da Cakto
-// (regular: 6g8iiak/xs9s7ws_914041 · limitada: 6a3owem).
-// Preço 12/07: anual R$46,80 (12x ou Pix, preço único), mensal R$14,90 —
-// revertido ao patamar antigo (R$69,90 travava tráfego frio). O anual NUNCA é
-// descontado — a roleta premia o 1º mês do mensal. Comunicação segue honesta
-// (sem "74% OFF"/"R$0,13/dia" fake); a cobrança real vive no painel da Cakto.
+// Modelo 13/07: acesso VITALÍCIO, pagamento ÚNICO, SÓ Pix — dentro do app
+// (PixCheckout). Motivo: dias 12-13 tiveram ~25 cliques no anual e 0 vendas
+// no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
+// Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
 const PRICING = {
-  monthly: { perMonth: "14,90" },
-  annual: { perMonth: "3,90", total: "46,80", savePerYear: "132" },
-  // Downsell 13/07: prêmio da roleta voltou a ser o ANUAL com desconto
-  // (R$34,80 = oferta limitada 6a3owem na Cakto, mesma do winback) — o
-  // "1º mês R$9,90" morreu. Mensal a preço cheio fica como alternativa.
-  downsell: { perMonth: "2,90", total: "34,80" },
+  lifetime: { total: "27,90" },
+  downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
+  legacyMonthly: "14,90", // âncora honesta: o antigo plano mensal
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -68,37 +55,16 @@ const LIGHT_VARS = {
 
 // VICTORY_PHRASE e GASTO_ANCHOR vêm de src/lib/funnel.ts (compartilhados com o quiz).
 
-async function startCheckout(
-  body: { billing: "monthly" | "annual"; offer?: "regular" | "limited" },
-  cta: string,
-  context: string,
-  setLoading: (v: boolean) => void,
-) {
+/** Sinal de intenção de compra + abre o Pix in-app. A Compra (Purchase) em si
+ *  continua server-side (CAPI da Cakto via webhook). */
+function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: PixOffer) => void) {
   trackEvent("funnel_click", { cta, context });
-  // Meta Pixel: intenção de compra (clicou pra assinar). A Compra em si vem
-  // server-side da Cakto — aqui é só o sinal de checkout iniciado.
   fireMetaEvent("InitiateCheckout", {
-    content_name: body.billing,
-    value: body.billing === "annual" ? 46.8 : 14.9,
+    content_name: offer,
+    value: offer === "lifetime" ? 27.9 : 14.9,
     currency: "BRL",
   });
-  setLoading(true);
-  try {
-    const { data, error } = await supabase.functions.invoke("cakto-checkout", {
-      body: { ...body, attribution: getAttributionParams() },
-    });
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    if (data?.url) {
-      try { localStorage.setItem(CHECKOUT_PENDING_KEY, JSON.stringify({ at: Date.now(), cta })); } catch { /* noop */ }
-      window.location.href = data.url;
-      return;
-    }
-    throw new Error("Checkout indisponível. Tente de novo.");
-  } catch (err: any) {
-    toast.error(err?.message || "Erro ao iniciar checkout");
-    setLoading(false);
-  }
+  open(offer);
 }
 
 const stagger = (i: number) => ({
@@ -340,8 +306,8 @@ function AnchorCard({ gasto }: { gasto: string }) {
           <p className="text-xl font-extrabold text-destructive/80 tracking-tight">{anchor.year}</p>
         </div>
         <div className="pl-3 text-center">
-          <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE Anual,<br />pra enxergar tudo</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.annual.total}</p>
+          <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
         </div>
       </div>
     </div>
@@ -363,7 +329,7 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">Com o CORE,<br />sai por</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.annual.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
         </div>
       </div>
     </div>
@@ -371,9 +337,9 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
 }
 
 const TRUST_CHIPS = [
-  { emoji: "🇧🇷", label: "Pix aceito" },
+  { emoji: "🇧🇷", label: "Pix na hora" },
   { emoji: "🛡️", label: "Garantia de 7 dias" },
-  { emoji: "✌️", label: "Sem fidelidade" },
+  { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
 function TrustChips() {
@@ -431,54 +397,30 @@ function FragmentRow({ row, Mark }: { row: (typeof COMPARE_ROWS)[number]; Mark: 
   );
 }
 
-function PlanPicker({
-  billing, setBilling,
-}: { billing: "monthly" | "annual"; setBilling: (b: "monthly" | "annual") => void }) {
+/** Card único do VITALÍCIO: pagamento 1x no Pix, sem mensalidade nunca.
+ *  Âncora honesta = o antigo mensal (2 meses dele > o vitalício inteiro). */
+function LifetimeCard() {
   return (
-    <div className="space-y-2.5 text-left">
-      <button
-        onClick={() => setBilling("annual")}
-        className={`relative w-full rounded-2xl border-2 p-4 transition-all ${
-          billing === "annual" ? "border-accent bg-accent/[0.05] shadow-[0_4px_20px_-8px_hsl(var(--accent)/0.45)]" : "border-border bg-card"
-        }`}
-      >
-        <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
-          MAIS ESCOLHIDO
-        </span>
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="font-bold text-[15px]">Anual</div>
-            <div className="text-[12px] leading-tight">
-              <span className="font-semibold text-foreground">R$ {PRICING.annual.total} no ano · em até 12x ou Pix</span>
-              <span className="block text-accent font-semibold mt-0.5">Economiza R$ {PRICING.annual.savePerYear}/ano vs mensal</span>
-            </div>
-          </div>
-          <div className="text-right shrink-0">
-            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.monthly.perMonth}</div>
-            <div className="font-extrabold text-xl leading-none">
-              R$ {PRICING.annual.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
-            </div>
+    <div className="relative w-full rounded-2xl border-2 border-accent bg-accent/[0.05] p-4 text-left shadow-[0_4px_20px_-8px_hsl(var(--accent)/0.45)]">
+      <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
+        ACESSO VITALÍCIO
+      </span>
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <div className="font-bold text-[15px]">Pague 1x. Seu pra sempre.</div>
+          <div className="text-[12px] leading-tight mt-0.5">
+            <span className="font-semibold text-foreground">Todos os 16 módulos · Pix na hora</span>
+            <span className="block text-accent font-semibold mt-0.5">Sem mensalidade. Nunca.</span>
           </div>
         </div>
-      </button>
-      <button
-        onClick={() => setBilling("monthly")}
-        className={`w-full rounded-2xl border-2 p-4 transition-all ${
-          billing === "monthly" ? "border-accent bg-accent/[0.05]" : "border-border bg-card"
-        }`}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <div className="font-bold text-[15px]">Mensal</div>
-            <div className="text-[12px] text-muted-foreground leading-tight">
-              Começa leve · cancela quando quiser
-            </div>
+        <div className="text-right shrink-0">
+          <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.legacyMonthly}/mês</div>
+          <div className="font-extrabold text-2xl leading-none text-accent">
+            R$ {PRICING.lifetime.total}
           </div>
-          <div className="font-extrabold text-xl leading-none">
-            R$ {PRICING.monthly.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
-          </div>
+          <div className="text-[10px] font-semibold text-muted-foreground mt-0.5">pagamento único</div>
         </div>
-      </button>
+      </div>
     </div>
   );
 }
@@ -486,10 +428,8 @@ function PlanPicker({
 /* ----------------------------------------------------------------- offer */
 
 function OfferScreen({
-  context, answers, onEscape,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void }) {
-  const [billing, setBilling] = useState<"monthly" | "annual">("annual");
-  const [loading, setLoading] = useState(false);
+  context, answers, onEscape, onBuy,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void }) {
   const [showClose, setShowClose] = useState(false);
   const [showGift, setShowGift] = useState(false);
   const escapeRef = useRef(onEscape);
@@ -581,7 +521,7 @@ function OfferScreen({
         <ValueStack area={area} />
         <GuaranteeTimeline />
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(10)}><PlanPicker billing={billing} setBilling={setBilling} /></motion.div>
+        <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
 
@@ -614,18 +554,15 @@ function OfferScreen({
         <div className="max-w-sm mx-auto px-5">
           <Button
             size="lg"
-            disabled={loading}
             className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-            onClick={() => startCheckout({ billing }, `paywall_${billing}`, context, setLoading)}
+            onClick={() => openPixIntent("lifetime", "paywall_lifetime", context, onBuy)}
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Desbloquear meu acesso <ArrowRight className="w-4 h-4" /></>}
+            Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
           </Button>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
-              {billing === "annual"
-                ? <>Hoje: <strong className="text-foreground font-semibold whitespace-nowrap">R$ {PRICING.annual.total}</strong> · em até 12x no cartão ou Pix · Garantia de 7 dias</>
-                : <>Hoje: <strong className="text-foreground font-semibold whitespace-nowrap">R$ {PRICING.monthly.perMonth}</strong> por mês · Pix ou cartão · Garantia de 7 dias</>}
+              Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias
             </span>
           </p>
         </div>
@@ -636,8 +573,7 @@ function OfferScreen({
 
 /* -------------------------------------------------------------- downsell */
 
-function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onDismiss: () => void }) {
-  const [loading, setLoading] = useState(false);
+function DownsellScreen({ context, onDismiss, onBuy }: { context: "funnel" | "app"; onDismiss: () => void; onBuy: (o: PixOffer) => void }) {
   const [secondsLeft, setSecondsLeft] = useState(10 * 60);
   useEffect(() => {
     const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
@@ -665,10 +601,10 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
         PRÊMIO DA ROLETA
       </motion.div>
       <motion.h2 {...stagger(1)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
-        CORE Anual por<br /><span className="text-accent">R$ {PRICING.downsell.perMonth}/mês</span>
+        CORE VITALÍCIO por<br /><span className="text-accent">R$ {PRICING.downsell.total}</span>
       </motion.h2>
       <motion.p {...stagger(2)} className="text-muted-foreground text-sm leading-relaxed mb-4">
-        R$ {PRICING.downsell.total} cobrado 1x no ano — o ano inteiro pelo preço de 2 meses do mensal. Garantia de 7 dias.
+        Pagamento único no Pix — seu pra sempre, sem mensalidade nunca. Garantia de 7 dias.
       </motion.p>
 
       <motion.div {...stagger(3)} className="inline-flex items-center gap-1.5 text-[13px] font-bold tabular-nums text-accent bg-accent/10 rounded-full px-4 py-1.5 mb-5">
@@ -678,38 +614,28 @@ function DownsellScreen({ context, onDismiss }: { context: "funnel" | "app"; onD
       <motion.div {...stagger(4)} className="rounded-2xl border-2 border-accent bg-accent/[0.04] p-4 mb-3 text-left shadow-[0_10px_34px_-12px_hsl(var(--accent)/0.5)]">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="font-bold text-[15px]">Anual com prêmio</div>
-            <div className="text-[11px] text-muted-foreground">R$ {PRICING.downsell.total} no ano · economiza R$ 144 vs mensal</div>
+            <div className="font-bold text-[15px]">Vitalício com prêmio</div>
+            <div className="text-[11px] text-muted-foreground">Todos os 16 módulos · pagamento único no Pix</div>
           </div>
           <div className="text-right shrink-0">
-            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.annual.total}</div>
+            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.lifetime.total}</div>
             <div className="font-extrabold text-2xl leading-none text-accent">
-              R$ {PRICING.downsell.perMonth}<span className="text-xs font-semibold text-muted-foreground">/mês</span>
+              R$ {PRICING.downsell.total}
             </div>
           </div>
         </div>
         <Button
           size="lg"
-          disabled={loading}
           className="w-full h-[52px] text-base font-bold mt-3 rounded-full"
-          onClick={() => startCheckout({ billing: "annual", offer: "limited" }, "downsell_annual", context, setLoading)}
+          onClick={() => openPixIntent("downsell", "downsell_lifetime", context, onBuy)}
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Resgatar meu prêmio <ArrowRight className="w-4 h-4" /></>}
+          Resgatar meu prêmio <ArrowRight className="w-4 h-4" />
         </Button>
       </motion.div>
 
       <motion.div {...stagger(5)}>
-        <Button
-          variant="outline"
-          disabled={loading}
-          className="w-full h-11 text-sm font-semibold mb-4 rounded-full"
-          onClick={() => startCheckout({ billing: "monthly" }, "downsell_monthly_full", context, setLoading)}
-        >
-          Prefiro mensal: R$ {PRICING.monthly.perMonth}/mês
-        </Button>
-
         <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5 justify-center mb-5">
-          <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · Pix ou cartão · cancele quando quiser
+          <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · Pix na hora · sem mensalidade
         </p>
 
         <div>
@@ -736,10 +662,10 @@ export function PaywallFlow({
 }) {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<"offer" | "wheel" | "downsell">("offer");
-  const { isSubscribed } = useAuth();
-  const subRef = useRef(isSubscribed);
-  subRef.current = isSubscribed;
-  const rescueDone = useRef(false);
+  // Pix in-app: quando setado, o overlay PixCheckout cobre o paywall.
+  // (O antigo "resgate do checkout_return" morreu junto com o redirect —
+  // ninguém mais SAI do app pra pagar.)
+  const [pixOffer, setPixOffer] = useState<PixOffer | null>(null);
 
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).
@@ -747,60 +673,6 @@ export function PaywallFlow({
     if (answers && Object.keys(answers).length) return answers;
     try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
   });
-
-  // Resgate do "voltei do checkout sem pagar": clicou em assinar, foi pra
-  // Cakto e voltou → abre a roleta (→ downsell) em vez do mesmo paywall mudo.
-  // Antes de disparar, CONFIRMA no servidor que não pagou. A espera cega de
-  // 2,5s perdeu a corrida na venda de 10/07 (webhook chegou junto do retorno
-  // e a pagante viu a roleta) — agora o check-subscription é consultado na
-  // hora e a roleta só abre com "subscribed: false" fresco.
-  useEffect(() => {
-    // Timer PRECISA morrer com o componente: em 10/07 ele sobreviveu ao
-    // desmonte do gate e registrou um checkout_return fantasma de uma pagante.
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const tryRescue = () => {
-      if (rescueDone.current) return;
-      let marker: { at?: number } | null = null;
-      try { marker = JSON.parse(localStorage.getItem(CHECKOUT_PENDING_KEY) || "null"); } catch { marker = null; }
-      if (!marker?.at) return;
-      const ageMs = Date.now() - marker.at;
-      if (ageMs > 6 * 60 * 60 * 1000) {
-        try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
-        return;
-      }
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(async () => {
-        if (rescueDone.current) return;
-        if (subRef.current) {
-          // Já sabemos que pagou: marcador morre aqui, sem roleta.
-          try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
-          return;
-        }
-        try {
-          const { data } = await supabase.functions.invoke("check-subscription");
-          if (data?.subscribed) {
-            // Pagou — some com o marcador e nada de roleta.
-            try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
-            return;
-          }
-        } catch { /* servidor indisponível: segue com o estado local */ }
-        if (rescueDone.current || subRef.current) return;
-        rescueDone.current = true;
-        try { localStorage.removeItem(CHECKOUT_PENDING_KEY); } catch { /* noop */ }
-        trackEvent("funnel_click", { cta: "checkout_return", context, mins: Math.round(ageMs / 60000) });
-        setPhase("wheel");
-      }, 2500);
-    };
-    tryRescue();
-    const onVis = () => { if (document.visibilityState === "visible") tryRescue(); };
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
-    return () => {
-      if (timer) clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("focus", onVis);
-    };
-  }, [context]);
 
   useEffect(() => {
     const name = context === "funnel" ? "funnel_view" : "paywall_view";
@@ -816,21 +688,25 @@ export function PaywallFlow({
 
   return (
     <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground overflow-y-auto">
+      {pixOffer && (
+        <PixCheckout offer={pixOffer} context={context} onClose={() => setPixOffer(null)} />
+      )}
       <div className="px-5">
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
             {phase === "offer" && (
-              <OfferScreen context={context} answers={quiz} onEscape={() => setPhase("wheel")} />
+              <OfferScreen context={context} answers={quiz} onEscape={() => setPhase("wheel")} onBuy={setPixOffer} />
             )}
             {phase === "wheel" && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">
-                <WinbackWheel attemptId={null} prizeLabel="ANUAL R$2,90/mês" onSpinComplete={() => setPhase("downsell")} />
+                <WinbackWheel attemptId={null} prizeLabel="VITALÍCIO R$14,90" onSpinComplete={() => setPhase("downsell")} />
               </div>
             )}
             {phase === "downsell" && (
               <div className="min-h-dvh grid place-items-center">
                 <DownsellScreen
                   context={context}
+                  onBuy={setPixOffer}
                   // Recusou o downsell: no funil entra no app (bloqueado) — na
                   // ÁREA que escolheu, se veio do funil vitrine; no gate in-app
                   // volta pra oferta (continua bloqueado).

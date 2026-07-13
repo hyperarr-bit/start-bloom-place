@@ -17,13 +17,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 // MANTER EM SINCRONIA com CHECKOUT_LINKS em supabase/functions/cakto-checkout/index.ts.
 // Os IDs são os códigos curtos dos links pay.cakto.com.br/<código>.
-const CAKTO_OFFERS: Record<string, { billing: "monthly" | "annual"; winback?: boolean }> = {
-  "6g8iiak": { billing: "monthly" },                    // CORE Pro Mensal
-  "37pjpm8": { billing: "monthly" },                    // Oferta limitada mensal
-  "xs9s7ws_914041": { billing: "annual" },              // CORE Pro Anual
+type OfferCfg = { billing: "monthly" | "annual" | "lifetime"; winback?: boolean };
+const CAKTO_OFFERS: Record<string, OfferCfg> = {
+  "6g8iiak": { billing: "monthly" },                    // CORE Pro Mensal (legado)
+  "37pjpm8": { billing: "monthly" },                    // Oferta limitada mensal (legado)
+  "xs9s7ws_914041": { billing: "annual" },              // CORE Pro Anual (legado)
   "xs9s7ws": { billing: "annual" },                     // (variação sem sufixo)
-  "6a3owem": { billing: "annual", winback: true },      // Oferta limitada anual (winback)
+  "6a3owem": { billing: "annual", winback: true },      // Oferta limitada anual (winback legado)
 };
+// VITALÍCIO (13/07, Pix in-app via cakto-pix): offer IDs vêm de secrets —
+// os mesmos que a cakto-pix usa — pra não hardcodar IDs de oferta no repo.
+const LIFETIME_OFFER = Deno.env.get("CAKTO_OFFER_LIFETIME") ?? "";
+const DOWNSELL_OFFER = Deno.env.get("CAKTO_OFFER_DOWNSELL") ?? "";
+if (LIFETIME_OFFER) CAKTO_OFFERS[LIFETIME_OFFER.toLowerCase()] = { billing: "lifetime" };
+if (DOWNSELL_OFFER) CAKTO_OFFERS[DOWNSELL_OFFER.toLowerCase()] = { billing: "lifetime" };
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";
@@ -93,7 +100,7 @@ serve(async (req) => {
 
     // ---- Plano: pela oferta; fallback por recorrência/preço --------------
     const offerCfg = CAKTO_OFFERS[offerId] || CAKTO_OFFERS[offerId.split("_")[0]];
-    let billingPeriod: "monthly" | "annual";
+    let billingPeriod: "monthly" | "annual" | "lifetime";
     if (offerCfg) {
       billingPeriod = offerCfg.billing;
     } else {
@@ -216,10 +223,14 @@ serve(async (req) => {
     }
 
     async function saveActiveSubscription(userId: string, emitConversion: boolean) {
-      // Fim do período: usa next_payment_date da Cakto quando vier; senão calcula
+      // Fim do período: usa next_payment_date da Cakto quando vier; senão calcula.
+      // VITALÍCIO: pagamento único, nada renova — period_end vai pra +100 anos
+      // (convenção da base; check-subscription só olha status+period_end).
       let periodEnd = new Date(now);
       const nextPayment = sub.next_payment_date ? new Date(sub.next_payment_date) : null;
-      if (nextPayment && !isNaN(nextPayment.getTime()) && nextPayment > now) {
+      if (billingPeriod === "lifetime") {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 100);
+      } else if (nextPayment && !isNaN(nextPayment.getTime()) && nextPayment > now) {
         periodEnd = nextPayment;
       } else if (billingPeriod === "annual") {
         periodEnd.setFullYear(periodEnd.getFullYear() + 1);
@@ -232,7 +243,7 @@ serve(async (req) => {
       const payload = {
         user_id: userId,
         status: "active",
-        plan: "core-pro",
+        plan: billingPeriod === "lifetime" ? "lifetime" : "core-pro",
         billing_period: billingPeriod,
         payment_method: paymentMethod,
         abacatepay_billing_id: purchaseId,
@@ -272,7 +283,7 @@ serve(async (req) => {
           await supabaseClient.from("analytics_events").insert({
             user_id: userId,
             event_name: "subscription_started",
-            event_data: { plan: "core-pro", billing_period: billingPeriod, payment_method: paymentMethod, gateway: "cakto" },
+            event_data: { plan: billingPeriod === "lifetime" ? "lifetime" : "core-pro", billing_period: billingPeriod, payment_method: paymentMethod, gateway: "cakto" },
             trial_day: trialDay,
           });
           // Evento canônico de conversão trial → pago
@@ -280,7 +291,7 @@ serve(async (req) => {
             user_id: userId,
             event_name: "trial_converted",
             event_data: {
-              plan: "core-pro",
+              plan: billingPeriod === "lifetime" ? "lifetime" : "core-pro",
               billing_period: billingPeriod,
               payment_method: paymentMethod,
               days_to_convert: daysToConvert,

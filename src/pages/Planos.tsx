@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { trackEvent, getAttributionParams } from "@/lib/analytics";
+import { trackEvent } from "@/lib/analytics";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
@@ -176,8 +176,7 @@ const Planos = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isSubscribed, user } = useAuth();
-  const [billing, setBilling] = useState<"monthly" | "annual">("annual");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
   // Retorno do checkout da Cakto (?success=true): tela de confirmação, não
@@ -206,44 +205,38 @@ const Planos = () => {
 
   const handleBack = useCallback(() => exitToPrevious(), [exitToPrevious]);
 
-  const plans = {
-    monthly: { price: "14,90", period: "/mês" },
-    annual: { price: "3,90", period: "/mês", savings: "R$ 46,80 no ano (em até 12x ou Pix) · economia de R$ 132" },
-  };
-  const currentPlan = plans[billing];
+  // VITALÍCIO (13/07): pagamento único no Pix, dentro do app (PixCheckout).
+  const [pixOpen, setPixOpen] = useState(false);
+  // Assinante lifetime não tem o que cancelar (nada renova) — esconde o botão.
+  const [isLifetime, setIsLifetime] = useState(false);
+  useEffect(() => {
+    if (!isSubscribed || !user) return;
+    // .limit(1) + order: contas antigas podem ter MAIS de uma linha (maybeSingle
+    // com 2+ linhas devolve erro e o vitalício não era detectado).
+    supabase.from("subscriptions").select("billing_period, plan")
+      .eq("user_id", user.id).order("current_period_end", { ascending: false }).limit(1)
+      .then(({ data }) => {
+        const s = data?.[0];
+        if (s?.billing_period === "lifetime" || s?.plan === "lifetime" || s?.plan === "premium") setIsLifetime(true);
+      });
+  }, [isSubscribed, user]);
 
   const handleCheckout = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    const { data: { user: u } } = await supabase.auth.getUser();
+    if (!u) {
       toast.error("Sua sessão expirou. Faça login novamente.");
       navigate("/auth");
       return;
     }
-    setLoading(true);
     winback.markIntent();
-    try {
-      const { data, error } = await supabase.functions.invoke("cakto-checkout", {
-        body: { billing, attribution: getAttributionParams() },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      if (data?.url) window.location.href = data.url;
-    } catch (err: any) {
-      const msg = err.message || "";
-      if (msg.includes("not authenticated") || msg.includes("missing sub claim")) {
-        toast.error("Sua sessão expirou. Faça login novamente.");
-        navigate("/auth");
-      } else {
-        toast.error(msg || "Erro ao iniciar checkout");
-      }
-      setLoading(false);
-    }
+    setPixOpen(true);
   };
 
   if (paymentReturn) return <PaymentSuccess />;
 
   return (
     <div className="min-h-screen bg-background">
+      {pixOpen && <PixCheckout offer="lifetime" context="app" onClose={() => setPixOpen(false)} />}
       <PaymentStatus />
 
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">
@@ -263,16 +256,18 @@ const Planos = () => {
         {isSubscribed && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center space-y-3">
             <p className="text-sm font-medium text-primary">
-              Você já é assinante CORE PRO
+              {isLifetime ? "Seu acesso ao CORE é VITALÍCIO 🎉 — nada a pagar, nunca." : "Você já é assinante CORE PRO"}
             </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCancelOpen(true)}
-              className="text-xs text-muted-foreground hover:text-destructive"
-            >
-              Cancelar assinatura
-            </Button>
+            {!isLifetime && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCancelOpen(true)}
+                className="text-xs text-muted-foreground hover:text-destructive"
+              >
+                Cancelar assinatura
+              </Button>
+            )}
           </div>
         )}
         <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} />
@@ -290,32 +285,8 @@ const Planos = () => {
           </p>
         </div>
 
-        {/* Billing toggle */}
-        <div className="flex items-center justify-center gap-1 p-1 rounded-xl bg-muted">
-          <button
-            onClick={() => setBilling("monthly")}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-              billing === "monthly" ? "bg-card shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Mensal
-          </button>
-          <button
-            onClick={() => setBilling("annual")}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all relative ${
-              billing === "annual" ? "bg-card shadow-sm" : "text-muted-foreground"
-            }`}
-          >
-            Anual
-            <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow">
-              −R$132
-            </span>
-          </button>
-        </div>
-
-        {/* Plan card */}
+        {/* Plan card — VITALÍCIO, pagamento único no Pix */}
         <motion.div
-          key={billing}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="relative rounded-2xl border-2 border-primary/30 bg-card p-6 sm:p-8 space-y-5 shadow-xl shadow-primary/10 overflow-hidden"
@@ -328,34 +299,26 @@ const Planos = () => {
                 <Crown className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-bold text-lg leading-tight">CORE PRO</h3>
-                <p className="text-xs text-muted-foreground">Acesso completo</p>
+                <h3 className="font-bold text-lg leading-tight">CORE VITALÍCIO</h3>
+                <p className="text-xs text-muted-foreground">Pague 1x. Seu pra sempre.</p>
               </div>
             </div>
-            {billing === "annual" && (
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-1 rounded-md">
-                Mais escolhido
-              </span>
-            )}
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-1 rounded-md">
+              Pagamento único
+            </span>
           </div>
 
           <div className="space-y-1">
-            {billing === "annual" && (
-              <p className="text-sm text-muted-foreground line-through">
-                R$ 14,90/mês
-              </p>
-            )}
+            <p className="text-sm text-muted-foreground line-through">
+              R$ 14,90/mês pra sempre
+            </p>
             <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-bold tracking-tight">
-                R$ {currentPlan.price}
-              </span>
-              <span className="text-muted-foreground">{currentPlan.period}</span>
+              <span className="text-5xl font-bold tracking-tight">R$ 27,90</span>
+              <span className="text-muted-foreground">uma vez</span>
             </div>
-            {billing === "annual" && (
-              <p className="text-xs text-primary font-medium">
-                {plans.annual.savings}
-              </p>
-            )}
+            <p className="text-xs text-primary font-medium">
+              No Pix · todos os 16 módulos · sem mensalidade, nunca
+            </p>
           </div>
 
           <Button
@@ -364,20 +327,12 @@ const Planos = () => {
             onClick={handleCheckout}
             disabled={loading || isSubscribed}
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" /> Redirecionando...
-              </>
-            ) : isSubscribed ? (
-              "Já assinante"
-            ) : (
-              "Assinar agora"
-            )}
+            {isSubscribed ? "Acesso já liberado" : "Gerar meu Pix de R$ 27,90"}
           </Button>
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Cancele quando quiser · Garantia de 7 dias · Sem fidelidade</span>
+            <span>Garantia de 7 dias · Pix libera na hora · sem fidelidade</span>
           </div>
         </motion.div>
 
@@ -427,20 +382,14 @@ const Planos = () => {
         <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 border-t border-border bg-card/95 backdrop-blur p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
           <div className="flex items-center justify-between gap-3">
             <div className="leading-tight">
-              <p className="text-[11px] text-muted-foreground">A partir de</p>
+              <p className="text-[11px] text-muted-foreground">Vitalício</p>
               <p className="text-base font-bold">
-                R$ {currentPlan.price}
-                <span className="text-xs font-normal text-muted-foreground">
-                  {currentPlan.period}
-                </span>
+                R$ 27,90
+                <span className="text-xs font-normal text-muted-foreground"> uma vez</span>
               </p>
             </div>
             <Button onClick={handleCheckout} disabled={loading} className="flex-1 max-w-[60%]">
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Assinar agora"
-              )}
+              Pagar no Pix
             </Button>
           </div>
         </div>

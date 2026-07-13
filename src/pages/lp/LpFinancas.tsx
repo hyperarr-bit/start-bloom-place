@@ -324,45 +324,28 @@ export default function LpFinancas() {
       <section id="precos" className="bg-secondary/50 border-y border-border">
         <Container className="py-14 md:py-20">
           <motion.div {...fadeUp} className="text-center max-w-xl mx-auto mb-10">
-            <Eyebrow>Preços</Eyebrow>
+            <Eyebrow>Preço</Eyebrow>
             <h2 className="text-[26px] md:text-4xl font-bold tracking-tight leading-tight mb-2">
-              Menos que um café por mês.
+              Pague uma vez. Use pra sempre.
             </h2>
-            <p className="text-muted-foreground">Garantia de 7 dias · cancele quando quiser · sem fidelidade</p>
+            <p className="text-muted-foreground">Garantia de 7 dias · Pix na hora · sem mensalidade, nunca</p>
           </motion.div>
 
-          <div className="grid sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-            {/* Anual (recomendado) */}
+          <div className="max-w-md mx-auto">
+            {/* Vitalício — pagamento único */}
             <motion.div {...fadeUp}>
               <Card className="relative h-full p-6 ring-2 ring-accent">
                 <Badge className="absolute -top-2.5 left-6 bg-accent text-accent-foreground border-transparent">
-                  mais popular · economiza R$ 132/ano
+                  acesso vitalício · pagamento único
                 </Badge>
-                <div className="text-sm font-semibold mb-1">Anual</div>
+                <div className="text-sm font-semibold mb-1">CORE Vitalício</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">R$ 3,90</span>
-                  <span className="text-sm text-muted-foreground">/mês</span>
+                  <span className="text-4xl font-bold tracking-tight">R$ 27,90</span>
+                  <span className="text-sm text-muted-foreground">uma vez</span>
                 </div>
-                <div className="text-xs text-muted-foreground mb-5">R$ 46,80/ano · em até 12x no cartão ou Pix</div>
+                <div className="text-xs text-muted-foreground mb-5">No Pix · todos os 16 módulos · sem assinatura</div>
                 <Button asChild className="w-full" size="lg">
-                  <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "pricing_anual" })}>
-                    Começar agora
-                  </Link>
-                </Button>
-              </Card>
-            </motion.div>
-
-            {/* Mensal */}
-            <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.08 }}>
-              <Card className="h-full p-6">
-                <div className="text-sm font-semibold mb-1">Mensal</div>
-                <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">R$ 14,90</span>
-                  <span className="text-sm text-muted-foreground">/mês</span>
-                </div>
-                <div className="text-xs text-muted-foreground mb-5">Pago mensalmente · sem compromisso</div>
-                <Button asChild variant="outline" className="w-full" size="lg">
-                  <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "pricing_mensal" })}>
+                  <Link to={SIGNUP} onClick={() => trackEvent("landing_cta_click", { cta: "pricing_lifetime" })}>
                     Começar agora
                   </Link>
                 </Button>

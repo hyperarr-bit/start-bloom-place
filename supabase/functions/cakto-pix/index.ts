@@ -46,6 +46,11 @@ const toE164 = (raw?: string | null): string | null => {
   return null;
 };
 
+// A API exige phone, mas o dono mandou não pedir do cliente (fricção; mesmo
+// padrão do outro SaaS dele). Coringa fixo — testado 13/07, a Cakto aceita.
+// O documento que importa (nota) é o CPF.
+const DUMMY_PHONE = "5511999999999";
+
 /** Token OAuth da Cakto (JWT ~10h). Cache em memória — instâncias quentes
  *  da edge function reaproveitam; frias pedem outro (barato). */
 let tokenCache: { token: string; expiresAt: number } | null = null;
@@ -138,11 +143,12 @@ serve(async (req) => {
       return jsonResponse({ error: "Oferta não configurada. Avise o suporte." }, 503);
     }
 
-    // Nome/telefone/CPF: body > profiles > fallback. Telefone E docNumber são
-    // OBRIGATÓRIOS na API ("docNumber é obrigatório para pagamentos no Brasil"
-    // — confirmado no teste real de 13/07; o CPF nem é validado, mas sem ele
-    // é 400). Erros conhecidos voltam com HTTP 200 + código: o invoke() do
-    // supabase-js descarta o body em non-2xx e o front nunca via o motivo.
+    // Nome/CPF: body > profiles > fallback. docNumber é OBRIGATÓRIO na API
+    // ("docNumber é obrigatório para pagamentos no Brasil" — teste real 13/07;
+    // o CPF nem é validado, mas sem ele é 400). Telefone também é obrigatório
+    // lá, mas NÃO pedimos do cliente: vai o DUMMY_PHONE (decisão do dono).
+    // Erros conhecidos voltam com HTTP 200 + código: o invoke() do supabase-js
+    // descarta o body em non-2xx e o front nunca via o motivo.
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("display_name, phone, tax_id")
@@ -150,14 +156,15 @@ serve(async (req) => {
       .maybeSingle();
 
     const name = (body.customer?.name || profile?.display_name || user.email.split("@")[0]).trim();
-    const phone = toE164(body.customer?.phone) ?? toE164(profile?.phone);
-    if (!phone) return jsonResponse({ error: "phone_required" });
+    const bodyPhone = toE164(body.customer?.phone);
+    const phone = (bodyPhone !== DUMMY_PHONE ? bodyPhone : null) ?? toE164(profile?.phone) ?? DUMMY_PHONE;
     const docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || undefined;
     if (!docNumber || docNumber.length !== 11) return jsonResponse({ error: "cpf_required" });
 
-    // Telefone/CPF novos vão pro profile (próxima compra não pede de novo)
+    // CPF (e telefone REAL, se algum dia voltar) vão pro profile — próxima
+    // compra não pede de novo. O coringa nunca é salvo.
     const profileUpdate: Record<string, string> = {};
-    if (body.customer?.phone && phone !== toE164(profile?.phone)) profileUpdate.phone = phone;
+    if (phone !== DUMMY_PHONE && phone !== toE164(profile?.phone)) profileUpdate.phone = phone;
     if (body.customer?.docNumber && docNumber !== onlyDigits(profile?.tax_id)) profileUpdate.tax_id = docNumber;
     if (Object.keys(profileUpdate).length) {
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", user.id);

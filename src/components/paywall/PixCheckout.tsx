@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, Copy, Fingerprint, Loader2, ShieldCheck, Smartphone, User, X, Zap } from "lucide-react";
+import { Check, Copy, Fingerprint, Loader2, ShieldCheck, User, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ import { firePurchaseConversion } from "@/lib/google-ads";
  * lá dentro, sem visibilidade nenhuma. Aqui cada passo vira evento:
  * pix_checkout_open → pix_generated → pix_copied → pix_confirmed/expired.
  *
- * Fluxo: [dados que faltam: WhatsApp e CPF, obrigatórios na API] → QR + copia-e-cola
+ * Fluxo: [nome + CPF (telefone vai coringa — ver DUMMY_PHONE)] → QR + copia-e-cola
  * → polling do check-subscription a cada 3s → celebração vitalícia.
  */
 
@@ -33,10 +33,10 @@ interface Props {
 
 type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
-const phoneLooksValid = (raw: string) => {
-  const d = raw.replace(/\D/g, "");
-  return d.length === 10 || d.length === 11 || (d.startsWith("55") && (d.length === 12 || d.length === 13));
-};
+// A API da Cakto exige phone, mas o dono mandou NÃO pedir (fricção — mesmo
+// padrão do outro SaaS dele): vai um coringa fixo. O que importa pra nota é
+// o CPF. Testado direto na API 13/07: aceita e gera o QR normalmente.
+const DUMMY_PHONE = "5511999999999";
 
 // A Cakto exige CPF ("docNumber é obrigatório para pagamentos no Brasil") mas
 // não valida o dígito — validamos aqui pra pegar erro de digitação antes do Pix.
@@ -77,7 +77,6 @@ function IconInput({ Icon, ...props }: { Icon: typeof User } & React.ComponentPr
 export function PixCheckout({ offer, onClose, context }: Props) {
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
@@ -86,25 +85,24 @@ export function PixCheckout({ offer, onClose, context }: Props) {
   const doneRef = useRef(false);
   const price = PIX_PRICES[offer];
 
-  // Prefill do profile — com telefone E CPF já salvos, pula o form direto pro QR
+  // Prefill do profile — com CPF já salvo, pula o form direto pro QR
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context });
     (async () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
       if (!uid) return;
-      const { data: p } = await supabase.from("profiles").select("display_name, phone, tax_id").eq("id", uid).maybeSingle();
+      const { data: p } = await supabase.from("profiles").select("display_name, tax_id").eq("id", uid).maybeSingle();
       if (p?.display_name) setName(p.display_name);
-      const okPhone = p?.phone && phoneLooksValid(p.phone);
-      const okCpf = p?.tax_id && cpfLooksValid(p.tax_id);
-      if (okPhone) setPhone(p!.phone!);
-      if (okCpf) setCpf(maskCpf(p!.tax_id!));
-      if (okPhone && okCpf) generate(p!.display_name ?? "", p!.phone!, p!.tax_id!);
+      if (p?.tax_id && cpfLooksValid(p.tax_id)) {
+        setCpf(maskCpf(p.tax_id));
+        generate(p.display_name ?? "", p.tax_id);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const generate = async (nm: string, ph: string, doc: string) => {
+  const generate = async (nm: string, doc: string) => {
     setStep("generating");
     setErrMsg(null);
     try {
@@ -122,14 +120,13 @@ export function PixCheckout({ offer, onClose, context }: Props) {
       const { data, error } = await supabase.functions.invoke("cakto-pix", {
         body: {
           offer,
-          customer: { name: nm || undefined, phone: ph, docNumber: doc || undefined },
+          customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
           fingerprint,
           antifraudRef,
           attribution: getAttributionParams(),
         },
       });
       if (error) throw error;
-      if (data?.error === "phone_required") { setStep("form"); setErrMsg("Confere o WhatsApp — precisa do DDD."); return; }
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
       setPix({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
@@ -256,18 +253,14 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                   Icon={Fingerprint} inputMode="numeric" placeholder="CPF"
                   value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))}
                 />
-                <IconInput
-                  Icon={Smartphone} type="tel" inputMode="tel" placeholder="WhatsApp com DDD"
-                  value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel"
-                />
                 <p className="text-[11px] text-muted-foreground text-center leading-snug px-2">
-                  🔒 O banco exige CPF e telefone pra emitir o Pix — não usamos pra mais nada.
+                  🔒 O banco exige o CPF pra emitir o Pix — não usamos pra mais nada.
                 </p>
                 {errMsg && <p className="text-sm text-destructive text-center">{errMsg}</p>}
                 <Button
                   size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
-                  disabled={!phoneLooksValid(phone) || !cpfLooksValid(cpf)}
-                  onClick={() => generate(name, phone, cpf)}
+                  disabled={!cpfLooksValid(cpf)}
+                  onClick={() => generate(name, cpf)}
                 >
                   Gerar meu Pix de R$ {price}
                 </Button>
@@ -353,7 +346,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                   ? "Sem problema — gera outro em 1 toque, o preço é o mesmo."
                   : errMsg ?? "Tenta de novo em alguns segundos."}
               </p>
-              <Button size="lg" className="w-full h-12 rounded-full font-bold" onClick={() => generate(name, phone, cpf)}>
+              <Button size="lg" className="w-full h-12 rounded-full font-bold" onClick={() => generate(name, cpf)}>
                 Gerar novo código Pix
               </Button>
             </motion.div>

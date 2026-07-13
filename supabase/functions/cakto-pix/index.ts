@@ -138,8 +138,11 @@ serve(async (req) => {
       return jsonResponse({ error: "Oferta não configurada. Avise o suporte." }, 503);
     }
 
-    // Nome/telefone: body > profiles > fallback. Telefone é OBRIGATÓRIO na
-    // API (E.164) — sem um válido, o front pede antes de chamar aqui.
+    // Nome/telefone/CPF: body > profiles > fallback. Telefone E docNumber são
+    // OBRIGATÓRIOS na API ("docNumber é obrigatório para pagamentos no Brasil"
+    // — confirmado no teste real de 13/07; o CPF nem é validado, mas sem ele
+    // é 400). Erros conhecidos voltam com HTTP 200 + código: o invoke() do
+    // supabase-js descarta o body em non-2xx e o front nunca via o motivo.
     const { data: profile } = await supabaseAdmin
       .from("profiles")
       .select("display_name, phone, tax_id")
@@ -148,12 +151,16 @@ serve(async (req) => {
 
     const name = (body.customer?.name || profile?.display_name || user.email.split("@")[0]).trim();
     const phone = toE164(body.customer?.phone) ?? toE164(profile?.phone);
-    if (!phone) return jsonResponse({ error: "phone_required" }, 400);
+    if (!phone) return jsonResponse({ error: "phone_required" });
     const docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || undefined;
+    if (!docNumber || docNumber.length !== 11) return jsonResponse({ error: "cpf_required" });
 
-    // Telefone novo vai pro profile (próxima compra não pede de novo)
-    if (body.customer?.phone && phone && phone !== toE164(profile?.phone)) {
-      await supabaseAdmin.from("profiles").update({ phone }).eq("id", user.id);
+    // Telefone/CPF novos vão pro profile (próxima compra não pede de novo)
+    const profileUpdate: Record<string, string> = {};
+    if (body.customer?.phone && phone !== toE164(profile?.phone)) profileUpdate.phone = phone;
+    if (body.customer?.docNumber && docNumber !== onlyDigits(profile?.tax_id)) profileUpdate.tax_id = docNumber;
+    if (Object.keys(profileUpdate).length) {
+      await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", user.id);
     }
 
     const caktoToken = await getCaktoToken(clientId, clientSecret);
@@ -169,7 +176,8 @@ serve(async (req) => {
         // qualquer string não-vazia; antifraudProfilingAttemptReference NÃO
         // existe no contrato público (a doc mentia — 400 se enviado).
         fingerprint: body.fingerprint || crypto.randomUUID(),
-        ...(docNumber ? { docType: "cpf", docNumber } : {}),
+        docType: "cpf",
+        docNumber,
       },
       items: [{ offerId, quantity: 1, offerType: "main" }],
       metadata: {

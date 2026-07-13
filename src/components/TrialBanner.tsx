@@ -54,12 +54,15 @@ export const TrialBanner = () => {
 
   // Conta pós-paywall (sem trial): paywall completo estilo Cal AI,
   // autocontido (planos + checkout + roleta/downsell), sem sair da tela.
+  // z-[310]: acima dos tutoriais (QuickStart z-100, Spotlight z-200/300) —
+  // com z-50, fechar o PixCheckout revelava o card de tutorial POR CIMA do
+  // paywall pra conta não-pagante. Abaixo só do próprio PixCheckout (400).
   if (noTrial) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="fixed inset-0 z-50 overflow-y-auto bg-white"
+        className="fixed inset-0 z-[310] overflow-y-auto bg-white"
       >
         <PaywallFlow context="app" />
       </motion.div>
@@ -72,7 +75,7 @@ export const TrialBanner = () => {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed inset-0 z-50 bg-background flex items-center justify-center px-4"
+        className="fixed inset-0 z-[310] bg-background flex items-center justify-center px-4"
       >
         <div className="max-w-sm w-full text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">

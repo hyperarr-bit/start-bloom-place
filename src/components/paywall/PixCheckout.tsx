@@ -14,7 +14,7 @@ import { firePurchaseConversion } from "@/lib/google-ads";
  * lá dentro, sem visibilidade nenhuma. Aqui cada passo vira evento:
  * pix_checkout_open → pix_generated → pix_copied → pix_confirmed/expired.
  *
- * Fluxo: [dados que faltam: WhatsApp obrigatório na API] → QR + copia-e-cola
+ * Fluxo: [dados que faltam: WhatsApp e CPF, obrigatórios na API] → QR + copia-e-cola
  * → polling do check-subscription a cada 3s → celebração vitalícia.
  */
 
@@ -38,6 +38,26 @@ const phoneLooksValid = (raw: string) => {
   return d.length === 10 || d.length === 11 || (d.startsWith("55") && (d.length === 12 || d.length === 13));
 };
 
+// A Cakto exige CPF ("docNumber é obrigatório para pagamentos no Brasil") mas
+// não valida o dígito — validamos aqui pra pegar erro de digitação antes do Pix.
+const cpfLooksValid = (raw: string) => {
+  const d = raw.replace(/\D/g, "");
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
+    const r = (sum * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(9) === Number(d[9]) && dv(10) === Number(d[10]);
+};
+
+const maskCpf = (raw: string) =>
+  raw.replace(/\D/g, "").slice(0, 11)
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d{1,2})$/, ".$1-$2");
+
 export function PixCheckout({ offer, onClose, context }: Props) {
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
@@ -50,19 +70,20 @@ export function PixCheckout({ offer, onClose, context }: Props) {
   const doneRef = useRef(false);
   const price = PIX_PRICES[offer];
 
-  // Prefill nome/telefone do profile — se já tem telefone, pula o form
+  // Prefill do profile — com telefone E CPF já salvos, pula o form direto pro QR
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context });
     (async () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;
       if (!uid) return;
-      const { data: p } = await supabase.from("profiles").select("display_name, phone").eq("id", uid).maybeSingle();
+      const { data: p } = await supabase.from("profiles").select("display_name, phone, tax_id").eq("id", uid).maybeSingle();
       if (p?.display_name) setName(p.display_name);
-      if (p?.phone && phoneLooksValid(p.phone)) {
-        setPhone(p.phone);
-        generate(p.display_name ?? "", p.phone, "");
-      }
+      const okPhone = p?.phone && phoneLooksValid(p.phone);
+      const okCpf = p?.tax_id && cpfLooksValid(p.tax_id);
+      if (okPhone) setPhone(p!.phone!);
+      if (okCpf) setCpf(maskCpf(p!.tax_id!));
+      if (okPhone && okCpf) generate(p!.display_name ?? "", p!.phone!, p!.tax_id!);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -93,6 +114,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
       });
       if (error) throw error;
       if (data?.error === "phone_required") { setStep("form"); setErrMsg("Confere o WhatsApp — precisa do DDD."); return; }
+      if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
       setPix({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
@@ -190,23 +212,23 @@ export function PixCheckout({ offer, onClose, context }: Props) {
               </div>
               <div className="space-y-3">
                 <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+                <Input
+                  type="tel" inputMode="tel" placeholder="WhatsApp com DDD (ex: 11 91234-5678)"
+                  value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className="h-12"
+                />
                 <div>
                   <Input
-                    type="tel" inputMode="tel" placeholder="WhatsApp com DDD (ex: 11 91234-5678)"
-                    value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className="h-12"
+                    inputMode="numeric" placeholder="CPF"
+                    value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))} className="h-12"
                   />
                   <p className="text-[11px] text-muted-foreground mt-1 ml-1">
-                    O banco usa pra emitir seu Pix — por isso é obrigatório.
+                    O banco exige CPF e telefone pra emitir o Pix — não usamos pra mais nada.
                   </p>
                 </div>
-                <Input
-                  inputMode="numeric" placeholder="CPF (opcional)"
-                  value={cpf} onChange={(e) => setCpf(e.target.value)} className="h-12"
-                />
                 {errMsg && <p className="text-sm text-destructive">{errMsg}</p>}
                 <Button
                   size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
-                  disabled={!phoneLooksValid(phone)}
+                  disabled={!phoneLooksValid(phone) || !cpfLooksValid(cpf)}
                   onClick={() => generate(name, phone, cpf)}
                 >
                   Gerar meu Pix de R$ {price}

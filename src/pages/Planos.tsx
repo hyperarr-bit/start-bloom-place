@@ -310,7 +310,7 @@ const Planos = () => {
 
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground line-through">
-              R$ 14,90/mês pra sempre
+              R$ 99,90
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-5xl font-bold tracking-tight">R$ 27,90</span>

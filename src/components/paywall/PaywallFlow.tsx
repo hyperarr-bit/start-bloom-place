@@ -31,7 +31,7 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
 const PRICING = {
   lifetime: { total: "27,90" },
   downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
-  legacyMonthly: "14,90", // âncora honesta: o antigo plano mensal
+  anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -414,7 +414,7 @@ function LifetimeCard() {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.legacyMonthly}/mês</div>
+          <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.anchor}</div>
           <div className="font-extrabold text-2xl leading-none text-accent">
             R$ {PRICING.lifetime.total}
           </div>

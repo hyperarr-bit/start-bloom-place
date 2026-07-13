@@ -190,10 +190,15 @@ export function PixCheckout({ offer, onClose, context }: Props) {
               </div>
               <div className="space-y-3">
                 <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-                <Input
-                  type="tel" inputMode="tel" placeholder="WhatsApp com DDD (ex: 11 91234-5678)"
-                  value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className="h-12"
-                />
+                <div>
+                  <Input
+                    type="tel" inputMode="tel" placeholder="WhatsApp com DDD (ex: 11 91234-5678)"
+                    value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel" className="h-12"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1 ml-1">
+                    O banco usa pra emitir seu Pix — por isso é obrigatório.
+                  </p>
+                </div>
                 <Input
                   inputMode="numeric" placeholder="CPF (opcional)"
                   value={cpf} onChange={(e) => setCpf(e.target.value)} className="h-12"

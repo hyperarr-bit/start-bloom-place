@@ -357,36 +357,44 @@ serve(async (req) => {
       const token = Deno.env.get("UTMIFY_API_TOKEN");
       if (!token) return;
       try {
-        // UTM: primeiro do metadata do pedido (se a Cakto ecoar), senão do
-        // que capturamos no funil (pix_generated / funnel_view guardam utm_*).
+        // UTM: metadata do pedido > eventos do usuário > eventos ANÔNIMOS das
+        // sessões dele (o clique no anúncio acontece antes do cadastro — caso
+        // alinecsouza06/elianefcamargo 14/07). Campanha ganha de source-só.
         const meta = (data.metadata || {}) as Record<string, string>;
-        let utm = {
-          utm_source: meta.utm_source || null,
-          utm_medium: meta.utm_medium || null,
-          utm_campaign: meta.utm_campaign || null,
-          utm_content: meta.utm_content || null,
-          utm_term: meta.utm_term || null,
-        };
-        if (!utm.utm_source) {
+        const pick = (d: Record<string, string>) => ({
+          utm_source: d.utm_source || null,
+          utm_medium: d.utm_medium || null,
+          utm_campaign: d.utm_campaign || null,
+          utm_content: d.utm_content || null,
+          utm_term: d.utm_term || null,
+        });
+        let utm = pick(meta);
+        if (!utm.utm_campaign) {
           const { data: rows } = await supabaseClient
             .from("analytics_events")
-            .select("event_data")
+            .select("event_data, session_id")
             .eq("user_id", userId)
-            .in("event_name", ["pix_generated", "pix_checkout_open", "pix_copied", "funnel_view"])
             .order("created_at", { ascending: false })
-            .limit(40);
-          const hit = (rows as Array<{ event_data: Record<string, string> }> | null)
-            ?.find((r) => r.event_data?.utm_source);
-          if (hit) {
-            const d = hit.event_data;
-            utm = {
-              utm_source: d.utm_source || null,
-              utm_medium: d.utm_medium || null,
-              utm_campaign: d.utm_campaign || null,
-              utm_content: d.utm_content || null,
-              utm_term: d.utm_term || null,
-            };
+            .limit(60);
+          const mine = (rows ?? []) as Array<{ event_data: Record<string, string>; session_id: string | null }>;
+          let hit = mine.find((r) => r.event_data?.utm_campaign) ?? mine.find((r) => r.event_data?.utm_source);
+          if (!hit?.event_data?.utm_campaign) {
+            // varre as sessões dele por eventos anônimos com campanha
+            const sessions = [...new Set(mine.map((r) => r.session_id).filter(Boolean))].slice(0, 5) as string[];
+            for (const sid of sessions) {
+              const { data: anon } = await supabaseClient
+                .from("analytics_events")
+                .select("event_data")
+                .eq("session_id", sid)
+                .is("user_id", null)
+                .limit(30);
+              const anonHit = (anon ?? []).find(
+                (r: { event_data: Record<string, string> }) => r.event_data?.utm_campaign,
+              );
+              if (anonHit) { hit = anonHit as typeof hit; break; }
+            }
           }
+          if (hit) utm = pick(hit.event_data);
         }
 
         // Valor: data.amount é a fonte (27.9 lifetime | 14.9 downsell); sem ele,

@@ -24,7 +24,16 @@ interface Metrics {
   totals: { sales: number; revenue_cents: number; sessions: number };
   aliases: Record<string, string>;
 }
-interface SpendRow { campaign_id: string; campaign_name: string; spend: number }
+interface SpendRow { campaign_id: string; campaign_name: string; spend: number; impressions?: number; clicks?: number; ctr?: number }
+interface MetaCampaign { id: string; name: string; status: string; daily_budget: number | null }
+
+const STATUS_LABEL: Record<string, { txt: string; cls: string }> = {
+  ACTIVE: { txt: "Ativa", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" },
+  PAUSED: { txt: "Pausada", cls: "bg-muted text-muted-foreground" },
+  CAMPAIGN_PAUSED: { txt: "Pausada", cls: "bg-muted text-muted-foreground" },
+  ARCHIVED: { txt: "Arquivada", cls: "bg-muted text-muted-foreground" },
+  DELETED: { txt: "Excluída", cls: "bg-muted text-muted-foreground" },
+};
 
 // Taxa da Cakto estimada (medido 14/07: R$424 bruto → ~R$362 líquido)
 const NET_FACTOR = 0.855;
@@ -40,6 +49,7 @@ export default function AdminCampaigns() {
   const [range, setRange] = useState<RangeKey>("today");
   const [data, setData] = useState<Metrics | null>(null);
   const [spend, setSpend] = useState<SpendRow[] | null>(null);
+  const [metaCampaigns, setMetaCampaigns] = useState<MetaCampaign[]>([]);
   const [spendErr, setSpendErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,14 +67,16 @@ export default function AdminCampaigns() {
     if (metricsRes.error) setError(metricsRes.error.message);
     else setData(metricsRes.data as unknown as Metrics);
 
-    const sd = spendRes.data as { spend?: SpendRow[]; error?: string; detail?: string } | null;
+    const sd = spendRes.data as { spend?: SpendRow[]; campaigns?: MetaCampaign[]; error?: string; detail?: string } | null;
     if (spendRes.error || !sd || sd.error) {
       setSpend(null);
+      setMetaCampaigns([]);
       setSpendErr(sd?.error === "token_missing"
         ? "token_missing"
         : (sd?.detail || sd?.error || spendRes.error?.message || "erro"));
     } else {
       setSpend(sd.spend ?? []);
+      setMetaCampaigns(sd.campaigns ?? []);
       setSpendErr(null);
     }
     setUpdatedAt(new Date());
@@ -84,11 +96,18 @@ export default function AdminCampaigns() {
     return m;
   }, [spend]);
 
-  // Nome exibido: apelido salvo > nome vindo da UTM (nome|id) > nome do Meta > id
+  const metaById = useMemo(() => {
+    const m: Record<string, MetaCampaign> = {};
+    for (const c of metaCampaigns) m[c.id] = c;
+    return m;
+  }, [metaCampaigns]);
+
+  // Nome exibido: apelido salvo > nome do Meta (campanhas OU insights) > nome
+  // vindo da UTM (nome|id) > id cru
   const displayName = (c: CampaignRow) => {
     if (c.key.startsWith("organic:")) return `Orgânico (${c.key.slice(8)})`;
     if (c.key === "none") return "Sem atribuição";
-    return data?.aliases?.[c.key] || c.name_utm || spendByCamp[c.key]?.campaign_name || c.key;
+    return data?.aliases?.[c.key] || metaById[c.key]?.name || spendByCamp[c.key]?.campaign_name || c.name_utm || c.key;
   };
 
   const rename = async (c: CampaignRow) => {
@@ -216,6 +235,7 @@ export default function AdminCampaigns() {
                           c={c} sp={sp} rev={rev} cac={cac} cRoas={cRoas}
                           open={open} ads={ads} isOrganic={isOrganic} isNone={isNone}
                           name={displayName(c)}
+                          status={metaById[c.key]?.status ?? null}
                           onToggle={() => setOpenKey(open ? null : c.key)}
                           onRename={() => rename(c)}
                           aliases={data.aliases}
@@ -246,12 +266,13 @@ export default function AdminCampaigns() {
 }
 
 function FragmentRows({
-  c, sp, rev, cac, cRoas, open, ads, isOrganic, isNone, name, onToggle, onRename, aliases,
+  c, sp, rev, cac, cRoas, open, ads, isOrganic, isNone, name, status, onToggle, onRename, aliases,
 }: {
   c: CampaignRow; sp: number | undefined; rev: number; cac: number | null; cRoas: number | null;
-  open: boolean; ads: AdRow[]; isOrganic: boolean; isNone: boolean; name: string;
+  open: boolean; ads: AdRow[]; isOrganic: boolean; isNone: boolean; name: string; status: string | null;
   onToggle: () => void; onRename: () => void; aliases: Record<string, string>;
 }) {
+  const st = status ? STATUS_LABEL[status] : null;
   return (
     <>
       <tr className="border-b border-border/50 hover:bg-muted/30 cursor-pointer" onClick={onToggle}>
@@ -261,6 +282,11 @@ function FragmentRows({
             {isOrganic && <Leaf className="w-3.5 h-3.5 text-emerald-600" />}
             {isNone && <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />}
             {name}
+            {st && (
+              <span className={`text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full ${st.cls}`}>
+                {st.txt}
+              </span>
+            )}
             {!isOrganic && !isNone && (
               <button
                 onClick={(e) => { e.stopPropagation(); onRename(); }}

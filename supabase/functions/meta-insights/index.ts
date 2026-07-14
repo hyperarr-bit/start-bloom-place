@@ -66,27 +66,48 @@ serve(async (req) => {
       return jsonResponse({ cached: true, ...(cache.data as Record<string, unknown>) });
     }
 
-    const url = new URL(`https://graph.facebook.com/v21.0/${account}/insights`);
-    url.searchParams.set("level", "campaign");
-    url.searchParams.set("fields", "campaign_id,campaign_name,spend");
-    url.searchParams.set("time_range", JSON.stringify({ since, until }));
-    url.searchParams.set("limit", "200");
-    url.searchParams.set("access_token", token);
+    // 1) Gasto/entrega por campanha no período (só campanhas que rodaram)
+    const insUrl = new URL(`https://graph.facebook.com/v21.0/${account}/insights`);
+    insUrl.searchParams.set("level", "campaign");
+    insUrl.searchParams.set("fields", "campaign_id,campaign_name,spend,impressions,clicks,ctr");
+    insUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
+    insUrl.searchParams.set("limit", "500");
+    insUrl.searchParams.set("access_token", token);
 
-    const res = await fetch(url);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      console.log("[META-INSIGHTS] Graph error", res.status, JSON.stringify(data).slice(0, 400));
-      return jsonResponse({ error: "meta_error", detail: data?.error?.message ?? `HTTP ${res.status}` });
+    // 2) TODAS as campanhas (nome + status), inclusive pausadas/sem gasto —
+    //    pro painel resolver o nome de qualquer utm_campaign.
+    const campUrl = new URL(`https://graph.facebook.com/v21.0/${account}/campaigns`);
+    campUrl.searchParams.set("fields", "id,name,effective_status,daily_budget");
+    campUrl.searchParams.set("limit", "500");
+    campUrl.searchParams.set("access_token", token);
+
+    const [insRes, campRes] = await Promise.all([fetch(insUrl), fetch(campUrl)]);
+    const insData = await insRes.json().catch(() => ({}));
+    const campData = await campRes.json().catch(() => ({}));
+    if (!insRes.ok) {
+      console.log("[META-INSIGHTS] insights error", insRes.status, JSON.stringify(insData).slice(0, 400));
+      return jsonResponse({ error: "meta_error", detail: insData?.error?.message ?? `HTTP ${insRes.status}` });
     }
 
-    const spend = (data?.data ?? []).map((r: Record<string, string>) => ({
+    const spend = (insData?.data ?? []).map((r: Record<string, string>) => ({
       campaign_id: r.campaign_id,
       campaign_name: r.campaign_name,
       spend: Number(r.spend ?? 0),
+      impressions: Number(r.impressions ?? 0),
+      clicks: Number(r.clicks ?? 0),
+      ctr: Number(r.ctr ?? 0),
     }));
+    // id → nome/status de todas as campanhas (o campRes pode falhar sem derrubar o gasto)
+    const campaigns = (campData?.data ?? []).map((c: Record<string, string>) => ({
+      id: c.id,
+      name: c.name,
+      status: c.effective_status, // ACTIVE, PAUSED, ...
+      daily_budget: c.daily_budget ? Number(c.daily_budget) / 100 : null,
+    }));
+
     const payload = {
       spend,
+      campaigns,
       total_spend: spend.reduce((a: number, r: { spend: number }) => a + r.spend, 0),
     };
     cache = { key: cacheKey, at: Date.now(), data: payload };

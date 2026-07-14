@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
+import { firePixPurchaseOnce } from "@/lib/purchase-tracking";
 
 export const TrialBanner = () => {
   const { user, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft } = useAuth();
@@ -27,6 +28,14 @@ export const TrialBanner = () => {
 
   const tutorialDone = loaded && get<string>("spotlight-done-financas", "") === "true";
   const viewedRef = useRef<string | null>(null);
+
+  // Rescue do Purchase: quem paga o Pix sai do app pra abrir o banco e volta
+  // já liberado (webhook gravou a assinatura) — a tela de confirmação não
+  // aparece, então o pixel não disparava. Aqui, ao virar assinante com uma
+  // intenção de Pix pendente, o Purchase (Meta+Google) sai mesmo assim.
+  useEffect(() => {
+    if (subLoaded && isSubscribed) firePixPurchaseOnce("rescue");
+  }, [subLoaded, isSubscribed]);
 
   useEffect(() => {
     // Antes da 1ª resposta do check-subscription o status é DESCONHECIDO —

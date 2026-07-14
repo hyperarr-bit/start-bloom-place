@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { Loader2, Gift, RotateCw, Users2, XCircle, RotateCcw } from "lucide-react";
+import { Loader2, Gift, RotateCw, Users2, XCircle, RotateCcw, Zap, QrCode, Copy, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   RangePicker, rangeToDates, type RangeKey,
@@ -15,6 +15,10 @@ interface FunnelData {
   totals: { sessions: number; accounts: number; paid: number; conversion_pct: number };
   steps: FunnelStep[];
   worst_drop: { key: string; label: string; drop_pct: number } | null;
+  pix: {
+    opened: number; generated: number; copied: number; confirmed: number; errored: number;
+    opened_funnel: number; opened_app: number; generated_funnel: number; generated_app: number;
+  } | null;
   recovery: { offer_views: number; wheel_views: number; downsell_views: number; downsell_dismissed: number; downsell_paid: number };
   cta_clicks: { cta: string; clicks: number; sessions: number }[];
   quiz_answers: Record<string, { answer: string; count: number }[]>;
@@ -186,6 +190,37 @@ export default function AdminFunnel() {
               </Panel>
 
               <WorstDropCallout drop={data.worst_drop} />
+
+              {/* Checkout Pix in-app: onde a venda vive ou morre desde 13/07 */}
+              {data.pix && (data.pix.opened > 0 || data.pix.generated > 0) && (
+                <Panel title="Checkout Pix (in-app)" sub="Abriu → gerou QR → copiou → confirmou. Split funil (/comecar) vs app (gate de quem não pagou)">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <MiniStat icon={Zap} label="Abriu o Pix" value={data.pix.opened} />
+                    <MiniStat icon={QrCode} label="Gerou o QR" value={data.pix.generated} />
+                    <MiniStat icon={Copy} label="Copiou o código" value={data.pix.copied} />
+                    <MiniStat icon={CheckCircle2} label="Confirmou na tela" value={data.pix.confirmed} accent />
+                    <MiniStat icon={AlertTriangle} label="Deu erro" value={data.pix.errored} />
+                  </div>
+                  <div className="mt-3 space-y-1 text-[12px] text-muted-foreground">
+                    <p>
+                      Abriu: <strong className="text-foreground">{data.pix.opened_funnel}</strong> no funil ·{" "}
+                      <strong className="text-foreground">{data.pix.opened_app}</strong> no app ·
+                      gerou QR: <strong className="text-foreground">{data.pix.generated_funnel}</strong> funil /{" "}
+                      <strong className="text-foreground">{data.pix.generated_app}</strong> app.
+                    </p>
+                    {data.pix.opened > 0 && data.pix.generated < data.pix.opened && (
+                      <p>
+                        {data.pix.opened - data.pix.generated} abriram o checkout mas <strong className="text-foreground">não geraram o QR</strong> (fricção no formulário nome+CPF).
+                      </p>
+                    )}
+                    {data.pix.confirmed === 0 && data.totals.paid > 0 && (
+                      <p className="text-amber-600 dark:text-amber-500">
+                        ⚠ Ninguém confirmou NA TELA, mas houve {data.totals.paid} venda(s): pagam fora e voltam já liberados — a celebração/pixel na tela é ignorada.
+                      </p>
+                    )}
+                  </div>
+                </Panel>
+              )}
 
               {/* Recuperação: roleta / downsell */}
               <Panel title="Recuperação (saída do paywall)" sub="Quem tentou sair viu a roleta → oferta de downsell">

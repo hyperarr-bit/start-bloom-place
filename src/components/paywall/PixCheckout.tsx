@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
-import { firePurchaseConversion } from "@/lib/google-ads";
-import { fireMetaEvent } from "@/lib/meta-pixel";
+import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -133,6 +132,9 @@ export function PixCheckout({ offer, onClose, context }: Props) {
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId });
+      // Intenção pendente: se a pessoa pagar e voltar já liberada (sem ver a
+      // tela de confirmação), o rescue no app dispara o Purchase mesmo assim.
+      markPixPurchasePending({ offer, orderId: data.orderId ?? null });
     } catch (e: any) {
       trackEvent("pix_error", { offer, context, message: String(e?.message || e).slice(0, 200) });
       setErrMsg("Não consegui gerar o Pix. Tenta de novo em alguns segundos.");
@@ -167,15 +169,9 @@ export function PixCheckout({ offer, onClose, context }: Props) {
         if (data?.subscribed) {
           doneRef.current = true;
           trackEvent("pix_confirmed", { offer, context });
-          // Purchase pro Meta sai DAQUI: a venda via API nunca passa pelo
-          // checkout da Cakto, então a CAPI deles não vê (vendas de 13/07
-          // sumiram do gerenciador/UTMify). eventID = orderId p/ dedup.
-          fireMetaEvent(
-            "Purchase",
-            { value: offer === "lifetime" ? 27.9 : 14.9, currency: "BRL", content_name: offer },
-            pix?.orderId ?? undefined,
-          );
-          firePurchaseConversion({ billingPeriod: "lifetime", transactionId: pix?.orderId ?? undefined });
+          // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
+          // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
+          firePixPurchaseOnce("checkout");
           setStep("confirmed");
           return;
         }

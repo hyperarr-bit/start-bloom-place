@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { checkIsAdmin } from "@/lib/admin";
-import { Filter, Users, LogOut, ShieldCheck, Loader2, UserCircle, CreditCard, Megaphone } from "lucide-react";
+import { Filter, LogOut, ShieldCheck, Loader2, UserCircle, CreditCard, Megaphone } from "lucide-react";
 
 export const ADMIN_EMAIL = "jv20101958@gmail.com";
 
@@ -11,7 +11,6 @@ const navItems = [
   { to: "/admin/funil", label: "Funil", Icon: Filter },
   { to: "/admin/campanhas", label: "Campanhas", Icon: Megaphone },
   { to: "/admin/usuarios", label: "Usuários", Icon: UserCircle },
-  { to: "/admin/assinantes", label: "Assinantes", Icon: Users },
   { to: "/admin/pagantes", label: "Pagantes", Icon: CreditCard },
 ];
 

@@ -95,6 +95,7 @@ const Preview = lazy(() => import("./pages/Preview"));
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
 const AdminFunnel = lazy(() => import("./pages/admin/AdminFunnel"));
+const AdminCampaigns = lazy(() => import("./pages/admin/AdminCampaigns"));
 const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
 const AdminSubscribers = lazy(() => import("./pages/admin/AdminSubscribers"));
 const AdminPagantes = lazy(() => import("./pages/admin/AdminPagantes"));
@@ -138,6 +139,7 @@ const AnimatedRoutes = () => {
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="funil" element={<AdminFunnel />} />
+          <Route path="campanhas" element={<AdminCampaigns />} />
           <Route path="usuarios" element={<AdminUsuarios />} />
           <Route path="assinantes" element={<AdminSubscribers />} />
           <Route path="pagantes" element={<AdminPagantes />} />

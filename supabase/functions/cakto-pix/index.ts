@@ -193,6 +193,8 @@ serve(async (req) => {
         ...(attribution.utm_medium ? { utm_medium: attribution.utm_medium } : {}),
         ...(attribution.utm_campaign ? { utm_campaign: attribution.utm_campaign } : {}),
         ...(attribution.utm_content ? { utm_content: attribution.utm_content } : {}),
+        ...(attribution.fbclid ? { fbclid: attribution.fbclid } : {}),
+        ...(attribution.gclid ? { gclid: attribution.gclid } : {}),
       },
     };
 

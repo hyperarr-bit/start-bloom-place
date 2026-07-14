@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { firePurchaseConversion } from "@/lib/google-ads";
+import { fireMetaEvent } from "@/lib/meta-pixel";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -79,7 +80,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [pix, setPix] = useState<{ qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
+  const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
@@ -129,7 +130,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
       if (error) throw error;
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
-      setPix({ qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
+      setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId });
     } catch (e: any) {
@@ -166,7 +167,15 @@ export function PixCheckout({ offer, onClose, context }: Props) {
         if (data?.subscribed) {
           doneRef.current = true;
           trackEvent("pix_confirmed", { offer, context });
-          firePurchaseConversion({ billingPeriod: "lifetime", transactionId: undefined });
+          // Purchase pro Meta sai DAQUI: a venda via API nunca passa pelo
+          // checkout da Cakto, então a CAPI deles não vê (vendas de 13/07
+          // sumiram do gerenciador/UTMify). eventID = orderId p/ dedup.
+          fireMetaEvent(
+            "Purchase",
+            { value: offer === "lifetime" ? 27.9 : 14.9, currency: "BRL", content_name: offer },
+            pix?.orderId ?? undefined,
+          );
+          firePurchaseConversion({ billingPeriod: "lifetime", transactionId: pix?.orderId ?? undefined });
           setStep("confirmed");
           return;
         }

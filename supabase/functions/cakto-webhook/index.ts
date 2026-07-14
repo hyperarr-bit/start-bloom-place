@@ -37,6 +37,12 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[CAKTO-WEBHOOK] ${step}${d}`);
 };
 
+// UTMify Orders API: a venda do Pix in-app NÃO passa pelo checkout hospedado,
+// então a integração nativa Cakto→UTMify não dispara (nem notificação). Aqui
+// mandamos a venda server-side, com a UTM que capturamos no funil — cookie-
+// independente e com a campanha certa. Data em UTC "YYYY-MM-DD HH:MM:SS".
+const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -345,6 +351,105 @@ serve(async (req) => {
       }
     }
 
+    // Manda a venda paga pra UTMify (Orders API). Não-bloqueante: qualquer
+    // erro só loga — nunca derruba o webhook / o acesso do cliente.
+    async function sendToUtmify(userId: string, status: "paid" | "refunded" | "chargedback") {
+      const token = Deno.env.get("UTMIFY_API_TOKEN");
+      if (!token) return;
+      try {
+        // UTM: primeiro do metadata do pedido (se a Cakto ecoar), senão do
+        // que capturamos no funil (pix_generated / funnel_view guardam utm_*).
+        const meta = (data.metadata || {}) as Record<string, string>;
+        let utm = {
+          utm_source: meta.utm_source || null,
+          utm_medium: meta.utm_medium || null,
+          utm_campaign: meta.utm_campaign || null,
+          utm_content: meta.utm_content || null,
+          utm_term: meta.utm_term || null,
+        };
+        if (!utm.utm_source) {
+          const { data: rows } = await supabaseClient
+            .from("analytics_events")
+            .select("event_data")
+            .eq("user_id", userId)
+            .in("event_name", ["pix_generated", "pix_checkout_open", "pix_copied", "funnel_view"])
+            .order("created_at", { ascending: false })
+            .limit(40);
+          const hit = (rows as Array<{ event_data: Record<string, string> }> | null)
+            ?.find((r) => r.event_data?.utm_source);
+          if (hit) {
+            const d = hit.event_data;
+            utm = {
+              utm_source: d.utm_source || null,
+              utm_medium: d.utm_medium || null,
+              utm_campaign: d.utm_campaign || null,
+              utm_content: d.utm_content || null,
+              utm_term: d.utm_term || null,
+            };
+          }
+        }
+
+        // Valor: data.amount é a fonte (27.9 lifetime | 14.9 downsell); sem ele,
+        // deduz pelo offer id do downsell.
+        const amountNum = Number(data.amount ?? offer.price ?? 0);
+        const isDownsell = offerId === DOWNSELL_OFFER.toLowerCase();
+        const priceInCents = amountNum > 0
+          ? Math.round(amountNum * 100)
+          : (isDownsell ? 1490 : 2790);
+
+        const nowStamp = utcStamp(new Date());
+        const productName = billingPeriod === "lifetime"
+          ? (isDownsell || priceInCents <= 1490 ? "CORE Vitalício (oferta)" : "CORE Vitalício")
+          : "CORE Pro";
+
+        const payload = {
+          orderId: String(purchaseId ?? subscriptionId ?? `${userId}-${Date.now()}`),
+          platform: "Cakto",
+          paymentMethod: paymentMethod === "pix" ? "pix" : "credit_card",
+          status,
+          createdAt: nowStamp,
+          approvedDate: status === "paid" ? nowStamp : null,
+          refundedAt: status === "paid" ? null : nowStamp,
+          customer: {
+            name: customer.name || customerEmail?.split("@")[0] || "Cliente",
+            email: customerEmail || "",
+            phone: customer.phone || null,
+            document: customer.docNumber || customer.document || null,
+            country: "BR",
+          },
+          products: [{
+            id: offerId || String(purchaseId ?? "core"),
+            name: productName,
+            planId: null,
+            planName: billingPeriod,
+            quantity: 1,
+            priceInCents,
+          }],
+          trackingParameters: { src: null, sck: null, ...utm },
+          commission: {
+            totalPriceInCents: priceInCents,
+            gatewayFeeInCents: 0,
+            userCommissionInCents: priceInCents,
+          },
+          isTest: false,
+        };
+
+        const res = await fetch("https://api.utmify.com.br/api-credentials/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-token": token },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(() => "");
+          logStep("UTMify error", { status: res.status, body: txt.slice(0, 300) });
+        } else {
+          logStep("UTMify order sent", { orderId: payload.orderId, status, priceInCents, utm_source: utm.utm_source });
+        }
+      } catch (e) {
+        logStep("UTMify send failed", { message: (e as Error).message });
+      }
+    }
+
     async function updateStatus(userId: string | null, status: string) {
       let query = supabaseClient.from("subscriptions").update({ status });
       if (userId) {
@@ -368,6 +473,8 @@ serve(async (req) => {
       }
       // trial_converted só na 1ª cobrança; renovação não é conversão
       await saveActiveSubscription(userId, event === "purchase_approved");
+      // UTMify: só a 1ª compra (renovação não é venda nova no relatório)
+      if (event === "purchase_approved") await sendToUtmify(userId, "paid");
       logStep("Subscription activated", { userId, event, billingPeriod });
     } else if (event === "subscription_canceled") {
       const userId = await resolveUserId();
@@ -376,6 +483,7 @@ serve(async (req) => {
     } else if (event === "refund" || event === "chargeback") {
       const userId = await resolveUserId();
       await updateStatus(userId, "canceled");
+      if (userId) await sendToUtmify(userId, event === "chargeback" ? "chargedback" : "refunded");
       logStep("Access revoked", { event, userId, subscriptionId });
     } else {
       // pix_gerado, boleto_gerado, purchase_refused, checkout_abandonment…

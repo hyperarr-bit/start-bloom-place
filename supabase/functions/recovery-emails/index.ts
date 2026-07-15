@@ -76,7 +76,11 @@ serve(async (req) => {
       log("Skipped: RESEND_API_KEY not set");
       return Response.json({ skipped: "no RESEND_API_KEY" });
     }
-    const from = Deno.env.get("RECOVERY_EMAIL_FROM") || "CORE <onboarding@resend.dev>";
+    // Remetente: cai no WELCOME_EMAIL_FROM (domínio verificado, setado 15/07)
+    // se RECOVERY_EMAIL_FROM não existir — onboarding@resend.dev cai em spam.
+    const from = Deno.env.get("RECOVERY_EMAIL_FROM")
+      || Deno.env.get("WELCOME_EMAIL_FROM")
+      || "CORE <onboarding@resend.dev>";
 
     // Kill switch opcional (mesmo padrão dos trial emails)
     const { data: cfg } = await supabase

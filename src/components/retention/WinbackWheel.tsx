@@ -6,11 +6,11 @@ import { trackEvent } from "@/lib/analytics";
 
 /**
  * Roleta do prêmio (paywall + winback de cancelamento). Redesign 15/07:
- * - TAP pra girar (era giro automático): a pessoa AGE → o prêmio parece
- *   ganho, não dado — e segura a atenção de quem apertou "voltar" (dado de
- *   14/07: 44 de 84 fechavam durante os ~6s de animação passiva).
- * - Giro de ~2,2s (era 4,6s + esperas) e celebração com confete.
- * - Cores da marca (accent magenta) no lugar do cinza herdado do winback.
+ * - Giro AUTOMÁTICO e rápido (~2,2s; era ~6s — 44 de 84 fechavam durante a
+ *   espera). Tentamos tap-pra-girar por algumas horas e o dono derrubou, com
+ *   razão: quem cai aqui apertou VOLTAR, está fugindo — cada ação exigida é
+ *   porta de saída. O prêmio persegue a pessoa, não espera por ela.
+ * - Celebração com confete + cores da marca (accent magenta).
  */
 
 const SLICES = [
@@ -87,7 +87,7 @@ interface Props {
 
 export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel = "VITALÍCIO R$19,90" }: Props) {
   const controls = useAnimation();
-  const [phase, setPhase] = useState<"ready" | "spinning" | "done">("ready");
+  const [phase, setPhase] = useState<"spinning" | "done">("spinning");
   const spinningRef = useRef(false);
 
   // Prêmio em 2 linhas na fatia ("VITALÍCIO R$19,90" → "VITALÍCIO" / "R$19,90")
@@ -107,13 +107,19 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel = "VITALÍC
     }
   }, [attemptId]);
 
+  // Gira sozinha logo ao montar — 500ms de respiro pra tela assentar.
+  useEffect(() => {
+    const t = setTimeout(spin, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const spin = async () => {
     if (spinningRef.current) return;
     spinningRef.current = true;
-    setPhase("spinning");
 
-    if (attemptId) trackEvent("winback_wheel_spun", { auto: false });
-    else trackEvent("funnel_click", { cta: "wheel_spin" });
+    if (attemptId) trackEvent("winback_wheel_spun", { auto: true });
+    else trackEvent("funnel_click", { cta: "wheel_spin", auto: true });
 
     const targetCenter = WIN_INDEX * SLICE_DEG + SLICE_DEG / 2;
     const fullSpins = 4 * 360;
@@ -163,8 +169,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel = "VITALÍC
           animate={{ opacity: 1, y: 0 }}
           className="text-2xl font-bold leading-tight tracking-tight"
         >
-          {phase === "ready" && <>Você ganhou<br />1 giro grátis 🎯</>}
-          {phase === "spinning" && <>Girando...</>}
+          {phase === "spinning" && <>Girando<br />seu prêmio... 🎯</>}
           {phase === "done" && <>🎉 Você ganhou!</>}
         </motion.h2>
       </div>
@@ -310,28 +315,9 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel = "VITALÍC
         </div>
       </motion.div>
 
-      {/* CTA girar / revelação */}
+      {/* status / revelação */}
       <div className="h-16 flex items-center justify-center">
         <AnimatePresence mode="wait">
-          {phase === "ready" && (
-            <motion.div
-              key="spin-btn"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-            >
-              {/* pulso infinito num wrapper separado — dentro do child do
-                  AnimatePresence ele nunca "termina" e trava o exit */}
-              <motion.div animate={{ scale: [1, 1.04, 1] }} transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}>
-                <button
-                  onClick={spin}
-                  className="h-14 px-12 rounded-full bg-accent text-accent-foreground text-lg font-extrabold tracking-wide shadow-[0_12px_34px_-8px_hsl(var(--accent)/0.6)] active:scale-95 transition-transform"
-                >
-                  GIRAR
-                </button>
-              </motion.div>
-            </motion.div>
-          )}
           {phase === "spinning" && (
             <motion.p
               key="spin-hint"
@@ -340,7 +326,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel = "VITALÍC
               exit={{ opacity: 0 }}
               className="text-sm text-muted-foreground"
             >
-              Boa sorte! 🤞
+              Prêmio garantido — boa sorte! 🤞
             </motion.p>
           )}
           {phase === "done" && (

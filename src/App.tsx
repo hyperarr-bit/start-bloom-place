@@ -61,6 +61,7 @@ const RootGate = () => {
 // Leves / necessários cedo (LP anônima, auth) — ficam no bundle inicial.
 import Acesso from "./pages/Acesso";
 import Auth from "./pages/Auth";
+import Entrar from "./pages/Entrar";
 import AuthCallback from "./pages/AuthCallback";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
@@ -178,6 +179,8 @@ const App = () => {
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
                   <Route path="/inicio" element={<Comecar />} />
+                  {/* Porta de entrada do e-mail pós-compra da Cakto */}
+                  <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/callback" element={<AuthCallback />} />
                   <Route path="*" element={<AnimatedRoutes />} />

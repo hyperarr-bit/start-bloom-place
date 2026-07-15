@@ -77,9 +77,7 @@ export async function firePixPurchaseOnce(source: "checkout" | "rescue"): Promis
     } catch { /* fica no último gerado */ }
   }
 
-  // 15/07: downsell subiu pra 19,90. QR antigo de 14,90 pago depois da virada
-  // dispara 19,9 no pixel — erro de centavos aceitável por poucas horas.
-  const value = chosen.offer === "lifetime" ? 27.9 : 19.9;
+  const value = chosen.offer === "lifetime" ? 27.9 : 14.9;
   fireMetaEvent(
     "Purchase",
     { value, currency: "BRL", content_name: chosen.offer },

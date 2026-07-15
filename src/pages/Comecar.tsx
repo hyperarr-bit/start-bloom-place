@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
-  Eye, EyeOff,
 } from "lucide-react";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { Button } from "@/components/ui/button";
@@ -673,32 +672,16 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
 function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
   const { signUp, signIn } = useAuth();
   const { set: setUserData } = useUserData();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
-  // 14/07: campo nome saiu do muro (3 campos→2). O nome real do pagante chega
-  // pelo checkout Pix (cakto-pix grava em profiles); aqui basta um apelido do
-  // e-mail pro app não ficar mudo na saudação.
-  // Dado de 14/07: 221 de 579 (38%) viram o form e não tentaram NADA. O 1º foco
-  // por campo separa "nem tocou" de "começou e desistiu" na análise de amanhã.
-  const focusSent = useRef<Set<string>>(new Set());
-  const trackFocus = (field: string) => {
-    if (focusSent.current.has(field)) return;
-    focusSent.current.add(field);
-    trackEvent("funnel_click", { cta: "signup_field_focus", field });
-  };
-  const [area] = useState<AreaKey | null>(() => {
-    try {
-      const a = localStorage.getItem(FUNNEL_AREA_KEY);
-      return a && a in AREAS ? (a as AreaKey) : null;
-    } catch { return null; }
-  });
+  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
   // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
   // botão nesse ambiente e vai direto pro e-mail — igual o Auth.tsx já faz.
@@ -738,19 +721,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
-    // Validação com RESPOSTA (15/07): o guard mudo `disabled={!valid}` deixou
-    // o próprio dono travado digitando o nome no campo de e-mail.
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setErr("O primeiro campo é o seu e-mail (ex.: nome@gmail.com) — é com ele que você entra no app.");
-      trackEvent("funnel_error", { where: "signup_validate", field: "email" });
-      return;
-    }
-    if (password.length < 6) {
-      setErr("A senha precisa de pelo menos 6 caracteres.");
-      trackEvent("funnel_error", { where: "signup_validate", field: "password" });
-      return;
-    }
+    if (!valid || loading) return;
     setErr(null);
     setLoading(true);
 
@@ -770,12 +741,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     }
 
     trackEvent("funnel_click", { cta: "signup_submit" });
-    // Apelido do prefixo do e-mail ("maria.souza10" → "Maria"); o nome real
-    // vem depois, no checkout Pix.
-    const prefix = email.trim().split("@")[0] || "";
-    const first = prefix.split(/[._\-+0-9]/).filter(Boolean)[0] || prefix;
-    const derivedName = first ? first[0].toUpperCase() + first.slice(1) : "";
-    const { error, session } = await signUp(email.trim().toLowerCase(), password, derivedName);
+    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
       // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
@@ -802,7 +768,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       setLoading(false);
       return;
     }
-    try { if (derivedName) setUserData("user-name", derivedName); } catch { /* noop */ }
+    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
     // Tutorial forçado é o de FINANÇAS (spotlight do Index) e o wizard da Home.
     // Quem veio do funil vitrine com outra área cai no módulo dela — o flag
     // aqui sequestraria a 1ª visita à Home com o wizard multi-módulo.
@@ -820,48 +786,16 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     else onConfirm(email.trim().toLowerCase());
   };
 
-  const areaInfo = AREAS[area ?? "dinheiro"];
-
   return (
     <div className="w-full max-w-sm mx-auto">
-      {/* Barra de progresso: a pessoa JÁ fez o quiz+demo — falta um fio. */}
-      <div className="h-1 rounded-full bg-muted overflow-hidden mb-5">
-        <div className="h-full w-[95%] rounded-full bg-accent transition-all" />
-      </div>
-
-      <div className="text-center mb-5">
+      <div className="text-center mb-7">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
-          <CheckCircle2 className="w-3.5 h-3.5" /> Seu plano está pronto
+          <Sparkles className="w-3.5 h-3.5" /> Último passo
         </div>
         <h2 className="text-[26px] font-bold tracking-tight leading-tight">
-          Salve seu plano pra<br />não perder.
+          Só falta 1 passo pra você<br />começar a usar o CORE.
         </h2>
-        <p className="text-muted-foreground text-sm mt-2">
-          Crie seu acesso em 10 segundos — é com ele que você entra no app.
-        </p>
-      </div>
-
-      {/* O prêmio na frente do form: o plano existe, está montado, só falta
-          destravar — cadastro vira "salvar o que já é meu". */}
-      <div className="rounded-2xl border border-border bg-card p-4 mb-5 relative overflow-hidden">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl bg-muted grid place-items-center text-xl">{areaInfo.emoji}</div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold leading-tight">Plano de {areaInfo.nome}</p>
-            <p className="text-[12px] text-muted-foreground">montado com suas respostas</p>
-          </div>
-          <div className="w-8 h-8 rounded-full bg-accent/10 grid place-items-center shrink-0">
-            <Lock className="w-3.5 h-3.5 text-accent" />
-          </div>
-        </div>
-        <div className="space-y-2 select-none" aria-hidden="true">
-          {["Diagnóstico do seu quiz", `Central de ${areaInfo.nome} personalizada`, "Acesso aos 16 módulos do CORE"].map((t) => (
-            <div key={t} className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-accent shrink-0" />
-              <span className="text-[13px] text-muted-foreground blur-[2.5px]">{t}</span>
-            </div>
-          ))}
-        </div>
+        <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
       </div>
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
@@ -878,45 +812,20 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
             <div className="flex-1 h-px bg-border" />
           </div>
         </>
-      ) : null}
+      ) : (
+        <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4">
+          Crie sua conta com e-mail e senha — leva 10 segundos.
+        </p>
+      )}
 
-      <form onSubmit={submit} className="space-y-3" noValidate>
-        <div className="space-y-1">
-          <label htmlFor="funil-email" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground pl-0.5">
-            Seu e-mail
-          </label>
-          <Input id="funil-email" type="email" inputMode="email" enterKeyHint="next" placeholder="nome@gmail.com" value={email} onFocus={() => trackFocus("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); } setErr(null); }} autoComplete="email" className="h-12" />
-          {/* Caso real 15/07: dono digitou o NOME aqui e o botão morria mudo.
-              Aviso ao vivo quando o texto não parece e-mail. */}
-          {email.trim().length >= 3 && !email.includes("@") && (
-            <p className="text-[12px] text-amber-600 dark:text-amber-500 pl-0.5">
-              👆 Aqui vai seu <strong>e-mail</strong> (ex.: nome@gmail.com)
-            </p>
-          )}
-        </div>
-        <div className="space-y-1">
-          <label htmlFor="funil-senha" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground pl-0.5">
-            {existingAccount ? "Sua senha" : "Crie uma senha"}
-          </label>
-          <div className="relative">
-            <Input id="funil-senha" type={showPassword ? "text" : "password"} enterKeyHint="go" placeholder={existingAccount ? "Sua senha" : "Mínimo 6 caracteres"} value={password} onFocus={() => trackFocus("password")} onChange={(e) => { setPassword(e.target.value); setErr(null); }} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12 pr-11" />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-        </div>
+      <form onSubmit={submit} className="space-y-3">
+        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
+        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
-        {/* Botão SEMPRE clicável (fora do loading): botão cinza mudo era beco
-            sem saída — agora o clique explica exatamente o que falta. */}
-        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Salvar meu plano <ArrowRight className="w-4 h-4" /></>}
+        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
-        <p className="text-[12px] text-muted-foreground text-center">⚡ Leva 10 segundos · sem cartão, sem cobrança</p>
         {existingAccount && (
           <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
             Esqueci minha senha

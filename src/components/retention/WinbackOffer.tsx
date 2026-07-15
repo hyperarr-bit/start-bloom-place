@@ -7,9 +7,9 @@ import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
 
 // VITALÍCIO (13/07): o winback vende o mesmo prêmio do downsell — acesso
-// pra sempre, pagamento único no Pix (PixCheckout in-app). 15/07: 19,90.
+// pra sempre por R$14,90, pagamento único no Pix (PixCheckout in-app).
 const FULL_LIFETIME = 27.90;
-const OFFER_LIFETIME = 19.90;
+const OFFER_LIFETIME = 14.90;
 const SAVINGS = FULL_LIFETIME - OFFER_LIFETIME;
 
 const COUNTDOWN_SECONDS = 10 * 60;
@@ -136,7 +136,7 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         disabled={loading || secondsLeft === 0}
         className="w-full h-14 text-base font-bold"
       >
-        {"GARANTIR VITALÍCIO POR R$ 19,90"}
+        {"GARANTIR VITALÍCIO POR R$ 14,90"}
       </Button>
 
       <p className="text-[10px] text-muted-foreground text-center leading-relaxed">

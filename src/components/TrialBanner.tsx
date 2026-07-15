@@ -25,6 +25,14 @@ export const TrialBanner = () => {
     // recém-criada (sem trial) ganhava DOIS paywalls empilhados no /comecar:
     // o do funil + este gate por cima — eventos duplicados, voltar bugado.
     location.pathname.startsWith("/comecar") ||
+    // /inicio é o MESMO funil (vitrine, 96% do tráfego) — fora da lista, o
+    // gate montava um 2º paywall POR CIMA do paywall do funil pós-cadastro
+    // (15/07: todos os checkouts-fantasma "tela branca ao pagar" eram isso).
+    location.pathname.startsWith("/inicio") ||
+    // /entrar (login do e-mail pós-compra) e /acesso (gate do TikTok): o
+    // paywall por cima delas quebra o propósito da página.
+    location.pathname.startsWith("/entrar") ||
+    location.pathname.startsWith("/acesso") ||
     location.pathname.startsWith("/preview");
 
   const tutorialDone = loaded && get<string>("spotlight-done-financas", "") === "true";

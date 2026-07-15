@@ -1,6 +1,33 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { trackEvent } from "@/lib/analytics";
+
+// Telemetria de crash (15/07): cliente reportou "tela branca ao pagar" e a
+// gente só tinha silêncio nos eventos — sem isso, todo crash é adivinhação.
+// Rate-limit de 1 report/20s pra nunca inundar o analytics em loop de erro.
+let lastJsErrorAt = 0;
+const reportJsError = (kind: string, message: string, extra: Record<string, unknown> = {}) => {
+  const now = Date.now();
+  if (now - lastJsErrorAt < 20_000) return;
+  lastJsErrorAt = now;
+  try {
+    trackEvent("js_error", {
+      kind,
+      message: String(message || "?").slice(0, 300),
+      route: window.location.pathname + window.location.search.slice(0, 60),
+      ua: navigator.userAgent.slice(0, 160),
+      ...extra,
+    });
+  } catch { /* nunca deixar o report derrubar nada */ }
+};
+window.addEventListener("error", (e) => {
+  reportJsError("error", e.message, { source: `${e.filename?.split("/").pop() ?? "?"}:${e.lineno ?? "?"}` });
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const r = (e as PromiseRejectionEvent).reason;
+  reportJsError("unhandledrejection", r?.message ?? String(r ?? "?"));
+});
 
 // Deploy troca os chunks hasheados e APAGA os antigos. Quem estava com o site
 // aberto de antes fica com imports quebrados → TELA BRANCA (caso real 15/07:

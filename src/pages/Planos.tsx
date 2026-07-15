@@ -18,6 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
+import { PixCheckout } from "@/components/paywall/PixCheckout";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 

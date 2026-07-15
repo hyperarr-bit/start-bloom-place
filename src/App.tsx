@@ -92,6 +92,10 @@ const PetPage = lazy(() => import("./pages/Pet"));
 const Detox = lazy(() => import("./pages/Detox"));
 const Conquistas = lazy(() => import("./pages/Conquistas"));
 const Preview = lazy(() => import("./pages/Preview"));
+// Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
+const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
+// Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
+const BemVindo = lazy(() => import("./pages/BemVindo"));
 
 const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
@@ -115,6 +119,8 @@ const AnimatedRoutes = () => {
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
+        <Route path="/comecar-v2" element={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />
+        <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
         {/* Volta dos 16 módulos (funil vitrine, jul/2026): a Home hub reabriu. */}

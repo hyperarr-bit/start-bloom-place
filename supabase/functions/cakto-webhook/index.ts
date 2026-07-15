@@ -43,6 +43,56 @@ const logStep = (step: string, details?: unknown) => {
 // independente e com a campanha certa. Data em UTC "YYYY-MM-DD HH:MM:SS".
 const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
 
+// E-mail de boas-vindas (15/07): motivo real de reembolso é "paguei e não
+// consegui entrar". O e-mail mostra O e-mail da conta + relembra a senha do
+// cadastro e aponta pra /bem-vindo, que repete a instrução na tela.
+const APP_URL = "https://www.coreaplicativo.com.br";
+
+const welcomeHtml = (firstName: string | null, email: string, acessarUrl: string, resetUrl: string) => `<!doctype html>
+<html lang="pt-BR"><body style="margin:0;padding:0;background:#f5f2ec;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <div style="display:none;max-height:0;overflow:hidden;">Seu acesso ao CORE está liberado — veja como entrar.</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;overflow:hidden;">
+      <tr><td style="background:#211d18;padding:22px 28px;">
+        <span style="color:#ffffff;font-size:18px;font-weight:800;letter-spacing:.02em;">CORE</span>
+      </td></tr>
+      <tr><td style="padding:30px 28px 8px;">
+        <h1 style="margin:0 0 6px;font-size:24px;line-height:1.2;color:#211d18;">Pagamento confirmado ✅</h1>
+        <p style="margin:0;font-size:15px;line-height:1.6;color:#5c5245;">
+          ${firstName ? `${firstName}, seu` : "Seu"} acesso vitalício ao CORE tá liberado. Falta só entrar:
+        </p>
+      </td></tr>
+      <tr><td style="padding:18px 28px 0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f2ec;border-radius:12px;">
+          <tr><td style="padding:16px 18px;">
+            <p style="margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5c5245;">Como entrar</p>
+            <p style="margin:0 0 8px;font-size:14.5px;line-height:1.6;color:#211d18;">
+              <strong>1.</strong> Toque no botão verde abaixo.<br>
+              <strong>2.</strong> Entre com este e-mail:<br>
+              <span style="display:inline-block;margin:6px 0;padding:8px 12px;background:#ffffff;border-radius:8px;font-size:15px;font-weight:700;color:#211d18;">${email}</span><br>
+              <strong>3.</strong> Use a <strong>mesma senha que você criou no cadastro</strong>.
+            </p>
+            <p style="margin:8px 0 0;font-size:13px;line-height:1.55;color:#5c5245;">
+              Criou a conta com o Google? Então é só tocar em <strong>“Continuar com Google”</strong> — sem senha.
+            </p>
+          </td></tr>
+        </table>
+      </td></tr>
+      <tr><td align="center" style="padding:24px 28px 8px;">
+        <a href="${acessarUrl}" style="display:block;background:#1f9d55;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:15px 24px;border-radius:999px;">Acessar o CORE agora →</a>
+      </td></tr>
+      <tr><td align="center" style="padding:6px 28px 24px;">
+        <p style="margin:0;font-size:13px;color:#5c5245;">Esqueceu a senha? <a href="${resetUrl}" style="color:#1f9d55;font-weight:700;">Redefina em 30 segundos</a></p>
+      </td></tr>
+      <tr><td style="padding:18px 28px 26px;border-top:1px solid #eee7da;">
+        <p style="margin:0;font-size:12.5px;line-height:1.6;color:#8a8073;">
+          Qualquer dificuldade pra entrar, responde este e-mail que a gente resolve com você — seu acesso é garantido.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -463,6 +513,53 @@ serve(async (req) => {
       }
     }
 
+    // Boas-vindas via Resend na 1ª compra. Não-bloqueante: falha só loga —
+    // nunca derruba o webhook. A idempotência lá de cima garante 1 envio por
+    // compra (evento duplicado retorna antes de chegar aqui).
+    async function sendWelcomeEmail(userId: string) {
+      const resendKey = Deno.env.get("RESEND_API_KEY");
+      if (!resendKey) { logStep("Welcome email skipped: no RESEND_API_KEY"); return; }
+      try {
+        let email = customerEmail;
+        if (!email) {
+          const { data: u } = await supabaseClient.auth.admin.getUserById(userId);
+          email = u?.user?.email ?? null;
+        }
+        if (!email) { logStep("Welcome email skipped: no email", { userId }); return; }
+
+        const firstName = String(customer.name ?? "").trim().split(/\s+/)[0] || null;
+        const from = Deno.env.get("WELCOME_EMAIL_FROM")
+          || Deno.env.get("RECOVERY_EMAIL_FROM")
+          || "CORE <onboarding@resend.dev>";
+        const acessarUrl = `${APP_URL}/bem-vindo?e=${encodeURIComponent(email)}`;
+        const resetUrl = `${APP_URL}/reset-password`;
+
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from,
+            to: [email],
+            subject: "Pagamento confirmado ✅ Seu acesso ao CORE tá liberado",
+            html: welcomeHtml(firstName, email, acessarUrl, resetUrl),
+          }),
+        });
+        if (!res.ok) {
+          const bodyTxt = await res.text().catch(() => "");
+          throw new Error(`Resend ${res.status}: ${bodyTxt.slice(0, 200)}`);
+        }
+
+        await supabaseClient.from("analytics_events").insert({
+          user_id: userId,
+          event_name: "welcome_email_sent",
+          event_data: { gateway: "cakto", billing_period: billingPeriod, payment_method: paymentMethod },
+        });
+        logStep("Welcome email sent", { userId });
+      } catch (e) {
+        logStep("Welcome email failed", { message: (e as Error).message });
+      }
+    }
+
     async function updateStatus(userId: string | null, status: string) {
       let query = supabaseClient.from("subscriptions").update({ status });
       if (userId) {
@@ -486,8 +583,11 @@ serve(async (req) => {
       }
       // trial_converted só na 1ª cobrança; renovação não é conversão
       await saveActiveSubscription(userId, event === "purchase_approved");
-      // UTMify: só a 1ª compra (renovação não é venda nova no relatório)
-      if (event === "purchase_approved") await sendToUtmify(userId, "paid");
+      // UTMify + boas-vindas: só a 1ª compra (renovação não é venda nova)
+      if (event === "purchase_approved") {
+        await sendToUtmify(userId, "paid");
+        await sendWelcomeEmail(userId);
+      }
       logStep("Subscription activated", { userId, event, billingPeriod });
     } else if (event === "subscription_canceled") {
       const userId = await resolveUserId();

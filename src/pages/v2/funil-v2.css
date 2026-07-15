@@ -1,0 +1,214 @@
+/* Funil V2 — identidade própria (15/07/2026), escopada em .fv2.
+   NÃO compartilha tokens com o app nem com o funil atual (/comecar).
+   Fontes carregam junto com o chunk lazy — visitante do funil antigo não baixa nada disso. */
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Schibsted+Grotesk:wght@400;500;700&display=swap");
+
+.fv2,
+.fv2 *,
+.fv2 *::before,
+.fv2 *::after {
+  box-sizing: border-box;
+}
+
+.fv2 {
+  overflow-x: hidden;
+  --areia: #f5f0e6;
+  --areia-2: #ede6d6;
+  --jabuticaba: #26201a;
+  --tinta-2: #5c5245;
+  --capim: #2e9e52;
+  --capim-escuro: #1f7a3d;
+  --guarana: #e4572e;
+  --sol: #f2c14e;
+  --lagoa: #8fb8da;
+  --barro: #b4652f;
+  --card: #ffffff;
+  --wash-menta: #e3efe2;
+  --wash-lilas: #e9e6f3;
+  --wash-pessego: #fae7da;
+  --wash-banana: #f8efd2;
+  --linha: rgba(38, 32, 26, 0.12);
+  --sombra: 0 2px 6px rgba(38, 32, 26, 0.06), 0 12px 32px rgba(38, 32, 26, 0.08);
+
+  min-height: 100dvh;
+  background: var(--areia);
+  color: var(--jabuticaba);
+  font-family: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.5s ease;
+}
+.fv2[data-wash="menta"] { background: var(--wash-menta); }
+.fv2[data-wash="lilas"] { background: var(--wash-lilas); }
+.fv2[data-wash="pessego"] { background: var(--wash-pessego); }
+.fv2[data-wash="banana"] { background: var(--wash-banana); }
+
+.fv2-col {
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 16px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* header: voltar + barra + casinha que constrói */
+.fv2-top { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.fv2-back {
+  border: none; background: none; cursor: pointer; color: var(--jabuticaba);
+  width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 18px; flex: 0 0 auto;
+}
+.fv2-back:hover { background: rgba(38, 32, 26, 0.07); }
+.fv2-back:disabled { opacity: 0; pointer-events: none; }
+.fv2-bar { flex: 1; height: 6px; border-radius: 99px; background: rgba(38, 32, 26, 0.1); position: relative; overflow: hidden; }
+.fv2-bar i { position: absolute; inset: 0; right: auto; background: var(--capim); border-radius: 99px; transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.fv2-top svg { flex: 0 0 auto; }
+
+.fv2-display {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(28px, 7.4vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  margin: 6px 0 10px;
+}
+.fv2-display .hl { color: var(--capim); }
+.fv2-display .hl-g { color: var(--guarana); }
+.fv2-sub { color: var(--tinta-2); font-size: 15.5px; max-width: 34ch; }
+
+/* balão do João */
+.fv2-bolha {
+  background: var(--card); border-radius: 16px 16px 16px 4px; box-shadow: var(--sombra);
+  padding: 11px 14px; font-size: 14.5px; font-weight: 500;
+  display: flex; gap: 10px; align-items: center; margin-bottom: 16px;
+}
+.fv2-bolha svg { flex: 0 0 auto; }
+
+/* opções / chips */
+.fv2-opcoes { display: flex; flex-direction: column; gap: 10px; }
+.fv2-opcao {
+  background: var(--card); border: 1.5px solid transparent; border-radius: 15px;
+  padding: 13px 14px; font-size: 14.5px; font-weight: 500; text-align: left;
+  display: flex; align-items: center; gap: 11px; cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  font-family: inherit; color: inherit; width: 100%;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.fv2-opcao:active { transform: scale(0.98); }
+.fv2-opcao .emo {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 15px; background: var(--areia); flex: 0 0 auto;
+}
+.fv2-opcao[data-on="true"] { border-color: var(--capim); font-weight: 700; }
+.fv2-opcao[data-on="true"]::after {
+  content: "✓"; margin-left: auto; color: #fff; background: var(--capim);
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px;
+}
+.fv2-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fv2-grid2 .fv2-opcao { flex-direction: column; text-align: center; gap: 6px; padding: 14px 8px; }
+.fv2-grid2 .fv2-opcao[data-on="true"]::after { position: absolute; margin: 0; top: 8px; right: 8px; }
+.fv2-grid2 .fv2-opcao { position: relative; }
+
+/* botões */
+.fv2-cta {
+  font-family: inherit; font-weight: 700; font-size: 16px; border: none; cursor: pointer;
+  background: var(--jabuticaba); color: var(--areia); border-radius: 999px; padding: 15px 26px;
+  width: 100%; box-shadow: var(--sombra);
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.fv2-cta:hover { transform: translateY(-1px); }
+.fv2-cta:active { transform: scale(0.98); }
+.fv2-cta:disabled { opacity: 0.35; pointer-events: none; }
+.fv2-cta.verde { background: var(--capim); color: #fff; }
+.fv2-cta.fogo { background: var(--guarana); color: #fff; }
+.fv2-ghost {
+  font-family: inherit; background: none; border: none; cursor: pointer;
+  color: var(--tinta-2); font-size: 14px; font-weight: 500; padding: 10px;
+}
+.fv2-rodape { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 20px; }
+
+/* pill de feedback (pop) */
+.fv2-feedback {
+  background: color-mix(in srgb, var(--sol) 26%, var(--card));
+  border-radius: 13px; padding: 11px 14px; font-size: 13.5px; line-height: 1.45;
+  box-shadow: var(--sombra);
+}
+.fv2-feedback b { font-weight: 700; }
+.fv2-feedback.verde { background: color-mix(in srgb, var(--capim) 14%, var(--card)); }
+
+/* selo */
+.fv2-selo {
+  display: inline-flex; align-items: center; gap: 6px; background: var(--capim); color: #fff;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  border-radius: 999px; padding: 4px 11px; vertical-align: middle; white-space: nowrap;
+}
+
+/* cards genéricos */
+.fv2-card { background: var(--card); border-radius: 18px; padding: 16px; box-shadow: var(--sombra); }
+.fv2-num-grande {
+  font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800;
+  font-size: 46px; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums;
+}
+
+/* input de nome */
+.fv2-input {
+  width: 100%; border: 1.5px solid var(--linha); border-radius: 15px; background: var(--card);
+  font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 700; font-size: 26px;
+  text-align: center; padding: 14px; color: var(--jabuticaba); outline: none;
+}
+.fv2-input:focus { border-color: var(--capim); }
+.fv2-input::placeholder { color: rgba(38, 32, 26, 0.25); font-weight: 700; }
+
+/* progresso fake */
+.fv2-prog-item { font-size: 14px; color: var(--tinta-2); display: flex; gap: 9px; align-items: center; }
+.fv2-prog-item::before {
+  content: ""; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--linha); flex: 0 0 auto; transition: all 0.2s;
+}
+.fv2-prog-item[data-ok="true"] { color: var(--jabuticaba); }
+.fv2-prog-item[data-ok="true"]::before {
+  content: "✓"; border-color: var(--capim); background: var(--capim); color: #fff;
+  font-size: 9px; display: grid; place-items: center;
+}
+
+/* review card do "montando plano" */
+.fv2-review { font-size: 13px; color: var(--tinta-2); line-height: 1.5; }
+.fv2-review .estrelas { color: var(--sol); letter-spacing: 2px; font-size: 13px; }
+.fv2-review b { color: var(--jabuticaba); }
+
+/* paywall */
+.fv2-preco { border: 2px solid var(--capim); position: relative; }
+.fv2-preco .tag {
+  position: absolute; top: -11px; left: 14px; background: var(--capim); color: #fff;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+}
+.fv2-preco-linha { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+.fv2-preco-de { color: var(--tinta-2); text-decoration: line-through; font-size: 15px; }
+.fv2-preco-por { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; font-size: 36px; letter-spacing: -0.02em; }
+.fv2-preco-suf { font-size: 13px; color: var(--tinta-2); font-weight: 500; }
+.fv2-checks { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.fv2-checks li { font-size: 13.5px; display: flex; gap: 9px; align-items: center; }
+.fv2-checks li::before {
+  content: "✓"; color: #fff; background: var(--capim); width: 17px; height: 17px;
+  border-radius: 50%; display: grid; place-items: center; font-size: 10px; flex: 0 0 auto;
+}
+.fv2-prova { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--tinta-2); }
+.fv2-prova .estrelas { color: var(--sol); letter-spacing: 2px; font-size: 14px; }
+
+/* confete */
+.fv2-conf { position: fixed; width: 10px; height: 10px; border-radius: 2px; top: -14px; z-index: 60; pointer-events: none; animation: fv2-queda 1.6s ease-in forwards; }
+@keyframes fv2-queda {
+  0% { opacity: 1; transform: translateY(0) rotate(0); }
+  100% { opacity: 0; transform: translateY(105vh) rotate(560deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fv2 *, .fv2 *::before, .fv2 *::after { animation: none !important; transition: none !important; }
+}

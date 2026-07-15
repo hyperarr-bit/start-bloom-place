@@ -685,7 +685,6 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // 14/07: campo nome saiu do muro (3 campos→2). O nome real do pagante chega
   // pelo checkout Pix (cakto-pix grava em profiles); aqui basta um apelido do
   // e-mail pro app não ficar mudo na saudação.
-  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6;
   // Dado de 14/07: 221 de 579 (38%) viram o form e não tentaram NADA. O 1º foco
   // por campo separa "nem tocou" de "começou e desistiu" na análise de amanhã.
   const focusSent = useRef<Set<string>>(new Set());
@@ -739,7 +738,19 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!valid || loading) return;
+    if (loading) return;
+    // Validação com RESPOSTA (15/07): o guard mudo `disabled={!valid}` deixou
+    // o próprio dono travado digitando o nome no campo de e-mail.
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setErr("O primeiro campo é o seu e-mail (ex.: nome@gmail.com) — é com ele que você entra no app.");
+      trackEvent("funnel_error", { where: "signup_validate", field: "email" });
+      return;
+    }
+    if (password.length < 6) {
+      setErr("A senha precisa de pelo menos 6 caracteres.");
+      trackEvent("funnel_error", { where: "signup_validate", field: "password" });
+      return;
+    }
     setErr(null);
     setLoading(true);
 
@@ -869,21 +880,40 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         </>
       ) : null}
 
-      <form onSubmit={submit} className="space-y-3">
-        <Input type="email" inputMode="email" enterKeyHint="next" placeholder="Seu melhor e-mail" value={email} onFocus={() => trackFocus("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
-        <div className="relative">
-          <Input type={showPassword ? "text" : "password"} enterKeyHint="go" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={() => trackFocus("password")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12 pr-11" />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
-          >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+      <form onSubmit={submit} className="space-y-3" noValidate>
+        <div className="space-y-1">
+          <label htmlFor="funil-email" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground pl-0.5">
+            Seu e-mail
+          </label>
+          <Input id="funil-email" type="email" inputMode="email" enterKeyHint="next" placeholder="nome@gmail.com" value={email} onFocus={() => trackFocus("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); } setErr(null); }} autoComplete="email" className="h-12" />
+          {/* Caso real 15/07: dono digitou o NOME aqui e o botão morria mudo.
+              Aviso ao vivo quando o texto não parece e-mail. */}
+          {email.trim().length >= 3 && !email.includes("@") && (
+            <p className="text-[12px] text-amber-600 dark:text-amber-500 pl-0.5">
+              👆 Aqui vai seu <strong>e-mail</strong> (ex.: nome@gmail.com)
+            </p>
+          )}
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="funil-senha" className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground pl-0.5">
+            {existingAccount ? "Sua senha" : "Crie uma senha"}
+          </label>
+          <div className="relative">
+            <Input id="funil-senha" type={showPassword ? "text" : "password"} enterKeyHint="go" placeholder={existingAccount ? "Sua senha" : "Mínimo 6 caracteres"} value={password} onFocus={() => trackFocus("password")} onChange={(e) => { setPassword(e.target.value); setErr(null); }} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12 pr-11" />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
         {err && <p className="text-sm text-destructive">{err}</p>}
-        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
+        {/* Botão SEMPRE clicável (fora do loading): botão cinza mudo era beco
+            sem saída — agora o clique explica exatamente o que falta. */}
+        <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Salvar meu plano <ArrowRight className="w-4 h-4" /></>}
         </Button>
         <p className="text-[12px] text-muted-foreground text-center">⚡ Leva 10 segundos · sem cartão, sem cobrança</p>

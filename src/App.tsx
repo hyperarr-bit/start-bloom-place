@@ -114,7 +114,7 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
-        <Route path="/comecar" element={<PageTransition><Comecar /></PageTransition>} />
+        <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
         {/* Volta dos 16 módulos (funil vitrine, jul/2026): a Home hub reabriu. */}
@@ -178,7 +178,7 @@ const App = () => {
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
-                  <Route path="/inicio" element={<Comecar />} />
+                  <Route path="/inicio" element={<RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary>} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

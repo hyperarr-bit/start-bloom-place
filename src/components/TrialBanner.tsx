@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce } from "@/lib/purchase-tracking";
 
 export const TrialBanner = () => {
@@ -73,7 +74,10 @@ export const TrialBanner = () => {
         animate={{ opacity: 1 }}
         className="fixed inset-0 z-[310] overflow-y-auto bg-white"
       >
-        <PaywallFlow context="app" />
+        {/* Boundary: crash/chunk velho aqui era TELA BRANCA na hora de pagar */}
+        <RouteErrorBoundary routeName="paywall-gate">
+          <PaywallFlow context="app" />
+        </RouteErrorBoundary>
       </motion.div>
     );
   }

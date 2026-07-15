@@ -5,6 +5,7 @@ import { Check, Copy, Fingerprint, Loader2, ShieldCheck, User, X, Zap } from "lu
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 
@@ -75,6 +76,7 @@ function IconInput({ Icon, ...props }: { Icon: typeof User } & React.ComponentPr
 }
 
 export function PixCheckout({ offer, onClose, context }: Props) {
+  const { set: setUserData } = useUserData();
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -130,6 +132,12 @@ export function PixCheckout({ offer, onClose, context }: Props) {
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
+      // 14/07: o cadastro do funil não pede mais nome — o nome REAL entra aqui.
+      // Atualiza a saudação do app (o profiles a edge function já grava).
+      try {
+        const firstName = nm.trim().split(/\s+/)[0];
+        if (firstName) setUserData("user-name", firstName);
+      } catch { /* noop */ }
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId });
       // Intenção pendente: se a pessoa pagar e voltar já liberada (sem ver a

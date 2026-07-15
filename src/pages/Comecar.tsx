@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
+  Eye, EyeOff,
 } from "lucide-react";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { Button } from "@/components/ui/button";
@@ -672,16 +673,33 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
 function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
   const { signUp, signIn } = useAuth();
   const { set: setUserData } = useUserData();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
-  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
+  // 14/07: campo nome saiu do muro (3 campos→2). O nome real do pagante chega
+  // pelo checkout Pix (cakto-pix grava em profiles); aqui basta um apelido do
+  // e-mail pro app não ficar mudo na saudação.
+  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6;
+  // Dado de 14/07: 221 de 579 (38%) viram o form e não tentaram NADA. O 1º foco
+  // por campo separa "nem tocou" de "começou e desistiu" na análise de amanhã.
+  const focusSent = useRef<Set<string>>(new Set());
+  const trackFocus = (field: string) => {
+    if (focusSent.current.has(field)) return;
+    focusSent.current.add(field);
+    trackEvent("funnel_click", { cta: "signup_field_focus", field });
+  };
+  const [area] = useState<AreaKey | null>(() => {
+    try {
+      const a = localStorage.getItem(FUNNEL_AREA_KEY);
+      return a && a in AREAS ? (a as AreaKey) : null;
+    } catch { return null; }
+  });
   // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
   // botão nesse ambiente e vai direto pro e-mail — igual o Auth.tsx já faz.
@@ -741,7 +759,12 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     }
 
     trackEvent("funnel_click", { cta: "signup_submit" });
-    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
+    // Apelido do prefixo do e-mail ("maria.souza10" → "Maria"); o nome real
+    // vem depois, no checkout Pix.
+    const prefix = email.trim().split("@")[0] || "";
+    const first = prefix.split(/[._\-+0-9]/).filter(Boolean)[0] || prefix;
+    const derivedName = first ? first[0].toUpperCase() + first.slice(1) : "";
+    const { error, session } = await signUp(email.trim().toLowerCase(), password, derivedName);
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
       // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
@@ -768,7 +791,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       setLoading(false);
       return;
     }
-    try { setUserData("user-name", name.trim()); } catch { /* noop */ }
+    try { if (derivedName) setUserData("user-name", derivedName); } catch { /* noop */ }
     // Tutorial forçado é o de FINANÇAS (spotlight do Index) e o wizard da Home.
     // Quem veio do funil vitrine com outra área cai no módulo dela — o flag
     // aqui sequestraria a 1ª visita à Home com o wizard multi-módulo.
@@ -786,16 +809,48 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     else onConfirm(email.trim().toLowerCase());
   };
 
+  const areaInfo = AREAS[area ?? "dinheiro"];
+
   return (
     <div className="w-full max-w-sm mx-auto">
-      <div className="text-center mb-7">
+      {/* Barra de progresso: a pessoa JÁ fez o quiz+demo — falta um fio. */}
+      <div className="h-1 rounded-full bg-muted overflow-hidden mb-5">
+        <div className="h-full w-[95%] rounded-full bg-accent transition-all" />
+      </div>
+
+      <div className="text-center mb-5">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
-          <Sparkles className="w-3.5 h-3.5" /> Último passo
+          <CheckCircle2 className="w-3.5 h-3.5" /> Seu plano está pronto
         </div>
         <h2 className="text-[26px] font-bold tracking-tight leading-tight">
-          Só falta 1 passo pra você<br />começar a usar o CORE.
+          Salve seu plano pra<br />não perder.
         </h2>
-        <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
+        <p className="text-muted-foreground text-sm mt-2">
+          Crie seu acesso em 10 segundos — é com ele que você entra no app.
+        </p>
+      </div>
+
+      {/* O prêmio na frente do form: o plano existe, está montado, só falta
+          destravar — cadastro vira "salvar o que já é meu". */}
+      <div className="rounded-2xl border border-border bg-card p-4 mb-5 relative overflow-hidden">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-muted grid place-items-center text-xl">{areaInfo.emoji}</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold leading-tight">Plano de {areaInfo.nome}</p>
+            <p className="text-[12px] text-muted-foreground">montado com suas respostas</p>
+          </div>
+          <div className="w-8 h-8 rounded-full bg-accent/10 grid place-items-center shrink-0">
+            <Lock className="w-3.5 h-3.5 text-accent" />
+          </div>
+        </div>
+        <div className="space-y-2 select-none" aria-hidden="true">
+          {["Diagnóstico do seu quiz", `Central de ${areaInfo.nome} personalizada`, "Acesso aos 16 módulos do CORE"].map((t) => (
+            <div key={t} className="flex items-center gap-2">
+              <Check className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="text-[13px] text-muted-foreground blur-[2.5px]">{t}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
@@ -812,20 +867,26 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
             <div className="flex-1 h-px bg-border" />
           </div>
         </>
-      ) : (
-        <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4">
-          Crie sua conta com e-mail e senha — leva 10 segundos.
-        </p>
-      )}
+      ) : null}
 
       <form onSubmit={submit} className="space-y-3">
-        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
-        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
+        <Input type="email" inputMode="email" enterKeyHint="next" placeholder="Seu melhor e-mail" value={email} onFocus={() => trackFocus("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
+        <div className="relative">
+          <Input type={showPassword ? "text" : "password"} enterKeyHint="go" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={() => trackFocus("password")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12 pr-11" />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+          >
+            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Salvar meu plano <ArrowRight className="w-4 h-4" /></>}
         </Button>
+        <p className="text-[12px] text-muted-foreground text-center">⚡ Leva 10 segundos · sem cartão, sem cobrança</p>
         {existingAccount && (
           <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
             Esqueci minha senha

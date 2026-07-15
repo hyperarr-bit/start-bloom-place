@@ -309,7 +309,7 @@ function FragmentRows({
           {c.sales}
           {c.sales > 0 && (
             <span className="block text-[10px] text-muted-foreground">
-              {c.sales_lifetime}×27,90{c.sales_downsell > 0 ? ` + ${c.sales_downsell}×14,90` : ""}
+              {c.sales_lifetime} cheio{c.sales_downsell > 0 ? ` + ${c.sales_downsell} oferta` : ""}
             </span>
           )}
         </td>

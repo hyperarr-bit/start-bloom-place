@@ -9,7 +9,8 @@ import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
  * Por quê: dias 12-13 tiveram ~25 cliques no anual e 0 vendas no checkout
  * HOSPEDADO da Cakto (caixa-preta). Aqui a gente vê cada erro no log.
  *
- * Modelo: acesso VITALÍCIO R$27,90 · downsell R$14,90 (pagamento único).
+ * Modelo: acesso VITALÍCIO R$27,90 · downsell R$19,90 (pagamento único;
+ * o valor cobrado vem da OFERTA na Cakto — 14,90 até 15/07).
  * O preço mora na OFERTA da Cakto (items[0].offerId) — offer IDs e
  * credenciais são secrets, nunca código.
  *

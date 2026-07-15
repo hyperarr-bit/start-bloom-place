@@ -23,7 +23,7 @@ export type PixOffer = "lifetime" | "downsell";
 
 export const PIX_PRICES: Record<PixOffer, string> = {
   lifetime: "27,90",
-  downsell: "14,90",
+  downsell: "19,90", // 15/07: subiu de 14,90 (o valor cobrado vem da OFERTA na Cakto)
 };
 
 interface Props {

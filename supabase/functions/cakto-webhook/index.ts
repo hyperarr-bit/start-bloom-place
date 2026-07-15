@@ -246,6 +246,10 @@ serve(async (req) => {
 
       // NOTA: as colunas abacatepay_* são legadas — reutilizadas para os IDs da
       // Cakto para não exigir migration (são apenas texto de referência/match).
+      // 15/07: amount_cents = valor REAL pago (fonte da receita no admin; o
+      // preço do downsell mudou de 14,90→19,90 e chumbado em SQL quebraria o
+      // histórico).
+      const paidAmount = Number(data.amount ?? 0);
       const payload = {
         user_id: userId,
         status: "active",
@@ -257,6 +261,7 @@ serve(async (req) => {
         customer_email: customerEmail,
         current_period_start: now.toISOString(),
         current_period_end: periodEnd.toISOString(),
+        ...(paidAmount > 0 ? { amount_cents: Math.round(paidAmount * 100) } : {}),
       };
 
       const { data: updated, error: updateError } = await supabaseClient
@@ -397,17 +402,17 @@ serve(async (req) => {
           if (hit) utm = pick(hit.event_data);
         }
 
-        // Valor: data.amount é a fonte (27.9 lifetime | 14.9 downsell); sem ele,
-        // deduz pelo offer id do downsell.
+        // Valor: data.amount é a fonte (27.9 lifetime | 19.9 downsell desde
+        // 15/07); sem ele, deduz pelo offer id do downsell.
         const amountNum = Number(data.amount ?? offer.price ?? 0);
         const isDownsell = offerId === DOWNSELL_OFFER.toLowerCase();
         const priceInCents = amountNum > 0
           ? Math.round(amountNum * 100)
-          : (isDownsell ? 1490 : 2790);
+          : (isDownsell ? 1990 : 2790);
 
         const nowStamp = utcStamp(new Date());
         const productName = billingPeriod === "lifetime"
-          ? (isDownsell || priceInCents <= 1490 ? "CORE Vitalício (oferta)" : "CORE Vitalício")
+          ? (isDownsell || priceInCents < 2790 ? "CORE Vitalício (oferta)" : "CORE Vitalício")
           : "CORE Pro";
 
         const payload = {

@@ -18,7 +18,9 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
  * Usado em 2 contextos:
  *   - "funnel": passo `offer` do /comecar (depois do cadastro)
  *   - "app": gate de quem entrou sem pagar (TrialBanner, contas sem trial)
- * Exit (voltar do celular ou X) → roleta → downsell: VITALÍCIO R$14,90.
+ * Exit (voltar do celular ou X) → roleta → downsell: VITALÍCIO R$19,90 —
+ * exceto quem já clicou em comprar os 27,90 (alta intenção): esses caem na
+ * HoldScreen (reserva do preço cheio, sem desconto).
  * Compra acontece DENTRO do app (PixCheckout — QR + copia-e-cola + polling);
  * não existe mais redirect pra checkout externo.
  * Tudo interno: quem usa só renderiza <PaywallFlow context=... />.
@@ -30,8 +32,21 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
 const PRICING = {
   lifetime: { total: "27,90" },
-  downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
+  downsell: { total: "19,90" }, // prêmio da roleta (15/07: subiu de 14,90)
   anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
+};
+
+/** Alta intenção = clicou em comprar os 27,90 nesta sessão. Autópsia de 14/07:
+ *  12 de 34 compradores do downsell tinham clicado no CTA cheio (3 com QR de
+ *  27,90 GERADO) antes de levar 47% de desconto — o fluxo premiava abandono de
+ *  checkout. Quem tem intenção não vê mais roleta: vê a reserva (HoldScreen).
+ *  Quem ia embora sem tocar em nada segue caindo no downsell normalmente. */
+const INTENT_KEY = "core-paywall-lifetime-intent";
+const hasLifetimeIntent = () => {
+  try { return sessionStorage.getItem(INTENT_KEY) === "1"; } catch { return false; }
+};
+const markLifetimeIntent = () => {
+  try { sessionStorage.setItem(INTENT_KEY, "1"); } catch { /* noop */ }
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -58,10 +73,11 @@ const LIGHT_VARS = {
 /** Sinal de intenção de compra + abre o Pix in-app. A Compra (Purchase) em si
  *  continua server-side (CAPI da Cakto via webhook). */
 function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: PixOffer) => void) {
+  if (offer === "lifetime") markLifetimeIntent();
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 27.9 : 14.9,
+    value: offer === "lifetime" ? 27.9 : 19.9,
     currency: "BRL",
   });
   open(offer);
@@ -452,6 +468,9 @@ function OfferScreen({
 
   // Quem para de interagir na oferta ia embora sem ver a roleta (fechar a aba
   // não dispara popstate). 40s parado → banner-presente que leva pro downsell.
+  // EXCETO alta intenção: caso real de 14/07 — vazgiovannavaz48 clicou no CTA
+  // de 27,90, o gift apareceu por cima e ela fechou em 14,90. Quem já clicou
+  // em comprar não ganha banner de desconto (a parada dela é o checkout/QR).
   useEffect(() => {
     let idle: ReturnType<typeof setTimeout>;
     let fired = false;
@@ -459,6 +478,7 @@ function OfferScreen({
       if (fired) return;
       clearTimeout(idle);
       idle = setTimeout(() => {
+        if (hasLifetimeIntent()) { arm(); return; } // re-arma: intenção pode chegar a qualquer momento
         fired = true;
         setShowGift(true);
         trackEvent("funnel_view", { step: "idle_gift" });
@@ -660,6 +680,95 @@ function DownsellScreen({ context, onDismiss, onBuy }: { context: "funnel" | "ap
   );
 }
 
+/* ----------------------------------------------------------------- hold */
+
+/** Escape de quem JÁ clicou em comprar os 27,90: nada de roleta/desconto —
+ *  a compra dela está "reservada". Segura o preço cheio com urgência honesta
+ *  (a reserva é a própria sessão) e o caminho de volta pro Pix a 1 toque. */
+function HoldScreen({ context, onDismiss, onBuy }: { context: "funnel" | "app"; onDismiss: () => void; onBuy: (o: PixOffer) => void }) {
+  const [secondsLeft, setSecondsLeft] = useState(10 * 60);
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+
+  useEffect(() => {
+    const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    // voltar de novo = quer sair mesmo → app (bloqueado), sem beco sem saída
+    window.history.pushState({ paywallHold: true }, "");
+    const onPop = () => dismissRef.current();
+    window.addEventListener("popstate", onPop);
+    return () => { clearInterval(t); window.removeEventListener("popstate", onPop); };
+  }, []);
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+
+  const dismiss = () => {
+    trackEvent("funnel_click", { cta: "hold_dismiss", context });
+    onDismiss();
+  };
+
+  return (
+    <div className="w-full max-w-sm mx-auto text-center pt-10 pb-10">
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 220, damping: 14 }}
+        className="w-16 h-16 rounded-2xl bg-accent text-accent-foreground grid place-items-center mx-auto mb-4 shadow-[0_10px_30px_-6px_hsl(var(--accent)/0.6)]"
+      >
+        <ShieldCheck className="w-8 h-8" />
+      </motion.div>
+      <motion.div {...stagger(0)} className="inline-flex items-center px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-bold tracking-wide mb-3">
+        ACESSO RESERVADO
+      </motion.div>
+      <motion.h2 {...stagger(1)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
+        Seguramos sua vaga<br />no <span className="text-accent">vitalício</span>
+      </motion.h2>
+      <motion.p {...stagger(2)} className="text-muted-foreground text-sm leading-relaxed mb-4">
+        Seu acesso por R$ {PRICING.lifetime.total} está reservado — pagamento único no Pix, seu pra sempre.
+      </motion.p>
+
+      <motion.div {...stagger(3)} className="inline-flex items-center gap-1.5 text-[13px] font-bold tabular-nums text-accent bg-accent/10 rounded-full px-4 py-1.5 mb-5">
+        ⏳ Reserva expira em {mm}:{ss}
+      </motion.div>
+
+      <motion.div {...stagger(4)} className="rounded-2xl border-2 border-accent bg-accent/[0.04] p-4 mb-3 text-left shadow-[0_10px_34px_-12px_hsl(var(--accent)/0.5)]">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="font-bold text-[15px]">CORE Vitalício</div>
+            <div className="text-[11px] text-muted-foreground">Todos os 16 módulos · pagamento único no Pix</div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-[11px] text-muted-foreground line-through">R$ {PRICING.anchor}</div>
+            <div className="font-extrabold text-2xl leading-none text-accent">
+              R$ {PRICING.lifetime.total}
+            </div>
+          </div>
+        </div>
+        <Button
+          size="lg"
+          className="w-full h-[52px] text-base font-bold mt-3 rounded-full"
+          onClick={() => openPixIntent("lifetime", "hold_continue", context, onBuy)}
+        >
+          Finalizar minha compra <ArrowRight className="w-4 h-4" />
+        </Button>
+      </motion.div>
+
+      <motion.div {...stagger(5)}>
+        <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5 justify-center mb-5">
+          <ShieldCheck className="w-3.5 h-3.5" /> Garantia de 7 dias · Pix na hora · sem mensalidade
+        </p>
+        <div>
+          <button
+            onClick={dismiss}
+            className="text-xs text-muted-foreground/70 underline underline-offset-2 hover:text-muted-foreground transition-colors"
+          >
+            Deixar pra depois
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ flow */
 
 export function PaywallFlow({
@@ -670,7 +779,7 @@ export function PaywallFlow({
   answers?: Record<string, string>;
 }) {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState<"offer" | "wheel" | "downsell">("offer");
+  const [phase, setPhase] = useState<"offer" | "wheel" | "downsell" | "hold">("offer");
   // Pix in-app: quando setado, o overlay PixCheckout cobre o paywall.
   // (O antigo "resgate do checkout_return" morreu junto com o redirect —
   // ninguém mais SAI do app pra pagar.)
@@ -704,27 +813,35 @@ export function PaywallFlow({
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
             {phase === "offer" && (
-              <OfferScreen context={context} answers={quiz} onEscape={() => setPhase("wheel")} onBuy={setPixOffer} />
+              <OfferScreen
+                context={context}
+                answers={quiz}
+                // Alta intenção (clicou nos 27,90) → reserva, sem desconto.
+                // Quem ia embora sem tocar em nada → roleta/downsell, como antes.
+                onEscape={() => setPhase(hasLifetimeIntent() ? "hold" : "wheel")}
+                onBuy={setPixOffer}
+              />
             )}
             {phase === "wheel" && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">
-                <WinbackWheel attemptId={null} prizeLabel="VITALÍCIO R$14,90" onSpinComplete={() => setPhase("downsell")} />
+                <WinbackWheel attemptId={null} prizeLabel={`VITALÍCIO R$${PRICING.downsell.total}`} onSpinComplete={() => setPhase("downsell")} />
               </div>
             )}
-            {phase === "downsell" && (
+            {(phase === "downsell" || phase === "hold") && (
               <div className="min-h-dvh grid place-items-center">
-                <DownsellScreen
-                  context={context}
-                  onBuy={setPixOffer}
-                  // Recusou o downsell: no funil entra no app (bloqueado) — na
-                  // ÁREA que escolheu, se veio do funil vitrine; no gate in-app
-                  // volta pra oferta (continua bloqueado).
-                  onDismiss={() => {
+                {(() => {
+                  // Recusou (downsell ou reserva): no funil entra no app
+                  // (bloqueado) — na ÁREA que escolheu, se veio do funil
+                  // vitrine; no gate in-app volta pra oferta (continua preso).
+                  const onDismiss = () => {
                     if (context !== "funnel") { setPhase("offer"); return; }
                     const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
                     navigate(`/${AREAS[a].module}`);
-                  }}
-                />
+                  };
+                  return phase === "hold"
+                    ? <HoldScreen context={context} onBuy={setPixOffer} onDismiss={onDismiss} />
+                    : <DownsellScreen context={context} onBuy={setPixOffer} onDismiss={onDismiss} />;
+                })()}
               </div>
             )}
           </motion.div>

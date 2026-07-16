@@ -1146,9 +1146,10 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
-        <span className="fv2-app-selo">Dados de exemplo</span>
         {/* miniatura proporcional: o app renderiza a 390px (largura de celular
-            real) e é escalado — print perfeito, sem nada espremido/cortado */}
+            real) e é escalado — print perfeito, sem nada espremido/cortado.
+            Sem selo "dados de exemplo": o balão logo acima já diz isso, e o
+            carimbo preto cobria o header do app (decisão do dono 16/07). */}
         <iframe
           key={mod}
           src={`/preview/${mod}?embed=v2`}
@@ -1200,11 +1201,6 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
                 fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 16px rgba(23,17,28,.22)",
               }}
             >✕</button>
-            <span style={{
-              position: "fixed", top: 16, right: 12, zIndex: 32,
-              background: "var(--tinta)", color: "#fff", fontSize: 10.5, fontWeight: 800,
-              letterSpacing: ".06em", textTransform: "uppercase", borderRadius: 999, padding: "5px 11px",
-            }}>Dados de exemplo</span>
             <div style={{
               position: "fixed", left: 0, right: 0, bottom: "max(14px, env(safe-area-inset-bottom))",
               zIndex: 32, display: "flex", justifyContent: "center", pointerEvents: "none",

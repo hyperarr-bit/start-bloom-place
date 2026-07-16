@@ -8,7 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
-import { AREAS, type AreaKey, ALL_MODULE_ICONS } from "@/lib/funnel";
+import {
+  AREAS, AREA_TRACKS, AREA_PROOF, AREA_ANCHOR, DOOR_AREAS,
+  type AreaKey, type QuizQ, type QuizOpt, ALL_MODULE_ICONS,
+} from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
 import { Polvo, PolvoAvatar, PolvoEspiando, TentaculoGigante, type PolvoMood } from "./Polvo";
@@ -66,6 +69,152 @@ const Q_VITORIA: Opt[] = [
   { emoji: "🐷", label: "Guardar os primeiros R$ 100", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
   { emoji: "📈", label: "Fechar a semana no azul", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
 ];
+
+// ------------------------------------------------------- trilhas por área
+// As PERGUNTAS são as mesmas do funil atual (AREA_TRACKS em lib/funnel.ts) —
+// aqui elas só ganham a mecânica v2: reação do polvo pra cada resposta.
+// Dinheiro segue com Q_DOR/Q_CONTROLE/Q_VITORIA acima, intocados.
+
+const REACOES: Record<string, { reacao: string; mood?: PolvoMood }> = {
+  // rotina — atrapalha
+  "Acordo sem plano nenhum": { reacao: "Dia sem plano vira dia dos outros. Bora devolver ele pra você." },
+  "Perco horas no celular": { reacao: "O celular é projetado pra ganhar de você. Precisa de um sistema do SEU lado." },
+  "Começo mil coisas e não termino": { reacao: "Começar você já sabe. Falta quem cobre o fim — deixa comigo." },
+  "Esqueço tarefas e compromissos": { reacao: "Sua cabeça não nasceu pra ser agenda. Deixa a memória comigo." },
+  // rotina — consistência
+  "Uns 3 dias": { reacao: "3 dias é exatamente onde a maioria quebra. Não é defeito seu — é falta de sistema.", mood: "serio" },
+  "Uma semana": { reacao: "Uma semana na raça. Imagina com um painel marcando por você." },
+  "Um mês, aí largo": { reacao: "Um mês prova que você consegue. Faltou o que segura o mês 2." },
+  "Nunca consegui manter": { reacao: "Então hoje é a primeira vez com o jeito certo. Anotado.", mood: "serio" },
+  // corpo — atrapalha
+  "Começo a treinar e desisto": { reacao: "Desistir no escuro é fácil. Com o progresso na sua cara, fica difícil." },
+  "Como mal e nem percebo": { reacao: "O 'nem percebo' é o vilão. A gente vai dar rosto pra ele." },
+  "Não tenho plano de treino nem dieta": { reacao: "Esforço sem plano vaza. Vamos montar o seu." },
+  "Falta constância, não vontade": { reacao: "Exato. Vontade você tem — o que falta é sistema. Isso eu resolvo." },
+  // corpo — consistência
+  "Essa vai ser a primeira": { reacao: "Primeira vez já com sistema. Você começa na frente de quase todo mundo." },
+  "Umas 2 ou 3": { reacao: "Cada recomeço custou energia. Esse vai ser o último." },
+  "Perdi a conta": { reacao: "Perdeu a conta porque nunca teve onde contar. A gente conserta isso.", mood: "serio" },
+  "Tô na ativa, mas sem controle": { reacao: "Treinando no escuro. Bora acender a luz." },
+  // saude — negligência
+  "Beber água": { reacao: "O mais simples é o que mais se esquece. Lembrete no lugar certo resolve." },
+  "Dormir direito": { reacao: "Sono ruim cobra o dia inteiro. Vamos cuidar dele primeiro." },
+  "Vitaminas e remédios na hora": { reacao: "Hora certa não é memória — é sistema. Deixa comigo." },
+  "Exames e check-ups": { reacao: "Adiar exame é apostar contra você. A gente marca e lembra." },
+  "Um pouco de tudo": { reacao: "Normal. A gente começa pelo que muda seu dia mais rápido." },
+  // saude — avisos do corpo
+  "Cansaço o dia todo": { reacao: "Cansaço constante é o corpo pedindo sistema, não café.", mood: "serio" },
+  "Sono ruim": { reacao: "Sono ruim derruba todo o resto. Ele vira prioridade no seu painel.", mood: "serio" },
+  "Ansiedade e estresse": { reacao: "Rotina caótica alimenta isso. Ordem que você VÊ acalma.", mood: "serio" },
+  "Tô bem — quero prevenir": { reacao: "A melhor hora de cuidar é antes de precisar. Respeito." },
+  // metas — atrapalha
+  "Ficam na cabeça, nunca no papel": { reacao: "Meta na cabeça a vida engole. A gente tira ela de lá hoje." },
+  "Empolgo em janeiro, esqueço em março": { reacao: "Empolgação você tem. Falta o plano que sobrevive a março." },
+  "Tenho tantas que não sei por onde começar": { reacao: "Excesso de meta também paralisa. Vamos escolher UMA." },
+  "Sinto que não saio do lugar": { reacao: "Andar sem medir parece não sair do lugar. Vamos medir.", mood: "serio" },
+  // metas — consistência
+  "Surgiu agora": { reacao: "Recém-nascida. A melhor hora de dar um plano pra ela." },
+  "Uns meses": { reacao: "Meses na fila de espera. Hoje ela sai." },
+  "Mais de um ano": { reacao: "Um ano esperando. Não é falta de capacidade — é falta de plano visível.", mood: "serio" },
+  "Anos… nem conto mais": { reacao: "Anos olhando ela de longe. Hoje a distância começa a cair.", mood: "serio" },
+  // comum às trilhas (última opção do "atrapalha")
+  "Quero organizar tudo": { reacao: "Tudo de uma vez trava. A gente começa por UM ponto — ele puxa o resto." },
+};
+
+const REACAO_VITORIA = "Anotado. Essa é a primeira coisa que a sua central resolve.";
+
+const comReacao = (opts: QuizOpt[]): Opt[] =>
+  opts.map((o) => ({ ...o, reacao: REACOES[o.label]?.reacao ?? "Anotado.", mood: REACOES[o.label]?.mood }));
+
+const deKey = (arr: QuizQ[], key: string): QuizQ => arr.find((x) => x.key === key) ?? arr[0];
+
+type TrilhaV2 = { dorQ: string; dorOpts: Opt[]; consistQ: string; consistOpts: Opt[]; vitoriaOpts: Opt[] };
+
+function trilhaDe(area: AreaKey): TrilhaV2 {
+  if (area === "dinheiro") {
+    return {
+      dorQ: "O que mais te atrapalha hoje?", dorOpts: Q_DOR,
+      consistQ: "Como você tenta controlar hoje?", consistOpts: Q_CONTROLE,
+      vitoriaOpts: Q_VITORIA,
+    };
+  }
+  const t = AREA_TRACKS[area];
+  const atrapalha = deKey(t, "atrapalha");
+  const consistencia = deKey(t, "consistencia");
+  const vitoria = deKey(t, "vitoria");
+  return {
+    dorQ: atrapalha.q, dorOpts: comReacao(atrapalha.opts),
+    consistQ: consistencia.q, consistOpts: comReacao(consistencia.opts),
+    vitoriaOpts: vitoria.opts.map((o) => ({ ...o, reacao: REACAO_VITORIA })),
+  };
+}
+
+// copy por área nas telas fixas (dinheiro mantém a copy original)
+const OLHO_AREA: Record<AreaKey, string> = {
+  dinheiro: "Eu te mostro o vazamento em tempo real.",
+  rotina: "Eu te mostro seu dia inteiro num painel só.",
+  corpo: "Eu te mostro treino, dieta e progresso lado a lado.",
+  saude: "Eu te mostro água, sono e remédios num painel só.",
+  metas: "Eu te mostro sua meta virando passos com data.",
+};
+
+const FATO_HARKIN = "🎓 138 estudos (APA, 2016): registrar progresso é o maior preditor de meta atingida.";
+
+const FATOS_AREA: Record<AreaKey, string[]> = {
+  dinheiro: [
+    FATO_HARKIN,
+    "🔎 A maioria só descobre assinatura esquecida quando alguém mostra o extrato.",
+    "⚡ Multa e juros de conta atrasada são o gasto mais fácil de zerar: basta ser avisado antes.",
+  ],
+  rotina: [
+    FATO_HARKIN,
+    "🔥 Quem mantém 100 dias de streak não é mais disciplinado que você — só tem onde marcar.",
+    "📅 Painel que mostra o dia inteiro tira a decisão mais cansativa: \"o que eu faço agora?\"",
+  ],
+  corpo: [
+    FATO_HARKIN,
+    "🏋️ Quase ninguém desiste do treino — desiste de treinar no escuro, sem ver progresso.",
+    "🥗 Treino e dieta no mesmo lugar é uma decisão a menos por dia. E decisão cansa.",
+  ],
+  saude: [
+    FATO_HARKIN,
+    "💧 Água, sono e vitaminas na hora certa: pequenos cuidados que juntos mudam o dia inteiro.",
+    "🛡️ Corpo avisado cedo cobra barato. Avisado tarde, cobra caro.",
+  ],
+  metas: [
+    FATO_HARKIN,
+    "🗺️ Meta sem plano visível é só um desejo fazendo aniversário.",
+    "✅ Um primeiro passo pequeno vale mais que um plano perfeito que nunca sai da cabeça.",
+  ],
+};
+
+const ATIVACAO_AREA: Record<AreaKey, string[]> = {
+  dinheiro: [
+    "Registra seu primeiro gasto REAL (não o de exemplo)",
+    "Liga o lembrete das suas contas — 2 toques",
+    "Amanhã: 5 minutos. Eu te chamo. 🤝",
+  ],
+  rotina: [
+    "Marca sua primeira tarefa REAL de amanhã",
+    "Liga os lembretes do seu dia — 2 toques",
+    "Amanhã: 5 minutos. Eu te chamo. 🤝",
+  ],
+  corpo: [
+    "Registra o treino de hoje (ou monta o de amanhã)",
+    "Deixa a refeição de amanhã já decidida — 2 toques",
+    "Amanhã: 5 minutos. Eu te chamo. 🤝",
+  ],
+  saude: [
+    "Registra sua água de hoje — leva 5 segundos",
+    "Liga o lembrete das vitaminas — 2 toques",
+    "Amanhã: 5 minutos. Eu te chamo. 🤝",
+  ],
+  metas: [
+    "Escreve sua meta como ela é DE VERDADE",
+    "Quebra ela no primeiro passo de amanhã",
+    "Amanhã: 5 minutos. Eu te chamo. 🤝",
+  ],
+};
 
 const LS_KEY = "fv2-state";
 
@@ -127,29 +276,47 @@ export default function ComecarV2() {
   const [step, setStep] = useState<StepId>(passoUrl ?? (ORDEM.includes(salvo.step) ? salvo.step : "t1"));
   const [area, setArea] = useState<AreaKey | null>(salvo.area ?? null);
   const [dor, setDor] = useState<string | null>(salvo.dor ?? null);
+  const [consist, setConsist] = useState<string | null>(salvo.consist ?? null);
   const [estim, setEstim] = useState<number>(salvo.estim ?? 300);
   const [vitoria, setVitoria] = useState<string | null>(salvo.vitoria ?? null);
   const [gastoTeste, setGastoTeste] = useState<number | null>(salvo.gastoTeste ?? null);
   const [pixAberto, setPixAberto] = useState(false);
 
-  const idx = ORDEM.indexOf(step);
-  const progresso = Math.round((idx / (ORDEM.length - 1)) * 100);
-  const areaInfo = area ? AREAS[area] : AREAS.dinheiro;
+  // trilha da área escolhida (perguntas idênticas às do funil atual) e a
+  // ordem dela: fora de dinheiro não existe T5 (roda de R$) — o pico T6 vem
+  // direto da trilha (AREA_PROOF), como no funil atual.
+  const areaKey: AreaKey = area ?? "dinheiro";
+  const trilha = useMemo(() => trilhaDe(areaKey), [areaKey]);
+  const ordem = useMemo(() => (areaKey === "dinheiro" ? ORDEM : ORDEM.filter((s) => s !== "t5")), [areaKey]);
+
+  const idx = Math.max(0, ordem.indexOf(step));
+  const progresso = Math.round((idx / (ordem.length - 1)) * 100);
+  const areaInfo = AREAS[areaKey];
 
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, area, dor, estim, vitoria, gastoTeste })); } catch { /* noop */ }
-  }, [step, area, dor, estim, vitoria, gastoTeste]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, area, dor, consist, estim, vitoria, gastoTeste })); } catch { /* noop */ }
+  }, [step, area, dor, consist, estim, vitoria, gastoTeste]);
 
   useEffect(() => { track("funnel_v2_step", { step, idx }); }, [step, idx]);
   useEffect(() => { track("funnel_v2_start"); }, []);
 
   const avancar = useCallback(() => {
-    setStep((s) => ORDEM[Math.min(ORDEM.indexOf(s) + 1, ORDEM.length - 1)]);
+    setStep((s) => {
+      // s pode não existir na ordem da trilha (ex.: t5 salvo antes da troca de
+      // área) — cai pro vizinho válido em vez de travar
+      const i = ordem.indexOf(s);
+      const base = i === -1 ? ordem.indexOf("t4") : i;
+      return ordem[Math.min(base + 1, ordem.length - 1)];
+    });
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [ordem]);
   const voltar = useCallback(() => {
-    setStep((s) => ORDEM[Math.max(ORDEM.indexOf(s) - 1, 0)]);
-  }, []);
+    setStep((s) => {
+      const i = ordem.indexOf(s);
+      const base = i === -1 ? ordem.indexOf("t6") : i;
+      return ordem[Math.max(base - 1, 0)];
+    });
+  }, [ordem]);
   const irPara = useCallback((s: StepId) => { setStep(s); window.scrollTo({ top: 0 }); }, []);
 
   // T16: abre o Pix real ao entrar (só logado — o guest nunca chega aqui sem T15)
@@ -179,21 +346,21 @@ export default function ComecarV2() {
         <AnimatePresence mode="wait">
           <motion.div key={step} {...passoAnim} style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
 
-            {step === "t1" && <T1Hero onEscolher={(k) => { setArea(k); track("funnel_v2_area", { area: k }); avancar(); }} />}
+            {step === "t1" && <T1Hero onEscolher={(k, porta) => { setArea(k); track("funnel_v2_area", { area: k, porta: porta ?? k }); avancar(); }} />}
 
             {step === "t2" && (
               <QuizVivo
-                pergunta="O que mais te atrapalha hoje?"
-                opts={Q_DOR}
-                onDone={(o) => { setDor(o.label); track("funnel_v2_answer", { q: "dor", opt: o.label }); avancar(); }}
+                pergunta={trilha.dorQ}
+                opts={trilha.dorOpts}
+                onDone={(o) => { setDor(o.label); track("funnel_v2_answer", { q: "dor", area: areaKey, opt: o.label }); avancar(); }}
               />
             )}
 
             {step === "t3" && (
               <QuizVivo
-                pergunta="Como você tenta controlar hoje?"
-                opts={Q_CONTROLE}
-                onDone={(o) => { track("funnel_v2_answer", { q: "controle", opt: o.label }); avancar(); }}
+                pergunta={trilha.consistQ}
+                opts={trilha.consistOpts}
+                onDone={(o) => { setConsist(o.label); track("funnel_v2_answer", { q: "controle", area: areaKey, opt: o.label }); avancar(); }}
               />
             )}
 
@@ -205,21 +372,23 @@ export default function ComecarV2() {
               />
             )}
 
-            {step === "t6" && <T6Perda estim={estim} onContinuar={avancar} />}
+            {step === "t6" && (areaKey === "dinheiro"
+              ? <T6Perda estim={estim} onContinuar={avancar} />
+              : <T6PicoArea area={areaKey} consist={consist} onContinuar={avancar} />)}
 
-            {step === "t7" && <T7Metodo onContinuar={avancar} />}
+            {step === "t7" && <T7Metodo area={areaKey} onContinuar={avancar} />}
 
             {step === "t8" && <T8Pacto onFechado={() => { track("funnel_v2_pact"); avancar(); }} />}
 
             {step === "t9" && (
               <QuizVivo
                 pergunta="Qual seria uma vitória real nos próximos 7 dias?"
-                opts={Q_VITORIA}
-                onDone={(o) => { setVitoria(o.label); track("funnel_v2_answer", { q: "vitoria", opt: o.label }); avancar(); }}
+                opts={trilha.vitoriaOpts}
+                onDone={(o) => { setVitoria(o.label); track("funnel_v2_answer", { q: "vitoria", area: areaKey, opt: o.label }); avancar(); }}
               />
             )}
 
-            {step === "t10" && <T10Loading areaNome={areaInfo.nome} onPronto={avancar} />}
+            {step === "t10" && <T10Loading area={areaKey} areaNome={areaInfo.nome} onPronto={avancar} />}
 
             {step === "t11" && <T11Mapa area={area ?? "dinheiro"} areaNome={areaInfo.nome} onContinuar={avancar} />}
 
@@ -255,11 +424,12 @@ export default function ComecarV2() {
             )}
 
             {step === "t17" && (
-              <T17Ativacao areaModule={areaInfo.module} areaNome={areaInfo.nome} vitoria={vitoria} />
+              <T17Ativacao area={areaKey} areaModule={areaInfo.module} areaNome={areaInfo.nome} vitoria={vitoria} />
             )}
 
             {step === "t14" && (
               <T14Paywall
+                area={areaKey}
                 estim={estim}
                 vitoria={vitoria}
                 areaNome={areaInfo.nome}
@@ -282,7 +452,7 @@ export default function ComecarV2() {
 
 // ---------------------------------------------------------------- T1 — hero + porta
 
-function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey) => void }) {
+function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => void }) {
   return (
     <>
       {/* cena-colagem: card do módulo (fundo) → tag número-herói → polvo (frente) */}
@@ -339,7 +509,10 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey) => void }) {
         Escolhe por onde a gente começa:
       </p>
       <div className="fv2-opcoes">
-        {EIXOS.map((k, i) => (
+        {/* mesma porta do funil atual: 4 áreas (saúde fica fora da porta,
+            mas viva no radar/trilha) + "Tudo" caindo na trilha que mais
+            converte (dinheiro) */}
+        {DOOR_AREAS.map((k, i) => (
           <motion.button
             key={k}
             className="fv2-opcao"
@@ -357,8 +530,8 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey) => void }) {
           className="fv2-opcao"
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 + EIXOS.length * 0.06 }}
-          onClick={() => onEscolher("dinheiro")}
+          transition={{ delay: 0.55 + DOOR_AREAS.length * 0.06 }}
+          onClick={() => onEscolher("dinheiro", "tudo")}
         >
           <span className="emo">😵‍💫</span>
           Tudo, sinceramente
@@ -571,12 +744,75 @@ function T6Perda({ estim, onContinuar }: { estim: number; onContinuar: () => voi
   );
 }
 
+// ------------------------------------------- T6 (áreas) — pico da trilha
+// Fora de dinheiro não tem taxímetro: o pico é o da trilha do funil atual
+// (AREA_PROOF) — eco da resposta de consistência + reframe + card, no mesmo
+// wash coral cor-cheia e com o mesmo polvo cortado embaixo.
+
+function T6PicoArea({ area, consist, onContinuar }: {
+  area: Exclude<AreaKey, "dinheiro">; consist: string | null; onContinuar: () => void;
+}) {
+  const proof = AREA_PROOF[area];
+  const echo = consist ? proof.echo[consist] : undefined;
+  const branco = { color: "#fff" };
+
+  return (
+    <>
+      {/* espaços flexíveis acima e abaixo centralizam o bloco de texto —
+          o conteúdo aqui é mais curto que o taxímetro de dinheiro */}
+      <div style={{ flex: 1 }} />
+      {echo && (
+        <motion.p
+          className="fv2-sub"
+          style={{ ...branco, opacity: 0.9, textAlign: "center", margin: "10px auto 2px", fontWeight: 700 }}
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 0.9, y: 0 }}
+        >
+          {echo}
+        </motion.p>
+      )}
+      <motion.h1
+        className="fv2-display"
+        style={{ ...branco, textAlign: "center", fontSize: 29, margin: "10px 0 4px" }}
+        initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.35, type: "spring", stiffness: 260, damping: 20 }}
+      >
+        {proof.reframe}
+      </motion.h1>
+      <motion.div
+        className="fv2-card"
+        style={{ margin: "12px 0 0", fontSize: 14.5, fontWeight: 600, lineHeight: 1.55 }}
+        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.9 }}
+      >
+        {proof.card}
+      </motion.div>
+      <div style={{ flex: 1.2 }} />
+      {/* polvo sério GRANDE, cortado pela borda de baixo (mesma cena do taxímetro) */}
+      <div style={{ display: "flex", justifyContent: "center", overflow: "hidden", height: 150 }}>
+        <motion.div
+          initial={{ y: 90 }} animate={{ y: 26 }}
+          transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 22 }}
+        >
+          <Polvo mood="serio" size={220} />
+        </motion.div>
+      </div>
+      <div className="fv2-rodape" style={{ marginTop: 0, paddingTop: 12 }}>
+        <button
+          className="fv2-cta"
+          style={{ background: "#fff", color: "var(--tinta)" }}
+          onClick={onContinuar}
+        >{proof.cta} →</button>
+      </div>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- T7 — método
 
-function T7Metodo({ onContinuar }: { onContinuar: () => void }) {
+function T7Metodo({ area, onContinuar }: { area: AreaKey; onContinuar: () => void }) {
   const cards = [
     { emoji: "🗂️", txt: "Joga tudo aqui dentro.", rot: -3 },
-    { emoji: "👁️", txt: "Eu te mostro o vazamento em tempo real.", rot: 2.5 },
+    { emoji: "👁️", txt: OLHO_AREA[area], rot: 2.5 },
     { emoji: "⏱️", txt: "5 min por dia seguram tudo.", rot: -2 },
   ];
   return (
@@ -669,13 +905,8 @@ function T8Pacto({ onFechado }: { onFechado: () => void }) {
 
 // ---------------------------------------------------------------- T10 — loading teatral
 
-const FATOS = [
-  "🎓 138 estudos (APA, 2016): registrar progresso é o maior preditor de meta atingida.",
-  "🔎 A maioria só descobre assinatura esquecida quando alguém mostra o extrato.",
-  "⚡ Multa e juros de conta atrasada são o gasto mais fácil de zerar: basta ser avisado antes.",
-];
-
-function T10Loading({ areaNome, onPronto }: { areaNome: string; onPronto: () => void }) {
+function T10Loading({ area, areaNome, onPronto }: { area: AreaKey; areaNome: string; onPronto: () => void }) {
+  const fatos = FATOS_AREA[area];
   const [pct, setPct] = useState(0);
   const [fato, setFato] = useState(0);
   const feito = useRef(false);
@@ -689,9 +920,9 @@ function T10Loading({ areaNome, onPronto }: { areaNome: string; onPronto: () => 
   }, [onPronto]);
 
   useEffect(() => {
-    const t = setInterval(() => setFato((i) => (i + 1) % FATOS.length), 2100);
+    const t = setInterval(() => setFato((i) => (i + 1) % fatos.length), 2100);
     return () => clearInterval(t);
-  }, []);
+  }, [fatos.length]);
 
   const etapas: Array<[string, number]> = [
     [`Ligando o módulo ${areaNome}`, 40],
@@ -724,7 +955,7 @@ function T10Loading({ areaNome, onPronto }: { areaNome: string; onPronto: () => 
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.25 }}
         >
-          {FATOS[fato]}
+          {fatos[fato]}
         </motion.div>
       </AnimatePresence>
     </>
@@ -864,7 +1095,9 @@ function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
   const pHoje = radarPts(hoje, 40, 60, 52);
   const recap = [
     `🗺️ Seu mapa: ${areaNome} foi onde mais doeu`,
-    gastoTeste ? `✍️ Você registrou R$ ${brl(gastoTeste)} em 6 segundos` : "✍️ Sua central já calcula tudo sozinha",
+    area === "dinheiro"
+      ? (gastoTeste ? `✍️ Você registrou R$ ${brl(gastoTeste)} em 6 segundos` : "✍️ Sua central já calcula tudo sozinha")
+      : `✍️ Você mexeu no módulo ${areaNome} de verdade — não era maquete`,
     vitoria ? `🎯 Sua missão escolhida: ${vitoria.toLowerCase()}` : "🎯 Sua missão dos 7 dias tá escrita",
   ];
 
@@ -893,7 +1126,7 @@ function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
             </svg>
             <div style={{ fontSize: 12.5, color: "var(--tinta-2)", lineHeight: 1.5 }}>
               <b style={{ color: "var(--tinta)" }}>Módulo {areaNome}: ativo</b><br />
-              último gasto: R$ {brl(gastoTeste ?? 34)}<br />
+              {area === "dinheiro" ? <>último gasto: R$ {brl(gastoTeste ?? 34)}</> : <>missão dos 7 dias: escrita</>}<br />
               lembretes: ligados
             </div>
           </div>
@@ -933,8 +1166,8 @@ function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
 
 // ---------------------------------------------------------------- T14 — paywall
 
-function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
-  estim: number; vitoria: string | null; areaNome: string;
+function T14Paywall({ area, estim, vitoria, areaNome, onCheckout, onEntrar }: {
+  area: AreaKey; estim: number; vitoria: string | null; areaNome: string;
   onCheckout: () => void; onEntrar: () => void;
 }) {
   const anual = estim * 12;
@@ -952,7 +1185,11 @@ function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
       </div>
 
       <ul className="fv2-checks" style={{ marginBottom: 16 }}>
-        <li className="ruim">R$ {brl(anual)}/ano vazando sem você ver — sua própria conta</li>
+        {area === "dinheiro" ? (
+          <li className="ruim">R$ {brl(anual)}/ano vazando sem você ver — sua própria conta</li>
+        ) : (
+          <li className="ruim">{AREA_ANCHOR[area].pain}, {AREA_ANCHOR[area].painSub} — o preço de seguir sem sistema</li>
+        )}
         <li>Módulo {areaNome} configurado pro seu caso</li>
         <li>Primeira missão: {vitoria ? vitoria.toLowerCase() : "seus 7 primeiros dias"}</li>
         <li>16 módulos inclusos — entra um por vez, no seu ritmo</li>
@@ -1098,8 +1335,8 @@ function T16Pix({ pixAberto, onAbrir, onVoltar }: {
 
 // ---------------------------------------------------------------- T17 — ativação (peak-end)
 
-function T17Ativacao({ areaModule, areaNome, vitoria }: {
-  areaModule: string; areaNome: string; vitoria: string | null;
+function T17Ativacao({ area, areaModule, areaNome, vitoria }: {
+  area: AreaKey; areaModule: string; areaNome: string; vitoria: string | null;
 }) {
   const navigate = useNavigate();
   useEffect(() => { soltarConfete(); track("funnel_v2_activation_view"); }, []);
@@ -1124,9 +1361,7 @@ function T17Ativacao({ areaModule, areaNome, vitoria }: {
       </div>
 
       <ul className="fv2-checks" style={{ margin: "16px 0 0" }}>
-        <li>Registra seu primeiro gasto REAL (não o de exemplo)</li>
-        <li>Liga o lembrete das suas contas — 2 toques</li>
-        <li>Amanhã: 5 minutos. Eu te chamo. 🤝</li>
+        {ATIVACAO_AREA[area].map((linha) => <li key={linha}>{linha}</li>)}
       </ul>
 
       <div className="fv2-rodape">

@@ -21,13 +21,15 @@ type Wash = "fundo" | "rosa" | "lilas" | "pessego" | "menta" | "coral";
 
 type StepId =
   | "t1" | "t2" | "t3" | "t4" | "t5" | "t6" | "t7"
-  | "t8" | "t9" | "t10" | "t11" | "t12" | "t13" | "t14";
+  | "t8" | "t9" | "t10" | "t11" | "t12" | "t13" | "t14"
+  | "t15" | "t16" | "t17";
 
-const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14"];
+const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17"];
 
 const WASHES: Record<StepId, Wash> = {
   t1: "fundo", t2: "fundo", t3: "rosa", t4: "lilas", t5: "fundo", t6: "coral", t7: "menta",
   t8: "rosa", t9: "fundo", t10: "lilas", t11: "lilas", t12: "fundo", t13: "pessego", t14: "rosa",
+  t15: "fundo", t16: "lilas", t17: "menta",
 };
 
 type Opt = { emoji: string; label: string; reacao: string; mood?: PolvoMood; valor?: number };
@@ -106,7 +108,7 @@ const brl = (v: number) => v.toLocaleString("pt-BR");
 
 export default function ComecarV2() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isSubscribed } = useAuth();
 
   const salvo = useMemo(() => {
     // ?reset=1 zera o funil (QA/teste) — usuário real sempre retoma de onde parou
@@ -148,12 +150,28 @@ export default function ComecarV2() {
   const voltar = useCallback(() => {
     setStep((s) => ORDEM[Math.max(ORDEM.indexOf(s) - 1, 0)]);
   }, []);
+  const irPara = useCallback((s: StepId) => { setStep(s); window.scrollTo({ top: 0 }); }, []);
+
+  // T16: abre o Pix real ao entrar (só logado — o guest nunca chega aqui sem T15)
+  useEffect(() => {
+    if (step === "t16" && user) setPixAberto(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Pagamento confirmado (use-auth repolla check-subscription): peak-end
+  useEffect(() => {
+    if (step === "t16" && isSubscribed) {
+      setPixAberto(false);
+      track("funnel_v2_paid");
+      irPara("t17");
+    }
+  }, [step, isSubscribed, irPara]);
 
   return (
     <div className="fv2" data-wash={WASHES[step]}>
       <div className="fv2-col">
         <div className="fv2-top">
-          <button className="fv2-back" onClick={voltar} disabled={idx === 0 || step === "t10" || step === "t14"} aria-label="Voltar">←</button>
+          <button className="fv2-back" onClick={voltar} disabled={idx === 0 || step === "t10" || step === "t14" || step === "t16" || step === "t17"} aria-label="Voltar">←</button>
           <div className="fv2-bar"><i style={{ width: `${progresso}%` }} /></div>
           <PolvoAvatar size={34} />
         </div>
@@ -219,6 +237,27 @@ export default function ComecarV2() {
               />
             )}
 
+            {step === "t15" && (
+              <T15SalvarPlano
+                areaNome={areaInfo.nome}
+                vitoria={vitoria}
+                onSalvo={() => { track("funnel_v2_signup_success"); irPara("t16"); }}
+                onEntrar={() => navigate("/entrar")}
+              />
+            )}
+
+            {step === "t16" && (
+              <T16Pix
+                pixAberto={pixAberto}
+                onAbrir={() => setPixAberto(true)}
+                onVoltar={() => irPara("t14")}
+              />
+            )}
+
+            {step === "t17" && (
+              <T17Ativacao areaModule={areaInfo.module} areaNome={areaInfo.nome} vitoria={vitoria} />
+            )}
+
             {step === "t14" && (
               <T14Paywall
                 estim={estim}
@@ -226,10 +265,7 @@ export default function ComecarV2() {
                 areaNome={areaInfo.nome}
                 onCheckout={() => {
                   track("funnel_v2_checkout_click", { logged: !!user });
-                  if (user) setPixAberto(true);
-                  // Conta silenciosa do v2 (T15) é a próxima etapa da build.
-                  // Guest segue pro funil atual pra não perder venda.
-                  else navigate("/comecar");
+                  irPara(user ? "t16" : "t15");
                 }}
                 onEntrar={() => navigate("/entrar")}
               />
@@ -946,6 +982,158 @@ function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
           🤝 Você fechou: 5 min/dia. Eu seguro o resto.
         </p>
         <button className="fv2-ghost" onClick={onEntrar}>Já tenho conta</button>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T15 — conta "salvar meu plano"
+
+function T15SalvarPlano({ areaNome, vitoria, onSalvo, onEntrar }: {
+  areaNome: string; vitoria: string | null;
+  onSalvo: () => void; onEntrar: () => void;
+}) {
+  const { signUp } = useAuth();
+  const [nome, setNome] = useState("");
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => { track("funnel_v2_signup_view"); }, []);
+
+  const salvar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || senha.length < 6) {
+      setErro(senha.length < 6 ? "A senha precisa de 6+ caracteres." : "Confere o e-mail.");
+      return;
+    }
+    setSalvando(true);
+    setErro(null);
+    const { error, session } = await signUp(email.trim(), senha, nome.trim() || undefined);
+    setSalvando(false);
+    if (error) {
+      track("funnel_v2_signup_error", { message: String(error?.message ?? "").slice(0, 120) });
+      const msg = String(error?.message ?? "");
+      setErro(msg.includes("already") ? "Esse e-mail já tem conta — toca em 'Já tenho conta' embaixo." : "Não deu. Confere o e-mail e tenta de novo.");
+      return;
+    }
+    if (!session) { setErro("Confirma o e-mail que a gente te mandou e volta aqui."); return; }
+    onSalvo();
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", border: "2px solid var(--linha)", borderRadius: 15, background: "var(--card)",
+    fontFamily: "inherit", fontWeight: 600, fontSize: 15.5, padding: "13px 15px", color: "var(--tinta)", outline: "none",
+  };
+
+  return (
+    <>
+      {/* o plano DELE, montado e trancado — endowment (lei 8) */}
+      <div className="fv2-card" style={{ position: "relative", marginBottom: 16 }}>
+        <span className="fv2-app-selo" style={{ background: "var(--rosa)" }}>🔒 Reservado pra você</span>
+        <ul className="fv2-checks" style={{ opacity: 0.75 }}>
+          <li>Módulo {areaNome} configurado</li>
+          <li>Missão dos 7 dias: {vitoria ? vitoria.toLowerCase() : "escrita"}</li>
+          <li>16 módulos esperando</li>
+        </ul>
+      </div>
+
+      <div className="fv2-bolha" style={{ display: "flex", gap: 10, alignItems: "center", textAlign: "left" }}>
+        <PolvoAvatar size={30} /> <span>Onde eu te encontro? 30 segundos e o plano é seu.</span>
+      </div>
+
+      <form onSubmit={salvar} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <input style={inputStyle} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Seu nome" aria-label="Seu nome" autoComplete="name" />
+        <input style={inputStyle} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Seu melhor e-mail" aria-label="E-mail" type="email" autoComplete="email" inputMode="email" />
+        <input style={inputStyle} value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="Cria uma senha (6+)" aria-label="Senha" type="password" autoComplete="new-password" />
+        {erro && (
+          <div className="fv2-feedback" style={{ background: "color-mix(in srgb, var(--coral) 14%, var(--card))" }}>
+            {erro}
+          </div>
+        )}
+        <div className="fv2-rodape" style={{ marginTop: 4, paddingTop: 8 }}>
+          <button type="submit" className="fv2-cta magenta" disabled={salvando}>
+            {salvando ? "Salvando…" : "Salvar meu plano →"}
+          </button>
+          <p style={{ textAlign: "center", fontSize: 11.5, color: "var(--tinta-2)", margin: 0 }}>
+            Seus dados são só seus. Sem spam.
+          </p>
+          <button type="button" className="fv2-ghost" onClick={onEntrar}>Já tenho conta</button>
+        </div>
+      </form>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T16 — pagamento (polvo ansioso)
+
+function T16Pix({ pixAberto, onAbrir, onVoltar }: {
+  pixAberto: boolean; onAbrir: () => void; onVoltar: () => void;
+}) {
+  useEffect(() => { track("funnel_v2_pix_screen"); }, []);
+  return (
+    <>
+      <motion.div
+        style={{ display: "flex", justifyContent: "center" }}
+        animate={{ y: [0, -6, 0] }}
+        transition={{ repeat: Infinity, duration: 1.6, ease: "easeInOut" }}
+      >
+        <Polvo mood="neutro" size={150} />
+      </motion.div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+        {pixAberto
+          ? "Pagou? Seu acesso cai NA HORA — eu aviso aqui. 🐙"
+          : "Seu Pix tá pronto. Pagou, o acesso libera na hora — te espero aqui."}
+      </div>
+      {!pixAberto && (
+        <div className="fv2-rodape">
+          <button className="fv2-cta magenta" onClick={onAbrir}>Abrir o Pix de R$ {PIX_PRICES.lifetime}</button>
+          <button className="fv2-ghost" onClick={onVoltar}>Voltar pra oferta</button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T17 — ativação (peak-end)
+
+function T17Ativacao({ areaModule, areaNome, vitoria }: {
+  areaModule: string; areaNome: string; vitoria: string | null;
+}) {
+  const navigate = useNavigate();
+  useEffect(() => { soltarConfete(); track("funnel_v2_activation_view"); }, []);
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="festa" size={170} /></div>
+      <h1 className="fv2-display" style={{ textAlign: "center" }}>Bem-vindo à sua central! 🎉</h1>
+
+      {/* missão ativada — barra começa em 1/7, nunca em zero (started-progress) */}
+      <div className="fv2-card" style={{ marginTop: 6 }}>
+        <p style={{ fontSize: 13, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--rosa)", margin: "0 0 6px" }}>
+          🎯 Missão dos 7 dias · ativada
+        </p>
+        <p style={{ fontSize: 15, fontWeight: 700, margin: "0 0 10px" }}>
+          {vitoria ?? "Colocar sua vida em ordem"}
+        </p>
+        <div className="fv2-bar" style={{ height: 10, flex: "0 0 auto" }}><i style={{ width: `${100 / 7}%` }} /></div>
+        <p style={{ fontSize: 12, color: "var(--tinta-2)", margin: "6px 0 0" }}>
+          Dia 1 de 7 — montar o plano JÁ contou. O resto é comigo e com você.
+        </p>
+      </div>
+
+      <ul className="fv2-checks" style={{ margin: "16px 0 0" }}>
+        <li>Registra seu primeiro gasto REAL (não o de exemplo)</li>
+        <li>Liga o lembrete das suas contas — 2 toques</li>
+        <li>Amanhã: 5 minutos. Eu te chamo. 🤝</li>
+      </ul>
+
+      <div className="fv2-rodape">
+        <button
+          className="fv2-cta verde"
+          onClick={() => { track("funnel_v2_activation_start"); navigate(`/${areaModule}`); }}
+        >Começar meus 5 minutos no {areaNome} →</button>
       </div>
     </>
   );

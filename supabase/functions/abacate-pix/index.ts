@@ -22,7 +22,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const ABACATE_API = "https://api.abacatepay.com/v1";
+// API V2 (chaves abc_prod_* são da geração v2 — a v1 responde
+// "API key version mismatch"). Pix in-app = "transparent checkout".
+const ABACATE_API = "https://api.abacatepay.com/v2";
 const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
 const DUMMY_PHONE = "11999999999"; // mesmo padrão do cakto-pix: não pedimos telefone
 
@@ -97,22 +99,29 @@ serve(async (req) => {
       // CPF vai pro profile — próxima compra não pede de novo (paridade cakto-pix)
       await supabaseAdmin.from("profiles").update({ tax_id: docNumber }).eq("id", user.id);
 
-      const res = await fetch(`${ABACATE_API}/pixQrCode/create`, {
+      const res = await fetch(`${ABACATE_API}/transparents/create`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount,
-          expiresIn: 1800,
-          description: offer === "downsell" ? "CORE vitalício (oferta)" : "CORE vitalício",
-          customer: { name, cellphone: DUMMY_PHONE, email: user.email, taxId: docNumber },
-          metadata: { externalId: `${user.id}:${offer}` },
+          method: "PIX",
+          data: {
+            amount,
+            expiresIn: 1800,
+            description: offer === "downsell" ? "CORE vitalicio (oferta)" : "CORE vitalicio",
+            customer: { name, cellphone: DUMMY_PHONE, email: user.email, taxId: docNumber },
+            metadata: { externalId: `${user.id}:${offer}` },
+          },
         }),
       });
       const out = await res.json().catch(() => ({}));
       const d = out?.data;
-      if (!res.ok || out?.error || !d?.brCode) {
+      if (!res.ok || out?.success === false || !d?.brCode) {
         logStep("Abacate create error", { status: res.status, body: JSON.stringify(out).slice(0, 600) });
-        return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
+        return jsonResponse({
+          error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.",
+          // diagnóstico opt-in (QA): o corpo cru do gateway, sem nada sensível
+          ...(body.debug === true ? { gw: { status: res.status, body: JSON.stringify(out).slice(0, 400) } } : {}),
+        }, 502);
       }
       logStep("Pix created", { id: d.id, amount: d.amount, devMode: d.devMode });
       const b64 = typeof d.brCodeBase64 === "string" && d.brCodeBase64.length
@@ -131,12 +140,12 @@ serve(async (req) => {
     if (action === "check") {
       const id = String(body.id ?? "");
       if (!id) return jsonResponse({ error: "id_required" }, 400);
-      const res = await fetch(`${ABACATE_API}/pixQrCode/check?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`${ABACATE_API}/transparents/check?id=${encodeURIComponent(id)}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       const out = await res.json().catch(() => ({}));
       const status = out?.data?.status ?? "UNKNOWN";
-      if (!res.ok || out?.error) {
+      if (!res.ok || out?.success === false) {
         logStep("Abacate check error", { status: res.status, body: JSON.stringify(out).slice(0, 300) });
         return jsonResponse({ paid: false, status: "ERROR" });
       }

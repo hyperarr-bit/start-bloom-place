@@ -108,6 +108,11 @@ export default function ComecarV2() {
   const { user } = useAuth();
 
   const salvo = useMemo(() => {
+    // ?reset=1 zera o funil (QA/teste) — usuário real sempre retoma de onde parou
+    if (new URLSearchParams(window.location.search).has("reset")) {
+      try { localStorage.removeItem(LS_KEY); } catch { /* noop */ }
+      return {};
+    }
     try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
   }, []);
 

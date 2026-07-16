@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 import {
-  AREAS, AREA_TRACKS, AREA_PROOF, AREA_ANCHOR, DOOR_AREAS,
+  AREAS, AREA_TRACKS, AREA_PROOF, AREA_ANCHOR, DOOR_AREAS, DEMO_MODULES,
   type AreaKey, type QuizQ, type QuizOpt, ALL_MODULE_ICONS,
 } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
@@ -1049,17 +1049,68 @@ function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: str
 
 // ---------------------------------------------------------------- T12 — demo guiada
 
+// Chips de troca da demo: os módulos das áreas do quiz + dieta (par natural
+// do treino) — poucos de propósito; a amplitude total fica na régua "1 dos 16".
+const CHIPS_DEMO = ["financas", "rotina", "treino", "dieta", "desenvolvimento"];
+
 function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => void }) {
   // Demo = o APP REAL (decisão do dono 15/07: "o usuário se sente mais
   // confiante"). O /preview/:modulo já existe, é público e roda com dados
   // fictícios — embutido aqui via iframe, zero mudança em código compartilhado.
+  const [mod, setMod] = useState(module);
+  const [nudge, setNudge] = useState(false);
+  const jaNudgou = useRef(false);
+
+  // o módulo da área escolhida abre primeiro e lidera a fila de chips
+  const chips = useMemo(
+    () => [module, ...CHIPS_DEMO.filter((k) => k !== module)],
+    [module],
+  );
+
   useEffect(() => { track("funnel_v2_demo_open", { module }); }, [module]);
+
+  // pop-up do polvo se a pessoa ficar tempo demais explorando (dispersão):
+  // uma vez só, dispensável, com o CTA de seguir em frente
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!jaNudgou.current) { jaNudgou.current = true; setNudge(true); track("funnel_v2_demo_nudge"); }
+    }, 45000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const trocar = (k: string) => {
+    if (k === mod) return;
+    track("funnel_v2_demo_switch", { from: mod, to: k });
+    setMod(k);
+  };
 
   return (
     <>
       <h1 className="fv2-display" style={{ fontSize: 25 }}>Sua central. <span className="hl">Testa ela agora.</span></h1>
       <div className="fv2-bolha clara" style={{ marginTop: 2 }}>
-        👇 Isso embaixo é o app DE VERDADE, com dados de exemplo. Mexe à vontade — registra, risca, abre as coisas.
+        👇 Isso embaixo é o app DE VERDADE, com dados de exemplo. Mexe à vontade — e troca de braço nos botões.
+      </div>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "10px 0 4px" }}>
+        {chips.map((k) => {
+          const info = DEMO_MODULES.find((d) => d.key === k);
+          if (!info) return null;
+          const ativo = k === mod;
+          return (
+            <button
+              key={k}
+              onClick={() => trocar(k)}
+              style={{
+                background: ativo ? "var(--tinta)" : "var(--card)",
+                color: ativo ? "#fff" : "var(--tinta)",
+                border: "none", borderRadius: 999, padding: "8px 14px",
+                fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap",
+                fontFamily: "inherit", boxShadow: "var(--sombra)", cursor: "pointer",
+              }}
+            >
+              {info.emoji} {info.label}
+            </button>
+          );
+        })}
       </div>
       <motion.div
         className="fv2-app-frame"
@@ -1068,8 +1119,40 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
         <span className="fv2-app-selo">Dados de exemplo</span>
-        <iframe src={`/preview/${module}`} title="Demonstração do módulo no app real" loading="eager" />
+        <iframe key={mod} src={`/preview/${mod}`} title="Demonstração do módulo no app real" loading="eager" />
       </motion.div>
+      {nudge && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, background: "rgba(23,17,28,.42)", zIndex: 40 }}
+            onClick={() => { setNudge(false); track("funnel_v2_demo_nudge_dismiss"); }}
+          />
+          <motion.div
+            initial={{ y: 90, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 26 }}
+            style={{
+              position: "fixed", left: 0, right: 0, bottom: 16, zIndex: 41,
+              width: "min(402px, calc(100% - 28px))", margin: "0 auto",
+              background: "var(--card)", borderRadius: 22, padding: 18,
+              boxShadow: "var(--sombra)", display: "flex", flexDirection: "column", gap: 12,
+            }}
+          >
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <PolvoAvatar size={38} />
+              <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, lineHeight: 1.45 }}>
+                Curtiu fuçar? Isso é 1 braço dos 16. O seu — com a SUA vida dentro — destrava em 1 minuto.
+              </p>
+            </div>
+            <button className="fv2-cta magenta" onClick={() => { track("funnel_v2_demo_nudge_cta"); onContinuar(); }}>
+              Continuar →
+            </button>
+            <button className="fv2-ghost" onClick={() => { setNudge(false); track("funnel_v2_demo_nudge_dismiss"); }}>
+              Ainda tô testando
+            </button>
+          </motion.div>
+        </>
+      )}
       <p className="fv2-sub" style={{ margin: "12px 0 6px", fontSize: 13.5 }}>Isso foi <b>1 dos 16</b>:</p>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
         {ALL_MODULE_ICONS.map((m) => (

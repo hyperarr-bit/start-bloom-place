@@ -40,6 +40,104 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   });
 
 const onlyDigits = (v?: string | null) => (v ?? "").replace(/\D/g, "");
+const utcStamp = (d: Date) => d.toISOString().slice(0, 19).replace("T", " ");
+
+/**
+ * Canal server-side de conversão (16/07): manda a venda pra UTMify → Meta CAPI
+ * + Google. Espelha o sendToUtmify do cakto-webhook — o Pix in-app não passa
+ * por webhook de gateway, então é AQUI (no confirm) que o servidor avisa o
+ * Meta, cobrindo os ~30-50% que o Pixel do navegador perde (iOS/adblock).
+ * Não-bloqueante: falha só loga. A UTM vem dos eventos do funil (o clique no
+ * anúncio é anônimo, antes do cadastro — varre sessões do user).
+ */
+async function sendToUtmify(
+  admin: ReturnType<typeof createClient>,
+  args: { userId: string; email: string | null; orderId: string; offer: string; amountCents: number; name: string | null },
+) {
+  const token = Deno.env.get("UTMIFY_API_TOKEN");
+  if (!token) { logStep("UTMify skipped: no token"); return; }
+  try {
+    const pick = (d: Record<string, string>) => ({
+      utm_source: d.utm_source || null,
+      utm_medium: d.utm_medium || null,
+      utm_campaign: d.utm_campaign || null,
+      utm_content: d.utm_content || null,
+      utm_term: d.utm_term || null,
+    });
+    // UTM: eventos do user > eventos anônimos das sessões dele (clique no
+    // anúncio acontece antes do cadastro — mesma lógica do cakto-webhook).
+    let utm = pick({});
+    const { data: rows } = await admin
+      .from("analytics_events")
+      .select("event_data, session_id")
+      .eq("user_id", args.userId)
+      .order("created_at", { ascending: false })
+      .limit(60);
+    const mine = (rows ?? []) as Array<{ event_data: Record<string, string>; session_id: string | null }>;
+    let hit = mine.find((r) => r.event_data?.utm_campaign) ?? mine.find((r) => r.event_data?.utm_source);
+    if (!hit?.event_data?.utm_campaign) {
+      const sessions = [...new Set(mine.map((r) => r.session_id).filter(Boolean))].slice(0, 5) as string[];
+      for (const sid of sessions) {
+        const { data: anon } = await admin
+          .from("analytics_events")
+          .select("event_data")
+          .eq("session_id", sid)
+          .is("user_id", null)
+          .limit(30);
+        const anonHit = (anon ?? []).find((r: { event_data: Record<string, string> }) => r.event_data?.utm_campaign);
+        if (anonHit) { hit = anonHit as typeof hit; break; }
+      }
+    }
+    if (hit) utm = pick(hit.event_data);
+
+    const nowStamp = utcStamp(new Date());
+    const isDownsell = args.offer === "downsell";
+    const payload = {
+      orderId: args.orderId,
+      platform: "AbacatePay",
+      paymentMethod: "pix",
+      status: "paid",
+      createdAt: nowStamp,
+      approvedDate: nowStamp,
+      refundedAt: null,
+      customer: {
+        name: args.name || args.email?.split("@")[0] || "Cliente",
+        email: args.email || "",
+        phone: null,
+        document: null,
+        country: "BR",
+      },
+      products: [{
+        id: args.offer,
+        name: isDownsell ? "CORE Vitalício (oferta)" : "CORE Vitalício",
+        planId: null,
+        planName: "lifetime",
+        quantity: 1,
+        priceInCents: args.amountCents,
+      }],
+      trackingParameters: { src: null, sck: null, ...utm },
+      commission: {
+        totalPriceInCents: args.amountCents,
+        gatewayFeeInCents: 0,
+        userCommissionInCents: args.amountCents,
+      },
+      isTest: false,
+    };
+    const res = await fetch("https://api.utmify.com.br/api-credentials/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-token": token },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      logStep("UTMify error", { status: res.status, body: txt.slice(0, 300) });
+    } else {
+      logStep("UTMify order sent", { orderId: args.orderId, priceInCents: args.amountCents, utm_source: utm.utm_source });
+    }
+  } catch (e) {
+    logStep("UTMify send failed", { message: (e as Error).message });
+  }
+}
 
 /** E-mail de boas-vindas (versão enxuta do template do cakto-webhook). */
 const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html>
@@ -199,13 +297,22 @@ serve(async (req) => {
       logStep("Access granted", { userId: user.id, offer, id, jaLiberado });
 
       if (!jaLiberado) {
+        const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+        const displayName = (p?.display_name ?? "").trim() || null;
+
+        // Canal server-side pro Meta/Google (UTMify → CAPI) — a venda in-app
+        // não passa por webhook de gateway, então é aqui que o servidor avisa.
+        await sendToUtmify(supabaseAdmin, {
+          userId: user.id, email: user.email ?? null, orderId: id,
+          offer, amountCents: PRECOS_CENTAVOS[offer], name: displayName,
+        });
+
         // boas-vindas anti-reembolso (mesma missão do cakto-webhook)
         try {
           const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
           const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
           if (resendKey && user.email) {
-            const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
-            const firstName = (p?.display_name ?? "").trim().split(" ")[0] || null;
+            const firstName = (displayName ?? "").split(" ")[0] || null;
             await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },

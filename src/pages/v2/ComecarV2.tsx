@@ -11,12 +11,13 @@ import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey, ALL_MODULE_ICONS } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
-import { Polvo, PolvoAvatar, type PolvoMood } from "./Polvo";
+import { Polvo, PolvoAvatar, PolvoEspiando, type PolvoMood } from "./Polvo";
+import { Moeda, Recibo, Cedula } from "./Props";
 import "./funil-v2.css";
 
 // ---------------------------------------------------------------- constantes
 
-type Wash = "fundo" | "rosa" | "lilas" | "pessego" | "menta";
+type Wash = "fundo" | "rosa" | "lilas" | "pessego" | "menta" | "coral";
 
 type StepId =
   | "t1" | "t2" | "t3" | "t4" | "t5" | "t6" | "t7"
@@ -25,7 +26,7 @@ type StepId =
 const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14"];
 
 const WASHES: Record<StepId, Wash> = {
-  t1: "fundo", t2: "fundo", t3: "rosa", t4: "lilas", t5: "fundo", t6: "pessego", t7: "menta",
+  t1: "fundo", t2: "fundo", t3: "rosa", t4: "lilas", t5: "fundo", t6: "coral", t7: "menta",
   t8: "rosa", t9: "fundo", t10: "lilas", t11: "lilas", t12: "fundo", t13: "pessego", t14: "rosa",
 };
 
@@ -35,7 +36,7 @@ type Opt = { emoji: string; label: string; reacao: string; mood?: PolvoMood; val
 const Q_DOR: Opt[] = [
   { emoji: "💸", label: "Gasto sem perceber", reacao: "O gasto invisível é o pior tipo. A gente vai dar rosto pra ele." },
   { emoji: "🧾", label: "Esqueço de pagar contas", reacao: "Multa e juros são dinheiro pago pra ninguém. Isso acaba primeiro." },
-  { emoji: "🐷", label: "Não consigo guardar", reacao: "Guardar não é sobra — é decisão. Vamos criar a tua." },
+  { emoji: "🐷", label: "Não consigo guardar", reacao: "Guardar não é sobra — é decisão. Vamos criar a sua." },
   { emoji: "🤷", label: "Não sei pra onde vai", reacao: "Então começamos pelo raio-X. Ninguém conserta o que não enxerga." },
 ];
 
@@ -43,7 +44,7 @@ const Q_DOR: Opt[] = [
 const Q_CONTROLE: Opt[] = [
   { emoji: "📊", label: "Planilha", reacao: "Respeito. Mas planilha não te avisa nada — ela só espera você lembrar dela." },
   { emoji: "🧠", label: "De cabeça", reacao: "Cabeça é ótima pra viver, péssima pra contar. Deixa a memória comigo." },
-  { emoji: "📱", label: "Já usei app, larguei", reacao: "O app não era teu — era genérico. Esse aqui nasce das tuas respostas." },
+  { emoji: "📱", label: "Já usei app, larguei", reacao: "O app não era seu — era genérico. Esse aqui nasce das suas respostas." },
   { emoji: "🙈", label: "Não controlo", reacao: "Então hoje ele te controla. Justo. Vamos inverter isso.", mood: "serio" },
 ];
 
@@ -58,10 +59,10 @@ const Q_ESTIMATIVA: Opt[] = [
 
 // T9 — vitória de 7 dias (alimenta T13 e o paywall)
 const Q_VITORIA: Opt[] = [
-  { emoji: "🔍", label: "Saber pra onde vai cada real", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
-  { emoji: "✅", label: "Zerar contas atrasadas", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
-  { emoji: "🐷", label: "Guardar os primeiros R$ 100", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
-  { emoji: "📈", label: "Fechar a semana no azul", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
+  { emoji: "🔍", label: "Saber pra onde vai cada real", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
+  { emoji: "✅", label: "Zerar contas atrasadas", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
+  { emoji: "🐷", label: "Guardar os primeiros R$ 100", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
+  { emoji: "📈", label: "Fechar a semana no azul", reacao: "Anotado. Essa é a primeira coisa que a sua central resolve." },
 ];
 
 const LS_KEY = "fv2-state";
@@ -251,41 +252,87 @@ export default function ComecarV2() {
 // ---------------------------------------------------------------- T1 — hero + porta
 
 function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey) => void }) {
-  const orbitas: Array<{ emoji: string; style: React.CSSProperties }> = [
-    { emoji: "💸", style: { top: 8, left: "12%", animationDelay: "0s" } },
-    { emoji: "📅", style: { top: -6, right: "26%", animationDelay: ".6s" } },
-    { emoji: "❤️", style: { top: 46, right: "6%", animationDelay: ".3s" } },
-    { emoji: "📚", style: { top: 62, left: "2%", animationDelay: ".9s" } },
-    { emoji: "🧠", style: { top: -2, left: "34%", animationDelay: "1.2s" } },
-  ];
   return (
     <>
-      <div className="fv2-orbita">
-        {orbitas.map((o, i) => <span key={i} className="mod" style={o.style}>{o.emoji}</span>)}
-        <Polvo mood="feliz" size={185} />
+      {/* cena-colagem: card do módulo (fundo) → tag número-herói → polvo (frente) */}
+      <div className="fv2-cena">
+        <motion.div
+          className="fv2-cena-card"
+          initial={{ opacity: 0, y: 26, rotate: -2.5 }}
+          animate={{ opacity: 1, y: 0, rotate: -2.5 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="head">💸 Finanças <span className="ok">EM DIA</span></div>
+          <div className="fv2-nh" style={{ padding: "8px 0 6px" }}>
+            <b style={{ fontSize: 26 }}>R$ 2.418</b> <span style={{ fontSize: 11.5 }}>livres este mês</span>
+          </div>
+          <div className="linha"><span>🛒 Mercado</span><b>−R$ 182</b></div>
+          <div className="linha"><span>⚡ Luz · avisada antes</span><b className="verde">R$ 0 multa</b></div>
+        </motion.div>
+
+        <motion.div
+          className="fv2-tag"
+          initial={{ opacity: 0, scale: 0.7 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.25, type: "spring", stiffness: 380, damping: 20 }}
+        >
+          <b>R$ 417</b><span>recuperados/mês</span>
+        </motion.div>
+
+        <motion.span
+          className="fv2-manuscrito"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.65 }}
+        >
+          um braço pra<br />cada área ↘
+        </motion.span>
+
+        <span className="fv2-prop" style={{ left: 10, bottom: 6, transform: "rotate(-14deg)" }}><Moeda size={26} /></span>
+        <span className="fv2-prop" style={{ left: 44, bottom: -4, transform: "rotate(9deg)" }}><Recibo size={30} /></span>
+
+        <motion.div
+          className="fv2-cena-polvo"
+          initial={{ opacity: 0, y: 60 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, type: "spring", stiffness: 240, damping: 22 }}
+        >
+          <Polvo mood="feliz" size={196} />
+        </motion.div>
       </div>
-      <div className="fv2-bolha" style={{ textAlign: "center" }}>
-        Pode jogar tudo aqui em cima — braço é o que não me falta.
-      </div>
+
       <h1 className="fv2-display" style={{ textAlign: "center" }}>
         Sua vida inteira. <span className="hl">Um lugar só.</span>
       </h1>
-      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto 18px" }}>
-        Qual área tá mais fora de controle hoje?
+      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto 18px", fontWeight: 700 }}>
+        Escolhe por onde a gente começa:
       </p>
       <div className="fv2-opcoes">
-        {EIXOS.map((k) => (
-          <button key={k} className="fv2-opcao" onClick={() => onEscolher(k)}>
+        {EIXOS.map((k, i) => (
+          <motion.button
+            key={k}
+            className="fv2-opcao"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55 + i * 0.06 }}
+            onClick={() => onEscolher(k)}
+          >
             <span className="emo">{AREAS[k].emoji}</span>
             {AREAS[k].label}
             <span className="seta">→</span>
-          </button>
+          </motion.button>
         ))}
-        <button className="fv2-opcao" onClick={() => onEscolher("dinheiro")}>
+        <motion.button
+          className="fv2-opcao"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.55 + EIXOS.length * 0.06 }}
+          onClick={() => onEscolher("dinheiro")}
+        >
           <span className="emo">😵‍💫</span>
           Tudo, sinceramente
           <span className="seta">→</span>
-        </button>
+        </motion.button>
       </div>
     </>
   );
@@ -391,20 +438,40 @@ function T6Perda({ estim, onContinuar }: { estim: number; onContinuar: () => voi
     return () => cancelAnimationFrame(raf);
   }, [anual]);
 
+  const branco = { color: "#fff" };
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="arregalado" size={130} /></div>
-      <p className="fv2-sub" style={{ textAlign: "center", margin: "6px auto 2px" }}>
-        R$ {brl(estim)}/mês — o número que <b>você</b> estimou — em um ano vira:
+      <p className="fv2-sub" style={{ ...branco, opacity: 0.9, textAlign: "center", margin: "10px auto 2px" }}>
+        R$ {brl(estim)}/mês — o número que <b>VOCÊ</b> estimou — em um ano vira:
       </p>
-      <div className="fv2-num-grande" style={{ textAlign: "center", color: "var(--coral)", margin: "8px 0 4px" }}>
-        R$ {brl(n)}
+      <div style={{ position: "relative" }}>
+        <div className="fv2-num-grande fv2-nh" style={{ textAlign: "center", margin: "10px 0 6px" }}>
+          <b style={{ ...branco, fontSize: 62 }}>R$ {brl(n)}</b>
+        </div>
+        {/* moedas escapando */}
+        <span className="fv2-moeda-voa" style={{ left: "6%", top: -14, animationDelay: "0s" }}><Moeda size={30} /></span>
+        <span className="fv2-moeda-voa" style={{ right: "8%", top: -22, animationDelay: ".7s" }}><Moeda size={24} /></span>
+        <span className="fv2-moeda-voa" style={{ left: "16%", bottom: -26, animationDelay: "1.2s" }}><Cedula size={36} /></span>
+        <span className="fv2-moeda-voa" style={{ right: "14%", bottom: -18, animationDelay: ".4s" }}><Moeda size={20} /></span>
       </div>
-      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto" }}>
-        escapando por ano. Sem nota fiscal, sem memória, sem volta.
+      <p className="fv2-sub" style={{ ...branco, opacity: 0.9, textAlign: "center", margin: "6px auto 0" }}>
+        escapando por ano. Sem nota, sem memória, sem volta.
       </p>
-      <div className="fv2-rodape">
-        <button className="fv2-cta magenta" onClick={onContinuar}>Quero ver pra onde vai →</button>
+      {/* polvo arregalado GRANDE, cortado pela borda de baixo */}
+      <div style={{ marginTop: "auto", display: "flex", justifyContent: "center", overflow: "hidden", height: 150 }}>
+        <motion.div
+          initial={{ y: 90 }} animate={{ y: 26 }}
+          transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 22 }}
+        >
+          <Polvo mood="arregalado" size={220} />
+        </motion.div>
+      </div>
+      <div className="fv2-rodape" style={{ marginTop: 0, paddingTop: 12 }}>
+        <button
+          className="fv2-cta"
+          style={{ background: "#fff", color: "var(--tinta)" }}
+          onClick={onContinuar}
+        >Quero ver pra onde vai →</button>
       </div>
     </>
   );
@@ -507,7 +574,7 @@ function T10Loading({ onPronto }: { onPronto: () => void }) {
 
   const etapas: Array<[string, number]> = [
     ["Ligando o módulo Dinheiro", 40],
-    ["Posicionando teus pontos no mapa", 70],
+    ["Posicionando seus pontos no mapa", 70],
     ["Escrevendo tua primeira missão", 96],
   ];
 
@@ -556,7 +623,7 @@ function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: str
 
   return (
     <>
-      <h1 className="fv2-display" style={{ fontSize: 26 }}>Teu mapa da vida, <span className="hl">computado</span>.</h1>
+      <h1 className="fv2-display" style={{ fontSize: 26 }}>Seu mapa da vida, <span className="hl">computado</span>.</h1>
       <div className="fv2-card" style={{ margin: "10px 0" }}>
         <svg viewBox="0 0 240 210" style={{ width: "100%", display: "block" }}>
           {[0.33, 0.66, 1].map((f) => (
@@ -602,7 +669,7 @@ function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: str
         </div>
       </div>
       <motion.div {...popAnim} transition={{ ...popAnim.transition, delay: 2.4 }} className="fv2-feedback">
-        📍 <b>Teu ponto de partida: {areaNome}.</b> Foi onde você disse que mais dói — o plano começa aí.
+        📍 <b>Seu ponto de partida: {areaNome}.</b> Foi onde você disse que mais dói — o plano começa aí.
       </motion.div>
       <div className="fv2-rodape">
         <button className="fv2-cta magenta" onClick={onContinuar}>Ver minha central →</button>
@@ -636,7 +703,7 @@ function T12Demo({ onGasto, onContinuar }: { onGasto: (v: number) => void; onCon
 
   return (
     <>
-      <h1 className="fv2-display" style={{ fontSize: 25 }}>Tua central. <span className="hl">Testa ela agora.</span></h1>
+      <h1 className="fv2-display" style={{ fontSize: 25 }}>Sua central. <span className="hl">Testa ela agora.</span></h1>
 
       {fase === 1 && (
         <>
@@ -720,32 +787,40 @@ function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
 
   return (
     <>
-      {/* a central em miniatura, carimbada */}
-      <motion.div
-        initial={{ scale: 1.15, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="fv2-card"
-        style={{ position: "relative", margin: "4px auto 14px", width: "min(300px,100%)" }}
-      >
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <svg viewBox="0 0 120 104" style={{ width: 96, flex: "0 0 auto" }}>
-            <polygon points={radarPts([100, 100, 100, 100, 100], 40, 60, 52).map((p) => p.join(",")).join(" ")} fill="none" stroke="rgba(51,32,43,.12)" />
-            <polygon points={pHoje.map((p) => p.join(",")).join(" ")} fill="rgba(240,122,90,.25)" stroke="#F07A5A" strokeWidth="2" />
-          </svg>
-          <div style={{ fontSize: 12.5, color: "var(--tinta-2)", lineHeight: 1.5 }}>
-            <b style={{ color: "var(--tinta)" }}>Módulo {areaNome}: ativo</b><br />
-            último gasto: R$ {brl(gastoTeste ?? 34)}<br />
-            lembretes: ligados
+      {/* a central em miniatura (zoom-out da demo) com o polvo espiando por cima */}
+      <div className="fv2-espiada" style={{ margin: "62px auto 14px", width: "min(300px,100%)" }}>
+        <motion.div
+          className="fv2-polvo-borda"
+          initial={{ opacity: 0, y: 34 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.75, type: "spring", stiffness: 260, damping: 22 }}
+        >
+          <PolvoEspiando width={168} mood="serio" />
+        </motion.div>
+        <motion.div
+          initial={{ scale: 1.6, y: 46, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="fv2-card"
+        >
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <svg viewBox="0 0 120 104" style={{ width: 96, flex: "0 0 auto" }}>
+              <polygon points={radarPts([100, 100, 100, 100, 100], 40, 60, 52).map((p) => p.join(",")).join(" ")} fill="none" stroke="rgba(51,32,43,.12)" />
+              <polygon points={pHoje.map((p) => p.join(",")).join(" ")} fill="rgba(240,122,90,.25)" stroke="#F07A5A" strokeWidth="2" />
+            </svg>
+            <div style={{ fontSize: 12.5, color: "var(--tinta-2)", lineHeight: 1.5 }}>
+              <b style={{ color: "var(--tinta)" }}>Módulo {areaNome}: ativo</b><br />
+              último gasto: R$ {brl(gastoTeste ?? 34)}<br />
+              lembretes: ligados
+            </div>
           </div>
-        </div>
-        <div className="fv2-carimbo">Dados de exemplo</div>
-      </motion.div>
+          <div className="fv2-carimbo">Dados de exemplo</div>
+        </motion.div>
+      </div>
 
-      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="serio" size={100} /></div>
       <div className="fv2-bolha">
-        Tua central tá de pé. Mas olha o carimbo… isso ainda é a vida de outra pessoa.
-        A tua tá lá fora, sem ninguém segurando.
+        Sua central tá de pé. Mas olha o carimbo… isso ainda é a vida de outra pessoa.
+        A sua tá lá fora, sem ninguém segurando.
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -782,8 +857,18 @@ function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
   const anual = estim * 12;
   return (
     <>
-      <h1 className="fv2-display">Seu plano tá pronto. <span className="hl">Destrave ele inteiro.</span></h1>
-      <ul className="fv2-checks" style={{ marginBottom: 14 }}>
+      {/* faixa de celebração: polvo festa cortado + headline branca */}
+      <div className="fv2-faixa">
+        <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.85 }}>
+          ✓ Plano montado
+        </p>
+        <h1 className="fv2-display" style={{ fontSize: 30, maxWidth: "70%" }}>
+          Seu plano tá pronto. Destrave ele inteiro.
+        </h1>
+        <div className="fv2-faixa-polvo"><Polvo mood="festa" size={140} /></div>
+      </div>
+
+      <ul className="fv2-checks" style={{ marginBottom: 16 }}>
         <li className="ruim">R$ {brl(anual)}/ano vazando sem você ver — sua própria conta</li>
         <li>Módulo {areaNome} configurado pro seu caso</li>
         <li>Primeira missão: {vitoria ? vitoria.toLowerCase() : "seus 7 primeiros dias"}</li>
@@ -791,22 +876,25 @@ function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
       </ul>
       <div className="fv2-card fv2-preco">
         <span className="tag">Acesso vitalício</span>
-        <div className="fv2-preco-linha">
+        <div className="fv2-preco-linha fv2-nh">
           <span className="fv2-preco-de">R$ 99,90</span>
-          <span className="fv2-preco-por">R$ {PIX_PRICES.lifetime}</span>
-          <span className="fv2-preco-suf">pagamento único</span>
+          <b style={{ fontSize: 38, whiteSpace: "nowrap" }}>R$ {PIX_PRICES.lifetime}</b>
+          <span style={{ fontSize: 12, lineHeight: 1.25 }}>uma vez,<br />seu pra sempre</span>
         </div>
         <ul className="fv2-checks">
-          <li>Seu pra sempre. Sem mensalidade.</li>
-          <li>Garantia de 7 dias — não curtiu, devolvemos</li>
-          <li>Pix aprovado na hora · acesso imediato</li>
+          <li>Sem mensalidade. Sem renovação. Sem pegadinha.</li>
+          <li>Todos os 16 módulos + tudo que a gente lançar</li>
         </ul>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
         <div className="fv2-prova"><span className="estrelas">★★★★★</span><span><b>4,8</b> · milhares de vidas organizadas</span></div>
       </div>
       <div className="fv2-rodape">
-        <button className="fv2-cta magenta" onClick={onCheckout}>Gerar Pix de R$ {PIX_PRICES.lifetime}</button>
+        {/* risco zero COLADO no CTA (lei 9 do BitePal: a dúvida final mora aqui) */}
+        <p style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, margin: 0 }}>
+          🔒 Garantia de 7 dias · Pix aprovado na hora
+        </p>
+        <button className="fv2-cta magenta" onClick={onCheckout}>Gerar meu Pix de R$ {PIX_PRICES.lifetime}</button>
         <p style={{ textAlign: "center", fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
           🤝 Você fechou: 5 min/dia. Eu seguro o resto.
         </p>

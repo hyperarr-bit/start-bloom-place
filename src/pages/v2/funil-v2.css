@@ -2,7 +2,7 @@
    fundo lavanda-neutro, display Archivo Black, corpo Figtree, CTAs pretos em
    pílula, washes em gradiente vertical, sombras em duas camadas.
    Escopado em .fv2 — zero vazamento pro app/funil atual. */
-@import url("https://fonts.googleapis.com/css2?family=Archivo+Black&family=Figtree:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Archivo+Black&family=Figtree:wght@500;600;700;800&family=Caveat:wght@600&display=swap");
 
 .fv2,
 .fv2 *,
@@ -232,6 +232,72 @@
   0% { opacity: 1; transform: translateY(0) rotate(0); }
   100% { opacity: 0; transform: translateY(105vh) rotate(560deg); }
 }
+
+/* ---------- vitrines (T1/T6/T13/T14) ---------- */
+
+/* T6: pico de cor cheia */
+.fv2[data-wash="coral"] { background: linear-gradient(180deg, #ff7a57 0%, #f5522f 100%); }
+.fv2[data-wash="coral"] .fv2-bar { background: rgba(255, 255, 255, 0.28); }
+.fv2[data-wash="coral"] .fv2-bar i { background: #fff; }
+.fv2[data-wash="coral"] .fv2-back { color: #fff; }
+
+/* T1: cena-colagem */
+.fv2-cena {
+  position: relative; height: 296px; margin: 2px -6px 14px; overflow: hidden;
+}
+.fv2-cena-card {
+  position: absolute; top: 14px; left: 4px; width: 250px;
+  background: var(--card); border-radius: 20px; padding: 14px 16px;
+  box-shadow: var(--sombra); transform: rotate(-2.5deg);
+}
+.fv2-cena-card .head { font-size: 13px; font-weight: 800; display: flex; gap: 6px; align-items: center; }
+.fv2-cena-card .head .ok { margin-left: auto; font-size: 10px; font-weight: 800; color: var(--verde); background: color-mix(in srgb, var(--verde) 13%, var(--card)); border-radius: 999px; padding: 2px 8px; }
+.fv2-cena-card .linha { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--tinta2); padding: 6px 0; border-top: 1px solid var(--linha); }
+.fv2-cena-card .linha b { color: var(--tinta); font-variant-numeric: tabular-nums; }
+.fv2-cena-card .linha b.verde { color: var(--verde); }
+
+.fv2-tag {
+  position: absolute; top: 2px; right: 2px;
+  background: var(--card); border-radius: 16px; padding: 9px 14px;
+  box-shadow: 0 2px 4px rgba(23,17,28,.1), 0 14px 34px rgba(23,17,28,.18);
+  text-align: center; line-height: 1.1;
+}
+.fv2-tag b { font-family: "Archivo Black", sans-serif; font-size: 21px; display: block; }
+.fv2-tag span { font-size: 10.5px; font-weight: 600; color: var(--tinta2); }
+
+.fv2-cena-polvo { position: absolute; bottom: -6px; right: -8px; }
+.fv2-manuscrito {
+  position: absolute; right: 10px; top: 64px; width: 112px;
+  font-family: "Caveat", cursive; font-size: 21px; font-weight: 600; line-height: 1.1;
+  color: var(--tinta); transform: rotate(-4deg); text-align: center;
+}
+.fv2-prop { position: absolute; }
+
+/* número-herói */
+.fv2-nh b { font-family: "Archivo Black", sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.fv2-nh span { color: var(--tinta2); font-weight: 600; }
+
+/* T6: moedas voando */
+.fv2-moeda-voa { position: absolute; animation: fv2-moeda 2.6s ease-in-out infinite; }
+@keyframes fv2-moeda {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-16px) rotate(22deg); }
+}
+
+/* T13: polvo espiando a mini-central */
+.fv2-espiada { position: relative; margin-top: 62px; }
+.fv2-espiada .fv2-polvo-borda { position: absolute; top: -76px; left: 50%; transform: translateX(-50%); z-index: 5; }
+.fv2-espiada .fv2-card { position: relative; z-index: 3; }
+.fv2-espiada .fv2-carimbo { z-index: 4; }
+
+/* T14: faixa de celebração */
+.fv2-faixa {
+  margin: -18px -22px 20px; padding: 24px 22px 20px;
+  background: linear-gradient(160deg, #f0559d 0%, #d63b84 100%);
+  border-radius: 0 0 30px 30px; color: #fff; position: relative; overflow: hidden;
+}
+.fv2-faixa .fv2-display { color: #fff; margin: 4px 0 6px; }
+.fv2-faixa-polvo { position: absolute; right: -20px; bottom: -30px; opacity: .95; }
 
 @media (prefers-reduced-motion: reduce) {
   .fv2 *, .fv2 *::before, .fv2 *::after { animation: none !important; transition: none !important; }

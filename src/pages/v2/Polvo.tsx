@@ -141,6 +141,62 @@ export function Polvo({ mood = "neutro", size = 150 }: { mood?: PolvoMood; size?
   );
 }
 
+/**
+ * Polvo ESPIANDO por cima de uma borda (o frame do guaxinim no card de
+ * Peso/Progresso do BitePal): só o topo da cabeça + olhos + duas patas
+ * agarrando a borda. Posicionar com o bottom alinhado ao topo do card.
+ */
+export function PolvoEspiando({ width = 160, mood = "feliz" }: { width?: number; mood?: "feliz" | "serio" }) {
+  const uid = `esp${seq++ % 1000}`;
+  return (
+    <svg width={width} height={width * 0.56} viewBox="0 0 240 134" aria-hidden="true">
+      <defs>
+        <radialGradient id={`corpo-${uid}`} cx="0.42" cy="0.3" r="1">
+          <stop offset="0%" stopColor="#FF97C6" />
+          <stop offset="55%" stopColor="#F566A8" />
+          <stop offset="100%" stopColor="#E4468F" />
+        </radialGradient>
+      </defs>
+      {/* topo da cabeça — o corpo continua "atrás" da borda */}
+      <path
+        d="M46 134 C46 66 78 26 120 26 C162 26 194 66 194 134 Z"
+        fill={`url(#corpo-${uid})`} stroke={TINTA} strokeWidth="5"
+      />
+      <path d="M70 62 C82 42 102 32 120 32 C130 32 133 40 124 44 C108 50 94 58 88 72 Z" fill="#FF9FCB" opacity=".55" />
+      {/* olhos */}
+      {mood === "feliz" ? (
+        <>
+          <path d="M84 88 Q96 74 108 88" stroke={TINTA} strokeWidth="5.5" fill="none" strokeLinecap="round" />
+          <path d="M132 88 Q144 74 156 88" stroke={TINTA} strokeWidth="5.5" fill="none" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <ellipse cx="96" cy="88" rx="18" ry="19" fill="#fff" stroke={TINTA} strokeWidth="4" />
+          <ellipse cx="144" cy="88" rx="18" ry="19" fill="#fff" stroke={TINTA} strokeWidth="4" />
+          <circle cx="98" cy="91" r="8.5" fill={TINTA} />
+          <circle cx="146" cy="91" r="8.5" fill={TINTA} />
+          <circle cx="101" cy="87" r="2.6" fill="#fff" />
+          <circle cx="149" cy="87" r="2.6" fill="#fff" />
+          <path d="M82 70 L106 73" stroke={TINTA} strokeWidth="5" strokeLinecap="round" />
+          <path d="M158 70 L134 73" stroke={TINTA} strokeWidth="5" strokeLinecap="round" />
+        </>
+      )}
+      {/* bochechas */}
+      <circle cx="70" cy="104" r="7" fill="#F9A8CB" />
+      <circle cx="170" cy="104" r="7" fill="#F9A8CB" />
+      {/* patas agarrando a borda */}
+      <g fill={`url(#corpo-${uid})`} stroke={TINTA} strokeWidth="4.5">
+        <path d="M52 134 C52 120 66 114 76 122 C82 127 82 134 78 134 Z" />
+        <path d="M162 134 C162 120 176 114 186 122 C192 127 192 134 188 134 Z" />
+      </g>
+      <g fill="#FFB7D6">
+        <circle cx="66" cy="127" r="2.6" />
+        <circle cx="176" cy="127" r="2.6" />
+      </g>
+    </svg>
+  );
+}
+
 /** Avatar redondo pro cabeçalho/balões. */
 export function PolvoAvatar({ size = 30 }: { size?: number }) {
   const uid = `av${seq++ % 1000}`;

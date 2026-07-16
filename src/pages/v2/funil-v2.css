@@ -1,7 +1,8 @@
-/* Funil V2 "polvo" (15/07/2026) — identidade própria, escopada em .fv2.
-   NÃO compartilha tokens com o app nem com o funil atual (/comecar).
-   Fontes carregam junto com o chunk lazy. */
-@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Schibsted+Grotesk:wght@400;500;700&display=swap");
+/* Funil V2 "polvo" — sistema visual na régua BitePal (15/07/2026, retheme):
+   fundo lavanda-neutro, display Archivo Black, corpo Figtree, CTAs pretos em
+   pílula, washes em gradiente vertical, sombras em duas camadas.
+   Escopado em .fv2 — zero vazamento pro app/funil atual. */
+@import url("https://fonts.googleapis.com/css2?family=Archivo+Black&family=Figtree:wght@500;600;700;800&display=swap");
 
 .fv2,
 .fv2 *,
@@ -12,151 +13,152 @@
 
 .fv2 {
   overflow-x: hidden;
-  --fundo: #fdf0f3;
-  --tinta: #33202b;
-  --tinta-2: #7a5f6d;
-  --polvo: #ec5fa2;
-  --polvo-escuro: #d84a8f;
-  --magenta: #e23d7b;
-  --coral: #f07a5a;
-  --verde: #2fa968;
-  --sol: #f5c048;
+  --fundo: #f3f2f7;
+  --tinta: #17111c;
+  --tinta-2: #6e6577;
+  --rosa: #f0559d;
+  --rosa-suave: #fbe7f0;
+  --verde: #2bb673;
+  --coral: #ff6b4a;
+  --sol: #ffc94d;
+  --ceu: #7fb7e8;
   --card: #ffffff;
-  --wash-rosa: #fbe3ea;
-  --wash-lilas: #efe6f6;
-  --wash-pessego: #fdebdf;
-  --wash-menta: #e4f2e8;
-  --linha: rgba(51, 32, 43, 0.12);
-  --sombra: 0 2px 6px rgba(51, 32, 43, 0.06), 0 12px 32px rgba(51, 32, 43, 0.1);
+  --linha: rgba(23, 17, 28, 0.1);
+  --sombra: 0 1px 2px rgba(23, 17, 28, 0.05), 0 10px 30px rgba(23, 17, 28, 0.09);
+  --sombra-cta: 0 2px 4px rgba(23, 17, 28, 0.18), 0 10px 24px rgba(23, 17, 28, 0.22);
 
   min-height: 100dvh;
   background: var(--fundo);
   color: var(--tinta);
-  font-family: "Schibsted Grotesk", system-ui, -apple-system, sans-serif;
+  font-family: "Figtree", system-ui, -apple-system, sans-serif;
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   display: flex;
   flex-direction: column;
   transition: background 0.5s ease;
 }
-.fv2[data-wash="rosa"] { background: var(--wash-rosa); }
-.fv2[data-wash="lilas"] { background: var(--wash-lilas); }
-.fv2[data-wash="pessego"] { background: var(--wash-pessego); }
-.fv2[data-wash="menta"] { background: var(--wash-menta); }
+/* washes: gradiente vertical suave que morre no fundo neutro (padrão BitePal) */
+.fv2[data-wash="rosa"] { background: linear-gradient(180deg, #ffe4f0 0%, #f3f2f7 62%); }
+.fv2[data-wash="lilas"] { background: linear-gradient(180deg, #eae4f9 0%, #f3f2f7 62%); }
+.fv2[data-wash="pessego"] { background: linear-gradient(180deg, #ffe7dc 0%, #f3f2f7 62%); }
+.fv2[data-wash="menta"] { background: linear-gradient(180deg, #ddf3e6 0%, #f3f2f7 62%); }
 
 .fv2-col {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  padding: 16px 20px 28px;
+  padding: 18px 22px 30px;
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
-/* header: voltar + barra */
-.fv2-top { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+/* header */
+.fv2-top { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
 .fv2-back {
   border: none; background: none; cursor: pointer; color: var(--tinta);
-  width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center;
-  font-size: 18px; flex: 0 0 auto;
+  width: 38px; height: 38px; border-radius: 13px; display: grid; place-items: center;
+  font-size: 19px; flex: 0 0 auto;
 }
-.fv2-back:hover { background: rgba(51, 32, 43, 0.07); }
+.fv2-back:hover { background: rgba(23, 17, 28, 0.06); }
 .fv2-back:disabled { opacity: 0; pointer-events: none; }
-.fv2-bar { flex: 1; height: 6px; border-radius: 99px; background: rgba(51, 32, 43, 0.1); position: relative; overflow: hidden; }
-.fv2-bar i { position: absolute; inset: 0; right: auto; background: var(--magenta); border-radius: 99px; transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+.fv2-bar { flex: 1; height: 5px; border-radius: 99px; background: rgba(23, 17, 28, 0.09); position: relative; overflow: hidden; }
+.fv2-bar i { position: absolute; inset: 0; right: auto; background: var(--rosa); border-radius: 99px; transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* tipografia */
 .fv2-display {
-  font-family: "Baloo 2", system-ui, sans-serif;
-  font-weight: 800;
-  font-size: clamp(27px, 7vw, 33px);
-  line-height: 1.08;
-  letter-spacing: -0.01em;
+  font-family: "Archivo Black", system-ui, sans-serif;
+  font-weight: 400; /* a família só tem um peso — e ele é um trator */
+  font-size: clamp(28px, 7.6vw, 35px);
+  line-height: 1.04;
+  letter-spacing: -0.015em;
   text-wrap: balance;
-  margin: 6px 0 10px;
+  margin: 8px 0 12px;
 }
-.fv2-display .hl { color: var(--magenta); }
+.fv2-display .hl { color: var(--rosa); }
 .fv2-display .hl-v { color: var(--verde); }
 .fv2-display .hl-c { color: var(--coral); }
-.fv2-sub { color: var(--tinta-2); font-size: 15.5px; max-width: 36ch; }
+.fv2-sub { color: var(--tinta-2); font-size: 15.5px; font-weight: 500; max-width: 36ch; }
 
 /* balão do polvo */
 .fv2-bolha {
-  background: var(--tinta); color: #fff; border-radius: 16px; box-shadow: var(--sombra);
-  padding: 12px 15px; font-size: 14.5px; font-weight: 500; line-height: 1.5;
-  position: relative; margin: 4px 0 16px;
+  background: var(--tinta); color: #fff; border-radius: 18px; box-shadow: var(--sombra);
+  padding: 14px 17px; font-size: 14.5px; font-weight: 600; line-height: 1.5;
+  position: relative; margin: 10px 0 18px;
 }
 .fv2-bolha::before {
   content: ""; position: absolute; top: -7px; left: 50%; transform: translateX(-50%) rotate(45deg);
-  width: 14px; height: 14px; background: var(--tinta);
+  width: 14px; height: 14px; background: var(--tinta); border-radius: 3px;
 }
 .fv2-bolha.clara { background: var(--card); color: var(--tinta); }
 .fv2-bolha.clara::before { background: var(--card); }
 
 /* opções */
-.fv2-opcoes { display: flex; flex-direction: column; gap: 10px; }
+.fv2-opcoes { display: flex; flex-direction: column; gap: 11px; }
 .fv2-opcao {
-  background: var(--card); border: 1.5px solid transparent; border-radius: 16px;
-  padding: 14px 15px; font-size: 15px; font-weight: 600; text-align: left;
-  display: flex; align-items: center; gap: 12px; cursor: pointer;
-  box-shadow: 0 1px 3px rgba(51, 32, 43, 0.06);
+  background: var(--card); border: 2px solid transparent; border-radius: 18px;
+  padding: 15px 16px; font-size: 15.5px; font-weight: 700; text-align: left;
+  display: flex; align-items: center; gap: 13px; cursor: pointer;
+  box-shadow: var(--sombra);
   font-family: inherit; color: inherit; width: 100%;
-  transition: transform 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
+.fv2-opcao:hover { transform: translateY(-1px); }
 .fv2-opcao:active { transform: scale(0.98); }
 .fv2-opcao .emo {
-  width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
-  font-size: 16px; background: var(--wash-rosa); flex: 0 0 auto;
+  width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+  font-size: 18px; background: var(--rosa-suave); flex: 0 0 auto;
 }
-.fv2-opcao[data-on="true"] { border-color: var(--magenta); }
-.fv2-opcao .seta { margin-left: auto; color: var(--tinta-2); }
-.fv2-opcao:disabled { opacity: 0.45; pointer-events: none; }
+.fv2-opcao[data-on="true"] { border-color: var(--tinta); }
+.fv2-opcao .seta { margin-left: auto; color: var(--tinta-2); font-weight: 800; }
+.fv2-opcao:disabled { opacity: 0.4; pointer-events: none; }
 
-/* botões */
+/* botões — pílula preta, padrão BitePal */
 .fv2-cta {
-  font-family: "Baloo 2", system-ui, sans-serif; font-weight: 700; font-size: 17px;
+  font-family: "Figtree", system-ui, sans-serif; font-weight: 800; font-size: 16.5px;
   border: none; cursor: pointer;
-  background: var(--tinta); color: #fff; border-radius: 999px; padding: 15px 26px;
-  width: 100%; box-shadow: var(--sombra);
+  background: var(--tinta); color: #fff; border-radius: 999px;
+  height: 58px; padding: 0 28px; width: 100%;
+  box-shadow: var(--sombra-cta);
   transition: transform 0.15s ease, opacity 0.15s ease;
 }
 .fv2-cta:hover { transform: translateY(-1px); }
 .fv2-cta:active { transform: scale(0.98); }
-.fv2-cta:disabled { opacity: 0.35; pointer-events: none; }
-.fv2-cta.magenta { background: var(--magenta); }
-.fv2-cta.verde { background: var(--verde); }
+.fv2-cta:disabled { opacity: 0.32; pointer-events: none; }
+.fv2-cta.magenta { background: var(--tinta); }
+.fv2-cta.verde { background: var(--tinta); }
 .fv2-ghost {
   font-family: inherit; background: none; border: none; cursor: pointer;
-  color: var(--tinta-2); font-size: 14px; font-weight: 500; padding: 10px;
+  color: var(--tinta-2); font-size: 14px; font-weight: 600; padding: 10px;
 }
-.fv2-rodape { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 20px; }
+.fv2-rodape { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 22px; }
 
 /* feedback / cards */
 .fv2-feedback {
-  background: color-mix(in srgb, var(--sol) 24%, var(--card));
-  border-radius: 14px; padding: 12px 15px; font-size: 13.5px; line-height: 1.5;
+  background: color-mix(in srgb, var(--sol) 22%, var(--card));
+  border-radius: 16px; padding: 13px 16px; font-size: 13.5px; font-weight: 500; line-height: 1.55;
   box-shadow: var(--sombra);
 }
-.fv2-feedback b { font-weight: 700; }
+.fv2-feedback b { font-weight: 800; }
 .fv2-feedback.verde { background: color-mix(in srgb, var(--verde) 13%, var(--card)); }
-.fv2-card { background: var(--card); border-radius: 18px; padding: 16px; box-shadow: var(--sombra); }
+.fv2-card { background: var(--card); border-radius: 22px; padding: 18px; box-shadow: var(--sombra); }
 .fv2-selo {
   display: inline-flex; align-items: center; gap: 6px; background: var(--verde); color: #fff;
-  font-size: 11.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;
   border-radius: 999px; padding: 4px 11px; vertical-align: middle; white-space: nowrap;
 }
 .fv2-num-grande {
-  font-family: "Baloo 2", system-ui, sans-serif; font-weight: 800;
-  font-size: 54px; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums;
+  font-family: "Archivo Black", system-ui, sans-serif; font-weight: 400;
+  font-size: 56px; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums;
 }
 
 /* bolhas de módulo orbitando o polvo (hero) */
-.fv2-orbita { position: relative; display: flex; justify-content: center; padding: 8px 0 2px; }
+.fv2-orbita { position: relative; display: flex; justify-content: center; padding: 10px 0 4px; }
 .fv2-orbita .mod {
-  position: absolute; width: 42px; height: 42px; border-radius: 50%;
+  position: absolute; width: 46px; height: 46px; border-radius: 50%;
   background: var(--card); box-shadow: var(--sombra);
-  display: grid; place-items: center; font-size: 19px;
+  display: grid; place-items: center; font-size: 21px;
   animation: fv2-flutua 3.6s ease-in-out infinite;
 }
 @keyframes fv2-flutua {
@@ -166,17 +168,18 @@
 
 /* input de valor (demo) */
 .fv2-input {
-  width: 100%; border: 1.5px solid var(--linha); border-radius: 15px; background: var(--card);
-  font-family: "Baloo 2", system-ui, sans-serif; font-weight: 700; font-size: 24px;
-  text-align: center; padding: 12px; color: var(--tinta); outline: none;
+  width: 100%; border: 2px solid var(--linha); border-radius: 18px; background: var(--card);
+  font-family: "Archivo Black", system-ui, sans-serif; font-size: 26px;
+  text-align: center; padding: 14px; color: var(--tinta); outline: none;
+  box-shadow: var(--sombra);
 }
-.fv2-input:focus { border-color: var(--magenta); }
-.fv2-input::placeholder { color: rgba(51, 32, 43, 0.25); font-weight: 700; }
+.fv2-input:focus { border-color: var(--tinta); }
+.fv2-input::placeholder { color: rgba(23, 17, 28, 0.22); }
 
 /* progresso fake (T10) */
-.fv2-prog-item { font-size: 14px; color: var(--tinta-2); display: flex; gap: 9px; align-items: center; }
+.fv2-prog-item { font-size: 14.5px; font-weight: 600; color: var(--tinta-2); display: flex; gap: 10px; align-items: center; }
 .fv2-prog-item::before {
-  content: ""; width: 16px; height: 16px; border-radius: 50%;
+  content: ""; width: 17px; height: 17px; border-radius: 50%;
   border: 2px solid var(--linha); flex: 0 0 auto; transition: all 0.2s;
 }
 .fv2-prog-item[data-ok="true"] { color: var(--tinta); }
@@ -190,9 +193,9 @@
   position: absolute; top: 38%; left: 50%;
   transform: translate(-50%, -50%) rotate(-11deg);
   border: 3px solid var(--coral); color: var(--coral);
-  font-family: "Baloo 2", sans-serif; font-weight: 800; font-size: 15px;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  padding: 5px 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.82);
+  font-family: "Archivo Black", sans-serif; font-size: 14px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 6px 14px; border-radius: 9px; background: rgba(255, 255, 255, 0.85);
   animation: fv2-carimba 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 @keyframes fv2-carimba {
@@ -203,24 +206,24 @@
 }
 
 /* paywall */
-.fv2-preco { border: 2px solid var(--magenta); position: relative; }
+.fv2-preco { border: 2.5px solid var(--tinta); position: relative; }
 .fv2-preco .tag {
-  position: absolute; top: -11px; left: 14px; background: var(--magenta); color: #fff;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 3px 10px; border-radius: 999px;
+  position: absolute; top: -12px; left: 16px; background: var(--rosa); color: #fff;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 999px;
 }
-.fv2-preco-linha { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
-.fv2-preco-de { color: var(--tinta-2); text-decoration: line-through; font-size: 15px; }
-.fv2-preco-por { font-family: "Baloo 2", sans-serif; font-weight: 800; font-size: 36px; letter-spacing: -0.02em; }
-.fv2-preco-suf { font-size: 13px; color: var(--tinta-2); font-weight: 500; }
-.fv2-checks { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.fv2-checks li { font-size: 13.5px; display: flex; gap: 9px; align-items: flex-start; line-height: 1.45; }
+.fv2-preco-linha { display: flex; align-items: baseline; gap: 9px; margin-top: 8px; flex-wrap: nowrap; }
+.fv2-preco-de { color: var(--tinta-2); text-decoration: line-through; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.fv2-preco-por { font-family: "Archivo Black", sans-serif; font-size: 31px; letter-spacing: -0.02em; white-space: nowrap; }
+.fv2-preco-suf { font-size: 13px; color: var(--tinta-2); font-weight: 600; }
+.fv2-checks { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.fv2-checks li { font-size: 13.5px; font-weight: 600; display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; }
 .fv2-checks li::before {
-  content: "✓"; color: #fff; background: var(--verde); width: 17px; height: 17px;
-  border-radius: 50%; display: grid; place-items: center; font-size: 10px; flex: 0 0 auto; margin-top: 2px;
+  content: "✓"; color: #fff; background: var(--verde); width: 18px; height: 18px;
+  border-radius: 50%; display: grid; place-items: center; font-size: 10px; flex: 0 0 auto; margin-top: 1px;
 }
 .fv2-checks li.ruim::before { content: "✕"; background: var(--coral); }
-.fv2-prova { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--tinta-2); }
+.fv2-prova { display: flex; gap: 8px; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--tinta-2); }
 .fv2-prova .estrelas { color: var(--sol); letter-spacing: 2px; font-size: 14px; }
 
 /* confete */

@@ -445,7 +445,14 @@ export default function ComecarV2() {
         </AnimatePresence>
       </div>
 
-      {pixAberto && <PixCheckout offer="lifetime" context="funnel" onClose={() => setPixAberto(false)} />}
+      {pixAberto && (
+        <PixCheckout
+          offer="lifetime"
+          context="funnel"
+          v2={{ mascote: <PolvoEspiando width={150} mood="feliz" />, missao: vitoria }}
+          onClose={() => setPixAberto(false)}
+        />
+      )}
     </div>
   );
 }

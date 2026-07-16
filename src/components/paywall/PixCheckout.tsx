@@ -29,6 +29,11 @@ interface Props {
   offer: PixOffer;
   onClose: () => void;
   context: "funnel" | "app";
+  /** Skin do funil v2 (16/07). SEM essa prop o checkout fica byte-idêntico ao
+   *  do funil atual (ordem do dono: o original não muda). Com ela: mascote
+   *  espiando o recibo, campo nome oculto (v2 já coletou no cadastro), CTA
+   *  sempre vivo (valida no toque), garantia em frase e eco da missão no QR. */
+  v2?: { mascote?: React.ReactNode; missao?: string | null };
 }
 
 type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
@@ -65,16 +70,16 @@ const fmtBRL = (v: string | number) => {
 };
 
 /** Input com ícone à esquerda (form curto de checkout — reduz cara de cadastro) */
-function IconInput({ Icon, ...props }: { Icon: typeof User } & React.ComponentProps<typeof Input>) {
+function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?: React.Ref<HTMLInputElement> } & React.ComponentProps<typeof Input>) {
   return (
     <div className="relative">
       <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
-      <Input {...props} className="h-12 pl-10 rounded-xl" />
+      <Input {...props} ref={inputRef} className="h-12 pl-10 rounded-xl" />
     </div>
   );
 }
 
-export function PixCheckout({ offer, onClose, context }: Props) {
+export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [step, setStep] = useState<Step>("form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -83,6 +88,7 @@ export function PixCheckout({ offer, onClose, context }: Props) {
   const [copied, setCopied] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
+  const cpfRef = useRef<HTMLInputElement>(null);
   const price = PIX_PRICES[offer];
 
   // Prefill do profile — com CPF já salvo, pula o form direto pro QR
@@ -226,8 +232,16 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                 <p className="text-sm text-muted-foreground mt-1.5">Pagamento único — sem mensalidade, nunca.</p>
               </div>
 
-              {/* Resumo do pedido estilo recibo — a pessoa vê O QUE está pagando */}
-              <div className="rounded-2xl border border-border bg-card p-4 mb-5 shadow-sm">
+              {/* Resumo do pedido estilo recibo — a pessoa vê O QUE está pagando.
+                  No v2 o mascote espia por cima do recibo (a identidade do funil
+                  não solta a mão na hora do dinheiro). */}
+              <div className="relative" style={v2?.mascote ? { marginTop: 74 } : undefined}>
+                {v2?.mascote && (
+                  <div aria-hidden style={{ position: "absolute", top: -68, left: "50%", transform: "translateX(-50%)", zIndex: 1, pointerEvents: "none", lineHeight: 0 }}>
+                    {v2.mascote}
+                  </div>
+                )}
+              <div className="rounded-2xl border border-border bg-card p-4 mb-5 shadow-sm relative">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5 text-left">
                     <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground shrink-0">
@@ -251,12 +265,15 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                   <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-accent" /> Garantia de 7 dias</span>
                 </div>
               </div>
+              </div>
 
               <div className="space-y-3">
-                <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+                {/* v2 já sabe o nome (cadastro T15) — campo some, prefill segue no estado */}
+                {!v2 && <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />}
                 <IconInput
                   Icon={Fingerprint} inputMode="numeric" placeholder="CPF"
                   value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))}
+                  inputRef={cpfRef}
                 />
                 <p className="text-[11px] text-muted-foreground text-center leading-snug px-2">
                   🔒 O banco exige o CPF pra emitir o Pix — não usamos pra mais nada.
@@ -264,11 +281,24 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                 {errMsg && <p className="text-sm text-destructive text-center">{errMsg}</p>}
                 <Button
                   size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
-                  disabled={!cpfLooksValid(cpf)}
-                  onClick={() => generate(name, cpf)}
+                  disabled={v2 ? false : !cpfLooksValid(cpf)}
+                  onClick={() => {
+                    // v2: CTA sempre vivo — sem CPF válido, aponta o que falta
+                    if (!cpfLooksValid(cpf)) {
+                      setErrMsg("Só falta um CPF válido pra emitir o Pix 👆");
+                      cpfRef.current?.focus();
+                      return;
+                    }
+                    generate(name, cpf);
+                  }}
                 >
                   Gerar meu Pix de R$ {price}
                 </Button>
+                {v2 && (
+                  <p className="text-[11.5px] text-muted-foreground text-center leading-snug px-2">
+                    Não era pra você? Uma mensagem em até 7 dias e a gente devolve seus R$ {price}.
+                  </p>
+                )}
               </div>
             </motion.div>
           )}
@@ -318,6 +348,11 @@ export function PixCheckout({ offer, onClose, context }: Props) {
                 </span>
                 Aguardando seu pagamento…
               </p>
+              {v2?.missao && (
+                <p className="text-[12px] text-muted-foreground mt-2">
+                  🎯 Te esperando lá dentro: <strong className="text-foreground">{v2.missao.toLowerCase()}</strong>
+                </p>
+              )}
             </motion.div>
           )}
 

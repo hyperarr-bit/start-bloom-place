@@ -167,6 +167,10 @@ const Preview = () => {
   const [params] = useSearchParams();
   const funnel = params.get("funnel") === "1";
   const tour = params.get("tour") === "vida";
+  // Embutido no funil v2 (?embed=v2): o v2 põe a própria moldura/selo/CTA por
+  // fora, então o banner e o rodapé daqui saem de cena. Sem o parâmetro,
+  // NADA muda — o preview de sempre segue idêntico pro funil atual.
+  const embed = params.get("embed") === "v2";
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
 
@@ -199,7 +203,7 @@ const Preview = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <PreviewBanner funnel={funnel} />
+      {!embed && <PreviewBanner funnel={funnel} />}
       {tour && <DemoTourNav current={key} />}
       <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
@@ -207,7 +211,7 @@ const Preview = () => {
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
       {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} />}
-      <DemoCta funnel={funnel} tour={tour} />
+      {!embed && <DemoCta funnel={funnel} tour={tour} />}
     </div>
   );
 };

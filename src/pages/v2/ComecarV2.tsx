@@ -1062,11 +1062,31 @@ const CHIPS_DEMO = ["financas", "rotina", "treino", "dieta", "desenvolvimento"];
 
 function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => void }) {
   // Demo = o APP REAL (decisão do dono 15/07: "o usuário se sente mais
-  // confiante"). O /preview/:modulo já existe, é público e roda com dados
-  // fictícios — embutido aqui via iframe, zero mudança em código compartilhado.
+  // confiante"). Reforma 16/07 (dono: "espremido causa percepção ruim"):
+  // a moldura virou uma MINIATURA proporcional (iframe a 390px escalado — um
+  // print perfeito, nada cortado) que é só porta de entrada; o teste de
+  // verdade acontece em TELA CHEIA (?embed=v2 tira o cromo do preview velho).
   const [mod, setMod] = useState(module);
+  const [cheia, setCheia] = useState(false);
   const [nudge, setNudge] = useState(false);
   const jaNudgou = useRef(false);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const [dim, setDim] = useState({ w: 344, h: 440 });
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const calc = () => setDim({ w: el.clientWidth, h: el.clientHeight });
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const escala = dim.w / 390;
+
+  const abrirCheia = () => { setCheia(true); track("funnel_v2_demo_fullscreen", { module: mod }); };
+  const fecharCheia = () => { setCheia(false); track("funnel_v2_demo_fullscreen_close", { module: mod }); };
 
   // o módulo da área escolhida abre primeiro e lidera a fila de chips
   const chips = useMemo(
@@ -1095,7 +1115,7 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
     <>
       <h1 className="fv2-display" style={{ fontSize: 25 }}>Sua central. <span className="hl">Testa ela agora.</span></h1>
       <div className="fv2-bolha clara" style={{ marginTop: 2 }}>
-        👇 Isso embaixo é o app DE VERDADE, com dados de exemplo. Mexe à vontade — e troca de braço nos botões.
+        👇 Isso é o app DE VERDADE, com dados de exemplo. Toca pra abrir em tela cheia — e troca de braço nos botões.
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "10px 0 4px" }}>
         {chips.map((k) => {
@@ -1121,13 +1141,85 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
       </div>
       <motion.div
         className="fv2-app-frame"
+        ref={frameRef}
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       >
         <span className="fv2-app-selo">Dados de exemplo</span>
-        <iframe key={mod} src={`/preview/${mod}`} title="Demonstração do módulo no app real" loading="eager" />
+        {/* miniatura proporcional: o app renderiza a 390px (largura de celular
+            real) e é escalado — print perfeito, sem nada espremido/cortado */}
+        <iframe
+          key={mod}
+          src={`/preview/${mod}?embed=v2`}
+          title="Demonstração do módulo no app real"
+          loading="eager"
+          style={{
+            width: 390, height: dim.h / escala,
+            transform: `scale(${escala})`, transformOrigin: "top left",
+            pointerEvents: "none", border: 0, display: "block",
+          }}
+        />
+        <button
+          onClick={abrirCheia}
+          aria-label="Abrir o app em tela cheia"
+          style={{ position: "absolute", inset: 0, zIndex: 3, background: "transparent", border: 0, cursor: "pointer", padding: 0 }}
+        >
+          <span style={{
+            position: "absolute", bottom: 14, left: "50%", transform: "translateX(-50%)",
+            background: "var(--tinta)", color: "#fff", borderRadius: 999, padding: "10px 18px",
+            fontSize: 13.5, fontWeight: 800, whiteSpace: "nowrap", boxShadow: "0 10px 26px rgba(23,17,28,.38)",
+          }}>
+            Abrir em tela cheia ↗
+          </span>
+        </button>
       </motion.div>
+
+      <AnimatePresence>
+        {cheia && (
+          <motion.div
+            key="fs"
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+            style={{ position: "fixed", inset: 0, zIndex: 30, background: "#fff" }}
+          >
+            <iframe
+              key={mod}
+              src={`/preview/${mod}?embed=v2`}
+              title="App em tela cheia"
+              style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+            />
+            <button
+              onClick={fecharCheia}
+              aria-label="Fechar tela cheia"
+              style={{
+                position: "fixed", top: 12, left: 12, zIndex: 32, width: 38, height: 38,
+                borderRadius: 999, border: "2.5px solid var(--tinta)", background: "#fff",
+                fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 16px rgba(23,17,28,.22)",
+              }}
+            >✕</button>
+            <span style={{
+              position: "fixed", top: 16, right: 12, zIndex: 32,
+              background: "var(--tinta)", color: "#fff", fontSize: 10.5, fontWeight: 800,
+              letterSpacing: ".06em", textTransform: "uppercase", borderRadius: 999, padding: "5px 11px",
+            }}>Dados de exemplo</span>
+            <div style={{
+              position: "fixed", left: 0, right: 0, bottom: "max(14px, env(safe-area-inset-bottom))",
+              zIndex: 32, display: "flex", justifyContent: "center", pointerEvents: "none",
+            }}>
+              <button
+                className="fv2-cta"
+                style={{ pointerEvents: "auto", width: "min(360px, calc(100vw - 32px))", boxShadow: "0 14px 34px rgba(23,17,28,.4)" }}
+                onClick={() => { track("funnel_v2_demo_fullscreen_continue"); onContinuar(); }}
+              >
+                Continuar →
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {nudge && (
         <>
           <div
@@ -1169,7 +1261,8 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
         ))}
       </div>
       <div className="fv2-rodape" style={{ paddingTop: 14 }}>
-        <button className="fv2-cta magenta" onClick={onContinuar}>Continuar →</button>
+        <button className="fv2-cta magenta" onClick={abrirCheia}>Testar o app em tela cheia</button>
+        <button className="fv2-ghost" onClick={onContinuar}>Continuar →</button>
       </div>
     </>
   );

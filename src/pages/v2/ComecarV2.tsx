@@ -13,7 +13,7 @@ import {
   type AreaKey, type QuizQ, type QuizOpt, ALL_MODULE_ICONS,
 } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
-import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES, type PixOffer } from "@/components/paywall/PixCheckout";
 import { Polvo, PolvoAvatar, PolvoEspiando, TentaculoGigante, type PolvoMood } from "./Polvo";
 import { Moeda, Recibo, Cedula, Lupa } from "./Props";
 import "./funil-v2.css";
@@ -281,6 +281,12 @@ export default function ComecarV2() {
   const [vitoria, setVitoria] = useState<string | null>(salvo.vitoria ?? null);
   const [gastoTeste, setGastoTeste] = useState<number | null>(salvo.gastoTeste ?? null);
   const [pixAberto, setPixAberto] = useState(false);
+  // Downsell (16/07, ordem do dono): fechou o Pix sem pagar no T16 → UMA vez,
+  // o polvo corta o preço no meio (offer "downsell" = vitalício R$14,90, a
+  // mesma que roda no funil atual).
+  const [pixOffer, setPixOffer] = useState<PixOffer>("lifetime");
+  const [downsell, setDownsell] = useState(false);
+  const downsellVisto = useRef(false);
 
   // trilha da área escolhida (perguntas idênticas às do funil atual) e a
   // ordem dela: fora de dinheiro não existe T5 (roda de R$) — o pico T6 vem
@@ -415,13 +421,18 @@ export default function ComecarV2() {
               />
             )}
 
-            {step === "t16" && (
+            {step === "t16" && (downsell ? (
+              <T16Downsell
+                onPagar={() => { setPixOffer("downsell"); setPixAberto(true); track("funnel_v2_downsell_click"); }}
+                onRecusar={() => { setDownsell(false); setPixOffer("lifetime"); track("funnel_v2_downsell_dismiss"); }}
+              />
+            ) : (
               <T16Pix
                 pixAberto={pixAberto}
-                onAbrir={() => setPixAberto(true)}
+                onAbrir={() => { setPixOffer("lifetime"); setPixAberto(true); }}
                 onVoltar={() => irPara("t14")}
               />
-            )}
+            ))}
 
             {step === "t17" && (
               <T17Ativacao area={areaKey} areaModule={areaInfo.module} areaNome={areaInfo.nome} vitoria={vitoria} />
@@ -447,10 +458,18 @@ export default function ComecarV2() {
 
       {pixAberto && (
         <PixCheckout
-          offer="lifetime"
+          offer={pixOffer}
           context="funnel"
           v2={{ mascote: <PolvoEspiando width={150} mood="feliz" />, missao: vitoria }}
-          onClose={() => setPixAberto(false)}
+          onClose={() => {
+            setPixAberto(false);
+            // fechou sem pagar no T16 → downsell, uma única vez
+            if (step === "t16" && !isSubscribed && !downsellVisto.current) {
+              downsellVisto.current = true;
+              setDownsell(true);
+              track("funnel_v2_downsell_view");
+            }
+          }}
         />
       )}
     </div>
@@ -460,19 +479,22 @@ export default function ComecarV2() {
 // ---------------------------------------------------------------- T1 — hero + porta
 
 function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => void }) {
+  // Tela única (16/07, dono): hero + as 5 opções SEM scroll num iPhone —
+  // cena mais baixa, polvo menor, tipografia e opções mais justas.
   return (
     <>
       {/* cena-colagem: card do módulo (fundo) → tag número-herói → polvo (frente) */}
-      <div className="fv2-cena">
+      <div className="fv2-cena" style={{ height: 174, margin: "0 -6px 8px" }}>
         <motion.div
           className="fv2-cena-card"
+          style={{ width: 222, padding: "11px 13px" }}
           initial={{ opacity: 0, y: 26, rotate: -2.5 }}
           animate={{ opacity: 1, y: 0, rotate: -2.5 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="head">💸 Finanças <span className="ok">EM DIA</span></div>
-          <div className="fv2-nh" style={{ padding: "8px 0 6px" }}>
-            <b style={{ fontSize: 26 }}>R$ 2.418</b> <span style={{ fontSize: 11.5 }}>livres este mês</span>
+          <div className="fv2-nh" style={{ padding: "6px 0 4px" }}>
+            <b style={{ fontSize: 21 }}>R$ 2.418</b> <span style={{ fontSize: 11 }}>livres este mês</span>
           </div>
           <div className="linha"><span>🛒 Mercado</span><b>−R$ 182</b></div>
           <div className="linha"><span>⚡ Luz · avisada antes</span><b className="verde">R$ 0 multa</b></div>
@@ -480,15 +502,17 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => vo
 
         <motion.div
           className="fv2-tag"
+          style={{ padding: "7px 12px" }}
           initial={{ opacity: 0, scale: 0.7 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.25, type: "spring", stiffness: 380, damping: 20 }}
         >
-          <b>R$ 417</b><span>recuperados/mês</span>
+          <b style={{ fontSize: 18 }}>R$ 417</b><span>recuperados/mês</span>
         </motion.div>
 
         <motion.span
           className="fv2-manuscrito"
+          style={{ fontSize: 17, top: 48, width: 92 }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.65 }}
@@ -496,8 +520,8 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => vo
           um braço pra<br />cada área ↘
         </motion.span>
 
-        <span className="fv2-prop" style={{ left: 10, bottom: 6, transform: "rotate(-14deg)" }}><Moeda size={26} /></span>
-        <span className="fv2-prop" style={{ left: 44, bottom: -4, transform: "rotate(9deg)" }}><Recibo size={30} /></span>
+        <span className="fv2-prop" style={{ left: 10, bottom: 6, transform: "rotate(-14deg)" }}><Moeda size={24} /></span>
+        <span className="fv2-prop" style={{ left: 42, bottom: -4, transform: "rotate(9deg)" }}><Recibo size={28} /></span>
 
         <motion.div
           className="fv2-cena-polvo"
@@ -505,17 +529,17 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => vo
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4, type: "spring", stiffness: 240, damping: 22 }}
         >
-          <Polvo mood="feliz" size={196} />
+          <Polvo mood="feliz" size={124} />
         </motion.div>
       </div>
 
-      <h1 className="fv2-display" style={{ textAlign: "center" }}>
+      <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 24, margin: "0 0 4px" }}>
         Sua vida inteira. <span className="hl">Um lugar só.</span>
       </h1>
-      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto 18px", fontWeight: 700 }}>
+      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto 10px", fontWeight: 700, fontSize: 14 }}>
         Escolhe por onde a gente começa:
       </p>
-      <div className="fv2-opcoes">
+      <div className="fv2-opcoes" style={{ gap: 7 }}>
         {/* mesma porta do funil atual: 4 áreas (saúde fica fora da porta,
             mas viva no radar/trilha) + "Tudo" caindo na trilha que mais
             converte (dinheiro) */}
@@ -523,24 +547,26 @@ function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey, porta?: string) => vo
           <motion.button
             key={k}
             className="fv2-opcao"
+            style={{ padding: "9px 14px", fontSize: 15 }}
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.55 + i * 0.06 }}
             onClick={() => onEscolher(k)}
           >
-            <span className="emo">{AREAS[k].emoji}</span>
+            <span className="emo" style={{ width: 31, height: 31, borderRadius: 10, fontSize: 15 }}>{AREAS[k].emoji}</span>
             {AREAS[k].label}
             <span className="seta">→</span>
           </motion.button>
         ))}
         <motion.button
           className="fv2-opcao"
+          style={{ padding: "9px 14px", fontSize: 15 }}
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 + DOOR_AREAS.length * 0.06 }}
           onClick={() => onEscolher("dinheiro", "tudo")}
         >
-          <span className="emo">😵‍💫</span>
+          <span className="emo" style={{ width: 31, height: 31, borderRadius: 10, fontSize: 15 }}>😵‍💫</span>
           Tudo, sinceramente
           <span className="seta">→</span>
         </motion.button>
@@ -1071,7 +1097,26 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
   const [nudge, setNudge] = useState(false);
   const jaNudgou = useRef(false);
   const frameRef = useRef<HTMLDivElement>(null);
+  const fsRef = useRef<HTMLIFrameElement>(null);
   const [dim, setDim] = useState({ w: 344, h: 440 });
+
+  // Cerca da tela cheia: a seta ← do app (dentro do iframe) navega pro funil
+  // VELHO (dono viu no celular, 16/07). Mesma origem → dá pra vigiar o
+  // pathname e trazer de volta pro módulo em ~1 frame se sair de /preview.
+  useEffect(() => {
+    if (!cheia) return;
+    const t = setInterval(() => {
+      const win = fsRef.current?.contentWindow;
+      try {
+        const path = win?.location?.pathname ?? "";
+        if (path && !path.startsWith("/preview/")) {
+          track("funnel_v2_demo_escape", { to: path.slice(0, 60) });
+          win!.location.replace(`/preview/${mod}?embed=v2`);
+        }
+      } catch { /* nunca cross-origin aqui; se der, deixa quieto */ }
+    }, 300);
+    return () => clearInterval(t);
+  }, [cheia, mod]);
 
   useEffect(() => {
     const el = frameRef.current;
@@ -1207,6 +1252,7 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
             </div>
             <iframe
               key={mod}
+              ref={fsRef}
               src={`/preview/${mod}?embed=v2`}
               title="App em tela cheia"
               style={{ width: "100%", flex: 1, border: 0, display: "block" }}
@@ -1518,6 +1564,39 @@ function T16Pix({ pixAberto, onAbrir, onVoltar }: {
           <button className="fv2-ghost" onClick={onVoltar}>Voltar pra oferta</button>
         </div>
       )}
+    </>
+  );
+}
+
+// -------------------------------------------- T16 — downsell (metade do preço)
+// Fechou o Pix sem pagar: a última cartada é a mesma oferta do funil atual
+// (vitalício R$14,90). Zero fricção — o desconto já vem dado, sem roleta.
+
+function T16Downsell({ onPagar, onRecusar }: { onPagar: () => void; onRecusar: () => void }) {
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Polvo mood="serio" size={132} />
+      </div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+        Espera. Se o preço pesou, eu corto ele <b>NO MEIO</b>. Mesmo app inteiro, mesmo vitalício.
+      </div>
+      <motion.div {...popAnim} className="fv2-card fv2-preco">
+        <span className="tag" style={{ background: "var(--coral)" }}>Só nessa tela</span>
+        <div className="fv2-preco-linha fv2-nh">
+          <span className="fv2-preco-de">R$ {PIX_PRICES.lifetime}</span>
+          <b style={{ fontSize: 38, whiteSpace: "nowrap" }}>R$ {PIX_PRICES.downsell}</b>
+          <span style={{ fontSize: 12, lineHeight: 1.25 }}>uma vez,<br />seu pra sempre</span>
+        </div>
+        <ul className="fv2-checks">
+          <li>Os mesmos 16 módulos, sem tirar nada</li>
+          <li>Mesma garantia de 7 dias</li>
+        </ul>
+      </motion.div>
+      <div className="fv2-rodape">
+        <button className="fv2-cta magenta" onClick={onPagar}>Gerar meu Pix de R$ {PIX_PRICES.downsell}</button>
+        <button className="fv2-ghost" onClick={onRecusar}>Deixa no preço normal</button>
+      </div>
     </>
   );
 }

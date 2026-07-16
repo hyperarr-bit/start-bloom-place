@@ -302,11 +302,13 @@ export default function ComecarV2() {
   const [vitoria, setVitoria] = useState<string | null>(salvo.vitoria ?? null);
   const [gastoTeste, setGastoTeste] = useState<number | null>(salvo.gastoTeste ?? null);
   const [pixAberto, setPixAberto] = useState(false);
-  // Downsell (16/07, ordem do dono): fechou o Pix sem pagar no T16 → UMA vez,
-  // o polvo corta o preço no meio (offer "downsell" = vitalício R$14,90, a
-  // mesma que roda no funil atual).
-  const [pixOffer, setPixOffer] = useState<PixOffer>("lifetime");
+  // Downsell (16/07, ordem do dono; ampliado no mesmo dia): a MESMA tela de
+  // resgate (vitalício R$14,90) atende quatro portas de fuga — X atrasado no
+  // paywall, voltar do celular no paywall, 40s parado no paywall e fechar o
+  // pagamento sem pagar. Uma vez por sessão; recusou, ninguém insiste.
+  const [pixOffer, setPixOffer] = useState<PixOffer>(salvo.pixOffer === "downsell" ? "downsell" : "lifetime");
   const [downsell, setDownsell] = useState(false);
+  const [downsellOrigem, setDownsellOrigem] = useState("");
   const downsellVisto = useRef(false);
 
   // trilha da área escolhida (perguntas idênticas às do funil atual) e a
@@ -321,8 +323,8 @@ export default function ComecarV2() {
   const areaInfo = AREAS[areaKey];
 
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, area, dor, consist, estim, vitoria, gastoTeste })); } catch { /* noop */ }
-  }, [step, area, dor, consist, estim, vitoria, gastoTeste]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, area, dor, consist, estim, vitoria, gastoTeste, pixOffer })); } catch { /* noop */ }
+  }, [step, area, dor, consist, estim, vitoria, gastoTeste, pixOffer]);
 
   useEffect(() => { track("funnel_v2_step", { step, idx }); }, [step, idx]);
   useEffect(() => {
@@ -371,23 +373,65 @@ export default function ComecarV2() {
     setTimeout(() => { window.location.href = urlHospedado(offer, email, nome); }, 150);
   }, [user]);
 
-  // Modo hospedado: voltou do checkout sem pagar (ficou 25s+ fora) → downsell
-  // UMA vez. Espera 6s pro check-subscription ter chance de confirmar antes.
+  // Uma porta só pro resgate: qualquer gatilho passa por aqui. Guarda-corpos:
+  // uma vez por sessão, nunca pra assinante, nunca pra quem JÁ está no 14,90.
+  const abrirDownsell = useCallback((origem: string) => {
+    if (downsellVisto.current || isSubscribed || pixOffer === "downsell") return;
+    downsellVisto.current = true;
+    setDownsellOrigem(origem);
+    setDownsell(true);
+    track("funnel_v2_downsell_view", { origem, modo: CHECKOUT_HOSPEDADO ? "hospedado" : "pix" });
+  }, [isSubscribed, pixOffer]);
+
+  const aceitarDownsell = useCallback(() => {
+    track("funnel_v2_downsell_click", { origem: downsellOrigem });
+    setPixOffer("downsell");
+    setDownsell(false);
+    if (!user) { irPara("t15"); return; }        // conta primeiro — o e-mail é o vínculo
+    if (CHECKOUT_HOSPEDADO) { irCheckoutHospedado("downsell"); return; }
+    if (step !== "t16") irPara("t16");           // entrar no t16 abre o Pix (offer já é downsell)
+    else setPixAberto(true);
+  }, [downsellOrigem, user, step, irPara, irCheckoutHospedado]);
+
+  const recusarDownsell = useCallback(() => {
+    setDownsell(false);
+    track("funnel_v2_downsell_dismiss", { origem: downsellOrigem });
+  }, [downsellOrigem]);
+
+  // Gatilho VOLTAR (celular) no paywall: o primeiro voltar abre o resgate;
+  // o segundo sai de verdade — insistir duas vezes é spam.
+  useEffect(() => {
+    if (step !== "t14" || downsellVisto.current || isSubscribed) return;
+    window.history.pushState({ fv2ds: 1 }, "");
+    const onPop = () => abrirDownsell("voltar");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [step, isSubscribed, abrirDownsell]);
+
+  // Gatilho 40s PARADO no paywall (qualquer toque/scroll rearma o timer)
+  useEffect(() => {
+    if (step !== "t14") return;
+    let t: number;
+    const arma = () => { clearTimeout(t); t = window.setTimeout(() => abrirDownsell("inatividade"), 40000); };
+    arma();
+    const evs = ["pointerdown", "scroll", "keydown", "touchstart"] as const;
+    evs.forEach((e) => window.addEventListener(e, arma, { passive: true }));
+    return () => { clearTimeout(t); evs.forEach((e) => window.removeEventListener(e, arma)); };
+  }, [step, abrirDownsell]);
+
+  // Modo hospedado: voltou do checkout sem pagar (ficou 25s+ fora) → resgate.
+  // Espera 6s pro check-subscription ter chance de confirmar antes.
   useEffect(() => {
     if (!CHECKOUT_HOSPEDADO || step !== "t16" || isSubscribed) return;
     let marca = 0;
     try { marca = Number(sessionStorage.getItem(FOI_CHECKOUT_KEY) || 0); } catch { /* noop */ }
     if (!marca || Date.now() - marca < 25000) return;
     const t = setTimeout(() => {
-      if (!downsellVisto.current) {
-        downsellVisto.current = true;
-        try { sessionStorage.removeItem(FOI_CHECKOUT_KEY); } catch { /* noop */ }
-        setDownsell(true);
-        track("funnel_v2_downsell_view", { modo: "hospedado" });
-      }
+      try { sessionStorage.removeItem(FOI_CHECKOUT_KEY); } catch { /* noop */ }
+      abrirDownsell("voltou_hospedado");
     }, 6000);
     return () => clearTimeout(t);
-  }, [step, isSubscribed]);
+  }, [step, isSubscribed, abrirDownsell]);
 
   // Pagamento confirmado (use-auth repolla check-subscription): peak-end
   useEffect(() => {
@@ -479,24 +523,17 @@ export default function ComecarV2() {
               />
             )}
 
-            {step === "t16" && (downsell ? (
-              <T16Downsell
-                onPagar={() => {
-                  track("funnel_v2_downsell_click");
-                  if (CHECKOUT_HOSPEDADO) { irCheckoutHospedado("downsell"); return; }
-                  setPixOffer("downsell"); setPixAberto(true);
-                }}
-                onRecusar={() => { setDownsell(false); setPixOffer("lifetime"); track("funnel_v2_downsell_dismiss"); }}
-              />
-            ) : CHECKOUT_HOSPEDADO ? (
+            {step === "t16" && (CHECKOUT_HOSPEDADO ? (
               <T16Externo
                 email={user?.email ?? null}
-                onPagar={() => irCheckoutHospedado("lifetime")}
+                offer={pixOffer}
+                onPagar={() => irCheckoutHospedado(pixOffer)}
               />
             ) : (
               <T16Pix
+                offer={pixOffer}
                 pixAberto={pixAberto}
-                onAbrir={() => { setPixOffer("lifetime"); setPixAberto(true); }}
+                onAbrir={() => setPixAberto(true)}
                 onVoltar={() => irPara("t14")}
               />
             ))}
@@ -516,12 +553,17 @@ export default function ComecarV2() {
                   irPara(user ? "t16" : "t15");
                 }}
                 onEntrar={() => navigate("/entrar")}
+                onFugir={() => abrirDownsell("x_paywall")}
               />
             )}
 
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {downsell && <DownsellTakeover onPagar={aceitarDownsell} onRecusar={recusarDownsell} />}
+      </AnimatePresence>
 
       {pixAberto && (
         <PixCheckout
@@ -530,12 +572,8 @@ export default function ComecarV2() {
           v2={{ mascote: <PolvoEspiando width={150} mood="feliz" />, missao: vitoria }}
           onClose={() => {
             setPixAberto(false);
-            // fechou sem pagar no T16 → downsell, uma única vez
-            if (step === "t16" && !isSubscribed && !downsellVisto.current) {
-              downsellVisto.current = true;
-              setDownsell(true);
-              track("funnel_v2_downsell_view");
-            }
+            // fechou o pagamento sem pagar → resgate (guardas no abrirDownsell)
+            if (step === "t16") abrirDownsell("fechou_pix");
           }}
         />
       )}
@@ -1468,15 +1506,39 @@ function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
 
 // ---------------------------------------------------------------- T14 — paywall
 
-function T14Paywall({ area, estim, vitoria, areaNome, onCheckout, onEntrar }: {
+function T14Paywall({ area, estim, vitoria, areaNome, onCheckout, onEntrar, onFugir }: {
   area: AreaKey; estim: number; vitoria: string | null; areaNome: string;
-  onCheckout: () => void; onEntrar: () => void;
+  onCheckout: () => void; onEntrar: () => void; onFugir: () => void;
 }) {
   const anual = estim * 12;
+  // X atrasado (padrão BitePal/Cal AI): o paywall abre sem saída visível;
+  // depois de 4s um X discreto surge — quem toca cai no resgate, não sai.
+  const [xVisivel, setXVisivel] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setXVisivel(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <>
       {/* faixa de celebração: polvo festa cortado + headline branca */}
       <div className="fv2-faixa">
+        {xVisivel && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7 }}
+            onClick={onFugir}
+            aria-label="Fechar oferta"
+            style={{
+              position: "absolute", top: 12, right: 12, zIndex: 5,
+              width: 30, height: 30, borderRadius: 999, border: 0,
+              background: "rgba(255,255,255,.26)", color: "#fff",
+              fontSize: 13, fontWeight: 800, cursor: "pointer",
+              display: "grid", placeItems: "center",
+            }}
+          >✕</motion.button>
+        )}
         <p style={{ fontSize: 12, fontWeight: 800, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.85 }}>
           ✓ Plano montado
         </p>
@@ -1607,10 +1669,10 @@ function T15SalvarPlano({ areaNome, vitoria, onSalvo, onEntrar }: {
 
 // ---------------------------------------------------------------- T16 — pagamento (polvo ansioso)
 
-function T16Pix({ pixAberto, onAbrir, onVoltar }: {
-  pixAberto: boolean; onAbrir: () => void; onVoltar: () => void;
+function T16Pix({ offer, pixAberto, onAbrir, onVoltar }: {
+  offer: PixOffer; pixAberto: boolean; onAbrir: () => void; onVoltar: () => void;
 }) {
-  useEffect(() => { track("funnel_v2_pix_screen"); }, []);
+  useEffect(() => { track("funnel_v2_pix_screen", { offer }); }, [offer]);
   return (
     <>
       <motion.div
@@ -1627,7 +1689,7 @@ function T16Pix({ pixAberto, onAbrir, onVoltar }: {
       </div>
       {!pixAberto && (
         <div className="fv2-rodape">
-          <button className="fv2-cta magenta" onClick={onAbrir}>Abrir o Pix de R$ {PIX_PRICES.lifetime}</button>
+          <button className="fv2-cta magenta" onClick={onAbrir}>Abrir o Pix de R$ {PIX_PRICES[offer]}</button>
           <button className="fv2-ghost" onClick={onVoltar}>Voltar pra oferta</button>
         </div>
       )}
@@ -1639,8 +1701,8 @@ function T16Pix({ pixAberto, onAbrir, onVoltar }: {
 // Vigente enquanto a API de Pix estiver fora: o pagamento acontece no checkout
 // hospedado, e o acesso é liberado pelo E-MAIL — daí o aviso martelado.
 
-function T16Externo({ email, onPagar }: { email: string | null; onPagar: () => void }) {
-  useEffect(() => { track("funnel_v2_pix_screen", { modo: "hospedado" }); }, []);
+function T16Externo({ email, offer, onPagar }: { email: string | null; offer: PixOffer; onPagar: () => void }) {
+  useEffect(() => { track("funnel_v2_pix_screen", { modo: "hospedado", offer }); }, [offer]);
   return (
     <>
       <motion.div
@@ -1666,7 +1728,7 @@ function T16Externo({ email, onPagar }: { email: string | null; onPagar: () => v
       </motion.div>
       <div className="fv2-rodape">
         <button className="fv2-cta magenta" onClick={onPagar}>
-          Pagar R$ {PIX_PRICES.lifetime} no checkout seguro →
+          Pagar R$ {PIX_PRICES[offer]} no checkout seguro →
         </button>
         <p style={{ textAlign: "center", fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
           🔒 Garantia de 7 dias · Pix aprovado na hora
@@ -1677,36 +1739,100 @@ function T16Externo({ email, onPagar }: { email: string | null; onPagar: () => v
   );
 }
 
-// -------------------------------------------- T16 — downsell (metade do preço)
-// Fechou o Pix sem pagar: a última cartada é a mesma oferta do funil atual
-// (vitalício R$14,90). Zero fricção — o desconto já vem dado, sem roleta.
+// ------------------------------------- resgate — takeover 14,90 (4 portas)
+// A MESMA tela pra toda fuga: X do paywall, voltar do celular, 40s parado e
+// fechar o pagamento. Zero fricção (o corte já vem dado, sem roleta — regra
+// do dono) e teatro no preço: o 27,90 é riscado AO VIVO e o 14,90 estoura.
 
-function T16Downsell({ onPagar, onRecusar }: { onPagar: () => void; onRecusar: () => void }) {
+function DownsellTakeover({ onPagar, onRecusar }: { onPagar: () => void; onRecusar: () => void }) {
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Polvo mood="serio" size={132} />
-      </div>
-      <div className="fv2-bolha" style={{ textAlign: "center" }}>
-        Espera. Se o preço pesou, eu corto ele <b>NO MEIO</b>. Mesmo app inteiro, mesmo vitalício.
-      </div>
-      <motion.div {...popAnim} className="fv2-card fv2-preco">
-        <span className="tag" style={{ background: "var(--coral)" }}>Só nessa tela</span>
-        <div className="fv2-preco-linha fv2-nh">
-          <span className="fv2-preco-de">R$ {PIX_PRICES.lifetime}</span>
-          <b style={{ fontSize: 38, whiteSpace: "nowrap" }}>R$ {PIX_PRICES.downsell}</b>
-          <span style={{ fontSize: 12, lineHeight: 1.25 }}>uma vez,<br />seu pra sempre</span>
+    <motion.div
+      key="fv2-ds"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.22 }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 70,
+        background: "rgba(23,17,28,.58)", backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+      }}
+    >
+      <motion.div
+        initial={{ y: 110, scale: 0.97 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 110, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 27 }}
+        style={{
+          width: "min(430px, 100%)", position: "relative",
+          background: "linear-gradient(180deg, #ffe4f0 0%, #f3f2f7 46%)",
+          borderRadius: "26px 26px 0 0",
+          padding: "70px 22px calc(18px + env(safe-area-inset-bottom, 0px))",
+        }}
+      >
+        {/* polvo espiando por cima da borda do sheet — ele "segura" a oferta */}
+        <motion.div
+          initial={{ opacity: 0, y: 30, x: "-50%" }}
+          animate={{ opacity: 1, y: 0, x: "-50%" }}
+          transition={{ delay: 0.28, type: "spring", stiffness: 260, damping: 22 }}
+          style={{ position: "absolute", top: -82, left: "50%", lineHeight: 0, pointerEvents: "none" }}
+        >
+          <PolvoEspiando width={158} mood="serio" />
+        </motion.div>
+
+        <button
+          onClick={onRecusar}
+          aria-label="Recusar desconto"
+          style={{
+            position: "absolute", top: 12, right: 12, width: 30, height: 30,
+            borderRadius: 999, border: 0, background: "rgba(23,17,28,.08)",
+            color: "var(--tinta-2)", fontSize: 12.5, fontWeight: 800,
+            cursor: "pointer", display: "grid", placeItems: "center",
+          }}
+        >✕</button>
+
+        <p style={{ margin: 0, textAlign: "center", fontSize: 11.5, fontWeight: 800, letterSpacing: ".12em", textTransform: "uppercase", color: "var(--coral)" }}>
+          Espera — antes de você ir
+        </p>
+        <h2 className="fv2-display" style={{ textAlign: "center", fontSize: 26, margin: "6px 0 2px" }}>
+          Fica com TUDO <span className="hl">pela metade</span>.
+        </h2>
+
+        {/* o corte ao vivo: risca o 27,90, o 14,90 estoura */}
+        <div className="fv2-nh" style={{ display: "flex", gap: 14, alignItems: "baseline", justifyContent: "center", margin: "10px 0 2px" }}>
+          <span style={{ position: "relative", fontSize: 22, fontWeight: 700, color: "var(--tinta-2)" }}>
+            R$ {PIX_PRICES.lifetime}
+            <motion.span
+              initial={{ width: 0 }}
+              animate={{ width: "112%" }}
+              transition={{ delay: 0.55, duration: 0.35, ease: "easeOut" }}
+              style={{ position: "absolute", left: "-6%", top: "52%", height: 3.5, background: "var(--coral)", borderRadius: 2 }}
+            />
+          </span>
+          <motion.b
+            initial={{ scale: 0, rotate: -6 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.95, type: "spring", stiffness: 320, damping: 14 }}
+            style={{ fontSize: 46, whiteSpace: "nowrap" }}
+          >
+            R$ {PIX_PRICES.downsell}
+          </motion.b>
         </div>
-        <ul className="fv2-checks">
+        <p style={{ margin: "0 0 12px", textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "var(--tinta-2)" }}>
+          Pagamento único · seu pra sempre
+        </p>
+
+        <ul className="fv2-checks" style={{ margin: "0 auto", maxWidth: 300 }}>
           <li>Os mesmos 16 módulos, sem tirar nada</li>
           <li>Mesma garantia de 7 dias</li>
         </ul>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 16 }}>
+          <button className="fv2-cta magenta" onClick={onPagar}>Quero por R$ {PIX_PRICES.downsell} →</button>
+          <button className="fv2-ghost" onClick={onRecusar}>Deixa no preço normal</button>
+        </div>
       </motion.div>
-      <div className="fv2-rodape">
-        <button className="fv2-cta magenta" onClick={onPagar}>Gerar meu Pix de R$ {PIX_PRICES.downsell}</button>
-        <button className="fv2-ghost" onClick={onRecusar}>Deixa no preço normal</button>
-      </div>
-    </>
+    </motion.div>
   );
 }
 

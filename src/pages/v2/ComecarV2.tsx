@@ -1115,7 +1115,7 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
     <>
       <h1 className="fv2-display" style={{ fontSize: 25 }}>Sua central. <span className="hl">Testa ela agora.</span></h1>
       <div className="fv2-bolha clara" style={{ marginTop: 2 }}>
-        👇 Isso é o app DE VERDADE, com dados de exemplo. Toca pra abrir em tela cheia — e troca de braço nos botões.
+        👇 Isso é o app DE VERDADE, com dados de exemplo. Toca pra abrir em tela cheia — e troca de módulo nos botões.
       </div>
       <div style={{ display: "flex", gap: 6, overflowX: "auto", padding: "10px 0 4px" }}>
         {chips.map((k) => {
@@ -1184,23 +1184,33 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.97 }}
             transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-            style={{ position: "fixed", inset: 0, zIndex: 30, background: "#fff" }}
+            style={{ position: "fixed", inset: 0, zIndex: 30, background: "#fff", display: "flex", flexDirection: "column" }}
           >
+            {/* a mesma barra do funil original (Preview funnel=1), com o ✕ dentro */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10, flex: "0 0 auto",
+              padding: "8px 12px", paddingTop: "max(8px, env(safe-area-inset-top))",
+              background: "linear-gradient(90deg, #7c3aed, #c026d3)", color: "#fff",
+            }}>
+              <button
+                onClick={fecharCheia}
+                aria-label="Fechar tela cheia"
+                style={{
+                  width: 30, height: 30, borderRadius: 999, border: 0, flex: "0 0 auto",
+                  background: "rgba(255,255,255,.22)", color: "#fff", fontSize: 14,
+                  fontWeight: 800, cursor: "pointer", display: "grid", placeItems: "center",
+                }}
+              >✕</button>
+              <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.3 }}>
+                ✨ <b>Experimente à vontade</b> — dados de exemplo.
+              </span>
+            </div>
             <iframe
               key={mod}
               src={`/preview/${mod}?embed=v2`}
               title="App em tela cheia"
-              style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+              style={{ width: "100%", flex: 1, border: 0, display: "block" }}
             />
-            <button
-              onClick={fecharCheia}
-              aria-label="Fechar tela cheia"
-              style={{
-                position: "fixed", top: 12, left: 12, zIndex: 32, width: 38, height: 38,
-                borderRadius: 999, border: "2.5px solid var(--tinta)", background: "#fff",
-                fontSize: 15, fontWeight: 800, cursor: "pointer", boxShadow: "0 6px 16px rgba(23,17,28,.22)",
-              }}
-            >✕</button>
             <div style={{
               position: "fixed", left: 0, right: 0, bottom: "max(14px, env(safe-area-inset-bottom))",
               zIndex: 32, display: "flex", justifyContent: "center", pointerEvents: "none",
@@ -1236,7 +1246,7 @@ function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => v
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <PolvoAvatar size={38} />
               <p style={{ margin: 0, fontSize: 14.5, fontWeight: 700, lineHeight: 1.45 }}>
-                Curtiu fuçar? Isso é 1 braço dos 16. O seu — com a SUA vida dentro — destrava em 1 minuto.
+                Curtiu fuçar? Isso é 1 módulo dos 16. O seu — com a SUA vida dentro — destrava em 1 minuto.
               </p>
             </div>
             <button className="fv2-cta magenta" onClick={() => { track("funnel_v2_demo_nudge_cta"); onContinuar(); }}>

@@ -39,9 +39,12 @@ interface Props {
   v2?: { mascote?: React.ReactNode; missao?: string | null; onConfirmado?: () => void };
 }
 
-// Gateway do Pix do funil v2. Quando a Cakto reativar a conta: troca pra
-// "cakto" (1 linha) e pusha — NÃO é rollback na Vercel (desfaria o resto).
-const V2_GATEWAY: "abacate" | "cakto" = "abacate";
+// Gateway do Pix de TODO o app (16/07 noite, ordem do dono: Cakto não volta
+// hoje — funil original também migra). As TELAS não mudam: o original segue
+// com o form nome+CPF; só o cano por baixo troca. Quando a Cakto reativar:
+// troca pra "cakto" (1 linha) e pusha — NÃO é rollback na Vercel (desfaria
+// downsell/atribuição/AbacatePay juntos).
+const PIX_GATEWAY: "abacate" | "cakto" = "abacate";
 
 type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
@@ -103,7 +106,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // existe, então vai DIRETO pro QR sem digitar nada (decisão do dono 16/07).
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context });
-    if (v2 && V2_GATEWAY === "abacate") {
+    if (v2 && PIX_GATEWAY === "abacate") {
       generate("", "");
       return;
     }
@@ -126,7 +129,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     setErrMsg(null);
     try {
       let data: any, error: any;
-      if (v2 && V2_GATEWAY === "abacate") {
+      if (PIX_GATEWAY === "abacate") {
         // AbacatePay: contrato de resposta idêntico (orderId/qrCode/…)
         ({ data, error } = await supabase.functions.invoke("abacate-pix", {
           body: {
@@ -195,7 +198,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   useEffect(() => {
     if (step !== "qr" || doneRef.current) return;
     let stopped = false;
-    const abacate = !!v2 && V2_GATEWAY === "abacate";
+    const abacate = PIX_GATEWAY === "abacate";
     const orderId = pix?.orderId;
     const poll = async () => {
       if (stopped || doneRef.current) return;

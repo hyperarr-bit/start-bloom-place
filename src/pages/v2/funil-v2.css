@@ -299,6 +299,86 @@
 .fv2-faixa .fv2-display { color: #fff; margin: 4px 0 6px; }
 .fv2-faixa-polvo { position: absolute; right: -20px; bottom: -30px; opacity: .95; }
 
+/* ---------- varredura T2-T12 ---------- */
+
+/* quiz: polvo descendo de cima (cortado pelo topo) */
+.fv2-pendurado { display: flex; justify-content: center; margin: -34px 0 -6px; pointer-events: none; }
+
+/* flash de reação (wash momentâneo) */
+.fv2-flash {
+  position: fixed; inset: 0; pointer-events: none; z-index: 40;
+  animation: fv2-flash 0.55s ease-out forwards;
+}
+@keyframes fv2-flash { 0% { opacity: 0.55; } 100% { opacity: 0; } }
+
+/* T5: wheel picker de R$ */
+.fv2-wheel {
+  height: 220px; overflow-y: auto; scroll-snap-type: y mandatory;
+  -ms-overflow-style: none; scrollbar-width: none; position: relative;
+  mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+}
+.fv2-wheel::-webkit-scrollbar { display: none; }
+.fv2-wheel .item {
+  height: 56px; scroll-snap-align: center; display: flex; align-items: baseline;
+  justify-content: center; gap: 6px; font-family: "Archivo Black", sans-serif;
+  font-size: 26px; color: var(--tinta); transition: opacity 0.15s, transform 0.15s;
+  font-variant-numeric: tabular-nums;
+}
+.fv2-wheel .item span { font-family: "Figtree", sans-serif; font-size: 13px; font-weight: 600; color: var(--tinta-2); }
+.fv2-wheel .item[data-sel="false"] { opacity: 0.22; transform: scale(0.82); }
+.fv2-wheel .item[data-sel="true"] { font-size: 36px; }
+.fv2-wheel-marcas { position: relative; }
+.fv2-wheel-marcas::before, .fv2-wheel-marcas::after {
+  content: ""; position: absolute; left: 18%; right: 18%; height: 2px;
+  background: var(--linha); z-index: 2; pointer-events: none;
+}
+.fv2-wheel-marcas::before { top: calc(50% - 30px); }
+.fv2-wheel-marcas::after { top: calc(50% + 30px); }
+
+/* T7: polaroids */
+.fv2-polaroid { position: relative; }
+.fv2-polaroid .num {
+  position: absolute; top: -9px; left: 14px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--rosa); color: #fff;
+  font-family: "Archivo Black", sans-serif; font-size: 13px;
+  display: grid; place-items: center;
+}
+
+/* T8: tentáculo entrando de fora */
+.fv2-tentaculo { position: absolute; right: -36px; bottom: -14px; z-index: 5; pointer-events: none; }
+
+/* T10: mini-cards nos braços */
+.fv2-malabar { position: relative; display: flex; justify-content: center; }
+.fv2-malabar .mini {
+  position: absolute; background: var(--card); border-radius: 12px; padding: 6px 10px;
+  font-size: 12px; font-weight: 800; box-shadow: var(--sombra);
+  animation: fv2-flutua 2.8s ease-in-out infinite;
+}
+
+/* T11: placar */
+.fv2-placar {
+  display: flex; align-items: baseline; justify-content: center; gap: 12px;
+  margin: 14px 0 2px; font-variant-numeric: tabular-nums;
+}
+.fv2-placar .de { font-family: "Archivo Black", sans-serif; font-size: 34px; color: var(--coral); }
+.fv2-placar .pra { font-family: "Archivo Black", sans-serif; font-size: 46px; color: var(--rosa); }
+.fv2-placar .cem { font-size: 13px; font-weight: 600; color: var(--tinta-2); }
+.fv2-placar .seta { font-size: 22px; color: var(--tinta-2); }
+
+/* T12: app real emoldurado */
+.fv2-app-frame {
+  border-radius: 24px; overflow: hidden; box-shadow: var(--sombra);
+  border: 3px solid var(--tinta); background: #fff;
+  height: min(58vh, 480px); position: relative;
+}
+.fv2-app-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+.fv2-app-selo {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  background: var(--tinta); color: #fff; font-size: 10.5px; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; border-radius: 999px; padding: 4px 10px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fv2 *, .fv2 *::before, .fv2 *::after { animation: none !important; transition: none !important; }
 }

@@ -197,6 +197,30 @@ export function PolvoEspiando({ width = 160, mood = "feliz" }: { width?: number;
   );
 }
 
+/**
+ * Tentáculo GIGANTE entrando de fora da tela (T8, o pacto): braço estendido
+ * pro leitor, com ventosas. Posicionar no canto inferior-direito, cortado.
+ */
+export function TentaculoGigante({ width = 250 }: { width?: number }) {
+  return (
+    <svg width={width} height={width * 0.92} viewBox="0 0 280 258" aria-hidden="true">
+      <path d="M262 244 C200 214 162 168 156 118 C152 86 170 62 198 66 C222 70 230 96 214 108 C202 116 188 110 186 98"
+        fill="none" stroke={TINTA} strokeWidth="44" strokeLinecap="round" />
+      <path d="M262 244 C200 214 162 168 156 118 C152 86 170 62 198 66 C222 70 230 96 214 108 C202 116 188 110 186 98"
+        fill="none" stroke="#F566A8" strokeWidth="34" strokeLinecap="round" />
+      <path d="M262 244 C200 214 162 168 156 118"
+        fill="none" stroke="#FF97C6" strokeWidth="11" strokeLinecap="round" opacity=".55" />
+      <g fill="#FFB7D6" stroke={TINTA} strokeWidth="2">
+        <circle cx="226" cy="212" r="7" />
+        <circle cx="196" cy="180" r="6.5" />
+        <circle cx="178" cy="146" r="6" />
+        <circle cx="174" cy="112" r="5.5" />
+        <circle cx="192" cy="82" r="5" />
+      </g>
+    </svg>
+  );
+}
+
 /** Avatar redondo pro cabeçalho/balões. */
 export function PolvoAvatar({ size = 30 }: { size?: number }) {
   const uid = `av${seq++ % 1000}`;

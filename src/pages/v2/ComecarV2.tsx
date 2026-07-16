@@ -11,8 +11,8 @@ import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey, ALL_MODULE_ICONS } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
-import { Polvo, PolvoAvatar, PolvoEspiando, type PolvoMood } from "./Polvo";
-import { Moeda, Recibo, Cedula } from "./Props";
+import { Polvo, PolvoAvatar, PolvoEspiando, TentaculoGigante, type PolvoMood } from "./Polvo";
+import { Moeda, Recibo, Cedula, Lupa } from "./Props";
 import "./funil-v2.css";
 
 // ---------------------------------------------------------------- constantes
@@ -159,7 +159,7 @@ export default function ComecarV2() {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.div key={step} {...passoAnim} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+          <motion.div key={step} {...passoAnim} style={{ display: "flex", flexDirection: "column", flex: 1, position: "relative" }}>
 
             {step === "t1" && <T1Hero onEscolher={(k) => { setArea(k); track("funnel_v2_area", { area: k }); avancar(); }} />}
 
@@ -182,10 +182,8 @@ export default function ComecarV2() {
             {step === "t4" && <T4Crenca onContinuar={avancar} />}
 
             {step === "t5" && (
-              <QuizVivo
-                pergunta="Quanto você acha que escapa por mês sem você perceber?"
-                opts={Q_ESTIMATIVA}
-                onDone={(o) => { setEstim(o.valor ?? 300); track("funnel_v2_answer", { q: "estimativa", opt: o.label, valor: o.valor }); avancar(); }}
+              <T5Estimativa
+                onDone={(v) => { setEstim(v); track("funnel_v2_answer", { q: "estimativa", valor: v }); avancar(); }}
               />
             )}
 
@@ -203,15 +201,12 @@ export default function ComecarV2() {
               />
             )}
 
-            {step === "t10" && <T10Loading onPronto={avancar} />}
+            {step === "t10" && <T10Loading areaNome={areaInfo.nome} onPronto={avancar} />}
 
             {step === "t11" && <T11Mapa area={area ?? "dinheiro"} areaNome={areaInfo.nome} onContinuar={avancar} />}
 
             {step === "t12" && (
-              <T12Demo
-                onGasto={(v) => { setGastoTeste(v); track("funnel_v2_demo_expense", { valor: v }); }}
-                onContinuar={avancar}
-              />
+              <T12Demo module={areaInfo.module} onContinuar={avancar} />
             )}
 
             {step === "t13" && (
@@ -355,9 +350,22 @@ function QuizVivo({ pergunta, opts, onDone }: {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
-        <Polvo mood={picked?.mood ?? "neutro"} size={110} />
-      </div>
+      {/* flash de wash junto com a reação */}
+      {picked && (
+        <div
+          className="fv2-flash"
+          style={{ background: picked.mood === "serio" ? "#B7A6E6" : "#A8E3C2" }}
+        />
+      )}
+      {/* polvo descendo de cima, cortado pelo topo */}
+      <motion.div
+        className="fv2-pendurado"
+        initial={{ y: -46, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 240, damping: 22 }}
+      >
+        <Polvo mood={picked?.mood ?? "neutro"} size={126} />
+      </motion.div>
       {picked ? (
         <motion.div {...popAnim} className="fv2-bolha" style={{ textAlign: "center" }}>
           {picked.reacao}
@@ -377,6 +385,56 @@ function QuizVivo({ pergunta, opts, onDone }: {
             <span className="emo">{o.emoji}</span>{o.label}
           </button>
         ))}
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T5 — wheel de R$
+
+const VALORES_WHEEL = [100, 150, 200, 300, 400, 500, 700, 1000];
+const ITEM_H = 56;
+
+function T5Estimativa({ onDone }: { onDone: (v: number) => void }) {
+  const [idx, setIdx] = useState(3); // começa em R$ 300
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ref.current?.scrollTo({ top: 3 * ITEM_H });
+  }, []);
+
+  const onScroll = () => {
+    const el = ref.current;
+    if (!el) return;
+    const i = Math.max(0, Math.min(VALORES_WHEEL.length - 1, Math.round(el.scrollTop / ITEM_H)));
+    setIdx(i);
+  };
+
+  const v = VALORES_WHEEL[idx];
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, alignItems: "center" }}>
+        <Polvo mood="neutro" size={96} />
+        <span style={{ marginTop: -20 }}><Lupa size={30} /></span>
+      </div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>Quanto escapa por mês sem você perceber?</div>
+      <div className="fv2-wheel-marcas">
+        <div className="fv2-wheel" ref={ref} onScroll={onScroll} aria-label="Escolha um valor mensal">
+          <div style={{ height: 82 }} />
+          {VALORES_WHEEL.map((val, i) => (
+            <div key={val} className="item" data-sel={i === idx}>
+              R$ {brl(val)}{val === 1000 ? "+" : ""} <span>/mês</span>
+            </div>
+          ))}
+          <div style={{ height: 82 }} />
+        </div>
+      </div>
+      <motion.div key={v} initial={{ opacity: 0.4 }} animate={{ opacity: 1 }} className="fv2-feedback" style={{ marginTop: 10 }}>
+        📉 Em 5 anos isso vira <b>R$ {brl(v * 60)}</b> — só de vazamento.
+      </motion.div>
+      <div className="fv2-rodape">
+        <button className="fv2-cta" onClick={() => onDone(v)}>Continuar →</button>
+        <button className="fv2-ghost" onClick={() => onDone(300)}>Nem imagino — usa a média (R$ 300)</button>
       </div>
     </>
   );
@@ -481,28 +539,37 @@ function T6Perda({ estim, onContinuar }: { estim: number; onContinuar: () => voi
 
 function T7Metodo({ onContinuar }: { onContinuar: () => void }) {
   const cards = [
-    { emoji: "🗂️", txt: "Você joga tudo num lugar só — gasto, conta, meta." },
-    { emoji: "👁️", txt: "Eu te mostro o que tá vazando, em tempo real." },
-    { emoji: "⏱️", txt: "5 minutos por dia mantêm todos os pratos de pé." },
+    { emoji: "🗂️", txt: "Joga tudo aqui dentro.", rot: -3 },
+    { emoji: "👁️", txt: "Eu te mostro o vazamento em tempo real.", rot: 2.5 },
+    { emoji: "⏱️", txt: "5 min por dia seguram tudo.", rot: -2 },
   ];
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="feliz" size={110} /></div>
       <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 26 }}>Como isso funciona</h1>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 12 }}>
         {cards.map((c, i) => (
           <motion.div
             key={c.txt}
-            className="fv2-card"
-            style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 14.5, fontWeight: 600 }}
-            initial={{ opacity: 0, y: -18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 + i * 0.35, type: "spring", stiffness: 320, damping: 22 }}
+            className="fv2-card fv2-polaroid"
+            style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 15, fontWeight: 700, rotate: c.rot }}
+            initial={{ opacity: 0, y: -26, rotate: 0 }}
+            animate={{ opacity: 1, y: 0, rotate: c.rot }}
+            transition={{ delay: 0.25 + i * 0.32, type: "spring", stiffness: 300, damping: 20 }}
           >
+            <span className="num">{i + 1}</span>
             <span style={{ fontSize: 24 }}>{c.emoji}</span>{c.txt}
           </motion.div>
         ))}
       </div>
+      {/* polvo embaixo, braços "segurando" a pilha */}
+      <motion.div
+        style={{ display: "flex", justifyContent: "center", marginTop: -4 }}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.2, type: "spring", stiffness: 240, damping: 22 }}
+      >
+        <Polvo mood="feliz" size={128} />
+      </motion.div>
       <div className="fv2-rodape">
         <button className="fv2-cta" onClick={onContinuar}>Faz sentido →</button>
       </div>
@@ -524,16 +591,34 @@ function T8Pacto({ onFechado }: { onFechado: () => void }) {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "center" }}>
-        <Polvo mood={fechado ? "festa" : "neutro"} size={150} />
-      </div>
-      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+      {fechado && <div className="fv2-flash" style={{ background: "#F0559D" }} />}
+      {fechado ? (
+        <motion.div
+          style={{ display: "flex", justifyContent: "center" }}
+          initial={{ y: 80, scale: 0.7, opacity: 0 }}
+          animate={{ y: 0, scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 18 }}
+        >
+          <Polvo mood="festa" size={190} />
+        </motion.div>
+      ) : (
+        /* só o braço em cena: o tentáculo entra de fora da tela, estendido */
+        <motion.div
+          className="fv2-tentaculo"
+          initial={{ x: 120, y: 90, rotate: 12 }}
+          animate={{ x: 0, y: 0, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 120, damping: 18 }}
+        >
+          <TentaculoGigante width={320} />
+        </motion.div>
+      )}
+      <div className="fv2-bolha" style={{ textAlign: "center", marginTop: fechado ? 10 : 90 }}>
         {fechado
           ? "Fechado! 🤝 Agora deixa eu trabalhar."
           : "5 minutos por dia. Eu cuido do resto. Fechado?"}
       </div>
       {!fechado && (
-        <div className="fv2-opcoes" style={{ marginTop: 8 }}>
+        <div className="fv2-opcoes" style={{ marginTop: 8, maxWidth: 300 }}>
           <button className="fv2-opcao" onClick={() => setFechado(true)}>
             <span className="emo">🤝</span>Fechado
           </button>
@@ -554,7 +639,7 @@ const FATOS = [
   "⚡ Multa e juros de conta atrasada são o gasto mais fácil de zerar: basta ser avisado antes.",
 ];
 
-function T10Loading({ onPronto }: { onPronto: () => void }) {
+function T10Loading({ areaNome, onPronto }: { areaNome: string; onPronto: () => void }) {
   const [pct, setPct] = useState(0);
   const [fato, setFato] = useState(0);
   const feito = useRef(false);
@@ -573,17 +658,23 @@ function T10Loading({ onPronto }: { onPronto: () => void }) {
   }, []);
 
   const etapas: Array<[string, number]> = [
-    ["Ligando o módulo Dinheiro", 40],
+    [`Ligando o módulo ${areaNome}`, 40],
     ["Posicionando seus pontos no mapa", 70],
-    ["Escrevendo tua primeira missão", 96],
+    ["Escrevendo sua missão de 7 dias", 96],
   ];
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="neutro" size={120} /></div>
-      <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 25 }}>Montando a tua central…</h1>
+      {/* polvo malabarista: braços "segurando" os módulos enquanto trabalha */}
+      <div className="fv2-malabar">
+        <span className="mini" style={{ left: "8%", top: 6, animationDelay: "0s" }}>💸 Contas</span>
+        <span className="mini" style={{ right: "6%", top: 14, animationDelay: ".8s" }}>📅 Rotina</span>
+        <span className="mini" style={{ left: "16%", bottom: 4, animationDelay: "1.4s" }}>🎯 Missão</span>
+        <Polvo mood="neutro" size={130} />
+      </div>
+      <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 25 }}>Montando a sua central…</h1>
       <div className="fv2-num-grande" style={{ margin: "6px 0 8px", fontSize: 40 }}>{pct}%</div>
-      <div className="fv2-bar" style={{ height: 10 }}><i style={{ width: `${pct}%` }} /></div>
+      <div className="fv2-bar" style={{ height: 10, flex: "0 0 auto" }}><i style={{ width: `${pct}%` }} /></div>
       <div style={{ display: "flex", flexDirection: "column", gap: 9, margin: "16px 0" }}>
         {etapas.map(([label, min]) => (
           <div key={label} className="fv2-prog-item" data-ok={pct >= min}>{label}</div>
@@ -668,6 +759,17 @@ function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: str
           <span>▪ <span style={{ color: "#E23D7B", fontWeight: 700 }}>com o CORE</span></span>
         </div>
       </div>
+      {/* placar: a nota computada (número-herói) */}
+      <motion.div
+        className="fv2-placar"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 3.4 }}
+      >
+        <span>Hoje <b className="de">42</b><span className="cem">/100</span></span>
+        <span className="seta">→</span>
+        <span>Potencial <b className="pra">86</b><span className="cem">/100</span></span>
+      </motion.div>
       <motion.div {...popAnim} transition={{ ...popAnim.transition, delay: 2.4 }} className="fv2-feedback">
         📍 <b>Seu ponto de partida: {areaNome}.</b> Foi onde você disse que mais dói — o plano começa aí.
       </motion.div>
@@ -680,93 +782,38 @@ function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: str
 
 // ---------------------------------------------------------------- T12 — demo guiada
 
-function T12Demo({ onGasto, onContinuar }: { onGasto: (v: number) => void; onContinuar: () => void }) {
-  const [fase, setFase] = useState<1 | 2 | 3>(1);
-  const [valor, setValor] = useState("");
-  const [gasto, setGasto] = useState<number | null>(null);
-
-  const registrar = () => {
-    const v = Math.max(1, Math.round(Number(valor.replace(",", ".")) || 34));
-    setGasto(v);
-    onGasto(v);
-    setFase(2);
-    setTimeout(() => setFase(3), 1900);
-  };
-
-  const barras = [
-    { label: "Mercado", v: 120 },
-    { label: "Transporte", v: 60 },
-    { label: "Lazer", v: 90 },
-    ...(gasto ? [{ label: "Seu teste", v: gasto, meu: true }] : []),
-  ];
-  const max = Math.max(...barras.map((b) => b.v), 1);
+function T12Demo({ module, onContinuar }: { module: string; onContinuar: () => void }) {
+  // Demo = o APP REAL (decisão do dono 15/07: "o usuário se sente mais
+  // confiante"). O /preview/:modulo já existe, é público e roda com dados
+  // fictícios — embutido aqui via iframe, zero mudança em código compartilhado.
+  useEffect(() => { track("funnel_v2_demo_open", { module }); }, [module]);
 
   return (
     <>
       <h1 className="fv2-display" style={{ fontSize: 25 }}>Sua central. <span className="hl">Testa ela agora.</span></h1>
-
-      {fase === 1 && (
-        <>
-          <div className="fv2-bolha clara">👉 Registra um gasto de teste aqui — qualquer valor.</div>
-          <input
-            className="fv2-input"
-            inputMode="decimal"
-            value={valor}
-            onChange={(e) => setValor(e.target.value.replace(/[^\d,]/g, "").slice(0, 7))}
-            placeholder="R$ 34"
-            aria-label="Valor do gasto de teste"
-          />
-          <div className="fv2-rodape">
-            <button className="fv2-cta" onClick={registrar}>Registrar ✍️</button>
-          </div>
-        </>
-      )}
-
-      {fase >= 2 && (
-        <>
-          <div className="fv2-bolha clara">
-            {fase === 2 ? "👀 Olha ele virando gráfico na hora." : "⚡ E aqui eu te aviso do que vence amanhã."}
-          </div>
-          <div className="fv2-card">
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 120, padding: "0 4px" }}>
-              {barras.map((b) => (
-                <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${(b.v / max) * 90}px` }}
-                    transition={{ type: "spring", stiffness: 260, damping: 24 }}
-                    style={{
-                      width: "100%", borderRadius: 8,
-                      background: (b as { meu?: boolean }).meu ? "var(--magenta)" : "var(--wash-rosa)",
-                    }}
-                  />
-                  <span style={{ fontSize: 10.5, color: "var(--tinta-2)", fontWeight: 600 }}>{b.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {fase === 3 && (
-            <motion.div {...popAnim} className="fv2-feedback" style={{ marginTop: 10 }}>
-              🔔 <b>Conta de luz vence amanhã</b> — avisei com um dia de folga. Multa: R$ 0.
-            </motion.div>
-          )}
-          {fase === 3 && (
-            <>
-              <p className="fv2-sub" style={{ margin: "16px 0 8px", fontSize: 13.5 }}>Isso foi <b>1 dos 16</b>:</p>
-              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
-                {ALL_MODULE_ICONS.map((m) => (
-                  <span key={m.label} style={{ background: "var(--card)", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", boxShadow: "var(--sombra)" }}>
-                    {m.emoji} {m.label}
-                  </span>
-                ))}
-              </div>
-              <div className="fv2-rodape">
-                <button className="fv2-cta magenta" onClick={onContinuar}>Continuar →</button>
-              </div>
-            </>
-          )}
-        </>
-      )}
+      <div className="fv2-bolha clara" style={{ marginTop: 2 }}>
+        👇 Isso embaixo é o app DE VERDADE, com dados de exemplo. Mexe à vontade — registra, risca, abre as coisas.
+      </div>
+      <motion.div
+        className="fv2-app-frame"
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <span className="fv2-app-selo">Dados de exemplo</span>
+        <iframe src={`/preview/${module}`} title="Demonstração do módulo no app real" loading="eager" />
+      </motion.div>
+      <p className="fv2-sub" style={{ margin: "12px 0 6px", fontSize: 13.5 }}>Isso foi <b>1 dos 16</b>:</p>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
+        {ALL_MODULE_ICONS.map((m) => (
+          <span key={m.label} style={{ background: "var(--card)", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", boxShadow: "var(--sombra)" }}>
+            {m.emoji} {m.label}
+          </span>
+        ))}
+      </div>
+      <div className="fv2-rodape" style={{ paddingTop: 14 }}>
+        <button className="fv2-cta magenta" onClick={onContinuar}>Continuar →</button>
+      </div>
     </>
   );
 }

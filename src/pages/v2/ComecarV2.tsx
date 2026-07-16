@@ -1,8 +1,9 @@
-// Funil V2 (15/07/2026) — rota /comecar-v2, paralela e independente do funil
-// atual (/comecar segue intocado). Blueprint BitePal: promessa → área →
-// mascote nomeado → quiz-conversa com feedback → meta realista → labor
-// illusion → plano com confete → paywall Pix vitalício.
-// Eventos: todos com funnel_version: "v2".
+// Funil V2 "polvo" (15/07/2026) — rota /comecar-v2, paralela e independente do
+// funil atual (/comecar, intocado). Arco: dor → conversa (não formulário) →
+// culpa absolvida → número DELE doendo → método nomeado → pacto → espera
+// teatral → mapa computado (pico) → mão na massa → ponte "quase seu" → paywall.
+// Pagamento real do CORE: Pix vitalício R$27,90 in-app (sem trial; garantia 7d).
+// Eventos: todos com funnel_version: "v2". QA: ?passo=<id> pula pra qualquer tela.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -10,119 +11,70 @@ import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey, ALL_MODULE_ICONS } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
-import { Joao, JoaoAvatar, Casinha, Ninho } from "./Joao";
+import { Polvo, PolvoAvatar, type PolvoMood } from "./Polvo";
 import "./funil-v2.css";
 
 // ---------------------------------------------------------------- constantes
 
-type Wash = "areia" | "menta" | "lilas" | "pessego" | "banana";
+type Wash = "fundo" | "rosa" | "lilas" | "pessego" | "menta";
 
 type StepId =
-  | "promessa1" | "promessa2"
-  | "area"
-  | "ninho" | "batismo"
-  | "q1" | "q2" | "q3" | "q4"
-  | "prova" | "meta"
-  | "montando" | "plano"
-  | "paywall";
+  | "t1" | "t2" | "t3" | "t4" | "t5" | "t6" | "t7"
+  | "t8" | "t9" | "t10" | "t11" | "t12" | "t13" | "t14";
 
-const ORDEM: StepId[] = [
-  "promessa1", "promessa2", "area", "ninho", "batismo",
-  "q1", "q2", "q3", "q4", "prova", "meta", "montando", "plano", "paywall",
-];
+const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14"];
 
 const WASHES: Record<StepId, Wash> = {
-  promessa1: "areia", promessa2: "menta", area: "areia",
-  ninho: "banana", batismo: "banana",
-  q1: "areia", q2: "menta", q3: "areia", q4: "lilas",
-  prova: "lilas", meta: "lilas", montando: "menta", plano: "banana", paywall: "pessego",
+  t1: "fundo", t2: "fundo", t3: "rosa", t4: "lilas", t5: "fundo", t6: "pessego", t7: "menta",
+  t8: "rosa", t9: "fundo", t10: "lilas", t11: "lilas", t12: "fundo", t13: "pessego", t14: "rosa",
 };
 
-// casinha constrói junto com o funil (0..4)
-const CASA_STAGE: Record<StepId, number> = {
-  promessa1: 0, promessa2: 0, area: 0, ninho: 0, batismo: 1,
-  q1: 1, q2: 2, q3: 2, q4: 3, prova: 3, meta: 3, montando: 3, plano: 4, paywall: 4,
-};
+type Opt = { emoji: string; label: string; reacao: string; mood?: PolvoMood; valor?: number };
 
-const NOMES_SORTEIO = ["Chico", "Barro", "Juca", "Nina", "Bento", "Zeca", "Dora", "Caco"];
-
-type QuizQ = {
-  id: "q1" | "q2" | "q3" | "q4";
-  pergunta: string;
-  opts: Array<{ emoji: string; label: string }>;
-  // feedback devolvido na hora — a razão dado/recebido do BitePal
-  feedback: (opt: string, nome: string) => string;
-};
-
-const QUIZ: QuizQ[] = [
-  {
-    id: "q1",
-    pergunta: "O que mais te trava hoje?",
-    opts: [
-      { emoji: "🌀", label: "Começo e largo no meio" },
-      { emoji: "🧭", label: "Não sei por onde começar" },
-      { emoji: "🤯", label: "Esqueço das coisas" },
-      { emoji: "⏰", label: "Falta de tempo" },
-    ],
-    feedback: () => "Anotado. Essa é a trava mais comum de quem chega aqui — e é a que o plano resolve primeiro.",
-  },
-  {
-    id: "q2",
-    pergunta: "Quanto tempo por dia você consegue dar pra isso?",
-    opts: [
-      { emoji: "⚡", label: "5 minutos" },
-      { emoji: "☕", label: "15 minutos" },
-      { emoji: "🧘", label: "30 minutos ou mais" },
-    ],
-    feedback: (opt, nome) =>
-      opt === "5 minutos"
-        ? `Perfeito — o ${nome} monta o plano em passos de 5 minutos. Constância vale mais que maratona.`
-        : `Ótimo. Com esse tempo o ${nome} consegue montar um plano com folga.`,
-  },
-  {
-    id: "q3",
-    pergunta: "Você já tentou se organizar antes?",
-    opts: [
-      { emoji: "📝", label: "Planilha ou caderno" },
-      { emoji: "📱", label: "Outro app, mas larguei" },
-      { emoji: "🆕", label: "Nunca tentei de verdade" },
-    ],
-    feedback: () => "Boa notícia: quem já tentou e largou não falhou — só usou ferramenta genérica demais. O plano aqui é montado pra você.",
-  },
-  {
-    id: "q4",
-    pergunta: "Como você prefere começar?",
-    opts: [
-      { emoji: "🪜", label: "Um passo por dia" },
-      { emoji: "🚀", label: "Tudo de uma vez" },
-      { emoji: "🤲", label: "Me guiando devagar" },
-    ],
-    feedback: (_o, nome) => `Fechou. Última coisa e o ${nome} termina a casa — e o seu plano.`,
-  },
+// T2 — a dor (pergunta do funil atual, intacta)
+const Q_DOR: Opt[] = [
+  { emoji: "💸", label: "Gasto sem perceber", reacao: "O gasto invisível é o pior tipo. A gente vai dar rosto pra ele." },
+  { emoji: "🧾", label: "Esqueço de pagar contas", reacao: "Multa e juros são dinheiro pago pra ninguém. Isso acaba primeiro." },
+  { emoji: "🐷", label: "Não consigo guardar", reacao: "Guardar não é sobra — é decisão. Vamos criar a tua." },
+  { emoji: "🤷", label: "Não sei pra onde vai", reacao: "Então começamos pelo raio-X. Ninguém conserta o que não enxerga." },
 ];
 
-const REVIEWS = [
-  { nome: "Mariana", texto: "Eu já tinha desistido de planilha, de agenda, de tudo. Aqui foi a primeira vez que uma rotina durou mais de uma semana." },
-  { nome: "Rafael", texto: "Paguei achando que ia largar em 3 dias. Tô no terceiro mês e a fatura do cartão nunca mais me surpreendeu." },
-  { nome: "Camila", texto: "O que me ganhou foi ser tudo num app só. Organizei as finanças e acabei arrumando a rotina inteira junto." },
+// T3 — como controla hoje
+const Q_CONTROLE: Opt[] = [
+  { emoji: "📊", label: "Planilha", reacao: "Respeito. Mas planilha não te avisa nada — ela só espera você lembrar dela." },
+  { emoji: "🧠", label: "De cabeça", reacao: "Cabeça é ótima pra viver, péssima pra contar. Deixa a memória comigo." },
+  { emoji: "📱", label: "Já usei app, larguei", reacao: "O app não era teu — era genérico. Esse aqui nasce das tuas respostas." },
+  { emoji: "🙈", label: "Não controlo", reacao: "Então hoje ele te controla. Justo. Vamos inverter isso.", mood: "serio" },
+];
+
+// T5 — estimativa (combustível da T6)
+const Q_ESTIMATIVA: Opt[] = [
+  { emoji: "🫰", label: "Uns R$ 150/mês", reacao: "Anotado.", valor: 150 },
+  { emoji: "💰", label: "Uns R$ 300/mês", reacao: "Anotado.", valor: 300 },
+  { emoji: "😬", label: "Uns R$ 500/mês", reacao: "Anotado.", valor: 500 },
+  { emoji: "🥵", label: "R$ 800 ou mais", reacao: "Anotado.", valor: 800 },
+  { emoji: "🤷", label: "Nem imagino", reacao: "É a resposta mais comum. Vamos usar a média: R$ 300.", valor: 300 },
+];
+
+// T9 — vitória de 7 dias (alimenta T13 e o paywall)
+const Q_VITORIA: Opt[] = [
+  { emoji: "🔍", label: "Saber pra onde vai cada real", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
+  { emoji: "✅", label: "Zerar contas atrasadas", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
+  { emoji: "🐷", label: "Guardar os primeiros R$ 100", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
+  { emoji: "📈", label: "Fechar a semana no azul", reacao: "Anotado. Essa é a primeira coisa que a tua central vai fazer por você." },
 ];
 
 const LS_KEY = "fv2-state";
 
-// ---------------------------------------------------------------- utilitários
+// eixos do mapa (T11) = as 5 áreas da porta
+const EIXOS: AreaKey[] = ["dinheiro", "rotina", "corpo", "saude", "metas"];
 
 const track = (evento: string, data: Record<string, unknown> = {}) =>
   trackEvent(evento, { funnel_version: "v2", ...data });
 
-function dataMeta21d(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 21);
-  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
-}
-
 function soltarConfete() {
-  const cores = ["#2E9E52", "#E4572E", "#F2C14E", "#8FB8DA", "#B4652F", "#26201A"];
-  for (let i = 0; i < 34; i++) {
+  const cores = ["#E23D7B", "#EC5FA2", "#F5C048", "#2FA968", "#F07A5A", "#33202B"];
+  for (let i = 0; i < 30; i++) {
     const c = document.createElement("span");
     c.className = "fv2-conf";
     c.style.left = `${2 + Math.random() * 96}%`;
@@ -134,7 +86,6 @@ function soltarConfete() {
   }
 }
 
-// animação padrão entre passos
 const passoAnim = {
   initial: { opacity: 0, x: 34 },
   animate: { opacity: 1, x: 0 },
@@ -148,6 +99,8 @@ const popAnim = {
   transition: { type: "spring" as const, stiffness: 420, damping: 26 },
 };
 
+const brl = (v: number) => v.toLocaleString("pt-BR");
+
 // ---------------------------------------------------------------- página
 
 export default function ComecarV2() {
@@ -158,24 +111,26 @@ export default function ComecarV2() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "{}"); } catch { return {}; }
   }, []);
 
-  // ?passo=<id> pula direto pra uma tela (QA/preview) — tem prioridade sobre o estado salvo
   const passoUrl = useMemo(() => {
     const p = new URLSearchParams(window.location.search).get("passo") as StepId | null;
     return p && ORDEM.includes(p) ? p : null;
   }, []);
 
-  const [step, setStep] = useState<StepId>(passoUrl ?? (ORDEM.includes(salvo.step) ? salvo.step : "promessa1"));
-  const [nome, setNome] = useState<string>(salvo.nome ?? "");
+  const [step, setStep] = useState<StepId>(passoUrl ?? (ORDEM.includes(salvo.step) ? salvo.step : "t1"));
   const [area, setArea] = useState<AreaKey | null>(salvo.area ?? null);
-  const [respostas, setRespostas] = useState<Record<string, string>>(salvo.respostas ?? {});
+  const [dor, setDor] = useState<string | null>(salvo.dor ?? null);
+  const [estim, setEstim] = useState<number>(salvo.estim ?? 300);
+  const [vitoria, setVitoria] = useState<string | null>(salvo.vitoria ?? null);
+  const [gastoTeste, setGastoTeste] = useState<number | null>(salvo.gastoTeste ?? null);
   const [pixAberto, setPixAberto] = useState(false);
 
   const idx = ORDEM.indexOf(step);
   const progresso = Math.round((idx / (ORDEM.length - 1)) * 100);
+  const areaInfo = area ? AREAS[area] : AREAS.dinheiro;
 
   useEffect(() => {
-    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, nome, area, respostas })); } catch { /* noop */ }
-  }, [step, nome, area, respostas]);
+    try { localStorage.setItem(LS_KEY, JSON.stringify({ step, area, dor, estim, vitoria, gastoTeste })); } catch { /* noop */ }
+  }, [step, area, dor, estim, vitoria, gastoTeste]);
 
   useEffect(() => { track("funnel_v2_step", { step, idx }); }, [step, idx]);
   useEffect(() => { track("funnel_v2_start"); }, []);
@@ -188,191 +143,95 @@ export default function ComecarV2() {
     setStep((s) => ORDEM[Math.max(ORDEM.indexOf(s) - 1, 0)]);
   }, []);
 
-  const areaInfo = area ? AREAS[area] : null;
-
   return (
     <div className="fv2" data-wash={WASHES[step]}>
       <div className="fv2-col">
         <div className="fv2-top">
-          <button className="fv2-back" onClick={voltar} disabled={idx === 0 || step === "paywall"} aria-label="Voltar">←</button>
+          <button className="fv2-back" onClick={voltar} disabled={idx === 0 || step === "t10" || step === "t14"} aria-label="Voltar">←</button>
           <div className="fv2-bar"><i style={{ width: `${progresso}%` }} /></div>
-          <Casinha stage={CASA_STAGE[step]} size={44} />
+          <PolvoAvatar size={34} />
         </div>
 
         <AnimatePresence mode="wait">
           <motion.div key={step} {...passoAnim} style={{ display: "flex", flexDirection: "column", flex: 1 }}>
 
-            {step === "promessa1" && (
-              <>
-                <h1 className="fv2-display">Sua vida inteira organizada. <span className="hl">Num app só.</span></h1>
-                <p className="fv2-sub">Finanças, rotina, casa, saúde e mais 12 áreas — com um plano montado pra você em 2 minutos.</p>
-                <div style={{ display: "flex", justifyContent: "center", margin: "26px 0" }}><Joao mood="feliz" size={170} /></div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center" }}>
-                  {ALL_MODULE_ICONS.slice(0, 8).map((m) => (
-                    <span key={m.label} style={{ background: "var(--card)", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 500, boxShadow: "var(--sombra)" }}>
-                      {m.emoji} {m.label}
-                    </span>
-                  ))}
-                </div>
-                <div className="fv2-rodape">
-                  <button className="fv2-cta" onClick={avancar}>Começar →</button>
-                  <button className="fv2-ghost" onClick={() => navigate("/entrar")}>Já tenho conta</button>
-                </div>
-              </>
+            {step === "t1" && <T1Hero onEscolher={(k) => { setArea(k); track("funnel_v2_area", { area: k }); avancar(); }} />}
+
+            {step === "t2" && (
+              <QuizVivo
+                pergunta="O que mais te atrapalha hoje?"
+                opts={Q_DOR}
+                onDone={(o) => { setDor(o.label); track("funnel_v2_answer", { q: "dor", opt: o.label }); avancar(); }}
+              />
             )}
 
-            {step === "promessa2" && (
-              <>
-                <h1 className="fv2-display">Do caos pro controle em <span className="hl">21 dias</span>.</h1>
-                <p className="fv2-sub">Sem força de vontade infinita: um plano com passos pequenos, na ordem certa.</p>
-                <div className="fv2-card" style={{ margin: "24px 0" }}>
-                  <svg viewBox="0 0 260 110" style={{ width: "100%", display: "block" }}>
-                    <path d="M10 18 C70 30 100 78 250 92" stroke="#E4572E" strokeWidth="3.5" strokeDasharray="6 6" fill="none" />
-                    <path d="M10 18 C60 90 140 96 250 40" stroke="#2E9E52" strokeWidth="4.5" fill="none" strokeLinecap="round" />
-                    <circle cx="250" cy="40" r="6" fill="#2E9E52" />
-                    <text x="176" y="26" fontSize="11" fontWeight="700" fill="#2E9E52">com um plano</text>
-                    <text x="150" y="105" fontSize="11" fill="#8a8073">na força de vontade</text>
-                  </svg>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--tinta-2)", marginTop: 6 }}>
-                    <span>hoje</span><span>{dataMeta21d()}</span>
-                  </div>
-                </div>
-                <div className="fv2-rodape"><button className="fv2-cta" onClick={avancar}>Continuar →</button></div>
-              </>
+            {step === "t3" && (
+              <QuizVivo
+                pergunta="Como você tenta controlar hoje?"
+                opts={Q_CONTROLE}
+                onDone={(o) => { track("funnel_v2_answer", { q: "controle", opt: o.label }); avancar(); }}
+              />
             )}
 
-            {step === "area" && (
-              <>
-                <h1 className="fv2-display">Qual área tá pedindo socorro primeiro?</h1>
-                <p className="fv2-sub" style={{ marginBottom: 18 }}>O plano começa por ela — as outras entram depois.</p>
-                <div className="fv2-grid2">
-                  {(Object.keys(AREAS) as AreaKey[]).map((k) => (
-                    <button
-                      key={k}
-                      className="fv2-opcao"
-                      data-on={area === k}
-                      onClick={() => { setArea(k); track("funnel_v2_area", { area: k }); }}
-                    >
-                      <span className="emo">{AREAS[k].emoji}</span>
-                      {AREAS[k].nome}
-                    </button>
-                  ))}
-                </div>
-                <div className="fv2-rodape">
-                  <button className="fv2-cta" disabled={!area} onClick={avancar}>Continuar →</button>
-                </div>
-              </>
+            {step === "t4" && <T4Crenca onContinuar={avancar} />}
+
+            {step === "t5" && (
+              <QuizVivo
+                pergunta="Quanto você acha que escapa por mês sem você perceber?"
+                opts={Q_ESTIMATIVA}
+                onDone={(o) => { setEstim(o.valor ?? 300); track("funnel_v2_answer", { q: "estimativa", opt: o.label, valor: o.valor }); avancar(); }}
+              />
             )}
 
-            {step === "ninho" && (
-              <NinhoStep onRevelar={avancar} />
+            {step === "t6" && <T6Perda estim={estim} onContinuar={avancar} />}
+
+            {step === "t7" && <T7Metodo onContinuar={avancar} />}
+
+            {step === "t8" && <T8Pacto onFechado={() => { track("funnel_v2_pact"); avancar(); }} />}
+
+            {step === "t9" && (
+              <QuizVivo
+                pergunta="Qual seria uma vitória real nos próximos 7 dias?"
+                opts={Q_VITORIA}
+                onDone={(o) => { setVitoria(o.label); track("funnel_v2_answer", { q: "vitoria", opt: o.label }); avancar(); }}
+              />
             )}
 
-            {step === "batismo" && (
-              <>
-                <h1 className="fv2-display">Ele constrói a própria casa. E agora vai construir a sua.</h1>
-                <p className="fv2-sub">É um joão-de-barro — o passarinho arquiteto. Dá um nome pra ele:</p>
-                <div style={{ display: "flex", justifyContent: "center", margin: "18px 0 8px" }}><Joao mood="feliz" size={130} /></div>
-                <input
-                  className="fv2-input"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value.slice(0, 14))}
-                  placeholder="Nome do passarinho"
-                  aria-label="Nome do passarinho"
-                />
-                <button
-                  className="fv2-ghost"
-                  onClick={() => setNome(NOMES_SORTEIO[Math.floor(Math.random() * NOMES_SORTEIO.length)])}
-                >🎲 Sortear um nome</button>
-                <div className="fv2-rodape">
-                  <button
-                    className="fv2-cta"
-                    disabled={nome.trim().length < 2}
-                    onClick={() => { track("funnel_v2_pet_named", { nome }); avancar(); }}
-                  >É esse! →</button>
-                </div>
-              </>
-            )}
+            {step === "t10" && <T10Loading onPronto={avancar} />}
 
-            {(step === "q1" || step === "q2" || step === "q3" || step === "q4") && (
-              <QuizStep
-                key={step}
-                q={QUIZ.find((q) => q.id === step)!}
-                nome={nome || "João"}
-                selecionada={respostas[step]}
-                onResponder={(opt) => setRespostas((r) => ({ ...r, [step]: opt }))}
+            {step === "t11" && <T11Mapa area={area ?? "dinheiro"} areaNome={areaInfo.nome} onContinuar={avancar} />}
+
+            {step === "t12" && (
+              <T12Demo
+                onGasto={(v) => { setGastoTeste(v); track("funnel_v2_demo_expense", { valor: v }); }}
                 onContinuar={avancar}
               />
             )}
 
-            {step === "prova" && (
-              <>
-                <div className="fv2-bolha"><JoaoAvatar /> <span>Sabe por que plano montado funciona e força de vontade não?</span></div>
-                <h1 className="fv2-display">Constância vem de <span className="hl">passo pequeno</span>, não de motivação.</h1>
-                <p className="fv2-sub">Por isso o seu plano começa com uma única ação por dia na área de {areaInfo?.nome.toLowerCase() ?? "foco"} — e cresce só quando você tá pronto.</p>
-                <motion.div {...popAnim} className="fv2-feedback verde" style={{ marginTop: 18 }}>
-                  🏗️ <b>A casa já tá quase de pé.</b> Falta pouco pro seu plano ficar pronto.
-                </motion.div>
-                <div className="fv2-rodape"><button className="fv2-cta" onClick={avancar}>Continuar →</button></div>
-              </>
+            {step === "t13" && (
+              <T13Ponte
+                area={area ?? "dinheiro"}
+                areaNome={areaInfo.nome}
+                gastoTeste={gastoTeste}
+                vitoria={vitoria}
+                onCta={() => { track("funnel_v2_ponte_cta"); avancar(); }}
+              />
             )}
 
-            {step === "meta" && (
-              <>
-                <h1 className="fv2-display">
-                  Colocar {areaInfo ? `${areaInfo.emoji} ${areaInfo.nome.toLowerCase()}` : "sua vida"} em ordem até <span className="hl">{dataMeta21d()}</span>{" "}
-                  <span className="fv2-selo">✓ Realista</span>
-                </h1>
-                <p className="fv2-sub">21 dias com passos de 5 minutos. Primeiros resultados visíveis já na primeira semana.</p>
-                <motion.div {...popAnim} className="fv2-feedback" style={{ marginTop: 18 }}>
-                  🌱 Quem segue os 3 primeiros dias do plano tem <b>muito mais chance</b> de chegar no dia 21 — e o {nome || "João"} vai te lembrar.
-                </motion.div>
-                <div className="fv2-rodape"><button className="fv2-cta verde" onClick={avancar}>Montar meu plano →</button></div>
-              </>
-            )}
-
-            {step === "montando" && (
-              <MontandoStep nome={nome || "João"} onPronto={avancar} />
-            )}
-
-            {step === "plano" && (
-              <PlanoStep nome={nome || "João"} areaInfo={areaInfo} onContinuar={avancar} />
-            )}
-
-            {step === "paywall" && (
-              <>
-                <h1 className="fv2-display">Seu plano tá pronto. <span className="hl-g">Destrave ele inteiro.</span></h1>
-                <div className="fv2-card fv2-preco" style={{ marginTop: 20 }}>
-                  <span className="tag">Acesso vitalício</span>
-                  <div className="fv2-preco-linha">
-                    <span className="fv2-preco-de">R$ 97</span>
-                    <span className="fv2-preco-por">R$ {PIX_PRICES.lifetime}</span>
-                    <span className="fv2-preco-suf">pagamento único</span>
-                  </div>
-                  <ul className="fv2-checks">
-                    <li>O plano do {nome || "João"} + as 16 áreas da sua vida</li>
-                    <li>Seu pra sempre. Sem mensalidade.</li>
-                    <li>Garantia de 7 dias — não curtiu, devolvemos</li>
-                  </ul>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 14 }}>
-                  <div className="fv2-prova"><span className="estrelas">★★★★★</span><span><b>4,8</b> · milhares de vidas organizadas</span></div>
-                  <div className="fv2-prova">🔒 Pix aprovado na hora · acesso imediato</div>
-                </div>
-                <div className="fv2-rodape">
-                  <button
-                    className="fv2-cta fogo"
-                    onClick={() => {
-                      track("funnel_v2_checkout_click", { logged: !!user });
-                      if (user) setPixAberto(true);
-                      // Sem conta ainda: cadastro próprio do v2 é a próxima etapa da
-                      // build. Por ora o guest segue pro funil atual pra não perder venda.
-                      else navigate("/comecar");
-                    }}
-                  >Gerar Pix de R$ {PIX_PRICES.lifetime}</button>
-                  <button className="fv2-ghost" onClick={() => navigate("/entrar")}>Já tenho conta</button>
-                </div>
-              </>
+            {step === "t14" && (
+              <T14Paywall
+                estim={estim}
+                vitoria={vitoria}
+                areaNome={areaInfo.nome}
+                onCheckout={() => {
+                  track("funnel_v2_checkout_click", { logged: !!user });
+                  if (user) setPixAberto(true);
+                  // Conta silenciosa do v2 (T15) é a próxima etapa da build.
+                  // Guest segue pro funil atual pra não perder venda.
+                  else navigate("/comecar");
+                }}
+                onEntrar={() => navigate("/entrar")}
+              />
             )}
 
           </motion.div>
@@ -384,132 +243,569 @@ export default function ComecarV2() {
   );
 }
 
-// ---------------------------------------------------------------- sub-passos
+// ---------------------------------------------------------------- T1 — hero + porta
 
-function NinhoStep({ onRevelar }: { onRevelar: () => void }) {
-  const [aberto, setAberto] = useState(false);
+function T1Hero({ onEscolher }: { onEscolher: (k: AreaKey) => void }) {
+  const orbitas: Array<{ emoji: string; style: React.CSSProperties }> = [
+    { emoji: "💸", style: { top: 8, left: "12%", animationDelay: "0s" } },
+    { emoji: "📅", style: { top: -6, right: "26%", animationDelay: ".6s" } },
+    { emoji: "❤️", style: { top: 46, right: "6%", animationDelay: ".3s" } },
+    { emoji: "📚", style: { top: 62, left: "2%", animationDelay: ".9s" } },
+    { emoji: "🧠", style: { top: -2, left: "34%", animationDelay: "1.2s" } },
+  ];
   return (
     <>
-      <h1 className="fv2-display">{aberto ? "Olha quem tava construindo aqui!" : "Tem alguém construindo uma casa aqui…"}</h1>
-      {!aberto && <p className="fv2-sub">Toca no ninho pra espiar.</p>}
-      <motion.div
-        style={{ display: "flex", justifyContent: "center", margin: "30px 0", cursor: aberto ? "default" : "pointer" }}
-        animate={aberto ? {} : { rotate: [0, -2.5, 2.5, -1.5, 0] }}
-        transition={aberto ? {} : { repeat: Infinity, duration: 1.6, ease: "easeInOut" }}
-        onClick={() => { if (!aberto) { setAberto(true); track("funnel_v2_ninho_aberto"); } }}
-        role="button"
-        aria-label="Espiar o ninho"
-      >
-        <Ninho size={190} aberto={aberto} />
-      </motion.div>
-      {aberto && (
-        <motion.div {...popAnim} className="fv2-feedback">
-          🐦 É um <b>joão-de-barro</b> — o único passarinho que constrói a própria casa, um puxadinho por dia.
-        </motion.div>
-      )}
-      <div className="fv2-rodape">
-        {aberto
-          ? <button className="fv2-cta" onClick={onRevelar}>Quero conhecer →</button>
-          : <button className="fv2-cta" onClick={() => { setAberto(true); track("funnel_v2_ninho_aberto"); }}>Espiar 👀</button>}
+      <div className="fv2-orbita">
+        {orbitas.map((o, i) => <span key={i} className="mod" style={o.style}>{o.emoji}</span>)}
+        <Polvo mood="feliz" size={185} />
+      </div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+        Pode jogar tudo aqui em cima — braço é o que não me falta.
+      </div>
+      <h1 className="fv2-display" style={{ textAlign: "center" }}>
+        Sua vida inteira. <span className="hl">Um lugar só.</span>
+      </h1>
+      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto 18px" }}>
+        Qual área tá mais fora de controle hoje?
+      </p>
+      <div className="fv2-opcoes">
+        {EIXOS.map((k) => (
+          <button key={k} className="fv2-opcao" onClick={() => onEscolher(k)}>
+            <span className="emo">{AREAS[k].emoji}</span>
+            {AREAS[k].label}
+            <span className="seta">→</span>
+          </button>
+        ))}
+        <button className="fv2-opcao" onClick={() => onEscolher("dinheiro")}>
+          <span className="emo">😵‍💫</span>
+          Tudo, sinceramente
+          <span className="seta">→</span>
+        </button>
       </div>
     </>
   );
 }
 
-function QuizStep({ q, nome, selecionada, onResponder, onContinuar }: {
-  q: QuizQ; nome: string; selecionada?: string;
-  onResponder: (opt: string) => void; onContinuar: () => void;
+// ---------------------------------------------------------------- quiz vivo (T2/T3/T5/T9)
+
+function QuizVivo({ pergunta, opts, onDone }: {
+  pergunta: string;
+  opts: Opt[];
+  onDone: (o: Opt) => void;
 }) {
+  const [picked, setPicked] = useState<Opt | null>(null);
+
+  useEffect(() => {
+    if (!picked) return;
+    const t = setTimeout(() => onDone(picked), 1400);
+    return () => clearTimeout(t);
+  }, [picked, onDone]);
+
   return (
     <>
-      <div className="fv2-bolha"><JoaoAvatar /> <span>{q.pergunta}</span></div>
-      <div className="fv2-opcoes">
-        {q.opts.map((o) => (
-          <button key={o.label} className="fv2-opcao" data-on={selecionada === o.label} onClick={() => onResponder(o.label)}>
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+        <Polvo mood={picked?.mood ?? "neutro"} size={110} />
+      </div>
+      {picked ? (
+        <motion.div {...popAnim} className="fv2-bolha" style={{ textAlign: "center" }}>
+          {picked.reacao}
+        </motion.div>
+      ) : (
+        <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 26 }}>{pergunta}</h1>
+      )}
+      <div className="fv2-opcoes" style={{ marginTop: 6 }}>
+        {opts.map((o) => (
+          <button
+            key={o.label}
+            className="fv2-opcao"
+            data-on={picked?.label === o.label}
+            disabled={!!picked && picked.label !== o.label}
+            onClick={() => { if (!picked) setPicked(o); }}
+          >
             <span className="emo">{o.emoji}</span>{o.label}
           </button>
         ))}
       </div>
-      {selecionada && (
-        <motion.div {...popAnim} className="fv2-feedback" style={{ marginTop: 14 }}>
-          💡 {q.feedback(selecionada, nome)}
-        </motion.div>
-      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T4 — crença
+
+function T4Crenca({ onContinuar }: { onContinuar: () => void }) {
+  return (
+    <>
+      <h1 className="fv2-display">Não é falta de disciplina. É falta de <span className="hl">visibilidade</span>.</h1>
+      <div className="fv2-card" style={{ margin: "14px 0" }}>
+        <svg viewBox="0 0 260 110" style={{ width: "100%", display: "block" }}>
+          {/* ioiô da força de vontade */}
+          <motion.path
+            d="M10 42 C28 16 38 84 58 48 C78 18 92 88 112 52 C132 22 148 84 168 56 C188 32 200 78 218 62"
+            stroke="#F07A5A" strokeWidth="3.5" strokeDasharray="6 6" fill="none"
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, ease: "easeOut" }}
+          />
+          {/* com sistema */}
+          <motion.path
+            d="M10 92 C70 86 150 58 250 20"
+            stroke="#E23D7B" strokeWidth="4.5" fill="none" strokeLinecap="round"
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.4, delay: 0.7, ease: "easeOut" }}
+          />
+          <motion.circle cx="250" cy="20" r="6" fill="#E23D7B"
+            initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 2 }} />
+          <text x="150" y="14" fontSize="11" fontWeight="700" fill="#E23D7B">com sistema</text>
+          <text x="16" y="24" fontSize="11" fill="#F07A5A">na força de vontade</text>
+        </svg>
+      </div>
+      <motion.div {...popAnim} transition={{ ...popAnim.transition, delay: 1.6 }} className="fv2-feedback">
+        🎓 <b>Meta-análise de 138 estudos</b> (Harkin et al., 2016, <i>Psychological Bulletin</i>/APA):
+        monitorar o próprio progresso aumenta significativamente a chance de atingir a meta — e quanto
+        mais frequente o registro, maior o efeito.
+      </motion.div>
       <div className="fv2-rodape">
-        <button className="fv2-cta" disabled={!selecionada} onClick={onContinuar}>Continuar →</button>
+        <button className="fv2-cta" onClick={onContinuar}>Entendi. Quero enxergar →</button>
       </div>
     </>
   );
 }
 
-function MontandoStep({ nome, onPronto }: { nome: string; onPronto: () => void }) {
+// ---------------------------------------------------------------- T6 — matemática da perda
+
+function T6Perda({ estim, onContinuar }: { estim: number; onContinuar: () => void }) {
+  const anual = estim * 12;
+  const [n, setN] = useState(0);
+
+  useEffect(() => {
+    const dur = 1800; const t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur);
+      setN(Math.round(anual * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [anual]);
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="arregalado" size={130} /></div>
+      <p className="fv2-sub" style={{ textAlign: "center", margin: "6px auto 2px" }}>
+        R$ {brl(estim)}/mês — o número que <b>você</b> estimou — em um ano vira:
+      </p>
+      <div className="fv2-num-grande" style={{ textAlign: "center", color: "var(--coral)", margin: "8px 0 4px" }}>
+        R$ {brl(n)}
+      </div>
+      <p className="fv2-sub" style={{ textAlign: "center", margin: "0 auto" }}>
+        escapando por ano. Sem nota fiscal, sem memória, sem volta.
+      </p>
+      <div className="fv2-rodape">
+        <button className="fv2-cta magenta" onClick={onContinuar}>Quero ver pra onde vai →</button>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T7 — método
+
+function T7Metodo({ onContinuar }: { onContinuar: () => void }) {
+  const cards = [
+    { emoji: "🗂️", txt: "Você joga tudo num lugar só — gasto, conta, meta." },
+    { emoji: "👁️", txt: "Eu te mostro o que tá vazando, em tempo real." },
+    { emoji: "⏱️", txt: "5 minutos por dia mantêm todos os pratos de pé." },
+  ];
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="feliz" size={110} /></div>
+      <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 26 }}>Como isso funciona</h1>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
+        {cards.map((c, i) => (
+          <motion.div
+            key={c.txt}
+            className="fv2-card"
+            style={{ display: "flex", gap: 12, alignItems: "center", fontSize: 14.5, fontWeight: 600 }}
+            initial={{ opacity: 0, y: -18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 + i * 0.35, type: "spring", stiffness: 320, damping: 22 }}
+          >
+            <span style={{ fontSize: 24 }}>{c.emoji}</span>{c.txt}
+          </motion.div>
+        ))}
+      </div>
+      <div className="fv2-rodape">
+        <button className="fv2-cta" onClick={onContinuar}>Faz sentido →</button>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T8 — pacto
+
+function T8Pacto({ onFechado }: { onFechado: () => void }) {
+  const [fechado, setFechado] = useState(false);
+
+  useEffect(() => {
+    if (!fechado) return;
+    soltarConfete();
+    const t = setTimeout(onFechado, 1400);
+    return () => clearTimeout(t);
+  }, [fechado, onFechado]);
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Polvo mood={fechado ? "festa" : "neutro"} size={150} />
+      </div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+        {fechado
+          ? "Fechado! 🤝 Agora deixa eu trabalhar."
+          : "5 minutos por dia. Eu cuido do resto. Fechado?"}
+      </div>
+      {!fechado && (
+        <div className="fv2-opcoes" style={{ marginTop: 8 }}>
+          <button className="fv2-opcao" onClick={() => setFechado(true)}>
+            <span className="emo">🤝</span>Fechado
+          </button>
+          <button className="fv2-opcao" onClick={() => setFechado(true)}>
+            <span className="emo">🫱</span>Fechado, se for bem simples
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T10 — loading teatral
+
+const FATOS = [
+  "🎓 138 estudos (APA, 2016): registrar progresso é o maior preditor de meta atingida.",
+  "🔎 A maioria só descobre assinatura esquecida quando alguém mostra o extrato.",
+  "⚡ Multa e juros de conta atrasada são o gasto mais fácil de zerar: basta ser avisado antes.",
+];
+
+function T10Loading({ onPronto }: { onPronto: () => void }) {
   const [pct, setPct] = useState(0);
-  const [reviewIdx, setReviewIdx] = useState(0);
+  const [fato, setFato] = useState(0);
   const feito = useRef(false);
 
-  // roteiro com pausas fabricadas (labor illusion)
   useEffect(() => {
-    const roteiro: Array<[number, number]> = [[300, 34], [1100, 69], [2400, 97], [3400, 100]];
+    // duas retas, nunca estacionado no 99
+    const roteiro: Array<[number, number]> = [[300, 18], [1400, 43], [2800, 64], [4200, 82], [5400, 96], [6100, 100]];
     const timers = roteiro.map(([t, v]) => setTimeout(() => setPct(v), t));
-    const fim = setTimeout(() => { if (!feito.current) { feito.current = true; onPronto(); } }, 4100);
+    const fim = setTimeout(() => { if (!feito.current) { feito.current = true; onPronto(); } }, 6600);
     return () => { timers.forEach(clearTimeout); clearTimeout(fim); };
   }, [onPronto]);
 
   useEffect(() => {
-    const t = setInterval(() => setReviewIdx((i) => (i + 1) % REVIEWS.length), 1700);
+    const t = setInterval(() => setFato((i) => (i + 1) % FATOS.length), 2100);
     return () => clearInterval(t);
   }, []);
 
   const etapas: Array<[string, number]> = [
-    ["Analisando suas respostas", 34],
-    ["Escolhendo seus módulos", 69],
-    ["Ajustando a rotina dos 21 dias", 97],
+    ["Ligando o módulo Dinheiro", 40],
+    ["Posicionando teus pontos no mapa", 70],
+    ["Escrevendo tua primeira missão", 96],
   ];
-  const review = REVIEWS[reviewIdx];
 
   return (
     <>
-      <h1 className="fv2-display">O {nome} tá montando seu plano…</h1>
-      <div className="fv2-num-grande" style={{ margin: "10px 0 8px" }}>{pct}%</div>
+      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="neutro" size={120} /></div>
+      <h1 className="fv2-display" style={{ textAlign: "center", fontSize: 25 }}>Montando a tua central…</h1>
+      <div className="fv2-num-grande" style={{ margin: "6px 0 8px", fontSize: 40 }}>{pct}%</div>
       <div className="fv2-bar" style={{ height: 10 }}><i style={{ width: `${pct}%` }} /></div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 9, margin: "18px 0" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 9, margin: "16px 0" }}>
         {etapas.map(([label, min]) => (
           <div key={label} className="fv2-prog-item" data-ok={pct >= min}>{label}</div>
         ))}
       </div>
-      <div className="fv2-card fv2-review">
-        <span className="estrelas">★★★★★</span>
-        <p style={{ margin: "6px 0 4px" }}>“{review.texto}”</p>
-        <b>{review.nome}</b>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={fato}
+          className="fv2-card"
+          style={{ fontSize: 13, color: "var(--tinta-2)", lineHeight: 1.5 }}
+          initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.25 }}
+        >
+          {FATOS[fato]}
+        </motion.div>
+      </AnimatePresence>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T11 — mapa computado
+
+function radarPts(vals: number[], r = 84, cx = 120, cy = 104) {
+  return vals.map((v, i) => {
+    const a = ((i * 72 - 90) * Math.PI) / 180;
+    return [cx + Math.cos(a) * r * (v / 100), cy + Math.sin(a) * r * (v / 100)] as const;
+  });
+}
+
+function T11Mapa({ area, areaNome, onContinuar }: { area: AreaKey; areaNome: string; onContinuar: () => void }) {
+  const hoje = EIXOS.map((k, i) => (k === area ? 26 : [58, 52, 60, 55, 62][i]));
+  const potencial = EIXOS.map(() => 86);
+  const pHoje = radarPts(hoje);
+  const pPot = radarPts(potencial);
+  const grade = radarPts([100, 100, 100, 100, 100]);
+  const lbl = radarPts([118, 118, 118, 118, 118]);
+
+  return (
+    <>
+      <h1 className="fv2-display" style={{ fontSize: 26 }}>Teu mapa da vida, <span className="hl">computado</span>.</h1>
+      <div className="fv2-card" style={{ margin: "10px 0" }}>
+        <svg viewBox="0 0 240 210" style={{ width: "100%", display: "block" }}>
+          {[0.33, 0.66, 1].map((f) => (
+            <polygon
+              key={f}
+              points={radarPts([100, 100, 100, 100, 100], 84 * f).map((p) => p.join(",")).join(" ")}
+              fill="none" stroke="rgba(51,32,43,.1)" strokeWidth="1"
+            />
+          ))}
+          {grade.map((p, i) => (
+            <line key={i} x1="120" y1="104" x2={p[0]} y2={p[1]} stroke="rgba(51,32,43,.08)" />
+          ))}
+          {/* hoje: coral, ponto a ponto */}
+          {pHoje.map((p, i) => (
+            <motion.circle
+              key={`h${i}`} cx={p[0]} cy={p[1]} r="5" fill="#F07A5A"
+              initial={{ scale: 0 }} animate={{ scale: 1 }}
+              transition={{ delay: 0.4 + i * 0.35, type: "spring", stiffness: 400, damping: 18 }}
+            />
+          ))}
+          <motion.polygon
+            points={pHoje.map((p) => p.join(",")).join(" ")}
+            fill="rgba(240,122,90,.22)" stroke="#F07A5A" strokeWidth="2.5" strokeDasharray="5 4"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.3 }}
+          />
+          {/* potencial: rosa cheio */}
+          <motion.polygon
+            points={pPot.map((p) => p.join(",")).join(" ")}
+            fill="rgba(226,61,123,.2)" stroke="#E23D7B" strokeWidth="3"
+            initial={{ opacity: 0, scale: 0.6 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 3, type: "spring", stiffness: 180, damping: 20 }}
+            style={{ transformOrigin: "120px 104px" }}
+          />
+          {lbl.map((p, i) => (
+            <text key={i} x={p[0]} y={p[1] + 4} fontSize="12" fontWeight="700" fill="#33202B" textAnchor="middle">
+              {AREAS[EIXOS[i]].emoji}
+            </text>
+          ))}
+        </svg>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", fontSize: 12, color: "var(--tinta-2)", marginTop: 4 }}>
+          <span>▪ <span style={{ color: "#F07A5A", fontWeight: 700 }}>hoje</span></span>
+          <span>▪ <span style={{ color: "#E23D7B", fontWeight: 700 }}>com o CORE</span></span>
+        </div>
+      </div>
+      <motion.div {...popAnim} transition={{ ...popAnim.transition, delay: 2.4 }} className="fv2-feedback">
+        📍 <b>Teu ponto de partida: {areaNome}.</b> Foi onde você disse que mais dói — o plano começa aí.
+      </motion.div>
+      <div className="fv2-rodape">
+        <button className="fv2-cta magenta" onClick={onContinuar}>Ver minha central →</button>
       </div>
     </>
   );
 }
 
-function PlanoStep({ nome, areaInfo, onContinuar }: {
-  nome: string;
-  areaInfo: { emoji: string; nome: string } | null;
-  onContinuar: () => void;
-}) {
-  useEffect(() => { soltarConfete(); track("funnel_v2_plan_ready"); }, []);
-  const extras = ALL_MODULE_ICONS.filter((m) => m.label !== areaInfo?.nome).slice(0, 2);
+// ---------------------------------------------------------------- T12 — demo guiada
+
+function T12Demo({ onGasto, onContinuar }: { onGasto: (v: number) => void; onContinuar: () => void }) {
+  const [fase, setFase] = useState<1 | 2 | 3>(1);
+  const [valor, setValor] = useState("");
+  const [gasto, setGasto] = useState<number | null>(null);
+
+  const registrar = () => {
+    const v = Math.max(1, Math.round(Number(valor.replace(",", ".")) || 34));
+    setGasto(v);
+    onGasto(v);
+    setFase(2);
+    setTimeout(() => setFase(3), 1900);
+  };
+
+  const barras = [
+    { label: "Mercado", v: 120 },
+    { label: "Transporte", v: 60 },
+    { label: "Lazer", v: 90 },
+    ...(gasto ? [{ label: "Seu teste", v: gasto, meu: true }] : []),
+  ];
+  const max = Math.max(...barras.map((b) => b.v), 1);
+
   return (
     <>
-      <h1 className="fv2-display">A casa ficou pronta — e o seu plano também! 🎉</h1>
-      <div style={{ display: "flex", justifyContent: "center", gap: 18, alignItems: "flex-end", margin: "18px 0" }}>
-        <Joao mood="festa" size={120} />
-        <Casinha stage={4} size={110} />
+      <h1 className="fv2-display" style={{ fontSize: 25 }}>Tua central. <span className="hl">Testa ela agora.</span></h1>
+
+      {fase === 1 && (
+        <>
+          <div className="fv2-bolha clara">👉 Registra um gasto de teste aqui — qualquer valor.</div>
+          <input
+            className="fv2-input"
+            inputMode="decimal"
+            value={valor}
+            onChange={(e) => setValor(e.target.value.replace(/[^\d,]/g, "").slice(0, 7))}
+            placeholder="R$ 34"
+            aria-label="Valor do gasto de teste"
+          />
+          <div className="fv2-rodape">
+            <button className="fv2-cta" onClick={registrar}>Registrar ✍️</button>
+          </div>
+        </>
+      )}
+
+      {fase >= 2 && (
+        <>
+          <div className="fv2-bolha clara">
+            {fase === 2 ? "👀 Olha ele virando gráfico na hora." : "⚡ E aqui eu te aviso do que vence amanhã."}
+          </div>
+          <div className="fv2-card">
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 120, padding: "0 4px" }}>
+              {barras.map((b) => (
+                <div key={b.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(b.v / max) * 90}px` }}
+                    transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                    style={{
+                      width: "100%", borderRadius: 8,
+                      background: (b as { meu?: boolean }).meu ? "var(--magenta)" : "var(--wash-rosa)",
+                    }}
+                  />
+                  <span style={{ fontSize: 10.5, color: "var(--tinta-2)", fontWeight: 600 }}>{b.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {fase === 3 && (
+            <motion.div {...popAnim} className="fv2-feedback" style={{ marginTop: 10 }}>
+              🔔 <b>Conta de luz vence amanhã</b> — avisei com um dia de folga. Multa: R$ 0.
+            </motion.div>
+          )}
+          {fase === 3 && (
+            <>
+              <p className="fv2-sub" style={{ margin: "16px 0 8px", fontSize: 13.5 }}>Isso foi <b>1 dos 16</b>:</p>
+              <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 }}>
+                {ALL_MODULE_ICONS.map((m) => (
+                  <span key={m.label} style={{ background: "var(--card)", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", boxShadow: "var(--sombra)" }}>
+                    {m.emoji} {m.label}
+                  </span>
+                ))}
+              </div>
+              <div className="fv2-rodape">
+                <button className="fv2-cta magenta" onClick={onContinuar}>Continuar →</button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T13 — ponte
+
+function T13Ponte({ area, areaNome, gastoTeste, vitoria, onCta }: {
+  area: AreaKey; areaNome: string; gastoTeste: number | null; vitoria: string | null;
+  onCta: () => void;
+}) {
+  const hoje = EIXOS.map((k, i) => (k === area ? 26 : [58, 52, 60, 55, 62][i]));
+  const pHoje = radarPts(hoje, 40, 60, 52);
+  const recap = [
+    `🗺️ Seu mapa: ${areaNome} foi onde mais doeu`,
+    gastoTeste ? `✍️ Você registrou R$ ${brl(gastoTeste)} em 6 segundos` : "✍️ Sua central já calcula tudo sozinha",
+    vitoria ? `🎯 Sua missão escolhida: ${vitoria.toLowerCase()}` : "🎯 Sua missão dos 7 dias tá escrita",
+  ];
+
+  return (
+    <>
+      {/* a central em miniatura, carimbada */}
+      <motion.div
+        initial={{ scale: 1.15, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="fv2-card"
+        style={{ position: "relative", margin: "4px auto 14px", width: "min(300px,100%)" }}
+      >
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <svg viewBox="0 0 120 104" style={{ width: 96, flex: "0 0 auto" }}>
+            <polygon points={radarPts([100, 100, 100, 100, 100], 40, 60, 52).map((p) => p.join(",")).join(" ")} fill="none" stroke="rgba(51,32,43,.12)" />
+            <polygon points={pHoje.map((p) => p.join(",")).join(" ")} fill="rgba(240,122,90,.25)" stroke="#F07A5A" strokeWidth="2" />
+          </svg>
+          <div style={{ fontSize: 12.5, color: "var(--tinta-2)", lineHeight: 1.5 }}>
+            <b style={{ color: "var(--tinta)" }}>Módulo {areaNome}: ativo</b><br />
+            último gasto: R$ {brl(gastoTeste ?? 34)}<br />
+            lembretes: ligados
+          </div>
+        </div>
+        <div className="fv2-carimbo">Dados de exemplo</div>
+      </motion.div>
+
+      <div style={{ display: "flex", justifyContent: "center" }}><Polvo mood="serio" size={100} /></div>
+      <div className="fv2-bolha">
+        Tua central tá de pé. Mas olha o carimbo… isso ainda é a vida de outra pessoa.
+        A tua tá lá fora, sem ninguém segurando.
       </div>
-      <div className="fv2-card">
-        <b style={{ fontSize: 14 }}>Plano dos seus 21 dias</b>
-        <ul className="fv2-checks" style={{ marginTop: 10 }}>
-          <li>Começa por {areaInfo ? `${areaInfo.emoji} ${areaInfo.nome}` : "onde dói mais"} — 1 passo de 5 min por dia</li>
-          {extras.map((m) => <li key={m.label}>{m.emoji} {m.label} entra na semana 2</li>)}
-          <li>O {nome} te lembra e comemora cada passo</li>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {recap.map((r, i) => (
+          <motion.div
+            key={r}
+            className="fv2-card"
+            style={{ fontSize: 13.5, fontWeight: 600, padding: "12px 14px" }}
+            initial={{ opacity: 0, y: -14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.9 + i * 0.3, type: "spring", stiffness: 320, damping: 22 }}
+          >
+            {r}
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="fv2-rodape">
+        <button className="fv2-cta magenta" onClick={onCta}>Colocar minha vida no CORE</button>
+        <p style={{ textAlign: "center", fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
+          🤝 Você fechou: 5 min/dia. Eu seguro o resto.
+        </p>
+      </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- T14 — paywall
+
+function T14Paywall({ estim, vitoria, areaNome, onCheckout, onEntrar }: {
+  estim: number; vitoria: string | null; areaNome: string;
+  onCheckout: () => void; onEntrar: () => void;
+}) {
+  const anual = estim * 12;
+  return (
+    <>
+      <h1 className="fv2-display">Seu plano tá pronto. <span className="hl">Destrave ele inteiro.</span></h1>
+      <ul className="fv2-checks" style={{ marginBottom: 14 }}>
+        <li className="ruim">R$ {brl(anual)}/ano vazando sem você ver — sua própria conta</li>
+        <li>Módulo {areaNome} configurado pro seu caso</li>
+        <li>Primeira missão: {vitoria ? vitoria.toLowerCase() : "seus 7 primeiros dias"}</li>
+        <li>16 módulos inclusos — entra um por vez, no seu ritmo</li>
+      </ul>
+      <div className="fv2-card fv2-preco">
+        <span className="tag">Acesso vitalício</span>
+        <div className="fv2-preco-linha">
+          <span className="fv2-preco-de">R$ 99,90</span>
+          <span className="fv2-preco-por">R$ {PIX_PRICES.lifetime}</span>
+          <span className="fv2-preco-suf">pagamento único</span>
+        </div>
+        <ul className="fv2-checks">
+          <li>Seu pra sempre. Sem mensalidade.</li>
+          <li>Garantia de 7 dias — não curtiu, devolvemos</li>
+          <li>Pix aprovado na hora · acesso imediato</li>
         </ul>
       </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+        <div className="fv2-prova"><span className="estrelas">★★★★★</span><span><b>4,8</b> · milhares de vidas organizadas</span></div>
+      </div>
       <div className="fv2-rodape">
-        <button className="fv2-cta verde" onClick={onContinuar}>Quero destravar meu plano →</button>
+        <button className="fv2-cta magenta" onClick={onCheckout}>Gerar Pix de R$ {PIX_PRICES.lifetime}</button>
+        <p style={{ textAlign: "center", fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
+          🤝 Você fechou: 5 min/dia. Eu seguro o resto.
+        </p>
+        <button className="fv2-ghost" onClick={onEntrar}>Já tenho conta</button>
       </div>
     </>
   );

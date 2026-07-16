@@ -216,15 +216,11 @@ const ATIVACAO_AREA: Record<AreaKey, string[]> = {
   ],
 };
 
-// MODO CHECKOUT HOSPEDADO (16/07): a API de Pix da Cakto caiu; enquanto isso
-// o pagamento do v2 vai pro checkout hospedado deles. O webhook libera o
-// acesso pelo E-MAIL do comprador — por isso o T16 martela "paga com o mesmo
-// e-mail da conta". REVERTER quando a API voltar: CHECKOUT_HOSPEDADO = null
-// (1 linha) ou instant rollback na Vercel.
-const CHECKOUT_HOSPEDADO: Record<PixOffer, string> | null = {
-  lifetime: "https://pay.cakto.com.br/3e6pp6n",
-  downsell: "https://pay.cakto.com.br/kt9rrgt",
-};
+// MODO CHECKOUT HOSPEDADO (16/07): serviu de estepe enquanto a API da Cakto
+// esteve fora. DESLIGADO 16/07 tarde — o Pix in-app voltou via ABACATEPAY
+// (gateway definido no PixCheckout). Se precisar do estepe de novo, é só
+// reapontar os links aqui (27,90: pay.cakto.com.br/3e6pp6n · 14,90: /kt9rrgt).
+const CHECKOUT_HOSPEDADO: Record<PixOffer, string> | null = null;
 
 const FOI_CHECKOUT_KEY = "fv2-foi-checkout";
 
@@ -569,7 +565,13 @@ export default function ComecarV2() {
         <PixCheckout
           offer={pixOffer}
           context="funnel"
-          v2={{ mascote: <PolvoEspiando width={150} mood="feliz" />, missao: vitoria }}
+          v2={{
+            mascote: <PolvoEspiando width={150} mood="feliz" />,
+            missao: vitoria,
+            // pagou → T17 (ativação/missão), não direto pro app: era o
+            // vazamento que a 1ª venda do v2 expôs (pulou o peak-end)
+            onConfirmado: () => { setPixAberto(false); track("funnel_v2_paid"); irPara("t17"); },
+          }}
           onClose={() => {
             setPixAberto(false);
             // fechou o pagamento sem pagar → resgate (guardas no abrirDownsell)

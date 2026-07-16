@@ -32,9 +32,16 @@ interface Props {
   /** Skin do funil v2 (16/07). SEM essa prop o checkout fica byte-idêntico ao
    *  do funil atual (ordem do dono: o original não muda). Com ela: mascote
    *  espiando o recibo, campo nome oculto (v2 já coletou no cadastro), CTA
-   *  sempre vivo (valida no toque), garantia em frase e eco da missão no QR. */
-  v2?: { mascote?: React.ReactNode; missao?: string | null };
+   *  sempre vivo (valida no toque), garantia em frase e eco da missão no QR.
+   *  GATEWAY (16/07 tarde): com a prop v2, o Pix roda na ABACATEPAY (API da
+   *  Cakto caiu — docs da conta em análise); onConfirmado deixa o funil levar
+   *  o pagante pro T17 em vez de jogar direto pro app. */
+  v2?: { mascote?: React.ReactNode; missao?: string | null; onConfirmado?: () => void };
 }
+
+// Gateway do Pix do funil v2. Quando a Cakto reativar a conta: troca pra
+// "cakto" (1 linha) e pusha — NÃO é rollback na Vercel (desfaria o resto).
+const V2_GATEWAY: "abacate" | "cakto" = "abacate";
 
 type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
@@ -112,26 +119,38 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     setStep("generating");
     setErrMsg(null);
     try {
-      // SDK antifraude da Cakto (best-effort — doc diz que é fluxo de cartão)
-      let fingerprint: string | undefined;
-      let antifraudRef: string | undefined;
-      try {
-        const w = window as any;
-        if (w.Cakto?.CaktoSDK && w.__caktoSdk) {
-          await w.__caktoSdk.completeAntifraudProfile?.();
-          antifraudRef = w.__caktoSdk.getAntifraudReference?.();
-        }
-      } catch { /* segue sem — a edge function manda UUID */ }
+      let data: any, error: any;
+      if (v2 && V2_GATEWAY === "abacate") {
+        // AbacatePay: contrato de resposta idêntico (orderId/qrCode/…)
+        ({ data, error } = await supabase.functions.invoke("abacate-pix", {
+          body: {
+            action: "create",
+            offer,
+            customer: { name: nm || undefined, docNumber: doc || undefined },
+          },
+        }));
+      } else {
+        // SDK antifraude da Cakto (best-effort — doc diz que é fluxo de cartão)
+        let fingerprint: string | undefined;
+        let antifraudRef: string | undefined;
+        try {
+          const w = window as any;
+          if (w.Cakto?.CaktoSDK && w.__caktoSdk) {
+            await w.__caktoSdk.completeAntifraudProfile?.();
+            antifraudRef = w.__caktoSdk.getAntifraudReference?.();
+          }
+        } catch { /* segue sem — a edge function manda UUID */ }
 
-      const { data, error } = await supabase.functions.invoke("cakto-pix", {
-        body: {
-          offer,
-          customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
-          fingerprint,
-          antifraudRef,
-          attribution: getAttributionParams(),
-        },
-      });
+        ({ data, error } = await supabase.functions.invoke("cakto-pix", {
+          body: {
+            offer,
+            customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
+            fingerprint,
+            antifraudRef,
+            attribution: getAttributionParams(),
+          },
+        }));
+      }
       if (error) throw error;
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
@@ -164,15 +183,21 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     return () => clearInterval(t);
   }, [step, pix?.expiresAt, offer, context]);
 
-  // Polling: pagou? (webhook grava a assinatura; a gente só pergunta)
+  // Polling: pagou? Cakto: o webhook grava a assinatura e a gente pergunta ao
+  // check-subscription. AbacatePay (v2): perguntamos direto à abacate-pix, que
+  // confirma E libera o acesso no mesmo passo (sem depender de webhook).
   useEffect(() => {
     if (step !== "qr" || doneRef.current) return;
     let stopped = false;
+    const abacate = !!v2 && V2_GATEWAY === "abacate";
+    const orderId = pix?.orderId;
     const poll = async () => {
       if (stopped || doneRef.current) return;
       try {
-        const { data } = await supabase.functions.invoke("check-subscription");
-        if (data?.subscribed) {
+        const { data } = abacate
+          ? await supabase.functions.invoke("abacate-pix", { body: { action: "check", id: orderId } })
+          : await supabase.functions.invoke("check-subscription");
+        if (abacate ? data?.paid : data?.subscribed) {
           doneRef.current = true;
           trackEvent("pix_confirmed", { offer, context });
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
@@ -186,7 +211,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     };
     const t = setTimeout(poll, 3000);
     return () => { stopped = true; clearTimeout(t); };
-  }, [step, offer, context]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, offer, context, pix?.orderId]);
 
   const copyCode = async () => {
     if (!pix) return;
@@ -370,8 +396,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                 O CORE agora é <strong className="text-foreground">seu pra sempre</strong> — todos os módulos,
                 sem mensalidade, nunca.
               </p>
-              <Button size="lg" className="w-full h-[52px] text-base font-bold rounded-full" onClick={enterApp}>
-                Entrar no meu app
+              <Button
+                size="lg" className="w-full h-[52px] text-base font-bold rounded-full"
+                onClick={v2?.onConfirmado ?? enterApp}
+              >
+                {v2?.onConfirmado ? "Ativar minha central →" : "Entrar no meu app"}
               </Button>
             </motion.div>
           )}

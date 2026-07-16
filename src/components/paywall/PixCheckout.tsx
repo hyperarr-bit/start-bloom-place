@@ -98,9 +98,15 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const cpfRef = useRef<HTMLInputElement>(null);
   const price = PIX_PRICES[offer];
 
-  // Prefill do profile — com CPF já salvo, pula o form direto pro QR
+  // Prefill do profile — com CPF já salvo, pula o form direto pro QR.
+  // v2 + AbacatePay: CPF nem é pedido (opcional no gateway) — a conta já
+  // existe, então vai DIRETO pro QR sem digitar nada (decisão do dono 16/07).
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context });
+    if (v2 && V2_GATEWAY === "abacate") {
+      generate("", "");
+      return;
+    }
     (async () => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth?.user?.id;

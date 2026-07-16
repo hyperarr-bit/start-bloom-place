@@ -91,13 +91,19 @@ serve(async (req) => {
       const amount = PRECOS_CENTAVOS[offer];
       if (!amount) return jsonResponse({ error: "Oferta não configurada. Avise o suporte." }, 503);
 
+      // CPF é OPCIONAL na AbacatePay (16/07, decisão do dono: conta criada →
+      // QR direto, zero digitação). O objeto customer é tudo-ou-nada no
+      // contrato deles: só vai se tivermos CPF válido; sem ele, a cobrança
+      // sai mesmo assim e o vínculo fica no metadata.externalId (user_id).
       const customer = (body.customer ?? {}) as Record<string, string | undefined>;
       const docNumber = onlyDigits(customer.docNumber);
-      if (!docNumber || docNumber.length !== 11) return jsonResponse({ error: "cpf_required" });
       const name = (customer.name ?? "").trim() || user.email?.split("@")[0] || "Cliente CORE";
-
-      // CPF vai pro profile — próxima compra não pede de novo (paridade cakto-pix)
-      await supabaseAdmin.from("profiles").update({ tax_id: docNumber }).eq("id", user.id);
+      let customerPayload: Record<string, string> | null = null;
+      if (docNumber.length === 11 && user.email) {
+        customerPayload = { name, cellphone: DUMMY_PHONE, email: user.email, taxId: docNumber };
+        // CPF vai pro profile — próxima compra não pede de novo (paridade cakto-pix)
+        await supabaseAdmin.from("profiles").update({ tax_id: docNumber }).eq("id", user.id);
+      }
 
       const res = await fetch(`${ABACATE_API}/transparents/create`, {
         method: "POST",
@@ -108,7 +114,7 @@ serve(async (req) => {
             amount,
             expiresIn: 1800,
             description: offer === "downsell" ? "CORE vitalicio (oferta)" : "CORE vitalicio",
-            customer: { name, cellphone: DUMMY_PHONE, email: user.email, taxId: docNumber },
+            ...(customerPayload ? { customer: customerPayload } : {}),
             metadata: { externalId: `${user.id}:${offer}` },
           },
         }),

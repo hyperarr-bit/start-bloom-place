@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, getAttributionParams, captureLandingMeta } from "@/lib/analytics";
 import {
   AREAS, AREA_TRACKS, AREA_PROOF, AREA_ANCHOR, DOOR_AREAS, DEMO_MODULES,
   type AreaKey, type QuizQ, type QuizOpt, ALL_MODULE_ICONS,
@@ -216,6 +216,27 @@ const ATIVACAO_AREA: Record<AreaKey, string[]> = {
   ],
 };
 
+// MODO CHECKOUT HOSPEDADO (16/07): a API de Pix da Cakto caiu; enquanto isso
+// o pagamento do v2 vai pro checkout hospedado deles. O webhook libera o
+// acesso pelo E-MAIL do comprador — por isso o T16 martela "paga com o mesmo
+// e-mail da conta". REVERTER quando a API voltar: CHECKOUT_HOSPEDADO = null
+// (1 linha) ou instant rollback na Vercel.
+const CHECKOUT_HOSPEDADO: Record<PixOffer, string> | null = {
+  lifetime: "https://pay.cakto.com.br/3e6pp6n",
+  downsell: "https://pay.cakto.com.br/kt9rrgt",
+};
+
+const FOI_CHECKOUT_KEY = "fv2-foi-checkout";
+
+/** Link do checkout hospedado com atribuição (utm/fbclid) + e-mail da conta. */
+function urlHospedado(offer: PixOffer, email?: string | null, nome?: string | null): string {
+  const u = new URL(CHECKOUT_HOSPEDADO![offer]);
+  for (const [k, v] of Object.entries(getAttributionParams())) u.searchParams.set(k, v);
+  if (email) u.searchParams.set("email", email);
+  if (nome) u.searchParams.set("name", nome);
+  return u.toString();
+}
+
 const LS_KEY = "fv2-state";
 
 // eixos do mapa (T11) = as 5 áreas da porta
@@ -304,7 +325,13 @@ export default function ComecarV2() {
   }, [step, area, dor, consist, estim, vitoria, gastoTeste]);
 
   useEffect(() => { track("funnel_v2_step", { step, idx }); }, [step, idx]);
-  useEffect(() => { track("funnel_v2_start"); }, []);
+  useEffect(() => {
+    // persiste utm/fbclid da URL do anúncio ANTES do primeiro evento — sem
+    // isso o v2 inteiro fica cego de atribuição (bug achado em 16/07: só o
+    // funil velho e a LP chamavam)
+    captureLandingMeta();
+    track("funnel_v2_start");
+  }, []);
 
   const avancar = useCallback(() => {
     setStep((s) => {
@@ -325,11 +352,42 @@ export default function ComecarV2() {
   }, [ordem]);
   const irPara = useCallback((s: StepId) => { setStep(s); window.scrollTo({ top: 0 }); }, []);
 
-  // T16: abre o Pix real ao entrar (só logado — o guest nunca chega aqui sem T15)
+  // T16: abre o Pix real ao entrar (só logado — o guest nunca chega aqui sem
+  // T15). No modo hospedado NÃO abre nada: a tela vira ponte pro link.
   useEffect(() => {
-    if (step === "t16" && user) setPixAberto(true);
+    if (step === "t16" && user && !CHECKOUT_HOSPEDADO) setPixAberto(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
+
+  // Modo hospedado: sai pro checkout na MESMA aba (o estado fica salvo;
+  // voltar retoma o t16 e o repoll da assinatura empurra pro T17 sozinho).
+  const irCheckoutHospedado = useCallback((offer: PixOffer) => {
+    if (!CHECKOUT_HOSPEDADO) return;
+    try { sessionStorage.setItem(FOI_CHECKOUT_KEY, String(Date.now())); } catch { /* noop */ }
+    track("funnel_v2_hosted_checkout_open", { offer });
+    const email = user?.email ?? null;
+    const nome = (user?.user_metadata?.display_name as string | undefined) ?? null;
+    // um respiro pro evento sair antes da navegação
+    setTimeout(() => { window.location.href = urlHospedado(offer, email, nome); }, 150);
+  }, [user]);
+
+  // Modo hospedado: voltou do checkout sem pagar (ficou 25s+ fora) → downsell
+  // UMA vez. Espera 6s pro check-subscription ter chance de confirmar antes.
+  useEffect(() => {
+    if (!CHECKOUT_HOSPEDADO || step !== "t16" || isSubscribed) return;
+    let marca = 0;
+    try { marca = Number(sessionStorage.getItem(FOI_CHECKOUT_KEY) || 0); } catch { /* noop */ }
+    if (!marca || Date.now() - marca < 25000) return;
+    const t = setTimeout(() => {
+      if (!downsellVisto.current) {
+        downsellVisto.current = true;
+        try { sessionStorage.removeItem(FOI_CHECKOUT_KEY); } catch { /* noop */ }
+        setDownsell(true);
+        track("funnel_v2_downsell_view", { modo: "hospedado" });
+      }
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [step, isSubscribed]);
 
   // Pagamento confirmado (use-auth repolla check-subscription): peak-end
   useEffect(() => {
@@ -423,8 +481,17 @@ export default function ComecarV2() {
 
             {step === "t16" && (downsell ? (
               <T16Downsell
-                onPagar={() => { setPixOffer("downsell"); setPixAberto(true); track("funnel_v2_downsell_click"); }}
+                onPagar={() => {
+                  track("funnel_v2_downsell_click");
+                  if (CHECKOUT_HOSPEDADO) { irCheckoutHospedado("downsell"); return; }
+                  setPixOffer("downsell"); setPixAberto(true);
+                }}
                 onRecusar={() => { setDownsell(false); setPixOffer("lifetime"); track("funnel_v2_downsell_dismiss"); }}
+              />
+            ) : CHECKOUT_HOSPEDADO ? (
+              <T16Externo
+                email={user?.email ?? null}
+                onPagar={() => irCheckoutHospedado("lifetime")}
               />
             ) : (
               <T16Pix
@@ -1564,6 +1631,48 @@ function T16Pix({ pixAberto, onAbrir, onVoltar }: {
           <button className="fv2-ghost" onClick={onVoltar}>Voltar pra oferta</button>
         </div>
       )}
+    </>
+  );
+}
+
+// --------------------------------- T16 (hospedado) — ponte pro checkout Cakto
+// Vigente enquanto a API de Pix estiver fora: o pagamento acontece no checkout
+// hospedado, e o acesso é liberado pelo E-MAIL — daí o aviso martelado.
+
+function T16Externo({ email, onPagar }: { email: string | null; onPagar: () => void }) {
+  useEffect(() => { track("funnel_v2_pix_screen", { modo: "hospedado" }); }, []);
+  return (
+    <>
+      <motion.div
+        style={{ display: "flex", justifyContent: "center" }}
+        animate={{ y: [0, -6, 0] }}
+        transition={{ repeat: Infinity, duration: 1.6, ease: "easeInOut" }}
+      >
+        <Polvo mood="neutro" size={140} />
+      </motion.div>
+      <div className="fv2-bolha" style={{ textAlign: "center" }}>
+        Vou te levar pro checkout seguro. Regra de OURO: paga com o <b>mesmo e-mail</b> da sua conta 👇
+      </div>
+      {email && (
+        <div className="fv2-card" style={{ textAlign: "center", padding: "13px 16px" }}>
+          <p style={{ margin: 0, fontSize: 11.5, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--tinta-2)" }}>
+            Seu e-mail de acesso
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 16, fontWeight: 800, fontVariantLigatures: "none", overflowWrap: "anywhere" }}>{email}</p>
+        </div>
+      )}
+      <motion.div {...popAnim} className="fv2-feedback" style={{ marginTop: 12 }}>
+        ⚡ Pagou? Volta aqui que o acesso libera sozinho. Se fechar sem querer, também chega um e-mail com o passo a passo.
+      </motion.div>
+      <div className="fv2-rodape">
+        <button className="fv2-cta magenta" onClick={onPagar}>
+          Pagar R$ {PIX_PRICES.lifetime} no checkout seguro →
+        </button>
+        <p style={{ textAlign: "center", fontSize: 12, color: "var(--tinta-2)", margin: 0 }}>
+          🔒 Garantia de 7 dias · Pix aprovado na hora
+        </p>
+        <button className="fv2-ghost" onClick={() => window.location.reload()}>Já paguei — liberar meu acesso</button>
+      </div>
     </>
   );
 }

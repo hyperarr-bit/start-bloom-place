@@ -53,7 +53,7 @@ const Casa = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => navigate("/")} className="hover:bg-muted rounded-md p-1 transition-colors">
+          <button onClick={() => navigate("/home")} className="hover:bg-muted rounded-md p-1 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <Home className="w-5 h-5 text-cyan-600" />

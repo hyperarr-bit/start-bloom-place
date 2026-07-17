@@ -55,7 +55,7 @@ const Viagens = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/home")}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <Plane className="w-5 h-5 text-teal-600" />

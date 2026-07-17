@@ -4,8 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
-import { ArrowLeft, DollarSign, Menu, Sparkles, LayoutGrid } from "lucide-react";
-import { AccountDrawer } from "@/components/home/AccountDrawer";
+import { ArrowLeft, DollarSign, Sparkles } from "lucide-react";
 import { AskCore } from "@/components/ask/AskCore";
 
 import { useUserData } from "@/hooks/use-user-data";
@@ -68,8 +67,6 @@ const Index = () => {
   useSetTrackedTab(activeTab);
   const [openMonth, setOpenMonth] = useState<string | null>(null);
   // Finanças virou a tela-raiz do app (pivot "só finanças"): o header dá acesso à
-  // conta/assinatura/sair via AccountDrawer (antes isso vivia na Home, aposentada).
-  const [accountOpen, setAccountOpen] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
 
   const handleReplayFinanceTutorial = () => {
@@ -194,15 +191,15 @@ const Index = () => {
       {/* Header */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
-          {isPreview ? (
-            <button onClick={() => navigate("/lp")} aria-label="Voltar" className="hover:bg-muted rounded-md p-1 transition-colors">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          ) : (
-            <button onClick={() => setAccountOpen(true)} aria-label="Conta e ajustes" className="hover:bg-muted rounded-md p-1 transition-colors">
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
+          {/* Faxina 16/07: hambúrguer saiu — a seta leva pro hub (o menu de
+              conta mora lá, no GreetingHeader). No preview, volta pra /lp. */}
+          <button
+            onClick={() => navigate(isPreview ? "/lp" : "/home")}
+            aria-label={isPreview ? "Voltar" : "Todos os módulos"}
+            className="hover:bg-muted rounded-md p-1 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
 
           <DollarSign className="w-5 h-5 text-amber-600" />
           <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
@@ -216,16 +213,6 @@ const Index = () => {
             >
               <Sparkles className="w-4 h-4" />
             </button>
-            {/* App completo: atalho de 1 toque pros 16 módulos (Home hub) */}
-            {!isPreview && (
-              <button
-                onClick={() => navigate("/home")}
-                aria-label="Todos os módulos"
-                className="grid place-items-center w-8 h-8 rounded-lg hover:bg-muted transition-colors"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-            )}
             <ThemeToggle />
           </div>
         </div>
@@ -461,14 +448,6 @@ const Index = () => {
           </TrackedCard>
         )}
       </main>
-
-      {!isPreview && (
-        <AccountDrawer
-          open={accountOpen}
-          onOpenChange={setAccountOpen}
-          onReplayTutorial={handleReplayFinanceTutorial}
-        />
-      )}
 
       <AskCore
         open={askOpen}

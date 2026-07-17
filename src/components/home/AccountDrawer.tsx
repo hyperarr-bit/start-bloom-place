@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, RotateCcw, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, Gift, LayoutGrid } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,7 +8,6 @@ import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { NameEditDialog } from "./NameEditDialog";
-import { ReferralSheet } from "./ReferralSheet";
 import { toast } from "sonner";
 
 interface AccountDrawerProps {
@@ -24,13 +23,11 @@ export const AccountDrawer = ({
   onOpenChange,
   displayName = "",
   onNameChange,
-  onReplayTutorial,
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
   const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
-  const [showReferral, setShowReferral] = useState(false);
   const [view, setView] = useState<"menu" | "account">("menu");
 
   useEffect(() => {
@@ -44,7 +41,6 @@ export const AccountDrawer = ({
     if (!open) return;
     import("@/pages/Conquistas");
     import("@/pages/Planos");
-    import("@/pages/Home");
   }, [open]);
 
   // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame
@@ -76,13 +72,6 @@ export const AccountDrawer = ({
 
   const handleManageSubscription = () => go("/planos");
 
-  const handleReplayTutorial = () => {
-    localStorage.removeItem("core-welcome-done");
-    setUserData("core-onboarding-done", "");
-    onOpenChange(false);
-    onReplayTutorial?.();
-  };
-
   const handleMinhaConta = () => {
     if (isGuest) {
       onOpenChange(false);
@@ -92,20 +81,19 @@ export const AccountDrawer = ({
     }
   };
 
+  // Faxina 16/07 (ordem do dono): saem "Todos os módulos" (o drawer agora só
+  // abre NO hub — a seta ← dos módulos leva até ele), "Indique e ganhe"
+  // (+30 dias não faz sentido pra base vitalícia) e "Rever tutorial".
+  // "Assinatura" vira "Meu acesso" (produto é vitalício; /planos já mostra
+  // o estado "VITALÍCIO 🎉" pra quem é).
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
       ]
     : [
-        // Todos os 16 módulos são da assinatura — mas quem entrou pelo funil
-        // de finanças não tinha NENHUM caminho até eles (caso real 12/07:
-        // pagante anual pediu rotina/treino e o app "era só finanças").
-        { icon: LayoutGrid, label: "Todos os módulos", onClick: () => go("/home") },
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
-        { icon: CreditCard, label: "Assinatura", onClick: handleManageSubscription },
+        { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
-        { icon: Gift, label: "Indique e ganhe", onClick: () => { onOpenChange(false); setShowReferral(true); } },
-        { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 
   return (
@@ -220,7 +208,6 @@ export const AccountDrawer = ({
         onSave={handleNameSave}
       />
 
-      <ReferralSheet open={showReferral} onOpenChange={setShowReferral} />
     </>
   );
 };

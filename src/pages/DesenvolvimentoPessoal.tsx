@@ -222,7 +222,7 @@ const DesenvolvimentoPessoal = () => {
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
           <Sparkles className="w-5 h-5 text-purple-600" />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
           <div className="flex items-center gap-2 ml-auto">

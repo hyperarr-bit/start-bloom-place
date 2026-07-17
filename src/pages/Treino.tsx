@@ -592,7 +592,7 @@ const Treino = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/")}><ArrowLeft className="w-5 h-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}><ArrowLeft className="w-5 h-5" /></Button>
           <div className="flex-1">
             <h1 className="text-lg font-bold tracking-tight flex items-center gap-2"><Dumbbell className="w-5 h-5 text-blue-600" /> TREINO</h1>
           </div>

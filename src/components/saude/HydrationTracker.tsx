@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
-import { Droplets, Plus } from "lucide-react";
+import { Droplets, Minus, Pencil, Plus } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
@@ -8,7 +9,9 @@ const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanh�
 export const HydrationTracker = () => {
   const today = todayStr();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
-  const [waterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
+  const [waterGoalRaw, setWaterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
+  const waterGoal = Math.min(20, Math.max(1, Math.round(Number(waterGoalRaw) || 8)));
+  const [editandoMeta, setEditandoMeta] = useState(false);
   // FIX 16/07: a ROTINA conta água em water-log — espelha os dois mundos
   // (lê o maior do dia, escreve nos dois) pra nenhuma tela mostrar zero
   const [waterLogRotina, setWaterLogRotina] = usePersistedState<Record<string, number>>("water-log", {});
@@ -23,6 +26,7 @@ export const HydrationTracker = () => {
     setWaterLog(prev => ({ ...prev, [today]: n }));
     setWaterLogRotina(prev => ({ ...prev, [today]: n }));
   };
+  const ajustaMeta = (delta: number) => setWaterGoal(Math.min(20, Math.max(1, waterGoal + delta)));
 
   return (
     <div className="bg-card rounded-xl border border-border p-4">
@@ -31,8 +35,42 @@ export const HydrationTracker = () => {
           <Droplets className="w-4 h-4 text-[hsl(var(--saude-blue))]" />
           <span className="text-xs font-bold uppercase tracking-wider">Hidratação</span>
         </div>
-        <span className="text-xs text-muted-foreground">{mlCurrent}ml / {mlGoal}ml</span>
+        <button
+          onClick={() => setEditandoMeta(v => !v)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          aria-label="Editar meta de hidratação"
+        >
+          {mlCurrent}ml / {mlGoal}ml
+          <Pencil className="w-3 h-3" />
+        </button>
       </div>
+
+      {editandoMeta && (
+        <div className="flex items-center justify-between gap-3 mb-3 px-3 py-2.5 rounded-lg bg-[hsl(var(--saude-blue)/0.08)] border border-[hsl(var(--saude-blue)/0.2)]">
+          <span className="text-xs font-bold">Meta diária</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => ajustaMeta(-1)}
+              disabled={waterGoal <= 1}
+              className="w-8 h-8 rounded-full border border-border bg-card flex items-center justify-center disabled:opacity-30"
+              aria-label="Diminuir meta"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-xs font-black w-24 text-center tabular-nums">
+              {waterGoal} {waterGoal === 1 ? "copo" : "copos"} · {waterGoal * 250}ml
+            </span>
+            <button
+              onClick={() => ajustaMeta(1)}
+              disabled={waterGoal >= 20}
+              className="w-8 h-8 rounded-full border border-border bg-card flex items-center justify-center disabled:opacity-30"
+              aria-label="Aumentar meta"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-4">
         {/* Visual cup */}

@@ -251,7 +251,9 @@ const HealthTracker = () => {
   const [waterLogSaude, setWaterLogSaude] = usePersistedState<Record<string, number>>("core-saude-water", {});
   const [sleepLogSaude, setSleepLogSaude] = usePersistedState<Record<string, number>>("core-saude-sleep", {});
   const [sleepInput, setSleepInput] = useState(String(sleepLog[today] || sleepLogSaude[today] || ""));
-  const waterGoal = 8;
+  // meta editável no card Hidratação da Saúde — mesma chave, telas convergem
+  const [waterGoalRaw] = usePersistedState<number>("core-saude-water-goal", 8);
+  const waterGoal = Math.min(20, Math.max(1, Math.round(Number(waterGoalRaw) || 8)));
   const waterToday = Math.max(waterLog[today] || 0, waterLogSaude[today] || 0);
   const sleepToday = sleepLog[today] || sleepLogSaude[today] || 0;
 
@@ -259,7 +261,7 @@ const HealthTracker = () => {
     setWaterLog(prev => ({ ...prev, [today]: n }));
     setWaterLogSaude(prev => ({ ...prev, [today]: n }));
   };
-  const addWater = () => setAgua(Math.min(waterToday + 1, 15));
+  const addWater = () => setAgua(Math.min(waterToday + 1, 20));
   const removeWater = () => setAgua(Math.max(waterToday - 1, 0));
   const saveSleep = (val: string) => {
     const n = parseFloat(val);

@@ -214,7 +214,14 @@ serve(async (req) => {
     if (!res.ok || !data?.pix?.qrCode) {
       // Log completo do erro — a visibilidade que o checkout hospedado nunca deu
       logStep("Cakto payments error", { status: res.status, body: JSON.stringify(data).slice(0, 600) });
-      return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
+      return jsonResponse({
+        error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.",
+        // diagnóstico opt-in (QA, 17/07 — conta em análise): corpo cru do
+        // gateway. Lê do rawBody: o zod STRIPA campos fora do schema.
+        ...((rawBody as Record<string, unknown>)?.debug === true
+          ? { gw: { status: res.status, body: JSON.stringify(data).slice(0, 400) } }
+          : {}),
+      }, 502);
     }
 
     logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount });

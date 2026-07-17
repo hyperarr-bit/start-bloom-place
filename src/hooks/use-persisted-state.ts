@@ -14,7 +14,7 @@ import { normalizeForKey } from "@/lib/data-normalizers";
  *   key updates to revert local state with stale closures).
  */
 export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] => {
-  const { get, set: setData, loaded } = useUserData();
+  const { get, set: setData, loaded, isGuest, fetchKey } = useUserData();
 
   const [state, setState] = useState<T>(() => normalizeForKey(key, get(key, initial)));
   const lastWrittenJson = useRef<string>(JSON.stringify(state));
@@ -29,6 +29,23 @@ export const usePersistedState = <T,>(key: string, initial: T): [T, (v: T | ((pr
     if (latestJson !== lastWrittenJson.current) {
       lastWrittenJson.current = latestJson;
       setState(latest);
+    }
+
+    // CHAVE PESADA (bug 16/07, relatos reais: diário/refeições/wishlist "em
+    // branco" ao reabrir): a carga inicial PULA chaves ≥50KB (por design, pra
+    // não pesar o boot) esperando busca sob demanda — que ninguém fazia. Num
+    // aparelho/sessão sem cache local a aba abria vazia e a PRÓXIMA escrita
+    // sobrescrevia o histórico inteiro. Aqui: se o store não tem a chave,
+    // busca no servidor; só aplica se o usuário não escreveu nesse meio-tempo.
+    if (!isGuest && get(key, undefined as unknown as T) === undefined) {
+      const baseline = lastWrittenJson.current;
+      fetchKey<T>(key).then((remote) => {
+        if (remote == null) return;
+        if (lastWrittenJson.current !== baseline) return; // usuário já escreveu — não atropela
+        const norm = normalizeForKey(key, remote);
+        lastWrittenJson.current = JSON.stringify(norm);
+        setState(norm);
+      }).catch(() => { /* sem rede: fica no estado atual */ });
     }
     // We only want this to fire once when `loaded` becomes true.
     // eslint-disable-next-line react-hooks/exhaustive-deps

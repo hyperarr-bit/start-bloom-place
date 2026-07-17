@@ -90,15 +90,18 @@ const normalizeSaudeMeals = (v: any) => {
 };
 
 const normalizeDietaDiary = (v: any) => {
+  // BUG 16/07 (relato real: "refeições somem ao reabrir"): a versão anterior
+  // esperava meals como ARRAY, mas o Dieta.tsx grava meals como OBJETO
+  // (Record por refeição) + extraFood. O normalizador substituía meals por []
+  // e descartava extraFood — triturava o diário inteiro na LEITURA, e a
+  // escrita seguinte persistia a versão mutilada. Agora: só filtra chaves de
+  // data e entradas não-objeto; o formato interno passa intacto.
   if (!isPlainObject(v)) return {};
-  const out: Record<string, { meals: any[]; macros: Record<string, number> }> = {};
+  const out: Record<string, any> = {};
   for (const [k, val] of Object.entries(v)) {
     if (!dateKeyRe.test(k)) continue;
     if (!isPlainObject(val)) continue;
-    out[k] = {
-      meals: Array.isArray((val as any).meals) ? (val as any).meals : [],
-      macros: isPlainObject((val as any).macros) ? (val as any).macros : {},
-    };
+    out[k] = val;
   }
   return out;
 };

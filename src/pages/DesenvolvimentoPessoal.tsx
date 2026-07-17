@@ -3,6 +3,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -151,6 +152,19 @@ const DesenvolvimentoPessoal = () => {
     "Qual foi minha maior vitória recente?", "Como me sinto agora e por quê?",
   ];
   const [todayJournal, setTodayJournal] = useState(journalEntries[today]?.text || "");
+  // FIX 16/07 ("salvar reflexão não funciona"): o texto salvo chega DEPOIS do
+  // mount (hidratação/chave pesada) e o campo ficava vazio pra sempre — a
+  // pessoa reescrevia, salvava e no retorno via vazio de novo. Sincroniza o
+  // campo quando o dado chegar, sem atropelar o que ela estiver digitando.
+  const reflexaoAplicada = useRef(journalEntries[today]?.text || "");
+  useEffect(() => {
+    const salvo = journalEntries[today]?.text || "";
+    if (salvo && salvo !== todayJournal && todayJournal === reflexaoAplicada.current) {
+      setTodayJournal(salvo);
+      reflexaoAplicada.current = salvo;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journalEntries, today]);
   const [todayPrompt] = useState(() => journalEntries[today]?.prompt || journalPrompts[Math.floor(Math.random() * journalPrompts.length)]);
 
   // === NEW: MOOD TRACKER ===
@@ -343,6 +357,10 @@ const DesenvolvimentoPessoal = () => {
                 placeholder="Escreva livremente seus pensamentos..." className="text-xs min-h-[150px] mb-3" />
               <Button size="sm" className="w-full" onClick={() => {
                 setJournalEntries({ ...journalEntries, [today]: { text: todayJournal, prompt: todayPrompt } });
+                reflexaoAplicada.current = todayJournal;
+                // feedback explícito — antes salvava mudo e parecia quebrado
+                // (a lista embaixo só mostra dias ANTERIORES, hoje não aparece)
+                toast.success("Reflexão salva ✅");
               }}>Salvar reflexão 📝</Button>
             </div>
             <div className="bg-card rounded-xl border border-border p-4">

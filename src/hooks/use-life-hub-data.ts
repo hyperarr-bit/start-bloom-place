@@ -144,12 +144,16 @@ export function useLifeHubData(): LifeHubData {
     const mealsLogged = Object.keys(todayMeals).length;
     const caloriesConsumed: number = Object.values(todayMeals).reduce<number>((s, m: any) => s + (Number(m?.calories) || 0), 0);
 
-    // Health
+    // Health — FIX 16/07 (pendência de água eterna): os MÓDULOS gravam em
+    // water-log/sleep-log; as chaves core-saude-* só recebiam as ações
+    // rápidas do hub. Lê as duas famílias e fica com o melhor valor do dia.
     const waterLog = get<any>("core-saude-water", {});
-    const waterGlasses = waterLog[tStr] || 0;
+    const waterLogModulo = get<any>("water-log", {});
+    const waterGlasses = Math.max(Number(waterLog[tStr]) || 0, Number(waterLogModulo[tStr]) || 0);
     const waterGoal = get<number>("core-saude-water-goal", 8);
     const sleepLog = get<any>("core-saude-sleep", {});
-    const sleepHours = sleepLog[tStr] || null;
+    const sleepLogModulo = get<any>("sleep-log", {});
+    const sleepHours = sleepLog[tStr] || sleepLogModulo[tStr] || null;
     const supplements = get<any[]>("core-saude-supplements", []);
     const supplementLog = get<any>("core-saude-supplement-log", {});
     const todaySups = supplementLog[tStr] || [];
@@ -160,13 +164,22 @@ export function useLifeHubData(): LifeHubData {
     const currentBook = books.find((b: any) => b.status === "lendo");
     const booksRead = books.filter((b: any) => b.status === "lido").length;
 
-    // Tasks / Habits
-    const habits = get<any[]>("core-rotina-habits", []);
+    // Tasks / Habits — FIX 16/07 ("adicionar hábito" eterno no hub): a fonte
+    // real é rotina-habits + rotina-habits-checked (Record<DIA, boolean[]>
+    // em MAIÚSCULO, paralelo à lista — convenção da Rotina). As chaves
+    // core-rotina-* nunca foram escritas por módulo nenhum.
+    const habitsLegado = get<any[]>("core-rotina-habits", []);
+    const habits = get<any[]>("rotina-habits", habitsLegado);
+    const DIAS_ROTINA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+    const agora = new Date();
+    const diaHoje = DIAS_ROTINA[agora.getDay() === 0 ? 6 : agora.getDay() - 1];
+    const habitsChecked = get<Record<string, boolean[]>>("rotina-habits-checked", {});
+    const checksHoje = Array.isArray(habitsChecked[diaHoje]) ? habitsChecked[diaHoje] : [];
     const habitLog = get<any>("core-rotina-habit-log", {});
     const todayHabits = habitLog[tStr] || {};
-    const mappedHabits = habits.slice(0, 5).map((h: any) => ({
+    const mappedHabits = habits.slice(0, 5).map((h: any, i: number) => ({
       name: typeof h === "string" ? h : h.name || "Hábito",
-      done: !!todayHabits[h.id || h.name || h],
+      done: !!checksHoje[i] || !!todayHabits[h.id || h.name || h],
     }));
     const tasksTotal = mappedHabits.length;
     const tasksCompleted = mappedHabits.filter(h => h.done).length;

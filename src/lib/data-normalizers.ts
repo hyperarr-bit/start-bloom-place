@@ -71,20 +71,26 @@ const normalizeMoodLog = (v: any) => {
   return out;
 };
 
+// BUG 16/07 (relato real: "cardápio some ao voltar pra aba"): a versão
+// anterior canonizava pra Title Case ("Segunda"), mas o Dieta.tsx usa dias
+// MAIÚSCULOS ("SEGUNDA") — a cada leitura as chaves mudavam de caixa e o
+// componente não achava mais nada (e a escrita seguinte persistia o vazio).
+// Canon agora é o MAIÚSCULO (convenção real do app); chaves legadas em
+// Title/minúsculo migram sem perda — em duplicata, vence a mais preenchida.
 const dayCanon: Record<string, string> = {
-  segunda: "Segunda", terca: "Terça", "terça": "Terça",
-  quarta: "Quarta", quinta: "Quinta", sexta: "Sexta",
-  sabado: "Sábado", "sábado": "Sábado", domingo: "Domingo",
+  segunda: "SEGUNDA", terca: "TERÇA", "terça": "TERÇA",
+  quarta: "QUARTA", quinta: "QUINTA", sexta: "SEXTA",
+  sabado: "SÁBADO", "sábado": "SÁBADO", domingo: "DOMINGO",
 };
+const preenchidas = (val: any): number =>
+  isPlainObject(val) ? Object.values(val).filter((m) => typeof m === "string" && (m as string).trim()).length : 0;
 const normalizeSaudeMeals = (v: any) => {
   if (!isPlainObject(v)) return {};
   const merged: Record<string, any> = {};
   for (const [k, val] of Object.entries(v)) {
     const norm = k.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const canon = dayCanon[norm] ?? k;
-    // Title-case version wins; if two map to same canon, prefer the one that
-    // is already Title Case (heuristic: matches canon exactly).
-    if (!merged[canon] || k === canon) merged[canon] = val;
+    const canon = dayCanon[norm] ?? k.toUpperCase();
+    if (!(canon in merged) || preenchidas(val) > preenchidas(merged[canon])) merged[canon] = val;
   }
   return merged;
 };

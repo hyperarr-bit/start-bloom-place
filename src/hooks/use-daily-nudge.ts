@@ -11,16 +11,18 @@ const DISMISS_PREFIX = "core_nudge_dismissed_";
  * remembers dismissals locally, and exposes handlers.
  */
 export function useDailyNudge() {
-  const { user, isSubscribed, trialExpired, trialDay } = useAuth();
+  const { user, isSubscribed, trialExpired, trialDay, subLoaded } = useAuth();
   const { keys, loaded } = useTrialActivations();
   const [open, setOpen] = useState(false);
   const [dismissedThisSession, setDismissedThisSession] = useState(false);
 
   const activations = useMemo(() => new Set(keys), [keys]);
   const nudge: DailyNudge | null = useMemo(() => {
-    if (!user || isSubscribed) return null;
+    // subLoaded: sem isso o nudge de trial abria no VÃO entre o boot e a
+    // resposta do check-subscription — dono vitalício viu "DIA 1 DE 7" (16/07)
+    if (!user || !subLoaded || isSubscribed) return null;
     return pickDailyNudge(trialDay, activations, trialExpired);
-  }, [user, isSubscribed, trialDay, activations, trialExpired]);
+  }, [user, subLoaded, isSubscribed, trialDay, activations, trialExpired]);
 
   const dismissKey = nudge && user
     ? `${DISMISS_PREFIX}${user.id}_${nudge.key}`

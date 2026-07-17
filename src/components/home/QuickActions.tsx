@@ -97,6 +97,10 @@ export const QuickActions = () => {
     const waterLog = get<Record<string, number>>("core-saude-water", {});
     const current = waterLog[tStr] || 0;
     set("core-saude-water", { ...waterLog, [tStr]: current + 1 });
+    // FIX 16/07: espelha no water-log (a chave dos MÓDULOS Rotina/Saúde) —
+    // sem isso o copo do hub não aparecia lá, e vice-versa
+    const waterLogModulo = get<Record<string, number>>("water-log", {});
+    set("water-log", { ...waterLogModulo, [tStr]: (Number(waterLogModulo[tStr]) || 0) + 1 });
     vibrate();
     showSuccess("water");
     setWaterSplash(true);

@@ -348,15 +348,22 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
             <select value={newItem.category} onChange={(e) => setNewItem({ ...newItem, category: e.target.value })} className="h-8 text-xs rounded-md border border-input bg-background px-2">
               {categories.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
-            <Input
-              type={newItem.targetDate ? "date" : "text"}
-              placeholder="Data alvo"
-              value={newItem.targetDate || ""}
-              onFocus={(e) => { e.currentTarget.type = "date"; }}
-              onBlur={(e) => { if (!e.currentTarget.value) e.currentTarget.type = "text"; }}
-              onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
-              className="h-8 text-xs"
-            />
+            {/* FIX 17/07 (dono, gravação de tela): o hack text→date no focus
+                não abre o seletor no CELULAR (o toque foca como texto e o SO
+                já decidiu não abrir picker). type="date" nativo sempre; o
+                rótulo vem do label flutuante abaixo. */}
+            <div className="relative">
+              <span className="absolute -top-1.5 left-2 px-1 bg-card text-[9px] text-muted-foreground leading-none pointer-events-none">
+                Data alvo
+              </span>
+              <Input
+                type="date"
+                aria-label="Data alvo"
+                value={newItem.targetDate || ""}
+                onChange={(e) => setNewItem({ ...newItem, targetDate: e.target.value })}
+                className="h-8 text-xs w-full"
+              />
+            </div>
 
             <Input type="number" placeholder="Já guardei (R$)" value={newItem.savedAmount || ""} onChange={(e) => setNewItem({ ...newItem, savedAmount: parseFloat(e.target.value) || 0 })} className="h-8 text-xs" />
           </div>

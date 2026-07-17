@@ -141,7 +141,13 @@ export function useLifeHubData(): LifeHubData {
     const todayLog = get<any>("core-dieta-log", {});
     const todayMeals = todayLog[tStr] || {};
     const mealsTotal = dietMeals.length || 4;
-    const mealsLogged = Object.keys(todayMeals).length;
+    // FIX 16/07: o diário REAL da Dieta (dieta-diary-v2) também conta —
+    // core-dieta-log só recebia a ação rápida do hub
+    const dietaDiary = get<any>("dieta-diary-v2", {});
+    const diaryMealsHoje = dietaDiary[tStr]?.meals && typeof dietaDiary[tStr].meals === "object"
+      ? Object.values(dietaDiary[tStr].meals).filter((m: any) => m?.followed).length
+      : 0;
+    const mealsLogged = Math.max(Object.keys(todayMeals).length, diaryMealsHoje);
     const caloriesConsumed: number = Object.values(todayMeals).reduce<number>((s, m: any) => s + (Number(m?.calories) || 0), 0);
 
     // Health — FIX 16/07 (pendência de água eterna): os MÓDULOS gravam em
@@ -212,13 +218,17 @@ export function useLifeHubData(): LifeHubData {
     // Leitura ativa (5pts)
     if (currentBook) scorePoints += 5;
 
-    // Humor registrado (5pts)
+    // Humor registrado (5pts) — FIX 16/07: Rotina grava em mood-log e o
+    // Dev. Pessoal em dp-mood-log; qualquer um dos três conta
     const moodLog = get<Record<string, any>>("core-mood-log", {});
-    if (moodLog[tStr]) scorePoints += 5;
+    const moodRotina = get<Record<string, any>>("mood-log", {});
+    const moodDp = get<Record<string, any>>("dp-mood-log", {});
+    if (moodLog[tStr] || moodRotina[tStr] || moodDp[tStr]) scorePoints += 5;
 
-    // Gratidão registrada (5pts)
+    // Gratidão registrada (5pts) — FIX 16/07: dp-gratitude (módulo) também
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
-    if ((gratLog[tStr] || []).length > 0) scorePoints += 5;
+    const gratDp = get<Record<string, string[]>>("dp-gratitude", {});
+    if ((gratLog[tStr] || []).length > 0 || (gratDp[tStr] || []).length > 0) scorePoints += 5;
 
     // Ideia capturada hoje (5pts)
     const thoughtsAll = get<Record<string, any>>("hiperfoco-thoughts", {});

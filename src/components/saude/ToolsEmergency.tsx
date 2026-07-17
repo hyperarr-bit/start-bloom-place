@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Moon, ShoppingCart, AlertTriangle, Plus, Trash2, Heart, Phone, Droplet } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 export const ToolsEmergency = () => {
   const today = todayStr();
@@ -21,7 +22,7 @@ export const ToolsEmergency = () => {
 
   const last7 = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - i);
-    return d.toISOString().slice(0, 10);
+    return localDayKey(d);
   });
   const totalSlept = last7.reduce((s, d) => s + (sleepLog[d] || 0), 0);
   const totalNeeded = sleepGoal * 7;

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, MapPin, HelpCircle, ChevronDown } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -108,7 +109,7 @@ export const MedicalLog = () => {
     const num = Number(value);
     if (isNaN(num)) return;
     setBiomarkers(prev => prev.map(b =>
-      b.id === bioId ? { ...b, entries: [...b.entries, { date: new Date().toISOString().slice(0, 10), value: num }] } : b
+      b.id === bioId ? { ...b, entries: [...b.entries, { date: localDayKey(), value: num }] } : b
     ));
   };
 

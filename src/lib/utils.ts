@@ -28,3 +28,9 @@ export function getAuthRedirectUrl(path: string = "/"): string {
   const base = isNonProd ? PRODUCTION_AUTH_URL : window.location.origin;
   return `${base}${safePath === "/" ? "" : safePath}`;
 }
+
+/** Chave de dia LOCAL (YYYY-MM-DD). NUNCA usar toISOString pra chave de dia:
+ *  no Brasil (UTC-3), depois das ~21h ela vira o dia SEGUINTE e os registros
+ *  "somem" — água/pendências do hub à noite (bug real, 16/07). */
+export const localDayKey = (d: Date = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

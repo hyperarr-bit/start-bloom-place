@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -12,7 +13,7 @@ interface Supplement {
   dosesPerDay: number;
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 const nameColors = [
   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",

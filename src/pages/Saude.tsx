@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useNavigate } from "react-router-dom";
@@ -14,7 +15,7 @@ import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 const tabs = [
   { id: "hoje", label: "HOJE", icon: "💊" },

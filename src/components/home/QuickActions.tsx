@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Droplets, DollarSign, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
@@ -7,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 type ActionId = "water" | "expense" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
 

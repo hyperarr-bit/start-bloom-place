@@ -245,17 +245,27 @@ const HealthTracker = () => {
   const today = getDateKey();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("water-log", {});
   const [sleepLog, setSleepLog] = usePersistedState<Record<string, number>>("sleep-log", {});
-  const [sleepInput, setSleepInput] = useState(String(sleepLog[today] || ""));
+  // FIX 16/07: o módulo SAÚDE conta água/sono em core-saude-* — dois mundos
+  // que não conversavam (cliente marcava aqui e a Saúde mostrava zero).
+  // Regra: lê o MAIOR dos dois no dia e escreve nos DOIS (convergem sozinhos).
+  const [waterLogSaude, setWaterLogSaude] = usePersistedState<Record<string, number>>("core-saude-water", {});
+  const [sleepLogSaude, setSleepLogSaude] = usePersistedState<Record<string, number>>("core-saude-sleep", {});
+  const [sleepInput, setSleepInput] = useState(String(sleepLog[today] || sleepLogSaude[today] || ""));
   const waterGoal = 8;
-  const waterToday = waterLog[today] || 0;
-  const sleepToday = sleepLog[today] || 0;
+  const waterToday = Math.max(waterLog[today] || 0, waterLogSaude[today] || 0);
+  const sleepToday = sleepLog[today] || sleepLogSaude[today] || 0;
 
-  const addWater = () => setWaterLog(prev => ({ ...prev, [today]: Math.min((prev[today] || 0) + 1, 15) }));
-  const removeWater = () => setWaterLog(prev => ({ ...prev, [today]: Math.max((prev[today] || 0) - 1, 0) }));
+  const setAgua = (n: number) => {
+    setWaterLog(prev => ({ ...prev, [today]: n }));
+    setWaterLogSaude(prev => ({ ...prev, [today]: n }));
+  };
+  const addWater = () => setAgua(Math.min(waterToday + 1, 15));
+  const removeWater = () => setAgua(Math.max(waterToday - 1, 0));
   const saveSleep = (val: string) => {
     const n = parseFloat(val);
     if (!isNaN(n) && n >= 0 && n <= 24) {
       setSleepLog(prev => ({ ...prev, [today]: n }));
+      setSleepLogSaude(prev => ({ ...prev, [today]: n }));
     }
   };
 

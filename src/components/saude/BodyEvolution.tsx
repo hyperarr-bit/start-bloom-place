@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Camera, ArrowLeftRight } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -36,7 +37,7 @@ const sentiments = [
   { id: "desafio", emoji: "🎯", label: "Desafio", headerBg: "bg-stone-200 dark:bg-stone-800/40", bodyBg: "bg-card" },
 ];
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 export const BodyEvolution = () => {
   const { user } = useAuth();

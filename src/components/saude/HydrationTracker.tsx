@@ -1,21 +1,27 @@
 import { motion } from "framer-motion";
+import { localDayKey } from "@/lib/utils";
 import { Droplets, Plus } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
 export const HydrationTracker = () => {
   const today = todayStr();
   const [waterLog, setWaterLog] = usePersistedState<Record<string, number>>("core-saude-water", {});
   const [waterGoal] = usePersistedState<number>("core-saude-water-goal", 8);
+  // FIX 16/07: a ROTINA conta água em water-log — espelha os dois mundos
+  // (lê o maior do dia, escreve nos dois) pra nenhuma tela mostrar zero
+  const [waterLogRotina, setWaterLogRotina] = usePersistedState<Record<string, number>>("water-log", {});
 
-  const current = waterLog[today] || 0;
+  const current = Math.max(waterLog[today] || 0, waterLogRotina[today] || 0);
   const pct = Math.min(100, (current / waterGoal) * 100);
   const mlCurrent = current * 250;
   const mlGoal = waterGoal * 250;
 
   const addWater = () => {
-    setWaterLog(prev => ({ ...prev, [today]: Math.min((prev[today] || 0) + 1, 20) }));
+    const n = Math.min(current + 1, 20);
+    setWaterLog(prev => ({ ...prev, [today]: n }));
+    setWaterLogRotina(prev => ({ ...prev, [today]: n }));
   };
 
   return (

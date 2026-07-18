@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
@@ -52,7 +53,11 @@ const Dieta = () => {
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const today = new Date().toISOString().split("T")[0];
+  // `today` é ESTADO (não const de render): o app fica vivo em memória no
+  // celular e, sem isso, "hoje" congelava no dia em que a aba abriu — cliente
+  // via sexta 17 no sábado (18/07). localDayKey = dia LOCAL (toISOString virava
+  // amanhã depois das 21h BRT). Reavaliado ao montar e quando o app volta ao foco.
+  const [today, setToday] = useState(localDayKey());
 
   // Configurable meals
   const [meals, setMeals] = usePersistedState<string[]>("dieta-meals-config", defaultMeals);
@@ -87,7 +92,29 @@ const Dieta = () => {
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
 
   // DIÁRIO v2
-  const [diaryDate, setDiaryDate] = useState(today);
+  const [diaryDate, setDiaryDate] = useState(localDayKey());
+
+  // Vira o dia quando o app reabre/volta ao foco (celular mantém a aba viva).
+  // Se a pessoa estava vendo "Hoje", arrasta o diário pro novo hoje; se ela
+  // tinha navegado pra um dia passado de propósito, respeita a escolha dela.
+  useEffect(() => {
+    const sync = () => {
+      const hoje = localDayKey();
+      setToday(prevHoje => {
+        if (prevHoje !== hoje) setDiaryDate(d => (d === prevHoje ? hoje : d));
+        return hoje;
+      });
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") sync(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sync);
+    const id = window.setInterval(sync, 60_000); // pega a virada de meia-noite com app aberto
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sync);
+      window.clearInterval(id);
+    };
+  }, []);
   const [diaryData, setDiaryData] = usePersistedState<Record<string, { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }>>("dieta-diary-v2", {});
 
   // LISTA INTELIGENTE
@@ -112,7 +139,7 @@ const Dieta = () => {
 
   // Diary helpers
   const getDiaryDayName = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = parseLocalDay(dateStr);
     const dayIndex = d.getDay() === 0 ? 6 : d.getDay() - 1;
     return weekDays[dayIndex];
   };
@@ -134,16 +161,16 @@ const Dieta = () => {
   };
 
   const navigateDiaryDate = (offset: number) => {
-    const d = new Date(diaryDate);
+    const d = parseLocalDay(diaryDate);
     d.setDate(d.getDate() + offset);
-    setDiaryDate(d.toISOString().split("T")[0]);
+    setDiaryDate(localDayKey(d));
   };
 
   const formatDateLabel = (dateStr: string) => {
     if (dateStr === today) return "Hoje";
-    const d = new Date(dateStr);
+    const d = parseLocalDay(dateStr);
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    if (dateStr === yesterday.toISOString().split("T")[0]) return "Ontem";
+    if (dateStr === localDayKey(yesterday)) return "Ontem";
     return d.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" });
   };
 
@@ -785,7 +812,7 @@ const Dieta = () => {
               <div className="text-center">
                 <p className="text-sm font-bold">{formatDateLabel(diaryDate)}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {new Date(diaryDate).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
+                  {parseLocalDay(diaryDate).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })}
                 </p>
               </div>
               <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigateDiaryDate(1)} disabled={diaryDate >= today}>
@@ -900,7 +927,7 @@ const Dieta = () => {
                     <div className="flex gap-1.5">
                       {Array.from({ length: 7 }, (_, i) => {
                         const d = new Date(); d.setDate(d.getDate() - (6 - i));
-                        const dateStr = d.toISOString().split("T")[0];
+                        const dateStr = localDayKey(d);
                         const dayDiary = getDayDiary(dateStr);
                         const dayNameCheck = getDiaryDayName(dateStr);
                         const dayMealsCheck = mealPlan[dayNameCheck];

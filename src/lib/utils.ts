@@ -34,3 +34,12 @@ export function getAuthRedirectUrl(path: string = "/"): string {
  *  "somem" — água/pendências do hub à noite (bug real, 16/07). */
 export const localDayKey = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Inverso do localDayKey: "YYYY-MM-DD" → Date à MEIA-NOITE LOCAL. `new
+ *  Date("2026-07-18")` parseia como UTC e no Brasil (UTC-3) volta pro dia
+ *  ANTERIOR ao formatar (bug real, diário da Dieta 18/07). Sempre parsear
+ *  chave de dia por aqui. */
+export const parseLocalDay = (key: string) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};

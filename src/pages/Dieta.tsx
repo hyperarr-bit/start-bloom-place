@@ -825,7 +825,13 @@ const Dieta = () => {
               const dayName = getDiaryDayName(diaryDate);
               const dayMeals = mealPlan[dayName];
               const diary = getDayDiary(diaryDate);
-              const plannedMeals = dayMeals ? Object.entries(dayMeals).filter(([, v]) => v && v.trim()) : [];
+              // ordem = a do CARDÁPIO (dieta-meals-config, reordenável pelo
+              // usuário) — a ordem interna do objeto salvo embaralha (edições
+              // fora de ordem/merge do normalizador) e jogava a janta pro topo
+              const posMeal = (m: string) => { const i = meals.indexOf(m); return i === -1 ? meals.length : i; };
+              const plannedMeals = dayMeals
+                ? Object.entries(dayMeals).filter(([, v]) => v && v.trim()).sort((a, b) => posMeal(a[0]) - posMeal(b[0]))
+                : [];
               const allFollowed = plannedMeals.length > 0 && plannedMeals.every(([meal]) => diary.meals[meal]?.followed);
 
               return (

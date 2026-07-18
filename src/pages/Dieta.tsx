@@ -844,8 +844,19 @@ const Dieta = () => {
                       </div>
                       {plannedMeals.map(([meal, desc]) => {
                         const mealDiary = diary.meals[meal] || { followed: false, note: "" };
+                        const seguiu = !!diary.meals[meal] && mealDiary.followed;
+                        const naoSeguiu = !!diary.meals[meal] && !mealDiary.followed;
+                        // clicar no estado já ativo DESMARCA (remove o registro
+                        // do dia — pedido de cliente 18/07): volta ao neutro
+                        const marcar = (followed: boolean, jaAtivo: boolean) =>
+                          updateDayDiary(diaryDate, prev => {
+                            const meals = { ...prev.meals };
+                            if (jaAtivo) delete meals[meal];
+                            else meals[meal] = { ...mealDiary, followed, ...(followed ? { note: "" } : {}) };
+                            return { ...prev, meals };
+                          });
                         return (
-                          <div key={meal} className={`bg-card rounded-xl border p-3 space-y-2 ${mealDiary.followed ? "border-green-300 dark:border-green-500/30" : "border-border"}`}>
+                          <div key={meal} className={`bg-card rounded-xl border p-3 space-y-2 ${seguiu ? "border-green-300 dark:border-green-500/30" : "border-border"}`}>
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <p className="text-xs font-bold">{mealEmojis[meal] || "🍽️"} {meal}</p>
@@ -853,30 +864,24 @@ const Dieta = () => {
                               </div>
                               <div className="flex gap-1.5">
                                 <button
-                                  onClick={() => updateDayDiary(diaryDate, prev => ({
-                                    ...prev,
-                                    meals: { ...prev.meals, [meal]: { ...mealDiary, followed: true, note: "" } }
-                                  }))}
+                                  onClick={() => marcar(true, seguiu)}
                                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
-                                    mealDiary.followed
+                                    seguiu
                                       ? "bg-green-100 dark:bg-green-500/20 border-green-400 text-green-600"
                                       : "bg-muted/30 border-border text-muted-foreground hover:border-green-300 dark:border-green-500/20"
                                   }`}
                                 >✅</button>
                                 <button
-                                  onClick={() => updateDayDiary(diaryDate, prev => ({
-                                    ...prev,
-                                    meals: { ...prev.meals, [meal]: { ...mealDiary, followed: false } }
-                                  }))}
+                                  onClick={() => marcar(false, naoSeguiu)}
                                   className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm border transition-colors ${
-                                    !mealDiary.followed && diary.meals[meal]
+                                    naoSeguiu
                                       ? "bg-red-100 dark:bg-red-500/20 border-red-400 text-red-600"
                                       : "bg-muted/30 border-border text-muted-foreground hover:border-red-300 dark:border-red-500/20"
                                   }`}
                                 >❌</button>
                               </div>
                             </div>
-                            {!mealDiary.followed && diary.meals[meal] && (
+                            {naoSeguiu && (
                               <Input
                                 value={mealDiary.note}
                                 onChange={e => updateDayDiary(diaryDate, prev => ({

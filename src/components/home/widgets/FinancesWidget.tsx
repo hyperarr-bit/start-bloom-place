@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { localDayKey } from "@/lib/utils";
 import { DollarSign, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
@@ -25,7 +26,7 @@ export const FinancesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
       description: quickName,
       category: "outros",
       value: parseFloat(quickAmount),
-      date: new Date().toISOString().slice(0, 10),
+      date: localDayKey(),
     };
     set("finance-expenses", [...currentExpenses, newExpense]);
     setQuickName("");

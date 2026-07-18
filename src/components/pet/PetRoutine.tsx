@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
 import { Check, Plus, X } from "lucide-react";
@@ -35,7 +36,7 @@ const getEmoji = (species: string) => {
 export const PetRoutine = () => {
   const { get, set } = useUserData();
   const pets = get<any[]>("pet-list", []);
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDayKey();
   const routine = get<Record<string, Record<string, boolean>>>(`pet-routine-${today}`, {});
 
   const [newLabel, setNewLabel] = useState<Record<string, string>>({});

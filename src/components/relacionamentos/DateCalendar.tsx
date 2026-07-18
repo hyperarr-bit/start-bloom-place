@@ -3,6 +3,7 @@ import { Trash2, CalendarHeart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { differenceInDays, setYear, format } from "date-fns";
+import { parseLocalDay } from "@/lib/utils";
 
 interface SpecialDate {
   id: string;
@@ -33,7 +34,7 @@ export const DateCalendar = () => {
 
   const getDaysUntil = (dateStr: string) => {
     const today = new Date();
-    const d = new Date(dateStr);
+    const d = parseLocalDay(dateStr);
     let next = setYear(d, today.getFullYear());
     if (next < today) next = setYear(d, today.getFullYear() + 1);
     return differenceInDays(next, today);
@@ -83,7 +84,7 @@ export const DateCalendar = () => {
             return (
               <div key={item.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
                 <span className="col-span-5 text-xs font-medium truncate">{item.title}</span>
-                <span className="col-span-3 text-[10px] text-muted-foreground">{format(new Date(item.date), "dd/MM")}</span>
+                <span className="col-span-3 text-[10px] text-muted-foreground">{format(parseLocalDay(item.date), "dd/MM")}</span>
                 <span className="col-span-2 text-[10px] text-muted-foreground truncate">{item.person || "—"}</span>
                 <div className="col-span-2 flex items-center justify-end gap-1">
                   <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${getColorClasses(days)}`}>

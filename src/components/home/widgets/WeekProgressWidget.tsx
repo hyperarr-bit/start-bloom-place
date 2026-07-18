@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 
 const DAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -19,12 +20,12 @@ export const WeekProgressWidget = () => {
     const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
     const moodLog = get<Record<string, any>>("core-mood-log", {});
 
-    const todayStr = today.toISOString().slice(0, 10);
+    const todayStr = localDayKey(today);
 
     return DAYS.map((_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = localDayKey(d);
 
       if (dateStr > todayStr) return 0;
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
@@ -24,7 +25,7 @@ export const DetoxDiary = () => {
 
   const addEntry = () => {
     if (!trigger.trim() && !note.trim()) return;
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDayKey();
     const updated = [{ id: Date.now().toString(), date: today, trigger: trigger.trim(), difficulty, note: note.trim() }, ...entries];
     set("detox-diary", updated);
     setTrigger(""); setNote(""); setDifficulty(3);

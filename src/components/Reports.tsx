@@ -1,4 +1,5 @@
 import { FileText, Download, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
+import { localDayKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -88,7 +89,7 @@ export const Reports = ({
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = `financas_${type}_${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `financas_${type}_${localDayKey()}.csv`;
     link.click();
   };
 

@@ -2,9 +2,10 @@
 // Cada entrada é um snapshot in-memory pra dar a sensação de app cheio.
 // Adicionar mais chaves aqui = preview mais rico.
 import { FINANCAS_SEED } from "./preview-seeds-financas";
+import { localDayKey } from "./utils";
 
 const today = new Date();
-const iso = (d: Date) => d.toISOString().slice(0, 10);
+const iso = (d: Date) => localDayKey(d);
 const daysAgo = (n: number) => {
   const d = new Date(today);
   d.setDate(d.getDate() - n);

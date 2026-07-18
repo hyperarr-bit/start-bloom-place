@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { localDayKey } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -166,7 +167,7 @@ const Treino = () => {
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDayKey();
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
@@ -255,7 +256,7 @@ const Treino = () => {
     let count = 0;
     const d = new Date();
     for (let i = 0; i < 365; i++) {
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = localDayKey(d);
       if (sorted.includes(dateStr)) { count++; d.setDate(d.getDate() - 1); }
       else if (i === 0) { d.setDate(d.getDate() - 1); continue; }
       else break;
@@ -274,7 +275,7 @@ const Treino = () => {
     for (let i = 0; i < dayOfWeek; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
-      total += weeklyVolume[d.toISOString().split("T")[0]] || 0;
+      total += weeklyVolume[localDayKey(d)] || 0;
     }
     return total;
   }, [weeklyVolume]);
@@ -286,7 +287,7 @@ const Treino = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - dayOfWeek - i);
-      total += weeklyVolume[d.toISOString().split("T")[0]] || 0;
+      total += weeklyVolume[localDayKey(d)] || 0;
     }
     return total;
   }, [weeklyVolume]);
@@ -866,7 +867,7 @@ const Treino = () => {
               <div className="flex items-end gap-1 h-24">
                 {Array.from({ length: 14 }, (_, i) => {
                   const d = new Date(); d.setDate(d.getDate() - (13 - i));
-                  const dateStr = d.toISOString().split("T")[0];
+                  const dateStr = localDayKey(d);
                   const vol = weeklyVolume[dateStr] || 0;
                   const trained = workoutLog.includes(dateStr);
                   const maxVol = Math.max(...Object.values(weeklyVolume), 1);
@@ -888,7 +889,7 @@ const Treino = () => {
               <div className="flex flex-wrap gap-1 mb-3">
                 {Array.from({ length: 60 }, (_, i) => {
                   const d = new Date(); d.setDate(d.getDate() - (59 - i));
-                  const dateStr = d.toISOString().split("T")[0];
+                  const dateStr = localDayKey(d);
                   const trained = workoutLog.includes(dateStr);
                   return (
                     <div key={i} title={d.toLocaleDateString("pt-BR")}

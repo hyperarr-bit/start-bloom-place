@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { localDayKey } from "@/lib/utils";
 import { Dumbbell, Check } from "lucide-react";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
@@ -9,7 +10,7 @@ export const WorkoutWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const data = useLifeHubData();
   const { get, set } = useUserData();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDayKey();
 
   const toggleWorkoutDone = (e: React.MouseEvent) => {
     e.stopPropagation();

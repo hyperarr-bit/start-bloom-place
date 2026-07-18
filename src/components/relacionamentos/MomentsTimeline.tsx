@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Trash2, Heart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
@@ -15,7 +16,7 @@ export const MomentsTimeline = () => {
   const { get, set } = useUserData();
   const moments = get<Moment[]>("rel-moments", []);
   const people = get<any[]>("rel-people", []);
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localDayKey());
   const [person, setPerson] = useState("");
   const [description, setDescription] = useState("");
 

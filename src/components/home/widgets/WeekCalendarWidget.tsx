@@ -1,10 +1,11 @@
 import { motion } from "framer-motion";
+import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large" }) => {
   const { get } = useUserData();
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = localDayKey(today);
   const dayNames = ["D", "S", "T", "Q", "Q", "S", "S"];
   const dayNamesFull = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -15,7 +16,7 @@ export const WeekCalendarWidget = ({ size = "large" }: { size?: "small" | "large
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    const dateStr = d.toISOString().slice(0, 10);
+    const dateStr = localDayKey(d);
     weekDays.push({ date: dateStr, label: dayNames[d.getDay()], labelFull: dayNamesFull[d.getDay()], dayNum: d.getDate(), isToday: dateStr === todayStr });
   }
 

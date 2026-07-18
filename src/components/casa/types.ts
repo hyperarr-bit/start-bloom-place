@@ -1,3 +1,5 @@
+import { parseLocalDay } from "@/lib/utils";
+
 export interface CleaningTask {
   id: string;
   name: string;
@@ -123,13 +125,13 @@ export interface GuestAllergy {
 // Utility functions
 export const daysSince = (dateStr: string): number => {
   if (!dateStr) return 999;
-  const diff = Date.now() - new Date(dateStr).getTime();
+  const diff = Date.now() - parseLocalDay(dateStr).getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 };
 
 export const monthsSince = (dateStr: string): number => {
   if (!dateStr) return 999;
-  const d = new Date(dateStr);
+  const d = parseLocalDay(dateStr);
   const now = new Date();
   return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
 };

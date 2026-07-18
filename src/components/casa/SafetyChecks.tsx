@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Check, Shield, AlertTriangle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ const SafetyChecks = () => {
   const allChecked = travelChecklist.length > 0 && travelChecklist.every(i => i.checked);
 
   const toggleEmergency = (id: string) => {
-    setEmergencyStock(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked, lastChecked: new Date().toISOString().split("T")[0] } : i));
+    setEmergencyStock(prev => prev.map(i => i.id === id ? { ...i, checked: !i.checked, lastChecked: localDayKey() } : i));
   };
 
   const addTravelItem = () => {

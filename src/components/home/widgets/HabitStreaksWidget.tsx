@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const HabitStreaksWidget = () => {
@@ -10,7 +11,7 @@ export const HabitStreaksWidget = () => {
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
+    days.push(localDayKey(d));
   }
 
   const displayHabits = habits.slice(0, 5);

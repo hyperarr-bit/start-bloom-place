@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -81,7 +82,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
           description: newExpense.description,
           category: newExpense.category || "outros",
           value: parseFloat(newExpense.value),
-          date: newExpense.date || new Date().toISOString().split("T")[0],
+          date: newExpense.date || localDayKey(),
           paymentMethod: newExpense.paymentMethod || "pix",
           cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
         },

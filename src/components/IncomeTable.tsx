@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -37,7 +38,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
           id: Date.now().toString(),
           description: newIncome.description,
           value: parseFloat(newIncome.value),
-          date: newIncome.date || new Date().toISOString().split("T")[0],
+          date: newIncome.date || localDayKey(),
         },
       ]);
       setNewIncome({ description: "", value: "", date: "" });

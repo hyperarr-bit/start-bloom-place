@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Moon, Minus, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const SleepLogWidget = () => {
   const { get, set: setData } = useUserData();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDayKey();
   const [sleepLog, setSleepLog] = useState(() => get<Record<string, number>>("core-saude-sleep", {}));
   const hours = sleepLog[todayStr] || 0;
 

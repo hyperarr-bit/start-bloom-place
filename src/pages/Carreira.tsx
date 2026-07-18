@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -44,13 +45,13 @@ const JobTracker = () => {
   const save = () => {
     if (!form.company || !form.role) return;
     if (editId) { setJobs(prev => prev.map(j => j.id === editId ? { ...j, ...form } as JobApp : j)); }
-    else { setJobs(prev => [...prev, { id: genId(), ...form, date: form.date || new Date().toISOString().slice(0, 10) } as JobApp]); }
+    else { setJobs(prev => [...prev, { id: genId(), ...form, date: form.date || localDayKey() } as JobApp]); }
     setForm({ status: "aplicado", favorite: false }); setEditId(null); setShowForm(false);
   };
 
   const addInline = () => {
     if (!inlineForm.company || !inlineForm.role) return;
-    setJobs(prev => [...prev, { id: genId(), company: inlineForm.company, role: inlineForm.role, link: "", status: inlineForm.status, date: new Date().toISOString().slice(0, 10), salary: "", notes: "", favorite: false }]);
+    setJobs(prev => [...prev, { id: genId(), company: inlineForm.company, role: inlineForm.role, link: "", status: inlineForm.status, date: localDayKey(), salary: "", notes: "", favorite: false }]);
     setInlineForm({ company: "", role: "", status: "aplicado" });
   };
 
@@ -189,14 +190,14 @@ const Portfolio = () => {
 
   const save = () => {
     if (!form.title) return;
-    setItems(prev => [...prev, { id: genId(), title: form.title || "", description: form.description || "", link: form.link || "", category: form.category || "projeto", date: form.date || new Date().toISOString().slice(0, 10), highlight: form.highlight || false }]);
+    setItems(prev => [...prev, { id: genId(), title: form.title || "", description: form.description || "", link: form.link || "", category: form.category || "projeto", date: form.date || localDayKey(), highlight: form.highlight || false }]);
     setForm({ category: "projeto", highlight: false }); setShowForm(false);
   };
 
   const addInline = (cat: string) => {
     const inp = inlineInputs[cat];
     if (!inp?.title) return;
-    setItems(prev => [...prev, { id: genId(), title: inp.title, description: "", link: inp.link, category: cat, date: new Date().toISOString().slice(0, 10), highlight: false }]);
+    setItems(prev => [...prev, { id: genId(), title: inp.title, description: "", link: inp.link, category: cat, date: localDayKey(), highlight: false }]);
     setInlineInputs(prev => ({ ...prev, [cat]: { title: "", link: "" } }));
   };
 
@@ -296,7 +297,7 @@ const Networking = () => {
 
   const addInline = () => {
     if (!inlineForm.name) return;
-    setContacts(prev => [...prev, { id: genId(), name: inlineForm.name, company: inlineForm.company, role: "", linkedin: "", email: "", phone: "", notes: "", lastContact: new Date().toISOString().slice(0, 10), category: "profissional" }]);
+    setContacts(prev => [...prev, { id: genId(), name: inlineForm.name, company: inlineForm.company, role: "", linkedin: "", email: "", phone: "", notes: "", lastContact: localDayKey(), category: "profissional" }]);
     setInlineForm({ name: "", company: "" });
   };
 
@@ -318,7 +319,7 @@ const Networking = () => {
           {needsFollowUp.slice(0, 5).map(c => (
             <div key={c.id} className="flex items-center justify-between py-1">
               <span className="text-xs">{catEmoji[c.category]} {c.name}</span>
-              <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: new Date().toISOString().slice(0, 10) } : x))}>Contatei ✓</Button>
+              <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => setContacts(prev => prev.map(x => x.id === c.id ? { ...x, lastContact: localDayKey() } : x))}>Contatei ✓</Button>
             </div>
           ))}
         </div>

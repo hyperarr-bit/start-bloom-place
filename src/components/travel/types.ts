@@ -1,3 +1,5 @@
+import { parseLocalDay } from "@/lib/utils";
+
 export const genId = () => crypto.randomUUID();
 
 // ===== DESTINATION / BUCKET LIST =====
@@ -276,7 +278,7 @@ export function calculateSettlement(data: BillSplitData): { from: string; to: st
 }
 
 export function daysUntil(dateStr: string): number {
-  return Math.ceil((new Date(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  return Math.ceil((parseLocalDay(dateStr).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
 export function formatCurrency(value: number, currency = "BRL"): string {

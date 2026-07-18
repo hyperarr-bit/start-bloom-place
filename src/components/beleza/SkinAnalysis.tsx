@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import type { SkinEntry } from "./utils";
 
 const genId = () => crypto.randomUUID();
-const getDateKey = () => new Date().toISOString().slice(0, 10);
+const getDateKey = () => localDayKey();
 
 const skinTypes = ["oleosa", "seca", "normal", "mista", "sensível", "acneica"];
 const moods = ["😊", "😐", "😔", "🤩", "😴"];

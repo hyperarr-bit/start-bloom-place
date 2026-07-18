@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, TrendingUp } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,7 @@ export const PetExpenses = () => {
   const [category, setCategory] = useState("Ração");
   const [description, setDescription] = useState("");
   const [value, setValue] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localDayKey());
 
   const addExpense = () => {
     const v = parseFloat(value);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,7 @@ const MaintenanceLog = () => {
   };
 
   const markTaskDone = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, lastDone: new Date().toISOString().split("T")[0] } : t));
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, lastDone: localDayKey() } : t));
   };
 
   const warrantyDaysLeft = (w: Warranty) => {

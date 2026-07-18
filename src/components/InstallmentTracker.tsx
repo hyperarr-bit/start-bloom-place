@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,7 +76,7 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
           totalInstallments,
           cardName: newItem.cardName || "outro",
           category: newItem.category || "outros",
-          date: newItem.date || new Date().toISOString().split("T")[0],
+          date: newItem.date || localDayKey(),
         },
       ]);
       setNewItem({ description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "" });

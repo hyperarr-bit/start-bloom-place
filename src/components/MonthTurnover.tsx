@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAuth } from "@/hooks/use-auth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -55,7 +56,7 @@ const copyToMonth = (
       const items = data.map((i: any) => ({
         ...i,
         id: newId(),
-        date: new Date().toISOString().split("T")[0],
+        date: localDayKey(),
       }));
       writeMonthData(userId, toKeys.incomes, items);
     }

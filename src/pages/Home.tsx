@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
@@ -63,6 +64,27 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
 
 const HomePage = () => {
   const [data, setDataTrigger] = useState(0);
+
+  // Virada de dia com o app VIVO (celular mantém a aba em memória): sem isso,
+  // hub/widgets seguem mostrando "hoje" de ontem — mesmo bug do diário da
+  // Dieta (18/07). Re-render ao voltar ao foco/visível + tique de 60s.
+  useEffect(() => {
+    let ultimoDia = localDayKey();
+    const sync = () => {
+      const hoje = localDayKey();
+      if (hoje !== ultimoDia) { ultimoDia = hoje; setDataTrigger(d => d + 1); }
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") sync(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", sync);
+    const id = window.setInterval(sync, 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", sync);
+      window.clearInterval(id);
+    };
+  }, []);
+
   const lifeData = useLifeHubData();
   const { activeWidgets, addWidget, removeWidget, isActive, toggleSize, reorder } = useHomeWidgets();
   const { get, set: setData, loaded, isGuest } = useUserData();
@@ -130,7 +152,7 @@ const HomePage = () => {
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {
     if (!loaded) return;
-    const today = new Date().toISOString().split("T")[0];
+    const today = localDayKey();
     const lastCheckIn = get<string>("gamification-lastCheckIn", "");
     if (lastCheckIn === today) return;
     setData("gamification-lastCheckIn", today);

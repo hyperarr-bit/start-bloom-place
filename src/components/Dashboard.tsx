@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { localDayKey } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
@@ -157,7 +158,7 @@ export const Dashboard = ({
   const lastTransactions = useMemo(() => {
     const allTransactions = [
       ...expenses.map((e) => ({ ...e, type: "variable" as const })),
-      ...fixedExpenses.map((e) => ({ ...e, date: new Date().toISOString().slice(0, 10), type: "fixed" as const })),
+      ...fixedExpenses.map((e) => ({ ...e, date: localDayKey(), type: "fixed" as const })),
     ];
     return allTransactions
       .sort((a, b) => b.date.localeCompare(a.date))

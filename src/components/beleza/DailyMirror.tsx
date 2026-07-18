@@ -1,6 +1,7 @@
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { localDayKey } from "@/lib/utils";
 
-const getDateKey = () => new Date().toISOString().slice(0, 10);
+const getDateKey = () => localDayKey();
 
 const skinOptions = [
   { id: "seca", label: "Seca", emoji: "🌵" },
@@ -27,7 +28,7 @@ export const DailyMirror = () => {
     let count = 0;
     const d = new Date();
     for (let i = 0; i < 30; i++) {
-      const key = d.toISOString().slice(0, 10);
+      const key = localDayKey(d);
       const m = morningChecked[key];
       const n = nightChecked[key];
       if ((m && m.length > 0) || (n && n.length > 0)) count++;

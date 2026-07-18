@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ const CleaningRadar = () => {
   const [newFreq, setNewFreq] = useState("7");
 
   const markDone = (id: string) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, lastDone: new Date().toISOString().split("T")[0] } : t));
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, lastDone: localDayKey() } : t));
   };
 
   const addTask = () => {

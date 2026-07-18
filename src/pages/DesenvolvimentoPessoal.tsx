@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { localDayKey } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -134,7 +135,7 @@ const DesenvolvimentoPessoal = () => {
 
   // GRATIDÃO
   const [gratitudeEntries, setGratitudeEntries] = usePersistedState<Record<string, string[]>>("dp-gratitude", {});
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDayKey();
   const [todayGratitude, setTodayGratitude] = useState<string[]>(() => gratitudeEntries[today] || ["", "", ""]);
 
   // LEITURAS
@@ -396,7 +397,7 @@ const DesenvolvimentoPessoal = () => {
               <div className="flex items-end gap-1 h-32">
                 {Array.from({ length: 14 }, (_, i) => {
                   const d = new Date(); d.setDate(d.getDate() - (13 - i));
-                  const key = d.toISOString().split("T")[0];
+                  const key = localDayKey(d);
                   const val = moodLog[key] || 0;
                   const colors = ["", "bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-300", "bg-green-500"];
                   return (

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +58,7 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
       currentValue: newInvestment.currentValue || newInvestment.investedAmount,
       monthlyContribution: newInvestment.monthlyContribution || 0,
       expectedReturn: newInvestment.expectedReturn ?? 10,
-      startDate: newInvestment.startDate || new Date().toISOString().split("T")[0],
+      startDate: newInvestment.startDate || localDayKey(),
       broker: newInvestment.broker,
     };
     setInvestments([...investments, investment]);

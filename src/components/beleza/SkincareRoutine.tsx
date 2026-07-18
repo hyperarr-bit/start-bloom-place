@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sun, Moon, Plus, X, AlertTriangle, ShieldCheck } from "lucide-react";
 import { getStepIcon, checkConflicts } from "./utils";
 
-const getDateKey = () => new Date().toISOString().slice(0, 10);
+const getDateKey = () => localDayKey();
 
 interface RoutineStep {
   name: string;

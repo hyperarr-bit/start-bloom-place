@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { DiaryEntry, genId } from "./types";
 import { Input } from "@/components/ui/input";
@@ -18,16 +19,16 @@ const MOODS = [
 
 export const TravelDiary = () => {
   const [entries, setEntries] = usePersistedState<DiaryEntry[]>("travel-diary-v2", []);
-  const [inlineForm, setInlineForm] = useState<Partial<DiaryEntry>>({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
+  const [inlineForm, setInlineForm] = useState<Partial<DiaryEntry>>({ mood: "🤩", date: localDayKey() });
 
   const save = () => {
     if (!inlineForm.bestThing) return;
     setEntries(prev => [{
-      id: genId(), tripName: inlineForm.tripName || "", date: inlineForm.date || new Date().toISOString().slice(0, 10),
+      id: genId(), tripName: inlineForm.tripName || "", date: inlineForm.date || localDayKey(),
       bestThing: inlineForm.bestThing || "", wouldNotDoAgain: inlineForm.wouldNotDoAgain || "",
       photoUrl: inlineForm.photoUrl || "", mood: inlineForm.mood || "🤩",
     }, ...prev]);
-    setInlineForm({ mood: "🤩", date: new Date().toISOString().slice(0, 10) });
+    setInlineForm({ mood: "🤩", date: localDayKey() });
   };
 
   const remove = (id: string) => setEntries(prev => prev.filter(e => e.id !== id));
@@ -126,7 +127,7 @@ export const TravelDiary = () => {
                   <div className="flex-1">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-sm">{entry.mood}</span>
-                      <span className="text-[10px] font-medium">{new Date(entry.date).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span>
+                      <span className="text-[10px] font-medium">{parseLocalDay(entry.date).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span>
                       {entry.tripName && <Badge variant="secondary" className="text-[8px] px-1.5 h-4">{entry.tripName}</Badge>}
                     </div>
                     {entry.bestThing && (

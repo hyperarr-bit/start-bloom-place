@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, RotateCcw, Flame, Shield, ChevronDown, Leaf, Check, X, Heart } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
@@ -41,7 +42,7 @@ export const DetoxTracker = () => {
   const monthStart = startOfMonth(today);
   const monthEnd = endOfMonth(today);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = localDayKey();
 
   const addHabit = () => {
     if (!name.trim()) return;

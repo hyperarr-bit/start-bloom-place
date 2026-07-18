@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ItineraryDay, TimelineItem, genId, formatCurrency } from "./types";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ export const DailyTimeline = () => {
       })
     : [];
   const dayTotal = currentDay?.items.reduce((s, i) => s + i.estimatedCost, 0) || 0;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDayKey();
   const todayDay = days.find(d => d.date === todayStr);
 
   return (

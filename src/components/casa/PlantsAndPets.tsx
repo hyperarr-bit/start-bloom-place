@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ const PlantsAndPets = () => {
   };
 
   const markCare = (id: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, lastCare: new Date().toISOString().split("T")[0] } : i));
+    setItems(prev => prev.map(i => i.id === id ? { ...i, lastCare: localDayKey() } : i));
   };
 
   const plants = items.filter(i => i.type === "plant");

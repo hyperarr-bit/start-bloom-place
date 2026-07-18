@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ const ChoreRotation = () => {
     setChores(prev => prev.map(c => {
       if (c.id !== id) return c;
       const nextIndex = (c.currentTurnIndex + 1) % members.length;
-      return { ...c, currentTurnIndex: nextIndex, lastRotation: new Date().toISOString().split("T")[0], done: false };
+      return { ...c, currentTurnIndex: nextIndex, lastRotation: localDayKey(), done: false };
     }));
   };
 

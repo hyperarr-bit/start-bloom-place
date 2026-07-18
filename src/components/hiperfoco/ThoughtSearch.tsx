@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { parseLocalDay } from "@/lib/utils";
 
 const TAGS = [
   { id: "pergunta", label: "Pergunta", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
@@ -84,7 +85,7 @@ export const ThoughtSearch = () => {
           <div key={thought.id} className="bg-card border border-border rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-[10px] text-muted-foreground font-mono">
-                {format(new Date(date), "dd/MM/yyyy", { locale: ptBR })} · {String(hour).padStart(2, "0")}:00
+                {format(parseLocalDay(date), "dd/MM/yyyy", { locale: ptBR })} · {String(hour).padStart(2, "0")}:00
               </span>
             </div>
             <p className="text-sm">{thought.text}</p>

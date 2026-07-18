@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BillSplitData, BillEntry, calculateSettlement, genId, formatCurrency } from "./types";
 import { Button } from "@/components/ui/button";
@@ -30,7 +31,7 @@ export const BillSplitter = () => {
     if (!form.description || !form.amount || !form.paidBy || !form.splitBetween?.length) return;
     const entry: BillEntry = {
       id: genId(), description: form.description, amount: form.amount, paidBy: form.paidBy,
-      splitBetween: form.splitBetween, date: form.date || new Date().toISOString().slice(0, 10),
+      splitBetween: form.splitBetween, date: form.date || localDayKey(),
     };
     setData(prev => ({ ...prev, entries: [...prev.entries, entry] }));
     setForm({ splitBetween: [] });

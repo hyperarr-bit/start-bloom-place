@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { Check, Plus, Trash2, Scissors, Droplets, FlaskConical } from "lucide-re
 import { calculatePorosity, getPorosityRecommendation, HAIR_RESULT_TAGS, WASH_STEPS, type PorosityResult, type HairEvent, type WashLog } from "./utils";
 
 const genId = () => crypto.randomUUID();
-const getDateKey = () => new Date().toISOString().slice(0, 10);
+const getDateKey = () => localDayKey();
 const getDayOfWeek = () => new Date().getDay();
 
 const typeLabels: Record<string, { label: string; emoji: string; bg: string }> = {
@@ -67,7 +68,7 @@ export const CronogramaCapilar = () => {
   const streak = (() => {
     let count = 0; const d = new Date();
     for (let i = 0; i < 30; i++) {
-      const key = d.toISOString().slice(0, 10); const dow = d.getDay();
+      const key = localDayKey(d); const dow = d.getDay();
       if (schedule[String(dow)] && history[key]) count++;
       else if (schedule[String(dow)] && !history[key] && i > 0) break;
       d.setDate(d.getDate() - 1);

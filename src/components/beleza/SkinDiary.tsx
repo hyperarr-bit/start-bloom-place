@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,7 @@ import { Plus, Trash2, Camera, ImagePlus, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 
 const genId = () => crypto.randomUUID();
-const getDateKey = () => new Date().toISOString().slice(0, 10);
+const getDateKey = () => localDayKey();
 
 interface DiaryEntry {
   id: string;

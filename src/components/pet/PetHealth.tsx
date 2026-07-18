@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, Syringe, AlertTriangle } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ export const PetHealth = () => {
   const [petId, setPetId] = useState("");
   const [type, setType] = useState<"vaccine" | "deworming" | "visit">("vaccine");
   const [name, setName] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localDayKey());
   const [nextDate, setNextDate] = useState("");
 
   const addRecord = () => {

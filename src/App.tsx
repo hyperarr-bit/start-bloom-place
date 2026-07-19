@@ -48,6 +48,15 @@ const RootGate = () => {
     forceNew = localStorage.getItem("force-new-user-tutorial") === "true";
   } catch { /* noop */ }
 
+  // A flag de usuário-novo só vale pra conta RECÉM-CRIADA (<48h). Órfã em
+  // conta veterana (replay v1 de 19/07) mandava o app abrir em /financas
+  // toda vez, antes do hub montar e se auto-sanear — limpa aqui também.
+  const contaNova = !!user.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
+  if (forceNew && !contaNova) {
+    try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* noop */ }
+    forceNew = false;
+  }
+
   if (area && !landed) {
     try { localStorage.setItem(AREA_LANDED_KEY, "true"); } catch { /* noop */ }
     return <Navigate to={area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;

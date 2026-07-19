@@ -92,7 +92,9 @@ const Auth = () => {
         toast({ title: "Erro ao entrar", description: error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message, variant: "destructive" });
       } else {
         trackEvent("login_completed", { method: "password" });
-        navigate("/financas");
+        // raiz decide (RootGate): veterano → hub; recém-chegado do funil →
+        // promessa da área. Antes ia direto pra /financas (dívida do pivot).
+        navigate("/");
       }
     } else {
       const { error, session } = await signUp(email, password, name.trim());

@@ -27,6 +27,15 @@ interface QuickStartOnboardingProps {
   skipWelcome?: boolean;
   /** Newly signed-up (already authenticated) user — skip welcome and show tutorial-done popup instead of QuickSignup. */
   forNewUser?: boolean;
+  /**
+   * MODO REPLAY ("Rever tutorial", 19/07): auto-contido, ZERO flags de
+   * usuário-novo. Sempre começa na seleção, tem botão fechar, e o único
+   * efeito persistido é limpar spotlight-done dos módulos escolhidos (o tour
+   * roda de novo quando a pessoa visitar cada um). A 1ª versão reusava o
+   * caminho force-new-user: auto-completava em 1s (allDone com seleção
+   * antiga) e reaparecia a cada abertura (flag viva) — bug real do dono.
+   */
+  replay?: boolean;
 }
 
 const OPTIONS: Array<{
@@ -58,7 +67,7 @@ const OPTIONS: Array<{
 const ALL_KEYS: ModuleKey[] = OPTIONS.map(o => o.key);
 const DEFAULT_SELECTED: ModuleKey[] = ["financas", "rotina", "dieta", "metas"];
 
-export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser }: QuickStartOnboardingProps) => {
+export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser, replay }: QuickStartOnboardingProps) => {
   const pending = pendingModules ?? ALL_KEYS;
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
@@ -70,12 +79,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
     hasStoredSelection ? storedSelection.filter(k => ALL_KEYS.includes(k)) : [...DEFAULT_SELECTED]
   );
 
-  const effectiveSelected = hasStoredSelection ? selectedModules : [...DEFAULT_SELECTED];
-  const visibleOptions = OPTIONS.filter(o => pending.includes(o.key) && effectiveSelected.includes(o.key));
-  const allDone = visibleOptions.length === 0;
+  const effectiveSelected = replay || hasStoredSelection ? selectedModules : [...DEFAULT_SELECTED];
+  // replay: mostra o que a pessoa escolheu AGORA, ignorando pending/estado velho
+  const visibleOptions = replay
+    ? OPTIONS.filter(o => selectedModules.includes(o.key))
+    : OPTIONS.filter(o => pending.includes(o.key) && effectiveSelected.includes(o.key));
+  const allDone = !replay && visibleOptions.length === 0;
 
   // step: 0 = welcome, 1 = seleção, 2 = picker
   const initialStep: 0 | 1 | 2 = (() => {
+    if (replay) return 1; // replay SEMPRE começa escolhendo módulos
     if (allDone) return 2;
     if (hasStoredSelection) return 2; // já escolheu, pula direto pro picker
     if (skipWelcome || forNewUser) return 1;
@@ -90,13 +103,15 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
   const pickerViewRef = useRef(false);
 
   // Funil: dispara para todos (logado ou não) — admin filtra por flag se quiser.
+  // Replay NÃO é funil: métrica própria, sem poluir pre_signup_*.
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
+    if (replay) { trackEvent("tutorial_replay_opened", {}); return; }
     captureLandingMeta();
     trackEvent("landing_view", { source: "quickstart", is_guest: isGuest });
     trackEvent("pre_signup_tutorial_started", { total_modules: OPTIONS.length, is_guest: isGuest });
-  }, [isGuest]);
+  }, [isGuest, replay]);
 
   // Etapa 3 / 8: dispara quando a página "Por onde você quer começar?" aparece.
   useEffect(() => {
@@ -125,12 +140,24 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
 
   const handleConfirmSelection = () => {
     if (selectedModules.length === 0) return;
-    set("tutorial-selected-modules", selectedModules);
-    trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
+    if (!replay) {
+      // replay não sobrescreve a seleção original do usuário
+      set("tutorial-selected-modules", selectedModules);
+      trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
+    }
     setStep(2);
   };
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
+    if (replay) {
+      // único efeito persistido do replay: reativa o tour dos módulos que a
+      // pessoa marcou — ele roda de novo na visita e se marca done ao fim
+      selectedModules.forEach(k => set(`spotlight-done-${k}`, ""));
+      trackEvent("tutorial_replay_started", { modules: selectedModules, first: opt.key });
+      onComplete();
+      navigate(opt.route);
+      return;
+    }
     set("quickstart-target-module", opt.key);
     trackEvent("quickstart_module_chosen", { module: opt.key, is_guest: isGuest });
     if (!completedRef.current) {
@@ -143,13 +170,14 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
   };
 
   useEffect(() => {
+    if (replay) return; // replay nunca auto-celebra
     if (!allDone || autoCelebratedRef.current) return;
     if (step !== 2) return;
     autoCelebratedRef.current = true;
     setTransitioning(true);
     handleCelebrationDone();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDone, step]);
+  }, [allDone, step, replay]);
 
 
   const handleCelebrationDone = () => {
@@ -202,6 +230,16 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
         paddingRight: "max(1.25rem, env(safe-area-inset-right))",
       }}
     >
+      {replay && (
+        <button
+          onClick={onComplete}
+          aria-label="Fechar tutorial"
+          className="absolute right-4 z-10 w-9 h-9 rounded-full bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center text-lg"
+          style={{ top: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          ✕
+        </button>
+      )}
       {transitioning ? (
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
       ) : (

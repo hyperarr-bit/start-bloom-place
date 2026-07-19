@@ -108,7 +108,27 @@ const HomePage = () => {
       return;
     }
 
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+    // Convidado não chega mais no /home (modo guest aposentado 16/07). Se o
+    // auth ainda não resolveu, NÃO decide tutorial com estado transitório —
+    // era isso que fazia a flag órfã piscar o tutorial de convidado no boot.
+    if (!user) {
+      setShowOnboarding(false);
+      setOnboardingResolved(true);
+      return;
+    }
+
+    // A flag force-new-user só vale pra conta RECÉM-CRIADA (<48h, fluxo de
+    // cadastro — inclusive Google, que só grava no localStorage). Conta
+    // veterana com a flag órfã (replay v1 bugado de 19/07, ou tutorial
+    // abandonado há dias) é auto-saneada aqui: limpa e segue como veterano.
+    const lsFlag = typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true";
+    const dbFlag = !!get<string>("force-new-user-tutorial", "");
+    const contaNova = !!user.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
+    const forceNewUser = contaNova && (dbFlag || lsFlag);
+    if ((dbFlag || lsFlag) && !contaNova) {
+      try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* ignore */ }
+      if (dbFlag) setData("force-new-user-tutorial", "");
+    }
 
     // Tutorial roda no modo convidado OU para um usuário recém-cadastrado (force-new-user-tutorial).
     if (!isGuest && !forceNewUser) {
@@ -147,7 +167,7 @@ const HomePage = () => {
     const shouldShow = !onboardingDone || pending.length > 0 || !celebrated;
     setShowOnboarding(shouldShow);
     setOnboardingResolved(true);
-  }, [loaded, isGuest, get, setData]);
+  }, [loaded, isGuest, get, setData, user]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {
@@ -187,22 +207,12 @@ const HomePage = () => {
     setDataTrigger(d => d + 1);
   }, []);
 
-  // Rever tutorial (volta 19/07, agora pelo caminho LIMPO do recém-cadastrado):
-  // o replay antigo só abria o overlay SEM resetar as flags — tutorial nascia
-  // com tudo "feito" (tela vazia, bug real de cliente). Aqui: zera onboarding
-  // + spotlights dos 16 módulos e liga a flag force, espelhando o efeito acima
-  // (com a guarda já marcada pra ele não repetir o reset no próximo mount).
-  const handleReplayTutorial = useCallback(() => {
-    try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* ignore */ }
-    setData("force-new-user-tutorial", "true");
-    setData("core-onboarding-done", "");
-    setData("core-all-modules-celebrated", "");
-    ALL_MODULES.forEach(m => setData(`spotlight-done-${m}`, ""));
-    setData("force-new-user-reset-done", "true");
-    setPendingModules(ALL_MODULES);
-    setShowOnboarding(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setData]);
+  // Rever tutorial v2 (19/07): modo REPLAY auto-contido do QuickStartOnboarding
+  // — estado local, zero flags de usuário-novo. A v1 reusava o caminho
+  // force-new-user e bugou feio (auto-completava em 1s e reaparecia a cada
+  // abertura). O replay só reativa o tour dos módulos que a pessoa escolher.
+  const [showReplayTutorial, setShowReplayTutorial] = useState(false);
+  const handleReplayTutorial = useCallback(() => setShowReplayTutorial(true), []);
 
   const handleWidgetToggle = (id: WidgetId) => {
     if (isActive(id)) removeWidget(id);
@@ -213,8 +223,18 @@ const HomePage = () => {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 
+  if (showReplayTutorial) {
+    return (
+      <AnimatePresence>
+        <QuickStartOnboarding replay onComplete={() => setShowReplayTutorial(false)} />
+      </AnimatePresence>
+    );
+  }
+
   if (showOnboarding) {
-    const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+    const contaNova = !!user?.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
+    const forceNewUser = (isGuest || contaNova) &&
+      (!!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true"));
     return (
       <AnimatePresence>
         <QuickStartOnboarding

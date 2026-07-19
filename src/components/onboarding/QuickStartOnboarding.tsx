@@ -79,16 +79,23 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
     hasStoredSelection ? storedSelection.filter(k => ALL_KEYS.includes(k)) : [...DEFAULT_SELECTED]
   );
 
+  // REPLAY: a fila tutorial-replay-modules é O estado. Vazia = escolher
+  // módulos; com itens = retomar direto no picker (é ela que o voltar do
+  // módulo reabre via Home, e o Encerrar zera).
+  const replayQueueRaw = get<ModuleKey[]>("tutorial-replay-modules", []);
+  const replayQueue = Array.isArray(replayQueueRaw) ? replayQueueRaw.filter(k => ALL_KEYS.includes(k)) : [];
+  const retomandoReplay = !!replay && replayQueue.length > 0;
+
   const effectiveSelected = replay || hasStoredSelection ? selectedModules : [...DEFAULT_SELECTED];
-  // replay: mostra o que a pessoa escolheu AGORA, ignorando pending/estado velho
+  // replay: mostra a FILA (retomada) ou o que a pessoa marcou agora
   const visibleOptions = replay
-    ? OPTIONS.filter(o => selectedModules.includes(o.key))
+    ? OPTIONS.filter(o => (retomandoReplay ? replayQueue : selectedModules).includes(o.key))
     : OPTIONS.filter(o => pending.includes(o.key) && effectiveSelected.includes(o.key));
   const allDone = !replay && visibleOptions.length === 0;
 
   // step: 0 = welcome, 1 = seleção, 2 = picker
   const initialStep: 0 | 1 | 2 = (() => {
-    if (replay) return 1; // replay SEMPRE começa escolhendo módulos
+    if (replay) return retomandoReplay ? 2 : 1; // fila viva → direto no picker
     if (allDone) return 2;
     if (hasStoredSelection) return 2; // já escolheu, pula direto pro picker
     if (skipWelcome || forNewUser) return 1;
@@ -140,22 +147,30 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
 
   const handleConfirmSelection = () => {
     if (selectedModules.length === 0) return;
-    if (!replay) {
-      // replay não sobrescreve a seleção original do usuário
-      set("tutorial-selected-modules", selectedModules);
-      trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
+    if (replay) {
+      // a fila vira o estado do tutorial: o SpotlightOverlay liga o tour pra
+      // quem tem o módulo nela, o voltar do módulo reabre este picker (Home
+      // mostra enquanto a fila viver) e o Encerrar zera tudo.
+      set("tutorial-replay-modules", selectedModules);
+      trackEvent("tutorial_replay_started", { modules: selectedModules });
+      setStep(2);
+      return;
     }
+    set("tutorial-selected-modules", selectedModules);
+    trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
     setStep(2);
+  };
+
+  // Encerrar tutorial (replay): zera a fila — nenhum tour pipoca depois.
+  const encerrarReplay = () => {
+    set("tutorial-replay-modules", []);
+    trackEvent("tutorial_replay_ended", {});
+    onComplete();
   };
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     if (replay) {
-      // único efeito persistido do replay: a FILA tutorial-replay-modules — o
-      // SpotlightOverlay liga o tour pra veterano quando o módulo está nela
-      // (limpar spotlight-done não funcionava: a condição do overlay só liga
-      // pra guest/recém-cadastrado e re-marcava como visto na hora).
-      set("tutorial-replay-modules", selectedModules);
-      trackEvent("tutorial_replay_started", { modules: selectedModules, first: opt.key });
+      trackEvent("tutorial_replay_module_opened", { module: opt.key });
       onComplete();
       navigate(opt.route);
       return;
@@ -234,7 +249,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
     >
       {replay && (
         <button
-          onClick={onComplete}
+          onClick={encerrarReplay}
           aria-label="Fechar tutorial"
           className="absolute right-4 z-10 w-9 h-9 rounded-full bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center text-lg"
           style={{ top: "max(1rem, env(safe-area-inset-top))" }}
@@ -368,10 +383,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
             >
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
-                  Por onde você quer começar?
+                  {replay ? "Qual módulo quer rever?" : "Por onde você quer começar?"}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Escolhe 1. Os outros ficam aqui esperando.
+                  {replay
+                    ? "Toque num módulo pro passo a passo. Ao voltar, os outros seguem aqui."
+                    : "Escolhe 1. Os outros ficam aqui esperando."}
                 </p>
               </div>
 
@@ -398,6 +415,15 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                   </motion.button>
                 ))}
               </div>
+
+              {replay && (
+                <button
+                  onClick={encerrarReplay}
+                  className="mt-2 w-full py-3 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                >
+                  Encerrar tutorial
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

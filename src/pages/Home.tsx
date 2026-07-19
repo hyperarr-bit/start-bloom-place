@@ -223,7 +223,12 @@ const HomePage = () => {
     return <div className="fixed inset-0 z-[100] bg-background" aria-hidden="true" />;
   }
 
-  if (showReplayTutorial) {
+  // Tutorial em andamento (fila viva) OU aberto pelo menu: o hub vira a tela
+  // do tutorial — é o que faz o "voltar" de um módulo cair na ESCOLHA de
+  // módulos (pedido do dono 19/07), com "Encerrar tutorial" sempre à mão.
+  const replayQueue = get<ModuleKey[]>("tutorial-replay-modules", []);
+  const replayPendente = Array.isArray(replayQueue) && replayQueue.length > 0;
+  if (showReplayTutorial || (loaded && !!user && replayPendente)) {
     return (
       <AnimatePresence>
         <QuickStartOnboarding replay onComplete={() => setShowReplayTutorial(false)} />

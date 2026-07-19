@@ -38,6 +38,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   const { get, set, isGuest, loaded } = useUserData();
   const navigate = useNavigate();
   const [active, setActive] = useState(false);
+  const [isReplay, setIsReplay] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [showFallback, setShowFallback] = useState(false);
@@ -59,15 +60,24 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     const target = get<string>("quickstart-target-module", "");
     const done = get<string>(`spotlight-done-${moduleKey}`, "");
     const forceNewUser = !!get<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
+    // REVER TUTORIAL (19/07): o "Rever tutorial" grava os módulos escolhidos em
+    // tutorial-replay-modules — o tour roda pra VETERANO também quando o módulo
+    // está nessa lista. (Antes o replay limpava spotlight-done, mas a condição
+    // abaixo só liga pra guest/recém-cadastrado e o else re-marcava como visto
+    // na hora — clicava e caía na aba normal, bug real do dono.)
+    const replayList = get<string[]>("tutorial-replay-modules", []);
+    const replayPending = Array.isArray(replayList) && replayList.includes(moduleKey);
     // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
     // App é só finanças: pro novo usuário (forceNewUser) não exigimos quickstart-target-module
     // (que não cruza a fronteira guest→logado), basta ser o módulo financas.
     const shouldShow =
-      (isGuest || forceNewUser) && !done && (target === moduleKey || (forceNewUser && moduleKey === "financas"));
+      replayPending ||
+      ((isGuest || forceNewUser) && !done && (target === moduleKey || (forceNewUser && moduleKey === "financas")));
     if (shouldShow) {
       setActive(true);
-      trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest });
-      trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest });
+      setIsReplay(replayPending);
+      trackEvent("quickstart_module_opened", { module: moduleKey, is_guest: isGuest, replay: replayPending });
+      trackEvent("spotlight_shown", { module: moduleKey, is_guest: isGuest, replay: replayPending });
     } else {
       setActive(false);
       // Para usuários logados (sem flag de tutorial), marca como concluído para não reaparecer.
@@ -94,6 +104,11 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
 
   const finish = useCallback((reason: "completed" | "dismissed") => {
     set(`spotlight-done-${moduleKey}`, "true");
+    // replay: terminou OU pulou, sai da fila — não reaparece na próxima visita
+    const rl = get<string[]>("tutorial-replay-modules", []);
+    if (Array.isArray(rl) && rl.includes(moduleKey)) {
+      set("tutorial-replay-modules", rl.filter((k) => k !== moduleKey));
+    }
     if (reason === "completed") set("quickstart-target-module", "");
     // App só finanças: ao terminar OU pular, limpa o flag de novo usuário pra não reabrir
     // e mantém o usuário no Finanças (sem o bounce legado pra /home).
@@ -107,7 +122,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         setShowCompletion(true);
       }
     }
-  }, [set, moduleKey, onComplete]);
+  }, [set, get, moduleKey, onComplete]);
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -138,8 +153,10 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
   }, [active, advance, activationActions]);
 
   // Fallback: if data for this step already exists, auto-advance.
+  // REPLAY: desligado — quem está REVENDO o tutorial tem dados em tudo; o
+  // auto-avanço faria o tour voar sozinho (400ms/passo). Cada passo espera.
   useEffect(() => {
-    if (!active) return;
+    if (!active || isReplay) return;
     const cur = steps[stepIdx];
     if (!cur?.checkKey) return;
     const v = get<any>(cur.checkKey, null);
@@ -153,7 +170,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
       const t = setTimeout(() => advance(), 400);
       return () => clearTimeout(t);
     }
-  }, [active, stepIdx, steps, get, advance]);
+  }, [active, isReplay, stepIdx, steps, get, advance]);
 
   // Measure target & re-measure
   useEffect(() => {

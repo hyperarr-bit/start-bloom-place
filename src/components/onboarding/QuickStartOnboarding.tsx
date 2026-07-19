@@ -150,9 +150,11 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
 
   const handlePick = (opt: (typeof OPTIONS)[number]) => {
     if (replay) {
-      // único efeito persistido do replay: reativa o tour dos módulos que a
-      // pessoa marcou — ele roda de novo na visita e se marca done ao fim
-      selectedModules.forEach(k => set(`spotlight-done-${k}`, ""));
+      // único efeito persistido do replay: a FILA tutorial-replay-modules — o
+      // SpotlightOverlay liga o tour pra veterano quando o módulo está nela
+      // (limpar spotlight-done não funcionava: a condição do overlay só liga
+      // pra guest/recém-cadastrado e re-marcava como visto na hora).
+      set("tutorial-replay-modules", selectedModules);
       trackEvent("tutorial_replay_started", { modules: selectedModules, first: opt.key });
       onComplete();
       navigate(opt.route);

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 
 /**
  * FONTE ÚNICA das categorias de finanças (19/07). Antes a lista estava
@@ -95,8 +95,16 @@ export function customToCategory(c: CustomCategory): FinanceCategory {
  * value (padrão, fixo ou personalizado) — usados nos gráficos/relatórios.
  */
 export function useFinanceCategories() {
-  const [custom, setCustom] = usePersistedState<CustomCategory[]>(CUSTOM_CATEGORIES_KEY, []);
-  const list = Array.isArray(custom) ? custom : [];
+  // Lê DIRETO do store do useUserData (não usePersistedState): o snapshot do
+  // usePersistedState hidrata 1x e não ouve escritas de OUTRA instância — o
+  // CategorySelect criava a categoria e a tabela/gráficos continuavam com a
+  // lista velha, mostrando o id cru "c_..." até recarregar (bug real do dono,
+  // 19/07). O set() do useUserData atualiza o contexto → todo mundo re-renderiza
+  // e o get() abaixo devolve a lista fresca em TODAS as telas, na hora.
+  const { get, set: setData } = useUserData();
+  const custom = get<CustomCategory[]>(CUSTOM_CATEGORIES_KEY, []);
+  const list = useMemo(() => (Array.isArray(custom) ? custom : []), [custom]);
+  const setCustom = (next: CustomCategory[]) => setData(CUSTOM_CATEGORIES_KEY, next);
   // ATIVAS aparecem no seletor; ARQUIVADAS só resolvem label/cor de gastos velhos
   const ativas = useMemo(() => list.filter((c) => !c.archived).map(customToCategory), [custom]);
   const todas = useMemo(() => list.map(customToCategory), [custom]);
@@ -161,5 +169,8 @@ export function useFinanceCategories() {
   // label/cor dos gastos já lançados. Zero perda de dado.
   const removeCustom = (value: string) => setCustom(list.map((c) => (c.value === value ? { ...c, archived: true } : c)));
 
-  return { custom: ativas, variableCats, fixedCats, allCats, byValue, labelOf, styleOf, barOf, addCustom, renameCustom, removeCustom };
+  // cor que a PRÓXIMA categoria criada vai ganhar (pré-visualização no diálogo)
+  const nextPalette = CUSTOM_PALETTE[list.length % CUSTOM_PALETTE.length];
+
+  return { custom: ativas, variableCats, fixedCats, allCats, byValue, labelOf, styleOf, barOf, addCustom, renameCustom, removeCustom, nextPalette };
 }

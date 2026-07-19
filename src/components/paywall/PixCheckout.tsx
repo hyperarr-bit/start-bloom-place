@@ -203,8 +203,18 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     const poll = async () => {
       if (stopped || doneRef.current) return;
       try {
+        // offer: fallback de contabilidade pra cobranças antigas (o check da
+        // AbacatePay não devolve valor); fbp/fbc: match da CAPI server-side.
+        const cookie = (n: string) =>
+          document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
         const { data } = abacate
-          ? await supabase.functions.invoke("abacate-pix", { body: { action: "check", id: orderId } })
+          ? await supabase.functions.invoke("abacate-pix", {
+              body: {
+                action: "check", id: orderId, offer,
+                fbp: cookie("_fbp"), fbc: cookie("_fbc"),
+                sourceUrl: window.location.href,
+              },
+            })
           : await supabase.functions.invoke("check-subscription");
         if (abacate ? data?.paid : data?.subscribed) {
           doneRef.current = true;

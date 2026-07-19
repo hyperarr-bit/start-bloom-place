@@ -46,6 +46,20 @@ interface Props {
 // downsell/atribuição/AbacatePay juntos).
 const PIX_GATEWAY: "abacate" | "cakto" = "abacate";
 
+// SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
+// já veio do cadastro — o form matava ~47% de quem abria o checkout (127
+// abriram → 67 geraram QR nas 72h anteriores). No lugar, uma PREPARAÇÃO de
+// ~2,3s (recibo + checklist animando) que é a latência REAL do create — sem
+// espera artificial. O form continua vivo atrás do gate: a Cakto EXIGE CPF,
+// então se PIX_GATEWAY voltar a "cakto" ele reaparece sozinho.
+const SEM_FORM = PIX_GATEWAY === "abacate";
+const PREPARO_MIN_MS = 2300;
+const PREPARO_LINHAS = [
+  "Criando seu acesso vitalício",
+  "Gerando seu Pix seguro",
+  "Reservando sua condição de hoje",
+];
+
 type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
 // A API da Cakto exige phone, mas o dono mandou NÃO pedir (fricção — mesmo
@@ -90,7 +104,7 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 }
 
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
-  const [step, setStep] = useState<Step>("form");
+  const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -101,12 +115,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const cpfRef = useRef<HTMLInputElement>(null);
   const price = PIX_PRICES[offer];
 
-  // Prefill do profile — com CPF já salvo, pula o form direto pro QR.
-  // v2 + AbacatePay: CPF nem é pedido (opcional no gateway) — a conta já
-  // existe, então vai DIRETO pro QR sem digitar nada (decisão do dono 16/07).
+  // AbacatePay: sem form pra NINGUÉM — gera direto (nome vem do profile no
+  // servidor; CPF é opcional no gateway). Cakto: prefill do profile — com CPF
+  // já salvo, pula o form direto pro QR.
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context });
-    if (v2 && PIX_GATEWAY === "abacate") {
+    if (SEM_FORM) {
       generate("", "");
       return;
     }
@@ -127,6 +141,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const generate = async (nm: string, doc: string) => {
     setStep("generating");
     setErrMsg(null);
+    const t0 = Date.now();
     try {
       let data: any, error: any;
       if (PIX_GATEWAY === "abacate") {
@@ -163,6 +178,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       if (error) throw error;
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
+      // segura o QR até o checklist de preparação terminar (~2,3s) — resposta
+      // mais rápida que isso deixaria a "preparação" com cara de mentira
+      if (SEM_FORM) {
+        const falta = PREPARO_MIN_MS - (Date.now() - t0);
+        if (falta > 0) await new Promise((r) => setTimeout(r, falta));
+      }
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId });
@@ -348,10 +369,75 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             </motion.div>
           )}
 
-          {step === "generating" && (
+          {step === "generating" && !SEM_FORM && (
             <motion.div key="gen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
               <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-4" />
               <p className="text-sm text-muted-foreground">Gerando seu Pix…</p>
+            </motion.div>
+          )}
+
+          {step === "generating" && SEM_FORM && (
+            <motion.div key="preparo" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
+              <div className="text-center mb-5">
+                <h2 className="text-[24px] font-bold tracking-tight leading-tight">Preparando seu acesso…</h2>
+                <p className="text-sm text-muted-foreground mt-1.5">Pagamento único — sem mensalidade, nunca.</p>
+              </div>
+
+              {/* Recibo: a pessoa VÊ o que está pagando enquanto o Pix real é
+                  criado — a preparação é a latência do gateway, não enfeite. */}
+              <div className="relative" style={v2?.mascote ? { marginTop: 74 } : undefined}>
+                {v2?.mascote && (
+                  <div aria-hidden style={{ position: "absolute", top: -68, left: "50%", transform: "translateX(-50%)", zIndex: 1, pointerEvents: "none", lineHeight: 0 }}>
+                    {v2.mascote}
+                  </div>
+                )}
+                <div className="rounded-2xl border border-border bg-card p-4 mb-5 shadow-sm relative">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 text-left">
+                      <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground shrink-0">
+                        <Zap className="w-5 h-5" />
+                      </span>
+                      <div>
+                        <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[11px] text-muted-foreground line-through">
+                        R$ {offer === "lifetime" ? "99,90" : PIX_PRICES.lifetime}
+                      </div>
+                      <div className="text-xl font-extrabold text-accent leading-none">R$ {price}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center gap-2.5 border-t border-dashed border-border mt-3.5 pt-3 text-[11px] font-semibold text-muted-foreground">
+                    <span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-accent" /> Pix na hora</span>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-accent" /> Garantia de 7 dias</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 px-1">
+                {PREPARO_LINHAS.map((txt, i) => (
+                  <motion.div
+                    key={txt}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + i * 0.65 }}
+                    className="flex items-center gap-2.5"
+                  >
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.7 + i * 0.65, type: "spring", stiffness: 300, damping: 18 }}
+                      className="grid place-items-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0"
+                    >
+                      <Check className="w-3 h-3" strokeWidth={3.5} />
+                    </motion.span>
+                    <span className="text-[13.5px] font-medium">{txt}…</span>
+                  </motion.div>
+                ))}
+              </div>
             </motion.div>
           )}
 
@@ -396,6 +482,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               {v2?.missao && (
                 <p className="text-[12px] text-muted-foreground mt-2">
                   🎯 Te esperando lá dentro: <strong className="text-foreground">{v2.missao.toLowerCase()}</strong>
+                </p>
+              )}
+              {SEM_FORM && (
+                <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug">
+                  🔒 Garantia de 7 dias — não era pra você? A gente devolve seus R$ {fmtBRL(pix.amount)}.
                 </p>
               )}
             </motion.div>

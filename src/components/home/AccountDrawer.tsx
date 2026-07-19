@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -23,6 +23,7 @@ export const AccountDrawer = ({
   onOpenChange,
   displayName = "",
   onNameChange,
+  onReplayTutorial,
 }: AccountDrawerProps) => {
   const { user, signOut } = useAuth();
   const { set: setUserData, isGuest } = useUserData();
@@ -82,10 +83,16 @@ export const AccountDrawer = ({
   };
 
   // Faxina 16/07 (ordem do dono): saem "Todos os módulos" (o drawer agora só
-  // abre NO hub — a seta ← dos módulos leva até ele), "Indique e ganhe"
-  // (+30 dias não faz sentido pra base vitalícia) e "Rever tutorial".
-  // "Assinatura" vira "Meu acesso" (produto é vitalício; /planos já mostra
-  // o estado "VITALÍCIO 🎉" pra quem é).
+  // abre NO hub — a seta ← dos módulos leva até ele) e "Indique e ganhe"
+  // (+30 dias não faz sentido pra base vitalícia). "Assinatura" vira
+  // "Meu acesso" (produto é vitalício; /planos já mostra "VITALÍCIO 🎉").
+  // "Rever tutorial" VOLTOU 19/07 (pedido de cliente) — agora pelo caminho
+  // limpo do Home.handleReplayTutorial, que reseta as flags de verdade (o
+  // antigo abria o overlay com tudo "feito" e nascia vazio).
+  const handleReplayTutorial = () => {
+    onOpenChange(false);
+    onReplayTutorial?.();
+  };
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
@@ -94,6 +101,7 @@ export const AccountDrawer = ({
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
         { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
+        { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 
   return (

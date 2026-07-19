@@ -187,6 +187,23 @@ const HomePage = () => {
     setDataTrigger(d => d + 1);
   }, []);
 
+  // Rever tutorial (volta 19/07, agora pelo caminho LIMPO do recém-cadastrado):
+  // o replay antigo só abria o overlay SEM resetar as flags — tutorial nascia
+  // com tudo "feito" (tela vazia, bug real de cliente). Aqui: zera onboarding
+  // + spotlights dos 16 módulos e liga a flag force, espelhando o efeito acima
+  // (com a guarda já marcada pra ele não repetir o reset no próximo mount).
+  const handleReplayTutorial = useCallback(() => {
+    try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* ignore */ }
+    setData("force-new-user-tutorial", "true");
+    setData("core-onboarding-done", "");
+    setData("core-all-modules-celebrated", "");
+    ALL_MODULES.forEach(m => setData(`spotlight-done-${m}`, ""));
+    setData("force-new-user-reset-done", "true");
+    setPendingModules(ALL_MODULES);
+    setShowOnboarding(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setData]);
+
   const handleWidgetToggle = (id: WidgetId) => {
     if (isActive(id)) removeWidget(id);
     else addWidget(id);
@@ -217,7 +234,7 @@ const HomePage = () => {
       <div className="min-h-dvh bg-background flex flex-col" onClick={() => editingWidgets && setEditingWidgets(false)}>
         <header className="sticky top-0 z-40 border-b border-border bg-card flex-shrink-0">
           <div className="max-w-lg md:max-w-4xl mx-auto px-4 py-3">
-            <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={() => { setShowOnboarding(true); }} />
+            <GreetingHeader data={lifeData} onNameChange={handleNameChange} onReplayTutorial={handleReplayTutorial} />
           </div>
         </header>
         <main className="flex-1 flex flex-col">

@@ -3,6 +3,8 @@ import { Plus, Trash2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CategorySelect } from "@/components/finance/CategorySelect";
+import { useFinanceCategories } from "@/lib/finance-categories";
 
 interface FixedExpense {
   id: string;
@@ -21,25 +23,6 @@ interface FixedExpensesTableProps {
   expenses: FixedExpense[];
   setExpenses: (expenses: FixedExpense[]) => void;
 }
-
-const categories = [
-  { value: "moradia", label: "Moradia", color: "bg-orange-500/15 text-orange-700 dark:text-orange-300" },
-  { value: "contas_casa", label: "Contas da Casa", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300" },
-  { value: "condominio", label: "Condomínio", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  { value: "seguro", label: "Seguro", color: "bg-sky-500/15 text-sky-700 dark:text-sky-300" },
-  { value: "plano_saude", label: "Plano de Saúde", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "assinaturas", label: "Assinaturas", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "internet_telefone", label: "Internet/Telefone", color: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
-  { value: "educacao", label: "Educação", color: "bg-teal-500/15 text-teal-700 dark:text-teal-300" },
-  { value: "academia", label: "Academia", color: "bg-lime-500/15 text-lime-700 dark:text-lime-300" },
-  { value: "transporte_fixo", label: "Transporte Fixo", color: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300" },
-  { value: "fatura_cartao", label: "Fatura Cartão", color: "bg-rose-500/15 text-rose-700 dark:text-rose-300" },
-  { value: "financiamento", label: "Financiamento", color: "bg-red-500/15 text-red-700 dark:text-red-300" },
-  { value: "pensao", label: "Pensão", color: "bg-stone-500/15 text-stone-700 dark:text-stone-300" },
-  { value: "pets", label: "Pets", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300" },
-  { value: "filhos", label: "Filhos", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
-  { value: "outros", label: "Outros", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
 
 const paymentMethods = [
   { value: "pix", label: "Pix" },
@@ -67,6 +50,7 @@ const cardOptions = [
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
 export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTableProps) => {
+  const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
@@ -105,8 +89,6 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
     setExpenses(expenses.filter((e) => e.id !== id));
   };
 
-  const getCategoryStyle = (v: string) => categories.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
-  const getCategoryLabel = (v: string) => categories.find((c) => c.value === v)?.label || v;
   const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
   const getCardLabel = (v: string) => cardOptions.find((c) => c.value === v)?.label || v;
   const getPaymentLabel = (v: string) => paymentMethods.find((p) => p.value === v)?.label || v;
@@ -186,10 +168,8 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
 
         {showMore && (
           <div className="grid grid-cols-2 gap-2 pt-1">
-            <Select value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Categoria" /></SelectTrigger>
-              <SelectContent>{categories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-            </Select>
+            <CategorySelect kind="fixed" value={newExpense.category} onValueChange={(v) => setNewExpense({ ...newExpense, category: v })} />
+            {/* seletor de categoria (variável/fixo) agora vem do CategorySelect */}
             <Select value={newExpense.paymentMethod} onValueChange={(v) => setNewExpense({ ...newExpense, paymentMethod: v, cardName: isCardPayment(v) ? newExpense.cardName : "" })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pagamento" /></SelectTrigger>
               <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>

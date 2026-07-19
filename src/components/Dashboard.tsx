@@ -5,6 +5,7 @@ import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, D
 import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
 import { computeDailyBudget, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
 import { useAuth } from "@/hooks/use-auth";
+import { useFinanceCategories } from "@/lib/finance-categories";
 import { Progress } from "@/components/ui/progress";
 
 const ALL_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -133,6 +134,8 @@ export const Dashboard = ({
   onNavigate,
 }: DashboardProps) => {
   const { user } = useAuth();
+  // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
+  const { labelOf, barOf } = useFinanceCategories();
   const userId = user?.id ?? null;
   const currentYear = getCurrentYear();
 
@@ -203,9 +206,9 @@ export const Dashboard = ({
       grouped[cat] = (grouped[cat] || 0) + e.value;
     });
     return Object.entries(grouped)
-      .map(([name, value]) => ({ name: categoryLabels[name] || name, value }))
+      .map(([name, value]) => ({ name: categoryLabels[name] || labelOf(name), value }))
       .sort((a, b) => b.value - a.value);
-  }, [expenses, fixedExpenses]);
+  }, [expenses, fixedExpenses, labelOf]);
 
   // Bar chart data — only consecutive months up to current month
   const currentMonthIdx = new Date().getMonth();
@@ -643,8 +646,8 @@ export const Dashboard = ({
         {top5Expenses.length > 0 ? (
           <div className="space-y-2">
             {top5Expenses.map((item, i) => {
-              const barColor = categoryBarColors[item.category] || "bg-gray-400";
-              const textColor = categoryTextColors[item.category] || "text-gray-400";
+              const barColor = categoryBarColors[item.category] || barOf(item.category);
+              const textColor = categoryTextColors[item.category] || "text-muted-foreground";
               return (
                 <div key={item.id} className="bg-secondary/30 rounded-lg px-3 py-2 space-y-1.5">
                   <div className="flex items-center justify-between">

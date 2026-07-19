@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
+import { useFinanceCategories } from "@/lib/finance-categories";
 
 interface Income {
   id: string;
@@ -54,6 +55,7 @@ export const Reports = ({
   setIncomes,
   setExpenses,
 }: ReportsProps) => {
+  const { labelOf } = useFinanceCategories(); // resolve nome de categorias personalizadas
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   // totalExpenses aqui já é a saída mensal completa (fixas + variáveis + parcelas),
   // calculada uma vez no Index — mesma base da Saúde Financeira e do Dashboard.
@@ -202,7 +204,7 @@ export const Reports = ({
               .sort(([, a], [, b]) => b - a)
               .map(([cat, value]) => (
                 <div key={cat} className="flex items-center justify-between bg-muted/30 rounded p-2">
-                  <span className="text-xs">{categoryLabels[cat] || cat}</span>
+                  <span className="text-xs">{categoryLabels[cat] || labelOf(cat)}</span>
                   <span className="text-xs font-medium">R$ {value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
                 </div>
               ))}
@@ -256,7 +258,7 @@ export const Reports = ({
                   {expenses.slice(0, 10).map((e) => (
                     <tr key={e.id} className="border-t border-border/50">
                       <td className="p-2">{e.description}</td>
-                      <td className="p-2 text-muted-foreground">{categoryLabels[e.category] || e.category}</td>
+                      <td className="p-2 text-muted-foreground">{categoryLabels[e.category] || labelOf(e.category)}</td>
                       <td className="p-2 text-right text-red-400">R$ {e.value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</td>
                     </tr>
                   ))}

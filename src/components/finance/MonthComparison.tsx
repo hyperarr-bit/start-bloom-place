@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
 import { useAuth } from "@/hooks/use-auth";
+import { useFinanceCategories } from "@/lib/finance-categories";
 
 const ALL_MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -59,6 +60,7 @@ const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigi
 
 export const MonthComparison = () => {
   const { user } = useAuth();
+  const { labelOf } = useFinanceCategories(); // resolve nome de categorias personalizadas
   const userId = user?.id ?? null;
   const currentIdx = new Date().getMonth();
   const prevIdx = currentIdx === 0 ? 11 : currentIdx - 1;
@@ -78,14 +80,14 @@ export const MonthComparison = () => {
     allCats.forEach((cat) => {
       data.push({
         category: cat,
-        label: categoryLabels[cat] || cat,
+        label: categoryLabels[cat] || labelOf(cat),
         monthA: catsA[cat] || 0,
         monthB: catsB[cat] || 0,
       });
     });
 
     return data.sort((a, b) => (b.monthA + b.monthB) - (a.monthA + a.monthB));
-  }, [monthA, monthB, userId]);
+  }, [monthA, monthB, userId, labelOf]);
 
   const maxCatValue = useMemo(() => {
     return Math.max(1, ...categoryComparison.map((c) => Math.max(c.monthA, c.monthB)));

@@ -1,51 +1,23 @@
 import { useState } from "react";
-import { Gauge, Pencil, Check, X, Target } from "lucide-react";
+import { Gauge, Pencil, Check, X, Target, Trash2, Tag } from "lucide-react";
+import { toast } from "sonner";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/EmptyState";
-
-const categories = [
-  // Variáveis
-  { value: "alimentacao", label: "Alimentação", color: "bg-orange-100/80 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300", bar: "bg-orange-500" },
-  { value: "restaurante", label: "Restaurante", color: "bg-amber-100/80 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300", bar: "bg-amber-500" },
-  { value: "mercado", label: "Mercado", color: "bg-lime-100/80 text-lime-700 dark:bg-lime-500/15 dark:text-lime-300", bar: "bg-lime-500" },
-  { value: "transporte", label: "Transporte", color: "bg-blue-100/80 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300", bar: "bg-blue-500" },
-  { value: "combustivel", label: "Combustível", color: "bg-indigo-100/80 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300", bar: "bg-indigo-500" },
-  { value: "lazer", label: "Lazer", color: "bg-purple-100/80 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300", bar: "bg-purple-500" },
-  { value: "entretenimento", label: "Entretenimento", color: "bg-violet-100/80 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300", bar: "bg-violet-500" },
-  { value: "saude", label: "Saúde", color: "bg-green-100/80 text-green-700 dark:bg-green-500/15 dark:text-green-300", bar: "bg-green-500" },
-  { value: "farmacia", label: "Farmácia", color: "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", bar: "bg-emerald-500" },
-  { value: "vestuario", label: "Vestuário", color: "bg-sky-100/80 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300", bar: "bg-sky-500" },
-  { value: "beleza", label: "Beleza", color: "bg-rose-100/80 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300", bar: "bg-rose-500" },
-  { value: "educacao", label: "Educação", color: "bg-teal-100/80 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300", bar: "bg-teal-500" },
-  { value: "eletronicos", label: "Eletrônicos", color: "bg-red-100/80 text-red-600 dark:bg-red-500/15 dark:text-red-300", bar: "bg-red-500" },
-  { value: "servicos", label: "Serviços", color: "bg-cyan-100/80 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300", bar: "bg-cyan-500" },
-  { value: "delivery", label: "Delivery", color: "bg-yellow-100/80 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300", bar: "bg-yellow-500" },
-  { value: "presente", label: "Presente", color: "bg-fuchsia-100/80 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-300", bar: "bg-fuchsia-500" },
-  { value: "casa", label: "Casa", color: "bg-stone-100/80 text-stone-700 dark:bg-stone-500/15 dark:text-stone-300", bar: "bg-stone-500" },
-  { value: "pets", label: "Pets", color: "bg-slate-200/80 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300", bar: "bg-slate-500" },
-  { value: "filhos", label: "Filhos", color: "bg-blue-200/80 text-blue-600 dark:bg-blue-400/15 dark:text-blue-300", bar: "bg-blue-400" },
-  { value: "viagem", label: "Viagem", color: "bg-pink-100/80 text-pink-700 dark:bg-pink-500/15 dark:text-pink-300", bar: "bg-pink-500" },
-  // Fixas
-  { value: "moradia", label: "Moradia", color: "bg-orange-100/80 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300", bar: "bg-orange-500" },
-  { value: "contas_casa", label: "Contas da Casa", color: "bg-yellow-100/80 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300", bar: "bg-yellow-500" },
-  { value: "assinaturas", label: "Assinaturas", color: "bg-purple-100/80 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300", bar: "bg-purple-500" },
-  { value: "internet_telefone", label: "Internet/Telefone", color: "bg-blue-100/80 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300", bar: "bg-blue-500" },
-  { value: "academia", label: "Academia", color: "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300", bar: "bg-emerald-500" },
-  { value: "plano_saude", label: "Plano de Saúde", color: "bg-green-100/80 text-green-700 dark:bg-green-500/15 dark:text-green-300", bar: "bg-green-500" },
-  { value: "seguro", label: "Seguro", color: "bg-sky-100/80 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300", bar: "bg-sky-500" },
-  { value: "financiamento", label: "Financiamento", color: "bg-red-100/80 text-red-700 dark:bg-red-500/15 dark:text-red-300", bar: "bg-red-500" },
-  { value: "outros", label: "Outros", color: "bg-gray-100/80 text-gray-700 dark:bg-gray-500/15 dark:text-gray-300", bar: "bg-gray-500" },
-];
+import { useFinanceCategories } from "@/lib/finance-categories";
 
 interface CategoryBudgetsProps {
   expenses: { category: string; value: number }[];
 }
 
 export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
+  // fonte única: categorias padrão + personalizadas (com renomear/excluir)
+  const { allCats: categories, custom, renameCustom, removeCustom } = useFinanceCategories();
   const [budgets, setBudgets] = usePersistedState<Record<string, number>>("finance-category-budgets", {});
   const [editing, setEditing] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const spentByCategory = expenses.reduce<Record<string, number>>((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + e.value;
@@ -216,6 +188,74 @@ export const CategoryBudgets = ({ expenses }: CategoryBudgetsProps) => {
           </div>
         )}
       </div>
+
+      {/* Suas categorias personalizadas: renomear / excluir */}
+      {custom.length > 0 && (
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <div className="bg-muted/40 px-4 py-2.5 flex items-center gap-2">
+            <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs font-bold tracking-wide uppercase">Suas categorias</span>
+          </div>
+          <div className="p-3 space-y-1.5">
+            {custom.map(cat => {
+              const isRenaming = renaming === cat.value;
+              return (
+                <div key={cat.value} className="flex items-center justify-between gap-2">
+                  {isRenaming ? (
+                    <>
+                      <Input
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            const r = renameCustom(cat.value, renameValue);
+                            if (r.error) { toast.error(r.error); return; }
+                            setRenaming(null);
+                          }
+                        }}
+                        maxLength={24}
+                        autoFocus
+                        className="h-7 text-xs flex-1"
+                      />
+                      <button
+                        type="button"
+                        onPointerDown={e => { e.preventDefault(); const r = renameCustom(cat.value, renameValue); if (r.error) { toast.error(r.error); return; } setRenaming(null); }}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md text-green-500 hover:bg-green-500/10"
+                        aria-label="Salvar nome"
+                      ><Check className="w-4 h-4" /></button>
+                      <button
+                        type="button"
+                        onPointerDown={e => { e.preventDefault(); setRenaming(null); }}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                        aria-label="Cancelar"
+                      ><X className="w-4 h-4" /></button>
+                    </>
+                  ) : (
+                    <>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cat.color}`}>{cat.label}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => { setRenaming(cat.value); setRenameValue(cat.label); }}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                          aria-label={`Renomear ${cat.label}`}
+                        ><Pencil className="w-3.5 h-3.5" /></button>
+                        <button
+                          onClick={() => { removeCustom(cat.value); toast.success("Categoria removida"); }}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive"
+                          aria-label={`Excluir ${cat.label}`}
+                        ><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+            <p className="text-[10px] text-muted-foreground pt-1">
+              Excluir tira a categoria da lista, mas os gastos já lançados nela continuam intactos.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

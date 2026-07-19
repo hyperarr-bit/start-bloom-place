@@ -27,7 +27,10 @@ type StepId =
   | "t8" | "t9" | "t10" | "t11" | "t12" | "t13" | "t14"
   | "t15" | "t16" | "t17";
 
-const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t14", "t15", "t16", "t17"];
+// CADASTRO ANTES DO PAYWALL (20/07, dado do original: conta-antes converte a
+// oferta a 41% vs 26% e captura 3× mais e-mails pra recuperação): t15 vem
+// antes do t14. Ids das telas NÃO mudam (métricas seguem comparáveis).
+const ORDEM: StepId[] = ["t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9", "t10", "t11", "t12", "t13", "t15", "t14", "t16", "t17"];
 
 const WASHES: Record<StepId, Wash> = {
   t1: "fundo", t2: "fundo", t3: "rosa", t4: "lilas", t5: "fundo", t6: "coral", t7: "menta",
@@ -506,7 +509,11 @@ export default function ComecarV2() {
                 areaNome={areaInfo.nome}
                 gastoTeste={gastoTeste}
                 vitoria={vitoria}
-                onCta={() => { track("funnel_v2_ponte_cta"); avancar(); }}
+                onCta={() => {
+                  track("funnel_v2_ponte_cta");
+                  // logado não repete cadastro — pula direto pra oferta
+                  if (user) irPara("t14"); else avancar();
+                }}
               />
             )}
 
@@ -514,7 +521,12 @@ export default function ComecarV2() {
               <T15SalvarPlano
                 areaNome={areaInfo.nome}
                 vitoria={vitoria}
-                onSalvo={() => { track("funnel_v2_signup_success"); irPara("t16"); }}
+                onSalvo={() => {
+                  track("funnel_v2_signup_success");
+                  // conta criada ANTES do preço → agora vê a oferta; exceção:
+                  // veio do downsell (aceitou 14,90 sem conta) → direto pro Pix
+                  irPara(pixOffer === "downsell" ? "t16" : "t14");
+                }}
                 onEntrar={() => navigate("/entrar")}
               />
             )}

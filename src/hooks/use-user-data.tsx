@@ -57,6 +57,9 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "theme",
   "vite-ui-theme",
   "finance-keys-migrated-v2",
+  // Marca "este aparelho é o app instalado" — é do DISPOSITIVO, não do
+  // usuário: sem ela aqui, trocar de conta/logar mandava o PWA pro funil.
+  "core-pwa",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;

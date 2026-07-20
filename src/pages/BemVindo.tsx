@@ -5,6 +5,7 @@ import { CheckCircle2, Mail, KeyRound, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
+import { PwaInstallCard } from "@/components/PwaInstallCard";
 
 /** /bem-vindo — recepção de quem PAGOU (15/07). Destino do e-mail de
  *  boas-vindas do cakto-webhook (?e=<e-mail da compra>). Uma função só:
@@ -47,14 +48,18 @@ const BemVindo = () => {
         </p>
 
         {!loading && user ? (
-          // Já logado (comprou dentro do app): só manda pra dentro.
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-            <p className="text-sm text-foreground text-center mb-4">
-              Você já está com a conta <strong>{user.email}</strong> aberta — bora usar.
-            </p>
-            <Button className="w-full h-12 rounded-xl text-base" onClick={() => navigate("/home")}>
-              Abrir meu CORE <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
+          // Já logado (comprou dentro do app): manda pra dentro e aproveita o
+          // pico de entusiasmo pós-compra pra convidar a instalar o app.
+          <div className="space-y-3">
+            <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+              <p className="text-sm text-foreground text-center mb-4">
+                Você já está com a conta <strong>{user.email}</strong> aberta — bora usar.
+              </p>
+              <Button className="w-full h-12 rounded-xl text-base" onClick={() => navigate("/home")}>
+                Abrir meu CORE <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+            <PwaInstallCard variant="welcome" />
           </div>
         ) : (
           <>

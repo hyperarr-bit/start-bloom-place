@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { trackEvent } from "@/lib/analytics";
+import { initPwaInstall } from "@/lib/pwa-install";
 
 // Telemetria de crash (15/07): cliente reportou "tela branca ao pagar" e a
 // gente só tinha silêncio nos eventos — sem isso, todo crash é adivinhação.
@@ -62,5 +63,10 @@ if ("serviceWorker" in navigator) {
 }
 
 
+
+// Captura o beforeinstallprompt ANTES do React montar (o evento pode disparar
+// cedo e só dispara uma vez). Sem service worker: o bloco acima continua
+// desregistrando qualquer SW — Chrome instala só com o manifest.
+initPwaInstall();
 
 createRoot(document.getElementById("root")!).render(<App />);

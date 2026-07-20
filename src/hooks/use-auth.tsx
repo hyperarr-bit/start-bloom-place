@@ -8,7 +8,9 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 // hook dependency.
 const purgeLocalUserCache = () => {
   try {
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2"]);
+    // core-pwa é marca do APARELHO (app instalado), não da conta: deslogar do
+    // PWA não pode mandar a pessoa de volta pro funil de vendas.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

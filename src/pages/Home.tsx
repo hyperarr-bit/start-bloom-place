@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
+import { PwaInstallCard } from "@/components/PwaInstallCard";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
@@ -268,6 +269,8 @@ const HomePage = () => {
             <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
               <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
             </div>
+
+            <PwaInstallCard variant="home" />
 
             <div>
               <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>

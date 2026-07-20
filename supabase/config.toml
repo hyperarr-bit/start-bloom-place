@@ -12,5 +12,8 @@ verify_jwt = false
 [functions.abacate-webhook]
 verify_jwt = false
 
+[functions.kiwify-webhook]
+verify_jwt = false
+
 [functions.recovery-emails]
 verify_jwt = false

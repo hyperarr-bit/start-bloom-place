@@ -49,6 +49,16 @@ const MODULOS_16: Array<[string, string]> = [
   ["✈️", "Viagens"], ["👥", "Relações"], ["🐾", "Pet"], ["📱", "Detox"],
 ];
 
+/** CHECKOUT KIWIFY (20/07, teste do dono SÓ no v3): multi-pagamento (Pix +
+ *  cartão) e marca conhecida. null = volta pro Pix in-app da AbacatePay.
+ *  Grant vem do kiwify-webhook (por e-mail — por isso o cadastro fica ANTES).
+ *  NÃO ativar o pixel Meta dentro da Kiwify: nossa CAPI já manda deduplicado. */
+const KIWIFY: Record<PixOffer, string> | null = {
+  lifetime: "https://pay.kiwify.com.br/MyqE4FO",
+  downsell: "https://pay.kiwify.com.br/MxrG3yB",
+};
+const FOI_KIWIFY_KEY = "fv3-foi-kiwify";
+
 const ESTADO_KEY = "fv3-state";
 const lerEstado = (): Record<string, unknown> => {
   try { return JSON.parse(localStorage.getItem(ESTADO_KEY) ?? "{}"); } catch { return {}; }
@@ -77,12 +87,46 @@ export default function PlanoV3() {
   // (fechou pix / voltar / 40s parado), 1× por sessão, nunca pra assinante.
   const [roletaAberta, setRoletaAberta] = useState(false);
   const roletaVista = () => { try { return sessionStorage.getItem("fv3-ds-visto") === "1"; } catch { return false; } };
+  const [dsJaVista, setDsJaVista] = useState(roletaVista);
   const abrirRoleta = useCallback((origem: string) => {
     if (roletaVista() || isSubscribed) return;
     try { sessionStorage.setItem("fv3-ds-visto", "1"); } catch { /* noop */ }
+    setDsJaVista(true);
     track("funnel_v3_wheel_view", { origem });
     setRoletaAberta(true);
   }, [isSubscribed]);
+
+  // Kiwify: sai pro checkout na MESMA aba com e-mail/nome prefilados + UTMs.
+  const irKiwify = useCallback((offer: PixOffer) => {
+    if (!KIWIFY) return;
+    try { sessionStorage.setItem(FOI_KIWIFY_KEY, String(Date.now())); } catch { /* noop */ }
+    track("funnel_v3_kiwify_open", { offer });
+    const u = new URL(KIWIFY[offer]);
+    if (user?.email) u.searchParams.set("email", user.email);
+    const nome = (user?.user_metadata?.display_name as string | undefined) ?? "";
+    if (nome) u.searchParams.set("name", nome);
+    try {
+      const atual = new URLSearchParams(window.location.search);
+      for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"]) {
+        const v = atual.get(k); if (v) u.searchParams.set(k, v);
+      }
+    } catch { /* noop */ }
+    u.searchParams.set("s1", "funil_v3");
+    setTimeout(() => { window.location.href = u.toString(); }, 150);
+  }, [user]);
+
+  // voltou do checkout Kiwify sem pagar (25s+ fora) → resgate
+  useEffect(() => {
+    try {
+      const t = Number(sessionStorage.getItem(FOI_KIWIFY_KEY) ?? 0);
+      if (!t) return;
+      sessionStorage.removeItem(FOI_KIWIFY_KEY);
+      if (Date.now() - t > 25_000 && !isSubscribed) {
+        const g = setTimeout(() => abrirRoleta("voltou_checkout"), 1200);
+        return () => clearTimeout(g);
+      }
+    } catch { /* noop */ }
+  }, [isSubscribed, abrirRoleta]);
 
   // OS NÚMEROS da pessoa — alimentam w6 (revelação), w11 (loading), w12
   // (plano) e w15 (âncora do paywall contra o próprio vazamento declarado)
@@ -448,7 +492,7 @@ export default function PlanoV3() {
               <div className="fv3-center" style={{ minHeight: "60dvh", justifyContent: "center" }}>
                 <h2 style={{ textAlign: "center", fontSize: 26 }}>A gente quer que você<br />teste sem risco.</h2>
                 <p className="fv3-checkline">✓ Garantia total de 7 dias — não gostou, devolvemos</p>
-                <p className="fv3-checkline">✓ Acesso liberado na hora, direto nesta tela</p>
+                <p className="fv3-checkline">✓ Acesso liberado em minutos, no seu e-mail</p>
                 <div className="fv3-rodape" style={{ width: "100%" }}>
                   <button className="fv3-cta" onClick={() => { track("funnel_v3_softask_ok"); avancar(); }}>Continuar</button>
                   <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pagamento único de R$ 27,90 · sem mensalidade, nunca</p>
@@ -457,7 +501,14 @@ export default function PlanoV3() {
             )}
 
             {step === "w15" && (
-              <div>
+              <div style={{ position: "relative" }}>
+                {!dsJaVista && !isSubscribed && (
+                  <button
+                    className="fv3-pay-x"
+                    aria-label="Fechar oferta"
+                    onClick={() => { track("funnel_v3_paywall_x"); abrirRoleta("x_paywall"); }}
+                  >✕</button>
+                )}
                 <h2>Tudo isso é seu.<br />Pra sempre.</h2>
                 <div className="fv3-card" style={{ padding: "14px 16px" }}>
                   <div className="fv3-preco">
@@ -483,10 +534,24 @@ export default function PlanoV3() {
                   <p className="fv3-ancora-pessoal">Seu plano: <b>{promessa.linha}</b> até <b>{fmtData(dataAlvo)}</b>.</p>
                 )}
                 <div className="fv3-rodape">
-                  <button className="fv3-cta" onClick={() => { track("funnel_v3_checkout_click"); setPixOffer("lifetime"); setPixAberto(true); }}>
+                  <button
+                    className="fv3-cta"
+                    onClick={() => {
+                      track("funnel_v3_checkout_click");
+                      if (KIWIFY) { irKiwify("lifetime"); return; }
+                      setPixOffer("lifetime"); setPixAberto(true);
+                    }}
+                  >
                     Garantir meu acesso vitalício →
                   </button>
-                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pix na hora · acesso libera nesta tela</p>
+                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>
+                    {KIWIFY ? "⚡ Pix na hora ou 💳 cartão de crédito" : "Pix na hora · acesso libera nesta tela"}
+                  </p>
+                  {KIWIFY && (
+                    <p className="fv3-mini" style={{ textAlign: "center", marginTop: 4 }}>
+                      🔒 Pagamento processado pela Kiwify — ambiente seguro
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -517,6 +582,7 @@ export default function PlanoV3() {
           onAceitar={() => {
             track("funnel_v3_wheel_accept");
             setRoletaAberta(false);
+            if (KIWIFY) { irKiwify("downsell"); return; }
             setPixOffer("downsell");
             setPixAberto(true);
           }}
@@ -859,6 +925,7 @@ const CSS_V3 = `
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }
 .fv3-range-legendas { display: flex; justify-content: space-between; font-size: 11.5px; color: #8a8378; }
 .fv3-ancora-pessoal { text-align: center; font-size: 15px; line-height: 1.55; background: #faf9f7; border: 1.5px dashed #d8d4cd; border-radius: 14px; padding: 12px 14px; margin: 14px 0 0; }
+.fv3-pay-x { position: absolute; top: -6px; right: 0; z-index: 5; width: 34px; height: 34px; border: 0; border-radius: 999px; background: rgba(0,0,0,.06); color: #6f695f; font-size: 15px; cursor: pointer; }
 .fv3-roleta-overlay { position: fixed; inset: 0; z-index: 70; background: #fff; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
 .fv3-roleta-x { position: fixed; top: 14px; right: 14px; z-index: 5; width: 36px; height: 36px; border: 0; border-radius: 999px; background: rgba(0,0,0,.06); color: #6f695f; font-size: 16px; cursor: pointer; }
 .fv3-roleta-wrap { width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; }

@@ -28,8 +28,12 @@ import { PixCheckout } from "@/components/paywall/PixCheckout";
  * Sem downsell nesta v1 do funil: uma variável por vez.
  */
 
-type Wid = "w1" | "w2" | "w3" | "w4" | "w5" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11" | "w12" | "w13" | "w14" | "w15";
-const FLUXO: Wid[] = ["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9", "w10", "w11", "w12", "w13", "w14", "w15"];
+type Wid = "w1" | "w2" | "w3" | "w4" | "w5" | "w5b" | "w5c" | "w6" | "w7" | "w8" | "w9" | "w10" | "w11" | "w12" | "w13" | "w14" | "w15";
+// w5b/w5c = O NÚMERO da pessoa (20/07, crítica do dono: Cal AI pede peso alvo
+// e devolve cálculo; o funil tava genérico). Cada trilha tem sua unidade:
+// finanças R$ (vazamento→poupança), rotina horas, corpo kg, metas tempo
+// adiando. "Tudo" cai na trilha de FINANÇAS (igual v1/v2) com ponte falada.
+const FLUXO_BASE: Wid[] = ["w1", "w2", "w3", "w4", "w5", "w5b", "w5c", "w6", "w7", "w8", "w9", "w10", "w11", "w12", "w13", "w14", "w15"];
 
 const AREAS_V3: Record<string, { nome: string; module: string; emoji: string; missao: string; foco: string }> = {
   dinheiro: { nome: "Finanças", module: "financas", emoji: "💰", missao: "Fechar o mês sabendo pra onde foi cada real", foco: "Controle financeiro" },
@@ -70,7 +74,22 @@ export default function PlanoV3() {
   const [demoAberta, setDemoAberta] = useState(false);
   const [pixAberto, setPixAberto] = useState(false);
 
+  // OS NÚMEROS da pessoa — alimentam w6 (revelação), w11 (loading), w12
+  // (plano) e w15 (âncora do paywall contra o próprio vazamento declarado)
+  const [vazamento, setVazamento] = useState<number>(600);
+  const [poupar, setPoupar] = useState<number>(400);
+  const [horas, setHoras] = useState<number>(2);
+  const [pesoAtual, setPesoAtual] = useState<number>(75);
+  const [pesoAlvo, setPesoAlvo] = useState<number>(70);
+  const [adiada, setAdiada] = useState<string>("");
+
   const info = AREAS_V3[area] ?? AREAS_V3.tudo;
+  // trilha numérica: "tudo" usa a de FINANÇAS (v1/v2 provaram: é a que converte)
+  const trilha = area === "tudo" ? "dinheiro" : area || "dinheiro";
+  const fluxo = useMemo<Wid[]>(
+    () => (trilha === "rotina" || trilha === "metas") ? FLUXO_BASE.filter((w) => w !== "w5c") : FLUXO_BASE,
+    [trilha],
+  );
   const dataAlvo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + ritmoDias); return d; }, [ritmoDias]);
   // score de partida: calibrado pelas respostas (sempre baixo — é o "antes")
   const scoreHoje = useMemo(() => {
@@ -80,6 +99,17 @@ export default function PlanoV3() {
     return Math.max(3, s);
   }, [obstaculo, area]);
 
+  // A promessa com o número DELA — usada na revelação, no plano e no paywall
+  const promessa = useMemo(() => {
+    if (trilha === "dinheiro") return { linha: `R$ ${poupar} guardados por mês`, ano: `R$ ${(poupar * 12).toLocaleString("pt-BR")} em um ano` };
+    if (trilha === "rotina") return { linha: `+${horas * 7}h livres por semana`, ano: `${horas * 365}h de volta em um ano` };
+    if (trilha === "corpo") {
+      const d = pesoAtual - pesoAlvo;
+      return { linha: d > 0 ? `−${d} kg no seu ritmo` : d < 0 ? `+${Math.abs(d)} kg com plano` : "peso mantido com constância", ano: "refeições e treinos prontos no app" };
+    }
+    return { linha: "sua meta destravada", ano: "primeiro passo nas próximas 48h" };
+  }, [trilha, poupar, horas, pesoAtual, pesoAlvo]);
+
   useEffect(() => { captureLandingMeta(); track("funnel_v3_start"); }, []);
   useEffect(() => {
     track("funnel_v3_step", { step });
@@ -87,10 +117,16 @@ export default function PlanoV3() {
     window.scrollTo({ top: 0 });
   }, [step]);
 
-  const idx = FLUXO.indexOf(step);
+  const idx = Math.max(0, fluxo.indexOf(step));
   const irPara = useCallback((w: Wid) => setStep(w), []);
-  const avancar = useCallback(() => setStep((s) => FLUXO[Math.min(FLUXO.indexOf(s) + 1, FLUXO.length - 1)]), []);
-  const voltar = useCallback(() => setStep((s) => FLUXO[Math.max(FLUXO.indexOf(s) - 1, 0)]), []);
+  const avancar = useCallback(() => setStep((s) => {
+    const i = fluxo.indexOf(s);
+    return fluxo[Math.min((i === -1 ? 0 : i) + 1, fluxo.length - 1)];
+  }), [fluxo]);
+  const voltar = useCallback(() => setStep((s) => {
+    const i = fluxo.indexOf(s);
+    return fluxo[Math.max((i === -1 ? 1 : i) - 1, 0)];
+  }), [fluxo]);
 
   const escolher = (w: Wid, campo: string, valor: string, setter: (v: string) => void) => {
     setter(valor);
@@ -112,7 +148,7 @@ export default function PlanoV3() {
       {step !== "w1" && step !== "w11" && !demoAberta && (
         <header className="fv3-top">
           <button className="fv3-back" onClick={voltar} disabled={idx <= 0 || step === "w15"} aria-label="Voltar">←</button>
-          <div className="fv3-progress"><div style={{ width: `${(idx / (FLUXO.length - 1)) * 100}%` }} /></div>
+          <div className="fv3-progress"><div style={{ width: `${(idx / (fluxo.length - 1)) * 100}%` }} /></div>
         </header>
       )}
 
@@ -197,6 +233,63 @@ export default function PlanoV3() {
               </div>
             )}
 
+            {step === "w5b" && trilha === "dinheiro" && (
+              <div>
+                {area === "tudo" && (
+                  <p className="fv3-ponte">Tudo, sinceramente? Respeito. <b>Vamos começar pelo mais importante: finanças.</b> Os outros 15 módulos entram junto.</p>
+                )}
+                <h2>Quanto some da sua conta todo mês sem você saber pra onde foi?</h2>
+                <p className="fv3-sub2">Chuta sem medo — a maioria descobre que é mais.</p>
+                <NumSlider valor={vazamento} onMudar={setVazamento} min={100} max={2000} passo={50} fmt={(v) => `R$ ${v}`} />
+                <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { salvarEstado({ vazamento }); track("funnel_v3_vazamento", { valor: vazamento }); avancar(); }}>Continuar</button></div>
+              </div>
+            )}
+
+            {step === "w5c" && trilha === "dinheiro" && (
+              <div>
+                <h2>E quanto você quer conseguir guardar por mês?</h2>
+                <p className="fv3-sub2">Esse vira o número oficial do seu plano.</p>
+                <NumSlider valor={poupar} onMudar={setPoupar} min={100} max={2000} passo={50} fmt={(v) => `R$ ${v}`} />
+                <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { salvarEstado({ poupar }); track("funnel_v3_poupar", { valor: poupar }); avancar(); }}>Continuar</button></div>
+              </div>
+            )}
+
+            {step === "w5b" && trilha === "rotina" && (
+              <div>
+                <h2>Quantas horas por dia a desorganização te rouba?</h2>
+                <p className="fv3-sub2">Retrabalho, esquecimento, decidir tudo na hora…</p>
+                <NumSlider valor={horas} onMudar={setHoras} min={1} max={6} passo={1} fmt={(v) => `${v}h por dia`} />
+                <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { salvarEstado({ horas }); track("funnel_v3_horas", { valor: horas }); avancar(); }}>Continuar</button></div>
+              </div>
+            )}
+
+            {step === "w5b" && trilha === "corpo" && (
+              <div>
+                <h2>Qual seu peso hoje?</h2>
+                <NumSlider valor={pesoAtual} onMudar={setPesoAtual} min={45} max={140} passo={1} fmt={(v) => `${v} kg`} />
+                <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { salvarEstado({ pesoAtual }); track("funnel_v3_peso", { valor: pesoAtual }); avancar(); }}>Continuar</button></div>
+              </div>
+            )}
+
+            {step === "w5c" && trilha === "corpo" && (
+              <div>
+                <h2>E qual peso você quer alcançar?</h2>
+                <NumSlider valor={pesoAlvo} onMudar={setPesoAlvo} min={45} max={140} passo={1} fmt={(v) => `${v} kg`} />
+                <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { salvarEstado({ pesoAlvo }); track("funnel_v3_peso_alvo", { valor: pesoAlvo }); avancar(); }}>Continuar</button></div>
+              </div>
+            )}
+
+            {step === "w5b" && trilha === "metas" && (
+              <div>
+                <h2>Há quanto tempo você adia a meta mais importante?</h2>
+                <div className="fv3-opcoes">
+                  {["Uns 3 meses", "Uns 6 meses", "Mais de 1 ano", "Nem lembro mais"].map((o) => (
+                    <button key={o} className={`fv3-op ${adiada === o ? "on" : ""}`} onClick={() => { setAdiada(o); salvarEstado({ adiada: o }); track("funnel_v3_adiada", { valor: o }); setTimeout(avancar, 220); }}>{o}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {step === "w6" && (
               <div>
                 <h2>Em quanto tempo você quer sua vida organizada?</h2>
@@ -215,7 +308,8 @@ export default function PlanoV3() {
                     ))}
                   </div>
                   <div className="fv3-datacaixa">
-                    Sua vida organizada até <b>{fmtData(dataAlvo)}</b>
+                    <b>{promessa.linha}</b> até <b>{fmtData(dataAlvo)}</b>
+                    <p className="fv3-mini" style={{ marginTop: 4 }}>{promessa.ano}</p>
                     <p className="fv3-mini" style={{ marginTop: 4 }}>
                       {ritmoDias === 14 ? "O ritmo equilibrado — ideal pra maioria." : ritmoDias === 7 ? "Pra quem quer virada rápida. Exige dedicação diária." : "Sem pressa, sem pressão. Constância acima de tudo."}
                     </p>
@@ -289,7 +383,7 @@ export default function PlanoV3() {
               </div>
             )}
 
-            {step === "w11" && <W11Loading areaNome={info.nome} ritmoDias={ritmoDias} onFim={avancar} />}
+            {step === "w11" && <W11Loading areaNome={info.nome} ritmoDias={ritmoDias} promessaLinha={promessa.linha} onFim={avancar} />}
 
             {step === "w12" && (
               <div>
@@ -301,6 +395,7 @@ export default function PlanoV3() {
                     <div className="fv3-scorebox"><span className="fv3-mini">até {fmtData(dataAlvo)}</span><b className="bom">8.5</b></div>
                   </div>
                   <ul className="fv3-plano">
+                    <li><b>Sua meta:</b> {promessa.linha} até {fmtData(dataAlvo)}</li>
                     <li><b>Foco nº 1:</b> {info.foco} ({info.nome})</li>
                     <li><b>Missão dos 7 dias:</b> {info.missao.toLowerCase()}</li>
                     <li><b>Ritmo:</b> organizada em {ritmoDias} dias{cobra ? " · com lembretes diários" : ""}</li>
@@ -341,6 +436,14 @@ export default function PlanoV3() {
                     ✓ Sem mensalidade, nunca &nbsp;·&nbsp; ✓ Garantia de 7 dias &nbsp;·&nbsp; ✓ Atualizações inclusas
                   </p>
                 </div>
+                {trilha === "dinheiro" && (
+                  <p className="fv3-ancora-pessoal">
+                    Você disse que <b>R$ {vazamento} somem</b> da sua conta todo mês.<br />O CORE custa <b>R$ 27,90 — uma vez.</b>
+                  </p>
+                )}
+                {trilha !== "dinheiro" && (
+                  <p className="fv3-ancora-pessoal">Seu plano: <b>{promessa.linha}</b> até <b>{fmtData(dataAlvo)}</b>.</p>
+                )}
                 <div className="fv3-rodape">
                   <button className="fv3-cta" onClick={() => { track("funnel_v3_checkout_click"); setPixAberto(true); }}>
                     Garantir meu acesso vitalício →
@@ -368,13 +471,14 @@ export default function PlanoV3() {
 
 // ---------------------------------------------------------------- telas com estado próprio
 
-function W11Loading({ areaNome, ritmoDias, onFim }: { areaNome: string; ritmoDias: number; onFim: () => void }) {
+function W11Loading({ areaNome, ritmoDias, promessaLinha, onFim }: { areaNome: string; ritmoDias: number; promessaLinha: string; onFim: () => void }) {
   const [pct, setPct] = useState(0);
   const fimRef = useRef(false);
   const etapas = [
     "Lendo suas respostas…",
     `Montando seu plano de ${areaNome}…`,
-    `Calibrando pro ritmo de ${ritmoDias} dias…`,
+    `Calibrando pra ${promessaLinha.toLowerCase()}…`,
+    `Ajustando pro ritmo de ${ritmoDias} dias…`,
     "Preparando seus 16 módulos…",
   ];
   useEffect(() => {
@@ -432,6 +536,25 @@ function W13Cadastro({ onOk, onEntrar }: { onOk: () => void; onEntrar: () => voi
         <button type="submit" className="fv3-cta" disabled={indo}>{indo ? "Salvando…" : "Salvar meu plano →"}</button>
         <button type="button" className="fv3-link" onClick={onEntrar}>Já tenho conta</button>
       </form>
+    </div>
+  );
+}
+
+/** Slider numérico grandão (o "peso alvo" do Cal AI): valor gigante em cima,
+ *  range embaixo — a pessoa VÊ o número dela virar o número do plano. */
+function NumSlider({ valor, onMudar, min, max, passo, fmt }: {
+  valor: number; onMudar: (v: number) => void; min: number; max: number; passo: number; fmt: (v: number) => string;
+}) {
+  return (
+    <div className="fv3-card" style={{ textAlign: "center" }}>
+      <div className="fv3-numgrande">{fmt(valor)}</div>
+      <input
+        type="range" className="fv3-range"
+        min={min} max={max} step={passo} value={valor}
+        onChange={(e) => onMudar(Number(e.target.value))}
+        aria-label="Escolher valor"
+      />
+      <div className="fv3-range-legendas"><span>{fmt(min)}</span><span>{fmt(max)}</span></div>
     </div>
   );
 }
@@ -532,6 +655,11 @@ const CSS_V3 = `
 .fv3-preco b { font-size: 32px; letter-spacing: -.02em; }
 .fv3-preco .fv3-mini { display: block; margin-top: 2px; }
 .fv3-modgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; border-top: 1px dashed #e2ded7; padding-top: 12px; font-size: 13.5px; font-weight: 600; }
+.fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
+.fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
+.fv3-range { width: 100%; accent-color: #111; height: 34px; }
+.fv3-range-legendas { display: flex; justify-content: space-between; font-size: 11.5px; color: #8a8378; }
+.fv3-ancora-pessoal { text-align: center; font-size: 15px; line-height: 1.55; background: #faf9f7; border: 1.5px dashed #d8d4cd; border-radius: 14px; padding: 12px 14px; margin: 14px 0 0; }
 .fv3-demo { position: fixed; inset: 0; z-index: 60; background: #fff; display: flex; flex-direction: column; }
 .fv3-demo-top { background: #111; color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-align: center; padding: 10px; }
 .fv3-demo iframe { flex: 1; width: 100%; border: 0; }

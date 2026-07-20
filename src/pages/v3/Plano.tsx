@@ -216,11 +216,11 @@ export default function PlanoV3() {
                 <div className="fv3-card">
                   <p className="fv3-mini">Sua organização</p>
                   <svg viewBox="0 0 300 130" className="fv3-grafico" aria-hidden>
-                    <path d="M10 30 C 70 20, 110 70, 150 95 S 250 115, 290 118" fill="none" stroke="#d0cbc4" strokeWidth="3" strokeDasharray="1 0" />
-                    <path d="M10 100 C 80 95, 140 55, 200 40 S 270 26, 290 24" fill="none" stroke="#111" strokeWidth="3.5" />
-                    <circle cx="290" cy="24" r="5" fill="#111" />
-                    <text x="180" y="105" fontSize="11" fill="#8a8378">motivação solta</text>
-                    <text x="205" y="20" fontSize="11.5" fontWeight="700" fill="#111">com o CORE</text>
+                    <path d="M10 30 C 70 20, 110 70, 150 95 S 250 115, 290 118" fill="none" stroke="#d0cbc4" strokeWidth="3" pathLength="1" className="fv3-desenha atras" />
+                    <path d="M10 100 C 80 95, 140 55, 200 40 S 270 26, 290 24" fill="none" stroke="#111" strokeWidth="3.5" pathLength="1" className="fv3-desenha frente" />
+                    <circle cx="290" cy="24" r="5" fill="#111" className="fv3-pop-tarde" />
+                    <text x="180" y="105" fontSize="11" fill="#8a8378" className="fv3-fade t1">motivação solta</text>
+                    <text x="205" y="20" fontSize="11.5" fontWeight="700" fill="#111" className="fv3-fade t2">com o CORE</text>
                     <text x="10" y="127" fontSize="10" fill="#8a8378">semana 1</text>
                     <text x="245" y="127" fontSize="10" fill="#8a8378">mês 6</text>
                   </svg>
@@ -235,10 +235,10 @@ export default function PlanoV3() {
                 <h2>O que mais pesa na sua vida hoje?</h2>
                 <p className="fv3-sub2">Seu plano começa por aqui.</p>
                 <div className="fv3-opcoes">
-                  {Object.entries({ dinheiro: "Meu dinheiro", rotina: "Minha rotina", corpo: "Treino e dieta", metas: "Metas e evolução pessoal", tudo: "Tudo, sinceramente" }).map(([k, label]) => (
-                    <button key={k} className={`fv3-op ${area === k ? "on" : ""}`} onClick={() => escolher("w3", "area", k, setArea)}>
+                  {Object.entries({ dinheiro: "Meu dinheiro", rotina: "Minha rotina", corpo: "Treino e dieta", metas: "Metas e evolução pessoal", tudo: "Tudo, sinceramente" }).map(([k, label], i) => (
+                    <motion.button key={k} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 + i * 0.06 }} className={`fv3-op ${area === k ? "on" : ""}`} onClick={() => escolher("w3", "area", k, setArea)}>
                       <span className="fv3-op-emoji">{AREAS_V3[k].emoji}</span> {label}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
@@ -249,8 +249,8 @@ export default function PlanoV3() {
                 <h2>Qual a sua faixa de idade?</h2>
                 <p className="fv3-sub2">Usamos isso pra calibrar o ritmo do seu plano.</p>
                 <div className="fv3-opcoes">
-                  {["18–24", "25–34", "35–44", "45+"].map((f) => (
-                    <button key={f} className={`fv3-op ${idade === f ? "on" : ""}`} onClick={() => escolher("w4", "idade", f, setIdade)}>{f}</button>
+                  {["18–24", "25–34", "35–44", "45+"].map((f, i) => (
+                    <motion.button key={f} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 + i * 0.06 }} className={`fv3-op ${idade === f ? "on" : ""}`} onClick={() => escolher("w4", "idade", f, setIdade)}>{f}</motion.button>
                   ))}
                 </div>
               </div>
@@ -261,8 +261,8 @@ export default function PlanoV3() {
                 <h2>O que te derrubou nas outras tentativas?</h2>
                 <p className="fv3-sub2">Sem julgamento — é aqui que o plano ataca primeiro.</p>
                 <div className="fv3-opcoes">
-                  {Object.entries({ constancia: "Falta de constância", tempo: "Falta de tempo", adiamento: "Ansiedade e adiamento", comeco: "Nunca soube por onde começar" }).map(([k, label]) => (
-                    <button key={k} className={`fv3-op ${obstaculo === k ? "on" : ""}`} onClick={() => escolher("w5", "obstaculo", k, setObstaculo)}>{label}</button>
+                  {Object.entries({ constancia: "Falta de constância", tempo: "Falta de tempo", adiamento: "Ansiedade e adiamento", comeco: "Nunca soube por onde começar" }).map(([k, label], i) => (
+                    <motion.button key={k} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 + i * 0.06 }} className={`fv3-op ${obstaculo === k ? "on" : ""}`} onClick={() => escolher("w5", "obstaculo", k, setObstaculo)}>{label}</motion.button>
                   ))}
                 </div>
               </div>
@@ -318,8 +318,8 @@ export default function PlanoV3() {
               <div>
                 <h2>Há quanto tempo você adia a meta mais importante?</h2>
                 <div className="fv3-opcoes">
-                  {["Uns 3 meses", "Uns 6 meses", "Mais de 1 ano", "Nem lembro mais"].map((o) => (
-                    <button key={o} className={`fv3-op ${adiada === o ? "on" : ""}`} onClick={() => { setAdiada(o); salvarEstado({ adiada: o }); track("funnel_v3_adiada", { valor: o }); setTimeout(avancar, 220); }}>{o}</button>
+                  {["Uns 3 meses", "Uns 6 meses", "Mais de 1 ano", "Nem lembro mais"].map((o, i) => (
+                    <motion.button key={o} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.08 + i * 0.06 }} className={`fv3-op ${adiada === o ? "on" : ""}`} onClick={() => { setAdiada(o); salvarEstado({ adiada: o }); track("funnel_v3_adiada", { valor: o }); setTimeout(avancar, 220); }}>{o}</motion.button>
                   ))}
                 </div>
               </div>
@@ -342,13 +342,13 @@ export default function PlanoV3() {
                       </button>
                     ))}
                   </div>
-                  <div className="fv3-datacaixa">
+                  <motion.div key={promessa.linha + ritmoDias} initial={{ opacity: 0.4, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: "spring", stiffness: 300, damping: 22 }} className="fv3-datacaixa">
                     <b>{promessa.linha}</b> até <b>{fmtData(dataAlvo)}</b>
                     <p className="fv3-mini" style={{ marginTop: 4 }}>{promessa.ano}</p>
                     <p className="fv3-mini" style={{ marginTop: 4 }}>
                       {ritmoDias === 14 ? "O ritmo equilibrado — ideal pra maioria." : ritmoDias === 7 ? "Pra quem quer virada rápida. Exige dedicação diária." : "Sem pressa, sem pressão. Constância acima de tudo."}
                     </p>
-                  </div>
+                  </motion.div>
                 </div>
                 <div className="fv3-rodape"><button className="fv3-cta" onClick={() => { track("funnel_v3_ritmo", { dias: ritmoDias }); avancar(); }}>Continuar</button></div>
               </div>
@@ -402,7 +402,7 @@ export default function PlanoV3() {
               <div>
                 <h2>Você não vai estar sozinho</h2>
                 <div className="fv3-card fv3-stats">
-                  <div><b>+500</b><span>feedbacks positivos</span></div>
+                  <div><b>+<Conta ate={500} dur={1100} /></b><span>feedbacks positivos</span></div>
                   <div><b>16</b><span>módulos inclusos</span></div>
                   <div><b>7 dias</b><span>de garantia total</span></div>
                 </div>
@@ -429,16 +429,20 @@ export default function PlanoV3() {
                 <h2>Seu plano tá pronto.</h2>
                 <div className="fv3-card">
                   <div className="fv3-scorelinha">
-                    <div className="fv3-scorebox"><span className="fv3-mini">Seu score hoje</span><b className="ruim">{scoreHoje}.0</b></div>
+                    <div className="fv3-scorebox"><span className="fv3-mini">Seu score hoje</span><b className="ruim"><Conta ate={scoreHoje} dec={1} dur={800} /></b></div>
                     <span className="fv3-seta" aria-hidden>→</span>
-                    <div className="fv3-scorebox"><span className="fv3-mini">até {fmtData(dataAlvo)}</span><b className="bom">8.5</b></div>
+                    <div className="fv3-scorebox"><span className="fv3-mini">até {fmtData(dataAlvo)}</span><b className="bom"><Conta ate={8.5} dec={1} dur={1400} /></b></div>
                   </div>
                   <ul className="fv3-plano">
-                    <li><b>Sua meta:</b> {promessa.linha} até {fmtData(dataAlvo)}</li>
-                    <li><b>Foco nº 1:</b> {info.foco} ({info.nome})</li>
-                    <li><b>Missão dos 7 dias:</b> {info.missao.toLowerCase()}</li>
-                    <li><b>Ritmo:</b> organizada em {ritmoDias} dias{cobra ? " · com lembretes diários" : ""}</li>
-                    <li><b>Reserva:</b> os outros 15 módulos te esperando</li>
+                    {[
+                      <><b>Sua meta:</b> {promessa.linha} até {fmtData(dataAlvo)}</>,
+                      <><b>Foco nº 1:</b> {info.foco} ({info.nome})</>,
+                      <><b>Missão dos 7 dias:</b> {info.missao.toLowerCase()}</>,
+                      <><b>Ritmo:</b> organizada em {ritmoDias} dias{cobra ? " · com lembretes diários" : ""}</>,
+                      <><b>Reserva:</b> os outros 15 módulos te esperando</>,
+                    ].map((li, i) => (
+                      <motion.li key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.14 }}>{li}</motion.li>
+                    ))}
                   </ul>
                 </div>
                 <div className="fv3-rodape"><button className="fv3-cta" onClick={avancar}>Salvar meu plano</button></div>
@@ -469,7 +473,9 @@ export default function PlanoV3() {
                     <span className="fv3-mini">pagamento único · vitalício</span>
                   </div>
                   <div className="fv3-modgrid">
-                    {MODULOS_16.map(([e, n]) => <span key={n}>{e} {n}</span>)}
+                    {MODULOS_16.map(([e, n], i) => (
+                      <motion.span key={n} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.04 }}>{e} {n}</motion.span>
+                    ))}
                   </div>
                   <p className="fv3-legenda" style={{ marginTop: 10 }}>
                     ✓ Sem mensalidade, nunca &nbsp;·&nbsp; ✓ Garantia de 7 dias &nbsp;·&nbsp; ✓ Atualizações inclusas
@@ -599,6 +605,23 @@ function W13Cadastro({ onOk, onEntrar }: { onOk: () => void; onEntrar: () => voi
   );
 }
 
+/** Número que CONTA até o alvo (easing cúbico) — vida nos scores e stats. */
+function Conta({ ate, dur = 900, dec = 0 }: { ate: number; dur?: number; dec?: number }) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / dur);
+      setV(ate * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ate, dur]);
+  return <>{v.toFixed(dec).replace(".", ",")}</>;
+}
+
 /** Slider numérico grandão (o "peso alvo" do Cal AI): valor gigante em cima,
  *  range embaixo — a pessoa VÊ o número dela virar o número do plano. */
 function NumSlider({ valor, onMudar, min, max, passo, fmt }: {
@@ -606,7 +629,7 @@ function NumSlider({ valor, onMudar, min, max, passo, fmt }: {
 }) {
   return (
     <div className="fv3-card" style={{ textAlign: "center" }}>
-      <div className="fv3-numgrande">{fmt(valor)}</div>
+      <motion.div key={valor} initial={{ scale: 0.92 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 24 }} className="fv3-numgrande">{fmt(valor)}</motion.div>
       <input
         type="range" className="fv3-range"
         min={min} max={max} step={passo} value={valor}
@@ -826,6 +849,16 @@ const CSS_V3 = `
   30% { opacity: 0; transform: scale(1); }
   100% { opacity: 0; }
 }
+.fv3-desenha { stroke-dasharray: 1; stroke-dashoffset: 1; animation: fv3draw 1.1s ease-out forwards; }
+.fv3-desenha.atras { animation-delay: .15s; }
+.fv3-desenha.frente { animation-delay: .6s; animation-duration: 1.25s; }
+@keyframes fv3draw { to { stroke-dashoffset: 0; } }
+.fv3-pop-tarde { opacity: 0; transform-origin: center; transform-box: fill-box; animation: fv3popin .45s cubic-bezier(.2,1.5,.4,1) 1.8s forwards; }
+@keyframes fv3popin { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: scale(1); } }
+.fv3-fade { opacity: 0; animation: fv3fadein .5s ease forwards; }
+.fv3-fade.t1 { animation-delay: .9s; }
+.fv3-fade.t2 { animation-delay: 1.7s; }
+@keyframes fv3fadein { to { opacity: 1; } }
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

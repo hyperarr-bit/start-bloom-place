@@ -4,6 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
+import shotFinancas from "@/assets/v3/demo-financas.jpg";
+import shotRotina from "@/assets/v3/demo-rotina.jpg";
+import shotDieta from "@/assets/v3/demo-dieta.jpg";
+import shotMetas from "@/assets/v3/demo-metas.jpg";
+
+// "vídeo" do mockup: capturas REAIS do app (uma por área) em crossfade — roda
+// em qualquer iPhone (WebM do gravador não toca no Safari) e pesa ~380KB
+const SHOTS = [shotFinancas, shotRotina, shotDieta, shotMetas];
 
 /**
  * FUNIL V3 — /plano (20/07). Reconstrução COMPLETA inspirada no Cal AI
@@ -159,13 +167,11 @@ export default function PlanoV3() {
             {step === "w1" && (
               <div className="fv3-center">
                 <div className="fv3-fone" aria-hidden>
+                  <div className="fv3-fone-notch" />
                   <div className="fv3-fone-tela">
-                    <div className="fv3-fone-head">Boa noite, você 👋</div>
-                    <div className="fv3-fone-score">7.8</div>
-                    <div className="fv3-fone-sub">Score do dia</div>
-                    <div className="fv3-fone-grid">
-                      {MODULOS_16.slice(0, 8).map(([e]) => <span key={e}>{e}</span>)}
-                    </div>
+                    {SHOTS.map((src, i) => (
+                      <img key={src} src={src} alt="" className="fv3-shot" style={{ animationDelay: `${i * 3}s` }} />
+                    ))}
                   </div>
                 </div>
                 <h1>Organize sua vida inteira.<br />Num app só.</h1>
@@ -655,6 +661,17 @@ const CSS_V3 = `
 .fv3-preco b { font-size: 32px; letter-spacing: -.02em; }
 .fv3-preco .fv3-mini { display: block; margin-top: 2px; }
 .fv3-modgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 10px; border-top: 1px dashed #e2ded7; padding-top: 12px; font-size: 13.5px; font-weight: 600; }
+.fv3-fone { position: relative; width: 208px; height: 424px; border: 9px solid #111; border-radius: 40px; overflow: hidden; box-shadow: 0 18px 50px rgba(0,0,0,.22); background: #111; }
+.fv3-fone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 86px; height: 22px; background: #111; border-radius: 0 0 14px 14px; z-index: 3; }
+.fv3-fone-tela { position: absolute; inset: 0; border-radius: 31px; overflow: hidden; background: #fff; }
+.fv3-shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; opacity: 0; animation: fv3loop 12s ease-in-out infinite; }
+@keyframes fv3loop {
+  0% { opacity: 0; transform: scale(1.04); }
+  4% { opacity: 1; }
+  25% { opacity: 1; transform: scale(1); }
+  30% { opacity: 0; transform: scale(1); }
+  100% { opacity: 0; }
+}
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

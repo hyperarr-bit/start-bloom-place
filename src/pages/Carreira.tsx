@@ -6,7 +6,8 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2, Briefcase } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ExternalLink, Edit2, X, Star, Clock, TrendingUp, Link2, Briefcase, BookMarked, ChevronLeft, ChevronRight } from "lucide-react";
+import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,9 @@ type JobApp = { id: string; company: string; role: string; link: string; status:
 type PortfolioItem = { id: string; title: string; description: string; link: string; category: string; date: string; highlight: boolean };
 type Contact = { id: string; name: string; company: string; role: string; linkedin: string; email: string; phone: string; notes: string; lastContact: string; category: string };
 type Skill = { id: string; name: string; category: string; level: number; targetLevel: number; notes: string };
+/** counts é por dia (localDayKey) — o fechamento do mês soma as chaves do mês. */
+type WorkPhase = { id: string; nome: string; memo: string; counts: Record<string, number> };
+type WorkTask = { id: string; texto: string; feito: boolean; dia: string };
 
 const statusConfig: Record<string, { label: string; emoji: string; color: string }> = {
   aplicado: { label: "Aplicado", emoji: "📤", color: "bg-blue-100 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/20" },
@@ -546,13 +550,187 @@ const InterviewPrep = () => {
   );
 };
 
+// ============= MEU DIA (trabalho do dia a dia) =============
+/** As fases são do USUÁRIO, não nossas: ele renomeia, cria e apaga. Os nomes
+ *  que vêm de fábrica são só um ponto de partida — quem vende renomeia pra
+ *  "chamar cliente novo", quem é dev renomeia pra "code review", e o contador
+ *  de cada fase é o mesmo risquinho que a pessoa faria numa folha. */
+const FASES_PADRAO: WorkPhase[] = [
+  { id: "f1", nome: "Prospecção", memo: "", counts: {} },
+  { id: "f2", nome: "Follow-up", memo: "", counts: {} },
+  { id: "f3", nome: "Entregas", memo: "", counts: {} },
+];
+
+const WorkDay = () => {
+  const [phases, setPhases] = usePersistedState<WorkPhase[]>("career-day-phases", FASES_PADRAO);
+  const [tasks, setTasks] = usePersistedState<WorkTask[]>("career-day-tasks", []);
+  const [novaFase, setNovaFase] = useState("");
+  const [novaTarefa, setNovaTarefa] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [memoAberto, setMemoAberto] = useState<string | null>(null);
+  const [mesOffset, setMesOffset] = useState(0);
+
+  const hoje = localDayKey();
+  const tarefasHoje = tasks.filter(t => t.dia === hoje);
+  const feitasHoje = tarefasHoje.filter(t => t.feito).length;
+
+  const contar = (id: string, delta: number) => setPhases(prev => prev.map(f => {
+    if (f.id !== id) return f;
+    const atual = f.counts[hoje] ?? 0;
+    return { ...f, counts: { ...f.counts, [hoje]: Math.max(0, atual + delta) } };
+  }));
+
+  const addFase = () => {
+    if (!novaFase.trim()) return;
+    setPhases(prev => [...prev, { id: genId(), nome: novaFase.trim(), memo: "", counts: {} }]);
+    setNovaFase("");
+  };
+
+  const addTarefa = () => {
+    if (!novaTarefa.trim()) return;
+    setTasks(prev => [...prev, { id: genId(), texto: novaTarefa.trim(), feito: false, dia: hoje }]);
+    setNovaTarefa("");
+  };
+
+  // Fechamento do mês: soma os contadores de cada fase no mês escolhido.
+  const refMes = new Date();
+  refMes.setDate(1);
+  refMes.setMonth(refMes.getMonth() + mesOffset);
+  const prefixoMes = `${refMes.getFullYear()}-${String(refMes.getMonth() + 1).padStart(2, "0")}`;
+  const totalDaFase = (f: WorkPhase) => Object.entries(f.counts)
+    .filter(([dia]) => dia.startsWith(prefixoMes))
+    .reduce((s, [, n]) => s + n, 0);
+  const tarefasDoMes = tasks.filter(t => t.dia.startsWith(prefixoMes) && t.feito).length;
+  const nomeMes = refMes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  return (
+    <div className="space-y-4">
+      <PomodoroTimer />
+
+      {/* Fases do dia */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-teal-200 dark:bg-teal-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">🔁 FASES DE HOJE</span>
+          <span className="text-[9px] text-muted-foreground">toque no lápis pra renomear</span>
+        </div>
+        <div className="bg-teal-50 dark:bg-teal-950/20 p-3 space-y-2">
+          {phases.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              Crie as fases do seu dia — cada uma vira um contador.
+            </p>
+          )}
+          {phases.map(f => (
+            <div key={f.id} className="rounded-lg border border-border bg-card p-2.5 space-y-2">
+              <div className="flex items-center gap-2">
+                {editId === f.id ? (
+                  <Input autoFocus value={f.nome} className="h-8 text-sm"
+                    onChange={e => setPhases(prev => prev.map(p => p.id === f.id ? { ...p, nome: e.target.value } : p))}
+                    onBlur={() => setEditId(null)}
+                    onKeyDown={e => e.key === "Enter" && setEditId(null)} />
+                ) : (
+                  <span className="flex-1 text-sm font-medium truncate">{f.nome}</span>
+                )}
+                <button onClick={() => setEditId(f.id)} className="text-muted-foreground hover:text-foreground p-1" aria-label="Renomear fase">
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setMemoAberto(memoAberto === f.id ? null : f.id)}
+                  className={`p-1 ${f.memo ? "text-amber-500" : "text-muted-foreground hover:text-foreground"}`} aria-label="Memorando">
+                  <BookMarked className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setPhases(prev => prev.filter(p => p.id !== f.id))}
+                  className="text-muted-foreground hover:text-destructive p-1" aria-label="Apagar fase">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex items-center justify-center gap-4">
+                <Button size="icon" variant="outline" className="h-9 w-9 rounded-full text-lg" onClick={() => contar(f.id, -1)}>−</Button>
+                <span className="text-2xl font-black tabular-nums w-12 text-center">{f.counts[hoje] ?? 0}</span>
+                <Button size="icon" variant="outline" className="h-9 w-9 rounded-full text-lg" onClick={() => contar(f.id, 1)}>+</Button>
+              </div>
+              {memoAberto === f.id && (
+                <Textarea placeholder="Memorando — dúvidas, combinados, o que ficou pendente..."
+                  value={f.memo} className="text-xs min-h-[60px]"
+                  onChange={e => setPhases(prev => prev.map(p => p.id === f.id ? { ...p, memo: e.target.value } : p))} />
+              )}
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <Input placeholder="Nova fase..." value={novaFase} onChange={e => setNovaFase(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addFase()} className="h-8 text-xs" />
+            <Button size="sm" className="h-8" onClick={addFase}><Plus className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Tarefas de hoje */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-sky-200 dark:bg-sky-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">✅ TAREFAS DE HOJE</span>
+          <span className="text-[9px] text-muted-foreground">{feitasHoje}/{tarefasHoje.length}</span>
+        </div>
+        <div className="bg-sky-50 dark:bg-sky-950/20 p-3 space-y-1.5">
+          {tarefasHoje.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-3">Nenhuma tarefa hoje ainda.</p>
+          )}
+          {tarefasHoje.map(t => (
+            <div key={t.id} className="flex items-center gap-2 rounded-lg bg-card border border-border px-2.5 py-2">
+              <Checkbox checked={t.feito}
+                onCheckedChange={v => setTasks(prev => prev.map(x => x.id === t.id ? { ...x, feito: !!v } : x))} />
+              <span className={`flex-1 text-sm ${t.feito ? "line-through text-muted-foreground" : ""}`}>{t.texto}</span>
+              <button onClick={() => setTasks(prev => prev.filter(x => x.id !== t.id))}
+                className="text-muted-foreground hover:text-destructive" aria-label="Apagar tarefa">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex gap-2 pt-1">
+            <Input placeholder="Nova tarefa do trabalho..." value={novaTarefa} onChange={e => setNovaTarefa(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && addTarefa()} className="h-8 text-xs" />
+            <Button size="sm" className="h-8" onClick={addTarefa}><Plus className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fechamento do mês */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-violet-200 dark:bg-violet-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📊 FECHAMENTO DO MÊS</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setMesOffset(m => m - 1)} className="p-0.5 hover:bg-background/50 rounded" aria-label="Mês anterior">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[9px] font-medium capitalize min-w-[76px] text-center">{nomeMes}</span>
+            <button onClick={() => setMesOffset(m => Math.min(0, m + 1))} disabled={mesOffset >= 0}
+              className="p-0.5 hover:bg-background/50 rounded disabled:opacity-30" aria-label="Próximo mês">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="bg-violet-50 dark:bg-violet-950/20 p-3 space-y-1.5">
+          {phases.map(f => (
+            <div key={f.id} className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+              <span className="text-xs truncate">{f.nome}</span>
+              <span className="text-sm font-bold tabular-nums">{totalDaFase(f)}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+            <span className="text-xs text-muted-foreground">Tarefas concluídas</span>
+            <span className="text-sm font-bold tabular-nums">{tarefasDoMes}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ============= MAIN =============
 const Carreira = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
-  const [activeTab, setActiveTab] = useState("jobs");
+  // Abre no MEU DIA: buscar vaga é episódico, o dia a dia do trabalho é diário.
+  const [activeTab, setActiveTab] = useState("dia");
   useScrollActiveTabIntoView(activeTab);
 
   const handleTabChange = (tabId: string) => {
@@ -561,6 +739,7 @@ const Carreira = () => {
   };
 
   const careerTabs = [
+    { id: "dia", label: "Meu Dia", icon: "🗓️" },
     { id: "jobs", label: "Vagas", icon: "💼" },
     { id: "portfolio", label: "Portfolio", icon: "🏆" },
     { id: "network", label: "Rede", icon: "👥" },
@@ -616,6 +795,7 @@ const Carreira = () => {
           ]}
         />
 
+        {activeTab === "dia" && <WorkDay />}
         {activeTab === "jobs" && <JobTracker />}
         {activeTab === "portfolio" && <Portfolio />}
         {activeTab === "network" && <Networking />}

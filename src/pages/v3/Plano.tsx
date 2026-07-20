@@ -4,15 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
-import shotFinancas from "@/assets/v3/demo-financas.jpg";
-import shotRotina from "@/assets/v3/demo-rotina.jpg";
-import shotDieta from "@/assets/v3/demo-dieta.jpg";
-import shotMetas from "@/assets/v3/demo-metas.jpg";
-
-// "vídeo" do mockup: capturas REAIS do app (uma por área) em crossfade — roda
-// em qualquer iPhone (WebM do gravador não toca no Safari) e pesa ~380KB
-const SHOTS = [shotFinancas, shotRotina, shotDieta, shotMetas];
-
 /**
  * FUNIL V3 — /plano (20/07). Reconstrução COMPLETA inspirada no Cal AI
  * (vídeo dissecado tela a tela): identidade clínica preto-e-branco, zero
@@ -195,13 +186,15 @@ export default function PlanoV3() {
 
             {step === "w1" && (
               <div className="fv3-center">
-                <div className="fv3-fone" aria-hidden>
-                  <div className="fv3-fone-notch" />
-                  <div className="fv3-fone-tela">
-                    {SHOTS.map((src, i) => (
-                      <img key={src} src={src} alt="" className="fv3-shot" style={{ animationDelay: `${i * 3}s` }} />
-                    ))}
-                  </div>
+                <div className="fv3-hero-video" aria-hidden>
+                  {/* vídeo do dono (hub real no iPhone). LOOP nos primeiros 14s:
+                      o arquivo tem 149s/23MB — limitar o trecho faz o navegador
+                      baixar só o começo. Corte inferior esconde a marca d'água. */}
+                  <video
+                    src="/v3-hero.mp4" poster="/v3-hero-poster.jpg"
+                    autoPlay muted loop playsInline preload="metadata"
+                    onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime > 14) v.currentTime = 0.05; }}
+                  />
                 </div>
                 <h1>Organize sua vida inteira.<br />Num app só.</h1>
                 <p className="fv3-sub">16 módulos. Um método. Resultados que ficam.</p>
@@ -416,7 +409,7 @@ export default function PlanoV3() {
                 </div>
                 <div className="fv3-quote">
                   <p>“Perfeito — no geral eu achei ele excelente, parabéns pelo app.”</p>
-                  <span>— @nandobonfacine</span>
+                  <span>— @nandobonfacine · Instagram</span>
                 </div>
                 <div className="fv3-rodape"><button className="fv3-cta" onClick={avancar}>Continuar</button></div>
               </div>
@@ -859,6 +852,8 @@ const CSS_V3 = `
 .fv3-fade.t1 { animation-delay: .9s; }
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
+.fv3-hero-video { width: 224px; height: 408px; overflow: hidden; border-radius: 30px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+.fv3-hero-video video { width: 100%; height: 107%; object-fit: cover; object-position: top center; display: block; }
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

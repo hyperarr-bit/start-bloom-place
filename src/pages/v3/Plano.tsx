@@ -402,17 +402,21 @@ export default function PlanoV3() {
               <div>
                 <h2>Você não vai estar sozinho</h2>
                 <div className="fv3-card fv3-stats">
-                  <div><b>+270</b><span>acessos vitalícios ativos</span></div>
+                  <div><b>+500</b><span>feedbacks positivos</span></div>
                   <div><b>16</b><span>módulos inclusos</span></div>
                   <div><b>7 dias</b><span>de garantia total</span></div>
                 </div>
                 <div className="fv3-quote">
-                  <p>“No geral, eu achei o app excelente.”</p>
-                  <span>— cliente CORE, via suporte</span>
+                  <p>“Adorei demais o aplicativo!! Estou usando há 1 dia e já está me ajudando bastante.”</p>
+                  <span>— @requeijohn · Instagram</span>
                 </div>
                 <div className="fv3-quote">
-                  <p>“Paguei uma vez e uso todo dia. Sem mensalidade é outra paz.”</p>
-                  <span>— acesso vitalício desde julho</span>
+                  <p>“Esse app é exatamente o que estou procurando a muito tempo.”</p>
+                  <span>— @bruupalavro · Instagram</span>
+                </div>
+                <div className="fv3-quote">
+                  <p>“Perfeito — no geral eu achei ele excelente, parabéns pelo app.”</p>
+                  <span>— @nandobonfacine</span>
                 </div>
                 <div className="fv3-rodape"><button className="fv3-cta" onClick={avancar}>Continuar</button></div>
               </div>

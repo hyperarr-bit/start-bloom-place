@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import { PixCheckout } from "@/components/paywall/PixCheckout";
+import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import shotFinancas from "@/assets/v3/demo-financas.jpg";
 import shotRotina from "@/assets/v3/demo-rotina.jpg";
 import shotDieta from "@/assets/v3/demo-dieta.jpg";
@@ -72,7 +72,7 @@ const fmtData = (d: Date) => d.toLocaleDateString("pt-BR", { day: "numeric", mon
 
 export default function PlanoV3() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isSubscribed } = useAuth();
   const [step, setStep] = useState<Wid>(() => (lerEstado().step as Wid) ?? "w1");
   const [area, setArea] = useState<string>(() => (lerEstado().area as string) ?? "");
   const [idade, setIdade] = useState<string>("");
@@ -81,6 +81,17 @@ export default function PlanoV3() {
   const [cobra, setCobra] = useState<boolean | null>(null);
   const [demoAberta, setDemoAberta] = useState(false);
   const [pixAberto, setPixAberto] = useState(false);
+  const [pixOffer, setPixOffer] = useState<PixOffer>("lifetime");
+  // DOWNSELL-ROLETA (estilo Cal AI, 20/07): só em rotas de FUGA do paywall
+  // (fechou pix / voltar / 40s parado), 1× por sessão, nunca pra assinante.
+  const [roletaAberta, setRoletaAberta] = useState(false);
+  const roletaVista = () => { try { return sessionStorage.getItem("fv3-ds-visto") === "1"; } catch { return false; } };
+  const abrirRoleta = useCallback((origem: string) => {
+    if (roletaVista() || isSubscribed) return;
+    try { sessionStorage.setItem("fv3-ds-visto", "1"); } catch { /* noop */ }
+    track("funnel_v3_wheel_view", { origem });
+    setRoletaAberta(true);
+  }, [isSubscribed]);
 
   // OS NÚMEROS da pessoa — alimentam w6 (revelação), w11 (loading), w12
   // (plano) e w15 (âncora do paywall contra o próprio vazamento declarado)
@@ -147,6 +158,24 @@ export default function PlanoV3() {
   useEffect(() => {
     if (step === "w13" && user) irPara("w14");
   }, [step, user, irPara]);
+
+  // gatilhos de fuga do paywall: voltar do celular (popstate) + 40s parado
+  useEffect(() => {
+    if (step !== "w15") return;
+    try { history.pushState({ fv3: 1 }, ""); } catch { /* noop */ }
+    const onPop = () => abrirRoleta("voltar");
+    window.addEventListener("popstate", onPop);
+    let idle: ReturnType<typeof setTimeout>;
+    const arm = () => { clearTimeout(idle); idle = setTimeout(() => abrirRoleta("inatividade"), 40_000); };
+    const evs = ["pointerdown", "scroll", "keydown", "touchstart"];
+    evs.forEach((e) => window.addEventListener(e, arm, { passive: true }));
+    arm();
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      evs.forEach((e) => window.removeEventListener(e, arm));
+      clearTimeout(idle);
+    };
+  }, [step, abrirRoleta]);
 
   return (
     <div className="fv3">
@@ -451,7 +480,7 @@ export default function PlanoV3() {
                   <p className="fv3-ancora-pessoal">Seu plano: <b>{promessa.linha}</b> até <b>{fmtData(dataAlvo)}</b>.</p>
                 )}
                 <div className="fv3-rodape">
-                  <button className="fv3-cta" onClick={() => { track("funnel_v3_checkout_click"); setPixAberto(true); }}>
+                  <button className="fv3-cta" onClick={() => { track("funnel_v3_checkout_click"); setPixOffer("lifetime"); setPixAberto(true); }}>
                     Garantir meu acesso vitalício →
                   </button>
                   <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pix na hora · acesso libera nesta tela</p>
@@ -469,7 +498,27 @@ export default function PlanoV3() {
       )}
 
       {pixAberto && (
-        <PixCheckout offer="lifetime" context="funnel" onClose={() => setPixAberto(false)} />
+        <PixCheckout
+          offer={pixOffer}
+          context="funnel"
+          onClose={() => {
+            setPixAberto(false);
+            // fechou o Pix do preço cheio sem pagar → a rota de fuga mais quente
+            if (pixOffer === "lifetime") abrirRoleta("fechou_pix");
+          }}
+        />
+      )}
+
+      {roletaAberta && (
+        <RoletaDownsell
+          onAceitar={() => {
+            track("funnel_v3_wheel_accept");
+            setRoletaAberta(false);
+            setPixOffer("downsell");
+            setPixAberto(true);
+          }}
+          onFechar={(fase) => { track("funnel_v3_wheel_dismiss", { fase }); setRoletaAberta(false); }}
+        />
       )}
     </div>
   );
@@ -561,6 +610,107 @@ function NumSlider({ valor, onMudar, min, max, passo, fmt }: {
         aria-label="Escolher valor"
       />
       <div className="fv3-range-legendas"><span>{fmt(min)}</span><span>{fmt(max)}</span></div>
+    </div>
+  );
+}
+
+/**
+ * DOWNSELL-ROLETA estilo Cal AI: roda dourada/magenta que SEMPRE cai no 46%
+ * — porque 27,90→14,90 É 46% de desconto real (nada de 80% fake). Depois, a
+ * tela "Sua oferta única" com card grafite + sparkles. Prêmio já aplicado:
+ * zero digitação, 1 toque pro Pix (regra da casa: resgate sem fricção).
+ */
+const FATIAS: Array<{ rotulo: string; cor: string; texto: string }> = [
+  { rotulo: "Sem sorte", cor: "#ffffff", texto: "#8a8378" },
+  { rotulo: "25%", cor: "#d22d82", texto: "#ffffff" },
+  { rotulo: "🎁", cor: "#211d18", texto: "#ffffff" },
+  { rotulo: "46%", cor: "#d4a437", texto: "#ffffff" },
+  { rotulo: "10%", cor: "#ffffff", texto: "#8a8378" },
+  { rotulo: "30%", cor: "#ef7fb6", texto: "#ffffff" },
+];
+// centro da fatia "46%" (i=3): -90 + 3*60 + 30 = 120°; ponteiro fica a 0°
+// (3h) → giro final = 5 voltas + (360-120) = 2040°
+const GIRO_FINAL = 5 * 360 + 240;
+
+function fatiaPath(i: number, r: number) {
+  const rad = (a: number) => (a * Math.PI) / 180;
+  const a0 = (i * 60) - 90;
+  const a1 = ((i + 1) * 60) - 90;
+  const x0 = 150 + r * Math.cos(rad(a0)), y0 = 150 + r * Math.sin(rad(a0));
+  const x1 = 150 + r * Math.cos(rad(a1)), y1 = 150 + r * Math.sin(rad(a1));
+  return `M150 150 L${x0.toFixed(1)} ${y0.toFixed(1)} A${r} ${r} 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)} Z`;
+}
+
+function RoletaDownsell({ onAceitar, onFechar }: { onAceitar: () => void; onFechar: (fase: string) => void }) {
+  const [fase, setFase] = useState<"roda" | "premio">("roda");
+  const [girando, setGirando] = useState(false);
+  const [rot, setRot] = useState(0);
+
+  const girar = () => {
+    if (girando) return;
+    setGirando(true);
+    track("funnel_v3_wheel_spin");
+    setRot(GIRO_FINAL);
+    setTimeout(() => { track("funnel_v3_wheel_offer_view"); setFase("premio"); }, 4200);
+  };
+
+  return (
+    <div className="fv3-roleta-overlay">
+      <button className="fv3-roleta-x" aria-label="Fechar" onClick={() => onFechar(fase)}>✕</button>
+
+      {fase === "roda" && (
+        <div className="fv3-roleta-wrap">
+          <h2 style={{ textAlign: "center" }}>Antes de ir —<br />você ganhou um giro.</h2>
+          <p className="fv3-sub" style={{ marginTop: 4 }}>Uma condição exclusiva, só desta vez.</p>
+          <div className="fv3-roda-area">
+            <svg viewBox="0 0 300 300" className="fv3-roda" style={{ transform: `rotate(${rot}deg)` }}>
+              <circle cx="150" cy="150" r="148" fill="#d4a437" />
+              <circle cx="150" cy="150" r="138" fill="#fff" />
+              {FATIAS.map((f, i) => <path key={i} d={fatiaPath(i, 136)} fill={f.cor} stroke="#f0ede8" strokeWidth="1" />)}
+              {FATIAS.map((f, i) => {
+                const ang = (i * 60) - 90 + 30;
+                const rad = (ang * Math.PI) / 180;
+                const x = 150 + 92 * Math.cos(rad), y = 150 + 92 * Math.sin(rad);
+                return (
+                  <text key={i} x={x} y={y} fill={f.texto} fontSize="17" fontWeight="800"
+                    textAnchor="middle" dominantBaseline="middle"
+                    transform={`rotate(${ang + 90} ${x} ${y})`}>{f.rotulo}</text>
+                );
+              })}
+              <circle cx="150" cy="150" r="26" fill="#211d18" />
+              <text x="150" y="151" fontSize="18" textAnchor="middle" dominantBaseline="middle">🧭</text>
+            </svg>
+            <div className="fv3-ponteiro" aria-hidden>◀</div>
+          </div>
+          <button className="fv3-cta" onClick={girar} disabled={girando} style={{ maxWidth: 320 }}>
+            {girando ? "Girando…" : "Girar a roleta"}
+          </button>
+        </div>
+      )}
+
+      {fase === "premio" && (
+        <div className="fv3-roleta-wrap">
+          <h2 style={{ textAlign: "center" }}>Sua oferta única</h2>
+          <div className="fv3-premio-card">
+            <span className="fv3-sparkle s1">✦</span>
+            <span className="fv3-sparkle s2">✦</span>
+            <span className="fv3-sparkle s3">✦</span>
+            <div className="fv3-premio-off">46% OFF</div>
+            <div className="fv3-premio-sub">PRA SEMPRE — acesso vitalício</div>
+          </div>
+          <div className="fv3-premio-preco">
+            <span className="fv3-anchor">R$ 27,90</span>
+            <b>R$ 14,90</b>
+            <span className="fv3-mini">pagamento único</span>
+          </div>
+          <p className="fv3-mini" style={{ textAlign: "center", marginTop: 10 }}>
+            Fechou essa tela, ela não volta. Mesma garantia de 7 dias.
+          </p>
+          <button className="fv3-cta" onClick={onAceitar} style={{ maxWidth: 320 }}>
+            Garantir por R$ 14,90 →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -677,6 +827,23 @@ const CSS_V3 = `
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }
 .fv3-range-legendas { display: flex; justify-content: space-between; font-size: 11.5px; color: #8a8378; }
 .fv3-ancora-pessoal { text-align: center; font-size: 15px; line-height: 1.55; background: #faf9f7; border: 1.5px dashed #d8d4cd; border-radius: 14px; padding: 12px 14px; margin: 14px 0 0; }
+.fv3-roleta-overlay { position: fixed; inset: 0; z-index: 70; background: #fff; display: flex; align-items: center; justify-content: center; padding: 24px; overflow-y: auto; }
+.fv3-roleta-x { position: fixed; top: 14px; right: 14px; z-index: 5; width: 36px; height: 36px; border: 0; border-radius: 999px; background: rgba(0,0,0,.06); color: #6f695f; font-size: 16px; cursor: pointer; }
+.fv3-roleta-wrap { width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; }
+.fv3-roda-area { position: relative; width: min(300px, 78vw); margin: 22px 0 6px; }
+.fv3-roda { width: 100%; height: auto; transition: transform 4s cubic-bezier(.12,.82,.16,1); filter: drop-shadow(0 14px 30px rgba(0,0,0,.18)); }
+.fv3-ponteiro { position: absolute; right: -14px; top: 50%; transform: translateY(-50%); font-size: 30px; color: #d4a437; text-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.fv3-premio-card { position: relative; width: 100%; margin-top: 18px; background: linear-gradient(145deg, #37302a 0%, #17140f 70%); border-radius: 22px; padding: 34px 20px; text-align: center; color: #fff; box-shadow: 0 18px 44px rgba(0,0,0,.28); }
+.fv3-premio-off { font-size: 40px; font-weight: 800; letter-spacing: -.02em; }
+.fv3-premio-sub { font-size: 13px; font-weight: 700; letter-spacing: .08em; color: #d4a437; margin-top: 6px; }
+.fv3-sparkle { position: absolute; color: #fff; opacity: .9; animation: fv3sp 1.6s ease-in-out infinite; }
+.fv3-sparkle.s1 { top: 12px; left: 18px; font-size: 20px; }
+.fv3-sparkle.s2 { bottom: 14px; right: 22px; font-size: 26px; animation-delay: .4s; }
+.fv3-sparkle.s3 { top: 20px; right: 52px; font-size: 13px; animation-delay: .9s; }
+@keyframes fv3sp { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.fv3-premio-preco { text-align: center; margin-top: 16px; }
+.fv3-premio-preco b { font-size: 34px; letter-spacing: -.02em; display: inline-block; margin: 0 6px; }
+.fv3-premio-preco .fv3-mini { display: block; margin-top: 2px; }
 .fv3-demo { position: fixed; inset: 0; z-index: 60; background: #fff; display: flex; flex-direction: column; }
 .fv3-demo-top { background: #111; color: #fff; font-size: 12.5px; font-weight: 700; letter-spacing: .04em; text-align: center; padding: 10px; }
 .fv3-demo iframe { flex: 1; width: 100%; border: 0; }

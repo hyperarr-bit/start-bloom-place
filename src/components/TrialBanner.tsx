@@ -33,6 +33,8 @@ export const TrialBanner = () => {
     // paywall por cima delas quebra o propósito da página.
     location.pathname.startsWith("/entrar") ||
     location.pathname.startsWith("/acesso") ||
+    // /plano é o funil v3 (20/07) — paywall próprio, mesma regra do /comecar
+    location.pathname.startsWith("/plano") ||
     location.pathname.startsWith("/preview");
 
   const tutorialDone = loaded && get<string>("spotlight-done-financas", "") === "true";

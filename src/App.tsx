@@ -102,6 +102,7 @@ const Conquistas = lazy(() => import("./pages/Conquistas"));
 const Preview = lazy(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
+const PlanoV3 = lazy(() => import("./pages/v3/Plano"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazy(() => import("./pages/BemVindo"));
 
@@ -128,6 +129,7 @@ const AnimatedRoutes = () => {
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
         <Route path="/comecar-v2" element={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />
+        <Route path="/plano" element={<PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition>} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />

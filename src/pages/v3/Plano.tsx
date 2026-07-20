@@ -196,7 +196,7 @@ export default function PlanoV3() {
                     onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime > 14) v.currentTime = 0.05; }}
                   />
                 </div>
-                <h1>Organize sua vida inteira.<br />Num app só.</h1>
+                <h1>Organize sua vida em um só lugar.</h1>
                 <p className="fv3-sub">16 módulos. Um método. Resultados que ficam.</p>
                 <button className="fv3-cta" onClick={avancar}>Começar</button>
                 <button className="fv3-link" onClick={() => navigate("/entrar")}>Já tenho conta? <b>Entrar</b></button>
@@ -852,8 +852,8 @@ const CSS_V3 = `
 .fv3-fade.t1 { animation-delay: .9s; }
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
-.fv3-hero-video { width: 246px; height: 430px; overflow: hidden; }
-.fv3-hero-video video { width: 100%; height: 107%; object-fit: cover; object-position: top center; display: block; }
+.fv3-hero-video { height: min(46dvh, 440px); aspect-ratio: 1030 / 1930; overflow: hidden; }
+.fv3-hero-video video { width: 100%; height: auto; display: block; }
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

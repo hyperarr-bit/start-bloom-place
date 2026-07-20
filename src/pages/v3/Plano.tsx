@@ -852,7 +852,7 @@ const CSS_V3 = `
 .fv3-fade.t1 { animation-delay: .9s; }
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
-.fv3-hero-video { width: 224px; height: 408px; overflow: hidden; border-radius: 30px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+.fv3-hero-video { width: 246px; height: 430px; overflow: hidden; }
 .fv3-hero-video video { width: 100%; height: 107%; object-fit: cover; object-position: top center; display: block; }
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }

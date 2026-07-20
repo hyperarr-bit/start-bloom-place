@@ -2,7 +2,7 @@
   "name": "Core — Organize sua vida",
   "short_name": "Core",
   "description": "Seu hub pessoal de organização de vida",
-  "start_url": "/",
+  "start_url": "/?fonte=pwa",
   "display": "browser",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",

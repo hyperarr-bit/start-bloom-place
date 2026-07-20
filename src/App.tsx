@@ -35,10 +35,28 @@ captureLeadSource();
  *  Bônus: o "voltar" dos 15 módulos é navigate("/") — passa por aqui, então
  *  voltar de qualquer módulo agora leva à Home (era Finanças, loop torto). */
 const AREA_LANDED_KEY = "core-area-landed";
+const PWA_KEY = "core-pwa";
+
+/** Ícone na tela inicial = app instalado, não anúncio: quem abre por ali já
+ *  comprou (ou vai logar), então deslogado vai pro LOGIN e não pro funil de
+ *  venda. O manifest carrega ?fonte=pwa no start_url; guardamos a marca porque
+ *  o param só existe no lançamento, e navegações internas voltam sem ele. */
+const ehPwa = () => {
+  try {
+    if (new URLSearchParams(window.location.search).get("fonte") === "pwa") {
+      localStorage.setItem(PWA_KEY, "true");
+      return true;
+    }
+    if (localStorage.getItem(PWA_KEY) === "true") return true;
+  } catch { /* noop */ }
+  return window.matchMedia?.("(display-mode: standalone)").matches === true
+    || (window.navigator as { standalone?: boolean }).standalone === true;
+};
+
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/comecar" replace />;
+  if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
 
   const area = getFunnelArea();
   let landed = true;

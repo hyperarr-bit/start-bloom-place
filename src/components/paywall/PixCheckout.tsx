@@ -44,19 +44,16 @@ interface Props {
 // com o form nome+CPF; só o cano por baixo troca. Quando a Cakto reativar:
 // troca pra "cakto" (1 linha) e pusha — NÃO é rollback na Vercel (desfaria
 // downsell/atribuição/AbacatePay juntos).
-/* GATEWAY do Pix (21/07, ordem do dono): PAGAR.ME em 100%. A AbacatePay sai
- * de cena — o código dela fica intacto atrás desta constante, então voltar é
- * 1 linha ("abacate") + push, sem rollback de deploy.
+/* GATEWAY do Pix (21/07, ordem do dono): ASAAS em 100%, substitui a Pagar.me.
+ * O código dos outros gateways fica intacto atrás desta constante — trocar é
+ * 1 linha + push, sem rollback de deploy.
  *
- * CUSTO CONHECIDO da troca, medido ao vivo na API deles: a Pagar.me PSP EXIGE
- * document (CPF) e phone — sem eles a cobrança nasce "failed". Isso ressuscita
- * o formulário que matamos em 19/07 e que custava ~47% de quem abria o
- * checkout. Mitigações aplicadas aqui: (1) form de UM campo só — o nome sai
- * do cadastro/servidor; (2) foco automático no CPF (teclado numérico abre
- * sozinho); (3) quem já tem tax_id no perfil NUNCA vê o form. O telefone vai
- * coringa no servidor, como nos outros gateways.
+ * POR QUE O ASAAS RESOLVE A DOR DA PAGAR.ME: testado ao vivo na API deles, o
+ * Pix via QR CODE ESTÁTICO NÃO pede CPF (o dinâmico pediria, como a Pagar.me).
+ * Então volta o checkout SEM FORMULÁRIO — igual à AbacatePay — e a fricção do
+ * CPF que custava ~47% (19/07) some de novo. Bônus: expira em 30min exatos.
  */
-const PIX_GATEWAY: "pagarme" | "abacate" | "cakto" = "pagarme";
+const PIX_GATEWAY: "asaas" | "pagarme" | "abacate" | "cakto" = "asaas";
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
 // já veio do cadastro — o form matava ~47% de quem abria o checkout (127
@@ -116,8 +113,9 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const braco = PIX_GATEWAY;
-  // Só a AbacatePay dispensa CPF; Pagar.me e Cakto exigem, então o form volta.
-  const SEM_FORM = braco === "abacate";
+  // Asaas (QR estático) e AbacatePay dispensam CPF → sem formulário.
+  // Pagar.me e Cakto exigem, então o form volta pra esses.
+  const SEM_FORM = braco === "asaas" || braco === "abacate";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -158,9 +156,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     const t0 = Date.now();
     try {
       let data: any, error: any;
-      if (braco === "pagarme") {
-        // Pagar.me (braço B): MESMO contrato de resposta; exige CPF —
-        // devolve {error:"cpf_required"} e o handler abaixo reabre o form.
+      if (braco === "asaas") {
+        // Asaas (QR estático): sem CPF, contrato de resposta idêntico.
+        ({ data, error } = await supabase.functions.invoke("asaas-pix", {
+          body: { action: "create", offer },
+        }));
+      } else if (braco === "pagarme") {
+        // Pagar.me: MESMO contrato; exige CPF — devolve {error:"cpf_required"}
+        // e o handler abaixo reabre o form.
         ({ data, error } = await supabase.functions.invoke("pagarme-pix", {
           body: {
             action: "create",
@@ -243,10 +246,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   useEffect(() => {
     if (step !== "qr" || doneRef.current) return;
     let stopped = false;
-    // abacate e pagarme confirmam E liberam no mesmo passo (check da própria
-    // função); só a Cakto depende de webhook + check-subscription.
-    const proprio = braco === "abacate" || braco === "pagarme";
-    const fnNome = braco === "pagarme" ? "pagarme-pix" : "abacate-pix";
+    // asaas, abacate e pagarme confirmam E liberam no mesmo passo (check da
+    // própria função); só a Cakto depende de webhook + check-subscription.
+    const proprio = braco === "asaas" || braco === "abacate" || braco === "pagarme";
+    const fnNome = braco === "asaas" ? "asaas-pix" : braco === "pagarme" ? "pagarme-pix" : "abacate-pix";
     const orderId = pix?.orderId;
     const poll = async () => {
       if (stopped || doneRef.current) return;

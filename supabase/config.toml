@@ -18,5 +18,8 @@ verify_jwt = false
 [functions.pagarme-webhook]
 verify_jwt = false
 
+[functions.asaas-webhook]
+verify_jwt = false
+
 [functions.recovery-emails]
 verify_jwt = false

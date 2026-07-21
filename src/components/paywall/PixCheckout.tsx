@@ -44,34 +44,19 @@ interface Props {
 // com o form nome+CPF; só o cano por baixo troca. Quando a Cakto reativar:
 // troca pra "cakto" (1 linha) e pusha — NÃO é rollback na Vercel (desfaria
 // downsell/atribuição/AbacatePay juntos).
-const PIX_GATEWAY: "abacate" | "cakto" = "abacate";
-
-/* ---------------------------------------------------------- A/B de gateway
- * 21/07: a AbacatePay converte ~48% de QR gerado → pago (169 QRs / 121
- * pessoas / 58 vendas em 3 dias) e o dono quer medir a Pagar.me (trilho
- * Stone). NÃO é troca cega: é sorteio 50/50 POR USUÁRIO, gravado em
- * localStorage — quem cai num braço fica nele (senão a mesma pessoa geraria
- * QR em gateways diferentes e a leitura viraria lixo).
+/* GATEWAY do Pix (21/07, ordem do dono): PAGAR.ME em 100%. A AbacatePay sai
+ * de cena — o código dela fica intacto atrás desta constante, então voltar é
+ * 1 linha ("abacate") + push, sem rollback de deploy.
  *
- * ATENÇÃO ao trade-off medido ao vivo na API deles: a Pagar.me PSP EXIGE CPF
- * (sem document a charge nasce "failed"). Ou seja, o braço B reintroduz o
- * formulário que a gente matou em 19/07 — e o form custou ~47% naquela
- * medição. O teste responde a pergunta certa: o trilho deles converte tanto
- * melhor a ponto de pagar a fricção do CPF de volta?
- *
- * Desligar = AB_GATEWAY_PAGARME = 0 (todo mundo volta pra AbacatePay).
+ * CUSTO CONHECIDO da troca, medido ao vivo na API deles: a Pagar.me PSP EXIGE
+ * document (CPF) e phone — sem eles a cobrança nasce "failed". Isso ressuscita
+ * o formulário que matamos em 19/07 e que custava ~47% de quem abria o
+ * checkout. Mitigações aplicadas aqui: (1) form de UM campo só — o nome sai
+ * do cadastro/servidor; (2) foco automático no CPF (teclado numérico abre
+ * sozinho); (3) quem já tem tax_id no perfil NUNCA vê o form. O telefone vai
+ * coringa no servidor, como nos outros gateways.
  */
-const AB_GATEWAY_PAGARME = 0.5;
-const AB_KEY = "core-gw-arm";
-const escolherBraco = (): "abacate" | "pagarme" => {
-  try {
-    const salvo = localStorage.getItem(AB_KEY);
-    if (salvo === "abacate" || salvo === "pagarme") return salvo;
-    const arm = Math.random() < AB_GATEWAY_PAGARME ? "pagarme" : "abacate";
-    localStorage.setItem(AB_KEY, arm);
-    return arm;
-  } catch { return "abacate"; }
-};
+const PIX_GATEWAY: "pagarme" | "abacate" | "cakto" = "pagarme";
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
 // já veio do cadastro — o form matava ~47% de quem abria o checkout (127
@@ -130,8 +115,8 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 }
 
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
-  // Braço sorteado 1x por pessoa (persistido) — fixo durante todo o checkout.
-  const [braco] = useState(() => (PIX_GATEWAY === "abacate" ? escolherBraco() : "cakto" as const));
+  const braco = PIX_GATEWAY;
+  // Só a AbacatePay dispensa CPF; Pagar.me e Cakto exigem, então o form volta.
   const SEM_FORM = braco === "abacate";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
@@ -376,10 +361,16 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               </div>
 
               <div className="space-y-3">
-                {/* v2 já sabe o nome (cadastro T15) — campo some, prefill segue no estado */}
-                {!v2 && <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />}
+                {/* UM CAMPO SÓ (21/07): com a Pagar.me o CPF virou obrigatório e
+                    esta tela é a última porta antes do dinheiro — cada campo a
+                    mais custa venda. O nome sai do cadastro (e o servidor tem
+                    fallback), então some daqui. Autofocus abre o teclado
+                    numérico sozinho: a pessoa já chega digitando. */}
+                {!v2 && PIX_GATEWAY !== "pagarme" && (
+                  <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
+                )}
                 <IconInput
-                  Icon={Fingerprint} inputMode="numeric" placeholder="CPF"
+                  Icon={Fingerprint} inputMode="numeric" placeholder="CPF" autoFocus
                   value={cpf} onChange={(e) => setCpf(maskCpf(e.target.value))}
                   inputRef={cpfRef}
                 />

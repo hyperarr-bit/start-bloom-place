@@ -10,7 +10,9 @@ const purgeLocalUserCache = () => {
   try {
     // core-pwa é marca do APARELHO (app instalado), não da conta: deslogar do
     // PWA não pode mandar a pessoa de volta pro funil de vendas.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa"]);
+    // core-gw-arm é o braço do A/B de gateway: se a vassoura levar, a mesma
+    // pessoa cai em gateways diferentes entre sessões e o teste vira lixo.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

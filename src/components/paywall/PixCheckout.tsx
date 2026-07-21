@@ -46,13 +46,39 @@ interface Props {
 // downsell/atribuição/AbacatePay juntos).
 const PIX_GATEWAY: "abacate" | "cakto" = "abacate";
 
+/* ---------------------------------------------------------- A/B de gateway
+ * 21/07: a AbacatePay converte ~48% de QR gerado → pago (169 QRs / 121
+ * pessoas / 58 vendas em 3 dias) e o dono quer medir a Pagar.me (trilho
+ * Stone). NÃO é troca cega: é sorteio 50/50 POR USUÁRIO, gravado em
+ * localStorage — quem cai num braço fica nele (senão a mesma pessoa geraria
+ * QR em gateways diferentes e a leitura viraria lixo).
+ *
+ * ATENÇÃO ao trade-off medido ao vivo na API deles: a Pagar.me PSP EXIGE CPF
+ * (sem document a charge nasce "failed"). Ou seja, o braço B reintroduz o
+ * formulário que a gente matou em 19/07 — e o form custou ~47% naquela
+ * medição. O teste responde a pergunta certa: o trilho deles converte tanto
+ * melhor a ponto de pagar a fricção do CPF de volta?
+ *
+ * Desligar = AB_GATEWAY_PAGARME = 0 (todo mundo volta pra AbacatePay).
+ */
+const AB_GATEWAY_PAGARME = 0.5;
+const AB_KEY = "core-gw-arm";
+const escolherBraco = (): "abacate" | "pagarme" => {
+  try {
+    const salvo = localStorage.getItem(AB_KEY);
+    if (salvo === "abacate" || salvo === "pagarme") return salvo;
+    const arm = Math.random() < AB_GATEWAY_PAGARME ? "pagarme" : "abacate";
+    localStorage.setItem(AB_KEY, arm);
+    return arm;
+  } catch { return "abacate"; }
+};
+
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
 // já veio do cadastro — o form matava ~47% de quem abria o checkout (127
 // abriram → 67 geraram QR nas 72h anteriores). No lugar, uma PREPARAÇÃO de
 // ~2,3s (recibo + checklist animando) que é a latência REAL do create — sem
-// espera artificial. O form continua vivo atrás do gate: a Cakto EXIGE CPF,
-// então se PIX_GATEWAY voltar a "cakto" ele reaparece sozinho.
-const SEM_FORM = PIX_GATEWAY === "abacate";
+// espera artificial. O form continua vivo atrás do gate: Cakto e Pagar.me
+// EXIGEM CPF, então nesses braços ele reaparece sozinho.
 const PREPARO_MIN_MS = 2300;
 const PREPARO_LINHAS = [
   "Criando seu acesso vitalício",
@@ -104,6 +130,9 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 }
 
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
+  // Braço sorteado 1x por pessoa (persistido) — fixo durante todo o checkout.
+  const [braco] = useState(() => (PIX_GATEWAY === "abacate" ? escolherBraco() : "cakto" as const));
+  const SEM_FORM = braco === "abacate";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -119,7 +148,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // servidor; CPF é opcional no gateway). Cakto: prefill do profile — com CPF
   // já salvo, pula o form direto pro QR.
   useEffect(() => {
-    trackEvent("pix_checkout_open", { offer, context });
+    trackEvent("pix_checkout_open", { offer, context, gateway: braco });
     if (SEM_FORM) {
       generate("", "");
       return;
@@ -144,7 +173,17 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     const t0 = Date.now();
     try {
       let data: any, error: any;
-      if (PIX_GATEWAY === "abacate") {
+      if (braco === "pagarme") {
+        // Pagar.me (braço B): MESMO contrato de resposta; exige CPF —
+        // devolve {error:"cpf_required"} e o handler abaixo reabre o form.
+        ({ data, error } = await supabase.functions.invoke("pagarme-pix", {
+          body: {
+            action: "create",
+            offer,
+            customer: { name: nm || undefined, docNumber: doc || undefined },
+          },
+        }));
+      } else if (braco === "abacate") {
         // AbacatePay: contrato de resposta idêntico (orderId/qrCode/…)
         ({ data, error } = await supabase.functions.invoke("abacate-pix", {
           body: {
@@ -186,7 +225,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       }
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
-      trackEvent("pix_generated", { offer, context, order_id: data.orderId });
+      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: braco });
       // Intenção pendente: se a pessoa pagar e voltar já liberada (sem ver a
       // tela de confirmação), o rescue no app dispara o Purchase mesmo assim.
       markPixPurchasePending({ offer, orderId: data.orderId ?? null });
@@ -219,7 +258,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   useEffect(() => {
     if (step !== "qr" || doneRef.current) return;
     let stopped = false;
-    const abacate = PIX_GATEWAY === "abacate";
+    // abacate e pagarme confirmam E liberam no mesmo passo (check da própria
+    // função); só a Cakto depende de webhook + check-subscription.
+    const proprio = braco === "abacate" || braco === "pagarme";
+    const fnNome = braco === "pagarme" ? "pagarme-pix" : "abacate-pix";
     const orderId = pix?.orderId;
     const poll = async () => {
       if (stopped || doneRef.current) return;
@@ -228,8 +270,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         // AbacatePay não devolve valor); fbp/fbc: match da CAPI server-side.
         const cookie = (n: string) =>
           document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
-        const { data } = abacate
-          ? await supabase.functions.invoke("abacate-pix", {
+        const { data } = proprio
+          ? await supabase.functions.invoke(fnNome, {
               body: {
                 action: "check", id: orderId, offer,
                 fbp: cookie("_fbp"), fbc: cookie("_fbc"),
@@ -237,9 +279,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               },
             })
           : await supabase.functions.invoke("check-subscription");
-        if (abacate ? data?.paid : data?.subscribed) {
+        if (proprio ? data?.paid : data?.subscribed) {
           doneRef.current = true;
-          trackEvent("pix_confirmed", { offer, context });
+          trackEvent("pix_confirmed", { offer, context, gateway: braco });
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
           // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
           firePixPurchaseOnce("checkout");
@@ -252,7 +294,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     const t = setTimeout(poll, 3000);
     return () => { stopped = true; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, offer, context, pix?.orderId]);
+  }, [step, offer, context, pix?.orderId, braco]);
 
   const copyCode = async () => {
     if (!pix) return;

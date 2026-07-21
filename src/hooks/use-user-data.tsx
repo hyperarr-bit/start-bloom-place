@@ -60,6 +60,9 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   // Marca "este aparelho é o app instalado" — é do DISPOSITIVO, não do
   // usuário: sem ela aqui, trocar de conta/logar mandava o PWA pro funil.
   "core-pwa",
+  // Braço sorteado do A/B de gateway (abacate × pagarme): também é do
+  // dispositivo. Varrer isso faria a pessoa trocar de gateway entre sessões.
+  "core-gw-arm",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;

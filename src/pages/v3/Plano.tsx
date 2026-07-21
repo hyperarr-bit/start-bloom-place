@@ -49,14 +49,14 @@ const MODULOS_16: Array<[string, string]> = [
   ["✈️", "Viagens"], ["👥", "Relações"], ["🐾", "Pet"], ["📱", "Detox"],
 ];
 
-/** CHECKOUT KIWIFY (20/07, teste do dono SÓ no v3): multi-pagamento (Pix +
- *  cartão) e marca conhecida. null = volta pro Pix in-app da AbacatePay.
- *  Grant vem do kiwify-webhook (por e-mail — por isso o cadastro fica ANTES).
- *  NÃO ativar o pixel Meta dentro da Kiwify: nossa CAPI já manda deduplicado. */
-const KIWIFY: Record<PixOffer, string> | null = {
-  lifetime: "https://pay.kiwify.com.br/MyqE4FO",
-  downsell: "https://pay.kiwify.com.br/MxrG3yB",
-};
+/** CHECKOUT do v3. REVERTIDO PRA PIX IN-APP em 20/07 por dado: a Kiwify
+ *  convertia ~8% do clique de checkout (1 de 13) contra ~50% do Pix in-app
+ *  (16 de 32 QRs) — sair pro checkout de terceiro sangrava o funil. null =
+ *  PixCheckout in-app (AbacatePay), o mesmo do v1. Pra retomar o teste de
+ *  cartão, é só repôr o objeto abaixo; o resto do código já bifurca sozinho.
+ *  URLs Kiwify: lifetime pay.kiwify.com.br/MyqE4FO · downsell .../MxrG3yB
+ *  (grant do kiwify-webhook por e-mail; NÃO ativar pixel Meta lá — CAPI já manda). */
+const KIWIFY: Record<PixOffer, string> | null = null;
 const FOI_KIWIFY_KEY = "fv3-foi-kiwify";
 
 const ESTADO_KEY = "fv3-state";

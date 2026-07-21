@@ -681,6 +681,15 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
+  // Telemetria de campo (20/07): 41% de quem VÊ o form não conclui e a gente
+  // não sabia ONDE parava. 1º foco de cada campo vira evento — o último campo
+  // focado antes do abandono aponta o degrau exato. 1 evento por campo/tela.
+  const camposFocados = useRef<Set<string>>(new Set());
+  const focoCampo = (campo: string) => () => {
+    if (camposFocados.current.has(campo)) return;
+    camposFocados.current.add(campo);
+    trackEvent("funnel_signup_field", { field: campo, inapp: inApp });
+  };
   const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
   // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
@@ -819,9 +828,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       )}
 
       <form onSubmit={submit} className="space-y-3">
-        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
-        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
+        <Input placeholder="Seu nome" value={name} onFocus={focoCampo("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+        <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={focoCampo("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
+        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={focoCampo("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}

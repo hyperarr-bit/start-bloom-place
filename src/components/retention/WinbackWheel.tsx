@@ -39,9 +39,14 @@ interface Props {
   /** Texto da fatia vencedora. Default = winback de cancelamento; o paywall
    *  passa o prêmio dele (hoje ambos = VITALÍCIO R$14,90 via PixCheckout). */
   prizeLabel?: string;
+  /** Giro curto (~3s no total). O paywall usa: quem entra aqui está FUGINDO
+   *  (clicou X/voltar) e a animação de ~6s matava 37% antes do prêmio
+   *  (dado 18–20/07: 112 giros → 70 chegaram no downsell). O winback de
+   *  cancelamento mantém o ritmo padrão — lá a pessoa não está escapando. */
+  quick?: boolean;
 }
 
-export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel }: Props) {
+export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick }: Props) {
   const controls = useAnimation();
   const [phase, setPhase] = useState<"spinning" | "done">("spinning");
   const startedRef = useRef(false);
@@ -69,11 +74,11 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel }: Props) {
       const jitter = (Math.random() - 0.5) * (SLICE_DEG * 0.25);
       const finalAngle = fullSpins + (360 - targetCenter) + jitter;
 
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, quick ? 150 : 400));
 
       await controls.start({
         rotate: finalAngle,
-        transition: { duration: 4.6, ease: [0.16, 0.84, 0.28, 1] },
+        transition: { duration: quick ? 2.2 : 4.6, ease: [0.16, 0.84, 0.28, 1] },
       });
 
       setPhase("done");
@@ -83,7 +88,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel }: Props) {
           .update({ wheel_spun_at: new Date().toISOString() })
           .eq("id", attemptId);
       }
-      setTimeout(onSpinComplete, 1100);
+      setTimeout(onSpinComplete, quick ? 650 : 1100);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -176,7 +176,7 @@ function PaymentSuccess() {
 const Planos = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isSubscribed, user } = useAuth();
+  const { isSubscribed, user, subLoaded } = useAuth();
   const [loading] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const winback = useWinbackTrigger();
@@ -208,6 +208,21 @@ const Planos = () => {
 
   // VITALÍCIO (13/07): pagamento único no Pix, dentro do app (PixCheckout).
   const [pixOpen, setPixOpen] = useState(false);
+  // ?oferta=ds (20/07): última chamada do e-mail de recuperação (h24) com o
+  // vitalício de R$ 14,90 — mesmo prêmio da roleta do paywall. Fricção zero:
+  // o clique do e-mail cai DIRETO no QR, sem passar pela página de preços.
+  // ESPERA o subLoaded: no mount isSubscribed ainda é false até o check async
+  // responder — sem isso, assinante via link recebia QR de cobrança (corrida
+  // pega pelo teste de guarda em 20/07).
+  const querDs = searchParams.get("oferta") === "ds";
+  const ofertaDs = querDs && !isSubscribed;
+  const dsJaAbriu = useRef(false);
+  useEffect(() => {
+    if (!querDs || !subLoaded || isSubscribed || dsJaAbriu.current) return;
+    dsJaAbriu.current = true;
+    trackEvent("planos_ds_email_open");
+    setPixOpen(true);
+  }, [querDs, subLoaded, isSubscribed]);
   // Assinante lifetime não tem o que cancelar (nada renova) — esconde o botão.
   const [isLifetime, setIsLifetime] = useState(false);
   useEffect(() => {
@@ -237,7 +252,7 @@ const Planos = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {pixOpen && <PixCheckout offer="lifetime" context="app" onClose={() => setPixOpen(false)} />}
+      {pixOpen && <PixCheckout offer={ofertaDs ? "downsell" : "lifetime"} context="app" onClose={() => setPixOpen(false)} />}
       <PaymentStatus />
 
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">

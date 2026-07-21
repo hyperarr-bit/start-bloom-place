@@ -297,6 +297,26 @@ function GuaranteeTimeline() {
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
 function AnchorCard({ gasto }: { gasto: string }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
+  // "Não faço ideia" era null → a tela de venda perdia a âncora JUSTO pro
+  // segmento mais perdido (dado 18–20/07: 29 das 67 mortes silenciosas no
+  // paywall). Não inventamos número: vendemos a própria incerteza como dor.
+  if (!anchor && gasto === "Não faço ideia") {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4">
+        <div className="grid grid-cols-2 divide-x divide-border">
+          <div className="pr-3 text-center">
+            <p className="text-[11px] text-muted-foreground leading-tight mb-1">Somem por mês,<br />sem você ver</p>
+            <p className="text-xl font-extrabold text-destructive/80 tracking-tight">R$ ???</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">o que não se vê,<br />não se controla</p>
+          </div>
+          <div className="pl-3 text-center">
+            <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
+            <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!anchor) return null;
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
@@ -437,7 +457,6 @@ function OfferScreen({
   context, answers, onEscape, onBuy,
 }: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void }) {
   const [showClose, setShowClose] = useState(false);
-  const [showGift, setShowGift] = useState(false);
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -451,7 +470,11 @@ function OfferScreen({
   }, []);
 
   // Quem para de interagir na oferta ia embora sem ver a roleta (fechar a aba
-  // não dispara popstate). 40s parado → banner-presente que leva pro downsell.
+  // não dispara popstate). ANTES: 40s parado → mini-card que exigia CLIQUE de
+  // quem já desistiu — só 11 de ~40 clicavam (dado 18–20/07). Regra do dono
+  // (superfície de resgate): fricção ZERO, o prêmio persegue a pessoa.
+  // AGORA: 15s parado → roleta DIRETO. Qualquer toque/scroll rearma o timer,
+  // então quem está lendo/rolando nunca é interrompido.
   useEffect(() => {
     let idle: ReturnType<typeof setTimeout>;
     let fired = false;
@@ -460,9 +483,10 @@ function OfferScreen({
       clearTimeout(idle);
       idle = setTimeout(() => {
         fired = true;
-        setShowGift(true);
-        trackEvent("funnel_view", { step: "idle_gift" });
-      }, 40_000);
+        // mantém o nome idle_gift pra régua histórica; auto=true marca a era nova
+        trackEvent("funnel_view", { step: "idle_gift", auto: true });
+        escapeRef.current();
+      }, 15_000);
     };
     const events = ["scroll", "touchstart", "pointerdown", "keydown"] as const;
     events.forEach((e) => window.addEventListener(e, arm, { passive: true }));
@@ -530,27 +554,6 @@ function OfferScreen({
         <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
-
-      {/* Presente por inatividade → roleta/downsell */}
-      <AnimatePresence>
-        {showGift && (
-          <motion.button
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            onClick={() => { trackEvent("funnel_click", { cta: "idle_gift", context }); onEscape(); }}
-            className="fixed inset-x-5 bottom-[104px] z-[76] max-w-sm mx-auto flex items-center gap-3 rounded-2xl border-2 border-accent bg-white p-3 text-left shadow-[0_14px_40px_-10px_hsl(var(--accent)/0.55)]"
-          >
-            <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground text-xl shrink-0">🎁</span>
-            <span className="flex-1 leading-tight">
-              <span className="block text-[13.5px] font-bold">Espera — você ganhou um giro</span>
-              <span className="block text-[11.5px] text-muted-foreground">Roleta de boas-vindas com prêmio garantido</span>
-            </span>
-            <ArrowRight className="w-4 h-4 text-accent shrink-0" />
-          </motion.button>
-        )}
-      </AnimatePresence>
 
       {/* CTA sticky */}
       <div
@@ -708,7 +711,7 @@ export function PaywallFlow({
             )}
             {phase === "wheel" && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">
-                <WinbackWheel attemptId={null} prizeLabel="VITALÍCIO R$14,90" onSpinComplete={() => setPhase("downsell")} />
+                <WinbackWheel attemptId={null} prizeLabel="VITALÍCIO R$14,90" quick onSpinComplete={() => setPhase("downsell")} />
               </div>
             )}
             {phase === "downsell" && (

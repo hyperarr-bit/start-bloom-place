@@ -20,20 +20,31 @@ const log = (step: string, details?: unknown) => {
 
 // VITALÍCIO (13/07): a compra agora é Pix DENTRO do app (PixCheckout) —
 // o e-mail leva pro /planos logado, onde a pessoa gera o Pix em 2 toques.
-const checkoutLink = (_base: string, _email: string, _name: string) => {
+// h24 (20/07): ?oferta=ds abre DIRETO o Pix de R$ 14,90 (prêmio da roleta) —
+// depois de 24h sem comprar a R$ 27,90, o lead frio recuperado a 14,90 é
+// receita que não existiria. O /planos ignora o param pra quem já assina.
+const checkoutLink = (stage: "h1" | "h24") => {
   const url = new URL("https://www.coreaplicativo.com.br/planos");
   url.searchParams.set("from", "recovery_email");
   url.searchParams.set("utm_source", "recovery_email");
+  if (stage === "h24") url.searchParams.set("oferta", "ds");
   return url.toString();
 };
 
-const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthlyUrl: string) => {
+const emailHtml = (stage: "h1" | "h24", name: string, ctaUrl: string) => {
   const headline = stage === "h1"
     ? "Seu plano personalizado está pronto 🎉"
-    : "Última chamada: sua condição de boas-vindas";
+    : "Você ganhou: CORE vitalício por R$ 14,90 (só hoje)";
   const intro = stage === "h1"
     ? `Você criou sua conta no CORE e seu plano ficou pronto. Pra começar, sua condição de boas-vindas está ativa:`
-    : `Sua condição de boas-vindas do CORE ainda está de pé — mas ela é da sua primeira semana. Aproveita enquanto vale.`;
+    : `Seu plano ainda tá te esperando — e como é sua primeira semana, liberamos a MESMA condição da roleta de boas-vindas: o acesso vitalício pela metade do preço. Depois dessa, acabou.`;
+  // h24 = downsell 14,90 (prêmio da roleta): lead que passou 24h sem pagar
+  // 27,90 dificilmente paga — 14,90 recuperado é receita que não existiria.
+  const preco = stage === "h24"
+    ? `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 27,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 14,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`
+    : `<div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span></div>`;
+  const selo = stage === "h24" ? "🎁 46% OFF — SÓ NESTE LINK" : "ACESSO VITALÍCIO";
+  const cta = stage === "h24" ? "Garantir por R$ 14,90 →" : "Garantir meu acesso vitalício";
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f6f4f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#262626;">
@@ -43,12 +54,12 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
       <h1 style="font-size:22px;line-height:1.25;margin:0 0 12px;">${headline}</h1>
       <p style="font-size:15px;line-height:1.6;color:#555;margin:0 0 20px;">Oi ${name},<br>${intro}</p>
       <div style="border:2px solid #D22D80;border-radius:14px;padding:18px;margin-bottom:14px;">
-        <div style="font-size:12px;font-weight:700;color:#D22D80;letter-spacing:0.5px;margin-bottom:6px;">ACESSO VITALÍCIO</div>
-        <div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span></div>
+        <div style="font-size:12px;font-weight:700;color:#D22D80;letter-spacing:0.5px;margin-bottom:6px;">${selo}</div>
+        ${preco}
         <div style="font-size:12px;color:#888;margin-top:2px;">Pague 1x no Pix · todos os 16 módulos · sem mensalidade, nunca</div>
-        <a href="${annualUrl}" style="display:block;background:#262626;color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:999px;margin-top:14px;">Garantir meu acesso vitalício</a>
+        <a href="${ctaUrl}" style="display:block;background:#262626;color:#ffffff;text-align:center;text-decoration:none;font-weight:700;font-size:15px;padding:14px;border-radius:999px;margin-top:14px;">${cta}</a>
       </div>
-      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">Leva 1 minuto: entra no app, toca em gerar Pix e pronto.</p>
+      <p style="font-size:13px;color:#666;text-align:center;margin:0 0 20px;">${stage === "h24" ? "O link já abre com o QR do Pix — paga e o acesso libera na hora." : "Leva 1 minuto: entra no app, toca em gerar Pix e pronto."}</p>
       <p style="font-size:12px;line-height:1.6;color:#888;margin:0;text-align:center;">🛡️ Garantia de 7 dias — não curtiu, devolvemos 100% em 1 mensagem.<br>Pix na hora · pagamento único · sem mensalidade.</p>
     </div>
     <p style="font-size:11px;color:#aaa;line-height:1.6;margin:20px 4px 0;text-align:center;">Você recebeu este e-mail porque criou uma conta no CORE.<br>Não quer mais receber? Responda com "sair".</p>
@@ -58,7 +69,7 @@ const emailHtml = (stage: "h1" | "h24", name: string, annualUrl: string, monthly
 
 const SUBJECTS: Record<"h1" | "h24", string> = {
   h1: "Seu plano está pronto — CORE vitalício por R$ 27,90, 1x só 🎁",
-  h24: "Última chamada: pague 1x, use pra sempre (R$ 27,90)",
+  h24: "🎁 Só hoje: CORE vitalício por R$ 14,90 (46% OFF, pague 1x)",
 };
 
 serve(async (req) => {
@@ -102,8 +113,7 @@ serve(async (req) => {
     for (const c of candidates) {
       try {
         const stage = c.stage as "h1" | "h24";
-        const annualUrl = checkoutLink("", c.email, c.display_name);
-        const monthlyUrl = annualUrl;
+        const ctaUrl = checkoutLink(stage);
 
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
@@ -112,7 +122,7 @@ serve(async (req) => {
             from,
             to: [c.email],
             subject: SUBJECTS[stage],
-            html: emailHtml(stage, c.display_name, annualUrl, monthlyUrl),
+            html: emailHtml(stage, c.display_name, ctaUrl),
           }),
         });
         if (!res.ok) {

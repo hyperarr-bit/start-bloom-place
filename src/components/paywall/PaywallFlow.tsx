@@ -470,11 +470,18 @@ function OfferScreen({
   }, []);
 
   // Quem para de interagir na oferta ia embora sem ver a roleta (fechar a aba
-  // não dispara popstate). ANTES: 40s parado → mini-card que exigia CLIQUE de
-  // quem já desistiu — só 11 de ~40 clicavam (dado 18–20/07). Regra do dono
-  // (superfície de resgate): fricção ZERO, o prêmio persegue a pessoa.
-  // AGORA: 15s parado → roleta DIRETO. Qualquer toque/scroll rearma o timer,
-  // então quem está lendo/rolando nunca é interrompido.
+  // não dispara popstate). Duas coisas separadas aqui, e a distinção custou
+  // dinheiro:
+  //  - COMO abrir: automático, sem clique. O mini-card antigo exigia ação de
+  //    quem já tinha desistido (só 11 de ~40 clicavam, 18–20/07). Isso fica.
+  //  - QUANDO abrir: 15s foi longe DEMAIS (20→21/07). A roleta passou a
+  //    sequestrar a tela de quem ainda estava LENDO — 15s parado sem rolar é
+  //    leitura normal, não desistência. Resultado medido na mesma janela de
+  //    horas: roleta vista +190%, mas venda de preço cheio −58% (12→5) com o
+  //    downsell estável (9→8) e receita por paywall visto de R$11,16 → R$3,08.
+  //    Ela não trouxe gente nova: converteu quem pagaria 27,90 em 14,90 e
+  //    interrompeu o resto. Volta pros 40s, que é hora de quem TRAVOU mesmo.
+  // Qualquer toque/scroll rearma o timer — quem interage nunca é interrompido.
   useEffect(() => {
     let idle: ReturnType<typeof setTimeout>;
     let fired = false;
@@ -486,7 +493,7 @@ function OfferScreen({
         // mantém o nome idle_gift pra régua histórica; auto=true marca a era nova
         trackEvent("funnel_view", { step: "idle_gift", auto: true });
         escapeRef.current();
-      }, 15_000);
+      }, 40_000);
     };
     const events = ["scroll", "touchstart", "pointerdown", "keydown"] as const;
     events.forEach((e) => window.addEventListener(e, arm, { passive: true }));

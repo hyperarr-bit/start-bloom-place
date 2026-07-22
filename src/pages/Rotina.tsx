@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
+import { semanaAtualId } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
@@ -932,6 +933,14 @@ const Rotina = () => {
     "rotina-habits-checked",
     Object.fromEntries(days.map(d => [d, defaultHabits.map(() => false)]))
   );
+  // CARIMBO DE SEMANA (22/07): a grade é por dia da semana e nunca zerava —
+  // o check de terça PASSADA aparecia hoje como feito (e o hub anunciava
+  // "80% dos hábitos" sem a pessoa ter feito nenhum). Semana nova = grade
+  // exibida zerada; a 1ª interação grava por cima e carimba a semana. Sem
+  // writes destrutivos no mount (à prova das corridas de hidratação).
+  const [semanaChecks, setSemanaChecks] = usePersistedState<string>("rotina-habits-week", "");
+  const semanaValida = semanaChecks === semanaAtualId();
+  const checkedAtual: Record<string, boolean[]> = semanaValida ? habitsChecked : {};
 
   // Schedule state
   const [schedule, setSchedule] = usePersistedState<Record<string, Record<string, string>>>("rotina-schedule", defaultSchedule);
@@ -945,7 +954,8 @@ const Rotina = () => {
   const [editCellValue, setEditCellValue] = useState("");
 
   const toggleHabit = (day: string, habitIndex: number) => {
-    const newChecked = { ...habitsChecked };
+    if (!semanaValida) setSemanaChecks(semanaAtualId());
+    const newChecked = { ...checkedAtual };
     if (!newChecked[day]) newChecked[day] = habitNames.map(() => false);
     newChecked[day] = [...newChecked[day]];
     newChecked[day][habitIndex] = !newChecked[day][habitIndex];
@@ -955,7 +965,8 @@ const Rotina = () => {
   const addHabit = () => {
     if (!newHabit.trim()) return;
     setHabits([...habitNames, newHabit.trim()]);
-    const newChecked = { ...habitsChecked };
+    if (!semanaValida) setSemanaChecks(semanaAtualId());
+    const newChecked = { ...checkedAtual };
     days.forEach(d => {
       if (!newChecked[d]) newChecked[d] = habitNames.map(() => false);
       newChecked[d] = [...newChecked[d], false];
@@ -968,7 +979,8 @@ const Rotina = () => {
   const removeHabit = (index: number) => {
     const newHabits = habitNames.filter((_, i) => i !== index);
     setHabits(newHabits);
-    const newChecked = { ...habitsChecked };
+    if (!semanaValida) setSemanaChecks(semanaAtualId());
+    const newChecked = { ...checkedAtual };
     days.forEach(d => { if (newChecked[d]) newChecked[d] = newChecked[d].filter((_, i) => i !== index); });
     setHabitsChecked(newChecked);
   };
@@ -1105,7 +1117,7 @@ const Rotina = () => {
                         <td className="px-3 py-2 font-bold text-[11px] border-r border-green-100 dark:border-[hsl(var(--rt-border))] text-foreground dark:text-[hsl(var(--rt-text))]">{day}</td>
                         {habitNames.map((_, hi) => (
                           <td key={hi} className="text-center px-2 py-2 border-r border-green-100 dark:border-[hsl(var(--rt-border))]">
-                            <Checkbox checked={habitsChecked[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />
+                            <Checkbox checked={checkedAtual[day]?.[hi] || false} onCheckedChange={() => toggleHabit(day, hi)} className="h-4 w-4 border-blue-400 dark:border-[hsl(var(--rt-text-soft))] data-[state=checked]:bg-[hsl(var(--rt-accent))] data-[state=checked]:border-[hsl(var(--rt-accent))] dark:data-[state=checked]:bg-[hsl(var(--rt-accent))] dark:data-[state=checked]:border-[hsl(var(--rt-accent))]" />
                           </td>
                         ))}
                       </tr>
@@ -1116,7 +1128,7 @@ const Rotina = () => {
             </div>
 
             {/* Heatmap */}
-            <HabitHeatmap habitsChecked={habitsChecked} habits={habitNames} days={days} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} />
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -1229,7 +1241,7 @@ const Rotina = () => {
         {activeTab === "revisao" && (
           <div className="space-y-5">
             <WeeklyReview />
-            <HabitHeatmap habitsChecked={habitsChecked} habits={habitNames} days={days} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} />
           </div>
         )}
       </main>

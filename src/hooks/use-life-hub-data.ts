@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
+import { semanaAtualId } from "@/lib/utils";
 
 export interface LifeHubData {
   dayScore: number;
@@ -179,8 +180,13 @@ export function useLifeHubData(): LifeHubData {
     const DIAS_ROTINA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
     const agora = new Date();
     const diaHoje = DIAS_ROTINA[agora.getDay() === 0 ? 6 : agora.getDay() - 1];
+    // A grade é indexada por DIA DA SEMANA e nunca zerava: o check de terça
+    // PASSADA contava como de hoje ("80% dos hábitos feitos" fantasma —
+    // 22/07). Só confia na grade se ela for DESTA semana (carimbo).
     const habitsChecked = get<Record<string, boolean[]>>("rotina-habits-checked", {});
-    const checksHoje = Array.isArray(habitsChecked[diaHoje]) ? habitsChecked[diaHoje] : [];
+    const semanaDosChecks = get<string>("rotina-habits-week", "");
+    const gradeDaSemana = semanaDosChecks === semanaAtualId();
+    const checksHoje = gradeDaSemana && Array.isArray(habitsChecked[diaHoje]) ? habitsChecked[diaHoje] : [];
     const habitLog = get<any>("core-rotina-habit-log", {});
     const todayHabits = habitLog[tStr] || {};
     const mappedHabits = habits.slice(0, 5).map((h: any, i: number) => ({

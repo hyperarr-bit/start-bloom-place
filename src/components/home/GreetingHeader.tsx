@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil } from "lucide-react";
+import { Sun, Moon, CloudSun, Sunset, Pencil, ChevronDown } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -112,9 +113,13 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Seta ▾ (22/07): o círculo de iniciais sozinho não lia como menu
+              pro público menos digital (hipótese do dono; itens de dentro
+              viravam ticket). A seta é o sinal universal de "abre algo".
+              account_drawer_open mede a descoberta real — decide o resto. */}
           <motion.button
-            onClick={() => setShowAccount(true)}
-            className="w-8 h-8 rounded-xl flex items-center justify-center overflow-hidden"
+            onClick={() => { trackEvent("account_drawer_open", { via: "avatar" }); setShowAccount(true); }}
+            className="h-8 pl-0.5 pr-1 rounded-xl flex items-center gap-0.5"
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"
           >
@@ -123,6 +128,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
                 {initials}
               </AvatarFallback>
             </Avatar>
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
           </motion.button>
           <ThemeToggle showPalette />
         </div>

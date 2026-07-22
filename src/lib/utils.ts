@@ -35,6 +35,17 @@ export function getAuthRedirectUrl(path: string = "/"): string {
 export const localDayKey = (d: Date = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** Id da semana local = localDayKey da SEGUNDA-FEIRA. A grade semanal de
+ *  hábitos (rotina-habits-checked) é indexada por dia da semana ("TERÇA"),
+ *  então sem um carimbo de semana o check de terça PASSADA ressuscitava hoje
+ *  ("80% dos hábitos feitos" sem fazer nenhum — bug real de 22/07). Quem lê a
+ *  grade só pode confiar nela se rotina-habits-week === semanaAtualId(). */
+export const semanaAtualId = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return localDayKey(d);
+};
+
 /** Inverso do localDayKey: "YYYY-MM-DD" → Date à MEIA-NOITE LOCAL. `new
  *  Date("2026-07-18")` parseia como UTC e no Brasil (UTC-3) volta pro dia
  *  ANTERIOR ao formatar (bug real, diário da Dieta 18/07). Sempre parsear

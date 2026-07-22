@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil, ChevronDown } from "lucide-react";
+import { Sun, Moon, CloudSun, Sunset, Pencil, Menu } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
@@ -113,13 +113,13 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Seta ▾ (22/07): o círculo de iniciais sozinho não lia como menu
-              pro público menos digital (hipótese do dono; itens de dentro
-              viravam ticket). A seta é o sinal universal de "abre algo".
-              account_drawer_open mede a descoberta real — decide o resto. */}
+          {/* ☰ + avatar (22/07, ajuste do dono: a seta ficou feia): os três
+              traços são o símbolo de menu que qualquer público reconhece —
+              mesmo padrão do pill do Airbnb (☰ + avatar juntos).
+              account_drawer_open segue medindo a descoberta real. */}
           <motion.button
             onClick={() => { trackEvent("account_drawer_open", { via: "avatar" }); setShowAccount(true); }}
-            className="h-8 pl-0.5 pr-1 rounded-xl flex items-center gap-0.5"
+            className="h-8 pl-1 pr-1.5 rounded-xl flex items-center gap-1"
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"
           >
@@ -128,7 +128,7 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+            <Menu className="w-4 h-4 text-muted-foreground" />
           </motion.button>
           <ThemeToggle showPalette />
         </div>

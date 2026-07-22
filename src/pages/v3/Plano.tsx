@@ -803,6 +803,10 @@ function RoletaDownsell({ onAceitar, onFechar }: { onAceitar: () => void; onFech
 
 function DemoFull({ module, onFechar }: { module: string; onFechar: () => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const fecharRef = useRef(onFechar);
+  fecharRef.current = onFechar;
+  // Retry com cache-buster: o ?cb= muda a URL e fura o cache de HTML do Safari
+  const [tentativa, setTentativa] = useState(0);
   // cerca: se a navegação interna sair do /preview, volta pro módulo da demo
   useEffect(() => {
     const t = setInterval(() => {
@@ -815,12 +819,36 @@ function DemoFull({ module, onFechar }: { module: string; onFechar: () => void }
     }, 400);
     return () => clearInterval(t);
   }, [module]);
+  // VIGIA DA TELA BRANCA (21/07, caso real dessa noite): deploy troca os chunks
+  // e quem tem HTML velho em cache vê o iframe falhar o import dinâmico → demo
+  // branca PRA SEMPRE, funil morto no pico de expectativa. O iframe é mesma
+  // origem, então dá pra LER se renderizou de verdade: 5s sem conteúdo →
+  // recarrega 1x com cache-buster; falhou de novo → PULA a demo e segue o
+  // funil (funil vivo sem demo > funil morto com demo).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      let vazio = false;
+      try {
+        const doc = ref.current?.contentWindow?.document;
+        vazio = !doc || (doc.body?.innerText ?? "").trim().length < 40;
+      } catch { vazio = true; }
+      if (!vazio) return;
+      if (tentativa === 0) {
+        trackEvent("funnel_v3_demo_retry", { module });
+        setTentativa(1); // muda o src (cb) → iframe recarrega do zero
+      } else {
+        trackEvent("funnel_v3_demo_skip", { module });
+        fecharRef.current();
+      }
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [tentativa, module]);
   return (
     <div className="fv3-demo">
       <div className="fv3-demo-top">
         <span>DEMO · mexa à vontade — dados de exemplo</span>
       </div>
-      <iframe ref={ref} title="Demonstração do CORE" src={`/preview/${module}?embed=v2`} />
+      <iframe ref={ref} title="Demonstração do CORE" src={`/preview/${module}?embed=v2${tentativa ? `&cb=${tentativa}` : ""}`} />
       <button className="fv3-cta fv3-demo-cta" onClick={onFechar}>Continuar →</button>
     </div>
   );

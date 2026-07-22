@@ -43,7 +43,16 @@ window.addEventListener("vite:preloadError", (event) => {
     sessionStorage.setItem(KEY, String(Date.now()));
   } catch { /* segue e recarrega mesmo assim */ }
   event.preventDefault();
-  window.location.reload();
+  // reload() puro pode devolver o MESMO index.html velho do cache do Safari
+  // (caso da demo branca de 21/07). O param novo muda a URL → cache miss →
+  // HTML fresco com os chunks novos. O param é inerte pro app.
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set("core-cb", String(Date.now() % 1e7));
+    window.location.replace(u.toString());
+  } catch {
+    window.location.reload();
+  }
 });
 
 // Always unregister any previously-installed service worker and wipe caches.

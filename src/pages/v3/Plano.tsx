@@ -229,21 +229,49 @@ export default function PlanoV3() {
           <motion.div key={step} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -14 }} transition={{ duration: 0.22 }}>
 
             {step === "w1" && (
-              <div className="fv3-center">
-                <div className="fv3-hero-video" aria-hidden>
-                  {/* vídeo do dono (hub real no iPhone). LOOP nos primeiros 14s:
-                      o arquivo tem 149s/23MB — limitar o trecho faz o navegador
-                      baixar só o começo. Corte inferior esconde a marca d'água. */}
-                  <video
-                    src="/v3-hero.mp4" poster="/v3-hero-poster.jpg"
-                    autoPlay muted loop playsInline preload="metadata"
-                    onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime > 14) v.currentTime = 0.05; }}
-                  />
+              /* BOAS-VINDAS "grade viva" (22/07, aprovada pelo dono no mockup):
+                 estilo BitePal — céu azul luminoso, a grade de módulos VIVA
+                 sangrando nas bordas, streak pendurado, título gigante. Também
+                 é a tela 1 do app Android (o app abre neste funil). O vídeo de
+                 23MB morreu de vez (iOS em economia de bateria bloqueava o
+                 autoplay → ▶ morto). O quiz (w2+) segue clínico de propósito:
+                 porta colorida vende desejo, corredor limpo converte. */
+              <div className="fv3-w1">
+                <div className="fv3-w1-grade" aria-hidden>
+                  {([["💰","#fdeccb"],["💪","#d9e4fb"],["🥗","#d7f0dd"],["📅","#cdeeee"],
+                     ["🎯","#e6def8"],["❤️","#fbd8e8"],["🎓","#ffe4cf"],["🧠","#dcf3d2"]] as const)
+                    .map(([emo, cor], i) => (
+                    <motion.span
+                      key={emo} className="fv3-w1-tile" style={{ background: cor }}
+                      initial={{ opacity: 0, y: -18, scale: 0.85 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.06 + i * 0.055, type: "spring", stiffness: 300, damping: 22 }}
+                    >{emo}</motion.span>
+                  ))}
                 </div>
-                <h1>Organize sua vida em um só lugar.</h1>
-                <p className="fv3-sub">16 módulos. Um método. Resultados que ficam.</p>
-                <button className="fv3-cta" onClick={avancar}>Começar</button>
-                <button className="fv3-link" onClick={() => navigate("/entrar")}>Já tenho conta? <b>Entrar</b></button>
+                <motion.div
+                  className="fv3-w1-streak"
+                  initial={{ opacity: 0, scale: 0.6, y: 8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ delay: 0.55, type: "spring", stiffness: 320, damping: 16 }}
+                >🔥 <b>11 dias</b> <span>seguidos</span></motion.div>
+                <div className="fv3-w1-corpo">
+                  <div>
+                    <motion.h1 className="fv3-w1-titulo" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }}>
+                      Um app<br />pra vida<br />inteira
+                    </motion.h1>
+                    <motion.p className="fv3-w1-sub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }}>
+                      Finanças, rotina, corpo, metas — tudo organizado num lugar só.
+                    </motion.p>
+                    <motion.p className="fv3-w1-prova" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6, duration: 0.4 }}>
+                      <span className="estrelas">★★★★★</span> <b>+500 pessoas</b> organizando a vida
+                    </motion.p>
+                  </div>
+                  <motion.div className="fv3-w1-rodape" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72, duration: 0.4 }}>
+                    <button className="fv3-cta" style={{ marginTop: 0 }} onClick={avancar}>Começar</button>
+                    <button className="fv3-link" onClick={() => navigate("/entrar")}>Já tenho conta? <b>Entrar</b></button>
+                  </motion.div>
+                </div>
               </div>
             )}
 
@@ -946,8 +974,46 @@ const CSS_V3 = `
 .fv3-fade.t1 { animation-delay: .9s; }
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
-.fv3-hero-video { height: min(46dvh, 440px); aspect-ratio: 1030 / 1930; overflow: hidden; }
-.fv3-hero-video video { width: 100%; height: auto; display: block; }
+/* ---- w1 "grade viva" (céu BitePal + tiles do CORE) ---- */
+.fv3:has(.fv3-w1) {
+  background:
+    radial-gradient(90% 46% at 88% 2%, rgba(255,182,214,.5) 0%, rgba(255,182,214,0) 60%),
+    linear-gradient(180deg, #7ec6f6 0%, #a8d9fa 30%, #d8edfd 55%, #f2f8fd 80%, #ffffff 100%);
+}
+.fv3-w1 { display: flex; flex-direction: column; min-height: calc(100dvh - 58px); }
+.fv3-w1-grade {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  margin: 2.5vh calc(-22px - 3vw) 0; padding: 0 8px;
+}
+.fv3-w1-tile {
+  aspect-ratio: 1; border-radius: 22px; display: grid; place-items: center;
+  font-size: clamp(32px, 10vw, 46px);
+  box-shadow: 0 18px 34px -12px rgba(20,60,110,.35);
+}
+.fv3-w1-grade .fv3-w1-tile:nth-child(odd) { rotate: -3deg; }
+.fv3-w1-grade .fv3-w1-tile:nth-child(even) { rotate: 3deg; }
+.fv3-w1-streak {
+  position: relative; z-index: 2; margin: -17px auto 0; width: max-content;
+  background: #fff; border-radius: 999px; padding: 10px 18px;
+  font-size: 14.5px; color: #16121c;
+  box-shadow: 0 16px 32px -12px rgba(20,60,110,.35);
+}
+.fv3-w1-streak b { font-weight: 800; }
+.fv3-w1-streak span { color: #8a8378; font-weight: 600; }
+.fv3-w1-corpo { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding-top: 1vh; }
+.fv3-w1-titulo {
+  font-weight: 900 !important; color: #141414; letter-spacing: -.035em !important;
+  line-height: .95 !important; font-size: clamp(47px, 15vw, 66px) !important;
+  text-align: left !important; margin: 0 !important;
+}
+.fv3-w1-sub { margin-top: 1.6vh; font-size: 16.5px; line-height: 1.45; color: #4f5a64; max-width: 24ch; }
+.fv3-w1-prova { margin-top: 1.4vh; font-size: 14px; color: #7d8691; }
+.fv3-w1-prova .estrelas { color: #f0a500; letter-spacing: .08em; }
+.fv3-w1-prova b { color: #141414; }
+.fv3-w1-rodape { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .fv3-w1 * { transition: none !important; animation: none !important; }
+}
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

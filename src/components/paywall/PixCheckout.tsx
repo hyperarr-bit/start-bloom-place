@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
+import { useAuth } from "@/hooks/use-auth";
 import { SubscriptionPaywall } from "@/components/paywall/SubscriptionPaywall";
 
 /**
@@ -54,8 +55,30 @@ interface Props {
  * Pix via QR CODE ESTÁTICO NÃO pede CPF (o dinâmico pediria, como a Pagar.me).
  * Então volta o checkout SEM FORMULÁRIO — igual à AbacatePay — e a fricção do
  * CPF que custava ~47% (19/07) some de novo. Bônus: expira em 30min exatos.
- */
-const PIX_GATEWAY: "asaas" | "pagarme" | "abacate" | "cakto" = "asaas";
+ *
+ * TESTE A/B DE GATEWAY (22/07, ordem do dono): Asaas × Pagar.me, 50/50 por
+ * hash do user.id — braço estável entre sessões/dispositivos e recomputável
+ * na análise (todo QR já sai carimbado em pix_order_created.event_data.gateway).
+ * A leitura honesta é POR DINHEIRO fim-a-fim (aberto→pago): o braço Pagar.me
+ * reabre o form de CPF (custou ~47% dos opens em 19/07) mas usa QR dinâmico.
+ * ENCERRAR o teste = FORCE_GATEWAY: "asaas" (ou o vencedor) e push.
+ * QA: localStorage "pix-ab-force" = braço (chave fora do prefixo core-*,
+ * sobrevive às vassouras de cache). */
+type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
+const FORCE_GATEWAY: Gateway | null = null;
+const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
+
+const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
+  if (FORCE_GATEWAY) return FORCE_GATEWAY;
+  try {
+    const f = localStorage.getItem("pix-ab-force");
+    if (f === "asaas" || f === "pagarme" || f === "abacate" || f === "cakto") return f;
+  } catch { /* noop */ }
+  const seed = uid || "anon";
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  return AB_BRACOS[Math.abs(h) % AB_BRACOS.length];
+};
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
 // já veio do cadastro — o form matava ~47% de quem abria o checkout (127
@@ -119,7 +142,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // bifurcação — todo funil/paywall que abre PixCheckout vira assinatura no
   // app automaticamente, hoje e no futuro.
   if (isNativeShell()) return <SubscriptionPaywall onClose={onClose} />;
-  const braco = PIX_GATEWAY;
+  const { user: abUser } = useAuth();
+  // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
+  const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id));
   // Asaas (QR estático) e AbacatePay dispensam CPF → sem formulário.
   // Pagar.me e Cakto exigem, então o form volta pra esses.
   const SEM_FORM = braco === "asaas" || braco === "abacate";
@@ -398,7 +423,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     mais custa venda. O nome sai do cadastro (e o servidor tem
                     fallback), então some daqui. Autofocus abre o teclado
                     numérico sozinho: a pessoa já chega digitando. */}
-                {!v2 && PIX_GATEWAY !== "pagarme" && (
+                {!v2 && braco !== "pagarme" && (
                   <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
                 )}
                 <IconInput

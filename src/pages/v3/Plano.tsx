@@ -230,55 +230,20 @@ export default function PlanoV3() {
 
             {step === "w1" && (
               <div className="fv3-center">
-                {/* HERO EM CÓDIGO (21/07): o vídeo de 23MB morreu. Motivo real,
-                    visto na gravação do dono: iOS com economia de bateria
-                    BLOQUEIA autoplay → parte do tráfego via um ▶ morto num
-                    retângulo branco. Composição em código nunca falha, pesa
-                    ~200KB e cada detalhe é dirigível (padrão Cal AI/Brainrot:
-                    welcome é interface animada, não vídeo). As telas trocam
-                    (hub → finanças → dieta) = "16 módulos, um lugar" ao vivo. */}
-                <div className="fv3-hero-comp" aria-hidden>
-                  <motion.div
-                    className="fv3-fone"
-                    initial={{ opacity: 0, y: 22, scale: 0.94 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.55, ease: [0.2, 0.9, 0.3, 1] }}
-                  >
-                    <span className="fv3-fone-notch" />
-                    <div className="fv3-fone-telas">
-                      <img src="/hero-app-home.jpg" alt="" className="t1" />
-                      <img src="/hero-app-financas.jpg" alt="" className="t2" loading="lazy" />
-                      <img src="/hero-app-dieta.jpg" alt="" className="t3" loading="lazy" />
-                    </div>
-                  </motion.div>
-                  {([
-                    ["💰", "Finanças", "a"], ["📅", "Rotina", "b"], ["🍎", "Dieta", "c"],
-                    ["🏋️", "Treino", "d"], ["📚", "Estudos", "e"], ["🎯", "Metas", "f"],
-                  ] as const).map(([emo, nome, pos], i) => (
-                    <motion.span
-                      key={nome}
-                      className={`fv3-chip fv3-chip-${pos}`}
-                      initial={{ opacity: 0, scale: 0.6, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ delay: 0.45 + i * 0.12, type: "spring", stiffness: 260, damping: 18 }}
-                    >
-                      {emo} {nome}
-                    </motion.span>
-                  ))}
+                <div className="fv3-hero-video" aria-hidden>
+                  {/* vídeo do dono (hub real no iPhone). LOOP nos primeiros 14s:
+                      o arquivo tem 149s/23MB — limitar o trecho faz o navegador
+                      baixar só o começo. Corte inferior esconde a marca d'água. */}
+                  <video
+                    src="/v3-hero.mp4" poster="/v3-hero-poster.jpg"
+                    autoPlay muted loop playsInline preload="metadata"
+                    onTimeUpdate={(e) => { const v = e.currentTarget; if (v.currentTime > 14) v.currentTime = 0.05; }}
+                  />
                 </div>
-                <motion.h1 initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.4 }}>
-                  Organize sua vida em um só lugar.
-                </motion.h1>
-                <motion.p className="fv3-sub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.4 }}>
-                  16 módulos. Um método. Resultados que ficam.
-                </motion.p>
-                <motion.p className="fv3-prova" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6, duration: 0.4 }}>
-                  <span className="estrelas">★★★★★</span> <b>+500 pessoas</b> organizando a vida
-                </motion.p>
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72, duration: 0.4 }} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <button className="fv3-cta fv3-cta-pulso" onClick={avancar}>Começar</button>
-                  <button className="fv3-link" onClick={() => navigate("/entrar")}>Já tenho conta? <b>Entrar</b></button>
-                </motion.div>
+                <h1>Organize sua vida em um só lugar.</h1>
+                <p className="fv3-sub">16 módulos. Um método. Resultados que ficam.</p>
+                <button className="fv3-cta" onClick={avancar}>Começar</button>
+                <button className="fv3-link" onClick={() => navigate("/entrar")}>Já tenho conta? <b>Entrar</b></button>
               </div>
             )}
 
@@ -953,55 +918,8 @@ const CSS_V3 = `
 .fv3-fade.t1 { animation-delay: .9s; }
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
-/* ------- hero em código (w1): fone CSS + telas em crossfade + chips ------- */
-.fv3-hero-comp { position: relative; height: min(44dvh, 420px); display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
-.fv3-fone {
-  position: relative; height: 100%; aspect-ratio: 9 / 18.5;
-  border-radius: 34px; background: #111; padding: 7px;
-  box-shadow: 0 24px 48px -20px rgba(0,0,0,.35), 0 0 0 2px rgba(0,0,0,.06);
-}
-.fv3-fone-notch {
-  position: absolute; top: 13px; left: 50%; transform: translateX(-50%);
-  width: 32%; height: 13px; border-radius: 999px; background: #111; z-index: 3;
-}
-.fv3-fone-telas { position: relative; width: 100%; height: 100%; border-radius: 27px; overflow: hidden; background: #fff; }
-.fv3-fone-telas img {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; object-position: top; opacity: 0;
-  animation: fv3tela 12s infinite;
-}
-/* 3 telas × 4s: cada uma visível 1/3 do ciclo, com fade de ~0.8s */
-.fv3-fone-telas img.t1 { animation-delay: 0s; }
-.fv3-fone-telas img.t2 { animation-delay: 4s; }
-.fv3-fone-telas img.t3 { animation-delay: 8s; }
-@keyframes fv3tela {
-  0% { opacity: 0; } 5% { opacity: 1; } 33% { opacity: 1; } 40% { opacity: 0; } 100% { opacity: 0; }
-}
-.fv3-chip {
-  position: absolute; z-index: 4; white-space: nowrap;
-  font-size: 12.5px; font-weight: 700; letter-spacing: -.01em;
-  background: #fff; border: 1px solid #eee9e2; border-radius: 999px;
-  padding: 7px 12px; box-shadow: 0 10px 22px -10px rgba(0,0,0,.22);
-  animation: fv3flutua 3.4s ease-in-out infinite alternate;
-}
-.fv3-chip-a { top: 8%; left: max(2%, calc(50% - 178px)); animation-delay: .2s; }
-.fv3-chip-b { top: 30%; right: max(1%, calc(50% - 182px)); animation-delay: .9s; }
-.fv3-chip-c { top: 55%; left: max(0%, calc(50% - 186px)); animation-delay: 1.5s; }
-.fv3-chip-d { top: 76%; right: max(2%, calc(50% - 176px)); animation-delay: .5s; }
-.fv3-chip-e { top: 6%; right: max(4%, calc(50% - 168px)); animation-delay: 1.2s; }
-.fv3-chip-f { top: 82%; left: max(4%, calc(50% - 170px)); animation-delay: 1.8s; }
-@keyframes fv3flutua { from { transform: translateY(-4px); } to { transform: translateY(5px); } }
-.fv3-prova { font-size: 13px; color: #8a8378; margin: 2px 0 10px; letter-spacing: .01em; }
-.fv3-prova b { color: #111; }
-.fv3-prova .estrelas { color: #f0a500; letter-spacing: .08em; }
-.fv3-cta-pulso { animation: fv3pulso 1.9s ease-in-out infinite; }
-@keyframes fv3pulso { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
-@media (prefers-reduced-motion: reduce) {
-  .fv3-fone-telas img { animation: none; }
-  .fv3-fone-telas img.t1 { opacity: 1; }
-  .fv3-chip { animation: none; }
-  .fv3-cta-pulso { animation: none; }
-}
+.fv3-hero-video { height: min(46dvh, 440px); aspect-ratio: 1030 / 1930; overflow: hidden; }
+.fv3-hero-video video { width: 100%; height: auto; display: block; }
 .fv3-ponte { background: #111; color: #fff; border-radius: 14px; padding: 12px 14px; font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
 .fv3-numgrande { font-size: 44px; font-weight: 800; letter-spacing: -.02em; padding: 6px 0 10px; }
 .fv3-range { width: 100%; accent-color: #111; height: 34px; }

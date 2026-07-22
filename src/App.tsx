@@ -19,6 +19,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
+import { isNativeShell } from "@/lib/native-shell";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -56,6 +57,10 @@ const ehPwa = () => {
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
+  // APP DA LOJA (Capacitor): install novo abre no ONBOARDING (/plano, o
+  // funil estilo Cal AI) — a tela 1 já tem "Já tenho conta? Entrar" pra quem
+  // é da base. PWA continua indo pro login (quem instala PWA já comprou).
+  if (!user && isNativeShell()) return <Navigate to="/plano" replace />;
   if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
 
   const area = getFunnelArea();

@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { isNativeShell } from "@/lib/native-shell";
+import { SubscriptionPaywall } from "@/components/paywall/SubscriptionPaywall";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -112,6 +114,11 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 }
 
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
+  // APP DA LOJA (22/07): dentro do shell Capacitor, Pix in-app viola o Play
+  // Billing (obrigatório no BR p/ conteúdo digital). ESTE é o único ponto de
+  // bifurcação — todo funil/paywall que abre PixCheckout vira assinatura no
+  // app automaticamente, hoje e no futuro.
+  if (isNativeShell()) return <SubscriptionPaywall onClose={onClose} />;
   const braco = PIX_GATEWAY;
   // Asaas (QR estático) e AbacatePay dispensam CPF → sem formulário.
   // Pagar.me e Cakto exigem, então o form volta pra esses.

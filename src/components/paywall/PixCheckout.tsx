@@ -145,9 +145,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const { user: abUser } = useAuth();
   // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
   const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id));
-  // Asaas (QR estático) e AbacatePay dispensam CPF → sem formulário.
-  // Pagar.me e Cakto exigem, então o form volta pra esses.
-  const SEM_FORM = braco === "asaas" || braco === "abacate";
+  // FORM DO DIA 14 DE VOLTA (22/07, ordem do dono): nome+CPF antes do QR em
+  // TODOS os braços, como na era Cakto (dia 14 = 89 vendas, 47% por abertura).
+  // O form é QUALIFICADOR: filtra o curioso antes de virar QR e devolve a
+  // régua comparável com o baseline. Asaas nem usa o CPF (QR estático) — mas
+  // quem digita CPF demonstrou intenção. Prefill continua: CPF já salvo no
+  // perfil pula o form direto pro QR, igual dia 14.
+  const SEM_FORM = false;
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -268,6 +272,19 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: braco });
+      // dia-14: o CPF digitado vira tax_id no perfil → próximo open pula o
+      // form. Pagar.me/Cakto salvam no servidor; Asaas/Abacate ignoram o doc,
+      // então salva daqui. Não-bloqueante: falha não afeta a venda.
+      if (cpfLooksValid(doc)) {
+        supabase.auth.getUser().then(({ data: auth }) => {
+          const uid = auth?.user?.id;
+          if (!uid) return;
+          const patch: { tax_id: string; display_name?: string } = { tax_id: doc.replace(/\D/g, "") };
+          if (nm.trim()) patch.display_name = nm.trim();
+          // builder do supabase é lazy: sem .then() a query nunca dispara
+          supabase.from("profiles").update(patch).eq("id", uid).then(() => { /* noop */ });
+        }).catch(() => { /* noop */ });
+      }
       // Intenção pendente: se a pessoa pagar e voltar já liberada (sem ver a
       // tela de confirmação), o rescue no app dispara o Purchase mesmo assim.
       markPixPurchasePending({ offer, orderId: data.orderId ?? null });

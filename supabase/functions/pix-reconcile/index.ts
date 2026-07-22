@@ -84,10 +84,17 @@ serve(async (req) => {
 
   try {
     const body = await req.json().catch(() => ({}));
+    // Dois caminhos de entrada (padrão recovery-emails): token dedicado
+    // (RECONCILE_TOKEN, chamadas manuais) OU Bearer com a anon key do projeto
+    // (pg_cron — a anon key já é pública no bundle; a segurança REAL é por
+    // construção: a função só credita cobrança que o gateway confirma PAID,
+    // não existe input que cunhe acesso).
     const esperado = Deno.env.get("RECONCILE_TOKEN") ?? "";
-    if (!esperado || String(body.token ?? "") !== esperado) {
-      return jsonResponse({ error: "unauthorized" }, 401);
-    }
+    const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const autorizado =
+      (esperado && String(body.token ?? "") === esperado) || (anon && bearer === anon);
+    if (!autorizado) return jsonResponse({ error: "unauthorized" }, 401);
     const dryRun = body.dryRun === true;
     const hours = Math.min(Math.max(Number(body.hours) || 48, 1), 168);
     const desde = new Date(Date.now() - hours * 3600e3).toISOString();

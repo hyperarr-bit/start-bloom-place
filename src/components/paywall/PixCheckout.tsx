@@ -55,7 +55,7 @@ interface Props {
  * Então volta o checkout SEM FORMULÁRIO — igual à AbacatePay — e a fricção do
  * CPF que custava ~47% (19/07) some de novo. Bônus: expira em 30min exatos.
  */
-const PIX_GATEWAY: "asaas" | "pagarme" | "abacate" | "cakto" = "abacate";
+const PIX_GATEWAY: "asaas" | "pagarme" | "abacate" | "cakto" = "asaas";
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
 // já veio do cadastro — o form matava ~47% de quem abria o checkout (127

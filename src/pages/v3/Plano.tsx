@@ -216,6 +216,20 @@ export default function PlanoV3() {
     <div className="fv3">
       <style>{CSS_V3}</style>
 
+      {/* Céu do w1 em CAMADA PRÓPRIA, fora do AnimatePresence dos passos:
+          preso na raiz via :has() ele desligava num corte seco no 1º toque
+          (feedback do dono: "transição não tá limpa"). Aqui ele faz fade de
+          ~450ms por baixo enquanto o conteúdo troca — céu derrete pro branco. */}
+      <AnimatePresence>
+        {step === "w1" && (
+          <motion.div
+            key="ceu" className="fv3-ceu-bg" aria-hidden
+            initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+          />
+        )}
+      </AnimatePresence>
+
       {/* topo: voltar + progresso fino (padrão Cal AI) */}
       {step !== "w1" && step !== "w11" && !demoAberta && (
         <header className="fv3-top">
@@ -887,12 +901,13 @@ function DemoFull({ module, onFechar }: { module: string; onFechar: () => void }
 const CSS_V3 = `
 .fv3 { min-height: 100dvh; background: #fff; color: #111; font-family: -apple-system, "SF Pro Text", Inter, system-ui, sans-serif; }
 .fv3 * { box-sizing: border-box; }
-.fv3-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 14px 18px 10px; background: rgba(255,255,255,.94); backdrop-filter: blur(8px); }
+.fv3-top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 14px; padding: 14px 18px 10px; background: rgba(255,255,255,.94); backdrop-filter: blur(8px); animation: fv3topin .35s ease both; }
+@keyframes fv3topin { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 .fv3-back { border: 0; background: none; font-size: 22px; line-height: 1; color: #111; padding: 4px 6px; cursor: pointer; }
 .fv3-back:disabled { opacity: .25; }
 .fv3-progress { flex: 1; height: 3px; background: #eceae6; border-radius: 99px; overflow: hidden; }
 .fv3-progress div { height: 100%; background: #111; border-radius: 99px; transition: width .3s ease; }
-.fv3-main { max-width: 430px; margin: 0 auto; padding: 18px 22px 40px; }
+.fv3-main { position: relative; z-index: 1; max-width: 430px; margin: 0 auto; padding: 18px 22px 40px; }
 .fv3 h1 { font-size: 30px; line-height: 1.15; letter-spacing: -.02em; font-weight: 800; text-align: center; margin: 22px 0 0; }
 .fv3 h2 { font-size: 24px; line-height: 1.2; letter-spacing: -.015em; font-weight: 800; margin: 10px 0 6px; }
 .fv3-sub { color: #6f695f; font-size: 15px; text-align: center; margin: 10px auto 0; line-height: 1.5; }
@@ -975,7 +990,8 @@ const CSS_V3 = `
 .fv3-fade.t2 { animation-delay: 1.7s; }
 @keyframes fv3fadein { to { opacity: 1; } }
 /* ---- w1 "grade viva" (céu BitePal + tiles do CORE) ---- */
-.fv3:has(.fv3-w1) {
+.fv3-ceu-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
   background:
     radial-gradient(90% 46% at 88% 2%, rgba(255,182,214,.5) 0%, rgba(255,182,214,0) 60%),
     linear-gradient(180deg, #7ec6f6 0%, #a8d9fa 30%, #d8edfd 55%, #f2f8fd 80%, #ffffff 100%);

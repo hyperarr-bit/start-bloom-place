@@ -127,6 +127,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [semSessao, setSemSessao] = useState(false);
   const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
@@ -160,6 +161,17 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const generate = async (nm: string, doc: string) => {
     setStep("generating");
     setErrMsg(null);
+    // Sem sessão as edge functions respondem 401 e o retry vira loop eterno
+    // (caso real 22/07: estado do funil restaurou o paywall pós-logout).
+    // Detecta ANTES e manda logar em vez de "tenta de novo".
+    const { data: sess } = await supabase.auth.getSession();
+    if (!sess?.session) {
+      trackEvent("pix_error", { offer, context, message: "sem_sessao" });
+      setSemSessao(true);
+      setErrMsg("Sua sessão expirou. Entra de novo rapidinho e o Pix sai na hora.");
+      setStep("error");
+      return;
+    }
     const t0 = Date.now();
     try {
       let data: any, error: any;
@@ -578,9 +590,15 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   ? "Sem problema — gera outro em 1 toque, o preço é o mesmo."
                   : errMsg ?? "Tenta de novo em alguns segundos."}
               </p>
-              <Button size="lg" className="w-full h-12 rounded-full font-bold" onClick={() => generate(name, cpf)}>
-                Gerar novo código Pix
-              </Button>
+              {semSessao ? (
+                <Button size="lg" className="w-full h-12 rounded-full font-bold" onClick={() => { window.location.href = "/entrar"; }}>
+                  Entrar de novo
+                </Button>
+              ) : (
+                <Button size="lg" className="w-full h-12 rounded-full font-bold" onClick={() => generate(name, cpf)}>
+                  Gerar novo código Pix
+                </Button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

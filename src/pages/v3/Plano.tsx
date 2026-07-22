@@ -73,7 +73,7 @@ const fmtData = (d: Date) => d.toLocaleDateString("pt-BR", { day: "numeric", mon
 
 export default function PlanoV3() {
   const navigate = useNavigate();
-  const { user, isSubscribed } = useAuth();
+  const { user, isSubscribed, loading: authLoading } = useAuth();
   const [step, setStep] = useState<Wid>(() => (lerEstado().step as Wid) ?? "w1");
   const [area, setArea] = useState<string>(() => (lerEstado().area as string) ?? "");
   const [idade, setIdade] = useState<string>("");
@@ -189,10 +189,13 @@ export default function PlanoV3() {
     setTimeout(avancar, 220);
   };
 
-  // cadastro: logado pula pro soft ask
+  // cadastro: logado pula pro soft ask; deslogado NUNCA passa do cadastro
+  // (estado salvo restaura w14/w15 mesmo após logout — o asaas-pix exige JWT
+  // e devolvia 401 → "Deu ruim ao gerar o Pix" pra sempre)
   useEffect(() => {
     if (step === "w13" && user) irPara("w14");
-  }, [step, user, irPara]);
+    if ((step === "w14" || step === "w15") && !authLoading && !user) irPara("w13");
+  }, [step, user, authLoading, irPara]);
 
   // gatilhos de fuga do paywall: voltar do celular (popstate) + 40s parado
   useEffect(() => {

@@ -280,11 +280,18 @@ serve(async (req) => {
       logStep("Pix criado", { id: out.id, amount });
       // FONTE DA VERDADE oferta↔cobrança E o ÚNICO elo com a conta (o QR
       // estático não carrega customer nosso): sem este registro o webhook
-      // não sabe de quem é o pagamento.
+      // não sabe de quem é o pagamento. fbp/fbc/source_url (22/07): sinal do
+      // NAVEGADOR capturado na criação — o webhook usa no CAPI pra quem paga
+      // no banco e nunca volta (metade das vendas só tinha e-mail no match).
       await supabaseAdmin.from("analytics_events").insert({
         event_name: "pix_order_created",
         user_id: user.id,
-        event_data: { order_id: out.id, offer, amount_cents: amount, gateway: "asaas" },
+        event_data: {
+          order_id: out.id, offer, amount_cents: amount, gateway: "asaas",
+          ...(body.fbp ? { fbp: String(body.fbp).slice(0, 120) } : {}),
+          ...(body.fbc ? { fbc: String(body.fbc).slice(0, 400) } : {}),
+          ...(body.sourceUrl ? { source_url: String(body.sourceUrl).slice(0, 300) } : {}),
+        },
       });
       const b64 = typeof out.encodedImage === "string" && out.encodedImage.length
         ? (out.encodedImage.startsWith("data:") ? out.encodedImage : `data:image/png;base64,${out.encodedImage}`)

@@ -83,7 +83,7 @@ async function sendToUtmify(admin: Admin, args: { userId: string; email: string 
   } catch (e) { logStep("UTMify send failed", { message: (e as Error).message }); }
 }
 
-async function sendMetaCapi(admin: Admin, args: { userId: string; email: string | null; orderId: string; offer: string; amountCents: number }) {
+async function sendMetaCapi(admin: Admin, args: { userId: string; email: string | null; orderId: string; offer: string; amountCents: number; fbp?: string | null; fbc?: string | null; sourceUrl?: string | null }) {
   const pixelId = Deno.env.get("META_PIXEL_ID");
   const token = Deno.env.get("META_CAPI_TOKEN");
   if (!pixelId || !token) return;
@@ -92,17 +92,26 @@ async function sendMetaCapi(admin: Admin, args: { userId: string; email: string 
       const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v.trim().toLowerCase()));
       return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
     };
-    let fbc: string | null = null;
-    const { data: rows } = await admin.from("analytics_events")
-      .select("event_data, created_at").eq("user_id", args.userId)
-      .order("created_at", { ascending: false }).limit(60);
-    const hit = (rows ?? []).find((r: { event_data: Record<string, string> }) => r.event_data?.fbclid);
-    if (hit) fbc = `fb.1.${new Date((hit as { created_at: string }).created_at).getTime()}.${(hit as { event_data: Record<string, string> }).event_data.fbclid}`;
+    // fbc: 1º o cookie salvo no create (22/07 — sinal de navegador de
+    // verdade), 2º reconstrução via fbclid dos eventos (fallback antigo).
+    let fbc: string | null = args.fbc ?? null;
+    if (!fbc) {
+      const { data: rows } = await admin.from("analytics_events")
+        .select("event_data, created_at").eq("user_id", args.userId)
+        .order("created_at", { ascending: false }).limit(60);
+      const hit = (rows ?? []).find((r: { event_data: Record<string, string> }) => r.event_data?.fbclid);
+      if (hit) fbc = `fb.1.${new Date((hit as { created_at: string }).created_at).getTime()}.${(hit as { event_data: Record<string, string> }).event_data.fbclid}`;
+    }
     const payload = {
       data: [{
         event_name: "Purchase", event_time: Math.floor(Date.now() / 1000), event_id: args.orderId,
-        action_source: "website", event_source_url: APP_URL,
-        user_data: { ...(args.email ? { em: [await sha(args.email)] } : {}), external_id: [await sha(args.userId)], ...(fbc ? { fbc } : {}) },
+        action_source: "website", event_source_url: args.sourceUrl || APP_URL,
+        user_data: {
+          ...(args.email ? { em: [await sha(args.email)] } : {}),
+          external_id: [await sha(args.userId)],
+          ...(fbc ? { fbc } : {}),
+          ...(args.fbp ? { fbp: args.fbp } : {}),
+        },
         custom_data: { value: args.amountCents / 100, currency: "BRL", content_name: args.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
       }],
     };
@@ -173,7 +182,8 @@ serve(async (req) => {
     let userId: string | null = null;
     let offer = "";
     const { data: reg } = await admin.from("analytics_events").select("user_id, event_data").eq("event_name", "pix_order_created").contains("event_data", { order_id: qrCodeId }).limit(1);
-    if (reg?.[0]) { userId = reg[0].user_id as string; offer = String((reg[0].event_data as Record<string, string>)?.offer ?? ""); }
+    const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
+    if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
     if (offer !== "downsell" && offer !== "lifetime") offer = "lifetime";
     const amountCents = PRECOS_CENTAVOS[offer];
@@ -198,7 +208,10 @@ serve(async (req) => {
       const { data: p } = await admin.from("profiles").select("display_name").eq("id", userId).maybeSingle();
       const displayName = (p?.display_name ?? "").trim() || null;
       await sendToUtmify(admin, { userId, email, orderId: qrCodeId, offer, amountCents, name: displayName });
-      await sendMetaCapi(admin, { userId, email, orderId: qrCodeId, offer, amountCents });
+      await sendMetaCapi(admin, {
+        userId, email, orderId: qrCodeId, offer, amountCents,
+        fbp: regData.fbp ?? null, fbc: regData.fbc ?? null, sourceUrl: regData.source_url ?? null,
+      });
       try {
         const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
         const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";

@@ -165,8 +165,18 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       let data: any, error: any;
       if (braco === "asaas") {
         // Asaas (QR estático): sem CPF, contrato de resposta idêntico.
+        // fbp/fbc/sourceUrl vão NO CREATE (22/07): metade dos pagantes paga no
+        // app do banco e nunca volta — o webhook fazia o CAPI só com e-mail.
+        // Capturando os cookies AGORA (navegador ainda aberto) e guardando no
+        // pix_order_created, o webhook manda o Purchase com sinal completo.
+        const cookie = (n: string) =>
+          document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
         ({ data, error } = await supabase.functions.invoke("asaas-pix", {
-          body: { action: "create", offer },
+          body: {
+            action: "create", offer,
+            fbp: cookie("_fbp"), fbc: cookie("_fbc"),
+            sourceUrl: window.location.href,
+          },
         }));
       } else if (braco === "pagarme") {
         // Pagar.me: MESMO contrato; exige CPF — devolve {error:"cpf_required"}

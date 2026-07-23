@@ -57,10 +57,10 @@ const ehPwa = () => {
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
-  // APP DA LOJA (Capacitor): install novo abre no ONBOARDING (/plano, o
-  // funil estilo Cal AI) — a tela 1 já tem "Já tenho conta? Entrar" pra quem
-  // é da base. PWA continua indo pro login (quem instala PWA já comprou).
-  if (!user && isNativeShell()) return <Navigate to="/plano" replace />;
+  // APP DA LOJA (Capacitor): install novo vai pro /inicio — o welcome "grade
+  // viva" é um overlay DENTRO do funil (rota própria causava flash branco na
+  // transição). PWA continua indo pro login (quem instala PWA já comprou).
+  if (!user && isNativeShell()) return <Navigate to="/inicio" replace />;
   if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
 
   const area = getFunnelArea();

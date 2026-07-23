@@ -102,10 +102,11 @@ const DemoTourNav = ({ current }: { current: string }) => (
   </div>
 );
 
-/** CTA fixo no rodapé da demo — no funil volta pro cadastro; fora dele, cria conta.
- *  No tour vitrine o cadastro é em /inicio (preserva a área escolhida). */
+/** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
+ *  Tour vitrine (ordem 23/07): a demo PROVA e devolve pro SEU PLANO em
+ *  /inicio?step=plano (o plano promete depois da prova; cadastro vem depois). */
 const DemoCta = ({ funnel, tour }: { funnel?: boolean; tour?: boolean }) => {
-  const to = tour ? "/inicio?step=signup" : funnel ? "/comecar?step=signup" : "/comecar";
+  const to = tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar";
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
@@ -148,7 +149,7 @@ const DemoTourNudge = ({ count }: { count: number }) => {
           <p className="text-[11.5px] text-muted-foreground">Bora montar tudo com os seus dados de verdade?</p>
         </div>
         <Link
-          to="/inicio?step=signup"
+          to="/inicio?step=plano"
           onClick={() => trackEvent("funnel_click", { cta: "demo_nudge_signup", modules: count })}
           className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary text-primary-foreground font-semibold text-[13px] px-3 py-2 hover:bg-primary/90 transition"
         >

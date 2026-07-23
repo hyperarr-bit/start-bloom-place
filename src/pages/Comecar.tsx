@@ -6,6 +6,10 @@ import {
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
+import { PortaPerguntaApp } from "@/components/app/PortaPerguntaApp";
+import { AppWelcome } from "@/components/app/AppWelcome";
+import { SeuPlanoScreen } from "@/components/funnel/SeuPlanoScreen";
+import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +47,7 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
+type Step = "start" | "quiz" | "progress" | "result" | "central" | "plano" | "signup" | "offer" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -84,6 +88,12 @@ const slide = {
   exit: { opacity: 0, x: -28 },
   transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const },
 };
+
+// APP DAS LOJAS (dono, 23/07 à noite: "gostei do 2"): perguntas na pele do
+// mockup de 21/07 — céu suave de fundo (continuidade com o welcome céu
+// forte), tiles pastel por posição e card com sombra. Web fica como está.
+const TILE_CORES_APP = ["#fdeccb", "#cdeeee", "#d9e4fb", "#e6def8", "#fbd8e8"];
+const CEU_SUAVE_APP = "linear-gradient(180deg,#eaf5fd 0%,#f7fbff 30%,#ffffff 62%)";
 
 const PREP_STEPS = [
   "Identificando seu perfil financeiro",
@@ -333,9 +343,9 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
         ))}
       </Card>
       <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}>
-        Ver minha central <ArrowRight className="w-4 h-4" />
+        Testar o app de verdade <ArrowRight className="w-4 h-4" />
       </Button>
-      <p className="text-xs text-muted-foreground mt-3">Abre o app de verdade, com dados de exemplo</p>
+      <p className="text-xs text-muted-foreground mt-3">Abre o app real, com dados de exemplo — seu plano vem em seguida</p>
     </div>
   );
 }
@@ -525,7 +535,10 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
           <motion.div className="h-full bg-accent rounded-full" initial={false}
             animate={{ width: `${((idx + 1) / items.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{items.length}</span>
+        {/* App das lojas: sem contador — só a barra (decisão do dono 23/07) */}
+        {!isNativeShell() && (
+          <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{items.length}</span>
+        )}
       </div>
 
       <AnimatePresence mode="wait">
@@ -538,19 +551,30 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
             )
           ) : (
             <>
-              <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q!.q}</h2>
+              <h2 className={`text-[27px] ${isNativeShell() ? "font-black" : "font-bold"} tracking-tight leading-[1.15] mb-7`}>{q!.q}</h2>
               <div className="space-y-3">
-                {q!.opts.map((o) => (
+                {q!.opts.map((o, oi) => (
                   <button
                     key={o.label}
                     onClick={() => pick(o.label)}
-                    className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+                    className={`group w-full flex items-center gap-3.5 rounded-2xl p-3.5 text-left active:scale-[0.99] transition-all ${
+                      isNativeShell()
+                        ? "border border-[#e8eef4] bg-white shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]"
+                        : "border-2 border-border bg-card hover:border-accent hover:bg-accent/[0.04]"
+                    }`}
                   >
-                    <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+                    <span
+                      className={`grid place-items-center w-11 h-11 rounded-xl text-2xl shrink-0 ${isNativeShell() ? "" : "bg-secondary"}`}
+                      style={isNativeShell() ? { background: TILE_CORES_APP[oi % TILE_CORES_APP.length] } : undefined}
+                    >{o.emoji}</span>
                     <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
-                    <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
-                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
-                    </span>
+                    {isNativeShell() ? (
+                      <ChevronRight className="w-4 h-4 text-[#c3cad2] shrink-0" />
+                    ) : (
+                      <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -874,7 +898,9 @@ export default function Comecar() {
   // ("trial" é aceito por compat com links antigos.)
   const [step, setStep] = useState<Step>(() => {
     const s = params.get("step");
-    return s === "signup" ? "signup" : s === "offer" || s === "trial" ? "offer" : "start";
+    // "plano" = volta da demo do funil vitrine (ordem 23/07: radar → demo →
+    // PLANO → cadastro; o plano promete depois que a demo provou).
+    return s === "signup" ? "signup" : s === "plano" ? "plano" : s === "offer" || s === "trial" ? "offer" : "start";
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -883,6 +909,12 @@ export default function Comecar() {
   // da demo (?step=signup) segue na trilha.
   const { pathname } = useLocation();
   const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
+  // APP DAS LOJAS: welcome "grade viva" como OVERLAY por cima da porta (a
+  // porta já está montada por baixo — Começar só derrete o céu, sem troca de
+  // rota, sem flash). Deep-link com ?step= pula o welcome.
+  const [welcomeVisible, setWelcomeVisible] = useState(
+    () => isNativeShell() && (window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
+  );
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
       const a = localStorage.getItem(FUNNEL_AREA_KEY);
@@ -935,12 +967,38 @@ export default function Comecar() {
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
   if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;
 
+  // Shell: céu suave da porta até o loading; branco do radar em diante
+  // (régua de cor: céu forte no welcome → suave no corredor → app assume).
+  const ceuShell = isNativeShell() && (step === "start" || step === "quiz" || step === "progress");
+
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh bg-white text-foreground flex flex-col">
-      <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
+    <div
+      style={{ ...LIGHT_VARS, ...(ceuShell ? { background: CEU_SUAVE_APP } : {}) }}
+      className={`min-h-dvh ${ceuShell ? "" : "bg-white"} text-foreground flex flex-col`}
+    >
+      {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
+          pergunta no mesmo y em toda tela) + transição em slide horizontal —
+          pra ler como UMA tela trocando conteúdo. Web fica como sempre foi. */}
+      <div className={`flex-1 flex flex-col ${step === "start" || (isNativeShell() && step === "quiz") ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
-          <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
-            {step === "start" && (vitrine ? (
+          <motion.div key={step} {...(isNativeShell() ? slide : fade)} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
+            {step === "start" && (vitrine && isNativeShell() ? (
+              // APP DAS LOJAS: a porta vira pergunta pura no molde do quiz
+              // (tela 2 do app; a headline mora no AppWelcome). Handler
+              // idêntico ao da VitrineStartScreen — mesmos eventos.
+              <PortaPerguntaApp
+                onBack={() => setWelcomeVisible(true)}
+                onPickArea={(picked, label) => {
+                  setArea(picked);
+                  const first = { area: picked };
+                  setAnswers(first);
+                  try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
+                  trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked });
+                  trackEvent("funnel_quiz_answer", { q: "area", answer: label });
+                  setStep("quiz");
+                }}
+              />
+            ) : vitrine ? (
               <VitrineStartScreen
                 onPickArea={(picked, label) => {
                   setArea(picked);
@@ -985,12 +1043,21 @@ export default function Comecar() {
             )}
             {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
             {step === "result" && (vitrine && area ? (
-              <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />
+              // Ordem 23/07: radar → DEMO direto (a central era um pedágio).
+              // A demo devolve em ?step=plano.
+              <RadarResultScreen answers={answers} area={area} onDone={() => { window.location.href = demoUrlFor(area); }} />
             ) : (
               <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
             ))}
             {step === "central" && area && (
               <CentralScreen area={area} onOpen={() => { window.location.href = demoUrlFor(area); }} />
+            )}
+            {step === "plano" && (
+              <SeuPlanoScreen
+                area={area ?? "dinheiro"}
+                answers={answers}
+                onCommit={() => setStep("signup")}
+              />
             )}
             {step === "signup" && (
               <SignupScreen
@@ -1002,6 +1069,16 @@ export default function Comecar() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* APP DAS LOJAS: welcome por cima da porta — o céu derrete revelando
+          o funil já montado por baixo (sem troca de rota, sem flash) */}
+      <AnimatePresence>
+        {welcomeVisible && (
+          <motion.div key="app-welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45, ease: "easeOut" }}>
+            <AppWelcome onComecar={() => setWelcomeVisible(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

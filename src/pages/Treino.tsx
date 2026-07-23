@@ -58,6 +58,12 @@ interface Exercise {
   carga: string;
   done: boolean;
   obs: string;
+  // Cardio (23/07, pedido de usuária): musculação usa S×R×Carga; cardio
+  // (corrida, pular corda, bike) não tem carga em kg — registra duração +
+  // distância/quantidade. tipo ausente = musculação (retrocompatível).
+  tipo?: "cardio";
+  duracao?: string;
+  distancia?: string;
 }
 
 interface DayPlan {
@@ -149,6 +155,9 @@ function migratePlan(plan: any): WorkoutPlan {
       carga: ex.carga || "",
       done: ex.done || false,
       obs: ex.obs || "",
+      ...(ex.tipo === "cardio" ? { tipo: "cardio" as const } : {}),
+      ...(ex.duracao ? { duracao: ex.duracao } : {}),
+      ...(ex.distancia ? { distancia: ex.distancia } : {}),
     }));
     result[day] = { muscles, exercises };
   }
@@ -458,6 +467,21 @@ const Treino = () => {
               <div className={`grid grid-cols-[20px_1fr_auto_28px] gap-2 items-center py-1.5 ${ex.done ? "opacity-60" : ""}`}>
                 <span className="text-[10px] text-muted-foreground">{i + 1}</span>
                 <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setWorkoutPlan(prev => {
+                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
+                        const atual = u[day].exercises[i];
+                        u[day].exercises[i] = { ...atual, tipo: atual.tipo === "cardio" ? undefined : "cardio" };
+                        return u;
+                      });
+                    }}
+                    className="text-xs leading-none shrink-0"
+                    title={ex.tipo === "cardio" ? "Cardio — toque pra musculação" : "Musculação — toque pra cardio"}
+                    aria-label="Alternar tipo de exercício"
+                  >
+                    {ex.tipo === "cardio" ? "🏃" : "🏋️"}
+                  </button>
                   <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`}>
                     {ex.name}
                   </span>
@@ -465,6 +489,24 @@ const Treino = () => {
                     <MessageSquare className={`w-3 h-3 ${ex.obs ? "text-amber-500" : ""}`} />
                   </button>
                 </div>
+                {ex.tipo === "cardio" ? (
+                  <div className="flex items-center gap-1">
+                    <Input value={ex.duracao ?? ""} placeholder="min" inputMode="decimal" onChange={e => {
+                      setWorkoutPlan(prev => {
+                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
+                        u[day].exercises[i] = { ...u[day].exercises[i], duracao: e.target.value }; return u;
+                      });
+                    }} className="text-xs h-6 w-12 text-center border-none bg-transparent p-0" />
+                    <span className="text-muted-foreground text-[10px]">min</span>
+                    <span className="text-muted-foreground text-xs mx-0.5">·</span>
+                    <Input value={ex.distancia ?? ""} placeholder="km/qtd" onChange={e => {
+                      setWorkoutPlan(prev => {
+                        const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
+                        u[day].exercises[i] = { ...u[day].exercises[i], distancia: e.target.value }; return u;
+                      });
+                    }} className="text-xs h-6 w-16 text-center border-none bg-transparent p-0 font-medium" />
+                  </div>
+                ) : (
                 <div className="flex items-center gap-1">
                   <Input value={ex.sets} placeholder="S" onChange={e => {
                     setWorkoutPlan(prev => {
@@ -487,6 +529,7 @@ const Treino = () => {
                     });
                   }} className="text-xs h-6 w-16 text-center border-none bg-transparent p-0 font-medium" />
                 </div>
+                )}
                 <button onClick={() => {
                   setWorkoutPlan(prev => {
                     const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };

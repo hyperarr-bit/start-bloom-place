@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, semanaAtualId, parseLocalDay } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -568,6 +568,7 @@ const WorkDay = () => {
   const [novaTarefa, setNovaTarefa] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [memoAberto, setMemoAberto] = useState<string | null>(null);
+  const [semanaOffset, setSemanaOffset] = useState(0);
   const [mesOffset, setMesOffset] = useState(0);
 
   const hoje = localDayKey();
@@ -591,6 +592,23 @@ const WorkDay = () => {
     setTasks(prev => [...prev, { id: genId(), texto: novaTarefa.trim(), feito: false, dia: hoje }]);
     setNovaTarefa("");
   };
+
+  // Fechamento da semana: soma os contadores de cada fase nos 7 dias da semana
+  // escolhida (segunda→domingo, mesma âncora dos hábitos — semanaAtualId).
+  const segundaBase = parseLocalDay(semanaAtualId());
+  segundaBase.setDate(segundaBase.getDate() + semanaOffset * 7);
+  const diasDaSemana = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(segundaBase);
+    d.setDate(segundaBase.getDate() + i);
+    return localDayKey(d);
+  });
+  const setDiasSemana = new Set(diasDaSemana);
+  const totalDaFaseSemana = (f: WorkPhase) => Object.entries(f.counts)
+    .filter(([dia]) => setDiasSemana.has(dia))
+    .reduce((s, [, n]) => s + n, 0);
+  const tarefasDaSemana = tasks.filter(t => setDiasSemana.has(t.dia) && t.feito).length;
+  const fmtDia = (k: string) => parseLocalDay(k).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const nomeSemana = `${fmtDia(diasDaSemana[0])} – ${fmtDia(diasDaSemana[6])}`;
 
   // Fechamento do mês: soma os contadores de cada fase no mês escolhido.
   const refMes = new Date();
@@ -687,6 +705,38 @@ const WorkDay = () => {
             <Input placeholder="Nova tarefa do trabalho..." value={novaTarefa} onChange={e => setNovaTarefa(e.target.value)}
               onKeyDown={e => e.key === "Enter" && addTarefa()} className="h-8 text-xs" />
             <Button size="sm" className="h-8" onClick={addTarefa}><Plus className="w-3.5 h-3.5" /></Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fechamento da semana */}
+      <div className="rounded-xl border border-border overflow-hidden">
+        <div className="bg-emerald-200 dark:bg-emerald-800/50 px-4 py-2 flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-wider">📈 FECHAMENTO DA SEMANA</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setSemanaOffset(s => s - 1)} className="p-0.5 hover:bg-background/50 rounded" aria-label="Semana anterior">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[9px] font-medium min-w-[84px] text-center tabular-nums">{nomeSemana}</span>
+            <button onClick={() => setSemanaOffset(s => Math.min(0, s + 1))} disabled={semanaOffset >= 0}
+              className="p-0.5 hover:bg-background/50 rounded disabled:opacity-30" aria-label="Próxima semana">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+        <div className="bg-emerald-50 dark:bg-emerald-950/20 p-3 space-y-1.5">
+          {phases.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-2">Crie fases pra ver o total da semana.</p>
+          )}
+          {phases.map(f => (
+            <div key={f.id} className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+              <span className="text-xs truncate">{f.nome}</span>
+              <span className="text-sm font-bold tabular-nums">{totalDaFaseSemana(f)}</span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between rounded-lg bg-card border border-border px-3 py-2">
+            <span className="text-xs text-muted-foreground">Tarefas concluídas</span>
+            <span className="text-sm font-bold tabular-nums">{tarefasDaSemana}</span>
           </div>
         </div>
       </div>

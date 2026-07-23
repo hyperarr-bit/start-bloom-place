@@ -490,7 +490,7 @@ const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] 
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea }: {
+function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, pele }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -500,6 +500,9 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   skipFirstAnswered?: boolean;
   /** Trilha de vida: renderiza o pico de área (senão, o proof de gasto). */
   proofArea?: AreaKey;
+  /** Pele do app (premissa 23/07, vitrine web+shell): tiles pastel, sombra,
+   *  h2 900, só barra sem contador. /comecar padrão fica sem. */
+  pele?: boolean;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -535,8 +538,8 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
           <motion.div className="h-full bg-accent rounded-full" initial={false}
             animate={{ width: `${((idx + 1) / items.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        {/* App das lojas: sem contador — só a barra (decisão do dono 23/07) */}
-        {!isNativeShell() && (
+        {/* Pele do app: sem contador — só a barra (decisão do dono 23/07) */}
+        {!pele && (
           <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{items.length}</span>
         )}
       </div>
@@ -551,24 +554,24 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
             )
           ) : (
             <>
-              <h2 className={`text-[27px] ${isNativeShell() ? "font-black" : "font-bold"} tracking-tight leading-[1.15] mb-7`}>{q!.q}</h2>
+              <h2 className={`text-[27px] ${pele ? "font-black" : "font-bold"} tracking-tight leading-[1.15] mb-7`}>{q!.q}</h2>
               <div className="space-y-3">
                 {q!.opts.map((o, oi) => (
                   <button
                     key={o.label}
                     onClick={() => pick(o.label)}
                     className={`group w-full flex items-center gap-3.5 rounded-2xl p-3.5 text-left active:scale-[0.99] transition-all ${
-                      isNativeShell()
+                      pele
                         ? "border border-[#e8eef4] bg-white shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]"
                         : "border-2 border-border bg-card hover:border-accent hover:bg-accent/[0.04]"
                     }`}
                   >
                     <span
-                      className={`grid place-items-center w-11 h-11 rounded-xl text-2xl shrink-0 ${isNativeShell() ? "" : "bg-secondary"}`}
-                      style={isNativeShell() ? { background: TILE_CORES_APP[oi % TILE_CORES_APP.length] } : undefined}
+                      className={`grid place-items-center w-11 h-11 rounded-xl text-2xl shrink-0 ${pele ? "" : "bg-secondary"}`}
+                      style={pele ? { background: TILE_CORES_APP[oi % TILE_CORES_APP.length] } : undefined}
                     >{o.emoji}</span>
                     <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
-                    {isNativeShell() ? (
+                    {pele ? (
                       <ChevronRight className="w-4 h-4 text-[#c3cad2] shrink-0" />
                     ) : (
                       <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
@@ -909,11 +912,12 @@ export default function Comecar() {
   // da demo (?step=signup) segue na trilha.
   const { pathname } = useLocation();
   const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
-  // APP DAS LOJAS: welcome "grade viva" como OVERLAY por cima da porta (a
-  // porta já está montada por baixo — Começar só derrete o céu, sem troca de
-  // rota, sem flash). Deep-link com ?step= pula o welcome.
+  // Welcome "grade viva" como OVERLAY por cima da porta (a porta já está
+  // montada por baixo — Começar só derrete o céu, sem troca de rota, sem
+  // flash). Desde 23/07 vale pro /inicio INTEIRO (dono: web segue a premissa
+  // do app — mesmas 2 telas iniciais). Deep-link com ?step= pula o welcome.
   const [welcomeVisible, setWelcomeVisible] = useState(
-    () => isNativeShell() && (window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
+    () => (window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
   );
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
@@ -967,9 +971,9 @@ export default function Comecar() {
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
   if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;
 
-  // Shell: céu suave da porta até o loading; branco do radar em diante
-  // (régua de cor: céu forte no welcome → suave no corredor → app assume).
-  const ceuShell = isNativeShell() && (step === "start" || step === "quiz" || step === "progress");
+  // Funil vitrine (web e app): céu suave da porta até o loading; branco do
+  // radar em diante (céu forte no welcome → suave no corredor → app assume).
+  const ceuShell = (vitrine || isNativeShell()) && (step === "start" || step === "quiz" || step === "progress");
 
   return (
     <div
@@ -982,24 +986,11 @@ export default function Comecar() {
       <div className={`flex-1 flex flex-col ${step === "start" || (isNativeShell() && step === "quiz") ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...(isNativeShell() ? slide : fade)} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
-            {step === "start" && (vitrine && isNativeShell() ? (
-              // APP DAS LOJAS: a porta vira pergunta pura no molde do quiz
-              // (tela 2 do app; a headline mora no AppWelcome). Handler
-              // idêntico ao da VitrineStartScreen — mesmos eventos.
+            {step === "start" && (vitrine ? (
+              // Porta como pergunta pura no molde do quiz (premissa do app,
+              // 23/07: web e app iguais — a headline mora no welcome).
               <PortaPerguntaApp
                 onBack={() => setWelcomeVisible(true)}
-                onPickArea={(picked, label) => {
-                  setArea(picked);
-                  const first = { area: picked };
-                  setAnswers(first);
-                  try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
-                  trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked });
-                  trackEvent("funnel_quiz_answer", { q: "area", answer: label });
-                  setStep("quiz");
-                }}
-              />
-            ) : vitrine ? (
-              <VitrineStartScreen
                 onPickArea={(picked, label) => {
                   setArea(picked);
                   const first = { area: picked };
@@ -1031,6 +1022,7 @@ export default function Comecar() {
                 items={trackItems}
                 skipFirstAnswered={!vitrine}
                 proofArea={vitrine && area ? area : undefined}
+                pele={vitrine || isNativeShell()}
                 initialAnswers={answers}
                 onBack={() => setStep("start")}
                 onDone={(a) => {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
+import { isNativeShell } from "@/lib/native-shell";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 
 /**
@@ -98,9 +99,11 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
           <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); navigate("/entrar"); }}>
             Já tenho conta? <b>Entrar</b>
           </button>
-          <button className="apw-restore" onClick={tentarRestaurar} disabled={restaurando}>
-            {restaurando ? "Verificando…" : "Restaurar compras"}
-          </button>
+          {isNativeShell() && (
+            <button className="apw-restore" onClick={tentarRestaurar} disabled={restaurando}>
+              {restaurando ? "Verificando…" : "Restaurar compras"}
+            </button>
+          )}
           {msgRestore && <span className="apw-msg">{msgRestore}</span>}
           <span className="apw-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
         </motion.div>

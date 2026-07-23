@@ -65,7 +65,10 @@ interface Props {
  * QA: localStorage "pix-ab-force" = braço (chave fora do prefixo core-*,
  * sobrevive às vassouras de cache). */
 type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
-const FORCE_GATEWAY: Gateway | null = null;
+// 23/07 (ordem do dono): A/B encerrado com Asaas na frente em todas as
+// métricas (50% vs 33% por abertura; painel Pagar.me reconciliado no centavo)
+// + 100 Pix grátis/mês. Pra reabrir o teste: FORCE_GATEWAY = null.
+const FORCE_GATEWAY: Gateway | null = "asaas";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {

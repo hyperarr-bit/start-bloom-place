@@ -462,6 +462,10 @@ const Treino = () => {
           <div className="grid grid-cols-[20px_1fr_auto_28px] gap-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border pb-1 mb-2">
             <span></span><span>Exercício</span><span className="text-center">S × R × Carga</span><span className="text-center">✓</span>
           </div>
+          <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
+            <span className="inline-flex items-center gap-0.5 h-4 px-1 rounded border border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300 text-[9px] font-semibold">🏋️ Força</span>
+            é o padrão — toque nele pra virar <span className="text-orange-600 dark:text-orange-300 font-semibold">🏃 Cardio</span> (corrida, bike, corda) e registrar tempo + distância.
+          </p>
           {workout.exercises.map((ex, i) => (
             <div key={i}>
               <div className={`grid grid-cols-[20px_1fr_auto_28px] gap-2 items-center py-1.5 ${ex.done ? "opacity-60" : ""}`}>
@@ -476,11 +480,16 @@ const Treino = () => {
                         return u;
                       });
                     }}
-                    className="text-xs leading-none shrink-0"
-                    title={ex.tipo === "cardio" ? "Cardio — toque pra musculação" : "Musculação — toque pra cardio"}
+                    className={`shrink-0 flex items-center gap-0.5 h-6 pl-1 pr-1.5 rounded-md border text-[10px] font-semibold active:scale-95 transition ${
+                      ex.tipo === "cardio"
+                        ? "border-orange-300 bg-orange-100 text-orange-700 dark:border-orange-500/40 dark:bg-orange-500/15 dark:text-orange-300"
+                        : "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300"
+                    }`}
+                    title="Toque pra alternar entre Musculação e Cardio"
                     aria-label="Alternar tipo de exercício"
                   >
-                    {ex.tipo === "cardio" ? "🏃" : "🏋️"}
+                    <span className="text-xs leading-none">{ex.tipo === "cardio" ? "🏃" : "🏋️"}</span>
+                    {ex.tipo === "cardio" ? "Cardio" : "Força"}
                   </button>
                   <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`}>
                     {ex.name}

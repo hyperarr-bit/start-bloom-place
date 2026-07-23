@@ -29,6 +29,14 @@ const hours = [
   "20:00", "21:00", "22:00", "23:00", "0:00"
 ];
 
+// "Começa às" da agenda (22/07, pedido de usuária: dia começa antes das 6 +
+// horário quebrado). A grade continua com as MESMAS 19 linhas de 1 em 1 hora —
+// só a âncora muda: escolher 4:30 rende 4:30, 5:30, 6:30… Célula salva em
+// horário fora da grade atual NUNCA some: entra como linha extra ordenada.
+const OPCOES_INICIO = ["3:00", "3:30", "4:00", "4:30", "5:00", "5:30", "6:00", "6:30", "7:00", "7:30", "8:00", "8:30", "9:00"];
+const paraMin = (h: string) => { const [hh, mm] = h.split(":").map(Number); return ((hh || 0) % 24) * 60 + (mm || 0); };
+const fmtHora = (min: number) => { const m = ((min % 1440) + 1440) % 1440; return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`; };
+
 const defaultSchedule: Record<string, Record<string, string>> = Object.fromEntries(
   ["6:00", "7:00", "8:00", "9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", "0:00"].map(h => [
     h, { Segunda: "", Terça: "", Quarta: "", Quinta: "", Sexta: "", Sábado: "", Domingo: "" }
@@ -1011,6 +1019,17 @@ const Rotina = () => {
 
   const scheduleDays = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"];
 
+  // Âncora da agenda (persistida e sincronizada como o resto da rotina)
+  const [inicioAgenda, setInicioAgenda] = usePersistedState<string>("rotina-agenda-inicio", "6:00");
+  const baseMin = paraMin(OPCOES_INICIO.includes(inicioAgenda) ? inicioAgenda : "6:00");
+  const offsetDaAncora = (h: string) => (((paraMin(h) - baseMin) % 1440) + 1440) % 1440;
+  const gradePadrao = hours.map((_, i) => fmtHora(baseMin + i * 60));
+  // horários salvos fora da grade atual (ex.: mudou a âncora depois de preencher)
+  const extrasSalvos = Object.keys(schedule).filter(
+    (h) => !gradePadrao.includes(h) && /^\d{1,2}:\d{2}$/.test(h) && scheduleDays.some((d) => (schedule[h]?.[d] ?? "").trim() !== "")
+  );
+  const horasGrade = [...gradePadrao, ...extrasSalvos].sort((a, b) => offsetDaAncora(a) - offsetDaAncora(b));
+
   const quote = motivationalQuotes[new Date().getDay() % motivationalQuotes.length];
 
   const tabs = [
@@ -1135,6 +1154,19 @@ const Rotina = () => {
               <div data-spotlight="weekly-schedule" className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
                 <div className="bg-gradient-to-r from-pink-300 to-pink-400 dark:from-[hsl(330,40%,22%)] dark:to-[hsl(330,40%,28%)] px-4 py-3 flex items-center justify-between">
                   <span className="font-bold text-sm text-white">ROTINA SEMANAL</span>
+                  <label className="flex items-center gap-1.5 text-[11px] font-medium text-white/90">
+                    começa às
+                    <select
+                      value={OPCOES_INICIO.includes(inicioAgenda) ? inicioAgenda : "6:00"}
+                      onChange={(e) => setInicioAgenda(e.target.value)}
+                      className="bg-white/25 text-white font-bold rounded-md px-1.5 py-0.5 text-[11px] outline-none cursor-pointer [&>option]:text-foreground [&>option]:bg-background"
+                      aria-label="Horário em que sua agenda começa"
+                    >
+                      {OPCOES_INICIO.map((o) => (
+                        <option key={o} value={o}>{o}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-[11px]">
@@ -1147,7 +1179,7 @@ const Rotina = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {hours.map((hour, ri) => (
+                      {horasGrade.map((hour, ri) => (
                         <tr key={hour} className={`border-t border-border/30 dark:border-[hsl(var(--rt-border))] hover:bg-muted/20 dark:hover:bg-[hsl(var(--rt-card-2))] ${ri % 2 === 1 ? "dark:bg-[hsl(var(--rt-card-2))]/40" : ""}`}>
                           <td className="px-2 py-1.5 font-mono font-bold text-muted-foreground dark:text-[hsl(var(--rt-text-soft))] border-r border-border/30 dark:border-[hsl(var(--rt-border))] bg-pink-50/30 dark:bg-transparent dark:bg-pink-500/10">{hour}</td>
                           {scheduleDays.map((day) => {

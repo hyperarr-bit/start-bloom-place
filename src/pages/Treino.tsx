@@ -197,6 +197,22 @@ const Treino = () => {
   };
 
   const [activeDays, setActiveDays] = usePersistedState<string[]>("treino-active-days", ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"]);
+  // Dias ativos normalizados: MAIÚSCULA + só dias válidos + sem repetição, na
+  // ordem da semana. Cura dado sujo (23/07: contas com "Segunda" Title Case
+  // AO LADO de "SEGUNDA" renderizavam a grade de músculos 2x, a 2ª com rótulo
+  // branco-no-branco — dayColors só tem as chaves em maiúscula).
+  const diasAtivosLimpos = useMemo(
+    () => [...new Set(activeDays.map(d => d.toUpperCase()).filter(d => weekDays.includes(d)))]
+      .sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)),
+    [activeDays],
+  );
+  // Grava a versão limpa de volta quando detectar sujeira (roda também DEPOIS
+  // da hidratação do servidor, que chega após o mount). Escreve só o normalizado
+  // do próprio activeDays — não apaga dado, só deduplica; converge e para.
+  useEffect(() => {
+    const sujo = activeDays.length !== diasAtivosLimpos.length || activeDays.some((d, i) => d !== diasAtivosLimpos[i]);
+    if (sujo) setActiveDays(diasAtivosLimpos);
+  }, [activeDays, diasAtivosLimpos, setActiveDays]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [newExName, setNewExName] = useState("");
   const [workoutLog, setWorkoutLog] = usePersistedState<string[]>("saude-workout-log", []);
@@ -807,7 +823,7 @@ const Treino = () => {
               <div>
                 <h3 className="text-xs font-bold mb-2 flex items-center gap-2"><Target className="w-4 h-4 text-muted-foreground" /> GRUPOS MUSCULARES POR DIA</h3>
                 <div className="space-y-3">
-                  {activeDays.sort((a, b) => weekDays.indexOf(a) - weekDays.indexOf(b)).map(day => (
+                  {diasAtivosLimpos.map(day => (
                     <div key={day} className="space-y-1">
                       <span className={`text-[10px] font-bold ${dayColors[day]} text-white px-2 py-0.5 rounded inline-block`}>{day}</span>
                       <div className="flex flex-wrap gap-1 ml-1">

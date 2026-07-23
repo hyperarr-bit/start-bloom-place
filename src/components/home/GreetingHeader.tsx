@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Sun, Moon, CloudSun, Sunset, Pencil, Menu } from "lucide-react";
+import { Sun, Moon, CloudSun, Sunset, Pencil, ChevronDown } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/hooks/use-auth";
@@ -113,22 +113,26 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
           <p className="text-xs text-muted-foreground">{contextMessage}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* ☰ + avatar (22/07, ajuste do dono: a seta ficou feia): os três
-              traços são o símbolo de menu que qualquer público reconhece —
-              mesmo padrão do pill do Airbnb (☰ + avatar juntos).
+          {/* Avatar-badge (22/07, escolha do dono após ▾ e ☰): o próprio
+              avatar É o menu — anel degradê + mini-badge ⌄ no canto, padrão
+              Google/Instagram. Um elemento só, nada solto do lado.
               account_drawer_open segue medindo a descoberta real. */}
           <motion.button
             onClick={() => { trackEvent("account_drawer_open", { via: "avatar" }); setShowAccount(true); }}
-            className="h-8 pl-1 pr-1.5 rounded-xl flex items-center gap-1"
+            className="relative rounded-full"
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"
           >
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold rounded-xl">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <Menu className="w-4 h-4 text-muted-foreground" />
+            <span className="block rounded-full p-[2px] bg-gradient-to-br from-primary/70 to-primary/20">
+              <Avatar className="h-8 w-8 border-2 border-background">
+                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </span>
+            <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-background border border-border shadow-sm flex items-center justify-center">
+              <ChevronDown className="w-2.5 h-2.5 text-muted-foreground" strokeWidth={3} />
+            </span>
           </motion.button>
           <ThemeToggle showPalette />
         </div>

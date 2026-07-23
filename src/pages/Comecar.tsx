@@ -47,7 +47,7 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "central" | "plano" | "signup" | "offer" | "confirm";
+type Step = "start" | "crenca" | "quiz" | "confianca" | "progress" | "result" | "central" | "plano" | "signup" | "offer" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -123,6 +123,108 @@ const TrustRow = () => (
 // Perguntas em QUIZ (src/lib/funnel.ts). A tela de impacto entra depois da
 // pergunta de "gasto" — usa a resposta da pessoa como âncora de dor em R$.
 const PROOF_AFTER_KEY = "gasto";
+
+
+/* ------------------------- telas novas do arco web (23/07, teste só-web) */
+
+/** Micro-feedback por resposta (lei nº 1 do BitePal: todo input devolve
+ *  algo). "gasto" fica de fora — a tela de impacto já é a devolução dele. */
+const FEEDBACK_QUIZ: Record<string, { padrao: string; por?: Record<string, string> }> = {
+  atrapalha: { padrao: "Anotado — é por aqui que seu plano começa." },
+  controle: {
+    padrao: "Bom ponto de partida — o CORE puxa tudo pra um lugar só.",
+    por: { "Não controlo": "73% chegam assim. É exatamente disso que o plano cuida." },
+  },
+  consistencia: { padrao: "Normal: sem sistema, todo mundo larga. Com sistema, fica." },
+  compromisso: { padrao: "Fechado 🤝 5 minutos é tudo que o plano pede." },
+  vitoria: { padrao: "Essa vira a meta nº 1 do seu plano." },
+};
+const feedbackPara = (key: string, answer: string): string | null => {
+  if (key === "gasto") return null;
+  const f = FEEDBACK_QUIZ[key];
+  return f ? f.por?.[answer] ?? f.padrao : null;
+};
+
+/** CRENÇA (BitePal "why it works"): instala o mecanismo antes do quiz —
+ *  motivação despenca, sistema fica. Curvas do v3 (w2), adaptadas. */
+function CrencaScreen({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
+        Por que dessa vez<br />funciona
+      </h2>
+      <div className="rounded-2xl border border-[#eef0f3] bg-white p-4 shadow-[0_8px_20px_-14px_rgba(20,40,70,0.28)]">
+        <svg viewBox="0 0 300 130" className="w-full" aria-hidden="true">
+          <motion.path d="M10 30 C 70 20, 110 70, 150 95 S 250 115, 290 118" fill="none" stroke="#d0cbc4" strokeWidth="3"
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} />
+          <motion.path d="M10 100 C 80 95, 140 55, 200 40 S 270 26, 290 24" fill="none" stroke="hsl(var(--accent))" strokeWidth="3.5"
+            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.5, duration: 1, ease: "easeOut" }} />
+          <motion.circle cx="290" cy="24" r="5" fill="hsl(var(--accent))" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} />
+          <text x="155" y="112" fontSize="11" fill="#8a8378">motivação solta</text>
+          <text x="196" y="18" fontSize="11.5" fontWeight="700" fill="hsl(var(--accent))">com um sistema</text>
+          <text x="10" y="127" fontSize="10" fill="#8a8378">semana 1</text>
+          <text x="252" y="127" fontSize="10" fill="#8a8378">mês 6</text>
+        </svg>
+        <p className="text-[13px] text-muted-foreground leading-relaxed mt-3 text-left">
+          Motivação despenca em 2 semanas — é normal. <b className="text-foreground">Sistema fica.</b> O CORE transforma organização em rotina, não em fase.
+        </p>
+      </div>
+      <Button size="lg" className="w-full h-12 text-base mt-5 rounded-full font-bold" onClick={onNext}>
+        Fazer meu diagnóstico <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+/** CONFIANÇA (Cal AI "thank you for trusting us"): reciprocidade antes do
+ *  loading — a pessoa entregou respostas pessoais, a gente agradece. */
+function ConfiancaScreen({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="w-full max-w-md mx-auto text-center">
+      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 240, damping: 15 }}
+        className="text-[44px] mb-3" aria-hidden>🤝</motion.div>
+      <h2 className="text-[26px] font-black tracking-tight leading-[1.12] mb-2">Obrigado por<br />confiar na gente</h2>
+      <p className="text-[14px] text-muted-foreground mb-5">Agora vamos montar sua análise.</p>
+      <div className="rounded-2xl border border-[#eef0f3] bg-white p-4 text-left shadow-[0_8px_20px_-14px_rgba(20,40,70,0.25)] flex items-start gap-3">
+        <Lock className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+        <p className="text-[12.5px] text-muted-foreground leading-relaxed">
+          Sua privacidade importa. Suas respostas são só suas — nunca vendidas, nunca compartilhadas.
+        </p>
+      </div>
+      <Button size="lg" className="w-full h-12 text-base mt-6 rounded-full font-bold" onClick={onNext}>
+        Montar minha análise <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+/** PONTE-DEMO: substitui o radar no web (23/07 — o gráfico tinha números
+ *  fabricados, mesma doença do gauge; o diagnóstico real já aconteceu no
+ *  quiz+impacto). Uma frase honesta e a nossa arma: o app de verdade. */
+const PONTE_AREA: Record<AreaKey, string> = {
+  dinheiro: "O padrão que você descreveu — gasto invisível, conta esquecida — é exatamente o que o painel de Finanças resolve.",
+  rotina: "O padrão que você descreveu — dia no improviso, hábito que não segura — é exatamente o que o painel de Rotina resolve.",
+  corpo: "O padrão que você descreveu — recomeço atrás de recomeço — é exatamente o que Treino e Dieta juntos resolvem.",
+  saude: "O padrão que você descreveu é exatamente o que os check-ins de Saúde resolvem.",
+  metas: "O padrão que você descreveu — meta adiada — é exatamente o que o painel de Metas destrava.",
+};
+function PonteDemoScreen({ area, onDemo }: { area: AreaKey; onDemo: () => void }) {
+  return (
+    <div className="w-full max-w-md mx-auto text-center">
+      <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 240, damping: 15 }}
+        className="w-11 h-11 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-3 text-lg font-black shadow-[0_8px_24px_-6px_hsl(var(--accent)/0.55)]">✓</motion.div>
+      <div className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground mb-1">Análise pronta</div>
+      <h2 className="text-[27px] font-black tracking-tight leading-[1.1] mb-3">
+        Seu ponto de partida:<br /><span className="text-accent">{AREAS[area].nome}</span>
+      </h2>
+      <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[30ch] mx-auto mb-7">{PONTE_AREA[area]}</p>
+      <Button size="lg" className="w-full h-12 text-base rounded-full font-bold" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDemo(); }}>
+        Testar o app de verdade <ArrowRight className="w-4 h-4" />
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3">Abre o app real, com dados de exemplo — seu plano vem em seguida</p>
+    </div>
+  );
+}
 
 /* ---------------------------------------------------------------- screens */
 
@@ -509,6 +611,10 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     : 0;
   const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
+  // Micro-feedback por resposta (só web vitrine): a opção acende, a tag
+  // devolve algo, e só então o slide segue — conversa, não formulário.
+  const comFeedback = !!pele && !isNativeShell();
+  const [feedback, setFeedback] = useState<{ label: string; texto: string } | null>(null);
   const item = items[idx];
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
@@ -521,11 +627,14 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     else onDone(next);
   };
   const pick = (label: string) => {
-    if (!q) return;
+    if (!q || feedback) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
-    advance(next);
+    const tag = comFeedback ? feedbackPara(q.key, label) : null;
+    if (!tag) { advance(next); return; }
+    setFeedback({ label, texto: tag });
+    setTimeout(() => { setFeedback(null); advance(next); }, 900);
   };
   return (
     <div className="w-full max-w-md mx-auto">
@@ -557,14 +666,14 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
               <h2 className={`text-[27px] ${pele ? "font-black" : "font-bold"} tracking-tight leading-[1.15] mb-7`}>{q!.q}</h2>
               <div className="space-y-3">
                 {q!.opts.map((o, oi) => (
+                  <div key={o.label}>
                   <button
-                    key={o.label}
                     onClick={() => pick(o.label)}
                     className={`group w-full flex items-center gap-3.5 rounded-2xl p-3.5 text-left active:scale-[0.99] transition-all ${
                       pele
                         ? "border border-[#e8eef4] bg-white shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]"
                         : "border-2 border-border bg-card hover:border-accent hover:bg-accent/[0.04]"
-                    }`}
+                    } ${feedback?.label === o.label ? "!border-accent bg-accent/5" : ""}`}
                   >
                     <span
                       className={`grid place-items-center w-11 h-11 rounded-xl text-2xl shrink-0 ${pele ? "" : "bg-secondary"}`}
@@ -579,6 +688,13 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
                       </span>
                     )}
                   </button>
+                  {feedback?.label === o.label && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                      className="mt-1.5 ml-1 inline-flex items-center gap-1.5 rounded-full bg-accent/10 text-accent px-3 py-1.5 text-[12px] font-bold"
+                    >✓ {feedback.texto}</motion.div>
+                  )}
+                  </div>
                 ))}
               </div>
             </>
@@ -589,7 +705,7 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   );
 }
 
-function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
+function ProgressScreen({ onDone, steps = PREP_STEPS, titulo = "Preparando seu plano…", review = false }: { onDone: () => void; steps?: string[]; titulo?: string; review?: boolean }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
     if (done >= steps.length) {
@@ -611,7 +727,7 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
         </svg>
         <div className="absolute inset-0 grid place-items-center text-2xl font-bold tabular-nums">{pct}%</div>
       </div>
-      <h2 className="text-2xl font-bold tracking-tight mb-1">Preparando seu plano…</h2>
+      <h2 className="text-2xl font-bold tracking-tight mb-1">{titulo}</h2>
       <p className="text-muted-foreground text-sm mb-8">Isso leva só alguns segundos.</p>
       <div className="space-y-3 text-left max-w-xs mx-auto">
         {steps.map((s, i) => {
@@ -626,6 +742,14 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
           );
         })}
       </div>
+      {/* Prova no meio da espera (BitePal): a espera vira argumento */}
+      {review && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.6 }}
+          className="mt-8 max-w-xs mx-auto rounded-2xl border border-[#eef0f3] bg-white p-3.5 text-left shadow-[0_8px_20px_-14px_rgba(20,40,70,0.25)]">
+          <p className="text-[12.5px] leading-snug">“Adorei demais o aplicativo!! Estou usando há 1 dia e já está me ajudando bastante.”</p>
+          <p className="text-[10.5px] text-muted-foreground mt-1.5"><span className="text-[#f0a500]">★★★★★</span> — @requeijohn · Instagram</p>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -930,8 +1054,10 @@ export default function Comecar() {
   const trackItems = vitrine && area && area !== "dinheiro"
     ? buildQuizItems(track, "consistencia")
     : QUIZ_ITEMS;
+  // Vitrine: o loading monta a ANÁLISE (a palavra "plano" pertence só ao SEU
+  // PLANO — eram 2 páginas gerando plano, dono 23/07).
   const vidaPrepSteps = area
-    ? ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
+    ? ["Lendo suas respostas", `Mapeando seu padrão de ${AREAS[area].nome}`, "Montando sua análise", "Separando o que resolver primeiro"]
     : PREP_STEPS;
 
   // Captura UTM/referrer da entrada no funil — sem isso o admin não sabe
@@ -973,7 +1099,7 @@ export default function Comecar() {
 
   // Funil vitrine (web e app): céu suave da porta até o loading; branco do
   // radar em diante (céu forte no welcome → suave no corredor → app assume).
-  const ceuShell = (vitrine || isNativeShell()) && (step === "start" || step === "quiz" || step === "progress");
+  const ceuShell = (vitrine || isNativeShell()) && (step === "start" || step === "crenca" || step === "quiz" || step === "confianca" || step === "progress");
 
   return (
     <div
@@ -998,7 +1124,8 @@ export default function Comecar() {
                   try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
                   trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked });
                   trackEvent("funnel_quiz_answer", { q: "area", answer: label });
-                  setStep("quiz");
+                  // Web (teste 23/07): beat de CRENÇA antes do quiz; app segue direto.
+                  setStep(isNativeShell() ? "quiz" : "crenca");
                 }}
               />
             ) : (
@@ -1016,6 +1143,8 @@ export default function Comecar() {
                 }}
               />
             ))}
+            {step === "crenca" && <CrencaScreen onNext={() => setStep("quiz")} />}
+            {step === "confianca" && <ConfiancaScreen onNext={() => setStep("progress")} />}
             {step === "quiz" && (
               <QuizScreen
                 questions={track}
@@ -1029,15 +1158,17 @@ export default function Comecar() {
                   setAnswers(a);
                   // Persiste pro paywall personalizar mesmo após OAuth/refresh
                   try { localStorage.setItem("funnel-quiz-answers", JSON.stringify(a)); } catch { /* noop */ }
-                  setStep("progress");
+                  setStep(vitrine && !isNativeShell() ? "confianca" : "progress");
                 }}
               />
             )}
-            {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
+            {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} titulo={vitrine && !isNativeShell() ? "Montando sua análise…" : undefined} review={vitrine && !isNativeShell()} onDone={() => setStep("result")} />}
             {step === "result" && (vitrine && area ? (
-              // Ordem 23/07: radar → DEMO direto (a central era um pedágio).
-              // A demo devolve em ?step=plano.
-              <RadarResultScreen answers={answers} area={area} onDone={() => { window.location.href = demoUrlFor(area); }} />
+              // Web: PONTE (radar saiu — números fabricados); shell mantém o
+              // radar até o web validar. A demo devolve em ?step=plano.
+              isNativeShell()
+                ? <RadarResultScreen answers={answers} area={area} onDone={() => { window.location.href = demoUrlFor(area); }} />
+                : <PonteDemoScreen area={area} onDemo={() => { window.location.href = demoUrlFor(area); }} />
             ) : (
               <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
             ))}

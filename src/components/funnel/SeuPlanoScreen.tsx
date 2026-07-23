@@ -52,6 +52,15 @@ const TILE_AREA: Record<AreaKey, Tile> = {
   metas: { emoji: "🧭", cor: "#d9e4fb", titulo: "Plano por meta", sub: "passos pequenos e claros" },
 };
 
+/** O contraste que a pessoa RECONHECE (substitui o gauge fabricado). */
+const HOJE_SEM1: Record<AreaKey, [string, string]> = {
+  dinheiro: ["Contas de cabeça, susto no fim do mês", "Tudo num painel, avisado antes de cada vencimento"],
+  rotina: ["O dia começa no improviso", "Semana inteira à vista, hábitos rodando"],
+  corpo: ["Treino e dieta no chute, recomeço eterno", "Refeições e treinos registrados, evolução visível"],
+  saude: ["Sinais ignorados até virar susto", "Check-ins diários, tudo acompanhado"],
+  metas: ["Meta adiada há meses", "Meta quebrada em passos — o 1º dado ainda esta semana"],
+};
+
 const fmtData = (d: Date) => d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
 
 export function SeuPlanoScreen({ area, answers, onCommit }: {
@@ -70,9 +79,6 @@ export function SeuPlanoScreen({ area, answers, onCommit }: {
 
   const anchor = area === "dinheiro" ? GASTO_ANCHOR[resp.gasto ?? ""] ?? null : null;
   const dataAlvo = useMemo(() => { const d = new Date(); d.setDate(d.getDate() + 7); return d; }, []);
-  const desorganizado = resp.controle === "Não controlo" || resp.consistencia === "Nunca consegui manter";
-  const scoreHoje = desorganizado ? "3,6" : "4,2";
-
   const tile1 = (area === "dinheiro" && TILE_ATRAPALHA[resp.atrapalha ?? ""]) || TILE_AREA[area];
   const tile2: Tile = {
     emoji: "🎯", cor: "#e6def8",
@@ -147,31 +153,30 @@ export function SeuPlanoScreen({ area, answers, onCommit }: {
         ))}
       </motion.div>
 
-      {/* antes → depois desenhado */}
-      <motion.div {...stag(5)} className="mt-3.5 flex items-center justify-center gap-4">
-        <span className="text-center">
-          <small className="block text-[9.5px] font-bold text-muted-foreground">organização hoje</small>
-          <b className="text-lg tabular-nums text-destructive/80">{scoreHoje}</b>
-        </span>
-        <svg width="92" height="42" viewBox="0 0 92 42" aria-hidden="true">
-          <path d="M7 35 A 40 40 0 0 1 85 35" fill="none" stroke="hsl(var(--secondary))" strokeWidth="7" strokeLinecap="round" />
-          <motion.path
-            d="M7 35 A 40 40 0 0 1 67 12" fill="none" stroke="hsl(var(--accent))" strokeWidth="7" strokeLinecap="round"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.7, duration: 0.9, ease: "easeOut" }}
-          />
-          <motion.circle cx="67" cy="12" r="5" fill="hsl(var(--accent))" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.55 }} />
-        </svg>
-        <span className="text-center">
-          <small className="block text-[9.5px] font-bold text-muted-foreground">semana 4 do plano</small>
-          <b className="text-lg tabular-nums text-accent">8,5</b>
-        </span>
+      {/* contraste concreto hoje → semana 1: coisa que a pessoa RECONHECE
+          (o gauge 3,6→8,5 saiu — número fabricado não gera apego; dono 23/07) */}
+      <motion.div {...stag(5)} className="mt-2.5 rounded-2xl border border-[#eef0f3] bg-white p-3.5 text-left shadow-[0_8px_20px_-14px_rgba(20,40,70,0.25)]">
+        <div className="flex items-start gap-2.5">
+          <span className="text-[9.5px] font-extrabold uppercase tracking-wider text-destructive/70 w-[62px] shrink-0 mt-0.5">Hoje</span>
+          <span className="text-[12.5px] text-muted-foreground leading-snug">{HOJE_SEM1[area][0]}</span>
+        </div>
+        <div className="my-1.5 ml-[7px] h-3.5 border-l-2 border-dashed border-accent/30" aria-hidden />
+        <div className="flex items-start gap-2.5">
+          <span className="text-[9.5px] font-extrabold uppercase tracking-wider text-accent w-[62px] shrink-0 mt-0.5">Semana 1</span>
+          <span className="text-[12.5px] font-semibold leading-snug">{HOJE_SEM1[area][1]}</span>
+        </div>
       </motion.div>
 
       <motion.p {...stag(6)} className="text-[11px] text-muted-foreground mt-2.5">
         montado com as suas respostas · dá pra ajustar tudo depois
       </motion.p>
 
-      <motion.div {...stag(7)} className="mt-5">
+      {/* prova no pico (BitePal: 10k ★ na tela de compromisso) */}
+      <motion.p {...stag(7)} className="text-[12.5px] mt-3">
+        <span className="text-[#f0a500] tracking-wide">★★★★★</span> <b>+500 pessoas</b> <span className="text-muted-foreground">já organizando a vida</span>
+      </motion.p>
+
+      <motion.div {...stag(8)} className="mt-4">
         <Button
           size="lg"
           className="w-full h-13 min-h-[52px] rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"

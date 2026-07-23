@@ -11,6 +11,9 @@ import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
+import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
+import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
+import { TrialTimeline } from "@/components/app/TrialTimeline";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 /**
@@ -293,6 +296,25 @@ function GuaranteeTimeline() {
   );
 }
 
+/** Coluna direita das âncoras: preço vitalício (web) ou o mensal-do-anual
+ *  (shell — copy de assinatura, zero menção a vitalício no app das lojas). */
+function AnchorPriceCol() {
+  if (isNativeShell()) {
+    return (
+      <div className="pl-3 text-center">
+        <p className="text-[11px] text-muted-foreground leading-tight mb-1">O CORE inteiro,<br />pra enxergar tudo</p>
+        <p className="text-xl font-extrabold text-accent tracking-tight">{APP_PRECOS.anual.porMes}<span className="block text-[10px] font-semibold text-muted-foreground">por mês, no plano anual</span></p>
+      </div>
+    );
+  }
+  return (
+    <div className="pl-3 text-center">
+      <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
+      <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
+    </div>
+  );
+}
+
 /** Contraste "o que some por ano" vs "o que o CORE custa" — usa a estimativa
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
 function AnchorCard({ gasto }: { gasto: string }) {
@@ -309,10 +331,7 @@ function AnchorCard({ gasto }: { gasto: string }) {
             <p className="text-xl font-extrabold text-destructive/80 tracking-tight">R$ ???</p>
             <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">o que não se vê,<br />não se controla</p>
           </div>
-          <div className="pl-3 text-center">
-            <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
-            <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
-          </div>
+          <AnchorPriceCol />
         </div>
       </div>
     );
@@ -325,10 +344,7 @@ function AnchorCard({ gasto }: { gasto: string }) {
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">Somem por ano,<br />pela sua estimativa</p>
           <p className="text-xl font-extrabold text-destructive/80 tracking-tight">{anchor.year}</p>
         </div>
-        <div className="pl-3 text-center">
-          <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
-        </div>
+        <AnchorPriceCol />
       </div>
     </div>
   );
@@ -349,7 +365,11 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">Com o CORE,<br />sai por</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">
+            {isNativeShell()
+              ? <>{APP_PRECOS.anual.porMes}<span className="block text-[10px] font-semibold text-muted-foreground">por mês, no plano anual</span></>
+              : <>R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></>}
+          </p>
         </div>
       </div>
     </div>
@@ -362,10 +382,17 @@ const TRUST_CHIPS = [
   { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
+// Shell: chips de assinatura — Pix/garantia são conceitos do web vitalício.
+const TRUST_CHIPS_APP = [
+  { emoji: "🎁", label: "3 dias grátis" },
+  { emoji: "🛡️", label: "Cancela quando quiser" },
+  { emoji: "📱", label: "16 módulos inclusos" },
+];
+
 function TrustChips() {
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
-      {TRUST_CHIPS.map((c) => (
+      {(isNativeShell() ? TRUST_CHIPS_APP : TRUST_CHIPS).map((c) => (
         <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
           <span>{c.emoji}</span> {c.label}
         </span>
@@ -457,6 +484,10 @@ function OfferScreen({
   context, answers, onEscape, onBuy,
 }: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void }) {
   const [showClose, setShowClose] = useState(false);
+  // APP DAS LOJAS: o CTA abre o bottom sheet de assinatura (lógica BitePal);
+  // nada de Pix, roleta ou downsell no shell — desconto só via oferta oficial.
+  const nativo = isNativeShell();
+  const [sheetAberta, setSheetAberta] = useState(false);
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -481,28 +512,8 @@ function OfferScreen({
   //    downsell estável (9→8) e receita por paywall visto de R$11,16 → R$3,08.
   //    Ela não trouxe gente nova: converteu quem pagaria 27,90 em 14,90 e
   //    interrompeu o resto. Volta pros 40s, que é hora de quem TRAVOU mesmo.
-  // Qualquer toque/scroll rearma o timer — quem interage nunca é interrompido.
-  useEffect(() => {
-    let idle: ReturnType<typeof setTimeout>;
-    let fired = false;
-    const arm = () => {
-      if (fired) return;
-      clearTimeout(idle);
-      idle = setTimeout(() => {
-        fired = true;
-        // mantém o nome idle_gift pra régua histórica; auto=true marca a era nova
-        trackEvent("funnel_view", { step: "idle_gift", auto: true });
-        escapeRef.current();
-      }, 40_000);
-    };
-    const events = ["scroll", "touchstart", "pointerdown", "keydown"] as const;
-    events.forEach((e) => window.addEventListener(e, arm, { passive: true }));
-    arm();
-    return () => {
-      clearTimeout(idle);
-      events.forEach((e) => window.removeEventListener(e, arm));
-    };
-  }, []);
+  // Idle-timer de 40s REMOVIDO (23/07, fase 1): ele existia só pra disparar
+  // a roleta, que saiu de cena — desconto nunca mais pra quem tá lendo.
 
   // Área de entrada (funil vitrine); sem área = funil padrão de finanças.
   const area: AreaKey = answers?.area && answers.area in AREAS ? (answers.area as AreaKey) : "dinheiro";
@@ -556,9 +567,11 @@ function OfferScreen({
         </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
-        <GuaranteeTimeline />
+        {nativo ? <TrialTimeline /> : <GuaranteeTimeline />}
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
+        {/* Shell: o PLANO é tela própria ANTES do cadastro (ordem 23/07) —
+            aqui não se repete; o paywall só vende e o sheet só cobra. */}
+        {!nativo && <motion.div {...stagger(10)}><LifetimeCard /></motion.div>}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
 
@@ -573,19 +586,32 @@ function OfferScreen({
             <Button
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-              onClick={() => openPixIntent("lifetime", "paywall_lifetime", context, onBuy)}
+              onClick={() => {
+                if (nativo) {
+                  trackEvent("funnel_click", { cta: "app_paywall_cta", context });
+                  setSheetAberta(true);
+                  return;
+                }
+                openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
+              }}
             >
-              Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
+              {nativo
+                ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
+                : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
-              Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias
+              {nativo
+                ? <>3 dias grátis · depois <strong className="text-foreground font-semibold">{APP_PRECOS.anual.preco}/ano</strong> · cancele quando quiser na Play Store</>
+                : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>
           </p>
         </div>
       </div>
+
+      {sheetAberta && <AppPurchaseSheet onClose={() => setSheetAberta(false)} />}
     </div>
   );
 }
@@ -714,7 +740,22 @@ export function PaywallFlow({
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
             {phase === "offer" && (
-              <OfferScreen context={context} answers={quiz} onEscape={() => setPhase("wheel")} onBuy={setPixOffer} />
+              <OfferScreen
+                context={context}
+                answers={quiz}
+                onEscape={() => {
+                  // DOWNSELL OFF (23/07, fase 1 da reforma): sem roleta/14,90
+                  // em lugar NENHUM — X/voltar entra no app (o gate de trial
+                  // segura). Ticket 100% preço cheio → sobe o cost cap. Dado
+                  // que sustenta: 20-21/07, roleta agressiva derrubou receita
+                  // por paywall visto de R$11,16 pra R$3,08 (canibalizava).
+                  trackEvent(isNativeShell() ? "app_paywall_close" : "funnel_click", isNativeShell() ? {} : { cta: "paywall_escape", context });
+                  if (context !== "funnel") return;
+                  const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
+                  navigate(`/${AREAS[a].module}`);
+                }}
+                onBuy={setPixOffer}
+              />
             )}
             {phase === "wheel" && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">

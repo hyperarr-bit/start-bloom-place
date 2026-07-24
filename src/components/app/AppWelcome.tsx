@@ -50,6 +50,7 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
       <style>{CSS_APW}</style>
       <div className="apw-glow" aria-hidden />
 
+      <div className="apw-col">
       <div className="apw-grade" aria-hidden>
         {TILES.map(([emo, cor], i) => (
           <motion.span
@@ -108,6 +109,7 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
           <span className="apw-termos">Ao continuar, você aceita nossos Termos e Aviso de Privacidade</span>
         </motion.div>
       </div>
+      </div>
     </div>
   );
 }
@@ -115,14 +117,18 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
 const CSS_APW = `
 .apw {
   position: fixed; inset: 0; z-index: 50; overflow: hidden;
-  display: flex; flex-direction: column;
-  padding: 0 22px calc(20px + env(safe-area-inset-bottom));
+  display: flex; justify-content: center;
   /* fonte herdada do app (uma métrica só em todas as plataformas — o
      line-height .95 com stack própria sobrepunha linhas no SF Pro do iOS) */
   -webkit-font-smoothing: antialiased;
   background:
     radial-gradient(90% 46% at 88% 2%, rgba(255,182,214,.5) 0%, rgba(255,182,214,0) 60%),
     linear-gradient(180deg, #7ec6f6 0%, #a8d9fa 30%, #d8edfd 55%, #f2f8fd 80%, #ffffff 100%);
+}
+.apw-col {
+  position: relative; width: 100%; max-width: 430px;
+  display: flex; flex-direction: column;
+  padding: 0 22px calc(20px + env(safe-area-inset-bottom));
 }
 .apw-glow {
   position: absolute; top: -6%; left: 50%; transform: translateX(-50%);
@@ -131,7 +137,7 @@ const CSS_APW = `
 }
 .apw-grade {
   position: relative;
-  margin: calc(3.5vh + env(safe-area-inset-top)) calc(-22px - 3vw) 0;
+  margin: calc(3.5vh + env(safe-area-inset-top)) calc(-22px - min(3vw, 14px)) 0;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 0 8px;
 }
 .apw-tile {

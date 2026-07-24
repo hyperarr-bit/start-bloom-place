@@ -147,9 +147,17 @@ const feedbackPara = (key: string, answer: string): string | null => {
 
 /** CRENÇA (BitePal "why it works"): instala o mecanismo antes do quiz —
  *  motivação despenca, sistema fica. Curvas do v3 (w2), adaptadas. */
-function CrencaScreen({ onNext }: { onNext: () => void }) {
+function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   return (
     <div className="w-full max-w-md mx-auto">
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <motion.div className="h-full bg-accent rounded-full" initial={{ width: "12%" }} animate={{ width: "15%" }} transition={{ duration: 0.35, ease: "easeOut" }} />
+        </div>
+      </div>
       <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
         Por que dessa vez<br />funciona
       </h2>
@@ -178,9 +186,17 @@ function CrencaScreen({ onNext }: { onNext: () => void }) {
 
 /** CONFIANÇA (Cal AI "thank you for trusting us"): reciprocidade antes do
  *  loading — a pessoa entregou respostas pessoais, a gente agradece. */
-function ConfiancaScreen({ onNext }: { onNext: () => void }) {
+function ConfiancaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
   return (
     <div className="w-full max-w-md mx-auto text-center">
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-accent rounded-full" style={{ width: "100%" }} />
+        </div>
+      </div>
       <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 240, damping: 15 }}
         className="text-[44px] mb-3" aria-hidden>🤝</motion.div>
       <h2 className="text-[26px] font-black tracking-tight leading-[1.12] mb-2">Obrigado por<br />confiar na gente</h2>
@@ -1193,7 +1209,7 @@ export default function Comecar() {
       {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
           pergunta no mesmo y em toda tela) + transição em slide horizontal —
           pra ler como UMA tela trocando conteúdo. Web fica como sempre foi. */}
-      <div className={`flex-1 flex flex-col ${step === "start" || ((vitrine || isNativeShell()) && step === "quiz") ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
+      <div className={`flex-1 flex flex-col ${step === "start" || ((vitrine || isNativeShell()) && (step === "crenca" || step === "quiz" || step === "confianca")) ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...(isNativeShell() ? slide : fade)} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
             {step === "start" && (vitrine ? (
@@ -1227,8 +1243,8 @@ export default function Comecar() {
                 }}
               />
             ))}
-            {step === "crenca" && <CrencaScreen onNext={() => setStep("quiz")} />}
-            {step === "confianca" && <ConfiancaScreen onNext={() => setStep("progress")} />}
+            {step === "crenca" && <CrencaScreen onNext={() => setStep("quiz")} onBack={() => setStep("start")} />}
+            {step === "confianca" && <ConfiancaScreen onNext={() => setStep("progress")} onBack={() => setStep("quiz")} />}
             {step === "quiz" && (
               <QuizScreen
                 questions={track}

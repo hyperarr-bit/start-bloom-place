@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { QRCodeSVG } from "qrcode.react";
-import { Check, Copy, Fingerprint, Loader2, ShieldCheck, User, X, Zap } from "lucide-react";
+import { Check, Copy, Fingerprint, ShieldCheck, User, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -174,6 +174,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // já salvo, pula o form direto pro QR.
   useEffect(() => {
     trackEvent("pix_checkout_open", { offer, context, gateway: braco });
+    // Cakto: aquece instância+token OAuth enquanto a pessoa digita o CPF —
+    // o create dela leva 5-7s frio; isso tira 1-2s da espera real.
+    if (braco === "cakto") {
+      supabase.functions.invoke("cakto-pix", { body: { warm: true } }).catch(() => { /* noop */ });
+    }
     if (SEM_FORM) {
       generate("", "");
       return;
@@ -481,14 +486,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             </motion.div>
           )}
 
-          {step === "generating" && !SEM_FORM && (
-            <motion.div key="gen" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-center">
-              <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-4" />
-              <p className="text-sm text-muted-foreground">Gerando seu Pix…</p>
-            </motion.div>
-          )}
-
-          {step === "generating" && SEM_FORM && (
+          {/* 24/07: o create da Cakto leva 5-7s (medido; Asaas era ~2,3s) e o
+              caminho com form mostrava um spinner cru esse tempo todo — o dono
+              sentiu na pele. A preparação (recibo+checklist) vira a tela de
+              espera de TODOS os caminhos: a latência real ganha narrativa. */}
+          {step === "generating" && (
             <motion.div key="preparo" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
               <div className="text-center mb-5">
                 <h2 className="text-[24px] font-bold tracking-tight leading-tight">Preparando seu acesso…</h2>

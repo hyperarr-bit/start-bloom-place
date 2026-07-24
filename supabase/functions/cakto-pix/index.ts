@@ -134,6 +134,14 @@ serve(async (req) => {
     } catch {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
+    // WARM-UP (24/07): o create da Cakto leva 5-7s; o front chama {warm:true}
+    // na ABERTURA do checkout (enquanto a pessoa digita o CPF) pra aquecer a
+    // instância + cachear o token OAuth — o create que ela espera fica só com
+    // o POST /payments. Não cria nada, não loga dados.
+    if ((rawBody as Record<string, unknown>)?.warm === true) {
+      try { await getCaktoToken(clientId, clientSecret); } catch { /* create tenta de novo */ }
+      return jsonResponse({ ok: true });
+    }
     const parsed = RequestSchema.safeParse(rawBody);
     if (!parsed.success) return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
     const body = parsed.data;

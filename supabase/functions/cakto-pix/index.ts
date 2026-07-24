@@ -225,6 +225,18 @@ serve(async (req) => {
     }
 
     logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount });
+    // Registro server-side do create (24/07, padrão dos outros 3 gateways):
+    // é o que o pix-reconcile varre — sem ele, cobrança cakto paga com
+    // webhook mudo viraria pago-sem-acesso invisível. amount vem em reais.
+    await supabaseAdmin.from("analytics_events").insert({
+      event_name: "pix_order_created",
+      user_id: user.id,
+      event_data: {
+        order_id: data.id, offer: body.offer, gateway: "cakto",
+        amount_cents: Math.round(Number(data.amount ?? 0) * 100) || null,
+        ref_id: data.refId ?? null,
+      },
+    });
     return jsonResponse({
       orderId: data.id,
       refId: data.refId,

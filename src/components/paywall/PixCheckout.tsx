@@ -65,12 +65,12 @@ interface Props {
  * QA: localStorage "pix-ab-force" = braço (chave fora do prefixo core-*,
  * sobrevive às vassouras de cache). */
 type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
-// 24/07: dono pediu volta pra CAKTO, mas o teste de cobrança REAL devolveu
-// 400: "Pix disponível apenas com conta ativa no Cakto Banking" — a conta
-// precisa ser aberta no painel da Cakto ANTES da troca. Até lá: Asaas.
-// Quando o Banking ativar: FORCE_GATEWAY = "cakto" (e cobrir cakto no
-// pix-reconcile, que hoje só fala abacate/asaas/pagarme).
-const FORCE_GATEWAY: Gateway | null = "asaas";
+// 24/07 (tarde): CAKTO em 100% — ordem do dono, Banking ativado e cobrança
+// REAL testada (QR gerado, R$27,90). Confirmação volta a ser webhook +
+// check-subscription; rede de segurança: pix-reconcile agora fala cakto
+// (rota por UUID, status via GET /orders/?id=) e o cakto-pix grava
+// pix_order_created no create. Rollback = "asaas" (1 linha) + push.
+const FORCE_GATEWAY: Gateway | null = "cakto";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {

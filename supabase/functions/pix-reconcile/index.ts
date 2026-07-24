@@ -9,7 +9,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  * status DIRETO ao gateway (fonte da verdade) e credita o que estiver pago.
  *
  * - Idempotente: pula quem já tem assinatura ativa vitalícia.
- * - Multi-gateway: abacate (pix_char_*), asaas (pixQrCodeId), pagarme (or_*).
+ * - Multi-gateway: abacate (pix_char_*), pagarme (or_*), cakto (UUID),
+ *   asaas (pixQrCodeId — o resto).
  * - Auditável: cada grant vira evento pix_reconciled em analytics_events.
  * - Chamada: POST com { token } == RECONCILE_TOKEN (cron externo ou manual);
  *   opcional { hours } (janela, default 48, máx 168) e { dryRun: true }.
@@ -26,6 +27,7 @@ const corsHeaders = {
 const ABACATE_API = "https://api.abacatepay.com/v2";
 const ASAAS_API = "https://api.asaas.com/v3";
 const PAGARME_API = "https://api.pagar.me/core/v5";
+const CAKTO_API = "https://api.cakto.com.br/public_api";
 const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -79,6 +81,37 @@ async function statusPagarme(key: string, id: string): Promise<Veredito> {
   return { pago: st === "PAID", status: st };
 }
 
+// Cakto (24/07, gateway principal de novo): o id da ordem é um UUID e a API
+// usa OAuth de curta duração — token pedido por varredura, sem cache (a
+// função é fria e roda a cada 15min; um POST a mais não dói).
+// Não existe retrieve unitário na API deles: é o LIST com filtro ?id= (doc
+// docs.cakto.com.br/api-reference/orders/list; validado com cobrança real).
+// Só "paid" credita — "authorized" é pré-captura de cartão, não Pix.
+const ehUuid = (v: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+async function tokenCakto(clientId: string, clientSecret: string): Promise<string> {
+  const res = await fetch(`${CAKTO_API}/token/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.access_token) throw new Error(`cakto_token_http_${res.status}`);
+  return data.access_token;
+}
+
+async function statusCakto(token: string, id: string): Promise<Veredito> {
+  const res = await fetch(`${CAKTO_API}/orders/?id=${encodeURIComponent(id)}&limit=5`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) return { pago: false, status: `http_${res.status}:${JSON.stringify(out).slice(0, 120)}` };
+  const ordem = (out?.results ?? []).find((o: { id?: string }) => String(o?.id) === id) ?? out?.results?.[0];
+  const st = String(ordem?.status ?? `nao_encontrado_${out?.count ?? 0}`).toLowerCase();
+  return { pago: st === "paid", status: st };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -92,8 +125,23 @@ serve(async (req) => {
     const esperado = Deno.env.get("RECONCILE_TOKEN") ?? "";
     const bearer = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const anon = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const autorizado =
+    let autorizado =
       (esperado && String(body.token ?? "") === esperado) || (anon && bearer === anon);
+    // 24/07: o runtime passou a injetar a chave NOVA (sb_publishable) em
+    // SUPABASE_ANON_KEY enquanto o pg_cron manda o JWT anon legado — a
+    // comparação de string nunca batia e o cron tomava 401 desde 22/07.
+    // Validação de verdade: o auth server confere a ASSINATURA do bearer;
+    // aceito se for a chave anon legítima deste projeto.
+    if (!autorizado && bearer.split(".").length === 3) {
+      try {
+        const payload = JSON.parse(atob(bearer.split(".")[1]));
+        const url = Deno.env.get("SUPABASE_URL") ?? "";
+        if (payload?.role === "anon" && payload?.ref && url.includes(payload.ref)) {
+          const r = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: bearer } });
+          autorizado = r.ok;
+        }
+      } catch { /* segue não autorizado */ }
+    }
     if (!autorizado) return jsonResponse({ error: "unauthorized" }, 401);
     const dryRun = body.dryRun === true;
     const hours = Math.min(Math.max(Number(body.hours) || 48, 1), 168);
@@ -107,6 +155,26 @@ serve(async (req) => {
     const abacateKey = Deno.env.get("ABACATE_API_KEY") ?? "";
     const asaasKey = Deno.env.get("ASAAS_API_KEY") ?? "";
     const pagarmeKey = Deno.env.get("PAGARME_API_KEY") ?? "";
+    const caktoId = Deno.env.get("CAKTO_CLIENT_ID") ?? "";
+    const caktoSecret = Deno.env.get("CAKTO_CLIENT_SECRET") ?? "";
+    // Token único por varredura; se a Cakto estiver fora, as ordens dela caem
+    // em falhas[] e a próxima rodada tenta de novo — nunca credita no escuro.
+    let caktoTokenMemo: string | null = null;
+    const caktoToken = async () => (caktoTokenMemo ??= await tokenCakto(caktoId, caktoSecret));
+
+    // Sonda de QA (token-gated, mesmo auth da função): devolve o veredito cru
+    // de UMA ordem sem creditar nada — pra validar contrato de status após
+    // mudança de gateway. { probe: "<orderId>" }.
+    if (typeof body.probe === "string" && body.probe) {
+      const id = String(body.probe);
+      let v: Veredito;
+      if (body.gw === "cakto") v = await statusCakto(await caktoToken(), id);
+      else if (id.startsWith("pix_char_")) v = await statusAbacate(abacateKey, id);
+      else if (id.startsWith("or_")) v = await statusPagarme(pagarmeKey, id);
+      else if (ehUuid(id)) v = await statusCakto(await caktoToken(), id);
+      else v = await statusAsaas(asaasKey, id);
+      return jsonResponse({ ok: true, probe: id, veredito: v });
+    }
 
     // QRs recentes (server-side, fonte: pix_order_created do create)
     const { data: qrs, error: qErr } = await admin
@@ -153,6 +221,7 @@ serve(async (req) => {
         try {
           if (o.orderId.startsWith("pix_char_")) v = await statusAbacate(abacateKey, o.orderId);
           else if (o.orderId.startsWith("or_")) v = await statusPagarme(pagarmeKey, o.orderId);
+          else if (ehUuid(o.orderId)) v = await statusCakto(await caktoToken(), o.orderId);
           else v = await statusAsaas(asaasKey, o.orderId);
         } catch (e) {
           falhas.push({ orderId: o.orderId, erro: String(e).slice(0, 120) });

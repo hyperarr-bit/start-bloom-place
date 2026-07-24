@@ -503,8 +503,72 @@ function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) 
 
 /** Tela de impacto: devolve a estimativa da própria pessoa, anualizada.
  *  É o momento "isso é sério" antes das duas últimas perguntas. */
-function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
+/** Número que CONTA até o alvo — o ano de vazamento ganha vida. */
+function ContaReais({ ate, sufixo = "" }: { ate: number; sufixo?: string }) {
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 1100;
+    const tick = (t: number) => {
+      const pr = Math.min(1, (t - t0) / dur);
+      setV(Math.round(ate * (1 - Math.pow(1 - pr, 3))));
+      if (pr < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [ate]);
+  return <>R$ {v.toLocaleString("pt-BR")}{sufixo}</>;
+}
+
+function ProofSlide({ gasto, pele, onNext }: { gasto: string; pele?: boolean; onNext: () => void }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
+  // Pele do vitrine (web+app): diagnóstico ALINHADO com as perguntas — mesma
+  // tipografia, card branco com sombra, número com count-up. A barra do quiz
+  // fica visível em cima (é um passo do corredor, não uma tela alienígena).
+  if (pele) {
+    const num = anchor ? Number((anchor.year.match(/[\d.]+/)?.[0] ?? "0").replace(/\./g, "")) : 0;
+    const sufixo = anchor?.year.endsWith("+") ? "+" : "";
+    return (
+      <div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-accent mb-2">
+          💡 Seu diagnóstico
+        </motion.div>
+        {anchor ? (
+          <>
+            <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
+              Pela sua estimativa,<br /><span className="text-accent">{anchor.month} somem</span><br />todo mês sem você ver.
+            </h2>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+              className="rounded-2xl border border-[#eef0f3] bg-white p-5 mb-4 text-center shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1.5">Em um ano, isso vira</p>
+              <p className="text-[42px] leading-none font-black text-accent tracking-tight tabular-nums">
+                <ContaReais ate={num} sufixo={sufixo} />
+              </p>
+              <p className="text-[11.5px] text-muted-foreground mt-2">dinheiro seu, escorrendo sem destino</p>
+            </motion.div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
+              A maioria <span className="text-accent">não faz ideia</span> —<br />e é assim que o dinheiro some.
+            </h2>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+              className="rounded-2xl border border-[#eef0f3] bg-white p-5 mb-4 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
+              <p className="text-[14px] leading-relaxed">Sem registro, cada gasto pequeno fica invisível. E o que é invisível não dá pra controlar.</p>
+            </motion.div>
+          </>
+        )}
+        <p className="text-[13.5px] text-muted-foreground leading-relaxed mb-6">
+          Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>. Registrar no CORE leva segundos.
+        </p>
+        <Button size="lg" className="w-full h-12 rounded-full text-[15px] font-bold gap-2" onClick={onNext}>
+          <span className="min-w-0 truncate">Quero ver pra onde vai</span> <ArrowRight className="w-4 h-4 shrink-0" />
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="text-center pt-2">
       <motion.div
@@ -554,9 +618,29 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
 
 /** Pico das trilhas de vida (funil vitrine): a resposta de consistência vira
  *  a confissão — "não é força de vontade, é falta de sistema". */
-function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: string; onNext: () => void }) {
+function AreaProofSlide({ area, answer, pele, onNext }: { area: AreaKey; answer: string; pele?: boolean; onNext: () => void }) {
   const proof = AREA_PROOF[area as Exclude<AreaKey, "dinheiro">];
   const echo = proof?.echo[answer] ?? "É sempre a mesma história.";
+  if (pele) {
+    return (
+      <div>
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+          className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-accent mb-2">
+          💡 Seu diagnóstico
+        </motion.div>
+        <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
+          <span className="text-accent">{echo}</span><br />{proof.reframe}
+        </h2>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          className="rounded-2xl border border-[#eef0f3] bg-white p-5 mb-6 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
+          <p className="text-[14px] leading-relaxed">{proof.card}</p>
+        </motion.div>
+        <Button size="lg" className="w-full h-12 rounded-full text-[15px] font-bold gap-2" onClick={onNext}>
+          <span className="min-w-0 truncate">{proof.cta}</span> <ArrowRight className="w-4 h-4 shrink-0" />
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="text-center pt-2">
       <motion.div
@@ -657,9 +741,9 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
         <motion.div key={item.kind === "q" ? q!.key : "proof"} {...slide}>
           {item.kind === "proof" ? (
             proofArea && proofArea !== "dinheiro" ? (
-              <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} onNext={() => advance(answers)} />
+              <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} pele={pele} onNext={() => advance(answers)} />
             ) : (
-              <ProofSlide gasto={answers.gasto ?? ""} onNext={() => advance(answers)} />
+              <ProofSlide gasto={answers.gasto ?? ""} pele={pele} onNext={() => advance(answers)} />
             )
           ) : (
             <>
@@ -1109,7 +1193,7 @@ export default function Comecar() {
       {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
           pergunta no mesmo y em toda tela) + transição em slide horizontal —
           pra ler como UMA tela trocando conteúdo. Web fica como sempre foi. */}
-      <div className={`flex-1 flex flex-col ${step === "start" || (isNativeShell() && step === "quiz") ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
+      <div className={`flex-1 flex flex-col ${step === "start" || ((vitrine || isNativeShell()) && step === "quiz") ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...(isNativeShell() ? slide : fade)} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>
             {step === "start" && (vitrine ? (

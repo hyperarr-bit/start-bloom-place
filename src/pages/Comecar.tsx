@@ -129,15 +129,69 @@ const PROOF_AFTER_KEY = "gasto";
 
 /** Micro-feedback por resposta (lei nº 1 do BitePal: todo input devolve
  *  algo). "gasto" fica de fora — a tela de impacto já é a devolução dele. */
+/** Micro-feedback POR RESPOSTA (lei nº 1 do BitePal: todo input devolve
+ *  algo ESPECÍFICO — reação genérica é a definição do que não fazer).
+ *  "gasto" fica de fora: o diagnóstico já é a devolução dele. */
 const FEEDBACK_QUIZ: Record<string, { padrao: string; por?: Record<string, string> }> = {
-  atrapalha: { padrao: "Anotado — é por aqui que seu plano começa." },
+  atrapalha: {
+    padrao: "Anotado — é por aqui que seu plano começa.",
+    por: {
+      "Gasto sem perceber": "O vazamento invisível — 8 em 10 começam por aqui.",
+      "Esqueço contas": "Juros por esquecimento: o custo mais evitável que existe.",
+      "Não consigo guardar dinheiro": "Guardar sem visibilidade é nadar contra a maré.",
+      "Não sei pra onde meu dinheiro vai": "Esse é o sintoma nº 1 de falta de painel.",
+      "Quero organizar tudo": "Boa — organização geral é exatamente o forte do CORE.",
+      "Acordo sem plano nenhum": "Dia sem plano é dia decidido pelos outros.",
+      "Perco horas no celular": "O celular cobra caro — o painel devolve as horas.",
+      "Começo mil coisas e não termino": "Foco é ver pouco de cada vez — o painel corta o resto.",
+      "Esqueço tarefas e compromissos": "Lembrar é trabalho do app, não seu.",
+      "Começo a treinar e desisto": "Desistir é o padrão sem progresso visível.",
+      "Como mal e nem percebo": "O invisível cobra caro — registrar muda na hora.",
+      "Não tenho plano de treino nem dieta": "Plano pronto é literalmente o começo do app.",
+      "Falta constância, não vontade": "Exato — e constância é sistema, não caráter.",
+    },
+  },
   controle: {
     padrao: "Bom ponto de partida — o CORE puxa tudo pra um lugar só.",
-    por: { "Não controlo": "73% chegam assim. É exatamente disso que o plano cuida." },
+    por: {
+      "Não controlo": "73% chegam assim. É exatamente disso que o plano cuida.",
+      "Bloco de notas": "Anotar ajuda. Mas nota não soma, não avisa, não compara.",
+      "Planilha": "Respeito. Mas planilha espera você lembrar dela — o CORE te procura.",
+      "App de banco": "Ele mostra o extrato de UM banco. Sua vida não cabe num extrato.",
+      "Outro app": "Então você já tenta — faltava um que junte tudo num lugar só.",
+    },
   },
-  consistencia: { padrao: "Normal: sem sistema, todo mundo larga. Com sistema, fica." },
-  compromisso: { padrao: "Fechado 🤝 5 minutos é tudo que o plano pede." },
-  vitoria: { padrao: "Essa vira a meta nº 1 do seu plano." },
+  consistencia: {
+    padrao: "Normal: sem sistema, todo mundo larga. Com sistema, fica.",
+    por: {
+      "Uns 3 dias": "É a média de todo mundo sem sistema. Com lembrete, o jogo vira.",
+      "Uma semana": "Você chega perto — falta o sistema segurar a segunda semana.",
+      "Um mês, aí largo": "Um mês na raça é força. Imagina com o app carregando junto.",
+      "Nunca consegui manter": "Não é sobre você: sem sistema, ninguém mantém.",
+      "Essa vai ser a primeira": "Melhor hora — começar já com sistema.",
+      "Umas 2 ou 3": "Recomeço faz parte. Dessa vez, com registro.",
+      "Perdi a conta": "Não é falta de vontade — é falta de sistema que segure.",
+      "Tô na ativa, mas sem controle": "Você já faz o difícil. Falta só enxergar o progresso.",
+    },
+  },
+  compromisso: {
+    padrao: "Fechado 🤝 5 minutos é tudo que o plano pede.",
+    por: { "Topo, se for bem simples": "É simples de verdade — um toque e pronto." },
+  },
+  vitoria: {
+    padrao: "Essa vira a meta nº 1 do seu plano.",
+    por: {
+      "Entender meus gastos": "Em 7 dias você olha o painel e SABE. Essa é a proposta.",
+      "Parar de esquecer contas": "O app avisa antes de vencer — nunca mais multa boba.",
+      "Criar minha primeira meta": "Meta com progresso visível — a que finalmente anda.",
+      "Saber quanto posso gastar": "Seu número livre do mês, calculado todo dia.",
+      "Organizar tudo em um painel": "É literalmente o que a demo vai te mostrar já já.",
+      "Manter um hábito 7 dias seguidos": "7 dias seguidos: exatamente a missão da sua semana 1.",
+      "Acordar sabendo o que fazer": "Primeira coisa que o painel resolve, logo de manhã.",
+      "Uma semana sem esquecer nada": "Com lembrete automático, essa é quase garantida.",
+      "Minha semana inteira num painel": "É literalmente a tela inicial do app.",
+    },
+  },
 };
 const feedbackPara = (key: string, answer: string): string | null => {
   if (key === "gasto") return null;
@@ -148,6 +202,11 @@ const feedbackPara = (key: string, answer: string): string | null => {
 /** CRENÇA (BitePal "why it works"): instala o mecanismo antes do quiz —
  *  motivação despenca, sistema fica. Curvas do v3 (w2), adaptadas. */
 function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const spring = (i: number) => ({
+    initial: { opacity: 0, y: 16, scale: 0.97 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    transition: { delay: 0.15 + i * 0.12, type: "spring" as const, stiffness: 280, damping: 22 },
+  });
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="flex items-center gap-3 mb-8">
@@ -158,25 +217,48 @@ function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => vo
           <motion.div className="h-full bg-accent rounded-full" initial={{ width: "12%" }} animate={{ width: "15%" }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
       </div>
-      <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
-        Por que dessa vez<br />funciona
-      </h2>
-      <div className="rounded-2xl border border-[#eef0f3] bg-white p-4 shadow-[0_8px_20px_-14px_rgba(20,40,70,0.28)]">
-        <svg viewBox="0 0 300 130" className="w-full" aria-hidden="true">
-          <motion.path d="M10 30 C 70 20, 110 70, 150 95 S 250 115, 290 118" fill="none" stroke="#d0cbc4" strokeWidth="3"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.9, ease: "easeOut" }} />
-          <motion.path d="M10 100 C 80 95, 140 55, 200 40 S 270 26, 290 24" fill="none" stroke="hsl(var(--accent))" strokeWidth="3.5"
-            initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.5, duration: 1, ease: "easeOut" }} />
-          <motion.circle cx="290" cy="24" r="5" fill="hsl(var(--accent))" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} />
-          <text x="155" y="112" fontSize="11" fill="#8a8378">motivação solta</text>
-          <text x="196" y="18" fontSize="11.5" fontWeight="700" fill="hsl(var(--accent))">com um sistema</text>
-          <text x="10" y="127" fontSize="10" fill="#8a8378">semana 1</text>
-          <text x="252" y="127" fontSize="10" fill="#8a8378">mês 6</text>
-        </svg>
-        <p className="text-[13px] text-muted-foreground leading-relaxed mt-3 text-left">
-          Motivação despenca em 2 semanas — é normal. <b className="text-foreground">Sistema fica.</b> O CORE transforma organização em rotina, não em fase.
-        </p>
+      <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-6">Como o CORE<br />funciona</h2>
+      <div className="space-y-2.5">
+        <motion.div {...spring(0)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
+          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">1</span>
+          <span className="flex-1 leading-tight">
+            <b className="block text-[13.5px]">Registra em 5 segundos</b>
+            <small className="text-[11px] text-muted-foreground">café, mercado, conta — um toque</small>
+          </span>
+          <span className="flex items-center gap-1.5 rounded-xl bg-secondary/70 px-2.5 py-2 text-[11px] font-bold shrink-0">
+            ☕ R$ 8,50
+            <motion.span animate={{ scale: [1, 1.18, 1] }} transition={{ delay: 1, duration: 0.5, repeat: 2 }}
+              className="w-[18px] h-[18px] rounded-full bg-accent text-accent-foreground grid place-items-center text-[12px] leading-none">+</motion.span>
+          </span>
+        </motion.div>
+        <motion.div {...spring(1)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
+          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">2</span>
+          <span className="flex-1 leading-tight">
+            <b className="block text-[13.5px]">O app organiza sozinho</b>
+            <small className="text-[11px] text-muted-foreground">categorias, somas e limites automáticos</small>
+          </span>
+          <span className="flex items-end gap-[3px] h-8 shrink-0" aria-hidden>
+            {[["100%", "hsl(var(--accent))"], ["68%", "#f2d4e4"], ["52%", "#fdeccb"], ["38%", "#cdeeee"], ["26%", "#d9e4fb"]].map(([h, c], bi) => (
+              <motion.i key={bi} className="w-[9px] rounded-t-[3px] block" style={{ background: c as string }}
+                initial={{ height: 0 }} animate={{ height: h as string }} transition={{ delay: 0.7 + bi * 0.08, duration: 0.4, ease: "easeOut" }} />
+            ))}
+          </span>
+        </motion.div>
+        <motion.div {...spring(2)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
+          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">3</span>
+          <span className="flex-1 leading-tight">
+            <b className="block text-[13.5px]">Ele te procura — não o contrário</b>
+            <small className="text-[11px] text-muted-foreground">avisa antes da conta, mostra o padrão</small>
+          </span>
+          <motion.span
+            className="rounded-lg bg-[#fff7e8] border border-[#f5e3bd] px-2 py-1.5 text-[9.5px] font-bold text-[#8a6d1f] shrink-0"
+            animate={{ rotate: [0, -3, 3, -2, 0] }} transition={{ delay: 1.4, duration: 0.5 }}
+          >🔔 Luz vence amanhã</motion.span>
+        </motion.div>
       </div>
+      <p className="text-[12px] text-muted-foreground text-center mt-5">
+        nada depende da sua força de vontade — é <b className="text-foreground">visibilidade automática</b>
+      </p>
       <Button size="lg" className="w-full h-12 text-base mt-5 rounded-full font-bold" onClick={onNext}>
         Fazer meu diagnóstico <ArrowRight className="w-4 h-4" />
       </Button>
@@ -186,9 +268,19 @@ function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => vo
 
 /** CONFIANÇA (Cal AI "thank you for trusting us"): reciprocidade antes do
  *  loading — a pessoa entregou respostas pessoais, a gente agradece. */
-function ConfiancaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+function ConfiancaScreen({ answers, onNext, onBack }: {
+  answers: Record<string, string>; onNext: () => void; onBack: () => void;
+}) {
+  // As respostas REAIS dela viram os papéis que escorrem pro cofre — a
+  // privacidade deixa de ser texto e vira cena ("isso aqui é seu").
+  const gastoChip = answers.gasto && answers.gasto !== "Não faço ideia"
+    ? `${answers.gasto.replace(" a ", "–")} por mês` : null;
+  const chips = [answers.atrapalha, gastoChip, answers.vitoria].filter(Boolean).slice(0, 3) as string[];
+  if (!chips.length) chips.push("Suas respostas");
+  const rot = ["-2.5deg", "1.8deg", "-1.2deg"];
+  const desl = [-26, 24, 0];
   return (
-    <div className="w-full max-w-md mx-auto text-center">
+    <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
       <div className="flex items-center gap-3 mb-8">
         <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="w-5 h-5" />
@@ -197,17 +289,34 @@ function ConfiancaScreen({ onNext, onBack }: { onNext: () => void; onBack: () =>
           <div className="h-full bg-accent rounded-full" style={{ width: "100%" }} />
         </div>
       </div>
-      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 240, damping: 15 }}
-        className="text-[44px] mb-3" aria-hidden>🤝</motion.div>
-      <h2 className="text-[26px] font-black tracking-tight leading-[1.12] mb-2">Obrigado por<br />confiar na gente</h2>
-      <p className="text-[14px] text-muted-foreground mb-5">Agora vamos montar sua análise.</p>
-      <div className="rounded-2xl border border-[#eef0f3] bg-white p-4 text-left shadow-[0_8px_20px_-14px_rgba(20,40,70,0.25)] flex items-start gap-3">
-        <Lock className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-        <p className="text-[12.5px] text-muted-foreground leading-relaxed">
-          Sua privacidade importa. Suas respostas são só suas — nunca vendidas, nunca compartilhadas.
-        </p>
+      <div className="flex-1 flex flex-col justify-center text-center pb-6">
+        <div className="flex flex-col items-center">
+          {chips.map((c, i) => (
+            <motion.span
+              key={c}
+              initial={{ opacity: 0, y: -24, x: desl[i], rotate: 0 }}
+              animate={{ opacity: 1, y: 0, x: desl[i], rotate: rot[i] }}
+              transition={{ delay: 0.2 + i * 0.22, type: "spring", stiffness: 300, damping: 20 }}
+              className="rounded-full border border-[#eef0f3] bg-white px-3.5 py-1.5 text-[11.5px] font-bold text-[#3c4652] shadow-[0_8px_18px_-12px_rgba(20,40,70,0.25)] -mt-0.5 first:mt-0"
+            >{c}</motion.span>
+          ))}
+          <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}
+            className="text-[#c3cad2] text-[15px] my-2" aria-hidden>↓</motion.span>
+          <motion.div
+            initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 1.05, type: "spring", stiffness: 260, damping: 14 }}
+            className="w-16 h-16 rounded-[20px] grid place-items-center text-[27px] shadow-[0_16px_34px_-10px_rgba(22,18,28,0.55)]"
+            style={{ background: "linear-gradient(135deg,#16121c,#3a3344)" }}
+          >🔒</motion.div>
+        </div>
+        <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.25 }}
+          className="text-[26px] font-black tracking-tight leading-[1.12] mt-5">Obrigado por<br />confiar na gente</motion.h2>
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.45 }}
+          className="text-[13.5px] text-muted-foreground leading-relaxed mt-2">
+          Suas respostas viram sua análise —<br />e ficam <b className="text-foreground">só com você</b>.<br />Nunca vendidas, nunca compartilhadas.
+        </motion.p>
       </div>
-      <Button size="lg" className="w-full h-12 text-base mt-6 rounded-full font-bold" onClick={onNext}>
+      <Button size="lg" className="w-full h-12 text-base rounded-full font-bold" onClick={onNext}>
         Montar minha análise <ArrowRight className="w-4 h-4" />
       </Button>
     </div>
@@ -217,27 +326,85 @@ function ConfiancaScreen({ onNext, onBack }: { onNext: () => void; onBack: () =>
 /** PONTE-DEMO: substitui o radar no web (23/07 — o gráfico tinha números
  *  fabricados, mesma doença do gauge; o diagnóstico real já aconteceu no
  *  quiz+impacto). Uma frase honesta e a nossa arma: o app de verdade. */
-const PONTE_AREA: Record<AreaKey, string> = {
-  dinheiro: "O padrão que você descreveu — gasto invisível, conta esquecida — é exatamente o que o painel de Finanças resolve.",
-  rotina: "O padrão que você descreveu — dia no improviso, hábito que não segura — é exatamente o que o painel de Rotina resolve.",
-  corpo: "O padrão que você descreveu — recomeço atrás de recomeço — é exatamente o que Treino e Dieta juntos resolvem.",
-  saude: "O padrão que você descreveu é exatamente o que os check-ins de Saúde resolvem.",
-  metas: "O padrão que você descreveu — meta adiada — é exatamente o que o painel de Metas destrava.",
+type Achado = { emoji: string; cor: string; titulo: string; sub: string; nivel: "ALTO" | "RISCO" | "META" | "OCULTO" };
+const NIVEL_CLS: Record<Achado["nivel"], string> = {
+  ALTO: "bg-destructive/10 text-destructive",
+  OCULTO: "bg-destructive/10 text-destructive",
+  RISCO: "bg-amber-500/15 text-amber-700",
+  META: "bg-accent/10 text-accent",
 };
-function PonteDemoScreen({ area, onDemo }: { area: AreaKey; onDemo: () => void }) {
+/** Os 2 primeiros achados por área (o 3º é sempre o objetivo declarado). */
+const ACHADOS_AREA: Record<Exclude<AreaKey, "dinheiro">, [Omit<Achado, "nivel">, Omit<Achado, "nivel">]> = {
+  rotina: [
+    { emoji: "⏰", cor: "#cdeeee", titulo: "Horas perdidas no improviso", sub: "dia decidido na hora custa tempo todo dia" },
+    { emoji: "📅", cor: "#d9e4fb", titulo: "Hábitos sem sistema que segure", sub: "motivação sozinha larga na 2ª semana" },
+  ],
+  corpo: [
+    { emoji: "🔁", cor: "#d7f0dd", titulo: "Recomeços sem registro", sub: "sem progresso visível, desistir é o padrão" },
+    { emoji: "🍎", cor: "#fdeccb", titulo: "Treino e dieta no improviso", sub: "sem plano, cada dia é uma decisão nova" },
+  ],
+  saude: [
+    { emoji: "❤️", cor: "#fbd8e8", titulo: "Sinais sem acompanhamento", sub: "o que não se registra vira susto" },
+    { emoji: "📋", cor: "#cdeeee", titulo: "Sem check-in de rotina", sub: "cuidado que depende de lembrar, falha" },
+  ],
+  metas: [
+    { emoji: "🕰️", cor: "#e6def8", titulo: "Meta parada há meses", sub: "sem passos pequenos, meta grande congela" },
+    { emoji: "🧭", cor: "#d9e4fb", titulo: "Sem plano quebrado em etapas", sub: "direção sem próximo passo não anda" },
+  ],
+};
+function PonteDemoScreen({ area, answers, onDemo }: {
+  area: AreaKey; answers: Record<string, string>; onDemo: () => void;
+}) {
+  const anchor = area === "dinheiro" ? GASTO_ANCHOR[answers.gasto ?? ""] ?? null : null;
+  const achados: Achado[] = area === "dinheiro"
+    ? [
+        anchor
+          ? { emoji: "💸", cor: "#fdeccb", titulo: "Vazamento estimado", sub: `${anchor.month}/mês pela sua estimativa`, nivel: "ALTO" }
+          : { emoji: "💸", cor: "#fdeccb", titulo: "Vazamento sem medida", sub: "você disse que não faz ideia — é o pior tipo", nivel: "OCULTO" },
+        answers.atrapalha === "Esqueço contas"
+          ? { emoji: "🔔", cor: "#cdeeee", titulo: "Contas sem sistema de aviso", sub: "você disse que esquece — e ninguém te avisa", nivel: "RISCO" }
+          : { emoji: "🔔", cor: "#cdeeee", titulo: "Vencimentos por memória", sub: "sem aviso, vencimento vira multa", nivel: "RISCO" },
+        { emoji: "🎯", cor: "#e6def8", titulo: "Seu objetivo", sub: `“${answers.vitoria ?? "organizar tudo num painel"}”`, nivel: "META" },
+      ]
+    : [
+        { ...ACHADOS_AREA[area as Exclude<AreaKey, "dinheiro">][0], nivel: "ALTO" },
+        { ...ACHADOS_AREA[area as Exclude<AreaKey, "dinheiro">][1], nivel: "RISCO" },
+        { emoji: "🎯", cor: "#e6def8", titulo: "Seu objetivo", sub: `“${answers.vitoria ?? "sair do papel"}”`, nivel: "META" },
+      ];
   return (
-    <div className="w-full max-w-md mx-auto text-center">
-      <motion.div initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 240, damping: 15 }}
-        className="w-11 h-11 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-3 text-lg font-black shadow-[0_8px_24px_-6px_hsl(var(--accent)/0.55)]">✓</motion.div>
-      <div className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-muted-foreground mb-1">Análise pronta</div>
-      <h2 className="text-[27px] font-black tracking-tight leading-[1.1] mb-3">
+    <div className="w-full max-w-md mx-auto">
+      <div className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-[#2e9e52] mb-1.5">✓ Análise pronta</div>
+      <h2 className="text-[27px] font-black tracking-tight leading-[1.1] mb-5">
         Seu ponto de partida:<br /><span className="text-accent">{AREAS[area].nome}</span>
       </h2>
-      <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[30ch] mx-auto mb-7">{PONTE_AREA[area]}</p>
+      <div className="rounded-2xl border border-[#eef0f3] bg-white px-4 py-1 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
+        {achados.map((a, i) => (
+          <motion.div
+            key={a.titulo}
+            initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + i * 0.18 }}
+            className={`flex items-start gap-3 py-3 ${i < achados.length - 1 ? "border-b border-[#f2f3f5]" : ""}`}
+          >
+            <span className="w-9 h-9 rounded-xl grid place-items-center text-base shrink-0" style={{ background: a.cor }}>{a.emoji}</span>
+            <span className="flex-1 leading-tight text-left">
+              <b className="block text-[13px]">{a.titulo}</b>
+              <small className="text-[11px] text-muted-foreground leading-snug">{a.sub}</small>
+            </span>
+            <motion.span
+              initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.45 + i * 0.18, type: "spring", stiffness: 300, damping: 16 }}
+              className={`text-[9px] font-extrabold px-2 py-1 rounded-full shrink-0 mt-0.5 ${NIVEL_CLS[a.nivel]}`}
+            >{a.nivel}</motion.span>
+          </motion.div>
+        ))}
+      </div>
+      <p className="text-[12px] text-muted-foreground text-center mt-4 mb-5">
+        agora confere você mesmo — o app aberto <b className="text-foreground">de verdade</b>, com dados de exemplo
+      </p>
       <Button size="lg" className="w-full h-12 text-base rounded-full font-bold" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDemo(); }}>
         Testar o app de verdade <ArrowRight className="w-4 h-4" />
       </Button>
-      <p className="text-xs text-muted-foreground mt-3">Abre o app real, com dados de exemplo — seu plano vem em seguida</p>
+      <p className="text-xs text-muted-foreground mt-3 text-center">seu plano vem em seguida</p>
     </div>
   );
 }
@@ -519,68 +686,97 @@ function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) 
 
 /** Tela de impacto: devolve a estimativa da própria pessoa, anualizada.
  *  É o momento "isso é sério" antes das duas últimas perguntas. */
-/** Número que CONTA até o alvo — o ano de vazamento ganha vida. */
-function ContaReais({ ate, sufixo = "" }: { ate: number; sufixo?: string }) {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const t0 = performance.now();
-    const dur = 1100;
-    const tick = (t: number) => {
-      const pr = Math.min(1, (t - t0) / dur);
-      setV(Math.round(ate * (1 - Math.pow(1 - pr, 3))));
-      if (pr < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [ate]);
-  return <>R$ {v.toLocaleString("pt-BR")}{sufixo}</>;
-}
-
-function ProofSlide({ gasto, pele, onNext }: { gasto: string; pele?: boolean; onNext: () => void }) {
+function ProofSlide({ gasto, atrapalha, pele, onNext }: { gasto: string; atrapalha?: string; pele?: boolean; onNext: () => void }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
-  // Pele do vitrine (web+app): diagnóstico ALINHADO com as perguntas — mesma
-  // tipografia, card branco com sombra, número com count-up. A barra do quiz
-  // fica visível em cima (é um passo do corredor, não uma tela alienígena).
   if (pele) {
-    const num = anchor ? Number((anchor.year.match(/[\d.]+/)?.[0] ?? "0").replace(/\./g, "")) : 0;
-    const sufixo = anchor?.year.endsWith("+") ? "+" : "";
+    // RELATÓRIO computado (23/07, refeito do zero): 3 escalas de dor
+    // derivadas da resposta (dia = mês÷30), 12 barras acumulando e "onde
+    // costuma vazar" — a resposta de atrapalha vira heurística. Nada
+    // genérico, nada inventado sem dizer que é estimativa.
+    const mesNum = anchor ? Number((anchor.month.match(/\d+/)?.[0] ?? "0")) : 0;
+    const diaNum = Math.max(1, Math.round(mesNum / 30));
+    const mais = anchor?.month.endsWith("+") ? "+" : "";
+    const anoNum = anchor ? Number((anchor.year.match(/[\d.]+/)?.[0] ?? "0").replace(/\./g, "")) : 0;
+    const fontes: Array<[string, string, string, number]> =
+      atrapalha === "Esqueço contas"
+        ? [["💸", "#fdeccb", "Juros e multas", 45], ["📅", "#cdeeee", "Cobranças em atraso", 35], ["🔁", "#e6def8", "Assinaturas duplicadas", 20]]
+        : atrapalha === "Não consigo guardar dinheiro"
+          ? [["🛒", "#cdeeee", "Compras por impulso", 40], ["🍔", "#fdeccb", "Delivery e lanches", 35], ["📺", "#e6def8", "Assinaturas paradas", 25]]
+          : [["🍔", "#fdeccb", "Delivery e lanches", 40], ["🛒", "#cdeeee", "Compras pequenas", 35], ["📺", "#e6def8", "Assinaturas paradas", 25]];
     return (
       <div>
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
           className="text-[11px] font-extrabold uppercase tracking-[0.08em] text-accent mb-2">
           💡 Seu diagnóstico
         </motion.div>
-        {anchor ? (
-          <>
-            <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
-              Pela sua estimativa,<br /><span className="text-accent">{anchor.month} somem</span><br />todo mês sem você ver.
-            </h2>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-              className="rounded-2xl border border-[#eef0f3] bg-white p-5 mb-4 text-center shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground mb-1.5">Em um ano, isso vira</p>
-              <p className="text-[42px] leading-none font-black text-accent tracking-tight tabular-nums">
-                <ContaReais ate={num} sufixo={sufixo} />
-              </p>
-              <p className="text-[11.5px] text-muted-foreground mt-2">dinheiro seu, escorrendo sem destino</p>
-            </motion.div>
-          </>
-        ) : (
-          <>
-            <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
-              A maioria <span className="text-accent">não faz ideia</span> —<br />e é assim que o dinheiro some.
-            </h2>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-              className="rounded-2xl border border-[#eef0f3] bg-white p-5 mb-4 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
-              <p className="text-[14px] leading-relaxed">Sem registro, cada gasto pequeno fica invisível. E o que é invisível não dá pra controlar.</p>
-            </motion.div>
-          </>
-        )}
-        <p className="text-[13.5px] text-muted-foreground leading-relaxed mb-6">
-          Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>. Registrar no CORE leva segundos.
+        <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-5">
+          {anchor
+            ? <>Pela sua estimativa,<br /><span className="text-accent">{anchor.month} somem</span><br />todo mês sem você ver.</>
+            : <>A maioria <span className="text-accent">não faz ideia</span> —<br />e é assim que o dinheiro some.</>}
+        </h2>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="rounded-2xl border border-[#eef0f3] bg-white p-4 mb-4 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.28)]">
+          {anchor && (
+            <>
+              <div className="flex text-center mb-1">
+                <div className="flex-1">
+                  <small className="block text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Por dia</small>
+                  <b className="text-[16px] tabular-nums text-destructive/80">R$ {diaNum}{mais}</b>
+                </div>
+                <div className="flex-1">
+                  <small className="block text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Por mês</small>
+                  <b className="text-[16px] tabular-nums">{anchor.month}</b>
+                </div>
+                <div className="flex-1">
+                  <small className="block text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Em 12 meses</small>
+                  <b className="text-[18px] tabular-nums text-accent">{anchor.year}</b>
+                </div>
+              </div>
+              <div className="relative flex items-end gap-[3px] h-[72px] mt-4 mb-1 px-0.5" aria-hidden>
+                {Array.from({ length: 12 }, (_, bi) => (
+                  <motion.i
+                    key={bi}
+                    className={`flex-1 rounded-t-[3px] block ${bi === 11 ? "bg-accent" : "bg-[#f2d4e4]"}`}
+                    initial={{ height: 0 }}
+                    animate={{ height: `${((bi + 1) / 12) * 100}%` }}
+                    transition={{ delay: 0.45 + bi * 0.07, duration: 0.35, ease: "easeOut" }}
+                  />
+                ))}
+                <motion.span
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4 }}
+                  className="absolute -top-1 right-0 bg-foreground text-background text-[9.5px] font-extrabold px-2 py-0.5 rounded-full"
+                >{anchor.year}</motion.span>
+              </div>
+              <div className="flex justify-between text-[8px] text-muted-foreground/70 px-0.5 mb-3">
+                <span>mês 1</span><span>mês 4</span><span>mês 8</span><span>mês 12</span>
+              </div>
+            </>
+          )}
+          {!anchor && (
+            <p className="text-[13.5px] leading-relaxed mb-3">
+              Sem registro, cada gasto pequeno fica invisível. E o que é invisível não dá pra controlar.
+            </p>
+          )}
+          <small className="block text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground mb-2">
+            Onde costuma vazar {atrapalha ? "— pelo que você contou" : ""}
+          </small>
+          {fontes.map(([emo, cor, nome, pct], fi) => (
+            <div key={nome} className="flex items-center gap-2 mb-1.5 last:mb-0">
+              <span className="w-6 h-6 rounded-[7px] grid place-items-center text-[12px] shrink-0" style={{ background: cor }}>{emo}</span>
+              <span className="text-[11.5px] font-semibold flex-1">{nome}</span>
+              <span className="flex-1 h-1.5 rounded-full bg-secondary overflow-hidden">
+                <motion.i className="block h-full rounded-full bg-accent/80"
+                  initial={{ width: 0 }} animate={{ width: `${pct * 2}%` }} transition={{ delay: 0.9 + fi * 0.12, duration: 0.4 }} />
+              </span>
+              <b className="text-[10px] text-muted-foreground w-9 text-right">~{pct}%</b>
+            </div>
+          ))}
+        </motion.div>
+        <p className="text-[11px] text-muted-foreground text-center mb-4">
+          estimativa com base nas suas respostas — o app mostra o <b className="text-foreground">SEU</b> número real
         </p>
         <Button size="lg" className="w-full h-12 rounded-full text-[15px] font-bold gap-2" onClick={onNext}>
-          <span className="min-w-0 truncate">Quero ver pra onde vai</span> <ArrowRight className="w-4 h-4 shrink-0" />
+          <span className="min-w-0 truncate">Quero estancar isso</span> <ArrowRight className="w-4 h-4 shrink-0" />
         </Button>
       </div>
     );
@@ -634,6 +830,7 @@ function ProofSlide({ gasto, pele, onNext }: { gasto: string; pele?: boolean; on
 
 /** Pico das trilhas de vida (funil vitrine): a resposta de consistência vira
  *  a confissão — "não é força de vontade, é falta de sistema". */
+
 function AreaProofSlide({ area, answer, pele, onNext }: { area: AreaKey; answer: string; pele?: boolean; onNext: () => void }) {
   const proof = AREA_PROOF[area as Exclude<AreaKey, "dinheiro">];
   const echo = proof?.echo[answer] ?? "É sempre a mesma história.";
@@ -759,7 +956,7 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
             proofArea && proofArea !== "dinheiro" ? (
               <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} pele={pele} onNext={() => advance(answers)} />
             ) : (
-              <ProofSlide gasto={answers.gasto ?? ""} pele={pele} onNext={() => advance(answers)} />
+              <ProofSlide gasto={answers.gasto ?? ""} atrapalha={answers.atrapalha} pele={pele} onNext={() => advance(answers)} />
             )
           ) : (
             <>
@@ -1244,7 +1441,7 @@ export default function Comecar() {
               />
             ))}
             {step === "crenca" && <CrencaScreen onNext={() => setStep("quiz")} onBack={() => setStep("start")} />}
-            {step === "confianca" && <ConfiancaScreen onNext={() => setStep("progress")} onBack={() => setStep("quiz")} />}
+            {step === "confianca" && <ConfiancaScreen answers={answers} onNext={() => setStep("progress")} onBack={() => setStep("quiz")} />}
             {step === "quiz" && (
               <QuizScreen
                 questions={track}
@@ -1268,7 +1465,7 @@ export default function Comecar() {
               // radar até o web validar. A demo devolve em ?step=plano.
               isNativeShell()
                 ? <RadarResultScreen answers={answers} area={area} onDone={() => { window.location.href = demoUrlFor(area); }} />
-                : <PonteDemoScreen area={area} onDemo={() => { window.location.href = demoUrlFor(area); }} />
+                : <PonteDemoScreen area={area} answers={answers} onDemo={() => { window.location.href = demoUrlFor(area); }} />
             ) : (
               <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
             ))}

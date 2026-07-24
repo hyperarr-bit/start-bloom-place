@@ -175,6 +175,14 @@ const Preview = () => {
   const key = (moduleKey ?? "").toLowerCase();
   const Component = MODULE_COMPONENTS[key];
 
+  // CERCA DO TOUR (bug 24/07): a seta ← dos módulos navega pra "/" e o
+  // RootGate mandava o visitante pro /comecar (funil de FINANÇAS) — fuga do
+  // vitrine. Marca o tour ativo; o RootGate devolve pra /inicio?step=analise.
+  useEffect(() => {
+    if (!tour) return;
+    try { sessionStorage.setItem("core-demo-tour", String(Date.now())); } catch { /* noop */ }
+  }, [tour]);
+
   // Nudge de fechamento: nº de módulos DISTINTOS abertos no tour (sessionStorage).
   const [nudgeCount, setNudgeCount] = useState(0);
   const nudgeFiredRef = useRef(false);

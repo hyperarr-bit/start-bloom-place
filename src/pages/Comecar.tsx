@@ -201,7 +201,40 @@ const feedbackPara = (key: string, answer: string): string | null => {
 
 /** CRENÇA (BitePal "why it works"): instala o mecanismo antes do quiz —
  *  motivação despenca, sistema fica. Curvas do v3 (w2), adaptadas. */
-function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+/** Mecanismo POR ÁREA — a crença mostra o produto que ELA escolheu na porta
+ *  (bug 24/07: era finanças pra todo mundo). Cada área: 3 passos com
+ *  micro-visual próprio. */
+type MecVisual = { tipo: "pill"; texto: string } | { tipo: "barras" } | { tipo: "alerta"; texto: string };
+const MEC_AREA: Record<AreaKey, Array<{ titulo: string; sub: string; vis: MecVisual }>> = {
+  dinheiro: [
+    { titulo: "Registra em 5 segundos", sub: "café, mercado, conta — um toque", vis: { tipo: "pill", texto: "☕ R$ 8,50" } },
+    { titulo: "O app organiza sozinho", sub: "categorias, somas e limites automáticos", vis: { tipo: "barras" } },
+    { titulo: "Ele te procura — não o contrário", sub: "avisa antes da conta, mostra o padrão", vis: { tipo: "alerta", texto: "🔔 Luz vence amanhã" } },
+  ],
+  rotina: [
+    { titulo: "Seus hábitos em um painel", sub: "monta a semana em 1 minuto", vis: { tipo: "pill", texto: "💧 Beber água ✓" } },
+    { titulo: "O dia acorda planejado", sub: "tarefas e hábitos já na ordem certa", vis: { tipo: "barras" } },
+    { titulo: "Ele te lembra na hora certa", sub: "nada depende da sua memória", vis: { tipo: "alerta", texto: "🔔 Academia em 30min" } },
+  ],
+  corpo: [
+    { titulo: "Refeição registrada num toque", sub: "sem pesar, sem planilha", vis: { tipo: "pill", texto: "🍳 Café da manhã ✓" } },
+    { titulo: "Treino do dia já montado", sub: "plano pronto, é só seguir", vis: { tipo: "barras" } },
+    { titulo: "Progresso que aparece", sub: "evolução visível toda semana", vis: { tipo: "alerta", texto: "📈 3 treinos essa semana" } },
+  ],
+  saude: [
+    { titulo: "Check-in de 10 segundos", sub: "como você tá, num toque", vis: { tipo: "pill", texto: "❤️ Hoje: bem ✓" } },
+    { titulo: "Tudo registrado num lugar", sub: "sintomas, remédios, consultas", vis: { tipo: "barras" } },
+    { titulo: "Avisos do que importa", sub: "remédio, consulta, retorno", vis: { tipo: "alerta", texto: "🔔 Remédio às 20h" } },
+  ],
+  metas: [
+    { titulo: "Meta quebrada em passos", sub: "do sonho pro passo de hoje", vis: { tipo: "pill", texto: "🎯 Passo 1 feito ✓" } },
+    { titulo: "Um passo pequeno por dia", sub: "5 minutos, sem se enganar", vis: { tipo: "barras" } },
+    { titulo: "Progresso que você VÊ", sub: "a barra enchendo toda semana", vis: { tipo: "alerta", texto: "📈 Meta 40% concluída" } },
+  ],
+};
+
+function CrencaScreen({ area, onNext, onBack }: { area: AreaKey; onNext: () => void; onBack: () => void }) {
+  const cards = MEC_AREA[area] ?? MEC_AREA.dinheiro;
   const spring = (i: number) => ({
     initial: { opacity: 0, y: 16, scale: 0.97 },
     animate: { opacity: 1, y: 0, scale: 1 },
@@ -219,42 +252,36 @@ function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => vo
       </div>
       <h2 className="text-[27px] font-black tracking-tight leading-[1.12] mb-6">Como o CORE<br />funciona</h2>
       <div className="space-y-2.5">
-        <motion.div {...spring(0)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
-          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">1</span>
-          <span className="flex-1 leading-tight">
-            <b className="block text-[13.5px]">Registra em 5 segundos</b>
-            <small className="text-[11px] text-muted-foreground">café, mercado, conta — um toque</small>
-          </span>
-          <span className="flex items-center gap-1.5 rounded-xl bg-secondary/70 px-2.5 py-2 text-[11px] font-bold shrink-0">
-            ☕ R$ 8,50
-            <motion.span animate={{ scale: [1, 1.18, 1] }} transition={{ delay: 1, duration: 0.5, repeat: 2 }}
-              className="w-[18px] h-[18px] rounded-full bg-accent text-accent-foreground grid place-items-center text-[12px] leading-none">+</motion.span>
-          </span>
-        </motion.div>
-        <motion.div {...spring(1)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
-          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">2</span>
-          <span className="flex-1 leading-tight">
-            <b className="block text-[13.5px]">O app organiza sozinho</b>
-            <small className="text-[11px] text-muted-foreground">categorias, somas e limites automáticos</small>
-          </span>
-          <span className="flex items-end gap-[3px] h-8 shrink-0" aria-hidden>
-            {[["100%", "hsl(var(--accent))"], ["68%", "#f2d4e4"], ["52%", "#fdeccb"], ["38%", "#cdeeee"], ["26%", "#d9e4fb"]].map(([h, c], bi) => (
-              <motion.i key={bi} className="w-[9px] rounded-t-[3px] block" style={{ background: c as string }}
-                initial={{ height: 0 }} animate={{ height: h as string }} transition={{ delay: 0.7 + bi * 0.08, duration: 0.4, ease: "easeOut" }} />
-            ))}
-          </span>
-        </motion.div>
-        <motion.div {...spring(2)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
-          <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">3</span>
-          <span className="flex-1 leading-tight">
-            <b className="block text-[13.5px]">Ele te procura — não o contrário</b>
-            <small className="text-[11px] text-muted-foreground">avisa antes da conta, mostra o padrão</small>
-          </span>
-          <motion.span
-            className="rounded-lg bg-[#fff7e8] border border-[#f5e3bd] px-2 py-1.5 text-[9.5px] font-bold text-[#8a6d1f] shrink-0"
-            animate={{ rotate: [0, -3, 3, -2, 0] }} transition={{ delay: 1.4, duration: 0.5 }}
-          >🔔 Luz vence amanhã</motion.span>
-        </motion.div>
+        {cards.map((c, i) => (
+          <motion.div key={c.titulo} {...spring(i)} className="flex items-center gap-3 rounded-2xl border border-[#eef0f3] bg-white p-3.5 shadow-[0_10px_24px_-14px_rgba(20,40,70,0.25)]">
+            <span className="w-6 h-6 rounded-full bg-foreground text-background grid place-items-center text-[11.5px] font-extrabold shrink-0">{i + 1}</span>
+            <span className="flex-1 leading-tight">
+              <b className="block text-[13.5px]">{c.titulo}</b>
+              <small className="text-[11px] text-muted-foreground">{c.sub}</small>
+            </span>
+            {c.vis.tipo === "pill" && (
+              <span className="flex items-center gap-1.5 rounded-xl bg-secondary/70 px-2.5 py-2 text-[11px] font-bold shrink-0">
+                {c.vis.texto}
+                <motion.span animate={{ scale: [1, 1.18, 1] }} transition={{ delay: 1, duration: 0.5, repeat: 2 }}
+                  className="w-[18px] h-[18px] rounded-full bg-accent text-accent-foreground grid place-items-center text-[12px] leading-none">+</motion.span>
+              </span>
+            )}
+            {c.vis.tipo === "barras" && (
+              <span className="flex items-end gap-[3px] h-8 shrink-0" aria-hidden>
+                {[["100%", "hsl(var(--accent))"], ["68%", "#f2d4e4"], ["52%", "#fdeccb"], ["38%", "#cdeeee"], ["26%", "#d9e4fb"]].map(([h, cor], bi) => (
+                  <motion.i key={bi} className="w-[9px] rounded-t-[3px] block" style={{ background: cor as string }}
+                    initial={{ height: 0 }} animate={{ height: h as string }} transition={{ delay: 0.7 + bi * 0.08, duration: 0.4, ease: "easeOut" }} />
+                ))}
+              </span>
+            )}
+            {c.vis.tipo === "alerta" && (
+              <motion.span
+                className="rounded-lg bg-[#fff7e8] border border-[#f5e3bd] px-2 py-1.5 text-[9.5px] font-bold text-[#8a6d1f] shrink-0"
+                animate={{ rotate: [0, -3, 3, -2, 0] }} transition={{ delay: 1.4, duration: 0.5 }}
+              >{c.vis.texto}</motion.span>
+            )}
+          </motion.div>
+        ))}
       </div>
       <p className="text-[12px] text-muted-foreground text-center mt-5">
         nada depende da sua força de vontade — é <b className="text-foreground">visibilidade automática</b>
@@ -266,8 +293,6 @@ function CrencaScreen({ onNext, onBack }: { onNext: () => void; onBack: () => vo
   );
 }
 
-/** CONFIANÇA (Cal AI "thank you for trusting us"): reciprocidade antes do
- *  loading — a pessoa entregou respostas pessoais, a gente agradece. */
 function ConfiancaScreen({ answers, onNext, onBack }: {
   answers: Record<string, string>; onNext: () => void; onBack: () => void;
 }) {
@@ -352,9 +377,15 @@ const ACHADOS_AREA: Record<Exclude<AreaKey, "dinheiro">, [Omit<Achado, "nivel">,
     { emoji: "🧭", cor: "#d9e4fb", titulo: "Sem plano quebrado em etapas", sub: "direção sem próximo passo não anda" },
   ],
 };
-function PonteDemoScreen({ area, answers, onDemo }: {
+function PonteDemoScreen({ area, answers: answersProp, onDemo }: {
   area: AreaKey; answers: Record<string, string>; onDemo: () => void;
 }) {
+  // Volta da demo pode ser page-load novo: respostas caem pro localStorage
+  // (mesma fonte do SeuPlanoScreen/PaywallFlow).
+  const answers = (() => {
+    if (answersProp && Object.keys(answersProp).length) return answersProp;
+    try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
+  })();
   const anchor = area === "dinheiro" ? GASTO_ANCHOR[answers.gasto ?? ""] ?? null : null;
   const achados: Achado[] = area === "dinheiro"
     ? [
@@ -1324,7 +1355,7 @@ export default function Comecar() {
     const s = params.get("step");
     // "plano" = volta da demo do funil vitrine (ordem 23/07: radar → demo →
     // PLANO → cadastro; o plano promete depois que a demo provou).
-    return s === "signup" ? "signup" : s === "plano" ? "plano" : s === "offer" || s === "trial" ? "offer" : "start";
+    return s === "signup" ? "signup" : s === "plano" ? "plano" : s === "analise" ? "result" : s === "offer" || s === "trial" ? "offer" : "start";
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -1368,7 +1399,8 @@ export default function Comecar() {
   // Telemetria do funil: cada tela vista (a "quiz" emite quiz_1/2/3 por dentro
   // e o paywall emite offer/wheel/downsell por conta própria).
   useEffect(() => {
-    if (step !== "quiz" && step !== "offer") {
+    // "plano" fica de fora: o SeuPlanoScreen emite o dele (com area) — sem duplo-count no admin.
+    if (step !== "quiz" && step !== "offer" && step !== "plano") {
       trackEvent("funnel_view", {
         step,
         // Segmenta o funil vitrine ("vida") do funil padrão (finanças) no admin.
@@ -1440,7 +1472,7 @@ export default function Comecar() {
                 }}
               />
             ))}
-            {step === "crenca" && <CrencaScreen onNext={() => setStep("quiz")} onBack={() => setStep("start")} />}
+            {step === "crenca" && <CrencaScreen area={area ?? "dinheiro"} onNext={() => setStep("quiz")} onBack={() => setStep("start")} />}
             {step === "confianca" && <ConfiancaScreen answers={answers} onNext={() => setStep("progress")} onBack={() => setStep("quiz")} />}
             {step === "quiz" && (
               <QuizScreen

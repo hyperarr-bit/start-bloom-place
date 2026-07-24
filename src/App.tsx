@@ -61,6 +61,14 @@ const RootGate = () => {
   // viva" é um overlay DENTRO do funil (rota própria causava flash branco na
   // transição). PWA continua indo pro login (quem instala PWA já comprou).
   if (!user && isNativeShell()) return <Navigate to="/inicio" replace />;
+  // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
+  // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
+  if (!user) {
+    try {
+      const t = Number(sessionStorage.getItem("core-demo-tour") ?? 0);
+      if (t && Date.now() - t < 30 * 60_000) return <Navigate to="/inicio?step=analise" replace />;
+    } catch { /* noop */ }
+  }
   if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
 
   const area = getFunnelArea();

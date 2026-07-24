@@ -65,9 +65,11 @@ interface Props {
  * QA: localStorage "pix-ab-force" = braço (chave fora do prefixo core-*,
  * sobrevive às vassouras de cache). */
 type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
-// 23/07 (ordem do dono): A/B encerrado com Asaas na frente em todas as
-// métricas (50% vs 33% por abertura; painel Pagar.me reconciliado no centavo)
-// + 100 Pix grátis/mês. Pra reabrir o teste: FORCE_GATEWAY = null.
+// 24/07: dono pediu volta pra CAKTO, mas o teste de cobrança REAL devolveu
+// 400: "Pix disponível apenas com conta ativa no Cakto Banking" — a conta
+// precisa ser aberta no painel da Cakto ANTES da troca. Até lá: Asaas.
+// Quando o Banking ativar: FORCE_GATEWAY = "cakto" (e cobrir cakto no
+// pix-reconcile, que hoje só fala abacate/asaas/pagarme).
 const FORCE_GATEWAY: Gateway | null = "asaas";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 

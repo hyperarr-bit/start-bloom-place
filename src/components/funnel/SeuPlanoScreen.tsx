@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, GASTO_ANCHOR, type AreaKey } from "@/lib/funnel";
+import { isNativeShell } from "@/lib/native-shell";
 
 /**
  * SEU PLANO — o pico de endowment do funil (web + app; decisão do dono
@@ -176,15 +177,41 @@ export function SeuPlanoScreen({ area, answers, onCommit }: {
         <span className="text-[#f0a500] tracking-wide">★★★★★</span> <b>+500 pessoas</b> <span className="text-muted-foreground">já organizando a vida</span>
       </motion.p>
 
-      <motion.div {...stag(8)} className="mt-4">
-        <Button
-          size="lg"
-          className="w-full h-13 min-h-[52px] rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-          onClick={() => { trackEvent("funnel_click", { cta: "plano_commit", area }); onCommit(); }}
-        >
-          Quero cumprir esse plano 🤝 <ArrowRight className="w-4 h-4" />
-        </Button>
-      </motion.div>
+      {/* CTA do compromisso. No SHELL (24/07, pedido do dono no teste do
+          iPhone): fixo no rodapé como Cal AI/BitePal — a tela do compromisso
+          nunca esconde o botão do compromisso abaixo da dobra; degradê deixa
+          o conteúdo rolar por baixo sem corte seco. Web segue no fluxo por
+          enquanto (mesma mudança aprovada, aguardando janela de push). */}
+      {isNativeShell() ? (
+        <>
+          <div aria-hidden className="h-16" />
+          <div
+            className="fixed inset-x-0 bottom-0 z-50 px-5 pt-10 pb-4"
+            style={{
+              paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+              background: "linear-gradient(to top, hsl(var(--background)) 55%, transparent)",
+            }}
+          >
+            <Button
+              size="lg"
+              className="w-full max-w-md mx-auto flex h-13 min-h-[52px] rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+              onClick={() => { trackEvent("funnel_click", { cta: "plano_commit", area }); onCommit(); }}
+            >
+              Quero cumprir esse plano 🤝 <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </>
+      ) : (
+        <motion.div {...stag(8)} className="mt-4">
+          <Button
+            size="lg"
+            className="w-full h-13 min-h-[52px] rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+            onClick={() => { trackEvent("funnel_click", { cta: "plano_commit", area }); onCommit(); }}
+          >
+            Quero cumprir esse plano 🤝 <ArrowRight className="w-4 h-4" />
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 }

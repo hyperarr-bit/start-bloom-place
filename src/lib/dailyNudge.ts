@@ -3,6 +3,7 @@
  * for the current trial day, adapting to which key actions
  * the user has already activated.
  */
+import { isNativeShell } from "@/lib/native-shell";
 
 export interface DailyNudge {
   key: string;
@@ -162,7 +163,11 @@ export function pickDailyNudge(
           ? "Amanhã é o último dia"
           : "Garanta seu acesso antes que expire",
         description: engaged
-          ? "Continue com tudo que você já configurou. Pague 1x (R$ 27,90) e é seu pra sempre."
+          // No app da loja o preço do Pix não pode aparecer (Play Billing):
+          // a versão sem valor serve pros dois e só a web cita o vitalício.
+          ? (isNativeShell()
+              ? "Continue com tudo que você já configurou — mantenha seu acesso ativo."
+              : "Continue com tudo que você já configurou. Pague 1x (R$ 27,90) e é seu pra sempre.")
           : "Assine agora e mantenha tudo organizado.",
         ctaLabel: "Assinar agora",
         ctaRoute: "/planos",

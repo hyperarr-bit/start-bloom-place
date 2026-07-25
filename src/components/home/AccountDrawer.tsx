@@ -1,13 +1,16 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
+import { isNativeShell } from "@/lib/native-shell";
 import { NameEditDialog } from "./NameEditDialog";
+import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { toast } from "sonner";
 
 interface AccountDrawerProps {
@@ -29,6 +32,7 @@ export const AccountDrawer = ({
   const { set: setUserData, isGuest } = useUserData();
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [view, setView] = useState<"menu" | "account">("menu");
 
   useEffect(() => {
@@ -41,7 +45,8 @@ export const AccountDrawer = ({
   useEffect(() => {
     if (!open) return;
     import("@/pages/Conquistas");
-    import("@/pages/Planos");
+    if (isNativeShell()) import("@/pages/PlanosApp");
+    else import("@/pages/Planos");
   }, [open]);
 
   // Fecha o drawer já e deixa o React montar a rota nova sem bloquear o frame
@@ -203,6 +208,19 @@ export const AccountDrawer = ({
                     Redefinir senha
                   </button>
                 </div>
+
+                {/* Exigência do Google Play (24/07): app com login precisa de
+                    caminho de exclusão DENTRO do app. Fica no fim, discreto e
+                    com confirmação por digitação — é irreversível. */}
+                <div className="pt-2 mt-1 border-t border-border">
+                  <button
+                    onClick={() => { trackEvent("account_delete_open", {}); setShowDeleteDialog(true); }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    Excluir minha conta
+                  </button>
+                </div>
               </div>
             </>
           )}
@@ -216,6 +234,7 @@ export const AccountDrawer = ({
         onSave={handleNameSave}
       />
 
+      <DeleteAccountDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog} />
     </>
   );
 };

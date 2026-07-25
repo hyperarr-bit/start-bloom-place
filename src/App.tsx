@@ -112,6 +112,13 @@ import NotFound from "./pages/NotFound";
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
 // bundle inicial e carregam sob demanda — a LP/anônimo carrega leve.
 const Planos = lazy(() => import("./pages/Planos"));
+// A /planos do SHELL (24/07): a web vende vitalício no Pix, e Pix dentro do
+// binário da loja é pagamento externo — motivo exato da remoção do Cal AI.
+const PlanosApp = lazy(() => import("./pages/PlanosApp"));
+// Páginas legais exigidas pelo Play (política, termos, exclusão de conta).
+const Privacidade = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Privacidade })));
+const Termos = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Termos })));
+const ExcluirConta = lazy(() => import("./pages/Legal").then((m) => ({ default: m.ExcluirConta })));
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
 const Rotina = lazy(() => import("./pages/Rotina"));
@@ -154,7 +161,11 @@ const AnimatedRoutes = () => {
       <Routes location={location} key={location.pathname}>
         <Route path="/reset-password" element={<PageTransition><ResetPassword /></PageTransition>} />
         <Route path="/update-password" element={<PageTransition><UpdatePassword /></PageTransition>} />
-        <Route path="/planos" element={<ProtectedRoute><PageTransition><Planos /></PageTransition></ProtectedRoute>} />
+        <Route path="/planos" element={<ProtectedRoute><PageTransition>{isNativeShell() ? <PlanosApp /> : <Planos />}</PageTransition></ProtectedRoute>} />
+        {/* Legais: públicas de propósito — o revisor do Google abre sem conta */}
+        <Route path="/privacidade" element={<PageTransition><Privacidade /></PageTransition>} />
+        <Route path="/termos" element={<PageTransition><Termos /></PageTransition>} />
+        <Route path="/excluir-conta" element={<PageTransition><ExcluirConta /></PageTransition>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />

@@ -14,6 +14,9 @@ import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { TrialTimeline } from "@/components/app/TrialTimeline";
+import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
+import { restaurar } from "@/lib/revenuecat";
+import { useAuth } from "@/hooks/use-auth";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 /**
@@ -480,6 +483,45 @@ function LifetimeCard() {
 
 /* ----------------------------------------------------------------- offer */
 
+/** Rodapé legal do paywall do APP (24/07). Existe por dois motivos de loja:
+ *  1. Restaurar compras e os links legais têm que estar visíveis onde se
+ *     vende (padrão Cal AI/BitePal — e o Play cobra o "Restaurar").
+ *  2. Quem não assina fica PRESO neste gate: sem esta saída, a exclusão de
+ *     conta do menu é inalcançável, e o Google exige caminho in-app pra
+ *     apagar conta. Aqui o não-pagante (e o revisor) consegue apagar. */
+function AppLegalFooter() {
+  const { user } = useAuth();
+  const [excluirAberto, setExcluirAberto] = useState(false);
+  return (
+    <div className="pt-1 pb-2 text-center space-y-2">
+      <button
+        onClick={async () => {
+          trackEvent("app_restore_paywall", {});
+          const ok = await restaurar();
+          if (ok) window.location.href = "/";
+        }}
+        className="text-[11.5px] font-semibold text-muted-foreground"
+      >
+        Restaurar compras
+      </button>
+      <p className="text-[11px] text-muted-foreground">
+        <a href="/privacidade" className="underline underline-offset-2">Privacidade</a>
+        {" · "}
+        <a href="/termos" className="underline underline-offset-2">Termos</a>
+        {user && (
+          <>
+            {" · "}
+            <button onClick={() => setExcluirAberto(true)} className="underline underline-offset-2">
+              Excluir conta
+            </button>
+          </>
+        )}
+      </p>
+      <DeleteAccountDialog open={excluirAberto} onOpenChange={setExcluirAberto} />
+    </div>
+  );
+}
+
 function OfferScreen({
   context, answers, onEscape, onBuy,
 }: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void }) {
@@ -573,6 +615,7 @@ function OfferScreen({
             aqui não se repete; o paywall só vende e o sheet só cobra. */}
         {!nativo && <motion.div {...stagger(10)}><LifetimeCard /></motion.div>}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
+        {nativo && <AppLegalFooter />}
       </div>
 
       {/* CTA sticky */}

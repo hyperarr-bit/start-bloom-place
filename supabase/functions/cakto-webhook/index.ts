@@ -560,6 +560,47 @@ serve(async (req) => {
       }
     }
 
+    // Meta CAPI (25/07): FALTAVA na Cakto — as vendas iam só pra UTMify e a
+    // Meta ficava CEGA (otimizava sem ver Purchase + ROAS do gerenciador
+    // subestimado; sintoma: "só chega na UTM"). Espelha a sendMetaCapi da
+    // abacate-webhook. event_id = order_id do pix_order_created (o MESMO id
+    // que o pixel do navegador usa como eventID) → a Meta deduplica quem
+    // voltou pra tela de confirmação. Dormente sem META_PIXEL_ID/TOKEN.
+    async function sendMetaCapi(userId: string) {
+      const pixelId = Deno.env.get("META_PIXEL_ID");
+      const token = Deno.env.get("META_CAPI_TOKEN");
+      if (!pixelId || !token) { logStep("Meta CAPI skipped: no secrets"); return; }
+      try {
+        const sha = async (v: string) => {
+          const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v.trim().toLowerCase()));
+          return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+        };
+        const { data: evs } = await supabaseClient.from("analytics_events")
+          .select("event_data, created_at, event_name").eq("user_id", userId)
+          .order("created_at", { ascending: false }).limit(80);
+        const rows = (evs ?? []) as Array<{ event_data: Record<string, string>; created_at: string; event_name: string }>;
+        const ordem = rows.find((r) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto");
+        const eventId = String(ordem?.event_data?.order_id ?? purchaseId ?? `${userId}-${Date.now()}`);
+        const offerKind = String(ordem?.event_data?.offer ?? (offerId === DOWNSELL_OFFER.toLowerCase() ? "downsell" : "lifetime"));
+        const amountCents = Number(ordem?.event_data?.amount_cents) || Math.round(Number(data.amount ?? 0) * 100) || (offerKind === "downsell" ? 1490 : 2790);
+        const fbHit = rows.find((r) => r.event_data?.fbclid);
+        const fbc = fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null;
+        const payload = {
+          data: [{
+            event_name: "Purchase", event_time: Math.floor(Date.now() / 1000), event_id: eventId,
+            action_source: "website", event_source_url: APP_URL,
+            user_data: { ...(customerEmail ? { em: [await sha(customerEmail)] } : {}), external_id: [await sha(userId)], ...(fbc ? { fbc } : {}) },
+            custom_data: { value: amountCents / 100, currency: "BRL", content_name: offerKind === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
+          }],
+        };
+        const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        const out = await res.json().catch(() => ({}));
+        logStep(res.ok ? "Meta CAPI sent" : "Meta CAPI error", { status: res.status, eventId, body: JSON.stringify(out).slice(0, 160) });
+      } catch (e) { logStep("Meta CAPI failed", { message: String(e).slice(0, 150) }); }
+    }
+
     async function updateStatus(userId: string | null, status: string) {
       let query = supabaseClient.from("subscriptions").update({ status });
       if (userId) {
@@ -583,9 +624,10 @@ serve(async (req) => {
       }
       // trial_converted só na 1ª cobrança; renovação não é conversão
       await saveActiveSubscription(userId, event === "purchase_approved");
-      // UTMify + boas-vindas: só a 1ª compra (renovação não é venda nova)
+      // UTMify + Meta CAPI + boas-vindas: só a 1ª compra (renovação não é venda nova)
       if (event === "purchase_approved") {
         await sendToUtmify(userId, "paid");
+        await sendMetaCapi(userId);
         await sendWelcomeEmail(userId);
       }
       logStep("Subscription activated", { userId, event, billingPeriod });

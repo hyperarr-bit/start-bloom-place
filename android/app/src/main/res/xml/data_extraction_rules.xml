@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Nada deste app entra em backup na nuvem nem em transferência de aparelho.
+  O WebView guarda o token de sessão do Supabase no localStorage; restaurar
+  isso noutro celular restauraria a conta logada junto (25/07). Os dados do
+  usuário vivem no Supabase e voltam sozinhos no login.
+-->
+<data-extraction-rules>
+    <cloud-backup><exclude domain="root" /></cloud-backup>
+    <device-transfer><exclude domain="root" /></device-transfer>
+</data-extraction-rules>

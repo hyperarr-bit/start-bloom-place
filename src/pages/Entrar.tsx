@@ -266,7 +266,13 @@ const Entrar = () => {
 
         {/* Quem criou a conta com Google no tutorial não tem senha — precisa desta porta.
             Escondido em webview (Instagram/Gmail in-app) porque o OAuth quebra lá. */}
-        {!isInAppBrowser() && (
+        {/* No app das lojas o Google fica fora (25/07): o WebView roda em
+            localhost, então getAuthRedirectUrl() manda o callback pro SITE —
+            o navegador externo abre, a sessão nasce lá e nunca volta pro app.
+            Não há intent-filter de deep link pra trazer de volta. Botão que
+            leva pra fora e não retorna é reprovação na revisão; e-mail e senha
+            funcionam. Reativar junto com o deep link. */}
+        {!isInAppBrowser() && !isNativeShell() && (
           <>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

@@ -1287,8 +1287,10 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       </div>
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
-          o OAuth trava, então nem mostra — e-mail vira o único caminho. */}
-      {!inApp ? (
+          o OAuth trava, então nem mostra — e-mail vira o único caminho.
+          No app das lojas cai na mesma regra: o callback do OAuth volta pro
+          SITE (o WebView roda em localhost) e a pessoa nunca retorna pro app. */}
+      {!inApp && !isNativeShell() ? (
         <>
           <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
             {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}

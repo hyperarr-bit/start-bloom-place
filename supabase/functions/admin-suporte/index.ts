@@ -58,11 +58,11 @@ serve(async (req) => {
       const { data: u } = await admin.auth.admin.getUserById(uid);
       const { data: sub } = await admin.from("subscriptions")
         .select("status, plan, customer_email, current_period_start").eq("user_id", uid).maybeSingle();
-      // só os NOMES das chaves (nunca o conteúdo) — o bastante pra distinguir
-      // flag de onboarding de dado real ao decidir um merge/parqueio
+      // só NOMES + updated_at (nunca o conteúdo) — o updated_at diagnostica
+      // "parou de salvar quando?" sem expor dado da pessoa (23/07, caso Daniela)
       const { data: dados } = await admin.from("user_data")
-        .select("key").eq("user_id", uid).limit(100);
-      const keys = (dados ?? []).map((r: { key: string }) => r.key);
+        .select("key, updated_at").eq("user_id", uid).order("updated_at", { ascending: false }).limit(100);
+      const keys = (dados ?? []).map((r: { key: string; updated_at: string }) => `${r.key} @ ${r.updated_at}`);
       return json({ found: true, uid, email: u?.user?.email, lastSignIn: u?.user?.last_sign_in_at, sub, userDataRows: keys.length, keys });
     }
 
@@ -212,6 +212,62 @@ serve(async (req) => {
       });
       const out = await res.json().catch(() => ({}));
       return json({ httpStatus: res.status, metaResposta: out });
+    }
+
+    // BACKFILL CAPI (25/07): reenvia pra Meta as vendas CAKTO que o webhook
+    // não mandou (o sendMetaCapi entrou hoje). event_id = order_id (o MESMO do
+    // pixel do navegador) → a Meta deduplica quem já tinha chegado; event_time
+    // = hora real do pagamento → atribui ao clique certo (aceita até 7 dias).
+    if (action === "meta_capi_backfill") {
+      const pixelId = Deno.env.get("META_PIXEL_ID");
+      const capiToken = Deno.env.get("META_CAPI_TOKEN");
+      if (!pixelId || !capiToken) return json({ error: "secrets_ausentes" }, 400);
+      const dryRun = body.dryRun === true;
+      const hours = Math.min(Math.max(Number(body.hours) || 48, 1), 168);
+      const desde = new Date(Date.now() - hours * 3600e3).toISOString();
+      const sha = async (v: string) => {
+        const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v.trim().toLowerCase()));
+        return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      };
+      const { data: subs } = await admin.from("subscriptions")
+        .select("user_id, customer_email, current_period_start, amount_cents")
+        .gte("current_period_start", desde).order("current_period_start", { ascending: true }).limit(500);
+      const enviados: Array<Record<string, unknown>> = [];
+      let cakto = 0, pulados = 0, erros = 0, receita = 0;
+      for (const sub of subs ?? []) {
+        const email = String(sub.customer_email ?? "");
+        if (email.includes("+qa")) { pulados++; continue; }
+        const { data: evs } = await admin.from("analytics_events")
+          .select("event_data, created_at, event_name").eq("user_id", sub.user_id)
+          .order("created_at", { ascending: false }).limit(80);
+        const rows = (evs ?? []) as Array<{ event_data: Record<string, string>; created_at: string; event_name: string }>;
+        const ordem = rows.find((r) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto");
+        if (!ordem) { pulados++; continue; } // não é venda cakto (ou sem rastro) → pula
+        cakto++;
+        const eventId = String(ordem.event_data.order_id);
+        const offerKind = String(ordem.event_data?.offer ?? "lifetime");
+        const amountCents = Number(ordem.event_data?.amount_cents) || Number(sub.amount_cents) || (offerKind === "downsell" ? 1490 : 2790);
+        const fbHit = rows.find((r) => r.event_data?.fbclid);
+        const fbc = fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null;
+        const eventTime = Math.floor(new Date(sub.current_period_start).getTime() / 1000);
+        receita += amountCents / 100;
+        if (dryRun) { enviados.push({ eventId, amountCents, quando: sub.current_period_start, temFbc: !!fbc }); continue; }
+        const payload = {
+          data: [{
+            event_name: "Purchase", event_time: eventTime, event_id: eventId,
+            action_source: "website", event_source_url: "https://www.coreaplicativo.com.br",
+            user_data: { ...(email ? { em: [await sha(email)] } : {}), external_id: [await sha(sub.user_id)], ...(fbc ? { fbc } : {}) },
+            custom_data: { value: amountCents / 100, currency: "BRL", content_name: offerKind === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
+          }],
+        };
+        const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${capiToken}`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) erros++;
+        enviados.push({ eventId, amountCents, ok: res.ok, recv: (out as { events_received?: number })?.events_received });
+      }
+      return json({ dryRun, janelaHoras: hours, subsNaJanela: (subs ?? []).length, vendasCakto: cakto, enviados: enviados.length, erros, receita: Number(receita.toFixed(2)), pulados, detalhe: enviados });
     }
 
     return json({ error: "unknown_action" }, 400);

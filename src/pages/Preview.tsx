@@ -75,7 +75,7 @@ const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
 
 /** Demo guiada do funil vitrine (tour=vida): navegação curada entre os 5
  *  módulos do criativo — liberdade com corrimão, não os 16 de uma vez. */
-const DemoTourNav = ({ current }: { current: string }) => (
+const DemoTourNav = ({ current, from }: { current: string; from?: string }) => (
   <div className="sticky top-0 z-[60] bg-background/95 backdrop-blur border-b border-border">
     <div className="max-w-5xl mx-auto px-3 py-2 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
       {DEMO_MODULES.map((m) => {
@@ -83,7 +83,7 @@ const DemoTourNav = ({ current }: { current: string }) => (
         return (
           <Link
             key={m.key}
-            to={`/preview/${m.key}?funnel=1&tour=vida`}
+            to={`/preview/${m.key}?funnel=1&tour=vida${from ? `&from=${from}` : ""}`}
             onClick={() => trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key })}
             className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
               active
@@ -102,11 +102,33 @@ const DemoTourNav = ({ current }: { current: string }) => (
   </div>
 );
 
+/** Funis de teste congelados (24/07): a demo é a MESMA página pros três, então
+ *  eles carimbam `&from=` na URL e a volta devolve pro funil de origem. Sem
+ *  isso a pessoa sai do /funil-radar e volta no /inicio, trocando de funil
+ *  justo antes da tela de venda. Whitelist fechada — `from` desconhecido cai
+ *  no comportamento normal. */
+const FUNIS_TESTE: Record<string, { path: string; volta: "plano" | "signup" }> = {
+  // dia14 e v1 só entendem ?step=signup — mandar "plano" pra eles reiniciaria
+  // o funil no começo. Só o radar tem a tela SEU PLANO na volta da demo.
+  dia14: { path: "/inicio", volta: "signup" },
+  radar: { path: "/funil-radar", volta: "plano" },
+  v1: { path: "/funil-v1", volta: "signup" },
+};
+
+/** Volta pro funil de teste preservando a trilha: ?porta=vida é o que faz o
+ *  funil rodar em modo vitrine (fora do /inicio ele não sabe disso sozinho). */
+const voltaFunilTeste = (from: string, tour?: boolean) => {
+  const f = FUNIS_TESTE[from];
+  if (!f) return null;
+  return `${f.path}?step=${f.volta}${tour ? "&porta=vida" : ""}`;
+};
+
 /** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
  *  Tour vitrine (ordem 23/07): a demo PROVA e devolve pro SEU PLANO em
  *  /inicio?step=plano (o plano promete depois da prova; cadastro vem depois). */
-const DemoCta = ({ funnel, tour }: { funnel?: boolean; tour?: boolean }) => {
-  const to = tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar";
+const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
+  const to = (from && voltaFunilTeste(from, tour))
+    ?? (tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar");
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
@@ -130,8 +152,9 @@ const DemoCta = ({ funnel, tour }: { funnel?: boolean; tour?: boolean }) => {
 
 /** Banner de fechamento ativo: aparece quando a pessoa abre o 2º módulo do
  *  tour — "você já viu N de 16, bora com os SEUS dados?". Some ao dispensar. */
-const DemoTourNudge = ({ count }: { count: number }) => {
+const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   const [show, setShow] = useState(true);
+  const to = (from && voltaFunilTeste(from, true)) ?? "/inicio?step=plano";
   if (!show) return null;
   const dismiss = () => {
     try { sessionStorage.setItem(TOUR_NUDGE_DISMISSED_KEY, "1"); } catch { /* noop */ }
@@ -149,7 +172,7 @@ const DemoTourNudge = ({ count }: { count: number }) => {
           <p className="text-[11.5px] text-muted-foreground">Bora montar tudo com os seus dados de verdade?</p>
         </div>
         <Link
-          to="/inicio?step=plano"
+          to={to}
           onClick={() => trackEvent("funnel_click", { cta: "demo_nudge_signup", modules: count })}
           className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary text-primary-foreground font-semibold text-[13px] px-3 py-2 hover:bg-primary/90 transition"
         >
@@ -168,6 +191,9 @@ const Preview = () => {
   const [params] = useSearchParams();
   const funnel = params.get("funnel") === "1";
   const tour = params.get("tour") === "vida";
+  // De qual funil de teste a pessoa saiu (whitelist em FUNIS_TESTE); vazio =
+  // funil de produção, comportamento inalterado.
+  const from = params.get("from") ?? undefined;
   // Embutido no funil v2 (?embed=v2): o v2 põe a própria moldura/selo/CTA por
   // fora, então o banner e o rodapé daqui saem de cena. Sem o parâmetro,
   // NADA muda — o preview de sempre segue idêntico pro funil atual.
@@ -213,14 +239,14 @@ const Preview = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       {!embed && <PreviewBanner funnel={funnel} />}
-      {tour && <DemoTourNav current={key} />}
+      {tour && <DemoTourNav current={key} from={from} />}
       <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
-      {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} />}
-      {!embed && <DemoCta funnel={funnel} tour={tour} />}
+      {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} />}
+      {!embed && <DemoCta funnel={funnel} tour={tour} from={from} />}
     </div>
   );
 };

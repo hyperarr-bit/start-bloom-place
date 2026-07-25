@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -54,6 +54,18 @@ const ehPwa = () => {
     || (window.navigator as { standalone?: boolean }).standalone === true;
 };
 
+/**
+ * Rota que SÓ EXISTE NA WEB (trava de 25/07). O app da loja embarca a SPA
+ * inteira — os funis de venda estão todos dentro do .aab, cada um com
+ * "acesso vitalício por R$ 27,90 no Pix" na tela. Hoje nenhum botão do app
+ * leva até lá, mas basta um redirect futuro, um link no histórico ou um deep
+ * link pra expor pagamento externo ao revisor do Google. A trava fica na
+ * ROTA, não dentro de cada funil: os funis são páginas congeladas de
+ * experimento e não podem depender de alguém lembrar da regra.
+ */
+const SoNaWeb = ({ children }: { children: ReactNode }) =>
+  isNativeShell() ? <Navigate to="/inicio" replace /> : <>{children}</>;
+
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
@@ -106,6 +118,9 @@ import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import LandingPage from "./pages/lp/LpFinancas";
 import Comecar from "./pages/Comecar";
+// dia14 é o funil do /inicio (25/07) — import EAGER: a URL do tráfego de
+// anúncio não pode ter flash de loading (lazy quebraria fora do Suspense).
+import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
 import TutorialLab from "./pages/TutorialLab";
 import NotFound from "./pages/NotFound";
 
@@ -141,6 +156,15 @@ const Preview = lazy(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
 const PlanoV3 = lazy(() => import("./pages/v3/Plano"));
+// Funis CONGELADOS pra teste (24/07, pedido do dono). Cada um é uma cópia de
+// uma versão que já rodou, num diretório próprio e com chunk próprio: abrir
+// /funil-* não muda NADA no /comecar e /inicio que estão vendendo.
+//   dia14 → 83c0d98 (14/07 22:30), sem downsell e sem X no paywall
+//   radar → baae257 (23/07 20:20), ordem radar→demo→PLANO com o gráfico 3,6→8,5
+//   v1    → d18e4fd (20/07 23:12), o último antes da ordem mudar
+const ComecarDia14 = lazy(() => import("./pages/funis/dia14/ComecarDia14"));
+const ComecarRadar = lazy(() => import("./pages/funis/radar/ComecarRadar"));
+const ComecarFunilV1 = lazy(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazy(() => import("./pages/BemVindo"));
 
@@ -170,8 +194,11 @@ const AnimatedRoutes = () => {
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
-        <Route path="/comecar-v2" element={<PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition>} />
-        <Route path="/plano" element={<PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition>} />
+        <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
         <Route path="/preview/:moduleKey" element={<PageTransition><Preview /></PageTransition>} />
@@ -236,7 +263,7 @@ const App = () => {
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
-                  <Route path="/inicio" element={<RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary>} />
+                  <Route path="/inicio" element={<RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary>} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

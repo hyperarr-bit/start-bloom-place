@@ -25,3 +25,6 @@ dist-ssr
 .vercel
 .env*
 supabase/.temp/
+
+# build alternativo do shell nativo (gerado, nunca versionado)
+dist-shell

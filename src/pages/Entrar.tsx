@@ -18,11 +18,21 @@ import {
 } from "lucide-react";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { isInAppBrowser } from "@/lib/funnel";
+import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 
-/** /entrar — porta de entrada enviada por E-MAIL pela Cakto após a compra.
- *  A pessoa acabou de pagar e criou a conta no tutorial minutos antes; esta
- *  tela só relembra: "use o e-mail e a senha que você criou no tutorial".
+/** /entrar — duas plateias, a mesma tela.
+ *
+ *  WEB: porta de entrada enviada por E-MAIL pela Cakto após a compra. A pessoa
+ *  acabou de pagar e criou a conta no tutorial minutos antes; a copy relembra
+ *  "use o e-mail e a senha que você criou no tutorial".
+ *
+ *  APP (25/07): quem baixou da loja NÃO comprou nada e não passou por tutorial
+ *  nenhum. A copy de pós-compra ali é confusa — e o rodapé "acesso vitalício,
+ *  pagou uma vez" contradiz o modelo de ASSINATURA do app, o tipo de coisa que
+ *  reprova na revisão do Play. Por isso todo texto que fala de compra/tutorial
+ *  é trocado quando `isNativeShell()`.
+ *
  *  Sem prefill de e-mail de propósito (decisão do dono: menos superfície de bug). */
 
 const GoogleIcon = () => (
@@ -37,6 +47,7 @@ const GoogleIcon = () => (
 const Entrar = () => {
   const { user, loading: authLoading, signIn } = useAuth();
   const navigate = useNavigate();
+  const app = isNativeShell();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -60,7 +71,9 @@ const Entrar = () => {
       setFailedOnce(true);
       setErrorMsg(
         error.message === "Invalid login credentials"
-          ? "E-mail ou senha não bateram. Confere se é o mesmo e-mail que você usou no tutorial."
+          ? app
+            ? "E-mail ou senha não bateram. Confere e tenta de novo."
+            : "E-mail ou senha não bateram. Confere se é o mesmo e-mail que você usou no tutorial."
           : error.message,
       );
       setLoading(false);
@@ -153,17 +166,26 @@ const Entrar = () => {
             transition={{ delay: 0.15 }}
             className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 text-xs font-semibold"
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Compra confirmada
+            {app ? <Sparkles className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            {app ? "Bem-vindo de volta" : "Compra confirmada"}
           </motion.div>
           <div className="space-y-1.5">
             <h1 className="text-[26px] leading-tight font-bold tracking-tight">
-              Seu acesso está liberado 🎉
+              {app ? "Entrar no seu CORE" : "Seu acesso está liberado 🎉"}
             </h1>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Entre com o <strong className="text-foreground">e-mail</strong> e a{" "}
-              <strong className="text-foreground">senha</strong> que você criou no
-              tutorial, antes do pagamento.
+              {app ? (
+                <>
+                  Use o <strong className="text-foreground">e-mail</strong> e a{" "}
+                  <strong className="text-foreground">senha</strong> da sua conta CORE.
+                </>
+              ) : (
+                <>
+                  Entre com o <strong className="text-foreground">e-mail</strong> e a{" "}
+                  <strong className="text-foreground">senha</strong> que você criou no
+                  tutorial, antes do pagamento.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -292,9 +314,13 @@ const Entrar = () => {
           </Link>
         </div>
 
+        {/* No app NÃO pode prometer vitalício: lá o modelo é assinatura, e a
+            contradição reprova na revisão do Play. */}
         <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-          Acesso vitalício: pagou uma vez, é seu pra sempre.
+          {app
+            ? "Seus dados ficam salvos na sua conta, em qualquer aparelho."
+            : "Acesso vitalício: pagou uma vez, é seu pra sempre."}
         </p>
       </motion.div>
     </div>

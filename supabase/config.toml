@@ -23,3 +23,8 @@ verify_jwt = false
 
 [functions.recovery-emails]
 verify_jwt = false
+
+# Quem chama é o RevenueCat (Play Store), não um usuário logado. A autenticação
+# é o header Authorization combinado no painel do RC (REVENUECAT_WEBHOOK_SECRET).
+[functions.revenuecat-webhook]
+verify_jwt = false

@@ -87,10 +87,16 @@ serve(async (req) => {
 
       // Vencido: checa se ainda está no grace period (7 dias).
       // Renovação cancelada não tem grace — o período pago acabou, acabou.
+      // Assinatura da Play também não: o Google já tem grace/hold próprios, e
+      // o RevenueCat mantém o entitlement vivo enquanto durarem. Se chegou
+      // vencida até aqui, é porque acabou de verdade — dar mais 7 dias seria
+      // acesso de graça (25/07).
       const msSinceExpiry = now.getTime() - endDate.getTime();
       const daysSinceExpiry = msSinceExpiry / (1000 * 60 * 60 * 24);
+      const semGrace =
+        localSub.status === "cancel_scheduled" || localSub.payment_method === "play_store";
 
-      if (localSub.status !== "cancel_scheduled" && daysSinceExpiry <= GRACE_PERIOD_DAYS) {
+      if (!semGrace && daysSinceExpiry <= GRACE_PERIOD_DAYS) {
         const graceDaysLeft = Math.max(0, Math.ceil(GRACE_PERIOD_DAYS - daysSinceExpiry));
         logStep("In grace period", { daysSinceExpiry, graceDaysLeft });
         return new Response(

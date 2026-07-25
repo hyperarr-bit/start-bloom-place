@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
+import { isNativeShell } from "@/lib/native-shell";
 
 // Purge cached user data on sign-out so nothing leaks across accounts on the
 // same browser. Kept inline (no import from use-user-data) to avoid a circular
@@ -70,13 +71,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [graceDaysLeft, setGraceDaysLeft] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Última vez que a gente pediu ao RevenueCat pra reconciliar. Sem trava, o
+  // ciclo de 60s + o listener de foco martelariam a API a cada checagem.
+  const ultimaReconciliacaoRef = useRef(0);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
-        
+
+        // A assinatura da loja tem que seguir a CONTA, não o aparelho: sem
+        // identificar, a compra fica num id anônimo e o próximo login no
+        // mesmo celular herda (ou perde) o acesso.
+        identificarNoRevenueCat(session?.user?.id ?? null);
+
         if (session?.user) {
           setTimeout(() => checkSubscriptionStatus(), 0);
         } else {
@@ -124,6 +133,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // Só existe no app das lojas. No web isso nunca roda (nem entra no bundle
+  // que importa: o módulo do RevenueCat é carregado por import dinâmico).
+  const identificarNoRevenueCat = (userId: string | null) => {
+    if (!isNativeShell()) return;
+    import("@/lib/revenuecat")
+      .then((m) => m.identificarRevenueCat(userId))
+      .catch(() => {});
+  };
+
+  /**
+   * Rede de segurança do app das lojas: se o RevenueCat diz que a assinatura
+   * está ativa mas o nosso banco não sabe, grava o acesso e re-checa.
+   * Cobre webhook perdido/atrasado e compra feita antes do login — sem isso
+   * a pessoa paga na Play e fica trancada (bug real de 25/07).
+   * Trava de 60s pra não virar martelo em cima da API do RevenueCat.
+   */
+  const reconciliarLoja = async () => {
+    if (!isNativeShell()) return;
+    if (Date.now() - ultimaReconciliacaoRef.current < 60000) return;
+    ultimaReconciliacaoRef.current = Date.now();
+    try {
+      const { reconciliarSePreciso } = await import("@/lib/revenuecat");
+      if (await reconciliarSePreciso()) checkSubscriptionStatus();
+    } catch { /* app nunca quebra por causa de loja */ }
+  };
+
   const checkSubscriptionStatus = async () => {
     try {
       const { data, error } = await supabase.functions.invoke("check-subscription");
@@ -131,6 +166,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("check-subscription error:", error);
         return;
       }
+      if (!data?.subscribed) reconciliarLoja();
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
       setNoTrial(data?.no_trial ?? false);

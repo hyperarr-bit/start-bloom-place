@@ -9,6 +9,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { isNativeShell } from "@/lib/native-shell";
 
 export const TrialBanner = () => {
   const { user, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft } = useAuth();
@@ -105,7 +106,12 @@ export const TrialBanner = () => {
             <Lock className="w-8 h-8 text-primary" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold">Seu trial de 7 dias terminou</h2>
+            {/* No app o trial não é de 7 dias (assinatura da Play tem 3, e conta
+                  pós-paywall não tem nenhum) — prometer 7 lá é contradição que
+                  o revisor do Play lê como propaganda enganosa (25/07). */}
+              <h2 className="text-2xl font-bold">
+                {isNativeShell() ? "Seu período de teste terminou" : "Seu trial de 7 dias terminou"}
+              </h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Continue de onde parou com acesso completo ao CORE.
             </p>

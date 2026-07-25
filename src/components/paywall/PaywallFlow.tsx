@@ -661,7 +661,16 @@ function OfferScreen({
 
 /* -------------------------------------------------------------- downsell */
 
-function DownsellScreen({ context, onDismiss, onBuy }: { context: "funnel" | "app"; onDismiss: () => void; onBuy: (o: PixOffer) => void }) {
+type PropsDownsell = { context: "funnel" | "app"; onDismiss: () => void; onBuy: (o: PixOffer) => void };
+
+// Segunda trava, colada no conteúdo proibido: oferta de VITALÍCIO por R$ 14,90
+// no Pix não pode existir dentro do app da loja, venha de onde vier. Separado
+// em wrapper porque os hooks abaixo não podem rodar condicionalmente.
+function DownsellScreen(p: PropsDownsell) {
+  return isNativeShell() ? null : <DownsellWeb {...p} />;
+}
+
+function DownsellWeb({ context, onDismiss, onBuy }: PropsDownsell) {
   const [secondsLeft, setSecondsLeft] = useState(10 * 60);
   useEffect(() => {
     const t = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
@@ -800,12 +809,16 @@ export function PaywallFlow({
                 onBuy={setPixOffer}
               />
             )}
-            {phase === "wheel" && (
+            {/* Roleta e downsell são de VITALÍCIO no Pix — nunca no app da loja
+                (trava de 25/07). Hoje nada chama setPhase("wheel"), então o
+                ramo está morto; a guarda existe justamente porque ele está a
+                uma linha de reviver dentro do binário. */}
+            {phase === "wheel" && !isNativeShell() && (
               <div className="w-full max-w-sm mx-auto min-h-dvh grid place-items-center py-10">
                 <WinbackWheel attemptId={null} prizeLabel="VITALÍCIO R$14,90" quick onSpinComplete={() => setPhase("downsell")} />
               </div>
             )}
-            {phase === "downsell" && (
+            {phase === "downsell" && !isNativeShell() && (
               <div className="min-h-dvh grid place-items-center">
                 <DownsellScreen
                   context={context}

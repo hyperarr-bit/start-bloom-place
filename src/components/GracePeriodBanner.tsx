@@ -2,12 +2,23 @@ import { useNavigate } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { isNativeShell } from "@/lib/native-shell";
 
+/**
+ * Aviso de cobrança falhada — SÓ NA WEB (trava de 25/07).
+ *
+ * Dentro do app das lojas ele não pode aparecer por dois motivos: fala em
+ * "cobrança no PIX/cartão", que é pagamento fora do Play Billing, e mesmo o
+ * caso legítimo não existe lá — assinatura da Play não entra no nosso grace
+ * period (o Google tem o dele, e o check-subscription já pula os 7 dias
+ * quando payment_method = play_store). Quem vê este banner é sempre pagante
+ * da web; o lugar de resolver é a web.
+ */
 export const GracePeriodBanner = () => {
   const { inGracePeriod, graceDaysLeft, paymentMethod } = useAuth();
   const navigate = useNavigate();
 
-  if (!inGracePeriod) return null;
+  if (!inGracePeriod || isNativeShell()) return null;
 
   const days = graceDaysLeft ?? 0;
   const methodLabel = paymentMethod === "pix" ? "PIX" : "cartão";

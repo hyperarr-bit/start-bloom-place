@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Sparkles, ArrowRight } from "lucide-react";
+import { isNativeShell } from "@/lib/native-shell";
 
 interface TutorialDonePopupProps {
   onClose: () => void;
@@ -38,7 +39,7 @@ export const TutorialDonePopup = ({ onClose }: TutorialDonePopupProps) => {
             Parabéns! Você terminou o tutorial 🎉
           </h2>
           <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-            Você desbloqueou o app. Aproveite seus 7 dias grátis.
+            {isNativeShell() ? "Você desbloqueou o app. Bom proveito." : "Você desbloqueou o app. Aproveite seus 7 dias grátis."}
           </p>
         </div>
         <button

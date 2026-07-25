@@ -11,6 +11,7 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import { isInAppBrowser } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
+import { isNativeShell } from "@/lib/native-shell";
 
 const GoogleIcon = () => (
   <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
@@ -308,8 +309,9 @@ const Auth = () => {
               <div className="rounded-xl border border-border bg-card p-4 space-y-2">
                 <p className="text-xs font-medium">✨ O que está incluso no teste grátis:</p>
                 <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Acesso completo aos 16 módulos por <strong>7 dias</strong></li>
-                  <li>• Sem cartão de crédito · Cancele quando quiser</li>
+  <li>• Acesso completo aos 16 módulos</li>
+                  {!isNativeShell() && <li>• Por <strong>7 dias</strong>, sem cartão de crédito</li>}
+                  <li>• Cancele quando quiser</li>
                   
                 </ul>
               </div>

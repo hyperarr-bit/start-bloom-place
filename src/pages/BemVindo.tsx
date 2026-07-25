@@ -1,17 +1,26 @@
 import { useEffect, useMemo } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Mail, KeyRound, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 import { PwaInstallCard } from "@/components/PwaInstallCard";
+import { isNativeShell } from "@/lib/native-shell";
 
 /** /bem-vindo — recepção de quem PAGOU (15/07). Destino do e-mail de
  *  boas-vindas do cakto-webhook (?e=<e-mail da compra>). Uma função só:
  *  matar o reembolso "paguei e não consegui entrar" repetindo, na tela,
- *  qual e-mail e qual senha usar. Sem prefill no /entrar (decisão do dono). */
-const BemVindo = () => {
+ *  qual e-mail e qual senha usar. Sem prefill no /entrar (decisão do dono).
+ *
+ *  Página EXCLUSIVA da web (trava de 25/07): promete "acesso vitalício" e
+ *  ainda oferece instalar o PWA — dentro do app da loja seria contradizer o
+ *  modelo de assinatura e mandar instalar o app que a pessoa já está usando. */
+const BemVindo = () =>
+  isNativeShell() ? <Navigate to="/" replace /> : <BemVindoWeb />;
+
+// Separado do guard porque os hooks abaixo não podem rodar condicionalmente.
+const BemVindoWeb = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();

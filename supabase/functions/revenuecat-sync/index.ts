@@ -127,19 +127,12 @@ async function reconciliarRevenueCat(
 
   // gives_access é o veredito do RevenueCat: cobre trial, grace period do
   // Google e cancelamento com período pago ainda em aberto.
-  let melhor: { fim: number | null; inicio: number | null; prod: string; id: string } | null = null;
-  for (const s of assinaturas) {
-    if (s?.gives_access !== true) continue;
-    const fim: number | null = s.current_period_ends_at ?? s.ends_at ?? null;
-    if (!melhor || fim === null || (melhor.fim !== null && fim > melhor.fim)) {
-      melhor = { fim, inicio: s.starts_at ?? null, prod: s.product_id ?? "", id: s.id ?? "" };
-    }
-  }
+  const vivas = assinaturas.filter((s) => s?.gives_access === true);
 
   // REGRA DE OURO: esta função só mexe em linha DA LOJA (payment_method =
   // play_store). Vitalício do Pix, Cakto, cortesia — nada disso é problema
   // dela. Sem essa trava, um sync mal-humorado rebaixaria quem pagou na web.
-  if (!melhor) {
+  if (!vivas.length) {
     const { data: linhas } = await admin
       .from("subscriptions")
       .select("id")
@@ -158,33 +151,76 @@ async function reconciliarRevenueCat(
     return { subscribed: false, reason: resp ? "sem_entitlement" : "sem_registro" };
   }
 
-  const storeId = await storeIdDoProduto(melhor.prod, secret);
-  const { billing, cents } = infoProduto(storeId);
-  const fimISO = melhor.fim ? new Date(melhor.fim).toISOString() : null;
+  // Grava TODAS as assinaturas vivas, não só a melhor. Uma pessoa pode ter
+  // mais de uma ao mesmo tempo no RevenueCat — é o que acontece no upgrade
+  // mensal→anual, que abre uma assinatura NOVA e encerra a antiga. Gravando
+  // só a melhor, a linha da antiga ficava "active" pra sempre: o acesso até
+  // ficava certo (o check-subscription pega a de fim mais distante), mas o
+  // /admin contava dois assinantes onde existe um. Visto de verdade em
+  // 25/07 — duas assinaturas no RC, só uma renovou na nossa tabela.
+  const idsVivos: string[] = [];
+  let melhor: { fim: string | null; prod: string } | null = null;
 
-  // UPSERT pela chave natural, não insert/update lido antes: o sync do app e
-  // o webhook chegam quase juntos (no 1º teste real, 214 ms de diferença) e
-  // os dois viam "não existe linha" → duas assinaturas pro mesmo assinante.
-  // Com índice único em revenuecat_subscription_id quem resolve a corrida é
-  // o Postgres.
-  const payload = {
-    user_id: userId,
-    status: "active",
-    plan: "app",
-    billing_period: billing,
-    payment_method: "play_store",
-    customer_email: email,
-    amount_cents: cents,
-    // starts_at é a data da compra ORIGINAL e não muda em renovação, então
-    // pode ser reescrito à vontade sem bagunçar relatório de coorte.
-    current_period_start: melhor.inicio ? new Date(melhor.inicio).toISOString() : null,
-    current_period_end: fimISO,
-    revenuecat_subscription_id: melhor.id || `rc:${userId}`,
-  };
-  const { error } = await admin
+  for (const s of vivas) {
+    const fim: number | null = s.current_period_ends_at ?? s.ends_at ?? null;
+    const fimISO = fim ? new Date(fim).toISOString() : null;
+    const storeId = await storeIdDoProduto(s.product_id ?? "", secret);
+    const { billing, cents } = infoProduto(storeId);
+    const rcId = s.id || `rc:${userId}`;
+    idsVivos.push(rcId);
+
+    // UPSERT pela chave natural, não insert/update lido antes: o sync do app e
+    // o webhook chegam quase juntos (no 1º teste real, 214 ms de diferença) e
+    // os dois viam "não existe linha" → duas assinaturas pro mesmo assinante.
+    // Com índice único em revenuecat_subscription_id quem resolve a corrida é
+    // o Postgres.
+    const payload = {
+      user_id: userId,
+      status: "active",
+      plan: "app",
+      billing_period: billing,
+      payment_method: "play_store",
+      customer_email: email,
+      amount_cents: cents,
+      // starts_at é a data da compra ORIGINAL e não muda em renovação, então
+      // pode ser reescrito à vontade sem bagunçar relatório de coorte.
+      current_period_start: s.starts_at ? new Date(s.starts_at).toISOString() : null,
+      current_period_end: fimISO,
+      revenuecat_subscription_id: rcId,
+    };
+    const { error } = await admin
+      .from("subscriptions")
+      .upsert(payload, { onConflict: "revenuecat_subscription_id" });
+    if (error) throw new Error(`upsert falhou: ${error.message}`);
+
+    if (!melhor || fimISO === null || (melhor.fim !== null && fimISO > melhor.fim)) {
+      melhor = { fim: fimISO, prod: storeId || (s.product_id ?? "") };
+    }
+  }
+
+  // Encerra linha da loja que o RevenueCat não reconhece mais. Só as que já
+  // venceram: uma linha com fim no futuro pode ter acabado de ser criada por
+  // um sync concorrente que este retrato do RC ainda não enxergava, e
+  // cancelá-la tiraria acesso de quem pagou agora.
+  const agora = Date.now();
+  const { data: sobras } = await admin
     .from("subscriptions")
-    .upsert(payload, { onConflict: "revenuecat_subscription_id" });
-  if (error) throw new Error(`upsert falhou: ${error.message}`);
+    .select("id, revenuecat_subscription_id, current_period_end")
+    .eq("user_id", userId)
+    .eq("payment_method", "play_store")
+    .neq("status", "canceled");
+  const mortas = (sobras ?? []).filter(
+    (l: any) =>
+      !idsVivos.includes(l.revenuecat_subscription_id ?? "") &&
+      (!l.current_period_end || new Date(l.current_period_end).getTime() <= agora)
+  );
+  if (mortas.length) {
+    await admin
+      .from("subscriptions")
+      .update({ status: "canceled" })
+      .in("id", mortas.map((l: any) => l.id));
+    log("linhas obsoletas encerradas", { userId, quantas: mortas.length });
+  }
 
-  return { subscribed: true, product: storeId || melhor.prod, expires: fimISO };
+  return { subscribed: true, product: melhor?.prod ?? null, expires: melhor?.fim ?? null };
 }

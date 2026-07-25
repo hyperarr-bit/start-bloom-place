@@ -167,8 +167,13 @@ serve(async (req) => {
     const name = (body.customer?.name || profile?.display_name || user.email.split("@")[0]).trim();
     const bodyPhone = toE164(body.customer?.phone);
     const phone = (bodyPhone !== DUMMY_PHONE ? bodyPhone : null) ?? toE164(profile?.phone) ?? DUMMY_PHONE;
-    const docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || undefined;
-    if (!docNumber || docNumber.length !== 11) return jsonResponse({ error: "cpf_required" });
+    // Form CPF removido (25/07): usa o CPF do body (Pagar.me/legado) ou o
+    // tax_id já salvo no perfil; sem nenhum dos dois → "00000000000" =
+    // CONSUMIDOR NÃO IDENTIFICADO (a Cakto exige 11 dígitos mas não valida,
+    // testado; NÃO fingimos o CPF de uma pessoa real). O zerado nunca é salvo
+    // no perfil (o guard abaixo já exige body.customer.docNumber).
+    let docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || "";
+    if (docNumber.length !== 11) docNumber = "00000000000";
 
     // CPF (e telefone REAL, se algum dia voltar) vão pro profile — próxima
     // compra não pede de novo. O coringa nunca é salvo.

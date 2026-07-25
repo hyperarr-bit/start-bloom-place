@@ -150,13 +150,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const { user: abUser } = useAuth();
   // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
   const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id));
-  // FORM DO DIA 14 DE VOLTA (22/07, ordem do dono): nome+CPF antes do QR em
-  // TODOS os braços, como na era Cakto (dia 14 = 89 vendas, 47% por abertura).
-  // O form é QUALIFICADOR: filtra o curioso antes de virar QR e devolve a
-  // régua comparável com o baseline. Asaas nem usa o CPF (QR estático) — mas
-  // quem digita CPF demonstrou intenção. Prefill continua: CPF já salvo no
-  // perfil pula o form direto pro QR, igual dia 14.
-  const SEM_FORM = false;
+  // FORM REMOVIDO (25/07, ordem do dono): o form nome+CPF do dia 14 saiu — a
+  // fricção não compensava (dado: pagantes/abertura ~40-47% com ou sem form).
+  // Só a Pagar.me ainda mostra o form, porque o QR dinâmico dela EXIGE CPF
+  // válido. Cakto exige CPF na API mas NÃO valida o dígito → a cakto-pix usa o
+  // tax_id do perfil quando existe e "00000000000" (consumidor não
+  // identificado) pros anônimos. Asaas/Abacate nem precisam de CPF.
+  const SEM_FORM = braco !== "pagarme";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");

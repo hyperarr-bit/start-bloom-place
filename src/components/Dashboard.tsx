@@ -261,15 +261,19 @@ export const Dashboard = ({
       const daysUntilDue = d.day - today;
       if (daysUntilDue > 5) return;
       const names = unpaidBills.map((b) => b.name).join(", ");
-      const when = daysUntilDue === 0 ? "vencem hoje" : daysUntilDue === 1 ? "vencem amanhã" : `vencem em ${daysUntilDue} dias`;
-      upcomingAlerts.push({ type: "warning", icon: Calendar, text: `${unpaidBills.length} conta(s) ${when}: ${names}` });
+      // "conta(s) vencem" é jeito de programador escrever. Alerta de dinheiro
+      // atrasado é onde a pessoa mais repara — vale a concordância certa.
+      const n = unpaidBills.length;
+      const verbo = n === 1 ? "vence" : "vencem";
+      const when = daysUntilDue === 0 ? `${verbo} hoje` : daysUntilDue === 1 ? `${verbo} amanhã` : `${verbo} em ${daysUntilDue} dias`;
+      upcomingAlerts.push({ type: "warning", icon: Calendar, text: `${n} ${n === 1 ? "conta" : "contas"} ${when}: ${names}` });
     });
     // Atrasadas primeiro (mais urgente), depois as próximas a vencer.
     if (overdueNames.length > 0) {
       list.push({
         type: "warning",
         icon: AlertTriangle,
-        text: `${overdueNames.length} conta(s) atrasada(s): ${overdueNames.join(", ")}`,
+        text: `${overdueNames.length} ${overdueNames.length === 1 ? "conta atrasada" : "contas atrasadas"}: ${overdueNames.join(", ")}`,
       });
     }
     upcomingAlerts.forEach((a) => list.push(a));
@@ -403,44 +407,49 @@ export const Dashboard = ({
 
   return (
     <div className="space-y-4">
-      {/* Quick Stats Row */}
+      {/* Quick Stats Row
+          O valor NÃO pode quebrar em duas linhas: "R$" numa linha e o número
+          na outra parece card estourado. Cabia num iPhone (430px de largura em
+          CSS) e quebrava em Android comum — Samsung é 360px. Por isso o corpo
+          escala com a largura da tela (clamp) em vez de tamanho fixo, o ícone
+          encolhe no celular e o texto ganha min-w-0 pra poder espremer. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Receitas</p>
-              <p className="text-xl font-bold text-green-400">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
+              <p className="text-[clamp(0.95rem,4.4vw,1.25rem)] font-bold text-green-400 whitespace-nowrap">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
-            <DollarSign className="w-8 h-8 text-green-400/30" />
+            <DollarSign className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-green-400/30" />
           </div>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Despesas</p>
-              <p className="text-xl font-bold text-red-400">R$ {totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
+              <p className="text-[clamp(0.95rem,4.4vw,1.25rem)] font-bold text-red-400 whitespace-nowrap">R$ {totalExpenses.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
-            <TrendingDown className="w-8 h-8 text-red-400/30" />
+            <TrendingDown className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-red-400/30" />
           </div>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Saldo do Mês</p>
-              <p className={`text-xl font-bold ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
+              <p className={`text-[clamp(0.95rem,4.4vw,1.25rem)] font-bold whitespace-nowrap ${balance >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {balance >= 0 ? "+" : ""}R$ {balance.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
               </p>
             </div>
-            {balance >= 0 ? <TrendingUp className="w-8 h-8 text-green-400/30" /> : <TrendingDown className="w-8 h-8 text-red-400/30" />}
+            {balance >= 0 ? <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-green-400/30" /> : <TrendingDown className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-red-400/30" />}
           </div>
         </div>
         <div className="bg-card rounded-lg border border-border p-4">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Investimentos</p>
-              <p className="text-xl font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
+              <p className="text-[clamp(0.95rem,4.4vw,1.25rem)] font-bold text-purple-400 whitespace-nowrap">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</p>
             </div>
-            <TrendingUp className="w-8 h-8 text-purple-400/30" />
+            <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 shrink-0 text-purple-400/30" />
           </div>
         </div>
       </div>

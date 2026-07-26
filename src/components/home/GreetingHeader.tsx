@@ -45,11 +45,17 @@ const getContextualMessage = (data: LifeHubData): string => {
     return "Manhã produtiva te espera ☀️";
   }
   if (h >= 12 && h < 14) {
-    if (data.mealsTotal > 0 && data.mealsLogged < data.mealsTotal) return `Hora do almoço! ${data.mealsTotal - data.mealsLogged} refeição restante 🍽️`;
+    if (data.mealsTotal > 0 && data.mealsLogged < data.mealsTotal) {
+      const faltam = data.mealsTotal - data.mealsLogged;
+      return `Hora do almoço! ${faltam} refei${faltam > 1 ? "ções restantes" : "ção restante"} 🍽️`;
+    }
     return "Hora do almoço, recarregue as energias 🍽️";
   }
   if (h >= 14 && h < 18) {
-    if (data.waterGlasses < data.waterGoal) return `Hidrate-se! Faltam ${data.waterGoal - data.waterGlasses} copos de água 💧`;
+    if (data.waterGlasses < data.waterGoal) {
+      const copos = data.waterGoal - data.waterGlasses;
+      return `Hidrate-se! Falta${copos > 1 ? "m" : ""} ${copos} copo${copos > 1 ? "s" : ""} de água 💧`;
+    }
     if (data.todayWorkoutGroup && !data.workoutDone) return `Ainda dá tempo do treino de ${data.todayWorkoutGroup} 🏋️`;
     const remaining = data.tasksTotal - data.tasksCompleted;
     if (remaining > 0) return `${remaining} hábito${remaining > 1 ? "s" : ""} pendente${remaining > 1 ? "s" : ""} para fechar o dia ✅`;

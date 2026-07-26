@@ -16,10 +16,10 @@ android {
         applicationId "br.com.coreaplicativo.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        // O Play recusa reenviar o mesmo versionCode: o 1 já foi pro teste
+        // O Play recusa reenviar o mesmo versionCode: 1 e 2 já foram pro teste
         // interno, então todo upload novo sobe este número.
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

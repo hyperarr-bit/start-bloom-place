@@ -20,7 +20,7 @@
  * Pra gerar um APK de TESTE com a chave do Test Store: `npm run loja -- --teste`.
  */
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync, rmSync, statSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, statSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const teste = process.argv.includes("--teste");
@@ -29,6 +29,20 @@ const ASSETS = "android/app/src/main/assets/public";
 // Peso morto: só a web alcança essas telas (a landing page e o funil /plano,
 // que dentro do app redirecionam pro /inicio pela trava de rota do App.tsx).
 const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png", "hero-phones.webp", "images"];
+
+// Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
+// pro binário (o Capacitor copia a pasta public inteira). Dentro do app eles
+// não têm função nenhuma — a venda é pelo Play Billing, não pelo pixel — e
+// custam caro: com eles o Data Safety da Play vira "compartilha dados com
+// terceiros para publicidade" num app de saúde e finanças, que é declaração
+// de risco e some com o app se for declarada errado. O código que os chama
+// (meta-pixel.ts, google-ads.ts) já é no-op quando o global não existe.
+const ASSINATURAS = [
+  { nome: "UTMify", re: /cdn\.utmify\.com\.br/i },
+  { nome: "TikTok Pixel", re: /TiktokAnalyticsObject|analytics\.tiktok\.com/i },
+  { nome: "Meta Pixel", re: /fbq\(|connect\.facebook\.net/i },
+  { nome: "Google Ads", re: /googletagmanager\.com|gtag\(/i },
+];
 
 const sh = (cmd) => execSync(cmd, { stdio: "inherit" });
 const tamanho = (p) => {
@@ -58,7 +72,35 @@ console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build
 sh("npm run build");
 sh("npx cap sync android");
 
-// 3. tira o peso morto
+// 3. tira os rastreadores de anúncio do index.html do binário
+const indexApp = join(ASSETS, "index.html");
+if (!existsSync(indexApp)) {
+  console.error(`\n✗ ${indexApp} não existe — o cap sync não rodou?\n`);
+  process.exit(1);
+}
+let html = readFileSync(indexApp, "utf8");
+for (const bloco of html.match(/<script[\s\S]*?<\/script>/gi) ?? []) {
+  const achado = ASSINATURAS.find((a) => a.re.test(bloco));
+  if (!achado) continue;
+  html = html.replace(bloco, "");
+  console.log(`  − rastreador: ${achado.nome}`);
+}
+// Os comentários que embrulhavam os blocos ficam órfãos e são inertes, mas um
+// binário com "<!-- Meta Pixel Code -->" dentro engana quem for auditar.
+html = html.replace(/[ \t]*<!--[^>]*(TikTok Pixel|Meta Pixel|Google tag)[^>]*-->\n?/gi, "");
+writeFileSync(indexApp, html);
+
+// A prova. Se o build da Vite um dia mudar o formato do index.html e um
+// rastreador escapar, o build TEM que parar — descobrir isso depois de
+// publicar significa Data Safety declarado errado na loja.
+const escaparam = ASSINATURAS.filter((a) => a.re.test(html)).map((a) => a.nome);
+if (escaparam.length) {
+  console.error(`\n✗ rastreador sobrou no binário: ${escaparam.join(", ")}`);
+  console.error("  Ajuste ASSINATURAS em scripts/preparar-loja.mjs antes de publicar.\n");
+  process.exit(1);
+}
+
+// 4. tira o peso morto
 const antes = tamanho(ASSETS);
 for (const alvo of MORTO) {
   const p = join(ASSETS, alvo);

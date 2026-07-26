@@ -63,22 +63,43 @@ const ehPwa = () => {
  * ROTA, não dentro de cada funil: os funis são páginas congeladas de
  * experimento e não podem depender de alguém lembrar da regra.
  */
+/**
+ * Porta de entrada do app da loja. TEM NOME PRÓPRIO de propósito.
+ *
+ * Até 26/07 o shell entrava por "/inicio" escrito na mão em três lugares.
+ * Em 25/07 o /inicio foi repontado pro funil do dia 14 (mudança de WEB,
+ * correta) — e o app foi junto sem ninguém perceber, porque compartilhava a
+ * rota. Resultado: quem instalava o app caía no funil do navegador, sem a
+ * welcome, e com "Quero pra sempre — R$ 27,90 no Pix" na tela, que é
+ * pagamento externo na cara do revisor do Google.
+ *
+ * Enquanto isso a trava SoNaWeb, criada pra evitar exatamente isso,
+ * despejava o usuário em /inicio — ou seja, dentro do problema.
+ *
+ * Com a constante, repontar /inicio nunca mais mexe no app.
+ */
+const ENTRADA_APP = "/comecar";
+
 const SoNaWeb = ({ children }: { children: ReactNode }) =>
-  isNativeShell() ? <Navigate to="/inicio" replace /> : <>{children}</>;
+  isNativeShell() ? <Navigate to={ENTRADA_APP} replace /> : <>{children}</>;
 
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
-  // APP DA LOJA (Capacitor): install novo vai pro /inicio — o welcome "grade
-  // viva" é um overlay DENTRO do funil (rota própria causava flash branco na
-  // transição). PWA continua indo pro login (quem instala PWA já comprou).
-  if (!user && isNativeShell()) return <Navigate to="/inicio" replace />;
+  // APP DA LOJA (Capacitor): install novo vai pra ENTRADA_APP — o welcome
+  // "grade viva" é um overlay DENTRO do funil (rota própria causava flash
+  // branco na transição). PWA continua indo pro login (quem instala PWA já
+  // comprou).
+  if (!user && isNativeShell()) return <Navigate to={ENTRADA_APP} replace />;
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
   if (!user) {
     try {
       const t = Number(sessionStorage.getItem("core-demo-tour") ?? 0);
-      if (t && Date.now() - t < 30 * 60_000) return <Navigate to="/inicio?step=analise" replace />;
+      // no app o retorno da demo tem que voltar pra porta do shell, não pro
+      // funil da web (ver ENTRADA_APP)
+      if (t && Date.now() - t < 30 * 60_000)
+        return <Navigate to={`${isNativeShell() ? ENTRADA_APP : "/inicio"}?step=analise`} replace />;
     } catch { /* noop */ }
   }
   if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
@@ -263,7 +284,12 @@ const App = () => {
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
-                  <Route path="/inicio" element={<RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary>} />
+                  {/* /inicio ficou de fora da trava enquanto ERA a porta do
+                      app. Agora o shell entra por ENTRADA_APP, e o /inicio é
+                      só o funil do dia 14 da web — que termina no paywall de
+                      Pix vitalício. Sem SoNaWeb aqui, um link no histórico ou
+                      um deep link recoloca pagamento externo dentro do app. */}
+                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary></SoNaWeb>} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

@@ -144,7 +144,9 @@ const QUESTIONS: Question[] = [
       const today = new Date().getDate();
       const overdue = ctx.dueDays.flatMap((d: any) =>
         (d.bills || []).filter((b: any) => !b.paid && d.day < today).map((b: any) => b.name));
-      if (overdue.length > 0) pts.push(`⚠️ ${overdue.length} conta(s) já venceu(ram) sem pagar: ${overdue.slice(0, 2).join(", ")}`);
+      if (overdue.length > 0) pts.push(overdue.length > 1
+        ? `⚠️ ${overdue.length} contas já venceram sem pagar: ${overdue.slice(0, 2).join(", ")}`
+        : `⚠️ 1 conta já venceu sem pagar: ${overdue[0]}`);
       if (ctx.totalIncome > 0 && ctx.monthlyInstallments / ctx.totalIncome > 0.15) {
         pts.push(`⚠️ Parcelas comendo ${Math.round((ctx.monthlyInstallments / ctx.totalIncome) * 100)}% da renda`);
       }

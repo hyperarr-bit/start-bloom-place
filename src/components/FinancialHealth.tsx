@@ -185,7 +185,8 @@ export const FinancialHealth = ({
   }
 
   if (billsPaymentRate < 100 && allBills.length > 0) {
-    tips.push({ icon: AlertTriangle, text: `${allBills.length - paidBills} conta(s) pendente(s) de ${allBills.length}. Pague em dia para evitar juros!`, type: "warning" });
+    const pendentes = allBills.length - paidBills;
+    tips.push({ icon: AlertTriangle, text: `${pendentes} conta${pendentes > 1 ? "s" : ""} pendente${pendentes > 1 ? "s" : ""} de ${allBills.length}. Pague em dia para evitar juros!`, type: "warning" });
   } else if (allBills.length > 0) {
     tips.push({ icon: CheckCircle, text: "Todas as contas pagas em dia! ✅", type: "success" });
   }

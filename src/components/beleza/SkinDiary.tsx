@@ -52,8 +52,13 @@ export const SkinDiary = () => {
       const path = `${user.id}/${genId()}.${ext}`;
       const { error } = await supabase.storage.from("skin-photos").upload(path, file, { upsert: true });
       if (error) throw error;
-      const { data: urlData } = supabase.storage.from("skin-photos").getPublicUrl(path);
-      setForm(prev => ({ ...prev, photoUrl: urlData.publicUrl }));
+      // Bucket é privado: getPublicUrl devolvia link que não abre (foto subia
+      // e ficava quebrada). URL assinada de 1 ano, igual ao image-upload.ts.
+      const { data: signed } = await supabase.storage
+        .from("skin-photos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (!signed?.signedUrl) throw new Error("não foi possível gerar o link da foto");
+      setForm(prev => ({ ...prev, photoUrl: signed.signedUrl }));
       toast.success("Foto carregada!");
     } catch (err: any) {
       toast.error("Erro ao carregar foto: " + err.message);

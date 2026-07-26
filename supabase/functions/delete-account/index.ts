@@ -26,6 +26,32 @@ const log = (step: string, details?: unknown) => {
   console.log(`[DELETE-ACCOUNT] ${step}${d}`);
 };
 
+// Buckets onde o usuário guarda arquivo. Todos usam o mesmo desenho de
+// caminho: `{userId}/…` (ver src/lib/image-upload.ts, BodyEvolution, SkinDiary).
+// Apagar linha de tabela NÃO apaga o arquivo do Storage — são sistemas
+// separados, e sem isso ficavam no bucket foto de corpo e de pele de conta
+// já excluída. A /excluir-conta promete "apagamos seu conteúdo", então tinha
+// que ser verdade.
+const BUCKETS = ["skin-photos", "dream-board", "receipts"];
+
+/** Lista recursiva: a API do Storage não devolve subpasta de uma vez. */
+async function listarArquivos(
+  admin: ReturnType<typeof createClient>,
+  bucket: string,
+  prefixo: string,
+): Promise<string[]> {
+  const achados: string[] = [];
+  const { data, error } = await admin.storage.from(bucket).list(prefixo, { limit: 1000 });
+  if (error || !data) return achados;
+  for (const item of data) {
+    const caminho = `${prefixo}/${item.name}`;
+    // Pasta vem sem id/metadata; arquivo vem com os dois.
+    if (item.id === null) achados.push(...await listarArquivos(admin, bucket, caminho));
+    else achados.push(caminho);
+  }
+  return achados;
+}
+
 // Tudo que carrega user_id. Ordem não importa (o cascade cobre o resto).
 const TABELAS_USER_ID = [
   "analytics_events",
@@ -83,6 +109,18 @@ serve(async (req) => {
     // Indicações referenciam o usuário por dois lados.
     await admin.from("referral_rewards").delete().eq("referrer_id", user.id);
     await admin.from("referral_rewards").delete().eq("referred_id", user.id);
+
+    // Arquivos ANTES do deleteUser: depois de apagar o usuário o dono some e
+    // fica lixo órfão que ninguém mais consegue associar a ele.
+    let arquivosApagados = 0;
+    for (const bucket of BUCKETS) {
+      const caminhos = await listarArquivos(admin, bucket, user.id);
+      if (!caminhos.length) continue;
+      const { error } = await admin.storage.from(bucket).remove(caminhos);
+      if (error) falhas.push(`storage/${bucket}:${error.message}`);
+      else arquivosApagados += caminhos.length;
+    }
+    if (arquivosApagados) log("Arquivos removidos", { total: arquivosApagados });
 
     if (falhas.length) log("Falhas parciais (segue pro deleteUser)", falhas);
 

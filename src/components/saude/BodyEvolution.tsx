@@ -70,8 +70,14 @@ export const BodyEvolution = () => {
       const path = `${user.id}/body/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("skin-photos").upload(path, file);
       if (error) throw error;
-      const { data: urlData } = supabase.storage.from("skin-photos").getPublicUrl(path);
-      setPhotos(prev => [...prev, { date: today, url: urlData.publicUrl }]);
+      // O bucket virou privado (foto de corpo não pode ser link aberto), então
+      // getPublicUrl passou a devolver URL que não resolve — a foto subia e
+      // aparecia quebrada. URL assinada de 1 ano, igual ao image-upload.ts.
+      const { data: signed } = await supabase.storage
+        .from("skin-photos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (!signed?.signedUrl) throw new Error("signed url");
+      setPhotos(prev => [...prev, { date: today, url: signed.signedUrl }]);
     } catch (e) {
       console.error("Upload failed", e);
     }

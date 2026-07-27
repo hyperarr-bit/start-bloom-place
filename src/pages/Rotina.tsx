@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
+import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
+import { sequenciaAtual } from "@/lib/reagendar";
 import { 
   ArrowLeft, Plus, X, Trash2, AlertTriangle, Play, Pause, RotateCcw, 
   Droplets, Moon, Sun, Brain, Target, Clock, Calendar, Star, Flame,
@@ -927,6 +929,15 @@ const WeeklyReview = () => {
 
 // ============= MAIN ROTINA COMPONENT =============
 const Rotina = () => {
+  // Sequência viva de dias marcados — a mesma conta que os lembretes usam,
+  // pra o convite não prometer um número diferente do que a notificação diz.
+  const [heatmapDoConvite] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
+  const sequenciaViva = useMemo(() => sequenciaAtual(new Set(
+    Object.entries(heatmapDoConvite ?? {})
+      .filter(([k, v]) => /^\d{4}-\d{2}-\d{2}$/.test(k) && (typeof v === "number" ? v > 0 : v === true))
+      .map(([k]) => k),
+  )), [heatmapDoConvite]);
+
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
@@ -1090,6 +1101,11 @@ const Rotina = () => {
             "Acompanhe seu humor diário e veja padrões ao longo do tempo"
           ]}
         />
+
+        {/* Convite pro lembrete de fechamento do dia — só com sequência viva.
+            Fica na aba "Minha Semana" porque é onde os hábitos são marcados:
+            é o lugar em que a sequência acabou de ficar visível pra pessoa. */}
+        {activeTab === "semana" && <PedirLembreteRotina sequencia={sequenciaViva} />}
 
         {/* ============= MINHA SEMANA ============= */}
         {activeTab === "semana" && (

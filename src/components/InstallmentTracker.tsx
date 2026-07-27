@@ -88,6 +88,49 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
     setInstallments(installments.filter((i) => i.id !== id));
   };
 
+  /**
+   * Editar o parcelamento (27/07).
+   *
+   * O único ajuste possível era o checkbox de "paguei mais uma" — que só
+   * AVANÇA. Quem marcou pago por engano não voltava, e quem errou o número de
+   * parcelas ou o valor tinha que apagar a dívida inteira e recadastrar.
+   */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({
+    description: "", installmentValue: "", paidInstallments: "", totalInstallments: "", date: "",
+  });
+
+  const comecarEdicao = (i: Installment) => {
+    setEditandoId(i.id);
+    setRascunho({
+      description: i.description,
+      installmentValue: String(i.installmentValue),
+      paidInstallments: String(i.paidInstallments),
+      totalInstallments: String(i.totalInstallments),
+      date: i.date ?? "",
+    });
+  };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.installmentValue);
+    const total = parseInt(rascunho.totalInstallments, 10);
+    const pagas = parseInt(rascunho.paidInstallments, 10);
+    if (!rascunho.description.trim() || !Number.isFinite(valor) || !Number.isInteger(total) || total < 1) return;
+    // pagas nunca passa do total nem fica negativo: é isso que decide se a
+    // dívida conta como quitada nos totais e nas conquistas
+    const pagasOk = Math.max(0, Math.min(Number.isInteger(pagas) ? pagas : 0, total));
+    setInstallments(installments.map((i) => i.id !== editandoId ? i : {
+      ...i,
+      description: rascunho.description.trim(),
+      installmentValue: valor,
+      totalInstallments: total,
+      paidInstallments: pagasOk,
+      totalValue: valor * total,
+      date: rascunho.date || i.date,
+    }));
+    setEditandoId(null);
+  };
+
   const payInstallment = (id: string) => {
     setInstallments(
       installments.map((i) =>
@@ -149,9 +192,58 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
             <tbody>
               {installments.map((inst) => {
                 const isDone = inst.paidInstallments >= inst.totalInstallments;
+                if (editandoId === inst.id) return (
+                  <tr key={inst.id} className="border-b border-border/50 bg-primary/[0.04]">
+                    <td colSpan={7} className="px-3 py-3">
+                      <div className="space-y-2 max-w-xl">
+                        <Input
+                          autoFocus
+                          value={rascunho.description}
+                          onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
+                          placeholder="Descrição"
+                          className="h-9 text-xs"
+                        />
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <label className="text-[10px] text-muted-foreground">
+                            Valor da parcela
+                            <Input type="number" inputMode="decimal" value={rascunho.installmentValue}
+                              onChange={(e) => setRascunho({ ...rascunho, installmentValue: e.target.value })}
+                              className="h-9 text-xs mt-0.5" />
+                          </label>
+                          <label className="text-[10px] text-muted-foreground">
+                            Já paguei
+                            <Input type="number" inputMode="numeric" value={rascunho.paidInstallments}
+                              onChange={(e) => setRascunho({ ...rascunho, paidInstallments: e.target.value })}
+                              className="h-9 text-xs mt-0.5" />
+                          </label>
+                          <label className="text-[10px] text-muted-foreground">
+                            Total de parcelas
+                            <Input type="number" inputMode="numeric" value={rascunho.totalInstallments}
+                              onChange={(e) => setRascunho({ ...rascunho, totalInstallments: e.target.value })}
+                              className="h-9 text-xs mt-0.5" />
+                          </label>
+                          <label className="text-[10px] text-muted-foreground">
+                            1ª parcela
+                            <Input type="date" value={rascunho.date}
+                              onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
+                              className="h-9 text-xs mt-0.5" />
+                          </label>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold">Salvar</button>
+                          <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground">Cancelar</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                );
                 return (
                   <tr key={inst.id} className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${isDone ? "opacity-50" : ""}`}>
-                    <td className="px-3 py-2 font-medium">{inst.description}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <button onClick={() => comecarEdicao(inst)} aria-label={`Editar ${inst.description}`} className="text-left hover:underline">
+                        {inst.description}
+                      </button>
+                    </td>
                     <td className="px-3 py-2 text-center">
                       <span className={`text-xs font-mono ${isDone ? "text-green-500" : ""}`}>
                         {inst.paidInstallments}/{inst.totalInstallments}

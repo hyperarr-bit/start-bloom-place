@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Note {
@@ -24,6 +24,22 @@ export const Notes = ({ notes, setNotes }: NotesProps) => {
 
   const deleteNote = (id: string) => setNotes(notes.filter((n) => n.id !== id));
 
+  /**
+   * Edição da anotação (27/07). Uma nota é texto puro — não faz sentido ter
+   * que apagar e redigitar tudo pra trocar uma palavra.
+   */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState("");
+
+  const salvarEdicao = () => {
+    const texto = rascunho.trim();
+    // nota vazia some: é o que a pessoa quis dizer ao apagar tudo e salvar
+    setNotes(texto
+      ? notes.map((n) => n.id === editandoId ? { ...n, text: texto } : n)
+      : notes.filter((n) => n.id !== editandoId));
+    setEditandoId(null);
+  };
+
   return (
     <div data-spotlight="add-note" className="notes-shell bg-card-dividas rounded-lg border border-card-dividas-border overflow-hidden animate-fade-in">
       <div className="bg-accent text-accent-foreground px-4 py-2 flex items-center gap-2">
@@ -34,11 +50,36 @@ export const Notes = ({ notes, setNotes }: NotesProps) => {
         {notes.length === 0 && (
           <p className="text-[10px] text-muted-foreground py-2">Anote lembretes, metas e ideias financeiras...</p>
         )}
-        {notes.map((note) => (
+        {notes.map((note) => editandoId === note.id ? (
+          <div key={note.id} className="flex items-center gap-1.5">
+            <span className="text-accent">•</span>
+            <Input
+              autoFocus
+              value={rascunho}
+              onChange={(e) => setRascunho(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") salvarEdicao(); if (e.key === "Escape") setEditandoId(null); }}
+              className="h-7 text-xs flex-1"
+            />
+            <button onClick={salvarEdicao} aria-label="Salvar anotação" className="text-primary">
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setEditandoId(null)} aria-label="Cancelar" className="text-muted-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
           <div key={note.id} className="flex items-start gap-2 group text-sm">
             <span className="text-accent mt-0.5">•</span>
-            <span className="flex-1 text-xs">{note.text}</span>
-            <button onClick={() => deleteNote(note.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
+            {/* Toque no texto edita. A lixeira fica de fora do alvo pra não
+                apagar quem só queria corrigir. */}
+            <button
+              onClick={() => { setEditandoId(note.id); setRascunho(note.text); }}
+              aria-label={`Editar anotação: ${note.text}`}
+              className="flex-1 text-xs text-left"
+            >
+              {note.text}
+            </button>
+            <button onClick={() => deleteNote(note.id)} aria-label="Apagar anotação" className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive">
               <Trash2 className="w-3 h-3" />
             </button>
           </div>

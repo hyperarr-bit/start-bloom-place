@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, TrendingUp, Calendar, Heart, AlertTriangle, ExternalLink, ImagePlus, Link2, Loader2, Link, CheckCircle2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -128,6 +128,44 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
 
   const deleteItem = (id: string) => {
     setItems(items.filter((i) => i.id !== id));
+  };
+
+  /**
+   * Editar o desejo (27/07).
+   *
+   * O "+ guardei" só soma. Preço de desejo muda o tempo todo (promoção, alta,
+   * a pessoa mira num modelo mais caro) — e sem editar, ajustar o preço
+   * significava apagar o item e perder tudo o que já tinha guardado nele.
+   */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({ name: "", price: "", savedAmount: "", link: "", targetDate: "" });
+
+  const comecarEdicao = (i: WishlistItem) => {
+    setEditandoId(i.id);
+    setRascunho({
+      name: i.name,
+      price: String(i.price),
+      savedAmount: String(i.savedAmount),
+      link: i.link ?? "",
+      targetDate: i.targetDate ?? "",
+    });
+  };
+
+  const salvarEdicao = () => {
+    const preco = parseFloat(rascunho.price);
+    const guardado = parseFloat(rascunho.savedAmount);
+    if (!rascunho.name.trim() || !Number.isFinite(preco) || preco <= 0) return;
+    setItems(items.map((i) => i.id !== editandoId ? i : {
+      ...i,
+      name: rascunho.name.trim(),
+      price: preco,
+      // guardado preso entre 0 e o preço novo — se o preço baixou pra menos do
+      // que já foi guardado, o item passa a estar 100% pago, não 130%
+      savedAmount: Math.max(0, Math.min(Number.isFinite(guardado) ? guardado : 0, preco)),
+      link: rascunho.link.trim() || undefined,
+      targetDate: rascunho.targetDate || undefined,
+    }));
+    setEditandoId(null);
   };
 
   const addToSaved = (id: string) => {
@@ -448,11 +486,56 @@ export const WishlistItems = ({ items: rawItems, setItems, monthlyBudget, totalE
                           <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
                         </a>
                       )}
-                      <button onClick={() => deleteItem(item.id)} className="p-1 rounded hover:bg-destructive/10 transition-colors">
+                      <button onClick={() => comecarEdicao(item)} aria-label={`Editar ${item.name}`} className="p-1 rounded hover:bg-muted transition-colors">
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                      <button onClick={() => deleteItem(item.id)} aria-label={`Apagar ${item.name}`} className="p-1 rounded hover:bg-destructive/10 transition-colors">
                         <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                       </button>
                     </div>
                   </div>
+
+                  {editandoId === item.id && (
+                    <div className="p-2.5 rounded-lg bg-primary/[0.05] border border-primary/20 space-y-2">
+                      <Input
+                        autoFocus
+                        value={rascunho.name}
+                        onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })}
+                        placeholder="O que você quer"
+                        className="h-9 text-xs"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-[10px] text-muted-foreground">
+                          Preço
+                          <Input type="number" inputMode="decimal" value={rascunho.price}
+                            onChange={(e) => setRascunho({ ...rascunho, price: e.target.value })}
+                            className="h-9 text-xs mt-0.5" />
+                        </label>
+                        <label className="text-[10px] text-muted-foreground">
+                          Já guardei
+                          <Input type="number" inputMode="decimal" value={rascunho.savedAmount}
+                            onChange={(e) => setRascunho({ ...rascunho, savedAmount: e.target.value })}
+                            className="h-9 text-xs mt-0.5" />
+                        </label>
+                        <label className="text-[10px] text-muted-foreground">
+                          Link (opcional)
+                          <Input value={rascunho.link}
+                            onChange={(e) => setRascunho({ ...rascunho, link: e.target.value })}
+                            className="h-9 text-xs mt-0.5" />
+                        </label>
+                        <label className="text-[10px] text-muted-foreground">
+                          Quero até
+                          <Input type="date" value={rascunho.targetDate}
+                            onChange={(e) => setRascunho({ ...rascunho, targetDate: e.target.value })}
+                            className="h-9 text-xs mt-0.5" />
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold">Salvar</button>
+                        <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground">Cancelar</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Price + Progress */}
                   <div>

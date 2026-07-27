@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet } from "lucide-react";
+import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Investment {
   id: string;
@@ -68,6 +69,45 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
 
   const deleteInvestment = (id: string) => {
     setInvestments(investments.filter((i) => i.id !== id));
+  };
+
+  /**
+   * Editar o investimento (27/07).
+   *
+   * Já dava pra mexer no valor atual e na rentabilidade — mas NÃO no nome, no
+   * tipo, na corretora, no aporte mensal nem no valor investido. Quem digitou
+   * o aportado errado (o número que define todo o retorno calculado) não tinha
+   * saída além de apagar e recadastrar.
+   */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({
+    name: "", type: "renda_fixa" as Investment["type"], investedAmount: "",
+    monthlyContribution: "", broker: "",
+  });
+
+  const comecarEdicao = (i: Investment) => {
+    setEditandoId(i.id);
+    setRascunho({
+      name: i.name,
+      type: i.type,
+      investedAmount: String(i.investedAmount ?? 0),
+      monthlyContribution: String(i.monthlyContribution ?? 0),
+      broker: i.broker ?? "",
+    });
+  };
+
+  const salvarEdicao = () => {
+    const aportado = parseFloat(rascunho.investedAmount);
+    if (!rascunho.name.trim() || !Number.isFinite(aportado) || aportado < 0) return;
+    setInvestments(investments.map((i) => i.id !== editandoId ? i : {
+      ...i,
+      name: rascunho.name.trim(),
+      type: rascunho.type,
+      investedAmount: aportado,
+      monthlyContribution: Math.max(0, parseFloat(rascunho.monthlyContribution) || 0),
+      broker: rascunho.broker.trim() || undefined,
+    }));
+    setEditandoId(null);
   };
 
   const updateCurrentValue = (id: string, value: number) => {
@@ -325,15 +365,80 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                         Desde {new Date(inv.startDate).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => deleteInvestment(inv.id)}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Editar ${inv.name}`}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => comecarEdicao(inv)}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Apagar ${inv.name}`}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => deleteInvestment(inv.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
                   </div>
+
+                  {editandoId === inv.id && (
+                    <div className="mt-2 p-2.5 rounded-lg bg-primary/[0.05] border border-primary/20 space-y-2">
+                      <Input
+                        autoFocus
+                        value={rascunho.name}
+                        onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })}
+                        placeholder="Nome do investimento"
+                        className="h-8 text-xs"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={rascunho.type} onValueChange={(v) => setRascunho({ ...rascunho, type: v as Investment["type"] })}>
+                          <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(typeLabels).map(([v, t]) => (
+                              <SelectItem key={v} value={v} className="text-xs">{t.icon} {t.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={rascunho.broker}
+                          onChange={(e) => setRascunho({ ...rascunho, broker: e.target.value })}
+                          placeholder="Corretora"
+                          className="h-8 text-xs"
+                        />
+                        <label className="text-[10px] text-muted-foreground">
+                          Valor investido
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={rascunho.investedAmount}
+                            onChange={(e) => setRascunho({ ...rascunho, investedAmount: e.target.value })}
+                            className="h-8 text-xs mt-0.5"
+                          />
+                        </label>
+                        <label className="text-[10px] text-muted-foreground">
+                          Aporte mensal
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={rascunho.monthlyContribution}
+                            onChange={(e) => setRascunho({ ...rascunho, monthlyContribution: e.target.value })}
+                            className="h-8 text-xs mt-0.5"
+                          />
+                        </label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={salvarEdicao} className="h-8 flex-1 text-xs">Salvar</Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditandoId(null)} className="h-8 text-xs">Cancelar</Button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-2 flex items-center gap-2">
                     <Input
                       type="number"

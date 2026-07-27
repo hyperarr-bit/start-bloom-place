@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Atalhos do toque longo no ícone (27/07).
+
+  QUAIS e POR QUÊ. O Android mostra no máximo 4 e ninguém lê uma lista de
+  atalhos — a pessoa mira num. Então não é "os módulos favoritos", é as três
+  AÇÕES que valem abrir o app só pra elas, escolhidas pelos 30 dias de uso
+  real: finanças (677 pessoas), rotina (322) e biblioteca (a de maior tempo
+  por pessoa do app).
+
+  O que fica de fora, de propósito: retrospectiva (é mensal — atalho é pra
+  gesto de rotina, não pra evento), conquistas (não é ação) e o resto dos 13
+  módulos (encher a lista é o mesmo que não ter atalho).
+
+  Cada um abre o app JÁ no módulo, pelo esquema `core://` declarado no
+  manifesto. `android:enabled="true"` + targetPackage explícito porque o
+  Android exige o alvo resolvido em atalho estático.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="gasto"
+        android:enabled="true"
+        android:icon="@drawable/ic_atalho_gasto"
+        android:shortcutShortLabel="@string/atalho_gasto_curto"
+        android:shortcutLongLabel="@string/atalho_gasto_longo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="core://financas"
+            android:targetPackage="br.com.coreaplicativo.app"
+            android:targetClass="br.com.coreaplicativo.app.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="habito"
+        android:enabled="true"
+        android:icon="@drawable/ic_atalho_habito"
+        android:shortcutShortLabel="@string/atalho_habito_curto"
+        android:shortcutLongLabel="@string/atalho_habito_longo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="core://rotina"
+            android:targetPackage="br.com.coreaplicativo.app"
+            android:targetClass="br.com.coreaplicativo.app.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="leitura"
+        android:enabled="true"
+        android:icon="@drawable/ic_atalho_livro"
+        android:shortcutShortLabel="@string/atalho_leitura_curto"
+        android:shortcutLongLabel="@string/atalho_leitura_longo">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="core://biblioteca"
+            android:targetPackage="br.com.coreaplicativo.app"
+            android:targetClass="br.com.coreaplicativo.app.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+</shortcuts>

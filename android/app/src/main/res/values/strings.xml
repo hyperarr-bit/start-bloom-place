@@ -4,4 +4,14 @@
     <string name="title_activity_main">CORE</string>
     <string name="package_name">br.com.coreaplicativo.app</string>
     <string name="custom_url_scheme">br.com.coreaplicativo.app</string>
+
+    <!-- Atalhos do toque longo no ícone. O rótulo CURTO é o que aparece na
+         lista (o Android corta em ~10 caracteres), o LONGO é o que vira nome
+         quando a pessoa arrasta o atalho pra tela inicial. -->
+    <string name="atalho_gasto_curto">Gasto</string>
+    <string name="atalho_gasto_longo">Registrar gasto</string>
+    <string name="atalho_habito_curto">Hábito</string>
+    <string name="atalho_habito_longo">Marcar hábito</string>
+    <string name="atalho_leitura_curto">Leitura</string>
+    <string name="atalho_leitura_longo">Continuar leitura</string>
 </resources>

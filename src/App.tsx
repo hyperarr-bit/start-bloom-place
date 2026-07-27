@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -259,6 +259,26 @@ const AnimatedRoutes = () => {
       .then((m) => m.ligarToqueNaNotificacao((rota) => navigate(rota)))
       .catch(() => {});
   }, [navigate]);
+
+  // Deep links `core://` — hoje quem manda são os atalhos do toque longo no
+  // ícone. Precisa do Router pelo mesmo motivo do bloco acima.
+  //
+  // Deps VAZIAS e navigate por ref de propósito: o `navigate` do react-router
+  // troca de identidade a cada navegação, e com ele nas deps o efeito
+  // reexecutava toda vez — reinstalando o ouvinte e relendo o link de
+  // abertura. Era isso que fazia o atalho abrir a tela certa e voltar sozinho
+  // pra anterior.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    let desligar = () => {};
+    import("@/lib/deep-link")
+      .then((m) => m.ligarDeepLinks((rota) => navigateRef.current(rota)))
+      .then((fn) => { desligar = fn; })
+      .catch(() => {});
+    return () => desligar();
+  }, []);
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
     <AnimatePresence mode="wait">

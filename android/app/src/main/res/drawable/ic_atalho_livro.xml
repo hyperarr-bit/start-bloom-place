@@ -1,0 +1,7 @@
+<!-- Atalho "Continuar leitura" — disco na cor do módulo Biblioteca + livro. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <path android:fillColor="#EA7317" android:pathData="M24,2 C36.15,2 46,11.85 46,24 C46,36.15 36.15,46 24,46 C11.85,46 2,36.15 2,24 C2,11.85 11.85,2 24,2 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M22.4,15.2 L22.4,34.6 C20.2,33.1 17.6,32.3 14.6,32.3 C13.4,32.3 12.2,32.4 11,32.7 L11,13.4 C12.2,13.1 13.4,13 14.6,13 C17.6,13 20.2,13.8 22.4,15.2 Z M25.6,15.2 C27.8,13.8 30.4,13 33.4,13 C34.6,13 35.8,13.1 37,13.4 L37,32.7 C35.8,32.4 34.6,32.3 33.4,32.3 C30.4,32.3 27.8,33.1 25.6,34.6 Z" />
+</vector>

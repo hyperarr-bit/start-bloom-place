@@ -40,6 +40,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+                DEEP LINK por esquema próprio (27/07). `core://financas` abre o
+                app já no módulo. Esquema próprio e não https:// de propósito:
+                link https exigiria hospedar o assetlinks.json e verificação de
+                domínio, e o único consumidor destes links hoje é o PRÓPRIO
+                aparelho (atalhos do ícone e notificações). Quando existir link
+                de campanha que precise abrir o app pelo navegador, aí sim vale
+                o App Link verificado.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="core" />
+            </intent-filter>
+
+            <!-- Atalhos do toque longo no ícone -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <provider

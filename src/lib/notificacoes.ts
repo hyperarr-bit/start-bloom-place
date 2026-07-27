@@ -17,11 +17,29 @@ import { isNativeShell } from "./native-shell";
 const CANAL = "core-lembretes";
 /** Silhueta em `res/drawable/ic_stat_core.xml`. Sem isto o Android desenha um "i" de sistema. */
 const ICONE = "ic_stat_core";
-/** Magenta da marca: é a cor que o Android pinta atrás da silhueta. */
-const COR_MARCA = "#D22D80";
-/** Faixas de id reservadas por tipo — permitem limpar um tipo sem tocar nos outros. */
-const BASE_CONTAS = 100000;
-const BASE_RETRO = 200000;
+/**
+ * Grafite da marca — é a cor do disco que o Android pinta ATRÁS da silhueta.
+ * Magenta aqui destoava: o "CORE" do ícone do app é grafite, o magenta é
+ * acento de interface, não a assinatura.
+ */
+const COR_MARCA = "#1C1917";
+/**
+ * Faixas de id reservadas por tipo — permitem limpar um tipo sem tocar nos
+ * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
+ * guarda o id, não sabe o que é "lembrete de treino").
+ */
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "outro";
+
+const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
+  contas: 100000,
+  retrospectiva: 200000,
+  rotina: 300000,
+  treino: 400000,
+  leitura: 500000,
+  dieta: 600000,
+};
+const BASE_CONTAS = BASES.contas;
+const BASE_RETRO = BASES.retrospectiva;
 const HORA_RETRO = 10; // 10h do dia 1º: o mês fechou, ninguém tem pressa
 
 type Bill = { name?: string; paid?: boolean };
@@ -254,23 +272,202 @@ const MESES_CURTOS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+/* ------------------------------------------------ lembretes diários (fase 2)
+ *
+ * Rotina, treino, leitura e dieta. Todos DESLIGADOS por padrão — ver o porquê
+ * em `prefs-notificacoes.ts`.
+ *
+ * A limitação que molda tudo aqui: notificação local não roda lógica na hora
+ * de disparar. O texto é congelado no agendamento. Então:
+ *
+ *  1. HOJE é o único dia sobre o qual sabemos algo — só ele pode ser pulado
+ *     ("já treinou hoje") ou ganhar texto específico ("faltam 40 páginas").
+ *  2. Os dias seguintes levam texto neutro, verdadeiro em qualquer cenário.
+ *     Um aviso que diz "você não fez" pra quem fez destrói a confiança na
+ *     notificação inteira, e a pessoa desliga tudo.
+ *  3. O reagendamento acontece a cada mudança de dado com o app aberto — e
+ *     marcar hábito, registrar treino ou virar página SÓ acontece com o app
+ *     aberto. Então o aviso de hoje some no instante em que deixa de valer.
+ */
+
+/** Quantos dias à frente cada série cobre. 10 dias sobrevive a uma semana sem abrir o app. */
+const HORIZONTE_DIAS = 10;
+
+const DIAS_SEMANA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+/** Índice 0=segunda, como o resto do app usa (JS conta domingo=0). */
+const indiceSemana = (d: Date) => (d.getDay() === 0 ? 6 : d.getDay() - 1);
+
+type Planejado = { quando: Date; title: string; body: string };
+
+/** Agenda uma série já pronta na faixa do tipo, substituindo a anterior. */
+async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string, avisos: Planejado[]): Promise<number> {
+  const p = await plugin();
+  if (!p) return 0;
+  const { LN } = p;
+  if (!(await temPermissao())) return 0;
+  await garantirCanal();
+  await limparFaixa(BASES[tipo]);
+  if (!avisos.length) return 0;
+
+  try {
+    await LN.schedule({
+      notifications: avisos.map((a) => ({
+        id: BASES[tipo] + Number(`${doisDigitos(a.quando.getMonth() + 1)}${doisDigitos(a.quando.getDate())}`),
+        title: a.title,
+        body: a.body,
+        schedule: { at: a.quando },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { rota },
+      })),
+    });
+    return avisos.length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Os próximos N dias em que a notificação ainda cabe no futuro, na hora dada. */
+function proximosDias(hora: number, dias = HORIZONTE_DIAS): Date[] {
+  const agora = new Date();
+  const out: Date[] = [];
+  for (let i = 0; i <= dias; i++) {
+    const d = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, hora, 0, 0, 0);
+    if (d.getTime() > agora.getTime()) out.push(d);
+  }
+  return out;
+}
+
+const localDia = (d: Date) =>
+  `${d.getFullYear()}-${doisDigitos(d.getMonth() + 1)}-${doisDigitos(d.getDate())}`;
+
+/**
+ * ROTINA — o fechamento do dia.
+ *
+ * É o lembrete mais forte do app: a sequência é o que faz voltar. Mas só o
+ * dia de HOJE pode citar a sequência, porque só dele sabemos que ainda está
+ * de pé. Se hoje já foi marcado, o aviso de hoje simplesmente não existe.
+ */
+export async function agendarRotina(
+  dados: { marcados: Set<string>; sequencia: number },
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.rotina); return 0; }
+  const hoje = localDia(new Date());
+  const avisos = proximosDias(opcoes.hora)
+    .filter((d) => !(localDia(d) === hoje && dados.marcados.has(hoje)))
+    .map((d, i) => {
+      const ehHoje = localDia(d) === hoje;
+      if (ehHoje && dados.sequencia >= 3) {
+        return {
+          quando: d,
+          title: `${dados.sequencia} dias seguidos 🔥`,
+          body: "Não deixa quebrar hoje — marca o que você fez.",
+        };
+      }
+      return {
+        quando: d,
+        title: i === 0 && ehHoje ? "Bora fechar o dia?" : "Como foi seu dia?",
+        body: "Marca os hábitos que você cumpriu na sua rotina.",
+      };
+    });
+  return agendarSerie("rotina", "/rotina", avisos);
+}
+
+/**
+ * TREINO — só nos dias que a pessoa marcou como dia de treino.
+ *
+ * Um lembrete de treino todo dia é ruído; nos dias certos é serviço. O grupo
+ * muscular entra no texto porque é a informação que a pessoa iria abrir o app
+ * pra ver de qualquer jeito.
+ */
+export async function agendarTreino(
+  dados: { diasAtivos: string[]; musculosPorDia: Record<string, string[]>; diasComPlano: Set<string>; jaTreinouHoje: boolean },
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.treino); return 0; }
+  const hoje = localDia(new Date());
+  const avisos = proximosDias(opcoes.hora)
+    .filter((d) => dados.diasAtivos.includes(DIAS_SEMANA[indiceSemana(d)]))
+    // Dia marcado como ativo mas SEM nada montado é descanso na prática —
+    // muita gente deixa os 7 dias ligados e configura 5. Avisar "hoje é dia
+    // de treino" num sábado vazio é o tipo de aviso que faz desligar tudo.
+    .filter((d) => dados.diasComPlano.has(DIAS_SEMANA[indiceSemana(d)]))
+    .filter((d) => !(localDia(d) === hoje && dados.jaTreinouHoje))
+    .map((d) => {
+      const musculos = dados.musculosPorDia[DIAS_SEMANA[indiceSemana(d)]] ?? [];
+      return {
+        quando: d,
+        title: musculos.length ? `Hoje é dia de ${musculos.slice(0, 2).join(" e ").toLowerCase()}` : "Hoje é dia de treino",
+        body: "Seu treino já tá montado no CORE. É só seguir.",
+      };
+    });
+  return agendarSerie("treino", "/treino", avisos);
+}
+
+/**
+ * LEITURA — 3× por semana, e só se existe livro em andamento.
+ *
+ * Diário seria demais pra um hábito que ninguém pratica todo dia. As páginas
+ * que faltam entram no texto: "faltam 40 páginas" move muito mais que
+ * "continue lendo", porque transforma o resto do livro num número pequeno.
+ */
+export async function agendarLeitura(
+  dados: { titulo: string; faltam: number } | null,
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado || !dados) { await limparFaixa(BASES.leitura); return 0; }
+  const DIAS_DE_LEITURA = [0, 2, 4]; // segunda, quarta, sexta
+  const avisos = proximosDias(opcoes.hora, 14)
+    .filter((d) => DIAS_DE_LEITURA.includes(indiceSemana(d)))
+    .map((d) => ({
+      quando: d,
+      title: dados.faltam > 0 ? `Faltam ${dados.faltam} páginas` : "Seu livro tá esperando",
+      body: `${dados.titulo} — 10 minutos hoje já andam bem.`,
+    }));
+  return agendarSerie("leitura", "/biblioteca", avisos);
+}
+
+/** DIETA — fechar o diário do dia. Pula hoje se já foi preenchido. */
+export async function agendarDieta(
+  dados: { jaPreencheuHoje: boolean },
+  opcoes: { hora: number; ligado: boolean },
+): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.dieta); return 0; }
+  const hoje = localDia(new Date());
+  const avisos = proximosDias(opcoes.hora)
+    .filter((d) => !(localDia(d) === hoje && dados.jaPreencheuHoje))
+    .map((d) => ({
+      quando: d,
+      title: "Como foi a dieta hoje?",
+      body: "Leva 20 segundos pra fechar o diário.",
+    }));
+  return agendarSerie("dieta", "/dieta", avisos);
+}
+
+/** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */
+const tipoDoId = (id: number): TipoDeLembrete => {
+  const achado = (Object.keys(BASES) as TipoDeLembrete[]).find(
+    (t) => id >= BASES[t] && id < BASES[t] + 10000,
+  );
+  return achado ?? "outro";
+};
+
 /** Tudo o que está agendado — usado pela tela de ajustes e pelos testes. */
 export async function listarAgendados(): Promise<
-  { id: number; title: string; at?: string; tipo: "contas" | "retrospectiva" | "outro" }[]
+  { id: number; title: string; at?: string; tipo: TipoDeLembrete }[]
 > {
   const p = await plugin();
   if (!p) return [];
   const { LN } = p;
   try {
-    const p = await LN.getPending();
-    return (p.notifications ?? []).map((n) => ({
+    const pendentes = await LN.getPending();
+    return (pendentes.notifications ?? []).map((n) => ({
       id: n.id,
       title: n.title ?? "",
       at: (n.schedule as { at?: Date } | undefined)?.at?.toISOString?.(),
-      tipo:
-        n.id >= BASE_CONTAS && n.id < BASE_CONTAS + 10000 ? "contas" as const
-        : n.id >= BASE_RETRO && n.id < BASE_RETRO + 10000 ? "retrospectiva" as const
-        : "outro" as const,
+      tipo: tipoDoId(n.id),
     }));
   } catch {
     return [];

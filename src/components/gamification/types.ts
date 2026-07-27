@@ -1,13 +1,35 @@
+export type BadgeCategoria = "finance" | "rotina" | "leitura" | "treino" | "dieta" | "geral";
+
+/** Rótulo e ordem das seções da grade — a ordem é a de uso real dos módulos. */
+export const CATEGORIAS: { id: BadgeCategoria; label: string; emoji: string }[] = [
+  { id: "finance", label: "Finanças", emoji: "💰" },
+  { id: "rotina", label: "Rotina", emoji: "📅" },
+  { id: "leitura", label: "Leitura", emoji: "📚" },
+  { id: "treino", label: "Treino", emoji: "🏋️" },
+  { id: "dieta", label: "Dieta", emoji: "🥗" },
+  { id: "geral", label: "CORE", emoji: "👑" },
+];
+
 export interface Badge {
   id: string;
   name: string;
   description: string;
   icon: string;
-  category: "finance" | "health" | "habits" | "general";
+  category: BadgeCategoria;
   unlocked: boolean;
   color: string;
   xp: number;
+  /**
+   * Quanto falta. Opcional porque nem toda conquista é numérica ("todas as
+   * contas pagas" é sim/não). Quando existe, é o que ordena "Próximas
+   * conquistas" por PROXIMIDADE em vez de por ordem de declaração.
+   */
+  progresso?: { atual: number; alvo: number };
 }
+
+/** 0..1. Sem progresso declarado, só existe trancada (0) ou aberta (1). */
+export const fracaoDe = (b: Badge): number =>
+  b.unlocked ? 1 : b.progresso && b.progresso.alvo > 0 ? b.progresso.atual / b.progresso.alvo : 0;
 
 export interface Level {
   name: string;

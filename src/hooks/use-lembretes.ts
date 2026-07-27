@@ -1,18 +1,27 @@
 import { useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
-import { agendarContas, agendarRetrospectiva, temPermissao } from "@/lib/notificacoes";
+import { temPermissao } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
+import { assinaturaDos, lerDadosDosLembretes, reagendarTudo } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 
 /**
- * Mantém os lembretes alinhados com os dados e com a central de notificações
- * (26/07, ampliado 27/07 pra retrospectiva).
+ * Mantém TODOS os lembretes alinhados com os dados e com a central
+ * (26/07, ampliado 27/07 pra retrospectiva e lembretes diários).
  *
  * Roda no app da loja e só faz trabalho quando algo MUDA de verdade — a
- * assinatura serializada é comparada antes de mexer no agendador, senão cada
- * render reagendaria tudo. Sem permissão, não faz nada e não pede: quem pede
- * é a tela onde a pessoa acabou de criar a primeira conta.
+ * assinatura é comparada antes de mexer no agendador, senão cada render
+ * reagendaria tudo.
+ *
+ * Este hook é também o que torna os lembretes diários honestos: o aviso de
+ * "fecha o dia" some no instante em que a pessoa marca o hábito, porque
+ * marcar muda o dado, mudar o dado muda a assinatura, e a assinatura nova
+ * reagenda a série sem o dia de hoje. E marcar hábito, registrar treino ou
+ * virar página só acontece com o app aberto — que é quando este hook roda.
+ *
+ * Sem permissão não faz nada e não pede: quem pede é a tela onde a pessoa
+ * acabou de criar a primeira conta, ou a central.
  */
 export function useLembretes() {
   const { get, loaded } = useUserData();
@@ -26,21 +35,12 @@ export function useLembretes() {
       if (!(await temPermissao())) return;
 
       const prefs = lerPrefs(get<unknown>(CHAVE_PREFS, undefined));
-      const dueDays = get<{ day?: number; bills?: { name?: string; paid?: boolean }[] }[]>("finance-dueDays", []) ?? [];
-
-      // só o que influencia o agendamento entra na assinatura
-      const assinatura = JSON.stringify([
-        prefs,
-        dueDays
-          .map((d) => [d?.day, (d?.bills ?? []).filter((b) => !b?.paid).map((b) => b?.name).sort()])
-          .filter(([, naoPagas]) => Array.isArray(naoPagas) && naoPagas.length),
-      ]);
+      const assinatura = assinaturaDos(lerDadosDosLembretes(get), prefs);
       if (assinatura === ultimaAssinatura.current) return;
       ultimaAssinatura.current = assinatura;
 
-      const quantos = await agendarContas(dueDays, { hora: prefs.horaContas, ligado: prefs.contas });
-      const retro = await agendarRetrospectiva(prefs.retrospectiva);
-      if (!cancelado) trackEvent("lembretes_agendados", { contas: quantos, retrospectiva: retro });
+      const contagem = await reagendarTudo(get, prefs);
+      if (!cancelado) trackEvent("lembretes_agendados", contagem);
     })();
 
     return () => { cancelado = true; };

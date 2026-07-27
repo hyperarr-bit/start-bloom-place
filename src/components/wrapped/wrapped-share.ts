@@ -149,21 +149,13 @@ export const renderWrappedImage = async (r: RetroMes): Promise<"shared" | "downl
     ctx.fillText(rodape.texto, W / 2, 1585);
   }
 
-  // wordmark
+  // Wordmark inteiro numa cor só. Antes o "o" saía magenta — um floreio que
+  // só existia aqui: as artes de insígnia e de perfil sempre desenharam
+  // "core" neutro, e o ícone do app é grafite chapado. Assinatura de marca
+  // que muda de arte pra arte não é assinatura.
+  ctx.fillStyle = "#fafaf9";
   ctx.font = font("800", 72);
-  const word = "core";
-  ctx.textAlign = "left";
-  const total = ctx.measureText(word).width;
-  let x = W / 2 - total / 2;
-  ctx.fillStyle = "#fafaf9";
-  ctx.fillText("c", x, 1780);
-  x += ctx.measureText("c").width;
-  ctx.fillStyle = "#D22D80";
-  ctx.fillText("o", x, 1780);
-  x += ctx.measureText("o").width;
-  ctx.fillStyle = "#fafaf9";
-  ctx.fillText("re", x, 1780);
-  ctx.textAlign = "center";
+  ctx.fillText("core", W / 2, 1780);
   ctx.fillStyle = "rgba(255,255,255,0.4)";
   ctx.font = font("normal", 30);
   ctx.fillText(rodapeDe(r), W / 2, 1835);

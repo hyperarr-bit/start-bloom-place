@@ -140,8 +140,10 @@ const Index = () => {
   // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
   const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments);
   const savingsRate = computeSavingsRate(totalIncome, monthlyOutflow);
-  const emergencyFund = goals.find((g: any) => g.name.toLowerCase().includes("emergência"))?.currentValue || 0;
-  const emergencyFundGoal = goals.find((g: any) => g.name.toLowerCase().includes("emergência"))?.targetValue || monthlyOutflow * 6;
+  // O alvo da reserva é 6 meses de despesa. Antes vinha de uma meta chamada
+  // "emergência" — do módulo Metas, removido em 31/03 — então era sempre o
+  // fallback mesmo. Agora é explícito.
+  const emergencyFundGoal = monthlyOutflow * 6;
 
   // Bills paid rate
   const allBills = dueDays.flatMap((d: any) => Array.isArray(d?.bills) ? d.bills : []);
@@ -441,9 +443,7 @@ const Index = () => {
               monthlyInstallments={monthlyInstallments}
               totalDebts={totalDebts}
               totalInvestments={totalInvestments}
-              emergencyFund={emergencyFund}
               emergencyFundGoal={emergencyFundGoal}
-              goals={goals}
               dueDays={dueDays}
               installments={installments}
               wishlistItems={wishlistItems}

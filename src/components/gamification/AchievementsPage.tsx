@@ -34,7 +34,6 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
   const investments = get<any[]>("finance-investments", []);
   const installments = get<any[]>("finance-installments", []);
   const dueDays = get<any[]>("finance-dueDays", []);
-  const goals = get<any[]>("finance-goals", []);
   const wishlist = get<any[]>("finance-wishlist", []);
 
   const totalIncome = incomes.reduce((s: number, i: any) => s + (Number(i.value) || Number(i.amount) || 0), 0);
@@ -54,7 +53,6 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
   const categorizedExpenses = expenses.filter((e: any) => e.category).length;
   const monthLaunches = incomes.length + expenses.length + fixedExpenses.length;
 
-  const completedGoals = goals.filter((g: any) => (g.current || 0) >= (g.target || 1) || g.completed).length;
   const reservaAlvo = monthlyExpenses * 3;
 
   const acquiredWish = wishlist.some((w: any) => w.acquired || w.purchased);
@@ -89,9 +87,13 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
     booleana({ ...base, id: "debt-free", name: "Livre de Dívidas", description: "Sem parcelas pendentes", icon: "🆓", xp: XP_HI }, installments.length > 0 && !hasActiveDebt),
     booleana({ ...base, id: "quitador", name: "Quitador", description: "Parcelamento 100% quitado", icon: "🎯", xp: XP }, hasQuitado),
 
-    // Metas / Planejamento
-    comProgresso({ ...base, id: "dreamer", name: "Sonhador", description: "Crie sua 1ª meta", icon: "✨", xp: XP }, goals.length, 1),
-    comProgresso({ ...base, id: "achiever", name: "Realizador", description: "Conclua 1 meta", icon: "🥇", xp: XP_HI }, completedGoals, 1),
+    /*
+     * "Sonhador" e "Realizador" saíram (27/07): as duas dependiam do módulo
+     * METAS, removido do app em 31/03. Sem tela pra criar meta, eram medalhas
+     * IMPOSSÍVEIS — e, com a nova ordenação por proximidade, apareceriam pra
+     * sempre em "Próximas conquistas" a 0%, que é o contrário do que aquele
+     * card serve. Alvo inalcançável apresentado como próximo passo desmotiva.
+     */
     reservaAlvo > 0
       ? comProgresso({ ...base, id: "emergency-fund", name: "Reserva de Emergência", description: "3× despesas mensais guardadas", icon: "🛡️", xp: XP_TOP }, totalInvestments, reservaAlvo)
       : booleana({ ...base, id: "emergency-fund", name: "Reserva de Emergência", description: "3× despesas mensais guardadas", icon: "🛡️", xp: XP_TOP }, false),

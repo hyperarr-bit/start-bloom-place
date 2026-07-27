@@ -2,13 +2,6 @@ import { AlertTriangle, CheckCircle, TrendingUp, Shield, Target, Lightbulb, Cred
 import { Progress } from "@/components/ui/progress";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 
-interface Goal {
-  id: string;
-  name: string;
-  targetValue: number;
-  currentValue: number;
-}
-
 interface Bill {
   id: string;
   name: string;
@@ -64,9 +57,7 @@ interface FinancialHealthProps {
   monthlyInstallments: number;
   totalDebts: number;
   totalInvestments: number;
-  emergencyFund: number;
   emergencyFundGoal: number;
-  goals: Goal[];
   dueDays: DueDay[];
   installments: Installment[];
   wishlistItems: WishlistItem[];
@@ -81,9 +72,7 @@ export const FinancialHealth = ({
   monthlyInstallments,
   totalDebts,
   totalInvestments,
-  emergencyFund,
   emergencyFundGoal,
-  goals,
   dueDays,
   installments,
   wishlistItems,
@@ -96,8 +85,22 @@ export const FinancialHealth = ({
   const totalRealExpenses = computeMonthlyOutflow(totalExpenses, totalFixedExpenses, monthlyInstallments);
   const savingsRate = computeSavingsRate(totalIncome, totalRealExpenses);
   const debtToIncome = totalIncome > 0 ? (totalDebts / (totalIncome * 12)) * 100 : 0;
+  /*
+   * RESERVA DE EMERGÊNCIA — de onde sai o número (27/07).
+   *
+   * Lia de uma meta chamada "emergência" dentro do módulo Metas. Como Metas
+   * foi removido em 31/03, NADA no app cria essa meta: o valor era sempre 0 e
+   * os 15 pontos da reserva eram tão inalcançáveis quanto os 10 das metas.
+   * Somados, 25 dos 100 pontos estavam mortos e o score travava em 75.
+   *
+   * Agora usa o TOTAL INVESTIDO, que é a mesma definição que a conquista
+   * "Reserva de Emergência" já usa (investido vs. despesas mensais). Duas
+   * partes do app medindo a mesma coisa de jeitos diferentes é como o número
+   * perde a confiança de quem lê. O alvo continua 6 meses de despesa — o
+   * clássico — enquanto a conquista pede 3; cada um coerente consigo.
+   */
   const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * 6 : emergencyFundGoal;
-  const emergencyProgress = realEmergencyGoal > 0 ? (emergencyFund / realEmergencyGoal) * 100 : 0;
+  const emergencyProgress = realEmergencyGoal > 0 ? (totalInvestments / realEmergencyGoal) * 100 : 0;
   const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
   const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
@@ -106,10 +109,22 @@ export const FinancialHealth = ({
   const paidBills = allBills.filter((b: any) => b?.paid).length;
   const billsPaymentRate = allBills.length > 0 ? (paidBills / allBills.length) * 100 : 100;
 
-  // Goals progress
-  const goalsProgress = goals.length > 0
-    ? goals.reduce((sum, g) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100), 0) / goals.length
-    : 0;
+  /*
+   * METAS SAIU DO SCORE (27/07).
+   *
+   * O módulo Metas foi removido do app em 31/03 ("Remove Metas module from
+   * finance"), mas o score continuou reservando 10 dos 100 pontos pro
+   * "progresso das metas" — e sem tela pra criar meta, `goals` é sempre
+   * vazio. Resultado: TODO usuário ficava travado em 90, penalizado por não
+   * usar algo que não existe.
+   *
+   * Era incoerente até dentro deste arquivo: parcelas e desejos vazios valem
+   * 100 (pontuação cheia, "nada a cobrar"), só metas valia 0.
+   *
+   * Os 10 pontos foram para reserva de emergência e aportes mensais (5 cada)
+   * — os dois critérios que sobraram com o mesmo espírito: guardar dinheiro
+   * mirando um objetivo.
+   */
 
   // Installment progress (how much already paid off)
   const installmentProgress = installments.length > 0
@@ -128,19 +143,34 @@ export const FinancialHealth = ({
   // Monthly contributions consistency
   const contributionRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
-  // === SCORE CALCULATION (0-100) — sem base inflada ===
-  let score = 0;
-  score += Math.min(Math.max(savingsRate, 0) * 1.0, 20);  // Poupança: até 20pts
-  score -= Math.min(debtToIncome * 0.5, 15);                // Dívidas: até -15pts
-  score += Math.min(emergencyProgress * 0.15, 15);          // Reserva: até 15pts
-  score += Math.min(investmentRate * 1.0, 15);               // Aportes mensais: até 15pts
-  score += Math.min(billsPaymentRate * 0.15, 15);            // Contas em dia: até 15pts
-  score += Math.min(goalsProgress * 0.1, 10);                // Metas: até 10pts
-  score += Math.min(installmentProgress * 0.05, 5);          // Parcelas: até 5pts
-  score += Math.min(wishlistDiscipline * 0.05, 5);           // Desejos: até 5pts
-  score += Math.min(diversificationScore * 0.05, 5);         // Diversificação: até 5pts
-  score += Math.min(contributionRate * 0.5, 5);              // Aportes regulares: até 5pts
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  /*
+   * SCORE (0-100). Os pesos abaixo somam EXATAMENTE 100 — e isso não era
+   * verdade antes (27/07).
+   *
+   * Dois defeitos que se escondiam um no outro:
+   *  1. as dívidas eram calculadas como DESCONTO (score -= penalidade) mas
+   *     exibidas na composição como pontos ganhos ("14,1/15pts"). Com isso a
+   *     lista somava 110 na tela enquanto a fórmula só permitia 95: ninguém
+   *     jamais tiraria 100, por mais impecável que fosse.
+   *  2. os 10 pontos de metas e os 15 da reserva estavam mortos (ver acima),
+   *     derrubando o teto real pra 75.
+   *
+   * Agora a dívida é positiva-invertida (quanto menos dívida, mais ponto),
+   * igual ao que a composição SEMPRE mostrou — a tela deixa de mentir — e sem
+   * os 10 das metas o total fecha em 100 sem inventar peso novo.
+   */
+  const pesos = [
+    Math.min(Math.max(savingsRate, 0) * 1.0, 20),              // Poupança: 20
+    Math.max(0, 15 - Math.min(debtToIncome * 0.5, 15)),        // Dívidas: 15 (invertido)
+    Math.min(emergencyProgress * 0.15, 15),                    // Reserva: 15
+    Math.min(investmentRate * 1.0, 15),                        // Aportes mensais: 15
+    Math.min(billsPaymentRate * 0.15, 15),                     // Contas em dia: 15
+    Math.min(installmentProgress * 0.05, 5),                   // Parcelas: 5
+    Math.min(wishlistDiscipline * 0.05, 5),                    // Desejos: 5
+    Math.min(diversificationScore * 0.05, 5),                  // Diversificação: 5
+    Math.min(contributionRate * 0.5, 5),                       // Aportes regulares: 5
+  ];                                                           // total: 100
+  const score = Math.max(0, Math.min(100, Math.round(pesos.reduce((a, b) => a + b, 0))));
 
   const getScoreColor = () => {
     if (score >= 80) return "text-green-400";
@@ -299,7 +329,6 @@ export const FinancialHealth = ({
             { label: "Contas em dia", value: Math.min(billsPaymentRate * 0.15, 15), max: 15, icon: "📋" },
             { label: "Reserva de emergência", value: Math.min(emergencyProgress * 0.15, 15), max: 15, icon: "🛡️" },
             { label: "Aportes mensais", value: Math.min(investmentRate * 1.0, 15), max: 15, icon: "📈" },
-            { label: "Progresso das metas", value: Math.min(goalsProgress * 0.1, 10), max: 10, icon: "🎯" },
             { label: "Controle de dívidas", value: Math.max(0, 15 - Math.min(debtToIncome * 0.5, 15)), max: 15, icon: "💳" },
             { label: "Quitação de parcelas", value: Math.min(installmentProgress * 0.05, 5), max: 5, icon: "📆" },
             { label: "Disciplina (desejos)", value: Math.min(wishlistDiscipline * 0.05, 5), max: 5, icon: "❤️" },
@@ -329,14 +358,6 @@ export const FinancialHealth = ({
           </div>
           <p className="text-lg font-bold">{paidBills}/{allBills.length}</p>
           <Progress value={billsPaymentRate} className="h-1 mt-1" />
-        </div>
-        <div className="bg-card rounded-lg border border-border p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Target className="w-4 h-4 text-yellow-400" />
-            <span className="text-[10px] text-muted-foreground">Metas</span>
-          </div>
-          <p className="text-lg font-bold">{goalsProgress.toFixed(0)}%</p>
-          <Progress value={goalsProgress} className="h-1 mt-1" />
         </div>
         <div className="bg-card rounded-lg border border-border p-3">
           <div className="flex items-center gap-2 mb-1">
@@ -402,7 +423,7 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {emergencyFund.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
+            R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">

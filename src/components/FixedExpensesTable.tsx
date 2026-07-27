@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,6 +87,41 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
 
   const deleteExpense = (id: string) => {
     setExpenses(expenses.filter((e) => e.id !== id));
+  };
+
+  /** Edição na própria linha — o mesmo motivo descrito em ExpenseTable. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({
+    description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
+  });
+
+  const comecarEdicao = (e: FixedExpense) => {
+    setEditandoId(e.id);
+    setRascunho({
+      description: e.description,
+      category: e.category,
+      value: String(e.value),
+      paymentMethod: e.paymentMethod,
+      cardName: e.cardName ?? "",
+      day: e.day ? String(e.day) : "",
+    });
+  };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.value);
+    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    const dia = parseInt(rascunho.day, 10);
+    setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
+      ...e,
+      description: rascunho.description.trim(),
+      category: rascunho.category || "outros",
+      value: valor,
+      paymentMethod: rascunho.paymentMethod || "pix",
+      cardName: isCardPayment(rascunho.paymentMethod) ? (rascunho.cardName || "outro") : undefined,
+      // dia fora de 1–31 vira "sem dia" em vez de sujar o calendário
+      day: Number.isInteger(dia) && dia >= 1 && dia <= 31 ? dia : undefined,
+    }));
+    setEditandoId(null);
   };
 
   const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
@@ -192,36 +227,95 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
             <p className="text-[10px] text-muted-foreground mt-1">Adicione aluguel, contas, assinaturas, academia...</p>
           </div>
         ) : (
-          expenses.map((expense) => (
+          expenses.map((expense) => editandoId === expense.id ? (
+            <div key={expense.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={rascunho.description}
+                  onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
+                  className="h-9 text-xs flex-1"
+                  placeholder="Descrição"
+                />
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={rascunho.value}
+                  onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}
+                  className="h-9 text-xs w-20 text-right"
+                  placeholder="Valor"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="min-w-0">
+                  <CategorySelect kind="fixed" value={rascunho.category} onValueChange={(v) => setRascunho({ ...rascunho, category: v })} />
+                </div>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  value={rascunho.day}
+                  onChange={(e) => setRascunho({ ...rascunho, day: e.target.value })}
+                  className="h-8 text-xs"
+                  placeholder="Vence dia"
+                />
+                <div className="min-w-0">
+                  <Select value={rascunho.paymentMethod} onValueChange={(v) => setRascunho({ ...rascunho, paymentMethod: v, cardName: isCardPayment(v) ? rascunho.cardName : "" })}>
+                    <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Pagamento" /></SelectTrigger>
+                    <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {isCardPayment(rascunho.paymentMethod) ? (
+                  <div className="min-w-0">
+                    <Select value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })}>
+                      <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Cartão" /></SelectTrigger>
+                      <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                ) : <div />}
+              </div>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
+                  <Check className="w-3.5 h-3.5" /> Salvar
+                </button>
+                <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
             <div key={expense.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors">
               <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm truncate">{expense.description}</span>
-                    <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
-                      {getCategoryLabel(expense.category)}
-                    </span>
+                <button onClick={() => comecarEdicao(expense)} className="flex items-center gap-2 flex-1 min-w-0 text-left" aria-label={`Editar ${expense.description}`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm truncate">{expense.description}</span>
+                      <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
+                        {getCategoryLabel(expense.category)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                      {expense.day ? (
+                        <>
+                          <span>vence dia {expense.day}</span>
+                          <span>·</span>
+                        </>
+                      ) : null}
+                      <span>{getPaymentLabel(expense.paymentMethod)}</span>
+                      {expense.cardName && (
+                        <>
+                          <span>·</span>
+                          <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
-                    {expense.day ? (
-                      <>
-                        <span>vence dia {expense.day}</span>
-                        <span>·</span>
-                      </>
-                    ) : null}
-                    <span>{getPaymentLabel(expense.paymentMethod)}</span>
-                    {expense.cardName && (
-                      <>
-                        <span>·</span>
-                        <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <span className="text-sm tabular-nums font-medium whitespace-nowrap">
-                  R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                  <span className="text-sm tabular-nums font-medium whitespace-nowrap">
+                    R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </button>
+                <button onClick={() => deleteExpense(expense.id)} aria-label={`Apagar ${expense.description}`} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>

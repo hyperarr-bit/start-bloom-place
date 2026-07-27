@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Income {
@@ -47,6 +47,27 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
 
   const deleteIncome = (id: string) => {
     setIncomes(incomes.filter((i) => i.id !== id));
+  };
+
+  /** Edição na própria linha — o mesmo motivo descrito em ExpenseTable. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({ description: "", value: "", date: "" });
+
+  const comecarEdicao = (i: Income) => {
+    setEditandoId(i.id);
+    setRascunho({ description: i.description, value: String(i.value), date: i.date });
+  };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.value);
+    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    setIncomes(incomes.map((i) => i.id !== editandoId ? i : {
+      ...i,
+      description: rascunho.description.trim(),
+      value: valor,
+      date: rascunho.date || i.date,
+    }));
+    setEditandoId(null);
   };
 
   const total = incomes.reduce((sum, i) => sum + i.value, 0);
@@ -107,19 +128,58 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
             <p className="text-[10px] text-muted-foreground mt-1">Adicione seu salário, freelances, rendas extras...</p>
           </div>
         ) : (
-          incomes.map((income) => (
+          incomes.map((income) => editandoId === income.id ? (
+            <div key={income.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={rascunho.description}
+                  onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
+                  className="h-9 text-xs flex-1"
+                  placeholder="Descrição"
+                />
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={rascunho.value}
+                  onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}
+                  className="h-9 text-xs w-20 text-right"
+                  placeholder="Valor"
+                />
+              </div>
+              <label className="h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background w-full">
+                <span className="text-muted-foreground flex-shrink-0">Data:</span>
+                <input
+                  type="date"
+                  value={rascunho.date}
+                  onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
+                  className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
+                />
+              </label>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
+                  <Check className="w-3.5 h-3.5" /> Salvar
+                </button>
+                <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
             <div key={income.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors">
               <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm truncate block">{income.description}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(income.date + "T00:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric", year: "numeric" })}
+                <button onClick={() => comecarEdicao(income)} className="flex items-center gap-2 flex-1 min-w-0 text-left" aria-label={`Editar ${income.description}`}>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm truncate block">{income.description}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(income.date + "T00:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  </div>
+                  <span className="text-sm tabular-nums font-medium whitespace-nowrap">
+                    R$ {income.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                </div>
-                <span className="text-sm tabular-nums font-medium whitespace-nowrap">
-                  R$ {income.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <button onClick={() => deleteIncome(income.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                </button>
+                <button onClick={() => deleteIncome(income.id)} aria-label={`Apagar ${income.description}`} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategorySelect } from "@/components/finance/CategorySelect";
@@ -73,6 +73,51 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
 
   const deleteExpense = (id: string) => {
     setExpenses(expenses.filter((e) => e.id !== id));
+  };
+
+  /**
+   * EDIÇÃO (27/07, pedido de cliente: "só dá pra apagar, seria bom poder
+   * editar"). Antes, corrigir um valor digitado errado obrigava a apagar e
+   * lançar de novo — e junto ia embora a data, a categoria, a forma de
+   * pagamento e o cartão. Num app de dinheiro, errar o valor é o erro mais
+   * comum que existe.
+   *
+   * A edição acontece NA PRÓPRIA LINHA e não no formulário do topo: o
+   * formulário fica acima de uma lista que pode ter dezenas de itens, então
+   * tocar numa linha lá embaixo e ver a tela "não fazer nada" (porque a
+   * mudança aconteceu fora do campo de visão) seria pior do que não ter.
+   */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({
+    description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
+  });
+
+  const comecarEdicao = (e: Expense) => {
+    setEditandoId(e.id);
+    setRascunho({
+      description: e.description,
+      category: e.category,
+      value: String(e.value),
+      date: e.date,
+      paymentMethod: e.paymentMethod,
+      cardName: e.cardName ?? "",
+    });
+  };
+
+  const salvarEdicao = () => {
+    const valor = parseFloat(rascunho.value);
+    // valor inválido não salva: melhor o botão não responder do que gravar NaN
+    if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
+    setExpenses(expenses.map((e) => e.id !== editandoId ? e : {
+      ...e,
+      description: rascunho.description.trim(),
+      category: rascunho.category || "outros",
+      value: valor,
+      date: rascunho.date || e.date,
+      paymentMethod: rascunho.paymentMethod || "pix",
+      cardName: isCardPayment(rascunho.paymentMethod) ? (rascunho.cardName || "outro") : undefined,
+    }));
+    setEditandoId(null);
   };
 
   const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
@@ -164,32 +209,103 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
             <p className="text-[10px] text-muted-foreground mt-1">Adicione compras, restaurantes, lazer, presentes...</p>
           </div>
         ) : (
-          expenses.map((expense) => (
+          expenses.map((expense) => editandoId === expense.id ? (
+            <div key={expense.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  autoFocus
+                  value={rascunho.description}
+                  onChange={(e) => setRascunho({ ...rascunho, description: e.target.value })}
+                  className="h-9 text-xs flex-1"
+                  placeholder="Descrição"
+                />
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  value={rascunho.value}
+                  onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}
+                  className="h-9 text-xs w-20 text-right"
+                  placeholder="Valor"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="min-w-0">
+                  <CategorySelect kind="variable" value={rascunho.category} onValueChange={(v) => setRascunho({ ...rascunho, category: v })} />
+                </div>
+                <label className="min-w-0 h-8 px-2 text-xs flex items-center gap-1 rounded-md border border-input bg-background">
+                  <span className="text-muted-foreground flex-shrink-0">Data:</span>
+                  <input
+                    type="date"
+                    value={rascunho.date}
+                    onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
+                    className="flex-1 min-w-0 w-full bg-transparent outline-none text-xs"
+                  />
+                </label>
+                <div className="min-w-0">
+                  <Select value={rascunho.paymentMethod} onValueChange={(v) => setRascunho({ ...rascunho, paymentMethod: v, cardName: isCardPayment(v) ? rascunho.cardName : "" })}>
+                    <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Pagamento" /></SelectTrigger>
+                    <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                {isCardPayment(rascunho.paymentMethod) ? (
+                  <div className="min-w-0">
+                    <Select value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })}>
+                      <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Cartão" /></SelectTrigger>
+                      <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                ) : <div />}
+              </div>
+              <div className="flex items-center gap-2 pt-0.5">
+                <button
+                  onClick={salvarEdicao}
+                  className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                >
+                  <Check className="w-3.5 h-3.5" /> Salvar
+                </button>
+                <button
+                  onClick={() => setEditandoId(null)}
+                  className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
             <div key={expense.id} className="px-3 py-2 border-b border-border/50 hover:bg-muted/20 transition-colors">
               <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm truncate">{expense.description}</span>
-                    <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
-                      {getCategoryLabel(expense.category)}
-                    </span>
+                {/* A linha inteira abre a edição. Só a lixeira escapa do toque —
+                    apagar por engano ao tentar corrigir seria trocar um
+                    problema por outro pior. */}
+                <button
+                  onClick={() => comecarEdicao(expense)}
+                  className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  aria-label={`Editar ${expense.description}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm truncate">{expense.description}</span>
+                      <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
+                        {getCategoryLabel(expense.category)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                      <span>{new Date(expense.date + "T00:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric" })}</span>
+                      <span>·</span>
+                      <span>{getPaymentLabel(expense.paymentMethod)}</span>
+                      {expense.cardName && (
+                        <>
+                          <span>·</span>
+                          <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
-                    <span>{new Date(expense.date + "T00:00:00").toLocaleDateString("pt-BR", { month: "short", day: "numeric" })}</span>
-                    <span>·</span>
-                    <span>{getPaymentLabel(expense.paymentMethod)}</span>
-                    {expense.cardName && (
-                      <>
-                        <span>·</span>
-                        <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <span className="text-sm tabular-nums font-medium whitespace-nowrap">
-                  R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <button onClick={() => deleteExpense(expense.id)} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
+                  <span className="text-sm tabular-nums font-medium whitespace-nowrap">
+                    R$ {expense.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </button>
+                <button onClick={() => deleteExpense(expense.id)} aria-label={`Apagar ${expense.description}`} className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>

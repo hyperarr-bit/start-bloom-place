@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, MapPin, HelpCircle, ChevronDown } from "lucide-react";
+import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus } from "lucide-react";
+import { toast } from "sonner";
+import { isNativeShell } from "@/lib/native-shell";
+import { adicionarAoCalendario, type EventoDeCalendario } from "@/lib/calendario";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -96,6 +99,25 @@ export const MedicalLog = () => {
 
   const toggleExamDone = (id: string) => {
     setExams(prev => prev.map(e => e.id === id ? { ...e, done: !e.done } : e));
+  };
+
+  /**
+   * "Adicionar ao calendário" (27/07, pedido de cliente).
+   *
+   * Abre a tela de novo evento do calendário que a pessoa já usa, preenchida
+   * com médico, data, hora, endereço e as perguntas anotadas. Quem grava é o
+   * app de calendário, depois que ela confirma — por isso não pedimos nenhuma
+   * permissão (o porquê completo está em CalendarioPlugin.java).
+   *
+   * Só no app da loja: no navegador não existe calendário do telefone pra
+   * abrir, então o botão nem aparece.
+   */
+  const naLoja = isNativeShell();
+
+  const mandarPraAgenda = async (evento: EventoDeCalendario) => {
+    const r = await adicionarAoCalendario(evento);
+    if (r === "sem-app") toast.error("Não achei um app de calendário neste aparelho");
+    else if (r === "erro") toast.error("Não consegui abrir o calendário");
   };
 
   const addBiomarker = () => {
@@ -197,6 +219,21 @@ export const MedicalLog = () => {
                           <button onClick={() => setExpandedAppt(expandedAppt === a.id ? null : a.id)}
                             className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
                             <HelpCircle className="w-3.5 h-3.5 text-[hsl(var(--saude-yellow))]" />
+                          </button>
+                        )}
+                        {/* Só aparece com DATA: sem data não há evento a criar,
+                            e um botão que não faz nada é pior que botão nenhum. */}
+                        {naLoja && a.date && (
+                          <button
+                            onClick={() => mandarPraAgenda({
+                              titulo: `${a.specialty || "Consulta"}${a.doctor ? ` — ${a.doctor}` : ""}`,
+                              data: a.date, hora: a.time || undefined,
+                              local: a.address || undefined,
+                              descricao: a.questions ? `Perguntar: ${a.questions}` : "Consulta marcada pelo CORE",
+                            })}
+                            aria-label="Adicionar ao calendário do telefone"
+                            className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
+                            <CalendarPlus className="w-3.5 h-3.5 text-[hsl(var(--saude-blue))]" />
                           </button>
                         )}
                         <button onClick={() => setAppointments(prev => prev.filter(x => x.id !== a.id))}
@@ -315,6 +352,21 @@ export const MedicalLog = () => {
                           <button onClick={() => setExpandedExam(expandedExam === e.id ? null : e.id)}
                             className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
                             <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedExam === e.id ? "rotate-180" : ""}`} />
+                          </button>
+                        )}
+                        {/* Exame já feito não vai pra agenda — seria marcar
+                            compromisso no passado. */}
+                        {naLoja && e.date && !e.done && (
+                          <button
+                            onClick={() => mandarPraAgenda({
+                              titulo: `Exame — ${e.name}`,
+                              data: e.date, hora: e.time || undefined,
+                              local: e.location || undefined,
+                              descricao: e.notes || "Exame marcado pelo CORE",
+                            })}
+                            aria-label="Adicionar ao calendário do telefone"
+                            className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors">
+                            <CalendarPlus className="w-3.5 h-3.5 text-[hsl(var(--saude-blue))]" />
                           </button>
                         )}
                         <button onClick={() => setExams(prev => prev.filter(x => x.id !== e.id))}>

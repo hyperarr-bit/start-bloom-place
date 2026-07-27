@@ -74,6 +74,25 @@
         </provider>
     </application>
 
+    <!--
+        VISIBILIDADE DE PACOTES (Android 11+). Sem isto o app NÃO ENXERGA os
+        outros apps do aparelho: `resolveActivity` devolve null mesmo com o
+        calendário instalado, e o "Adicionar ao calendário" respondia "sem app
+        de calendário neste aparelho" num emulador que tinha um. Só apareceu
+        rodando no aparelho — no navegador não existe intent nenhuma.
+
+        Declaração ESTREITA de propósito: só a intent de criar evento. O
+        QUERY_ALL_PACKAGES resolveria também, mas é permissão sensível, exige
+        justificativa na ficha da Play e serviria pra ver o aparelho inteiro
+        por causa de um botão.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.INSERT" />
+            <data android:mimeType="vnd.android.cursor.dir/event" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

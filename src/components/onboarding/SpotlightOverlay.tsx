@@ -390,7 +390,9 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
    * manda preencher, e a seta ia parar dentro do botão "+". Agora a altura é
    * lida do DOM e o balão nunca invade o alvo.
    */
-  const ESPACO = 34; // vão entre balão e alvo, onde a seta mora
+  // vão entre o balão e o alvo. Encolheu de 34 pra 14 quando a seta solta
+  // virou bico colado no balão (27/07): o bico ocupa 6px, o resto é respiro.
+  const ESPACO = 14;
   const alturaBalao = bubbleH || 150;
   const cabeAcima = rect ? rect.top - alturaBalao - ESPACO >= 8 : false;
   const cabeAbaixo = rect ? rect.top + rect.height + ESPACO + alturaBalao <= viewportH - 8 : false;
@@ -436,36 +438,23 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
           * continua 100% legível, que é o ponto.
           */}
         {rect && (
-          <>
-            <motion.div
-              key={`halo-${stepIdx}`}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0.55, 0.15, 0.55] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute rounded-2xl pointer-events-none"
-              style={{
-                top: rect.top - PADDING - 5,
-                left: rect.left - PADDING - 5,
-                width: rect.width + (PADDING + 5) * 2,
-                height: rect.height + (PADDING + 5) * 2,
-                boxShadow: "0 0 0 6px hsl(var(--primary) / 0.28)",
-              }}
-            />
-            <motion.div
-              key={`anel-${stepIdx}`}
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-              className="absolute rounded-xl pointer-events-none"
-              style={{
-                top: rect.top - PADDING,
-                left: rect.left - PADDING,
-                width: rect.width + PADDING * 2,
-                height: rect.height + PADDING * 2,
-                boxShadow: "0 0 0 2.5px hsl(var(--primary)), 0 0 24px -2px hsl(var(--primary) / 0.45)",
-              }}
-            />
-          </>
+          <motion.div
+            key={`anel-${stepIdx}`}
+            initial={{ opacity: 0, scale: 1.035 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute rounded-xl pointer-events-none"
+            style={{
+              top: rect.top - PADDING,
+              left: rect.left - PADDING,
+              width: rect.width + PADDING * 2,
+              height: rect.height + PADDING * 2,
+              transformOrigin: "center",
+              // um anel fino e um halo quase invisível. Nada pulsando: o que
+              // pisca sem parar é o que cansa em três segundos.
+              boxShadow: "0 0 0 1.5px hsl(var(--primary) / 0.85), 0 0 0 6px hsl(var(--primary) / 0.08)",
+            }}
+          />
         )}
 
         {rect && (
@@ -477,60 +466,79 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             className="absolute pointer-events-none"
             style={{ top: topoBalao, left: bubbleLeft, width: BUBBLE_W }}
           >
+            {/*
+              * BALÃO MINIMALISTA (27/07 — "tá muito agressivo, dá pra fazer um
+              * design mais minimalista e bonito").
+              *
+              * O que saiu e por quê:
+              *  - borda de 2px na cor da marca → virou fio de 1px quase neutro.
+              *    Borda grossa colorida é o que faz o balão parecer alerta.
+              *  - seta saltando em loop infinito → bico fixo colado no balão,
+              *    do jeito que um balão de fala é. O que se move sem parar
+              *    cansa em três segundos e rouba o olho da tarefa.
+              *  - "PASSO 1 DE 11" em caixa alta e negrito → risquinho fino de
+              *    progresso + "1 / 11" discreto. A informação continua lá, sem
+              *    gritar o tamanho do tutorial na cara de quem começou.
+              *  - sombra pesada → sombra larga e suave, que separa sem pesar.
+              */}
             <div className="relative" ref={bubbleRef}>
-              {!acimaFinal && (
-                <motion.div
-                  animate={{ y: [0, -4, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -top-7"
-                  style={{ left: arrowX, transform: "translateX(-50%)" }}
-                >
-                  <ArrowUp className="w-5 h-5 text-primary drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]" strokeWidth={3} />
-                </motion.div>
-              )}
-              {/* Sem véu por trás, o balão precisa se separar do app sozinho:
-                  borda da cor do tutorial + sombra funda (27/07). */}
-              <div className="bg-card border-2 border-primary/45 rounded-xl shadow-[0_18px_44px_-12px_rgba(0,0,0,0.45)] p-3 pointer-events-auto">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
-                    Passo {stepIdx + 1} de {steps.length}
-                  </p>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); finishRef.current("dismissed"); }}
-                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
-                  >
-                    Pular tutorial
-                  </button>
-                </div>
-                <p className="text-sm font-semibold text-foreground leading-snug">
+              {/* bico do balão: quadrado girado com a MESMA borda e fundo do
+                  card — some na emenda e vira um bico de verdade */}
+              <div
+                className="absolute w-3 h-3 rotate-45 bg-card border-l border-t border-black/[0.07] dark:border-white/10"
+                style={{
+                  left: arrowX,
+                  transform: `translateX(-50%) rotate(45deg)`,
+                  ...(acimaFinal
+                    ? { bottom: -6, borderLeft: "none", borderTop: "none", borderRight: "1px solid rgba(0,0,0,0.07)", borderBottom: "1px solid rgba(0,0,0,0.07)" }
+                    : { top: -6 }),
+                }}
+              />
+              {/* data-tutorial-*: âncora estável pros testes lerem em que passo
+                  o tour está sem depender de texto (um "28/02" na tela já se
+                  passou por "passo 28 de 2" no meu próprio teste). */}
+              <div
+                data-tutorial-balao
+                data-tutorial-passo={stepIdx + 1}
+                data-tutorial-total={steps.length}
+                data-tutorial-modulo={moduleKey}
+                className="relative bg-card rounded-2xl border border-black/[0.07] dark:border-white/10 shadow-[0_10px_36px_-14px_rgba(0,0,0,0.35)] px-4 py-3.5 pointer-events-auto overflow-hidden"
+              >
+                {/* progresso: um fio, não um rótulo */}
+                {/* Tentei uma barrinha de progresso no topo e ficou pior: com
+                    1 de 11, o trecho preenchido vira um risquinho solto no
+                    canto e lê como sujeira. O "1 / 11" abaixo já diz o mesmo
+                    sem enfeite — que é o pedido. */}
+                <p className="text-[14.5px] text-foreground leading-relaxed">
                   {step.label}
                 </p>
-                {step.skippable && (
-                  <div className="flex justify-end mt-2.5">
+
+                <div className="flex items-center justify-between gap-3 mt-3">
+                  <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                    {stepIdx + 1} / {steps.length}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {step.skippable && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
+                          advance();
+                        }}
+                        className="text-[12px] font-medium text-primary/90 hover:text-primary transition-colors"
+                      >
+                        Pular este passo
+                      </button>
+                    )}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        trackEvent("spotlight_step_skipped", { module: moduleKey, step: stepIdx, label: step.label });
-                        advance();
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors px-2.5 py-1 rounded-md border border-primary/30 bg-primary/5 hover:bg-primary/10"
+                      onClick={(e) => { e.stopPropagation(); finishRef.current("dismissed"); }}
+                      className="text-[12px] text-muted-foreground/70 hover:text-foreground transition-colors"
                     >
-                      <X className="w-3.5 h-3.5" strokeWidth={2.5} />
-                      Pular este passo
+                      Sair
                     </button>
                   </div>
-                )}
+                </div>
               </div>
-              {acimaFinal && (
-                <motion.div
-                  animate={{ y: [0, 4, 0] }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute -bottom-7"
-                  style={{ left: arrowX, transform: "translateX(-50%)" }}
-                >
-                  <ArrowDown className="w-5 h-5 text-primary drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]" strokeWidth={3} />
-                </motion.div>
-              )}
             </div>
           </motion.div>
         )}
@@ -571,24 +579,31 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
             initial={{ opacity: 0, x: "-50%", y: 20 }}
             animate={{ opacity: 1, x: "-50%", y: 0 }}
             exit={{ opacity: 0, x: "-50%" }}
-            className="fixed left-1/2 bottom-6 pointer-events-auto bg-card border border-border rounded-xl shadow-2xl p-3 z-[210]"
+            className="fixed left-1/2 bottom-6 pointer-events-auto bg-card rounded-2xl border border-black/[0.07] dark:border-white/10 shadow-[0_10px_36px_-14px_rgba(0,0,0,0.35)] px-4 py-3.5 z-[210] overflow-hidden"
             style={{ width: "min(320px, calc(100vw - 24px))" }}
+            data-tutorial-balao
+            data-tutorial-passo={stepIdx + 1}
+            data-tutorial-total={steps.length}
+            data-tutorial-modulo={moduleKey}
+            data-tutorial-fallback
           >
-            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-              Passo {stepIdx + 1} de {steps.length}
-            </p>
-            <p className="text-sm font-semibold text-foreground leading-snug mb-2">
+            {/* mesma pele do balão (27/07): este cartão aparece justo quando
+                algo já saiu do esperado — não pode ainda parecer outro app */}
+            <p className="text-[14.5px] text-foreground leading-relaxed">
               {step.label}
             </p>
-            <p className="text-xs text-muted-foreground mb-3">
-              Não estou encontrando este item na tela. Navegue até ele ou toque em Pular.
+            <p className="text-[12.5px] text-muted-foreground leading-snug mt-1.5">
+              Não achei esse item aqui — vá até a tela dele, ou saia do tutorial.
             </p>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3 mt-3">
+              <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                {stepIdx + 1} / {steps.length}
+              </span>
               <button
                 onClick={() => finish("dismissed")}
-                className="text-xs font-bold text-muted-foreground hover:text-foreground px-2 py-1"
+                className="text-[12px] text-muted-foreground/70 hover:text-foreground transition-colors"
               >
-                Pular tutorial
+                Sair
               </button>
             </div>
           </motion.div>

@@ -190,7 +190,13 @@ const Index = () => {
           { selector: '[data-spotlight="tab-itens"]', label: 'Quer comprar algo? Liste seus desejos e veja se cabe no bolso.', onEnter: () => { setActiveTab("investimentos"); setTimeout(() => document.querySelector('[data-spotlight="tab-itens"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="add-wish"]', label: 'Toque em Adicionar Desejo e preencha o que você quer comprar — o CORE te diz se cabe.', advanceOnAction: "first_wish", checkKey: "finance-wishlist", skippable: true, placement: "above", onEnter: () => setActiveTab("itens") },
           { selector: '[data-spotlight="tab-limites"]', label: 'Toque em LIMITES — defina um teto de gasto por categoria.', onEnter: () => { setActiveTab("itens"); setTimeout(() => document.querySelector('[data-spotlight="tab-limites"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
-          { selector: '[data-spotlight="add-limit"]', label: 'Crie um limite pra uma categoria (ex: comida, lazer).', advanceOnClick: false, checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, placement: "below", onEnter: () => setActiveTab("limites") },
+          // BECO SEM SAÍDA (27/07, bug do dono: "no passo 9 crie um limite não
+          // tá passando para o 10 mesmo após ter adicionado"). Este passo só
+          // sabia avançar pelo auto-avanço por DADO — e esse auto-avanço é
+          // desligado no "Rever tutorial" (senão o tour de quem já tem dados
+          // voa sozinho). Resultado: no replay o passo era intransponível.
+          // Agora ele avança pela AÇÃO first_limit, que vale nos dois modos.
+          { selector: '[data-spotlight="add-limit"]', label: 'Escolha uma categoria e defina quanto quer gastar nela no mês (ex: comida, lazer).', advanceOnClick: false, advanceOnAction: "first_limit", checkKey: "finance-category-budgets", checkValue: (v: any) => v && typeof v === "object" && Object.keys(v).length > 0, placement: "below", onEnter: () => setActiveTab("limites") },
           { selector: '[data-spotlight="tab-relatorios"]', label: 'Seus relatórios do mês saem prontos aqui — dá uma olhada.', onEnter: () => { setActiveTab("limites"); setTimeout(() => document.querySelector('[data-spotlight="tab-relatorios"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
           { selector: '[data-spotlight="tab-saude"]', label: `E sua saúde financeira vira um índice simples. Pronto — seu painel pra ${quizVictory ?? "cuidar do seu dinheiro"} tá montado! 🎉`, onEnter: () => { setActiveTab("relatorios"); setTimeout(() => document.querySelector('[data-spotlight="tab-saude"]')?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }), 150); } },
         ]}

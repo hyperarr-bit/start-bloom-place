@@ -943,19 +943,28 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   // devolve algo, e só então o slide segue — conversa, não formulário.
   const comFeedback = !!pele && !isNativeShell();
   const [feedback, setFeedback] = useState<{ label: string; texto: string } | null>(null);
-  const item = items[idx];
+  /* Crash por toque rápido — mesmo do dia 14 e do app (27/07): dois toques no
+     mesmo quadro liam o mesmo `idx`, ambos incrementavam, o índice passava do
+     fim e `item.kind` estourava na cara da pessoa no meio do quiz. Aqui o
+     `feedback` já barrava parte dos casos na vitrine, mas fora dela (e no
+     slide de prova, que não passa por `pick`) o buraco continuava aberto. */
+  const travaRef = useRef(false);
+  useEffect(() => { travaRef.current = false; }, [idx]);
+  const item = items[Math.min(idx, items.length - 1)] ?? items[0];
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
-    const it = items[idx];
+    const it = items[Math.min(idx, items.length - 1)] ?? items[0];
     trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : "quiz_proof" });
   }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
-    if (idx < items.length - 1) setIdx((i) => i + 1);
+    if (travaRef.current) return;
+    travaRef.current = true;
+    if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
   const pick = (label: string) => {
-    if (!q || feedback) return;
+    if (!q || feedback || travaRef.current) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });

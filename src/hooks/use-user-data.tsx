@@ -6,6 +6,12 @@ import { markActivation } from "@/lib/analytics";
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
 const ACTIVATION_RULES: Array<{ match: RegExp; action: string; meaningful?: (v: any) => boolean }> = [
+  // ORDEM IMPORTA: a primeira regra que casar ganha (break no loop). As duas
+  // abaixo precisam vir antes da genérica /transac|financ/i — sem elas, criar
+  // um LIMITE emitia "first_transaction" e o tutorial nunca via o evento que
+  // esperava. Era o passo 9 travado (27/07).
+  { match: /finance-category-budgets/i, action: "first_limit" },
+  { match: /goals-board-v2/i, action: "first_goal", meaningful: (v) => Array.isArray(v) && v.length > 0 },
   { match: /finance-incomes/i, action: "first_income" },
   { match: /finance-fixed-expenses/i, action: "first_fixed_expense" },
   { match: /finance-dueDays/i, action: "first_bill", meaningful: (v) => Array.isArray(v) && v.some((d: any) => Array.isArray(d?.bills) && d.bills.length > 0) },

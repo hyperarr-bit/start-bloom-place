@@ -56,7 +56,15 @@ if ! npm run test >"$LOG" 2>&1; then
   exit 2
 fi
 
-echo "Pre-deploy OK: sem erro de tipo novo, build e testes passaram." >&2
+# --- 4. tutorial: alvo fantasma / passo sem saida no "Rever tutorial"
+# (27/07: dois bugs no mesmo dia vieram dessa classe; ver o proprio script)
+if ! node scripts/auditar-tutorial.mjs >"$LOG" 2>&1; then
+  echo "DEPLOY BLOQUEADO: auditoria do tutorial falhou. Corrija antes do push:" >&2
+  cat "$LOG" >&2
+  exit 2
+fi
+
+echo "Pre-deploy OK: sem erro de tipo novo, build, testes e tutorial passaram." >&2
 exit 0
 
 # Regenerar baseline (apos corrigir erros antigos de proposito):

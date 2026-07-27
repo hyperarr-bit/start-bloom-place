@@ -232,7 +232,9 @@ const DesenvolvimentoPessoal = () => {
         onComplete={onModuleComplete}
         steps={[
           { selector: '[data-spotlight="add-motivation"]', label: 'Adicione 1 motivação pra acordar todo dia.', advanceOnClick: false, advanceOnAction: "first_motivation", onEnter: () => setActiveTab("sobre") },
-          { selector: '[data-spotlight="add-goal"]', label: 'Crie sua primeira meta.', advanceOnClick: false, checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
+          // Mesmo beco sem saída do "limites" em Finanças (27/07) + o alvo
+          // sumia da tela: ver GoalsBoardV2. Agora avança pela ação first_goal.
+          { selector: '[data-spotlight="add-goal"]', label: 'Escreva o nome da sua primeira meta e toque em Criar.', advanceOnClick: false, advanceOnAction: "first_goal", checkKey: "goals-board-v2", checkValue: (v: any) => Array.isArray(v) && v.length > 0, onEnter: () => setActiveTab("metas") },
         ]}
       />
       <header className="border-b border-border bg-card sticky top-0 z-50">

@@ -1,6 +1,7 @@
 import React from "react";
 import { AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackEvent } from "@/lib/analytics";
 
 interface Props {
   children: React.ReactNode;
@@ -39,6 +40,30 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     // eslint-disable-next-line no-console
     console.error(`[RouteErrorBoundary:${this.props.routeName ?? "?"}]`, error, info);
+
+    /*
+     * MANDA O ERRO PRA CASA (27/07).
+     *
+     * O dono levou esta tela no meio do funil e a única pista que sobrou foi
+     * a foto: título "Algo deu errado nesta seção" e os "Detalhes técnicos"
+     * fechados. Passei duas horas atrás da causa por eliminação e ERREI o
+     * diagnóstico — o console só existe pra quem tem o cabo na mão, e ninguém
+     * tem quando é o usuário que quebra.
+     *
+     * Agora todo crash de rota vira evento com a mensagem, a rota e a
+     * primeira linha do stack. Da próxima vez a resposta vem do painel, não
+     * de palpite meu.
+     */
+    try {
+      trackEvent("route_error", {
+        route: this.props.routeName ?? "?",
+        message: String(error?.message ?? "").slice(0, 300),
+        stack: String(error?.stack ?? "").split("\n").slice(0, 3).join(" | ").slice(0, 400),
+        componente: String(info?.componentStack ?? "").trim().split("\n")[0]?.slice(0, 120) ?? "",
+        url: typeof location !== "undefined" ? location.pathname + location.search : "",
+        chunk: isChunkError(error),
+      });
+    } catch { /* telemetria nunca pode derrubar a tela de erro */ }
     if (isChunkError(error)) {
       let last = 0;
       try { last = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0); } catch { /* noop */ }

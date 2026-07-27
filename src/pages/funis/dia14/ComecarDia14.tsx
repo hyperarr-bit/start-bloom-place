@@ -496,7 +496,15 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     : 0;
   const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
-  const item = items[idx];
+  /* MESMO CRASH DO FUNIL DO APP (27/07) — e aqui é o funil que está em
+     escala. Dois toques no mesmo quadro liam o mesmo `idx`, os dois
+     incrementavam, o índice passava do fim e `item.kind` estourava: a pessoa
+     via "algo deu errado nesta seção" no meio do quiz, antes do preço.
+     Correção idêntica à do ComecarRadar (trava + clamp). É defeito, não
+     mudança de comportamento — o funil continua o mesmo. */
+  const travaRef = useRef(false);
+  useEffect(() => { travaRef.current = false; }, [idx]);
+  const item = items[Math.min(idx, items.length - 1)] ?? items[0];
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
     const it = items[idx];
@@ -504,11 +512,13 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
-    if (idx < items.length - 1) setIdx((i) => i + 1);
+    if (travaRef.current) return;
+    travaRef.current = true;
+    if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
   const pick = (label: string) => {
-    if (!q) return;
+    if (!q || travaRef.current) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });

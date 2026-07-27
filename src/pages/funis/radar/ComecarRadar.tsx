@@ -512,7 +512,28 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     : 0;
   const [idx, setIdx] = useState(startIdx < 0 ? 0 : startIdx);
   const [answers, setAnswers] = useState<Record<string, string>>(initialAnswers ?? {});
-  const item = items[idx];
+  /*
+   * TELA DE ERRO NO QUIZ (27/07, relato do dono: "a primeira vez que fui
+   * entrar deu esse bug, deve ter sido na pergunta 4 — deve ter sido porque
+   * apertei os botões rapidamente").
+   *
+   * Era isso mesmo, e a causa é clássica: `advance` decidia com o `idx` do
+   * RENDER, não com o valor mais recente. Dois toques no mesmo quadro (dedo
+   * rápido, ou duplo toque na mesma opção) liam o mesmo idx, os dois passavam
+   * no `idx < items.length - 1` e os dois incrementavam. O índice pulava um a
+   * mais que o fim da lista, `items[idx]` virava undefined e a linha seguinte
+   * — `item.kind` — estourava. Quem via isso era o RouteErrorBoundary: "algo
+   * deu errado nesta seção", no meio do funil, antes de ver o preço.
+   *
+   * Duas travas, porque uma só não basta:
+   *  1. `travaRef` ignora toques repetidos até a próxima pergunta pintar — é o
+   *     que impede PULAR pergunta (o dano silencioso: resposta que ninguém deu).
+   *  2. o índice é clampado e o item tem fallback — se algo escapar, a tela
+   *     não quebra.
+   */
+  const travaRef = useRef(false);
+  useEffect(() => { travaRef.current = false; }, [idx]);
+  const item = items[Math.min(idx, items.length - 1)] ?? items[0];
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
     const it = items[idx];
@@ -538,11 +559,13 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   }, [idx]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
-    if (idx < items.length - 1) setIdx((i) => i + 1);
+    if (travaRef.current) return;
+    travaRef.current = true;
+    if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
   const pick = (label: string) => {
-    if (!q) return;
+    if (!q || travaRef.current) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });

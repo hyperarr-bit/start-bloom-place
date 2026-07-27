@@ -218,7 +218,13 @@ export const GoalsBoardV2 = () => {
           </div>
           <div className="px-5 py-4">
             <h3 className="text-lg font-black tracking-tight mb-4">PLANO DE AÇÃO PARA CADA META</h3>
-            <div className="space-y-2">
+            {/* O tutorial destaca esta CAIXA, não o botão "Nova meta" (27/07).
+                O botão é substituído pelo formulário no primeiro toque — o
+                alvo sumia da tela no meio do passo e o tour caía no cartão
+                "não estou encontrando este item" com a pessoa digitando o nome
+                da meta na frente dele (print do dono). A caixa sobrevive aos
+                dois estados. */}
+            <div className="space-y-2" data-spotlight="add-goal">
               {goals.map(g => (
                 <button key={g.id} onClick={() => openGoal(g.id)}
                   className="w-full flex items-center justify-between px-3 py-3 rounded-lg hover:bg-muted/50 transition-colors group">
@@ -238,7 +244,7 @@ export const GoalsBoardV2 = () => {
                   <Button size="sm" variant="ghost" className="h-9" onClick={() => setShowNewGoal(false)}><X className="w-4 h-4" /></Button>
                 </div>
               ) : (
-                <button onClick={() => setShowNewGoal(true)} data-spotlight="add-goal"
+                <button onClick={() => setShowNewGoal(true)}
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted/50 transition-colors text-muted-foreground">
                   <Plus className="w-4 h-4" />
                   <span className="text-sm">Nova meta</span>

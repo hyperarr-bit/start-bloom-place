@@ -294,6 +294,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     // Sync the UA color-scheme so Android Chrome paints native widgets
     // (inputs, scrollbars, form controls) with the right colors.
     root.style.colorScheme = mode === "dark" ? "dark" : "light";
+    // App da loja: a barra de status do Android tem que seguir o tema DO APP
+    // (a classe .dark acima), não o do sistema. Import dinâmico pra não pesar
+    // um grama no bundle da web.
+    import("@/lib/status-bar").then(m => m.aplicarBarraDeStatus(mode)).catch(() => {});
   }, [mode]);
 
 

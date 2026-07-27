@@ -27,6 +27,7 @@ import { WishlistItems } from "@/components/WishlistItems";
 import { InvestmentsTracker } from "@/components/InvestmentsTracker";
 import { FinancialHealth } from "@/components/FinancialHealth";
 import { TravelBudget } from "@/components/travel/TravelBudget";
+import { PedirLembretes } from "@/components/finance/PedirLembretes";
 import { Dashboard } from "@/components/Dashboard";
 import { Simulators } from "@/components/Simulators";
 
@@ -260,6 +261,10 @@ const Index = () => {
         {activeTab === "dashboard" && (
           <>
             <WrappedBanner />
+            {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
+                existe conta cadastrada — pedir permissão antes de haver o que
+                lembrar queima a única chance no Android 13+. */}
+            <PedirLembretes dueDays={dueDays as never} />
             <TrackedCard cardKey="weekly-challenge" tab="dashboard">
               <WeeklyChallenge expenses={expenses} />
             </TrackedCard>

@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -20,6 +20,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
+import { useLembretes } from "@/hooks/use-lembretes";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -243,8 +244,19 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
 
 const AnimatedRoutes = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   usarPreCarregamentoDosModulos(!!user);
+  // Lembretes de conta a vencer: reagendam sozinhos quando o módulo de
+  // Finanças muda. Aqui dentro porque precisa do Router (o toque no aviso
+  // navega) e do UserDataProvider.
+  useLembretes();
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    import("@/lib/notificacoes")
+      .then((m) => m.ligarToqueNaNotificacao((rota) => navigate(rota)))
+      .catch(() => {});
+  }, [navigate]);
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
     <AnimatePresence mode="wait">

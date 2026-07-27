@@ -3,6 +3,7 @@ import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { Sparkles, ArrowRight, X } from "lucide-react";
+import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { DEMO_MODULES } from "@/lib/funnel";
 
@@ -127,8 +128,19 @@ const voltaFunilTeste = (from: string, tour?: boolean) => {
  *  Tour vitrine (ordem 23/07): a demo PROVA e devolve pro SEU PLANO em
  *  /inicio?step=plano (o plano promete depois da prova; cadastro vem depois). */
 const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
-  const to = (from && voltaFunilTeste(from, tour))
-    ?? (tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar");
+  // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
+  // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
+  // quando eu fechei o vazamento do Pix. A trava manda pra ENTRADA_APP, que
+  // abre no welcome azul: a pessoa tocava em "Criar conta" no fim da demo e
+  // era devolvida ao começo do funil. Bug que eu mesmo introduzi.
+  //
+  // No shell o funil é sempre o radar, e ele entende ?step=plano e
+  // ?step=signup (ComecarRadar linha 903) — então a volta é pra porta do app
+  // com o passo certo, sem passar por rota bloqueada.
+  const to = isNativeShell()
+    ? `/app?step=${tour || funnel ? "plano" : "signup"}`
+    : (from && voltaFunilTeste(from, tour))
+      ?? (tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar");
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"

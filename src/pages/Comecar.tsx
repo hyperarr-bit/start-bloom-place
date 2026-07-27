@@ -1370,12 +1370,13 @@ export default function Comecar() {
   // montada por baixo — Começar só derrete o céu, sem troca de rota, sem
   // flash). Desde 23/07 vale pro /inicio INTEIRO (dono: web segue a premissa
   // do app — mesmas 2 telas iniciais). Deep-link com ?step= pula o welcome.
-  // A welcome era ligada só pelo caminho "/inicio". Quando o /inicio virou o
-  // funil do dia 14 (25/07), o app passou a entrar por outra rota e a tela de
-  // início sumiu do aplicativo sem ninguém mexer nele. No shell a welcome é
-  // condição do PRODUTO, não da URL — por isso isNativeShell() entra aqui.
+  // 26/07: cheguei a ligar a welcome por isNativeShell() aqui, quando a porta
+  // do app ainda era /comecar. A porta virou /app (funil radar), mas a linha
+  // ficou — e passou a abrir a tela azul de boas-vindas em CIMA de quem só
+  // queria criar conta vindo da demo. Volta a depender só da URL: no shell
+  // quem mostra a welcome é o ComecarRadar, que é o funil do app.
   const [welcomeVisible, setWelcomeVisible] = useState(
-    () => (isNativeShell() || window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
+    () => (window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
   );
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {

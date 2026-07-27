@@ -667,6 +667,23 @@ header.sticky.top-0 {
   z-index: 40;
 }
 
+/* ============================================================
+   Barra do tour da demo (27/07)
+   Ela é uma <div>, então a regra acima não a alcançava: grudava em top:0,
+   atrás da faixa da status bar, e sumia no scroll dentro do app. Aqui ela
+   ganha o mesmo tratamento dos headers — e empurra o header do módulo pra
+   baixo dela, senão os dois disputam o mesmo topo.
+   ============================================================ */
+.demo-tour-nav {
+  position: sticky;
+  top: var(--app-safe-top);
+  z-index: 60;
+}
+
+.demo-com-tour header.sticky.top-0 {
+  top: calc(var(--app-safe-top) + var(--demo-nav-h, 49px));
+}
+
 
 
 

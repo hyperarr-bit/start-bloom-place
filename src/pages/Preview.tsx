@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
@@ -76,8 +76,38 @@ const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
 
 /** Demo guiada do funil vitrine (tour=vida): navegação curada entre os 5
  *  módulos do criativo — liberdade com corrimão, não os 16 de uma vez. */
-const DemoTourNav = ({ current, from }: { current: string; from?: string }) => (
-  <div className="sticky top-0 z-[60] bg-background/95 backdrop-blur border-b border-border">
+/**
+ * BARRA DO TOUR (27/07 — bug do dono: "na web a parte de cima fica bonita, no
+ * app fica meio bugado").
+ *
+ * Causa: esta barra é uma <div class="sticky top-0">, e a regra global que
+ * empurra tudo que gruda pra baixo da status bar só casa com
+ * `header.sticky.top-0` (index.css). Sem o empurrão, no app ela grudava em
+ * top:0 — atrás da faixa opaca que cobre a status bar (.app-safe-top-guard,
+ * z-index máximo). Sumia quase inteira, e o header do módulo, esse sim
+ * empurrado, ficava sozinho no topo.
+ *
+ * Agora ela tem classe própria (.demo-tour-nav) que gruda em
+ * var(--app-safe-top), e a altura real dela é publicada em --demo-nav-h pra o
+ * header do módulo grudar LOGO ABAIXO em vez de disputar o mesmo topo. Altura
+ * medida, não chutada: quem aumenta a fonte do sistema muda esse número.
+ */
+const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publicar = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) el.closest(".demo-com-tour")?.setAttribute("style", `--demo-nav-h:${h}px`);
+    };
+    publicar();
+    const ro = new ResizeObserver(publicar);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+  <div ref={ref} className="demo-tour-nav bg-background/95 backdrop-blur border-b border-border">
     <div className="max-w-5xl mx-auto px-3 py-2 flex items-center gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
       {DEMO_MODULES.map((m) => {
         const active = m.key === current;
@@ -101,18 +131,20 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => (
       </span>
     </div>
   </div>
-);
+  );
+};
 
 /** Funis de teste congelados (24/07): a demo é a MESMA página pros três, então
  *  eles carimbam `&from=` na URL e a volta devolve pro funil de origem. Sem
  *  isso a pessoa sai do /funil-radar e volta no /inicio, trocando de funil
  *  justo antes da tela de venda. Whitelist fechada — `from` desconhecido cai
  *  no comportamento normal. */
-const FUNIS_TESTE: Record<string, { path: string; volta: "plano" | "signup" }> = {
-  // dia14 e v1 só entendem ?step=signup — mandar "plano" pra eles reiniciaria
-  // o funil no começo. Só o radar tem a tela SEU PLANO na volta da demo.
+const FUNIS_TESTE: Record<string, { path: string; volta: "signup" }> = {
+  // 27/07: os TRÊS voltam em ?step=signup. O radar voltava em "plano" porque
+  // tinha a tela SEU PLANO entre a demo e o cadastro — ela saiu quando o funil
+  // do app foi alinhado ao esqueleto do dia 14 (ver ComecarRadar).
   dia14: { path: "/inicio", volta: "signup" },
-  radar: { path: "/funil-radar", volta: "plano" },
+  radar: { path: "/funil-radar", volta: "signup" },
   v1: { path: "/funil-v1", volta: "signup" },
 };
 
@@ -125,8 +157,8 @@ const voltaFunilTeste = (from: string, tour?: boolean) => {
 };
 
 /** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
- *  Tour vitrine (ordem 23/07): a demo PROVA e devolve pro SEU PLANO em
- *  /inicio?step=plano (o plano promete depois da prova; cadastro vem depois). */
+ *  27/07: a demo PROVA e devolve direto pro CADASTRO, como no dia 14. (Antes
+ *  devolvia pra tela SEU PLANO, que saiu do funil do app.) */
 const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
   // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
   // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
@@ -134,13 +166,14 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
   // abre no welcome azul: a pessoa tocava em "Criar conta" no fim da demo e
   // era devolvida ao começo do funil. Bug que eu mesmo introduzi.
   //
-  // No shell o funil é sempre o radar, e ele entende ?step=plano e
-  // ?step=signup (ComecarRadar linha 903) — então a volta é pra porta do app
-  // com o passo certo, sem passar por rota bloqueada.
+  // O fallback do tour na web era "/inicio?step=plano" — e o /inicio (dia 14)
+  // NUNCA entendeu "plano": caía em "start" e reiniciava o funil. Só não
+  // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
+  // Corrigido de passagem.
   const to = isNativeShell()
-    ? `/app?step=${tour || funnel ? "plano" : "signup"}`
+    ? "/app?step=signup"
     : (from && voltaFunilTeste(from, tour))
-      ?? (tour ? "/inicio?step=plano" : funnel ? "/comecar?step=signup" : "/comecar");
+      ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
   return (
     <div
       className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
@@ -166,7 +199,11 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
  *  tour — "você já viu N de 16, bora com os SEUS dados?". Some ao dispensar. */
 const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   const [show, setShow] = useState(true);
-  const to = (from && voltaFunilTeste(from, true)) ?? "/inicio?step=plano";
+  // No shell o destino é a porta do app; na web, o funil de origem. Fallback
+  // em ?step=signup (o "plano" saiu — ver DemoCta).
+  const to = isNativeShell()
+    ? "/app?step=signup"
+    : (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
   if (!show) return null;
   const dismiss = () => {
     try { sessionStorage.setItem(TOUR_NUDGE_DISMISSED_KEY, "1"); } catch { /* noop */ }
@@ -249,7 +286,7 @@ const Preview = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className={`min-h-screen bg-background pb-20 ${tour ? "demo-com-tour" : ""}`}>
       {!embed && <PreviewBanner funnel={funnel} />}
       {tour && <DemoTourNav current={key} from={from} />}
       <PreviewUserDataProvider key={key} moduleKey={key}>

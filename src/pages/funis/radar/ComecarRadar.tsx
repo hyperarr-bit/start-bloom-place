@@ -8,7 +8,6 @@ import {
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { PortaPerguntaApp } from "@/components/app/PortaPerguntaApp";
 import { AppWelcome } from "@/components/app/AppWelcome";
-import { SeuPlanoScreen } from "./SeuPlanoGauge";
 import { CtaFixo } from "./CtaFixo";
 import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "central" | "plano" | "signup" | "offer" | "confirm";
+type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1&from=radar";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -343,9 +342,10 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
           </motion.div>
         ))}
       </Card>
+      {/* Copy do dia 14: o próximo passo é a CENTRAL, não a demo (27/07). */}
       <CtaFixo
-        label="Testar o app de verdade"
-        sub="Abre o app real, com dados de exemplo — seu plano vem em seguida"
+        label="Ver minha central"
+        sub="Abre o app de verdade, com dados de exemplo"
         onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}
       />
     </div>
@@ -922,9 +922,10 @@ export default function ComecarRadar() {
   // ("trial" é aceito por compat com links antigos.)
   const [step, setStep] = useState<Step>(() => {
     const s = params.get("step");
-    // "plano" = volta da demo do funil vitrine (ordem 23/07: radar → demo →
-    // PLANO → cadastro; o plano promete depois que a demo provou).
-    return s === "signup" ? "signup" : s === "plano" ? "plano" : s === "offer" || s === "trial" ? "offer" : "start";
+    // "plano" ainda é aceito por COMPAT: link velho (anúncio, aba aberta,
+    // atalho salvo) não pode cair no começo do funil. Ele agora cai no
+    // cadastro, que é onde o dia 14 devolve a demo.
+    return s === "signup" || s === "plano" ? "signup" : s === "offer" || s === "trial" ? "offer" : "start";
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -1083,22 +1084,28 @@ export default function ComecarRadar() {
               />
             )}
             {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
+            {/* ESQUELETO DO DIA 14 (27/07, ordem do dono). O funil do app volta
+                a ser o do dia 14 com pele de Android: radar → CENTRAL (os 16)
+                → demo → cadastro → paywall.
+
+                A central tinha sido desligada em 23/07 por ser "pedágio". O
+                dia 14 — que é o que aguenta escala hoje — mantém ela, e é a
+                ÚNICA tela do funil que prova os 16 módulos: sem ela a pessoa
+                compra um app de finanças e descobre o resto depois.
+
+                E o SEU PLANO saiu: era o único passo que o dia 14 não tem.
+                Razão do dono: "assim a versão do app é a web com design
+                melhor — se não converter, o problema não é o funil, é o preço
+                ou outra variável". Com um esqueleto só, o teste isola a
+                variável. (SeuPlanoGauge.tsx fica no repo — voltar é uma
+                linha.) */}
             {step === "result" && (vitrine && area ? (
-              // Ordem 23/07: radar → DEMO direto (a central era um pedágio).
-              // A demo devolve em ?step=plano.
-              <RadarResultScreen answers={answers} area={area} onDone={() => { window.location.href = demoUrlFor(area); }} />
+              <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />
             ) : (
               <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
             ))}
             {step === "central" && area && (
               <CentralScreen area={area} onOpen={() => { window.location.href = demoUrlFor(area); }} />
-            )}
-            {step === "plano" && (
-              <SeuPlanoScreen
-                area={area ?? "dinheiro"}
-                answers={answers}
-                onCommit={() => setStep("signup")}
-              />
             )}
             {step === "signup" && (
               <SignupScreen

@@ -67,12 +67,26 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     // na hora — clicava e caía na aba normal, bug real do dono.)
     const replayList = get<string[]>("tutorial-replay-modules", []);
     const replayPending = Array.isArray(replayList) && replayList.includes(moduleKey);
-    // Tutorial guiado (spotlight) roda no modo convidado OU para usuários recém-cadastrados.
-    // App é só finanças: pro novo usuário (forceNewUser) não exigimos quickstart-target-module
-    // (que não cruza a fronteira guest→logado), basta ser o módulo financas.
-    const shouldShow =
-      replayPending ||
-      ((isGuest || forceNewUser) && !done && (target === moduleKey || (forceNewUser && moduleKey === "financas")));
+
+    // Tutorial guiado (spotlight) roda no modo convidado OU para recém-cadastrados.
+    //
+    // 26/07 — até aqui a condição do recém-cadastrado era `moduleKey ===
+    // "financas"`, cravado. Isso é resto do pivô "só finanças" de 12/07, que
+    // foi REVERTIDO: o CORE voltou a ser os 16 módulos, mas a linha ficou.
+    // Efeito: quem acabava de criar conta caía no tour de FINANÇAS mesmo tendo
+    // escolhido outro módulo, e o tutorial parecia "começar dentro do módulo
+    // errado" em vez de na tela de escolha (bug relatado pelo dono).
+    //
+    // O motivo original de existir o atalho continua válido:
+    // quickstart-target-module é gravado enquanto a pessoa ainda é convidada e
+    // não cruza a fronteira convidado→logado. A saída certa não é cravar um
+    // módulo — é ler `tutorial-selected-modules`, que o próprio picker grava e
+    // que sobrevive ao cadastro.
+    const selecionadosRaw = get<string[]>("tutorial-selected-modules", []);
+    const selecionados = Array.isArray(selecionadosRaw) ? selecionadosRaw : [];
+    const escolhido = target === moduleKey || (forceNewUser && selecionados.includes(moduleKey));
+
+    const shouldShow = replayPending || ((isGuest || forceNewUser) && !done && escolhido);
     if (shouldShow) {
       setActive(true);
       setIsReplay(replayPending);

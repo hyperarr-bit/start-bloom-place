@@ -38,7 +38,16 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/plano") ||
     location.pathname.startsWith("/preview");
 
-  const tutorialDone = loaded && get<string>("spotlight-done-financas", "") === "true";
+  // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada
+  // no pivô "só finanças" (12/07, revertido). Quem faz o tutorial em Treino ou
+  // Rotina nunca marcava essa chave, então o banner de trial não aparecia
+  // NUNCA pra essa pessoa (linha 128 devolve null). A régua certa é a bandeira
+  // que o próprio tutorial grava ao terminar; a chave antiga fica no OU pra
+  // não recomeçar a cobrança de quem já concluiu antes desta correção.
+  const tutorialDone =
+    loaded &&
+    (get<string>("core-onboarding-done", "") === "true" ||
+      get<string>("spotlight-done-financas", "") === "true");
   const viewedRef = useRef<string | null>(null);
 
   // Rescue do Purchase: quem paga o Pix sai do app pra abrir o banco e volta

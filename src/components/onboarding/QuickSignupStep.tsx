@@ -26,7 +26,7 @@ const schema = z.object({
 });
 
 export const QuickSignupStep = ({ redirectTo = "", onFinished }: QuickSignupStepProps) => {
-  const { set } = useUserData();
+  const { get, set } = useUserData();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -87,8 +87,14 @@ export const QuickSignupStep = ({ redirectTo = "", onFinished }: QuickSignupStep
       return;
     }
 
-    // Marca o tutorial como concluído pra não reaparecer
-    set("spotlight-done-financas", "true");
+    // Marca o tutorial como concluído pra não reaparecer.
+    // Era "spotlight-done-financas" cravado (pivô "só finanças", revertido):
+    // quem fez o tutorial em Treino tinha o tour de FINANÇAS silenciado sem
+    // nunca ter visto, e o de Treino continuava pipocando. Marca o módulo que
+    // a pessoa realmente percorreu, e a bandeira geral do onboarding.
+    const moduloDoTutorial = get<string>("quickstart-target-module", "");
+    if (moduloDoTutorial) set(`spotlight-done-${moduloDoTutorial}`, "true");
+    set("core-onboarding-done", "true");
     set("quickstart-target-module", "");
     // Mostra tela de sucesso com oferta de 7 dias grátis
     setSuccessName(cleanName);

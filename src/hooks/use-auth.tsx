@@ -50,6 +50,10 @@ interface AuthContextType {
   inGracePeriod: boolean;
   graceDaysLeft: number | null;
   paymentMethod: string | null;
+  /** "monthly" | "annual" | "lifetime" — o que a pessoa assinou */
+  billingPeriod: string | null;
+  /** ISO do fim do período pago (null em vitalício sem data) */
+  subscriptionEnd: string | null;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: any; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -70,9 +74,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [inGracePeriod, setInGracePeriod] = useState(false);
   const [graceDaysLeft, setGraceDaysLeft] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<string | null>(null);
+  const [subscriptionEnd, setSubscriptionEnd] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Última vez que a gente pediu ao RevenueCat pra reconciliar. Sem trava, o
   // ciclo de 60s + o listener de foco martelariam a API a cada checagem.
+  // Uma consulta à loja por sessão antes de declarar "não assinante".
+  const lojaConsultadaRef = useRef(false);
   const ultimaReconciliacaoRef = useRef(0);
 
   useEffect(() => {
@@ -149,14 +157,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
    * a pessoa paga na Play e fica trancada (bug real de 25/07).
    * Trava de 60s pra não virar martelo em cima da API do RevenueCat.
    */
-  const reconciliarLoja = async () => {
-    if (!isNativeShell()) return;
-    if (Date.now() - ultimaReconciliacaoRef.current < 60000) return;
+  /** Devolve true se a loja tinha assinatura ativa e o banco foi atualizado. */
+  const reconciliarLoja = async (): Promise<boolean> => {
+    if (!isNativeShell()) return false;
+    if (Date.now() - ultimaReconciliacaoRef.current < 60000) return false;
     ultimaReconciliacaoRef.current = Date.now();
     try {
       const { reconciliarSePreciso } = await import("@/lib/revenuecat");
-      if (await reconciliarSePreciso()) checkSubscriptionStatus();
-    } catch { /* app nunca quebra por causa de loja */ }
+      return await reconciliarSePreciso();
+    } catch {
+      return false; // app nunca quebra por causa de loja
+    }
   };
 
   const checkSubscriptionStatus = async () => {
@@ -166,13 +177,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("check-subscription error:", error);
         return;
       }
-      if (!data?.subscribed) reconciliarLoja();
+      // ORDEM (26/07). Antes era: dispara reconciliarLoja() SEM esperar e, na
+      // linha seguinte, decreta "não assinante". O portão via isSubscribed
+      // false, subia o paywall, e a resposta da loja chegava tarde — quem
+      // acabou de comprar via o paywall por cima do acesso que já pagou.
+      // Agora, no app da loja, a primeira negativa não vira veredito antes de
+      // perguntar à loja. Uma vez por sessão (o ref), pra não virar martelo.
+      if (!data?.subscribed && isNativeShell() && !lojaConsultadaRef.current) {
+        lojaConsultadaRef.current = true;
+        if (await reconciliarLoja()) {
+          await checkSubscriptionStatus(); // relê já com o acesso gravado
+          return;
+        }
+      }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);
       setNoTrial(data?.no_trial ?? false);
       setInGracePeriod(data?.in_grace_period ?? false);
       setGraceDaysLeft(typeof data?.grace_days_left === "number" ? data.grace_days_left : null);
       setPaymentMethod(data?.payment_method ?? null);
+      // A função já devolvia estes dois desde sempre; o app jogava fora e a
+      // tela "Meu acesso" ficava sem plano nem data de renovação.
+      setBillingPeriod(data?.billing_period ?? null);
+      setSubscriptionEnd(data?.subscription_end ?? null);
       if (typeof data?.trial_day === "number") setTrialDay(data.trial_day);
       if (typeof data?.trial_hours_left === "number") setTrialHoursLeft(data.trial_hours_left);
       setSubLoaded(true);
@@ -212,7 +239,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft, inGracePeriod, graceDaysLeft, paymentMethod, billingPeriod, subscriptionEnd, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -206,8 +206,45 @@ const AdminPagantes = lazy(() => import("./pages/admin/AdminPagantes"));
 
 const queryClient = new QueryClient();
 
+/**
+ * Pré-carrega os módulos mais usados enquanto o app está ocioso.
+ *
+ * Os módulos são lazy: no PRIMEIRO toque em cada um, o React suspende, o
+ * fallback pinta uma tela vazia enquanto o pedaço baixa, e só então o módulo
+ * aparece. Era o "os módulos abrem bruscamente" — não era a animação (o
+ * PageTransition já faz fade), era o vão do download.
+ *
+ * A ordem segue o uso real medido em 30 dias (19.182 aberturas): finanças
+ * 677 pessoas, rotina 322, treino 222, dieta 194, biblioteca 141 (a de maior
+ * tempo por pessoa). requestIdleCallback garante que isso nunca dispute banda
+ * com o que está na tela.
+ */
+const usarPreCarregamentoDosModulos = (ligado: boolean) => {
+  useEffect(() => {
+    if (!ligado) return;
+    const chunks = [
+      () => import("./pages/Index"),
+      () => import("./pages/Rotina"),
+      () => import("./pages/Treino"),
+      () => import("./pages/Dieta"),
+      () => import("./pages/Biblioteca"),
+    ];
+    const agendar: (cb: () => void) => number =
+      typeof window.requestIdleCallback === "function"
+        ? (cb) => window.requestIdleCallback(cb, { timeout: 4000 })
+        : (cb) => window.setTimeout(cb, 1500);
+    const id = agendar(() => { chunks.forEach((carregar) => { carregar().catch(() => {}); }); });
+    return () => {
+      if (typeof window.cancelIdleCallback === "function") window.cancelIdleCallback(id);
+      else window.clearTimeout(id);
+    };
+  }, [ligado]);
+};
+
 const AnimatedRoutes = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  usarPreCarregamentoDosModulos(!!user);
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
     <AnimatePresence mode="wait">

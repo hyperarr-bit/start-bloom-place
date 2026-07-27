@@ -112,11 +112,22 @@ export const AccountDrawer = ({
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
+        {/* 26/07: era um painel lateral de ALTURA CHEIA com 5 itens — sobravam
+            ~400px de branco embaixo e parecia tela quebrada. Virou folha de
+            baixo, do tamanho do conteúdo, com cantos arredondados em cima: é o
+            gesto que a mão já espera no celular, e o menu encosta no polegar
+            em vez de ficar no topo da tela. max-h protege a aba "Minha conta",
+            que é mais alta e ganha rolagem própria. */}
         <SheetContent
-          side="left"
-          className="w-[300px] sm:w-[340px] p-0 z-[300]"
+          side="bottom"
+          className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto
+                     pb-[max(1.25rem,var(--app-safe-bottom))]"
           overlayClassName="z-[290]"
         >
+          {/* pegador: sinaliza que a folha desce arrastando */}
+          <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
+            <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />
+          </div>
           {view === "menu" && (
             <>
               <SheetHeader className="px-5 pt-6 pb-4">

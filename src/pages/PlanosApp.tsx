@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Check, Crown, ShieldCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Crown, ShieldCheck, Loader2, CalendarClock, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
@@ -31,12 +31,40 @@ const BENEFICIOS = [
   "Casa, viagens, estudos, carreira — 16 módulos",
 ];
 
+/** Deep link de assinaturas da Play precisa do id do pacote. */
+const PACOTE_ANDROID = "br.com.coreaplicativo.app";
+
+const NOME_DO_PLANO: Record<string, string> = {
+  monthly: "Plano mensal",
+  annual: "Plano anual",
+  lifetime: "Acesso vitalício",
+};
+
 const PlanosApp = () => {
   const navigate = useNavigate();
-  const { isSubscribed, subLoaded } = useAuth();
+  const { isSubscribed, subLoaded, billingPeriod, subscriptionEnd, paymentMethod, inGracePeriod } = useAuth();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [restaurando, setRestaurando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const nomeDoPlano = NOME_DO_PLANO[billingPeriod ?? ""] ?? "Todos os 16 módulos liberados";
+  const ehAssinaturaDaLoja = paymentMethod === "play_store";
+  const vitalicio = billingPeriod === "lifetime";
+
+  // Data por extenso: "12 de agosto de 2027" lê melhor que 12/08/2027 numa
+  // frase. Vitalício não tem renovação — dizer "renova em 2099" seria mentira
+  // de interface.
+  const linhaRenovacao = (() => {
+    if (vitalicio) return "Acesso permanente nesta conta — não expira e não renova.";
+    if (!subscriptionEnd) return null;
+    const d = new Date(subscriptionEnd);
+    if (Number.isNaN(d.getTime())) return null;
+    const quando = d.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+    if (inGracePeriod) return `Pagamento pendente. O acesso segue até ${quando}.`;
+    return ehAssinaturaDaLoja
+      ? `Renova automaticamente em ${quando}. Você pode cancelar antes disso.`
+      : `Seu acesso vai até ${quando}.`;
+  })();
 
   useEffect(() => {
     trackEvent("planos_view", { source: "app" });
@@ -80,21 +108,64 @@ const PlanosApp = () => {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : isSubscribed ? (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-2xl border border-primary/30 bg-primary/5 p-6 text-center space-y-3"
-          >
-            <div className="w-14 h-14 rounded-full bg-primary/10 text-primary grid place-items-center mx-auto">
-              <Check className="w-7 h-7" strokeWidth={3} />
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+            {/* Antes esta tela era um ✓, uma frase e um botão — 444px de branco
+                medidos na varredura. Quem paga quer saber O QUE tem, QUAL plano
+                e QUANDO renova; e a loja exige um caminho claro pra gerenciar. */}
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-primary/10 text-primary grid place-items-center shrink-0">
+                  <Check className="w-6 h-6" strokeWidth={3} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold tracking-tight leading-tight">Seu acesso está ativo</h2>
+                  <p className="text-[13px] text-muted-foreground">{nomeDoPlano}</p>
+                </div>
+              </div>
+
+              {linhaRenovacao && (
+                <div className="flex items-start gap-2.5 rounded-xl bg-background/70 px-3.5 py-3">
+                  <CalendarClock className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-[13px] leading-snug">{linhaRenovacao}</p>
+                </div>
+              )}
+
+              <Button size="lg" className="w-full h-12" onClick={() => navigate("/")}>
+                Voltar pro app
+              </Button>
             </div>
-            <h2 className="text-xl font-bold tracking-tight">Seu acesso está ativo</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Todos os 16 módulos liberados nesta conta. É só usar.
-            </p>
-            <Button size="lg" className="w-full h-12" onClick={() => navigate("/")}>
-              Voltar pro app
-            </Button>
+
+            <div>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                O que está liberado
+              </h3>
+              <ul className="space-y-2.5">
+                {BENEFICIOS.map((b) => (
+                  <li key={b} className="flex items-start gap-2.5 text-sm">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Cancelamento é da Play, não do app — o Google não permite que o
+                app processe. O que se pode (e deve) fazer é levar até lá. */}
+            {ehAssinaturaDaLoja && (
+              <a
+                href={`https://play.google.com/store/account/subscriptions?package=${PACOTE_ANDROID}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => trackEvent("app_gerenciar_assinatura", { billing: billingPeriod })}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-4 py-3.5 text-sm font-semibold"
+              >
+                <span className="flex items-center gap-2.5">
+                  <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                  Gerenciar ou cancelar assinatura
+                </span>
+                <span className="text-[11px] font-normal text-muted-foreground">Play Store</span>
+              </a>
+            )}
           </motion.div>
         ) : (
           <>

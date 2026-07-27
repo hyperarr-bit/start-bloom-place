@@ -156,7 +156,9 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2">
+        {/* Mesma regra da receita: o alvo do tutorial é a linha toda, porque a
+            tarefa é preencher e depois salvar (27/07). */}
+        <div className="flex items-center gap-2" data-spotlight="add-fixed">
           <Input
             placeholder="+ Novo custo fixo"
             value={newExpense.description}
@@ -184,7 +186,6 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
           />
           <button
             onClick={addExpense}
-            data-spotlight="add-fixed"
             aria-label="Adicionar custo fixo"
             className="h-9 w-9 flex-shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
           >

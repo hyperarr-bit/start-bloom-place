@@ -4,6 +4,8 @@ import { Check, X, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { initRevenueCat, estadoRevenueCat, comprar, restaurar } from "@/lib/revenuecat";
+import { useUserData } from "@/hooks/use-user-data";
+import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 
 /**
  * Paywall de ASSINATURA do app Android (22/07) — substitui o PixCheckout
@@ -20,6 +22,9 @@ export function SubscriptionPaywall({ onClose }: { onClose: () => void }) {
   const [rc, setRc] = useState(estadoRevenueCat());
   const [comprando, setComprando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [celebrar, setCelebrar] = useState(false);
+  const { get } = useUserData();
+  const nome = get<string>("core-user-name", "") || get<string>("user-name", "");
 
   useEffect(() => {
     trackEvent("app_paywall_view", {});
@@ -35,9 +40,15 @@ export function SubscriptionPaywall({ onClose }: { onClose: () => void }) {
     if (ativou) {
       trackEvent("app_paywall_success", { plano });
       setOk(true);
-      setTimeout(() => { window.location.href = "/"; }, 1600);
+      // Mesma regra do AppPurchaseSheet (27/07): celebra ANTES de navegar,
+      // pra o app não pintar cru por um segundo. Ver BoasVindasPago.
+      setTimeout(() => setCelebrar(true), 900);
     }
   };
+
+  if (celebrar) {
+    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
+  }
 
   if (ok) {
     return (
@@ -47,7 +58,7 @@ export function SubscriptionPaywall({ onClose }: { onClose: () => void }) {
             <Check className="w-9 h-9 text-emerald-500" />
           </div>
           <h2 className="text-2xl font-bold">Assinatura ativa! 🎉</h2>
-          <p className="text-sm text-muted-foreground mt-1">Abrindo seu CORE…</p>
+          <p className="text-sm text-muted-foreground mt-1">Só um instante…</p>
         </motion.div>
       </div>
     );

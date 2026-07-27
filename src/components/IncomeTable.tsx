@@ -80,7 +80,10 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
 
       {/* Form sempre visível */}
       <div className="p-3 border-b border-border bg-muted/20 space-y-2">
-        <div className="flex items-center gap-2">
+        {/* O tutorial destaca a LINHA INTEIRA, não o "+" (27/07). A tarefa é
+            escrever a receita, o valor e só então salvar — marcar só o botão
+            mandava a pessoa apertar antes de ter o que salvar. */}
+        <div className="flex items-center gap-2" data-spotlight="add-income">
           <Input
             placeholder="+ Nova receita"
             value={newIncome.description}
@@ -97,7 +100,6 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
           />
           <button
             onClick={addIncome}
-            data-spotlight="add-income"
             aria-label="Adicionar receita"
             className="h-9 w-9 flex-shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
           >

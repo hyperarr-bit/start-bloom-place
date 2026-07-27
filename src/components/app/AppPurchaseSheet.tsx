@@ -4,6 +4,8 @@ import { Check, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { initRevenueCat, estadoRevenueCat, comprar, restaurar } from "@/lib/revenuecat";
+import { useUserData } from "@/hooks/use-user-data";
+import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 
 /**
  * A "ABA DE COMPRAR" DO APP (decisão do dono 23/07, lógica BitePal): o
@@ -18,7 +20,10 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
   const [rc, setRc] = useState(estadoRevenueCat());
   const [comprando, setComprando] = useState(false);
   const [ok, setOk] = useState(false);
+  const [celebrar, setCelebrar] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const { get } = useUserData();
+  const nome = get<string>("core-user-name", "") || get<string>("user-name", "");
 
   useEffect(() => {
     trackEvent("app_sheet_view", {});
@@ -34,7 +39,10 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
     if (ativou) {
       trackEvent("app_sheet_success", { plano });
       setOk(true);
-      setTimeout(() => { window.location.href = "/"; }, 1600);
+      // Boas-vindas ANTES de navegar (27/07): o app não pode pintar primeiro,
+      // senão a pessoa vê o módulo cru por um segundo e a celebração chega
+      // atrasada, como aviso. Ver BoasVindasPago.
+      setTimeout(() => setCelebrar(true), 900);
     }
   };
 
@@ -44,6 +52,11 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
     if (r) { window.location.href = "/"; return; }
     setMsg("Nenhuma assinatura encontrada nesta conta Google.");
   };
+
+  // A celebração cobre tudo e é ela quem navega — o app só monta depois.
+  if (celebrar) {
+    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
+  }
 
   return (
     <div className="fixed inset-0 z-[90]">
@@ -67,7 +80,7 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
               <Check className="w-8 h-8 text-emerald-500" />
             </div>
             <h2 className="text-xl font-bold">Assinatura ativa! 🎉</h2>
-            <p className="text-sm text-muted-foreground mt-1">Abrindo seu CORE…</p>
+            <p className="text-sm text-muted-foreground mt-1">Só um instante…</p>
           </div>
         ) : (
           <>

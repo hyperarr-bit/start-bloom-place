@@ -213,7 +213,15 @@ const HomePage = () => {
   // force-new-user e bugou feio (auto-completava em 1s e reaparecia a cada
   // abertura). O replay só reativa o tour dos módulos que a pessoa escolher.
   const [showReplayTutorial, setShowReplayTutorial] = useState(false);
-  const handleReplayTutorial = useCallback(() => setShowReplayTutorial(true), []);
+  // "Veio do menu" precisa sobreviver à ida e volta pro módulo (27/07): esse
+  // estado é local da Home, e a Home REMONTA quando a pessoa volta do módulo —
+  // aí o mesmo replay passava a se anunciar como estreia ("Por onde você quer
+  // começar?" no meio de um 'rever'). A intenção agora fica gravada junto da
+  // fila, e some com ela.
+  const handleReplayTutorial = useCallback(() => {
+    setShowReplayTutorial(true);
+    setData("tutorial-replay-pelo-menu", "true");
+  }, [setData]);
 
   const handleWidgetToggle = (id: WidgetId) => {
     if (isActive(id)) removeWidget(id);
@@ -234,7 +242,13 @@ const HomePage = () => {
       <AnimatePresence>
         {/* aberturaPeloMenu só quando VEIO do menu: é o que decide se o texto
             fala "rever" ou "começar". A fila (replay) é a mecânica de todos. */}
-        <QuickStartOnboarding replay aberturaPeloMenu={showReplayTutorial} onComplete={() => setShowReplayTutorial(false)} />
+        <QuickStartOnboarding
+          replay
+          aberturaPeloMenu={showReplayTutorial || !!get<string>("tutorial-replay-pelo-menu", "")}
+          // onComplete também dispara ao ENTRAR num módulo do replay — por isso
+          // quem apaga a intenção é o "Encerrar tutorial", não este callback.
+          onComplete={() => setShowReplayTutorial(false)}
+        />
       </AnimatePresence>
     );
   }

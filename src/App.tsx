@@ -131,6 +131,29 @@ const RootGate = () => {
     forceNew = false;
   }
 
+  /*
+   * APP DA LOJA: nasce no HUB, sempre (27/07, relato do dono).
+   *
+   * "É estranho porque a home inicial é hub, o app não nasce no financas, o
+   * tutorial também não. Por que essa porra nasce no financas?"
+   *
+   * Ele está certo, e a origem é histórica: despejar a pessoa direto no
+   * módulo que ela escolheu no funil é regra da WEB, escrita quando o
+   * produto era só finanças e o funil vendia uma planilha. No app o
+   * primeiro contato passou a ser o hub — é lá que mora o "Por onde você
+   * quer começar?", é de lá que o tutorial parte. Cair direto no módulo
+   * pulava a única tela que explica que existem 16.
+   *
+   * A escolha do funil não se perde: ela continua no localStorage e é o que
+   * o seletor do tutorial usa pra já vir marcada.
+   *
+   * A web fica exatamente como estava — o funil em escala é dela.
+   */
+  if (isNativeShell()) {
+    try { localStorage.setItem(AREA_LANDED_KEY, "true"); } catch { /* noop */ }
+    return <Navigate to="/home" replace />;
+  }
+
   if (area && !landed) {
     try { localStorage.setItem(AREA_LANDED_KEY, "true"); } catch { /* noop */ }
     return <Navigate to={area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;

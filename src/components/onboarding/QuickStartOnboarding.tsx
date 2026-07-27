@@ -192,6 +192,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
    */
   const encerrarReplay = () => {
     set("tutorial-replay-modules", []);
+    // a intenção "abri pelo menu" morre junto com a fila (ver Home.tsx)
+    set("tutorial-replay-pelo-menu", "");
     // no primeiro uso é este flag que faz o tour renascer a cada abertura
     try { set("force-new-user-tutorial", ""); localStorage.removeItem("force-new-user-tutorial"); } catch { /* noop */ }
     set("core-onboarding-done", "true");

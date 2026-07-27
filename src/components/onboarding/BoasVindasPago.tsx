@@ -28,17 +28,34 @@ const CHAVE = "boas-vindas-pago-visto";
  *    próximo passo, que é o que dá pra cumprir em 30 segundos.
  *  - Os três itens são o que ela ACABOU de comprar, escritos como posse
  *    ("seus 16 módulos"), não como funcionalidade.
+ *
+ * ONDE ELA APARECE (27/07 — correção do dono). Antes era só um overlay no
+ * nível do app, e ele pegou o defeito no aparelho: "ainda NASCE dentro do
+ * financas, você vê o financeiro por segundos e aí aparece a tela do 'tá
+ * dentro'. E é estranho porque a home é hub, o app não nasce no financas".
+ * Estava certo: a celebração morava no DESTINO, então o destino pintava
+ * primeiro. Agora ela mora no MOMENTO DA COMPRA — sobe dentro da própria
+ * folha de pagamento, antes de qualquer navegação (`imediato`), e a
+ * navegação só acontece quando a pessoa toca em Começar. O overlay no nível
+ * do app fica como rede de segurança (compra reconciliada depois, restore).
  */
-export const BoasVindasPago = ({ nome, onComecar }: { nome?: string; onComecar: () => void }) => {
+export const BoasVindasPago = ({ nome, onComecar, imediato }: {
+  nome?: string;
+  onComecar: () => void;
+  /** Compra recém-confirmada: mostra na hora, sem esperar carregar os dados
+   *  nem consultar a chave de "já viu" (é impossível já ter visto). */
+  imediato?: boolean;
+}) => {
   const { get, set, loaded } = useUserData();
-  const [visivel, setVisivel] = useState(false);
+  const [visivel, setVisivel] = useState(!!imediato);
 
   useEffect(() => {
+    if (imediato) { trackEvent("boas_vindas_pago_visto", { origem: "compra" }); return; }
     if (!loaded) return;
     if (get<string>(CHAVE, "") === "true") return;
     setVisivel(true);
-    trackEvent("boas_vindas_pago_visto", {});
-  }, [loaded, get]);
+    trackEvent("boas_vindas_pago_visto", { origem: "abertura" });
+  }, [loaded, get, imediato]);
 
   const seguir = () => {
     set(CHAVE, "true");

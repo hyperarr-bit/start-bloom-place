@@ -415,38 +415,45 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         className="fixed inset-0 z-[200] pointer-events-none"
       >
         {/*
-          * HOLOFOTE (27/07). Antes NÃO EXISTIA destaque nenhum: o tutorial
-          * dizia "toque aqui" e não marcava onde — relato do dono, "não dá
-          * nem pra me ver". Duas peças:
+          * DESTAQUE SEM APAGAR O APP (27/07 — 2ª rodada, correção do dono).
           *
-          *  1. Quatro faixas escuras formando uma moldura em volta do alvo,
-          *     deixando um buraco por onde ele aparece iluminado. Faixas em
-          *     vez de máscara SVG porque o buraco fica LITERALMENTE vazio —
-          *     nada por cima do alvo, então o toque chega nele sem truque de
-          *     pointer-events.
-          *  2. Um anel pulsando na borda do buraco, que é o que o olho acha
-          *     em meio segundo.
+          * A 1ª versão escurecia a tela toda e deixava um buraco no alvo.
+          * Estava errado, e a frase do dono explica melhor que qualquer
+          * justificativa minha: "o foco não é o botão, o foco é o app em si.
+          * A missão do usuário não é só apertar o botão, é clicar lá, botar
+          * seus dados e SÓ DEPOIS clicar no +".
+          *
+          * Escurecer 90% da tela pra iluminar um botão de 36px assume que a
+          * tarefa é UM TOQUE. Não é: em Finanças a pessoa precisa ler os
+          * campos, digitar duas coisas e só então salvar. O véu apagava
+          * justamente o que ela tinha que ler — e ainda ensinava a olhar só
+          * pro buraco iluminado, quando a primeira sessão existe pra ela
+          * conhecer a TELA.
+          *
+          * Então: nada de véu. Fica o anel pulsando — que é o que o olho acha
+          * em meio segundo — em volta da ÁREA DA TAREFA (ver os alvos em
+          * Index.tsx: a linha inteira do formulário, não o "+"). O app
+          * continua 100% legível, que é o ponto.
           */}
         {rect && (
           <>
-            {[
-              { top: 0, left: 0, width: "100%", height: Math.max(0, rect.top - PADDING) },
-              { top: rect.top + rect.height + PADDING, left: 0, width: "100%", bottom: 0 },
-              { top: Math.max(0, rect.top - PADDING), left: 0, width: Math.max(0, rect.left - PADDING), height: rect.height + PADDING * 2 },
-              { top: Math.max(0, rect.top - PADDING), left: rect.left + rect.width + PADDING, right: 0, height: rect.height + PADDING * 2 },
-            ].map((faixa, i) => (
-              <motion.div
-                key={`veu-${i}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.25 }}
-                className="absolute bg-black/55"
-                style={faixa as React.CSSProperties}
-              />
-            ))}
+            <motion.div
+              key={`halo-${stepIdx}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.55, 0.15, 0.55] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute rounded-2xl pointer-events-none"
+              style={{
+                top: rect.top - PADDING - 5,
+                left: rect.left - PADDING - 5,
+                width: rect.width + (PADDING + 5) * 2,
+                height: rect.height + (PADDING + 5) * 2,
+                boxShadow: "0 0 0 6px hsl(var(--primary) / 0.28)",
+              }}
+            />
             <motion.div
               key={`anel-${stepIdx}`}
-              initial={{ opacity: 0, scale: 0.94 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
               className="absolute rounded-xl pointer-events-none"
@@ -455,7 +462,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                 left: rect.left - PADDING,
                 width: rect.width + PADDING * 2,
                 height: rect.height + PADDING * 2,
-                boxShadow: "0 0 0 3px hsl(var(--primary)), 0 0 0 9px hsl(var(--primary) / 0.25)",
+                boxShadow: "0 0 0 2.5px hsl(var(--primary)), 0 0 24px -2px hsl(var(--primary) / 0.45)",
               }}
             />
           </>
@@ -478,10 +485,12 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   className="absolute -top-7"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
-                  <ArrowUp className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
+                  <ArrowUp className="w-5 h-5 text-primary drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]" strokeWidth={3} />
                 </motion.div>
               )}
-              <div className="bg-card border border-border rounded-xl shadow-xl p-3 pointer-events-auto">
+              {/* Sem véu por trás, o balão precisa se separar do app sozinho:
+                  borda da cor do tutorial + sombra funda (27/07). */}
+              <div className="bg-card border-2 border-primary/45 rounded-xl shadow-[0_18px_44px_-12px_rgba(0,0,0,0.45)] p-3 pointer-events-auto">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
                     Passo {stepIdx + 1} de {steps.length}
@@ -519,7 +528,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   className="absolute -bottom-7"
                   style={{ left: arrowX, transform: "translateX(-50%)" }}
                 >
-                  <ArrowDown className="w-5 h-5 text-foreground/70" strokeWidth={2.5} />
+                  <ArrowDown className="w-5 h-5 text-primary drop-shadow-[0_2px_4px_rgba(0,0,0,0.25)]" strokeWidth={3} />
                 </motion.div>
               )}
             </div>

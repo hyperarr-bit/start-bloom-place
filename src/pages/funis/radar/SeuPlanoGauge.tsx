@@ -1,8 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
+import { CtaFixo } from "./CtaFixo";
 import { AREAS, GASTO_ANCHOR, type AreaKey } from "@/lib/funnel";
 
 /**
@@ -171,15 +170,12 @@ export function SeuPlanoScreen({ area, answers, onCommit }: {
         montado com as suas respostas · dá pra ajustar tudo depois
       </motion.p>
 
-      <motion.div {...stag(7)} className="mt-5">
-        <Button
-          size="lg"
-          className="w-full h-13 min-h-[52px] rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-          onClick={() => { trackEvent("funnel_click", { cta: "plano_commit", area }); onCommit(); }}
-        >
-          Quero cumprir esse plano 🤝 <ArrowRight className="w-4 h-4" />
-        </Button>
-      </motion.div>
+      {/* CTA ancorado (27/07): esta é a tela mais alta do funil — era a que
+          mais escondia o botão abaixo da dobra. Ver CtaFixo.tsx. */}
+      <CtaFixo
+        label="Quero cumprir esse plano 🤝"
+        onClick={() => { trackEvent("funnel_click", { cta: "plano_commit", area }); onCommit(); }}
+      />
     </div>
   );
 }

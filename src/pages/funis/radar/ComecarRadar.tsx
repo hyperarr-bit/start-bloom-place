@@ -9,6 +9,7 @@ import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { PortaPerguntaApp } from "@/components/app/PortaPerguntaApp";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { SeuPlanoScreen } from "./SeuPlanoGauge";
+import { CtaFixo } from "./CtaFixo";
 import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -342,10 +343,11 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
           </motion.div>
         ))}
       </Card>
-      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}>
-        Testar o app de verdade <ArrowRight className="w-4 h-4" />
-      </Button>
-      <p className="text-xs text-muted-foreground mt-3">Abre o app real, com dados de exemplo — seu plano vem em seguida</p>
+      <CtaFixo
+        label="Testar o app de verdade"
+        sub="Abre o app real, com dados de exemplo — seu plano vem em seguida"
+        onClick={() => { trackEvent("funnel_click", { cta: "result", area }); onDone(); }}
+      />
     </div>
   );
 }
@@ -391,20 +393,28 @@ function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) 
       <p className="text-[11px] text-accent font-semibold mb-6 inline-flex items-center justify-center gap-1 w-full">
         <Check className="w-3.5 h-3.5" strokeWidth={3} /> Todos os 16 inclusos, sem pagar à parte
       </p>
-      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "central_open", area }); onOpen(); }}>
-        Abrir minha central <ArrowRight className="w-4 h-4" />
-      </Button>
-      <p className="text-xs text-muted-foreground mt-3">Explore à vontade — dados de exemplo</p>
+      <CtaFixo
+        label="Abrir minha central"
+        sub="Explore à vontade — dados de exemplo"
+        onClick={() => { trackEvent("funnel_click", { cta: "central_open", area }); onOpen(); }}
+      />
     </div>
   );
 }
 
 /** Tela de impacto: devolve a estimativa da própria pessoa, anualizada.
  *  É o momento "isso é sério" antes das duas últimas perguntas. */
+/* Com o CTA ancorado no rodapé, o conteúdo top-aligned deixava um vão branco
+   enorme no meio da tela. No app o bloco passa a se centrar entre a barra de
+   progresso e a barra do botão. */
+const mioloCentrado = () => isNativeShell()
+  ? "text-center flex flex-col justify-center min-h-[calc(100dvh-172px)]"
+  : "text-center pt-2";
+
 function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
   return (
-    <div className="text-center pt-2">
+    <div className={mioloCentrado()}>
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -443,9 +453,7 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
         Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>.
         Registrar no CORE leva segundos.
       </p>
-      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
-        Quero ver pra onde vai <ArrowRight className="w-4 h-4" />
-      </Button>
+      <CtaFixo label="Quero ver pra onde vai" onClick={onNext} />
     </div>
   );
 }
@@ -456,7 +464,7 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
   const proof = AREA_PROOF[area as Exclude<AreaKey, "dinheiro">];
   const echo = proof?.echo[answer] ?? "É sempre a mesma história.";
   return (
-    <div className="text-center pt-2">
+    <div className={mioloCentrado()}>
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -472,9 +480,7 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
       <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
         <p className="text-[14px] leading-relaxed">{proof.card}</p>
       </div>
-      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
-        {proof.cta} <ArrowRight className="w-4 h-4" />
-      </Button>
+      <CtaFixo label={proof.cta} onClick={onNext} />
     </div>
   );
 }
@@ -993,6 +999,9 @@ export default function ComecarRadar() {
   // link do anúncio, reviu o quiz, tentou recriar a conta ("User already
   // registered") e cancelou achando que era problema técnico.
   if (user && subLoaded && isSubscribed) {
+    // No app o destino é o HUB, não o módulo — mesma razão do RootGate
+    // (27/07): o app não nasce dentro de finanças. Na web, nada muda.
+    if (isNativeShell()) return <Navigate to="/home" replace />;
     return <Navigate to={area && area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
   }
 

@@ -30,7 +30,10 @@ export const PortaoBoasVindas = () => {
   const contaNova = !!user.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
   if (!contaNova) return null;
 
-  const nome = get<string>("core-user-name", "") || (user.email?.split("@")[0] ?? "");
+  // "user-name" é a chave que o CADASTRO DO FUNIL grava (ComecarRadar); a
+  // "core-user-name" é a do hub. Ler só a segunda deixava justamente quem veio
+  // do funil — todo mundo, no app — sem nome na celebração.
+  const nome = get<string>("core-user-name", "") || get<string>("user-name", "") || (user.email?.split("@")[0] ?? "");
 
   return (
     <BoasVindasPago

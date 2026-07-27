@@ -107,23 +107,47 @@ export const WidgetPicker = ({ open, onOpenChange, activeWidgets, onToggle, onTo
                           </div>
                         </div>
 
+                        {/* Os widgets têm DOIS tamanhos, e antes isso vivia
+                            escondido num ícone de 24px. Virou seletor com
+                            nome: quem escolhe o widget escolhe o tamanho na
+                            mesma tela, sem precisar descobrir. */}
                         {isActive && (
-                          <>
-                            <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-primary text-primary-foreground grid place-items-center">
-                              <Check className="w-3 h-3" strokeWidth={3} />
-                            </span>
-                            {/* tamanho é ação secundária: só existe depois de ativo */}
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={e => { e.stopPropagation(); onToggleSize(widget.id); }}
-                              onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onToggleSize(widget.id); } }}
-                              title={grande ? "Deixar pequeno" : "Deixar grande"}
-                              className="absolute bottom-2.5 right-2.5 w-6 h-6 rounded-full bg-background/90 border border-border/70 grid place-items-center text-muted-foreground"
-                            >
-                              {grande ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                            </span>
-                          </>
+                          <div
+                            role="group"
+                            aria-label="Tamanho do widget"
+                            className="mt-2.5 grid grid-cols-2 gap-1 rounded-lg bg-muted/60 p-0.5"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {([["pequeno", false], ["grande", true]] as const).map(([rotulo, querGrande]) => (
+                              <span
+                                key={rotulo}
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={grande === querGrande}
+                                onClick={() => { if (grande !== querGrande) onToggleSize(widget.id); }}
+                                onKeyDown={e => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    if (grande !== querGrande) onToggleSize(widget.id);
+                                  }
+                                }}
+                                className={`flex items-center justify-center gap-1 rounded-[6px] py-1 text-[10px] font-semibold capitalize transition-colors ${
+                                  grande === querGrande
+                                    ? "bg-background text-foreground shadow-sm"
+                                    : "text-muted-foreground"
+                                }`}
+                              >
+                                {querGrande ? <Maximize2 className="w-2.5 h-2.5" /> : <Minimize2 className="w-2.5 h-2.5" />}
+                                {rotulo}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {isActive && (
+                          <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-primary text-primary-foreground grid place-items-center">
+                            <Check className="w-3 h-3" strokeWidth={3} />
+                          </span>
                         )}
                       </motion.button>
                     );

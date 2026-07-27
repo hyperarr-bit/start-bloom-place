@@ -264,7 +264,12 @@ const HomePage = () => {
           </div>
         </header>
         <main className="flex-1 flex flex-col">
-          <div className="flex-1 max-w-lg md:max-w-4xl mx-auto w-full px-4 pt-4 pb-5 space-y-6 flex flex-col justify-center">
+          {/* space-y-8 (26/07): era space-y-6. Medindo a Home em 360dp e em
+              430pt o espaçamento saía IDÊNTICO — o aperto não vinha do
+              aparelho, vinha do ritmo entre seções, que ficava irregular
+              (164px entre umas, 56px entre outras). Respiro maior e igual
+              separa os blocos sem inflar o conteúdo. */}
+          <div className="flex-1 max-w-lg md:max-w-4xl mx-auto w-full px-4 pt-4 pb-5 space-y-8 flex flex-col justify-center">
 
             <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
               <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
@@ -273,7 +278,7 @@ const HomePage = () => {
             <PwaInstallCard variant="home" />
 
             <div>
-              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Ações rápidas</h3>
+              <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ações rápidas</h3>
               <QuickActions />
             </div>
 

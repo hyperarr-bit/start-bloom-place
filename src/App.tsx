@@ -78,7 +78,15 @@ const ehPwa = () => {
  *
  * Com a constante, repontar /inicio nunca mais mexe no app.
  */
-const ENTRADA_APP = "/comecar";
+/*
+ * 26/07: a porta era "/comecar" — errado. Aquele é o funil ANTIGO, só de
+ * finanças ("O que mais te atrapalha hoje?"). O funil DO APP é o radar:
+ * pergunta a ÁREA da vida, tem o SeuPlanoGauge (a tela "Seu plano" do
+ * estudo Cal AI/BitePal de 23/07) antes do paywall, e 8 ramos isNativeShell()
+ * de estilo próprio. Ele foi congelado em /funil-radar no dia 25/07 e ficou
+ * inalcançável pelo app.
+ */
+const ENTRADA_APP = "/app";
 
 const SoNaWeb = ({ children }: { children: ReactNode }) =>
   isNativeShell() ? <Navigate to={ENTRADA_APP} replace /> : <>{children}</>;
@@ -219,6 +227,11 @@ const AnimatedRoutes = () => {
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        {/* ENTRADA_APP: mesmo funil do /funil-radar, mas SEM a trava SoNaWeb
+            — esta é a porta do app da loja. O radar é seguro no shell: o
+            paywall dele é o PaywallFlow, que bifurca pra assinatura e
+            esconde o card de vitalício quando isNativeShell(). */}
+        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />
         <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />

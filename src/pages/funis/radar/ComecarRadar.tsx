@@ -908,12 +908,20 @@ export default function ComecarRadar() {
   // Criativo "app pra vida inteira". A área escolhida persiste — quem volta
   // da demo (?step=signup) segue na trilha.
   const { pathname } = useLocation();
-  const vitrine = pathname.startsWith("/inicio") || params.get("porta") === "vida";
+  // O app da loja vende os 16 módulos, não só finanças — então ele é SEMPRE
+  // vitrine. Antes isso vinha de estar em "/inicio"; quando o /inicio virou
+  // o funil do dia 14, o app caiu no controle de finanças ("O que mais te
+  // atrapalha hoje?") e a pergunta de ÁREA sumiu.
+  const vitrine = isNativeShell() || pathname.startsWith("/inicio") || params.get("porta") === "vida";
   // APP DAS LOJAS: welcome "grade viva" como OVERLAY por cima da porta (a
   // porta já está montada por baixo — Começar só derrete o céu, sem troca de
   // rota, sem flash). Deep-link com ?step= pula o welcome.
+  // A welcome exigia estar em "/inicio". Quando o /inicio virou o funil do
+  // dia 14 (25/07) e este funil foi congelado em outra rota, a condição
+  // deixou de bater e a tela de início sumiu do app. No shell a welcome é
+  // condição do PRODUTO, não da URL.
   const [welcomeVisible, setWelcomeVisible] = useState(
-    () => isNativeShell() && (window.location.pathname.startsWith("/inicio") || new URLSearchParams(window.location.search).get("porta") === "vida") && !new URLSearchParams(window.location.search).get("step"),
+    () => isNativeShell() && !new URLSearchParams(window.location.search).get("step"),
   );
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {

@@ -14,7 +14,20 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!--
+            RETRATO TRAVADO (26/07). Sem isto o app girava, e em paisagem:
+            - as telas viram scroll infinito (o layout é desenhado pra 430pt
+              de largura e ~880 de altura)
+            - o teclado do Android entra em "extract mode" e cobre a tela com
+              um campo de texto branco em tela cheia — era o "quando clico em
+              digitar fica bugado"
+            - os cards do tutorial encavalam nas abas
+            windowSoftInputMode=adjustResize faz a webview encolher quando o
+            teclado sobe, em vez de o conteúdo ficar por baixo dele.
+        -->
         <activity
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
             android:label="@string/title_activity_main"

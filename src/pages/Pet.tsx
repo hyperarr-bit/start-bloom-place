@@ -8,6 +8,8 @@ import { PetHealth } from "@/components/pet/PetHealth";
 import { PetRoutine } from "@/components/pet/PetRoutine";
 import { PetExpenses } from "@/components/pet/PetExpenses";
 import { PetDiary } from "@/components/pet/PetDiary";
+import { useUserData } from "@/hooks/use-user-data";
+import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
@@ -22,6 +24,9 @@ const tabs = [
 
 const Pet = () => {
   const navigate = useNavigate();
+  const { get } = useUserData();
+  // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
+  const vazio = (get<unknown[]>("pet-list", []) ?? []).length === 0;
   const [activeTab, setActiveTab] = useState("pets");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -84,6 +89,17 @@ const Pet = () => {
         {activeTab === "rotina" && <PetRoutine />}
         {activeTab === "gastos" && <PetExpenses />}
         {activeTab === "diario" && <PetDiary />}
+        {vazio && (
+          <ProximoPasso
+            emoji="🐶"
+            titulo="Cadastre seu primeiro pet"
+            passos={[
+              "Toque em Pets e adicione nome, foto e raça",
+              "Registre vacinas e consultas na aba Saúde",
+              "Monte a rotina diária e acompanhe os gastos",
+            ]}
+          />
+        )}
       </main>
     </div>
   );

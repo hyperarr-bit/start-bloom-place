@@ -4,6 +4,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useUserData } from "@/hooks/use-user-data";
+import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Timer, Play, Pause, RotateCcw,
@@ -190,6 +191,11 @@ const Treino = () => {
   }, [isGuest, getUserData]);
 
   const [rawPlan, setRawPlan] = usePersistedState("saude-workouts-v2", defaultWorkoutPlan);
+  // Sem nenhum músculo ou exercício em nenhum dia, o módulo abre com três
+  // linhas e 501px de branco (medido na varredura) — o pior do app.
+  const treinoVazio = Object.values(rawPlan ?? {}).every(
+    (d) => !(d?.muscles?.length) && !(d?.exercises?.length),
+  );
   const workoutPlan = useMemo(() => migratePlan(rawPlan), [rawPlan]);
   const setWorkoutPlan = (p: WorkoutPlan | ((prev: WorkoutPlan) => WorkoutPlan)) => {
     if (typeof p === "function") setRawPlan((prev: any) => p(migratePlan(prev)));
@@ -1113,6 +1119,17 @@ const Treino = () => {
             </div>
           </div>}
         
+        {treinoVazio && (
+          <ProximoPasso
+            emoji="💪"
+            titulo="Monte seu treino da semana"
+            passos={[
+              "Abra a aba CONFIG e escolha os músculos de cada dia",
+              "Adicione os exercícios com séries, repetições e carga",
+              "Toque em Iniciar Sessão — o timer de descanso liga sozinho",
+            ]}
+          />
+        )}
       </main>
 
       {/* ===== BOTTOM ACTION BAR ===== */}

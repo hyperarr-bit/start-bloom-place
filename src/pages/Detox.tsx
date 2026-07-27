@@ -7,6 +7,8 @@ import { DetoxTracker } from "@/components/detox/DetoxTracker";
 import { DetoxDiary } from "@/components/detox/DetoxDiary";
 import { DetoxAchievements } from "@/components/detox/DetoxAchievements";
 import { DetoxStats } from "@/components/detox/DetoxStats";
+import { useUserData } from "@/hooks/use-user-data";
+import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
@@ -20,6 +22,9 @@ const tabs = [
 
 const Detox = () => {
   const navigate = useNavigate();
+  const { get } = useUserData();
+  // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
+  const vazio = (get<unknown[]>("detox-habits", []) ?? []).length === 0;
   const [activeTab, setActiveTab] = useState("rastreador");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -81,6 +86,17 @@ const Detox = () => {
         {activeTab === "diario" && <DetoxDiary />}
         {activeTab === "conquistas" && <DetoxAchievements />}
         {activeTab === "stats" && <DetoxStats />}
+        {vazio && (
+          <ProximoPasso
+            emoji="📵"
+            titulo="Escolha o que quer reduzir"
+            passos={[
+              "Crie um hábito de detox — redes, açúcar, o que for",
+              "Marque os dias em que você conseguiu",
+              "A sequência aparece aqui e vira conquista",
+            ]}
+          />
+        )}
       </main>
     </div>
   );

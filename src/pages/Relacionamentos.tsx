@@ -8,6 +8,8 @@ import { DateCalendar } from "@/components/relacionamentos/DateCalendar";
 import { MomentsTimeline } from "@/components/relacionamentos/MomentsTimeline";
 import { GiftIdeas } from "@/components/relacionamentos/GiftIdeas";
 import { EventLog } from "@/components/relacionamentos/EventLog";
+import { useUserData } from "@/hooks/use-user-data";
+import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
@@ -22,6 +24,9 @@ const tabs = [
 
 const Relacionamentos = () => {
   const navigate = useNavigate();
+  const { get } = useUserData();
+  // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
+  const vazio = (get<unknown[]>("rel-people", []) ?? []).length === 0;
   const [activeTab, setActiveTab] = useState("pessoas");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -84,6 +89,17 @@ const Relacionamentos = () => {
         {activeTab === "momentos" && <MomentsTimeline />}
         {activeTab === "presentes" && <GiftIdeas />}
         {activeTab === "eventos" && <EventLog />}
+        {vazio && (
+          <ProximoPasso
+            emoji="❤️"
+            titulo="Comece pelas pessoas"
+            passos={[
+              "Adicione quem importa e a data de aniversário",
+              "Guarde momentos que você não quer esquecer",
+              "O app te lembra das datas antes de passarem",
+            ]}
+          />
+        )}
       </main>
     </div>
   );

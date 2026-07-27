@@ -232,7 +232,9 @@ const HomePage = () => {
   if (showReplayTutorial || (loaded && !!user && replayPendente)) {
     return (
       <AnimatePresence>
-        <QuickStartOnboarding replay onComplete={() => setShowReplayTutorial(false)} />
+        {/* aberturaPeloMenu só quando VEIO do menu: é o que decide se o texto
+            fala "rever" ou "começar". A fila (replay) é a mecânica de todos. */}
+        <QuickStartOnboarding replay aberturaPeloMenu={showReplayTutorial} onComplete={() => setShowReplayTutorial(false)} />
       </AnimatePresence>
     );
   }

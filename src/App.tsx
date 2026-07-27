@@ -11,6 +11,7 @@ import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialBanner } from "@/components/TrialBanner";
+import { PortaoBoasVindas } from "@/components/onboarding/PortaoBoasVindas";
 import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
@@ -385,6 +386,9 @@ const App = () => {
                   <Route path="*" element={<AnimatedRoutes />} />
                 </Routes>
                 <TrialBanner />
+                {/* Os 10 segundos depois de assinar: celebração antes do
+                    produto cru (pedido do dono 27/07, inspirado no BitePal). */}
+                <PortaoBoasVindas />
                 <GlobalWinback />
                 {/* QuickSignupModal APOSENTADO 16/07: era o gate do modo visitante (teste grátis) — prendia cliente com sessão expirada numa tela sem saída ("Entrar" navegava por baixo do overlay). Visitante agora nem entra no app: ProtectedRoute sem allowGuest redireciona pro /auth. */}
               </BrowserRouter>

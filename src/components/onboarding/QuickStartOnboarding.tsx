@@ -28,6 +28,11 @@ interface QuickStartOnboardingProps {
   /** Newly signed-up (already authenticated) user — skip welcome and show tutorial-done popup instead of QuickSignup. */
   forNewUser?: boolean;
   /**
+   * Aberto pelo menu "Rever tutorial" — MUDA SÓ O TEXTO ("rever" em vez de
+   * "começar"). A mecânica de fila é a mesma pros dois desde 27/07.
+   */
+  aberturaPeloMenu?: boolean;
+  /**
    * MODO REPLAY ("Rever tutorial", 19/07): auto-contido, ZERO flags de
    * usuário-novo. Sempre começa na seleção, tem botão fechar, e o único
    * efeito persistido é limpar spotlight-done dos módulos escolhidos (o tour
@@ -67,7 +72,15 @@ const OPTIONS: Array<{
 const ALL_KEYS: ModuleKey[] = OPTIONS.map(o => o.key);
 const DEFAULT_SELECTED: ModuleKey[] = ["financas", "rotina", "dieta", "metas"];
 
-export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser, replay }: QuickStartOnboardingProps) => {
+export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser, replay, aberturaPeloMenu }: QuickStartOnboardingProps) => {
+  /*
+   * `replay` virou "usa a mecânica de fila" (que agora é a de todo mundo).
+   * Quem diz o TEXTO é `aberturaPeloMenu`: só quem clicou em "Rever tutorial"
+   * está revendo. Sem essa separação, o estreante lia "Qual módulo quer
+   * REVER?" no primeiro contato com o app — copy de reincidente pra quem
+   * nunca viu nada.
+   */
+  const revendo = !!aberturaPeloMenu;
   const pending = pendingModules ?? ALL_KEYS;
   const { set, get, isGuest } = useUserData();
   const navigate = useNavigate();
@@ -157,14 +170,32 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
       return;
     }
     set("tutorial-selected-modules", selectedModules);
+    /*
+     * A FILA TAMBÉM NO PRIMEIRO USO (27/07, relato do dono: "cliquei em pular
+     * tutorial em finanças e simplesmente acabou o tutorial tudo").
+     *
+     * O replay já tinha o comportamento certo — a fila é o estado, o voltar de
+     * um módulo reabre este seletor e o "Encerrar" zera. O primeiro uso não
+     * usava nada disso: escolhia um módulo, ia pra lá, e pular ali encerrava
+     * TUDO, porque não havia fila pra onde voltar. Duas mecânicas diferentes
+     * pra mesma coisa — e a de estreia, que é a que mais gente vê, era a pior.
+     */
+    set("tutorial-replay-modules", selectedModules);
     trackEvent("tutorial_modules_selected", { count: selectedModules.length, modules: selectedModules, is_guest: isGuest });
     setStep(2);
   };
 
-  // Encerrar tutorial (replay): zera a fila — nenhum tour pipoca depois.
+  /**
+   * Encerrar tutorial: zera a fila — nenhum tour pipoca depois. Vale nos DOIS
+   * modos desde 27/07; antes só existia no replay, então quem estava no
+   * primeiro uso não tinha como dizer "chega" sem pular módulo por módulo.
+   */
   const encerrarReplay = () => {
     set("tutorial-replay-modules", []);
-    trackEvent("tutorial_replay_ended", {});
+    // no primeiro uso é este flag que faz o tour renascer a cada abertura
+    try { set("force-new-user-tutorial", ""); localStorage.removeItem("force-new-user-tutorial"); } catch { /* noop */ }
+    set("core-onboarding-done", "true");
+    trackEvent("tutorial_replay_ended", { replay: !!replay });
     onComplete();
   };
 
@@ -383,12 +414,12 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
             >
               <div className="space-y-1.5 text-center mb-2">
                 <h2 className="text-xl font-bold text-foreground">
-                  {replay ? "Qual módulo quer rever?" : "Por onde você quer começar?"}
+                  {revendo ? "Qual módulo quer rever?" : "Por onde você quer começar?"}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {replay
+                  {revendo
                     ? "Toque num módulo pro passo a passo. Ao voltar, os outros seguem aqui."
-                    : "Escolhe 1. Os outros ficam aqui esperando."}
+                    : "Escolhe por onde começar. Ao voltar, os outros seguem esperando aqui."}
                 </p>
               </div>
 
@@ -416,7 +447,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
                 ))}
               </div>
 
-              {replay && (
+              {(
                 <button
                   onClick={encerrarReplay}
                   className="mt-2 w-full py-3 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"

@@ -533,13 +533,43 @@ function OfferScreen({
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
-  // X aparece com atraso (padrão Cal AI) e voltar do celular vira downsell
+  // X aparece com atraso (padrão Cal AI)
   useEffect(() => {
     const t = setTimeout(() => setShowClose(true), 1800);
+    return () => clearTimeout(t);
+  }, []);
+
+  /*
+   * VOLTAR: dois caminhos, e misturá-los era o bug (27/07).
+   *
+   * O relato do dono foi "o paywall do nada recomeça, eu tô andando e reseta".
+   * A causa: este componente empurrava uma entrada no histórico
+   * (`history.pushState`) e ouvia `popstate` — só que os PASSOS DO FUNIL são
+   * estado interno, sem entrada de histórico nenhuma. No gesto de voltar do
+   * Android, o React Router e este ouvinte disputavam o mesmo evento: medido
+   * no aparelho, o resultado era cair em /entrar. Fora do funil, o estado
+   * perdido, e reentrar significava recomeçar do primeiro passo.
+   *
+   * WEB continua igual (pushState/popstate), porque lá o "voltar" é do
+   * navegador e o comportamento está calibrado.
+   *
+   * APP DA LOJA usa o backButton do Capacitor: evento próprio, sem encostar
+   * no histórico, sem corrida com o roteador. E faz o MESMO que o X — entrar
+   * no app, onde o portão de trial segura.
+   */
+  useEffect(() => {
+    if (isNativeShell()) {
+      let desligar = () => {};
+      import("@capacitor/app")
+        .then((m) => m.App.addListener("backButton", () => escapeRef.current()))
+        .then((ouvinte) => { desligar = () => { void ouvinte.remove(); }; })
+        .catch(() => {});
+      return () => desligar();
+    }
     window.history.pushState({ paywall: true }, "");
     const onPop = () => escapeRef.current();
     window.addEventListener("popstate", onPop);
-    return () => { clearTimeout(t); window.removeEventListener("popstate", onPop); };
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   // Quem para de interagir na oferta ia embora sem ver a roleta (fechar a aba

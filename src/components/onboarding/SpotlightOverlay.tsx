@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useLayoutEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowDown, ArrowUp, ArrowLeft, CheckCircle2, X } from "lucide-react";
@@ -129,6 +129,21 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
     try { set("force-new-user-tutorial", ""); localStorage.removeItem("force-new-user-tutorial"); } catch {}
     trackEvent(reason === "completed" ? "quickstart_completed" : "spotlight_dismissed", { module: moduleKey });
     setActive(false);
+
+    /*
+     * PULAR ≠ ENCERRAR (27/07, relato do dono: "cliquei em pular tutorial em
+     * finanças e simplesmente acabou o tutorial tudo").
+     *
+     * Pular vale por ESTE módulo. Se ainda há outros na fila, a pessoa volta
+     * pro seletor — que é onde ela decide o próximo ou encerra de vez. Antes
+     * ela ficava parada dentro do módulo, sem nada indicando que o tutorial
+     * continuava, e concluía (com razão) que tinha acabado tudo.
+     */
+    if (reason === "dismissed") {
+      const restantes = (Array.isArray(rl) ? rl : []).filter((k) => k !== moduleKey);
+      if (restantes.length > 0) { navigate("/home"); return; }
+    }
+
     if (reason === "completed") {
       if (onComplete) {
         try { onComplete(); } catch {}
@@ -136,7 +151,15 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         setShowCompletion(true);
       }
     }
-  }, [set, get, moduleKey, onComplete]);
+  }, [set, get, moduleKey, onComplete, navigate]);
+
+  /* Altura real do balão, lida do DOM a cada passo (o texto muda de tamanho). */
+  const bubbleRef = useRef<HTMLDivElement | null>(null);
+  const [bubbleH, setBubbleH] = useState(0);
+  useLayoutEffect(() => {
+    const h = bubbleRef.current?.getBoundingClientRect().height ?? 0;
+    if (h && Math.abs(h - bubbleH) > 1) setBubbleH(h);
+  });
 
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -350,13 +373,36 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         ? "below"
         : null;
 
-  const BUBBLE_W = 260;
+  const BUBBLE_W = 288;
   const bubbleLeft = rect
     ? Math.max(12, Math.min(rect.left + rect.width / 2 - BUBBLE_W / 2, window.innerWidth - BUBBLE_W - 12))
     : 0;
   const targetCenterX = rect ? rect.left + rect.width / 2 : 0;
   // Arrow X relative to bubble's left edge, clamped inside bubble
   const arrowX = rect ? Math.max(16, Math.min(targetCenterX - bubbleLeft, BUBBLE_W - 16)) : BUBBLE_W / 2;
+
+  /*
+   * POSIÇÃO DO BALÃO — MEDIDA, não chutada (27/07).
+   *
+   * O cálculo antigo era `rect.top - 140`: 140 fixo, como se todo balão
+   * tivesse a mesma altura. Um passo com 4 linhas de texto (o print do dono)
+   * passa fácil de 160px — o balão descia POR CIMA do próprio campo que ele
+   * manda preencher, e a seta ia parar dentro do botão "+". Agora a altura é
+   * lida do DOM e o balão nunca invade o alvo.
+   */
+  const ESPACO = 34; // vão entre balão e alvo, onde a seta mora
+  const alturaBalao = bubbleH || 150;
+  const cabeAcima = rect ? rect.top - alturaBalao - ESPACO >= 8 : false;
+  const cabeAbaixo = rect ? rect.top + rect.height + ESPACO + alturaBalao <= viewportH - 8 : false;
+  // respeita o `placement` pedido pelo passo, mas só se couber de verdade
+  const acimaFinal = step.placement === "below" ? false
+    : step.placement === "above" ? cabeAcima
+    : cabeAcima || !cabeAbaixo;
+  const topoBalao = rect
+    ? acimaFinal
+      ? Math.max(8, rect.top - alturaBalao - ESPACO)
+      : Math.min(viewportH - alturaBalao - 8, rect.top + rect.height + ESPACO)
+    : 0;
 
   return (
     <AnimatePresence>
@@ -368,21 +414,64 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
         transition={{ duration: 0.25 }}
         className="fixed inset-0 z-[200] pointer-events-none"
       >
+        {/*
+          * HOLOFOTE (27/07). Antes NÃO EXISTIA destaque nenhum: o tutorial
+          * dizia "toque aqui" e não marcava onde — relato do dono, "não dá
+          * nem pra me ver". Duas peças:
+          *
+          *  1. Quatro faixas escuras formando uma moldura em volta do alvo,
+          *     deixando um buraco por onde ele aparece iluminado. Faixas em
+          *     vez de máscara SVG porque o buraco fica LITERALMENTE vazio —
+          *     nada por cima do alvo, então o toque chega nele sem truque de
+          *     pointer-events.
+          *  2. Um anel pulsando na borda do buraco, que é o que o olho acha
+          *     em meio segundo.
+          */}
+        {rect && (
+          <>
+            {[
+              { top: 0, left: 0, width: "100%", height: Math.max(0, rect.top - PADDING) },
+              { top: rect.top + rect.height + PADDING, left: 0, width: "100%", bottom: 0 },
+              { top: Math.max(0, rect.top - PADDING), left: 0, width: Math.max(0, rect.left - PADDING), height: rect.height + PADDING * 2 },
+              { top: Math.max(0, rect.top - PADDING), left: rect.left + rect.width + PADDING, right: 0, height: rect.height + PADDING * 2 },
+            ].map((faixa, i) => (
+              <motion.div
+                key={`veu-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.25 }}
+                className="absolute bg-black/55"
+                style={faixa as React.CSSProperties}
+              />
+            ))}
+            <motion.div
+              key={`anel-${stepIdx}`}
+              initial={{ opacity: 0, scale: 0.94 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="absolute rounded-xl pointer-events-none"
+              style={{
+                top: rect.top - PADDING,
+                left: rect.left - PADDING,
+                width: rect.width + PADDING * 2,
+                height: rect.height + PADDING * 2,
+                boxShadow: "0 0 0 3px hsl(var(--primary)), 0 0 0 9px hsl(var(--primary) / 0.25)",
+              }}
+            />
+          </>
+        )}
+
         {rect && (
           <motion.div
             key={`bubble-${stepIdx}`}
-            initial={{ opacity: 0, y: labelBelow ? -8 : 8 }}
+            initial={{ opacity: 0, y: acimaFinal ? 8 : -8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.25 }}
             className="absolute pointer-events-none"
-            style={{
-              top: labelBelow ? rect.top + rect.height + PADDING + 24 : Math.max(8, rect.top - 140),
-              left: bubbleLeft,
-              width: BUBBLE_W,
-            }}
+            style={{ top: topoBalao, left: bubbleLeft, width: BUBBLE_W }}
           >
-            <div className="relative">
-              {labelBelow && (
+            <div className="relative" ref={bubbleRef}>
+              {!acimaFinal && (
                 <motion.div
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
@@ -423,7 +512,7 @@ export const SpotlightOverlay = ({ moduleKey, steps, activationActions = [], onC
                   </div>
                 )}
               </div>
-              {!labelBelow && (
+              {acimaFinal && (
                 <motion.div
                   animate={{ y: [0, 4, 0] }}
                   transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}

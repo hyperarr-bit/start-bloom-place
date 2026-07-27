@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, useLayoutEffect } from "react";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -512,6 +512,24 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     const it = items[idx];
     trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : "quiz_proof" });
   }, [idx, items]);
+
+  /*
+   * VOLTA AO TOPO A CADA PERGUNTA (27/07, relato do dono: "o quiz começa de
+   * baixo pra cima, o usuário não vê o progresso, tem que arrastar pra cima").
+   *
+   * A troca de pergunta é só um `setIdx` — o React repinta o conteúdo mas a
+   * JANELA não se move. Quem respondeu uma pergunta longa, rolado até o fim,
+   * recebia a pergunta seguinte já rolada: a barra de progresso e o enunciado
+   * ficavam ACIMA da dobra. A pessoa não via o quanto já andou, que é
+   * justamente o que faz terminar um quiz.
+   *
+   * useLayoutEffect e não useEffect: rola ANTES da pintura, senão aparece o
+   * pulo. `behavior:"instant"` porque é troca de tela, não navegação — rolagem
+   * animada aqui parece defeito.
+   */
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [idx]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
     if (idx < items.length - 1) setIdx((i) => i + 1);
@@ -962,6 +980,12 @@ export default function ComecarRadar() {
           : {}),
       });
     }
+  }, [step]);
+
+  // Mesma razão do quiz: trocar de PASSO também não move a janela, e o passo
+  // seguinte abria rolado no ponto em que o anterior estava.
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [step]);
 
   // Assinante logado não tem nada a fazer no funil — manda pro app, na área

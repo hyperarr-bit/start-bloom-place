@@ -4,8 +4,13 @@ import { X, Share2, Loader2 } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
 import { computeSavingsRate } from "@/lib/finance-totals";
 import { trackEvent } from "@/lib/analytics";
+import { useTheme } from "@/hooks/use-theme";
+import { barraClaraEnquantoMontado } from "@/lib/status-bar";
 import { toast } from "sonner";
 import { renderWrappedImage } from "./wrapped-share";
+// só o TIPO: `retrospectiva.ts` importa o builder daqui, então um import de
+// valor fecharia o ciclo. `import type` some no build e não fecha nada.
+import type { RetroMes } from "@/lib/retrospectiva";
 
 /**
  * Retrospectiva do mês — "Spotify Wrapped" das finanças.
@@ -48,13 +53,12 @@ export interface WrappedData {
   pixPct: number;
   txCount: number;
   ego: EgoMoment;
-  profile: { emoji: string; name: string; line: string };
 }
 
-/** Lê os dados do mês e monta a retrospectiva. Null se o mês não tem dados. */
-export const buildWrappedData = (month: string, userId: string | null): WrappedData | null => {
-  const totals = getMonthTotals(month, userId);
-  const keys = getFinanceStorageKeys(month);
+/** Lê o bloco de FINANÇAS do mês. Null se o mês não tem lançamento nenhum. */
+export const buildWrappedData = (month: string, userId: string | null, ano?: number): WrappedData | null => {
+  const totals = getMonthTotals(month, userId, ano);
+  const keys = getFinanceStorageKeys(month, ano);
   const expenses: any[] = readMonthData(userId, keys.expenses) || [];
   const fixed: any[] = readMonthData(userId, keys.fixed) || [];
 
@@ -91,8 +95,12 @@ export const buildWrappedData = (month: string, userId: string | null): WrappedD
   const balance = income - outflow;
 
   // ---- comparação com o mês anterior (pro momento de ego) ----
-  const prevMonth = MONTHS[(MONTHS.indexOf(month) + 11) % 12];
-  const prev = getMonthTotals(prevMonth, userId);
+  // O ano tem que acompanhar a virada: em Janeiro o "anterior" é Dezembro do
+  // ANO PASSADO, e sem isso a comparação lia um mês que não existe.
+  const idxAtual = MONTHS.indexOf(month);
+  const prevMonth = MONTHS[(idxAtual + 11) % 12];
+  const anoBase = ano ?? new Date().getFullYear();
+  const prev = getMonthTotals(prevMonth, userId, idxAtual === 0 ? anoBase - 1 : anoBase);
   const prevOutflow = prev.custosFixos + prev.custosVariaveis;
   const incomeUpPct = prev.receitas > 0 ? ((income - prev.receitas) / prev.receitas) * 100 : 0;
   const spentDownPct = prevOutflow > 0 ? ((prevOutflow - outflow) / prevOutflow) * 100 : 0;
@@ -122,27 +130,11 @@ export const buildWrappedData = (month: string, userId: string | null): WrappedD
     ego = { kind: "modest", saved: balance };
   }
 
-  const topCat = topCategories[0]?.label ?? "";
-  const profile =
-    savingsRate >= 30
-      ? { emoji: "🐷", name: "Cofre Forte", line: `Guardou ${savingsRate.toFixed(0)}% da renda. Elite.` }
-      : ["Restaurante", "Delivery"].includes(topCat)
-      ? { emoji: "🍽️", name: "O Gourmet", line: `${topCat} liderou seus gastos este mês.` }
-      : topCat === "Lazer"
-      ? { emoji: "🎢", name: "Vida Boa", line: "Lazer no topo — viveu o mês, literalmente." }
-      : topCat === "Vestuário"
-      ? { emoji: "👟", name: "Estiloso(a)", line: "O guarda-roupa agradece." }
-      : savingsRate >= 10
-      ? { emoji: "⚖️", name: "Equilibrista", line: "Fechou no azul, com folga. Consistência é tudo." }
-      : savingsRate >= 0
-      ? { emoji: "🤏", name: "No Limite", line: "Fechou no azul... por pouco. Próximo mês a gente folga." }
-      : { emoji: "🌪️", name: "Mês Turbulento", line: "Saiu mais do que entrou. Acontece — agora tá no radar." };
-
   return {
     month, income, outflow, balance, savingsRate,
     topCategories, biggestExpense, pixPct,
     txCount: all.length,
-    ego, profile,
+    ego,
   };
 };
 
@@ -208,17 +200,28 @@ const Pop = ({ children, delay = 0.15, className = "" }: { children: React.React
 type SlideDef = { bg: string; blobs: [string, string]; node: React.ReactNode };
 
 interface Props {
-  data: WrappedData;
+  retro: RetroMes;
   onClose: () => void;
 }
 
-export const MonthlyWrapped = ({ data, onClose }: Props) => {
+export const MonthlyWrapped = ({ retro, onClose }: Props) => {
   const [idx, setIdx] = useState(0);
   const [sharing, setSharing] = useState(false);
-  const d = data;
+  const v = retro.vida;
+  const { mode } = useTheme();
+
+  // A retrospectiva é escura em tela cheia, doa o tema que doer: sem forçar,
+  // quem está no tema claro ficaria com relógio e bateria escuros por cima do
+  // roxo — invisíveis. Restaura ao sair.
+  useEffect(() => barraClaraEnquantoMontado(mode === "dark" ? "dark" : "light"), [mode]);
 
   const slides = useMemo<SlideDef[]>(() => {
     const s: SlideDef[] = [];
+    // `d` é o bloco de finanças. Quando é null, os slides de dinheiro
+    // simplesmente não entram e a retrospectiva vira só de vida — que é o
+    // caso de quem usa o CORE pra hábito, leitura e treino.
+    const d = retro.financas;
+    const mes = retro.mes;
 
     s.push({
       bg: "linear-gradient(165deg, #0c0a09 0%, #3b0764 160%)",
@@ -235,7 +238,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
           </motion.p>
           <Eyebrow>Retrospectiva CORE</Eyebrow>
           <Pop className="text-[44px] font-black text-white leading-[1.02] tracking-tight">
-            {d.month} fechou.<br />Bora ver como foi?
+            {mes} fechou.<br />Bora ver como foi?
           </Pop>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="text-white/45 text-sm mt-9">
             toca pra continuar →
@@ -244,7 +247,8 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
       ),
     });
 
-    s.push({
+    /* ---------------------------------------------------- bloco: dinheiro */
+    if (d) s.push({
       bg: "linear-gradient(165deg, #0c0a09 0%, #052e16 150%)",
       blobs: ["#10b981", "#D22D80"],
       node: (
@@ -276,7 +280,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
       ),
     });
 
-    if (d.topCategories.length > 0) {
+    if (d && d.topCategories.length > 0) {
       const max = d.topCategories[0].value || 1;
       s.push({
         bg: "linear-gradient(165deg, #500724 0%, #0c0a09 90%)",
@@ -313,7 +317,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
       });
     }
 
-    if (d.biggestExpense) {
+    if (d?.biggestExpense) {
       s.push({
         bg: "linear-gradient(165deg, #0c0a09 0%, #7c2d12 160%)",
         blobs: ["#f97316", "#D22D80"],
@@ -343,7 +347,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
       });
     }
 
-    if (d.pixPct > 0) {
+    if (d && d.pixPct > 0) {
       s.push({
         bg: "linear-gradient(165deg, #083344 0%, #0c0a09 95%)",
         blobs: ["#06b6d4", "#D22D80"],
@@ -365,7 +369,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
     }
 
     // ---- MOMENTO DE EGO (ou de realidade) ----
-    if (d.ego.kind === "reality") {
+    if (d?.ego.kind === "reality") {
       const e = d.ego;
       s.push({
         bg: "linear-gradient(170deg, #1c1917 0%, #450a0a 170%)",
@@ -401,7 +405,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
           </div>
         ),
       });
-    } else {
+    } else if (d) {
       const e = d.ego;
       const headline =
         e.kind === "saver" ? (
@@ -470,23 +474,182 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
       });
     }
 
+    /* ------------------------------------------------------- bloco: vida */
+
+    // CONSTÂNCIA. Vem antes de leitura/treino porque é o número que resume o
+    // mês inteiro: não "quanto você fez", e sim "quantos dias você apareceu".
+    if (v && v.diasAtivos > 0) {
+      const pct = Math.round((v.diasAtivos / Math.max(v.diasPossiveis, 1)) * 100);
+      s.push({
+        bg: "linear-gradient(165deg, #0c0a09 0%, #7c2d12 165%)",
+        blobs: ["#F59F0A", "#ea580c"],
+        node: (
+          <div className="text-center">
+            <Eyebrow>Sua constância</Eyebrow>
+            <p className="font-black tracking-tight text-[128px] leading-none text-amber-300 tabular-nums">
+              <CountUp to={v.diasAtivos} render={(n) => `${Math.round(n)}`} delay={0.3} duration={1.2} />
+            </p>
+            <Pop delay={0.9} className="text-white text-2xl font-bold mt-2">
+              dias no jogo em {mes}
+            </Pop>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }} className="text-white/50 text-base mt-2">
+              {pct}% dos dias do mês
+            </motion.p>
+            {v.melhorSequencia >= 3 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 1.5, type: "spring", stiffness: 200, damping: 14 }}
+                className="mt-8 inline-flex items-center gap-2 rounded-full border border-amber-300/30 bg-amber-300/10 backdrop-blur px-6 py-3"
+              >
+                <span className="text-xl">🔥</span>
+                <span className="text-white font-bold text-lg">
+                  {v.melhorSequencia} dias seguidos na melhor fase
+                </span>
+              </motion.div>
+            )}
+          </div>
+        ),
+      });
+    }
+
+    // LEITURA. O módulo mais usado do app em tempo por pessoa — e o que rende
+    // o print mais gostoso de postar, porque a pessoa lista os títulos.
+    if (v && v.livros.length > 0) {
+      s.push({
+        bg: "linear-gradient(165deg, #082f49 0%, #0c0a09 95%)",
+        blobs: ["#38bdf8", "#6366f1"],
+        node: (
+          <div className="w-full text-center">
+            <Eyebrow>Você leu</Eyebrow>
+            <p className="font-black tracking-tight text-[120px] leading-none text-sky-300 tabular-nums">
+              <CountUp to={v.livros.length} render={(n) => `${Math.round(n)}`} delay={0.3} />
+            </p>
+            <Pop delay={0.9} className="text-white text-2xl font-bold mt-1">
+              {v.livros.length === 1 ? "livro terminado" : "livros terminados"} 📖
+            </Pop>
+            <div className="mt-8 space-y-2.5 text-left">
+              {v.livros.slice(0, 4).map((l, i) => (
+                <motion.div
+                  key={`${l.titulo}-${i}`}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 1.1 + i * 0.18, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                  className="rounded-xl border border-white/12 bg-white/[0.06] backdrop-blur px-4 py-2.5"
+                >
+                  <p className="text-white font-bold text-[15px] leading-tight truncate">{l.titulo}</p>
+                  {l.autor && <p className="text-white/45 text-[12px] truncate">{l.autor}</p>}
+                </motion.div>
+              ))}
+              {v.livros.length > 4 && (
+                <p className="text-white/40 text-sm text-center pt-1">e mais {v.livros.length - 4}</p>
+              )}
+            </div>
+            {v.paginas > 0 && (
+              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.9 }} className="text-white/50 text-sm mt-6">
+                {v.paginas.toLocaleString("pt-BR")} páginas viradas
+              </motion.p>
+            )}
+          </div>
+        ),
+      });
+    }
+
+    if (v && v.treinos > 0) {
+      s.push({
+        bg: "linear-gradient(170deg, #0c0a09 0%, #4c0519 165%)",
+        blobs: ["#f43f5e", "#a21caf"],
+        node: (
+          <div className="text-center">
+            <motion.p
+              initial={{ scale: 0, rotate: -12 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 190, damping: 11 }}
+              className="text-6xl mb-5"
+            >
+              🏋️
+            </motion.p>
+            <Eyebrow>Na academia</Eyebrow>
+            <p className="font-black tracking-tight text-[120px] leading-none text-rose-300 tabular-nums">
+              <CountUp to={v.treinos} render={(n) => `${Math.round(n)}`} delay={0.4} />
+            </p>
+            <Pop delay={1} className="text-white text-2xl font-bold mt-1">
+              {v.treinos === 1 ? "treino registrado" : "treinos registrados"}
+            </Pop>
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="text-white/45 text-sm mt-6">
+              média de {(v.treinos / 4.3).toFixed(1)} por semana
+            </motion.p>
+          </div>
+        ),
+      });
+    }
+
+    // COMO VOCÊ ESTAVA. Fecha o bloco de vida com o dado mais íntimo — e o
+    // único que não é performance. Depois de contar dias e números, perguntar
+    // "e como você estava?" é o que faz a retrospectiva parecer sua.
+    if (v && (v.humorMedio !== null || v.diasDeDiario > 0)) {
+      const carinha = v.humorMedio === null ? "🪞"
+        : v.humorMedio >= 4.2 ? "😄" : v.humorMedio >= 3.4 ? "🙂" : v.humorMedio >= 2.6 ? "😐" : "😕";
+      s.push({
+        bg: "linear-gradient(165deg, #2e1065 0%, #0c0a09 95%)",
+        blobs: ["#a78bfa", "#D22D80"],
+        node: (
+          <div className="text-center">
+            <Eyebrow>Como você estava</Eyebrow>
+            <motion.p
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 180, damping: 11, delay: 0.2 }}
+              className="text-8xl mb-6"
+            >
+              {carinha}
+            </motion.p>
+            {v.humorMedio !== null && (
+              <>
+                <p className="font-black tracking-tight text-[76px] leading-none text-violet-200 tabular-nums">
+                  <CountUp to={v.humorMedio} render={(n) => n.toFixed(1)} delay={0.5} />
+                  <span className="text-white/30 text-4xl">/5</span>
+                </p>
+                <Pop delay={1.1} className="text-white/70 text-lg mt-3">humor médio do mês</Pop>
+              </>
+            )}
+            {v.diasDeDiario > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.4 }}
+                className="mt-8 rounded-2xl border border-white/15 bg-white/[0.07] backdrop-blur px-5 py-4"
+              >
+                <p className="text-white text-lg font-bold">
+                  {v.diasDeDiario} {v.diasDeDiario === 1 ? "dia de diário" : "dias de diário"} ✍️
+                </p>
+                <p className="text-white/55 text-sm mt-1">
+                  Ficou registrado. Daqui a um ano você vai querer reler.
+                </p>
+              </motion.div>
+            )}
+          </div>
+        ),
+      });
+    }
+
     s.push({
       bg: "linear-gradient(160deg, #D22D80 0%, #0c0a09 92%)",
       blobs: ["#f0abfc", "#7c3aed"],
       node: (
         <div className="text-center">
-          <Eyebrow>Seu perfil de {d.month}</Eyebrow>
+          <Eyebrow>Seu perfil de {mes}</Eyebrow>
           <motion.p
             initial={{ scale: 0, rotate: 10 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 180, damping: 10, delay: 0.2 }}
             className="text-8xl mb-6"
           >
-            {d.profile.emoji}
+            {retro.perfil.emoji}
           </motion.p>
-          <Pop className="text-[52px] font-black text-white tracking-tight leading-none">{d.profile.name}</Pop>
+          <Pop className="text-[52px] font-black text-white tracking-tight leading-none">{retro.perfil.name}</Pop>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="text-white/70 text-lg mt-5 max-w-[270px] mx-auto leading-snug">
-            {d.profile.line}
+            {retro.perfil.line}
           </motion.p>
           <motion.button
             initial={{ opacity: 0, y: 16 }}
@@ -495,8 +658,8 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
             onClick={async (e) => {
               e.stopPropagation();
               setSharing(true);
-              trackEvent("wrapped_share", { month: d.month });
-              const result = await renderWrappedImage(d);
+              trackEvent("wrapped_share", { month: mes });
+              const result = await renderWrappedImage(retro);
               if (result === "downloaded") toast.success("Imagem salva! Agora é só postar 🎉");
               setSharing(false);
             }}
@@ -511,7 +674,7 @@ export const MonthlyWrapped = ({ data, onClose }: Props) => {
     });
 
     return s;
-  }, [d, sharing]);
+  }, [retro, v, sharing]);
 
   const advance = (dir: 1 | -1) => {
     const next = idx + dir;

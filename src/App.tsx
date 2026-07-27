@@ -182,6 +182,8 @@ const Relacionamentos = lazy(() => import("./pages/Relacionamentos"));
 const PetPage = lazy(() => import("./pages/Pet"));
 const Detox = lazy(() => import("./pages/Detox"));
 const Conquistas = lazy(() => import("./pages/Conquistas"));
+const Retrospectiva = lazy(() => import("./pages/Retrospectiva"));
+const Notificacoes = lazy(() => import("./pages/Notificacoes"));
 const Preview = lazy(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
@@ -304,6 +306,10 @@ const AnimatedRoutes = () => {
         <Route path="/pet" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="pet"><TrackedModule moduleId="pet"><PetPage /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/detox" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="detox"><TrackedModule moduleId="detox"><Detox /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/conquistas" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="conquistas"><TrackedModule moduleId="conquistas"><Conquistas /></TrackedModule></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        {/* Destino da notificação mensal e do item do menu. Fora do TrackedModule:
+            não é módulo, é uma tela transversal que lê todos eles. */}
+        <Route path="/retrospectiva" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="retrospectiva"><Retrospectiva /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        <Route path="/notificacoes" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="notificacoes"><Notificacoes /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="funil" element={<AdminFunnel />} />

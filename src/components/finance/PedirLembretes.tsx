@@ -4,7 +4,7 @@ import { Bell, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/hooks/use-user-data";
 import { isNativeShell } from "@/lib/native-shell";
-import { agendarContas, pedirPermissao, temPermissao } from "@/lib/notificacoes";
+import { agendarContas, agendarRetrospectiva, pedirPermissao, temPermissao } from "@/lib/notificacoes";
 import { trackEvent } from "@/lib/analytics";
 
 const CHAVE_JA_PERGUNTOU = "lembretes-contas-perguntado";
@@ -58,8 +58,12 @@ export const PedirLembretes = ({ dueDays }: { dueDays: { day?: number; bills?: {
     set(CHAVE_JA_PERGUNTOU, "true");
     trackEvent("lembretes_permissao", { concedida: ok });
     if (ok) {
+      // liga os dois de uma vez: a permissão é única no Android, e quem
+      // aceitou "me avise" não vai querer ser perguntado de novo por causa da
+      // retrospectiva. Desligar cada um é papel da central, no menu.
       const quantos = await agendarContas(dueDays);
-      trackEvent("lembretes_agendados", { tipo: "contas", quantidade: quantos });
+      const retro = await agendarRetrospectiva();
+      trackEvent("lembretes_agendados", { contas: quantos, retrospectiva: retro });
       setPronto(true);
       setTimeout(() => setVisivel(false), 2200);
     } else {

@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2 } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -45,6 +45,8 @@ export const AccountDrawer = ({
   useEffect(() => {
     if (!open) return;
     import("@/pages/Conquistas");
+    import("@/pages/Retrospectiva");
+    import("@/pages/Notificacoes");
     if (isNativeShell()) import("@/pages/PlanosApp");
     else import("@/pages/Planos");
   }, [open]);
@@ -105,7 +107,11 @@ export const AccountDrawer = ({
     : [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
         { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
+        // 27/07: a retrospectiva existia escondida dentro de Finanças — quem
+        // não abria aquele módulo nunca soube. Agora tem porta no menu.
+        { icon: Sparkles, label: "Retrospectiva", onClick: () => go("/retrospectiva") },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
+        { icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") },
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 

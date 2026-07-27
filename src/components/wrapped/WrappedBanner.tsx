@@ -4,9 +4,8 @@ import { ChevronRight, X } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import { MonthlyWrapped, buildWrappedData } from "./MonthlyWrapped";
-
-const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+import { construirRetroMes, mesAnterior } from "@/lib/retrospectiva";
+import { MonthlyWrapped } from "./MonthlyWrapped";
 
 /**
  * Entrada da retrospectiva no topo do Dashboard: aparece quando o mês
@@ -18,12 +17,12 @@ export const WrappedBanner = () => {
   const [open, setOpen] = useState(false);
   const [dismissedMonth, setDismissedMonth] = usePersistedState<string>("wrapped-banner-dismissed", "");
 
-  const data = useMemo(() => {
-    const prevIdx = (new Date().getMonth() + 11) % 12;
-    return buildWrappedData(MONTHS[prevIdx], user?.id ?? null);
+  const retro = useMemo(() => {
+    const { ano, mesIdx } = mesAnterior();
+    return construirRetroMes(ano, mesIdx, user?.id ?? null);
   }, [user?.id]);
 
-  if (!data || dismissedMonth === data.month) return null;
+  if (!retro || dismissedMonth === retro.mes) return null;
 
   return (
     <>
@@ -34,18 +33,18 @@ export const WrappedBanner = () => {
         style={{ background: "linear-gradient(120deg, #1c1917 30%, #D22D80 160%)" }}
       >
         <button
-          onClick={() => { trackEvent("wrapped_open", { month: data.month }); setOpen(true); }}
+          onClick={() => { trackEvent("wrapped_open", { month: retro.mes, origem: "banner" }); setOpen(true); }}
           className="flex items-center gap-3 flex-1 min-w-0 text-left active:scale-[0.99] transition-transform"
         >
           <span className="grid place-items-center w-10 h-10 rounded-xl bg-white/15 text-xl shrink-0">🎁</span>
           <span className="flex-1 leading-tight min-w-0">
-            <span className="block text-sm font-bold">Sua retrospectiva de {data.month} tá pronta</span>
+            <span className="block text-sm font-bold">Sua retrospectiva de {retro.mes} tá pronta</span>
             <span className="block text-[11px] text-white/60 mt-0.5">Como foi seu mês em números — estilo wrapped</span>
           </span>
           <ChevronRight className="w-4 h-4 text-white/60 shrink-0" />
         </button>
         <button
-          onClick={() => { trackEvent("wrapped_dismiss", { month: data.month }); setDismissedMonth(data.month); }}
+          onClick={() => { trackEvent("wrapped_dismiss", { month: retro.mes }); setDismissedMonth(retro.mes); }}
           aria-label="Dispensar retrospectiva"
           className="shrink-0 grid place-items-center w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
         >
@@ -53,7 +52,7 @@ export const WrappedBanner = () => {
         </button>
       </motion.div>
 
-      {open && <MonthlyWrapped data={data} onClose={() => setOpen(false)} />}
+      {open && <MonthlyWrapped retro={retro} onClose={() => setOpen(false)} />}
     </>
   );
 };

@@ -695,7 +695,23 @@ function OfferScreen({
         style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
-          <div>
+          {/*
+            PULSO: sai no APP, FICA na web (28/07).
+
+            Tirei o pulso pra matar o repaint fantasma do WebView Android. Só
+            que este componente também é o paywall do /comecar, que está
+            rodando anúncio agora — e o pulso ali é elemento de conversão
+            calibrado (padrão Cal AI), não enfeite. Deixar a correção de um bug
+            de Android apagar um elemento de venda da web seria embutir uma
+            mudança por TEORIA junto de uma por DEFEITO: se a conversão caísse
+            semana que vem, ninguém saberia qual das duas foi.
+
+            Então o pulso é condicional: aparelho não pulsa, web continua igual
+            ao que está medido hoje.
+          */}
+          <motion.div
+            {...(nativo ? {} : { animate: { scale: [1, 1.02, 1] }, transition: { duration: 1.9, repeat: Infinity, ease: "easeInOut" } })}
+          >
             <Button
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
@@ -712,7 +728,7 @@ function OfferScreen({
                 ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
-          </div>
+          </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>

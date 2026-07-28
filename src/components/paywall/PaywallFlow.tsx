@@ -533,11 +533,24 @@ function OfferScreen({
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
-  // X aparece com atraso (padrão Cal AI)
+  /*
+   * X: só na WEB (27/07).
+   *
+   * O padrão Cal AI de mostrar o X com 1,8s de atraso continua valendo na web,
+   * onde o desenho está calibrado. No APP ele sai junto com o "voltar", pela
+   * mesma razão: sem downsell atrás, a saída não recupera ninguém — só entrega
+   * a pessoa ao app com a oferta pela metade. O funil do dia 14 não tem X, e é
+   * dele que estamos copiando o esqueleto.
+   *
+   * (Registro do meu erro: eu tinha dito ao dono que "o X nunca renderiza".
+   * Olhei o useState(false) e não vi este setTimeout três linhas abaixo. Ele
+   * renderizava sim, e o teste no aparelho é que mostrou.)
+   */
   useEffect(() => {
+    if (nativo) return;
     const t = setTimeout(() => setShowClose(true), 1800);
     return () => clearTimeout(t);
-  }, []);
+  }, [nativo]);
 
   /*
    * VOLTAR: dois caminhos, e misturá-los era o bug (27/07).
@@ -553,19 +566,20 @@ function OfferScreen({
    * WEB continua igual (pushState/popstate), porque lá o "voltar" é do
    * navegador e o comportamento está calibrado.
    *
-   * APP DA LOJA usa o backButton do Capacitor: evento próprio, sem encostar
-   * no histórico, sem corrida com o roteador. E faz o MESMO que o X — entrar
-   * no app, onde o portão de trial segura.
+   * APP DA LOJA (27/07, decisão do dono: "melhor tirar o voltar já que não tem
+   * downsell"): NENHUMA rota de fuga. É o mesmo desenho do funil do dia 14 —
+   * sem X, sem popstate, sem voltar que sai da oferta. A lógica é direta: a
+   * fuga só se paga quando existe algo esperando do outro lado (roleta,
+   * downsell de R$14,90). Sem isso, quem sai leva a oferta consigo e não
+   * volta — a saída vira ralo, não válvula.
+   *
+   * Sem ouvinte aqui, o botão voltar do Android faz o padrão do Capacitor:
+   * anda no histórico do webview. Quem veio da demo volta pra demo; quem
+   * chegou direto sai do app. Ninguém fica preso, e ninguém escorrega pra
+   * dentro do app com a oferta pela metade.
    */
   useEffect(() => {
-    if (isNativeShell()) {
-      let desligar = () => {};
-      import("@capacitor/app")
-        .then((m) => m.App.addListener("backButton", () => escapeRef.current()))
-        .then((ouvinte) => { desligar = () => { void ouvinte.remove(); }; })
-        .catch(() => {});
-      return () => desligar();
-    }
+    if (isNativeShell()) return;
     window.history.pushState({ paywall: true }, "");
     const onPop = () => escapeRef.current();
     window.addEventListener("popstate", onPop);

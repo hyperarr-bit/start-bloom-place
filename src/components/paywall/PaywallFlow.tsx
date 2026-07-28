@@ -129,16 +129,22 @@ function TransformChart({ label = CHART_LABEL.dinheiro }: { label?: string }) {
           animate={{ scale: [0, 1.4, 1], opacity: 1 }}
           transition={{ delay: 1.75, duration: 0.5 }}
         />
+        {/* halo do ponto final: entra uma vez e para. Antes pulsava pra
+            sempre — mais uma camada animada por cima de uma área que rola,
+            que é o que faz aparelho simples errar o repaint. */}
         <motion.circle
           cx="306" cy="20" r="10" fill="hsl(var(--accent) / 0.25)"
           initial={{ scale: 0 }}
-          animate={{ scale: [0.6, 1.15, 0.9, 1] }}
-          transition={{ delay: 1.85, duration: 1.6, repeat: Infinity, repeatType: "mirror" }}
+          animate={{ scale: [0.6, 1.15, 1] }}
+          transition={{ delay: 1.85, duration: 0.9 }}
         />
       </svg>
+      {/* right-12 e não right-4 (27/07): medido no aparelho, o ponto final do
+          gráfico (349→373px) caía EM CIMA do fim do chip (292→375px) e o
+          rótulo lia "Com o COR". Agora o chip para antes do ponto. */}
       <motion.span
         {...stagger(9)}
-        className="absolute right-4 top-11 text-[11px] font-bold text-accent bg-accent/10 rounded-full px-2 py-0.5"
+        className="absolute right-12 top-11 text-[11px] font-bold text-accent bg-accent/10 rounded-full px-2 py-0.5"
       >
         Com o CORE
       </motion.span>
@@ -662,14 +668,34 @@ function OfferScreen({
         {nativo && <AppLegalFooter />}
       </div>
 
-      {/* CTA sticky */}
+      {/*
+        CTA ANCORADO.
+
+        TENTEI mandar esta barra por portal pro body, como fiz no CtaFixo do
+        funil. NÃO FUNCIONA AQUI: o `body` do CORE tem `overflow-x: clip`
+        (index.css, pra não deixar nada vazar na horizontal), e `clip` — ao
+        contrário de `visible` — RECORTA descendentes `fixed`. Rolando a
+        página, a barra caía fora do retângulo do body e simplesmente não era
+        pintada: existia no DOM, media certo, e era invisível. Descobri
+        tirando print do aparelho parado, não lendo código.
+
+        Fica no lugar. O pulso infinito do botão é que saiu — era uma camada
+        animada pra sempre por cima de uma área que rola, que é o que faz
+        aparelho simples errar o repaint (e o dono já tinha pedido menos
+        agressividade no geral).
+      */}
       <div
-        className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white via-white/95 to-transparent pt-8"
+        // O degradê era curto demais (pt-8) e começava a desaparecer logo
+        // acima do botão: os cards de trás apareciam FATIADOS na altura do
+        // texto ("Finanças complet…" cortado no meio da letra), que é o que dá
+        // aquela sensação de tela quebrada. Agora a área de fade é o dobro e
+        // fica opaca por mais tempo — o conteúdo some por baixo em vez de ser
+        // cortado.
+        className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white from-55% via-white/90 to-transparent pt-16"
         style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
-          {/* Pulso sutil (padrão Cal AI): chama o olho sem parecer erro */}
-          <motion.div animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 1.9, repeat: Infinity, ease: "easeInOut" }}>
+          <div>
             <Button
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
@@ -686,7 +712,7 @@ function OfferScreen({
                 ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
-          </motion.div>
+          </div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
@@ -827,8 +853,17 @@ export function PaywallFlow({
     transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as const },
   };
 
+  /*
+   * SEM overflow-y-auto (27/07). Isso criava um SCROLLER ANINHADO: a página
+   * rolava por fora e o paywall rolava por dentro. Com uma barra `fixed` por
+   * cima, o WebView do Android invalidava só um pedaço da superfície e o
+   * conteúdo aparecia PINTADO DUAS VEZES, deslocado — o "mini bug" que o dono
+   * filmou (dá pra ver "R$ 1.200" e "SEU CONTROLE DO DINHEIRO" em dobro no
+   * meio do arrasto). A página inteira rola sozinha; o scroller de dentro
+   * nunca precisou existir.
+   */
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground overflow-y-auto">
+    <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground">
       {pixOffer && (
         <PixCheckout offer={pixOffer} context={context} onClose={() => setPixOffer(null)} />
       )}

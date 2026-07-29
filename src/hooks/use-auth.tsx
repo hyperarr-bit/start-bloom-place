@@ -13,7 +13,10 @@ const purgeLocalUserCache = () => {
     // PWA não pode mandar a pessoa de volta pro funil de vendas.
     // core-gw-arm é o braço do A/B de gateway: se a vassoura levar, a mesma
     // pessoa cai em gateways diferentes entre sessões e o teste vira lixo.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm"]);
+    // core-boas-vindas-visto: marca de dispositivo da comemoração pós-compra.
+    // Tem que estar nas DUAS listas (esta e a de use-user-data) — chave nova
+    // que começa com "core-" e fica fora some na primeira troca de conta.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

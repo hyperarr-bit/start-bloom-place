@@ -217,6 +217,15 @@ const PlanosApp = () => {
             {" · "}
             <a href="/termos" className="underline underline-offset-2">Termos de uso</a>
           </p>
+          {/* VERSÃO VISÍVEL (29/07). O app não mostrava a versão em lugar
+              nenhum, e isso custou caro: o dono testou o login com Google,
+              disse que ainda ia pro site, e ninguém sabia se era o conserto
+              que falhou ou se o aparelho estava com um build de cinco dias
+              atrás. Primeira pergunta de qualquer suporte, e não tínhamos
+              resposta. Vem do build (__APP_VERSION__), não escrito à mão. */}
+          <p className="text-[10px] text-muted-foreground/60 tabular-nums pt-1">
+            versão {__APP_VERSION__}
+          </p>
         </div>
       </main>
     </div>

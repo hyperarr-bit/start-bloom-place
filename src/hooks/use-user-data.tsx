@@ -69,6 +69,10 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   // Braço sorteado do A/B de gateway (abacate × pagarme): também é do
   // dispositivo. Varrer isso faria a pessoa trocar de gateway entre sessões.
   "core-gw-arm",
+  // "já vi a comemoração pós-compra" — de dispositivo de propósito, porque a
+  // tela aparece logo antes de um location.href e não dá tempo de sincronizar
+  // com o servidor. Fora daqui, a varredura apagaria e a tela voltaria.
+  "core-boas-vindas-visto",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;

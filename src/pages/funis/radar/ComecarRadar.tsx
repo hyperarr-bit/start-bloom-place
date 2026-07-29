@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, useLayoutEffect } from "react";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
+import { entrarComGoogle } from "@/lib/auth-nativo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
@@ -776,10 +777,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     setGoogleLoading(true);
     trackEvent("funnel_click", { cta: "signup_google", inapp: inApp });
     try { localStorage.setItem(FUNNEL_OAUTH_KEY, "true"); } catch { /* noop */ }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
-    });
+    // web igual ao que sempre foi; app vai por Custom Tab e volta em
+    // core://auth (antes voltava no SITE e deixava o app deslogado)
+    const { error } = await entrarComGoogle();
     if (error) {
       try { localStorage.removeItem(FUNNEL_OAUTH_KEY); } catch { /* noop */ }
       trackEvent("funnel_error", { where: "signup_google", inapp: inApp, message: (error.message || "").slice(0, 200) });

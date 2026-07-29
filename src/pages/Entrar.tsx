@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { entrarComGoogle } from "@/lib/auth-nativo";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -85,10 +86,9 @@ const Entrar = () => {
 
   const handleGoogle = async () => {
     setGoogleLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
-    });
+    // entrarComGoogle bifurca: web segue igual, app usa Custom Tab + core://auth
+    // (no app o redirect antigo devolvia a pessoa no SITE — ver auth-nativo.ts)
+    const { error } = await entrarComGoogle();
     if (error) {
       setErrorMsg("Não foi possível entrar com Google. Tente com e-mail e senha.");
       setGoogleLoading(false);
@@ -264,15 +264,16 @@ const Entrar = () => {
           </Button>
         </form>
 
-        {/* Quem criou a conta com Google no tutorial não tem senha — precisa desta porta.
-            Escondido em webview (Instagram/Gmail in-app) porque o OAuth quebra lá. */}
-        {/* No app das lojas o Google fica fora (25/07): o WebView roda em
-            localhost, então getAuthRedirectUrl() manda o callback pro SITE —
-            o navegador externo abre, a sessão nasce lá e nunca volta pro app.
-            Não há intent-filter de deep link pra trazer de volta. Botão que
-            leva pra fora e não retorna é reprovação na revisão; e-mail e senha
-            funcionam. Reativar junto com o deep link. */}
-        {!isInAppBrowser() && !isNativeShell() && (
+        {/* Quem criou a conta com Google não tem senha — precisa desta porta.
+            Escondido em webview (Instagram/Gmail in-app) porque o OAuth quebra lá.
+
+            O BOTÃO VOLTOU PRO APP (28/07). Em 25/07 ele foi escondido aqui com
+            a nota "reativar junto com o deep link", porque o callback ia pro
+            SITE e a sessão nascia no navegador. O deep link agora existe:
+            `core://auth` + Custom Tab (ver auth-nativo.ts), medido dentro do
+            APK. Sem esta porta, quem se cadastrava pelo Google no funil ficava
+            TRANCADO FORA na volta — sem senha pra tentar o e-mail. */}
+        {!isInAppBrowser() && (
           <>
             <div className="relative">
               <div className="absolute inset-0 flex items-center">

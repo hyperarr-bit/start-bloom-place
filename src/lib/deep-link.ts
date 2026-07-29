@@ -1,4 +1,5 @@
 import { isNativeShell } from "./native-shell";
+import { ehRetornoDeLogin, fecharNavegador, sessaoDoLink } from "./auth-nativo";
 
 /**
  * Deep links `core://` (27/07).
@@ -65,16 +66,31 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
     const mod = await import("@capacitor/app");
     const App = mod.App;
 
+    /* Nem todo core:// é atalho de módulo: o `core://auth` é a VOLTA DO LOGIN
+       com Google (ver auth-nativo.ts). Ele não vira rota — ele vira sessão.
+       Precisa ser testado ANTES da whitelist de rotas, senão cai como link
+       desconhecido e o login morre em silêncio. */
+    const tratar = async (url: string | null | undefined): Promise<boolean> => {
+      if (ehRetornoDeLogin(url)) {
+        const ok = await sessaoDoLink(url!);
+        await fecharNavegador();
+        // depois de logar, sai da tela de login/funil pro app
+        if (ok) navegar("/");
+        return true;
+      }
+      const rota = rotaDoLink(url);
+      if (rota) { navegar(rota); return true; }
+      return false;
+    };
+
     if (!jaConsumiuAbertura) {
       jaConsumiuAbertura = true;
       const inicial = await App.getLaunchUrl();
-      const rotaInicial = rotaDoLink(inicial?.url);
-      if (rotaInicial) navegar(rotaInicial);
+      await tratar(inicial?.url);
     }
 
     const ouvinte = await App.addListener("appUrlOpen", (evento) => {
-      const rota = rotaDoLink(evento?.url);
-      if (rota) navegar(rota);
+      void tratar(evento?.url);
     });
     return () => { void ouvinte.remove(); };
   } catch {

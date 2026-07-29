@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { entrarComGoogle } from "@/lib/auth-nativo";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,10 +40,8 @@ const Auth = () => {
 
   const handleGoogleAuth = async () => {
     setGoogleLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
-    });
+    // web igual; app usa Custom Tab + core://auth (ver auth-nativo.ts)
+    const { error } = await entrarComGoogle();
     if (error) {
       toast({ title: "Erro ao entrar com Google", description: error.message, variant: "destructive" });
       setGoogleLoading(false);

@@ -65,7 +65,11 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
         
         {streak > 0 && (
           <motion.div
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/10 border border-warning/20"
+            /* whitespace-nowrap: a 360px o selo partia em "19 dias" numa linha
+               e "consecutivos" na outra, virando uma pílula de duas alturas no
+               meio do card (foto do dono, 29/07). Selo é unidade — ou cabe
+               inteiro, ou não é selo. */
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/10 border border-warning/20 whitespace-nowrap max-w-full"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.7, type: "spring" }}

@@ -371,7 +371,7 @@ const DesenvolvimentoPessoal = () => {
               <div className="space-y-2">
                 {Object.entries(journalEntries).filter(([d]) => d !== today).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10).map(([date, entry]) => (
                   <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border">
-                    <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
+                    <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "long" })}</p>
                     <p className="text-[10px] text-muted-foreground italic mb-1">Prompt: {entry.prompt}</p>
                     <p className="text-xs">{entry.text}</p>
                   </div>
@@ -490,7 +490,7 @@ const DesenvolvimentoPessoal = () => {
               <h3 className="text-xs font-bold mb-3">📅 HISTÓRICO</h3>
               {Object.entries(gratitudeEntries).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 14).map(([date, items]) => (
                 <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border mb-2">
-                  <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}</p>
+                  <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "long" })}</p>
                   {(Array.isArray(items) ? items : []).filter(Boolean).map((item, i) => <p key={i} className="text-xs text-muted-foreground">• {item}</p>)}
                 </div>
               ))}

@@ -202,6 +202,53 @@ const Treino = () => {
     else setRawPlan(p);
   };
 
+  /*
+   * ZERA OS CHECKS NA VIRADA DA SEMANA (29/07, bug do dono: "fiz esse treino
+   * terça passada mas ainda estava marcado como feito hoje").
+   *
+   * A causa é a forma do dado: o `done` mora DENTRO do plano, na chave do dia
+   * da semana, sem data nenhuma. Marcar terça grava "TERÇA feito" — e fica
+   * assim pra sempre, porque nada nunca desmarcou. Na terça seguinte o
+   * exercício já nasce riscado.
+   *
+   * Em vez de pendurar uma data em cada exercício (mudaria o formato salvo de
+   * todo mundo e exigiria migração), guardo QUAL SEMANA os checks atuais
+   * pertencem. Semana nova, checks zerados — uma vez só, na primeira abertura.
+   *
+   * A semana começa na SEGUNDA porque é assim que o módulo é desenhado
+   * (weekDays começa em SEGUNDA); domingo pertence à semana que termina.
+   */
+  const [semanaDosChecks, setSemanaDosChecks] = usePersistedState<string>("treino-semana-dos-checks", "");
+  const semanaAtual = useMemo(() => {
+    const d = new Date();
+    const diaSemana = (d.getDay() + 6) % 7;        // 0 = segunda
+    const segunda = new Date(d);
+    segunda.setDate(d.getDate() - diaSemana);
+    segunda.setHours(0, 0, 0, 0);
+    return localDayKey(segunda);
+  }, []);
+
+  useEffect(() => {
+    if (!semanaAtual || semanaDosChecks === semanaAtual) return;
+    // primeira vez do usuário: só carimba a semana, sem mexer em nada
+    if (semanaDosChecks) {
+      setRawPlan((prev: any) => {
+        const plano = migratePlan(prev);
+        let mexeu = false;
+        const novo: WorkoutPlan = { ...plano };
+        for (const dia of Object.keys(novo)) {
+          const exs = novo[dia]?.exercises ?? [];
+          if (exs.some((e) => e.done)) {
+            mexeu = true;
+            novo[dia] = { ...novo[dia], exercises: exs.map((e) => ({ ...e, done: false })) };
+          }
+        }
+        return mexeu ? novo : prev;
+      });
+    }
+    setSemanaDosChecks(semanaAtual);
+  }, [semanaAtual, semanaDosChecks, setRawPlan, setSemanaDosChecks]);
+
   const [activeDays, setActiveDays] = usePersistedState<string[]>("treino-active-days", ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA"]);
   // Dias ativos normalizados: MAIÚSCULA + só dias válidos + sem repetição, na
   // ordem da semana. Cura dado sujo (23/07: contas com "Segunda" Title Case
@@ -490,9 +537,15 @@ const Treino = () => {
           </p>
           {workout.exercises.map((ex, i) => (
             <div key={i}>
-              <div className={`grid grid-cols-[20px_1fr_auto_28px] gap-2 items-center py-1.5 ${ex.done ? "opacity-60" : ""}`}>
+              {/* min-w-0 na coluna do nome (29/07). Sem isso a célula 1fr não
+                  encolhe abaixo do conteúdo: um exercício de nome comprido
+                  esticava a grade além dos 360px do aparelho e empurrava a 4ª
+                  coluna — o ✅ — pra fora da tela. Não dava pra marcar o
+                  treino. Bug do dono, e o pior tipo: some o CONTROLE, não o
+                  texto. */}
+              <div className={`grid grid-cols-[16px_minmax(0,1fr)_auto_28px] gap-1.5 items-center py-1.5 ${ex.done ? "opacity-60" : ""}`}>
                 <span className="text-[10px] text-muted-foreground">{i + 1}</span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <button
                     onClick={() => {
                       setWorkoutPlan(prev => {
@@ -513,10 +566,12 @@ const Treino = () => {
                     <span className="text-xs leading-none">{ex.tipo === "cardio" ? "🏃" : "🏋️"}</span>
                     {ex.tipo === "cardio" ? "Cardio" : "Força"}
                   </button>
-                  <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`}>
+                  {/* truncate: nome comprido vira reticências em vez de
+                      empurrar o resto da linha pra fora da tela */}
+                  <span className={`min-w-0 truncate px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`} title={ex.name}>
                     {ex.name}
                   </span>
-                  <button onClick={() => setShowObsFor(showObsFor === `${day}-${i}` ? null : `${day}-${i}`)} className="text-muted-foreground hover:text-foreground">
+                  <button onClick={() => setShowObsFor(showObsFor === `${day}-${i}` ? null : `${day}-${i}`)} className="shrink-0 text-muted-foreground hover:text-foreground">
                     <MessageSquare className={`w-3 h-3 ${ex.obs ? "text-amber-500" : ""}`} />
                   </button>
                 </div>

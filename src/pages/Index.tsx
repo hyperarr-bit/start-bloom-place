@@ -247,25 +247,29 @@ const Index = () => {
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
         {/* Compact summary bar - all tabs except dashboard and financeiro */}
         {activeTab !== "dashboard" && activeTab !== "financeiro" && (
-          <div className="bg-card rounded-lg border border-border px-4 py-2 flex items-center justify-between gap-3 overflow-x-auto">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground">Receitas</span>
-              <span className="text-xs font-bold text-green-500">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+          /* 2×2 EM VEZ DE FAIXA ROLÁVEL (29/07, foto do dono: "essa parte que
+             fala receitas, despesas, investimentos tá meio estranha").
+             Eram 4 colunas com valores de 5 dígitos numa tela de 360px: cabia
+             rolando, mas quem olha vê o último número cortado na borda e lê
+             como tela quebrada — ninguém adivinha que aquilo rola de lado.
+             Em duas linhas de dois, cada número tem largura inteira e nada se
+             move. */
+          <div className="bg-card rounded-lg border border-border px-3 py-2.5 grid grid-cols-2 gap-x-3 gap-y-2">
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-[10px] text-muted-foreground shrink-0">Receitas</span>
+              <span className="text-xs font-bold text-green-500 truncate">R$ {totalIncome.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="w-px h-4 bg-border flex-shrink-0" />
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground">Despesas</span>
-              <span className="text-xs font-bold text-red-400">R$ {monthlyOutflow.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-[10px] text-muted-foreground shrink-0">Despesas</span>
+              <span className="text-xs font-bold text-red-400 truncate">R$ {monthlyOutflow.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="w-px h-4 bg-border flex-shrink-0" />
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground">Dívidas</span>
-              <span className="text-xs font-bold text-orange-400">R$ {totalDebts.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-[10px] text-muted-foreground shrink-0">Dívidas</span>
+              <span className="text-xs font-bold text-orange-400 truncate">R$ {totalDebts.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="w-px h-4 bg-border flex-shrink-0" />
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] text-muted-foreground">Invest.</span>
-              <span className="text-xs font-bold text-purple-400">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <span className="text-[10px] text-muted-foreground shrink-0">Invest.</span>
+              <span className="text-xs font-bold text-purple-400 truncate">R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         )}

@@ -67,7 +67,9 @@ export const DailyMirror = () => {
               </div>
             </div>
 
-            <div className="flex-1">
+            {/* min-w-0: sem isso o flex-1 não encolhe abaixo do conteúdo e a
+                coluna toda escapava 31px pela direita a 360px (29/07) */}
+            <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-foreground mb-0.5">Como está sua pele hoje?</p>
               <p className="text-[10px] text-muted-foreground mb-2.5">
                 {streak > 0 ? `🔥 ${streak} dias consecutivos de rotina` : "Comece sua sequência hoje!"}

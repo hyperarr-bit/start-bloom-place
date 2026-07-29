@@ -80,11 +80,16 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
   const [showAccount, setShowAccount] = useState(false);
 
   const contextMessage = getContextualMessage(data);
-  const displayName = data.userName || user?.email?.split("@")[0] || "";
+  const nomeCompleto = data.userName || user?.email?.split("@")[0] || "";
+  /* Só o PRIMEIRO nome na saudação (29/07). "Boa tarde, João Victor 👋" não
+     cabe em 360px e virava "Boa tarde, João Vic…" — nome cortado no meio é
+     pior que nome curto. As iniciais do avatar continuam usando o nome
+     inteiro, que é onde as duas letras fazem sentido. */
+  const displayName = nomeCompleto.trim().split(/\s+/)[0] || "";
   const hasSetName = !!get<string>("core-user-name", "");
 
-  const initials = displayName
-    ? displayName.slice(0, 2).toUpperCase()
+  const initials = nomeCompleto
+    ? nomeCompleto.slice(0, 2).toUpperCase()
     : "?";
 
   const handleNameSave = (name: string) => {
@@ -103,7 +108,10 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <GreetingIcon className="w-4 h-4 text-warning" />
-            <h1 className="text-lg font-bold truncate">
+            {/* text-base em tela pequena (320px): a 18px "Boa tarde, João 👋"
+                  ainda cortava. O nome é a parte que importa — encolhe a fonte
+                  em vez de comer a palavra. */}
+            <h1 className="text-base sm:text-lg font-bold truncate">
               {greeting}{displayName ? `, ${displayName}` : ""} 👋
             </h1>
             {!hasSetName && (

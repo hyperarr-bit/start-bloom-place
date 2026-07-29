@@ -8,8 +8,6 @@ import {
 } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
-import coreLogo from "@/assets/core-logo.png";
-import coreLogoBlack from "@/assets/core-logo-black.png";
 import { TutorialDonePopup } from "@/components/onboarding/TutorialDonePopup";
 
 
@@ -71,6 +69,9 @@ const OPTIONS: Array<{
 
 const ALL_KEYS: ModuleKey[] = OPTIONS.map(o => o.key);
 const DEFAULT_SELECTED: ModuleKey[] = ["financas", "rotina", "dieta", "metas"];
+
+/** Cor da marca — a mesma da comemoração pós-compra (BoasVindasPago). */
+const MAGENTA = "hsl(330 65% 50%)";
 
 export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, forNewUser, replay, aberturaPeloMenu }: QuickStartOnboardingProps) => {
   /*
@@ -304,18 +305,27 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
               transition={{ duration: 0.25 }}
               className="flex flex-col items-center text-center gap-6 py-12"
             >
-              <img
-                src={coreLogoBlack}
-                alt="CORE"
-                className="w-28 h-16 object-contain dark:hidden"
-              />
-              <img
-                src={coreLogo}
-                alt="CORE"
-                className="w-28 h-16 object-contain hidden dark:block"
-              />
+              {/*
+                IDENTIDADE, NÃO PRETO E BRANCO (29/07, relato do dono: "ainda
+                estranho aquela tela de bem vindo ser preto e branco, não
+                combina com a estética do app").
+                Ele tinha razão: logo em escala de cinza e botão preto puro,
+                num app cuja marca é grafite + magenta. Era a única tela do
+                fluxo sem cor nenhuma. Agora o selo e o botão usam o magenta,
+                igual à comemoração pós-compra — as duas telas de "boas-vindas"
+                do app passam a falar a mesma língua.
+              */}
+              <motion.div
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 210, damping: 14 }}
+                className="grid place-items-center w-20 h-20 rounded-3xl text-white text-[30px] font-black"
+                style={{ background: MAGENTA, boxShadow: "0 14px 38px -14px hsl(330 65% 50% / 0.6)" }}
+              >
+                C
+              </motion.div>
               <div className="space-y-3">
-                <h1 className="text-2xl font-bold leading-tight text-foreground">
+                <h1 className="text-[26px] font-black tracking-tight leading-[1.1] text-foreground">
                   Organize sua vida
                   <br />
                   em 1 só lugar
@@ -326,7 +336,8 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
               </div>
               <button
                 onClick={handleStartClick}
-                className="mt-4 w-full max-w-[240px] py-3.5 rounded-xl bg-foreground text-background font-semibold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+                style={{ background: MAGENTA }}
+                className="mt-4 w-full max-w-[260px] py-3.5 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
               >
                 Quero começar <ArrowRight className="w-4 h-4" />
               </button>
@@ -395,6 +406,7 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
 
               <p className="text-[11px] text-muted-foreground text-center">
                 {selectedModules.length} de {OPTIONS.length} selecionados
+                {/* âncora: o botão de sair entra logo abaixo do contador */}
               </p>
 
               <button
@@ -404,6 +416,22 @@ export const QuickStartOnboarding = ({ onComplete, pendingModules, skipWelcome, 
               >
                 Continuar <ArrowRight className="w-4 h-4" />
               </button>
+
+              {/* SAÍDA COM NOME (29/07, relato do dono: "no rever tutorial não
+                  aparece a opção de terminar e sair"). Ela existia — um ✕ cinza
+                  de 36px, sem rótulo, no canto de cima. A tela SEGUINTE tinha
+                  um botão largo escrito "Encerrar tutorial". Duas saídas
+                  diferentes pra mesma ação, e a daqui era a invisível. Agora é
+                  a mesma nas duas. Só no replay: no primeiro uso a pessoa
+                  precisa escolher algo pra o tour existir. */}
+              {replay && (
+                <button
+                  onClick={encerrarReplay}
+                  className="w-full py-3 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-colors"
+                >
+                  Encerrar tutorial
+                </button>
+              )}
             </motion.div>
           ) : allDone ? null : (
             <motion.div

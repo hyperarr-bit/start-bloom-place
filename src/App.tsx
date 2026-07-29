@@ -268,6 +268,43 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
   }, [ligado]);
 };
 
+/**
+ * DEEP LINKS — fora das rotas, de propósito (29/07).
+ *
+ * Este ouvinte morava dentro do AnimatedRoutes, que é a rota CORINGA
+ * (`path="*"`). Só que `/entrar`, `/auth`, `/auth/callback`, `/acesso` e
+ * `/inicio` têm rota PRÓPRIA, declarada antes do coringa — nessas telas o
+ * AnimatedRoutes não está montado e ninguém estava ouvindo.
+ *
+ * Isso não incomodava enquanto o único deep link era o atalho do ícone (que
+ * chega com o app em qualquer lugar e navega). Passou a doer quando o link
+ * virou a VOLTA DO LOGIN com Google: quem tocava no botão a partir do
+ * /entrar autenticava e voltava pra um app que não estava escutando —
+ * exatamente o beco sem saída que a gente tinha acabado de fechar, só que por
+ * outro caminho. Descoberto com token real disparado por adb, não no papel.
+ *
+ * Aqui dentro do BrowserRouter (precisa do useNavigate) e fora do <Routes>:
+ * monta uma vez e vive enquanto o app viver.
+ */
+const DeepLinks = () => {
+  const navigate = useNavigate();
+  // navigate troca de identidade a cada navegação; com ele nas deps o efeito
+  // reexecutava, reinstalava o ouvinte e relia o link de abertura — era isso
+  // que fazia o atalho abrir a tela certa e voltar sozinho pra anterior.
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    let desligar = () => {};
+    import("@/lib/deep-link")
+      .then((m) => m.ligarDeepLinks((rota) => navigateRef.current(rota)))
+      .then((fn) => { desligar = fn; })
+      .catch(() => {});
+    return () => desligar();
+  }, []);
+  return null;
+};
+
 const AnimatedRoutes = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -292,17 +329,6 @@ const AnimatedRoutes = () => {
   // reexecutava toda vez — reinstalando o ouvinte e relendo o link de
   // abertura. Era isso que fazia o atalho abrir a tela certa e voltar sozinho
   // pra anterior.
-  const navigateRef = useRef(navigate);
-  navigateRef.current = navigate;
-  useEffect(() => {
-    if (!isNativeShell()) return;
-    let desligar = () => {};
-    import("@/lib/deep-link")
-      .then((m) => m.ligarDeepLinks((rota) => navigateRef.current(rota)))
-      .then((fn) => { desligar = fn; })
-      .catch(() => {});
-    return () => desligar();
-  }, []);
   return (
     <Suspense fallback={<div className="min-h-screen bg-background" />}>
     <AnimatePresence mode="wait">
@@ -391,6 +417,7 @@ const App = () => {
               <OfflineBanner />
               <BrowserRouter>
                 <ScrollToTop />
+                <DeepLinks />
                 <GracePeriodBanner />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />

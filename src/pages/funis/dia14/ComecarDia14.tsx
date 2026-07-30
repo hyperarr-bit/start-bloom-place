@@ -584,12 +584,12 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
  * Depoimentos REAIS (feedbacks do Instagram, curadoria do dono; fotos são
  * avatares escolhidos pelo dono — decisão dele, 29/07).
  */
-const PROVA_AVATARES = [
+const PROVA_AVATARES: Array<{ foto?: string; ini?: string; cor?: string }> = [
   { foto: "/depoimentos/mariana.jpg" },
+  { foto: "/depoimentos/joaop.jpg" },
+  { foto: "/depoimentos/amanda.jpg" },
   { foto: "/depoimentos/gabriel.jpg" },
-  { ini: "L", cor: "#127A56" },
-  { ini: "F", cor: "#E4572E" },
-  { ini: "J", cor: "#8FB8DA" },
+  { foto: "/depoimentos/fernandar.jpg" },
 ];
 
 function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
@@ -624,7 +624,10 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
           “Achei que seria só mais um app de finanças, mas acabei migrando praticamente minha
           rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”
         </p>
-        <p className="text-[11px] text-muted-foreground mt-2 font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
+        <div className="flex items-center gap-2 mt-2.5">
+          <img src="/depoimentos/joaop.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
+          <p className="text-[11px] text-muted-foreground font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
+        </div>
       </motion.div>
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
@@ -634,7 +637,10 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
           “A tela inicial personalizada foi o que mais me conquistou. Não preciso abrir cinco
           aplicativos diferentes durante o dia.”
         </p>
-        <p className="text-[11px] text-muted-foreground mt-2 font-semibold">Amanda L. — 21 anos · Fortaleza, CE <span className="text-[#f0a500]">★★★★★</span></p>
+        <div className="flex items-center gap-2 mt-2.5">
+          <img src="/depoimentos/amanda.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
+          <p className="text-[11px] text-muted-foreground font-semibold">Amanda L. — 21 anos · Fortaleza, CE <span className="text-[#f0a500]">★★★★★</span></p>
+        </div>
       </motion.div>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         Montar meu plano <ArrowRight className="w-4 h-4" />
@@ -691,9 +697,12 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
           “O que mais gostei foi que tudo fica conectado. Quando organizo minha rotina já lembro
           do treino, da dieta e até das contas que vencem naquela semana.”
         </p>
-        <p className="text-[10.5px] text-muted-foreground mt-1.5 font-semibold">
-          <span className="text-[#f0a500]">★★★★★</span> — Carlos H. · 31 anos · Florianópolis, SC
-        </p>
+        <div className="flex items-center gap-2 mt-2">
+          <img src="/depoimentos/carlos.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
+          <p className="text-[10.5px] text-muted-foreground font-semibold">
+            <span className="text-[#f0a500]">★★★★★</span> — Carlos H. · 31 anos · Florianópolis, SC
+          </p>
+        </div>
       </motion.div>
     </div>
   );

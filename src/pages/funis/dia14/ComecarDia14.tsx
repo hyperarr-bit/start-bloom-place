@@ -437,7 +437,7 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
           Número REAL: ~193 compras/semana medidas em 30/07 — manter honesto,
           atualizar se o ritmo mudar de patamar. */}
       <p className="text-[12px] font-semibold text-accent mb-5">
-        ▲ +190 pessoas entraram no CORE só esta semana
+        ▲ +190 pessoas entraram e aprovaram o CORE essa semana
       </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         Quero ver pra onde vai <ArrowRight className="w-4 h-4" />
@@ -470,7 +470,7 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
       </div>
       {/* Mesmo stat de uma linha do ramo de dinheiro (número real, 30/07). */}
       <p className="text-[12px] font-semibold text-accent mb-5">
-        ▲ +190 pessoas entraram no CORE só esta semana
+        ▲ +190 pessoas entraram e aprovaram o CORE essa semana
       </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         {proof.cta} <ArrowRight className="w-4 h-4" />

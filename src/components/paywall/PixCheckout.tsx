@@ -660,6 +660,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               <p className="text-[11px] text-muted-foreground mt-2">
                 <span className="text-[#f0a500]">★★★★★</span> +190 pessoas ativaram o CORE essa semana
               </p>
+              {/* Mata o medo do pós-pagamento ("e se eu fechar essa tela?").
+                  Promessa VERDADEIRA: o cakto-webhook manda o welcome email
+                  com link de acesso — 78/85 vendas nos últimos 3 dias. */}
+              <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
+                📩 Pagou? Além de liberar aqui na hora, seu acesso e o passo a passo
+                também chegam <strong className="text-foreground">no seu e-mail</strong> —
+                pode fechar esta tela sem medo.
+              </p>
               {v2?.missao && (
                 <p className="text-[12px] text-muted-foreground mt-2">
                   🎯 Te esperando lá dentro: <strong className="text-foreground">{v2.missao.toLowerCase()}</strong>

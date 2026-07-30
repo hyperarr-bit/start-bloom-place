@@ -111,7 +111,9 @@ export const AccountDrawer = ({
         // não abria aquele módulo nunca soube. Agora tem porta no menu.
         { icon: Sparkles, label: "Retrospectiva", onClick: () => go("/retrospectiva") },
         { icon: Trophy, label: "Conquistas", onClick: () => go("/conquistas") },
-        { icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") },
+        // Notificações são LOCAIS do app da loja — na web/PWA não existe como
+        // entregar (30/07, dono: some da web pra não virar ticket de suporte).
+        ...(isNativeShell() ? [{ icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") }] : []),
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 

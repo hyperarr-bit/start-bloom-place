@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { ArrowLeft, BellOff, BookOpen, CalendarCheck, Dumbbell, Receipt, Salad, Sparkles } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
@@ -34,6 +34,12 @@ const HORAS = [6, 7, 8, 9, 10, 12, 18, 20, 21, 22];
 type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta";
 
 const Notificacoes = () => {
+  // 30/07 (dono): na web/PWA não existe como ENTREGAR notificação local, e a
+  // tela com interruptores "que valem no app" só gera ticket de suporte.
+  // Fora do app da loja a rota nem abre. Antes de QUALQUER hook de propósito:
+  // isNativeShell() é constante na sessão, então a contagem de hooks é
+  // estável por ambiente. Reverter quando houver push web.
+  if (!isNativeShell()) return <Navigate to="/home" replace />;
   const navigate = useNavigate();
   const { get } = useUserData();
   const [prefs, setPrefs] = usePersistedState<PrefsNotificacoes>(CHAVE_PREFS, lerPrefs(undefined));

@@ -288,6 +288,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         const falta = PREPARO_MIN_MS - (Date.now() - t0);
         if (falta > 0) await new Promise((r) => setTimeout(r, falta));
       }
+      // CÓDIGO NOVO, ESTADO NOVO: sem isto, quem gera outro Pix depois do
+      // primeiro expirar cai numa tela que já diz "Código copiado!" — para um
+      // código que ela nunca copiou, e com o botão grande escondido. Mesma
+      // família do auto-copy: a tela afirmando algo que não aconteceu.
+      setCopiadoJa(false);
+      setMostrarQR(false);
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: braco });

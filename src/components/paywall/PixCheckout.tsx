@@ -600,6 +600,21 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     <p><strong className="text-foreground">2.</strong> Vá em <strong className="text-foreground">Pix → Copia e Cola</strong> e cole o código</p>
                     <p><strong className="text-foreground">3.</strong> Confirme <strong className="text-foreground">R$ {fmtBRL(pix.amount)}</strong> e volte aqui — libera na hora ✨</p>
                   </div>
+                  {/* REDE DE SEGURANÇA (30/07): esconder o QR criou um buraco —
+                      se o clipboard falhar em silêncio, a pessoa fica SEM nada
+                      pra colar. E 78% do tráfego chega pelo navegador de dentro
+                      do Instagram, onde a API de clipboard é justamente a mais
+                      furada. O código em texto selecionável é o plano B que
+                      sempre funciona: dá pra segurar e copiar na mão. */}
+                  <div className="text-left mb-4">
+                    <p className="text-[11.5px] text-muted-foreground mb-1.5">Não colou? Segura no código e copia na mão:</p>
+                    <p
+                      className="select-all break-all font-mono text-[10.5px] leading-snug bg-muted/60 border border-border rounded-lg p-2.5 text-foreground/80"
+                      onCopy={() => trackEvent("pix_copied", { offer, context, via: "selecao" })}
+                    >
+                      {pix.qrCode}
+                    </p>
+                  </div>
                 </>
               ) : (
                 <>
@@ -642,7 +657,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   onClick={() => { setMostrarQR(true); trackEvent("pix_qr_reveal", { offer, context }); }}
                   className="text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 mb-3"
                 >
-                  Prefiro escanear o QR code
+                  {copiadoJa ? "Pagar de outro celular? Mostrar QR code" : "Prefiro escanear o QR code"}
                 </button>
               )}
 

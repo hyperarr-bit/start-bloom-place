@@ -641,6 +641,23 @@ function OfferScreen({
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
         <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
         {braco === "b" && <MuralDepoimentos area={area} />}
+        {/* Laurels de fechamento (BitePal fecha as stories com "4.7 rating |
+            1M users"; Cal AI fecha o paywall com "Trusted by millions").
+            Números honestos: os que temos. */}
+        {braco === "b" && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
+              <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>
+              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">+500</div>
+              <div className="text-[10.5px] text-muted-foreground font-semibold">pessoas no CORE</div>
+            </div>
+            <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
+              <div className="text-[13px]" aria-hidden>📈</div>
+              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">+190</div>
+              <div className="text-[10.5px] text-muted-foreground font-semibold">entraram esta semana</div>
+            </div>
+          </div>
+        )}
         {braco === "b" && <GuaranteeTimeline />}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>

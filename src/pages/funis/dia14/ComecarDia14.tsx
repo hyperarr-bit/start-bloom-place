@@ -433,6 +433,12 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
         Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>.
         Registrar no CORE leva segundos.
       </p>
+      {/* Stat de uma linha no meio do quiz (Cal AI: "90% of users say...").
+          Número REAL: ~193 compras/semana medidas em 30/07 — manter honesto,
+          atualizar se o ritmo mudar de patamar. */}
+      <p className="text-[12px] font-semibold text-accent mb-5">
+        ▲ +190 pessoas entraram no CORE só esta semana
+      </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         Quero ver pra onde vai <ArrowRight className="w-4 h-4" />
       </Button>
@@ -462,6 +468,10 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
       <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
         <p className="text-[14px] leading-relaxed">{proof.card}</p>
       </div>
+      {/* Mesmo stat de uma linha do ramo de dinheiro (número real, 30/07). */}
+      <p className="text-[12px] font-semibold text-accent mb-5">
+        ▲ +190 pessoas entraram no CORE só esta semana
+      </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         {proof.cta} <ArrowRight className="w-4 h-4" />
       </Button>

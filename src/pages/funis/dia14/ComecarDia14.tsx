@@ -43,7 +43,7 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
+type Step = "start" | "quiz" | "prova" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
 
 const DEMO_URL = "/preview/financas?funnel=1&from=dia14";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -572,6 +572,77 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
   );
 }
 
+/* ------------------------------------------------ prova social no funil */
+
+/**
+ * Tela dedicada de prova (30/07) — cópia da lei do Cal AI analisada frame a
+ * frame ("Join over 10 million people like you": agregado + fileira de rostos
+ * + review, posicionada ANTES do "gerar seu plano"). O BitePal faz o mesmo no
+ * momento do compromisso ("Over 10,000+ with 5-star reviews"). Aqui ela entra
+ * entre o fim do quiz e o loading: a pessoa acabou de investir 5 respostas e
+ * está prestes a "receber" o plano — é o pico de compromisso do funil.
+ * Depoimentos REAIS (feedbacks do Instagram, curadoria do dono; fotos são
+ * avatares escolhidos pelo dono — decisão dele, 29/07).
+ */
+const PROVA_AVATARES = [
+  { foto: "/depoimentos/mariana.jpg" },
+  { foto: "/depoimentos/gabriel.jpg" },
+  { ini: "L", cor: "#127A56" },
+  { ini: "F", cor: "#E4572E" },
+  { ini: "J", cor: "#8FB8DA" },
+];
+
+function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
+  useEffect(() => { trackEvent("funnel_view", { step: "prova_social" }); }, []);
+  return (
+    <div className="w-full max-w-sm mx-auto text-center pt-4">
+      <div className="flex items-center justify-center mb-4" aria-hidden>
+        <span className="flex -space-x-2.5">
+          {PROVA_AVATARES.map((a, i) =>
+            a.foto ? (
+              <img key={i} src={a.foto} alt="" loading="lazy"
+                className="w-11 h-11 rounded-full border-2 border-white object-cover shadow-sm" />
+            ) : (
+              <span key={i} className="grid place-items-center w-11 h-11 rounded-full border-2 border-white text-[15px] font-bold text-white shadow-sm" style={{ background: a.cor }}>
+                {a.ini}
+              </span>
+            ))}
+        </span>
+      </div>
+      <div className="text-[15px] tracking-wide text-[#f0a500] mb-2" aria-label="5 estrelas">★★★★★</div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2">
+        Junte-se a <span className="text-accent">+500 pessoas</span><br />organizando a vida
+      </h2>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+        Gente que também cansou de app separado pra cada coisa.
+      </p>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+        className="rounded-2xl border border-border bg-card p-4 text-left mb-3"
+      >
+        <p className="text-[13px] leading-relaxed">
+          “Achei que seria só mais um app de finanças, mas acabei migrando praticamente minha
+          rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-2 font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
+      </motion.div>
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
+        className="rounded-2xl border border-border bg-card p-4 text-left mb-7"
+      >
+        <p className="text-[13px] leading-relaxed">
+          “A tela inicial personalizada foi o que mais me conquistou. Não preciso abrir cinco
+          aplicativos diferentes durante o dia.”
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-2 font-semibold">Amanda L. — 21 anos · Fortaleza, CE <span className="text-[#f0a500]">★★★★★</span></p>
+      </motion.div>
+      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
+        Montar meu plano <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
 function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
@@ -609,6 +680,21 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
           );
         })}
       </div>
+      {/* Prova no meio da espera (lei BitePal: a espera vira argumento). O
+          /comecar já faz isso; o dia14 não fazia. Entra depois do 1º passo
+          concluído pra não competir com o número grande. */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4 }}
+        className="mt-8 max-w-xs mx-auto rounded-2xl border border-border bg-card p-3.5 text-left"
+      >
+        <p className="text-[12.5px] leading-snug">
+          “O que mais gostei foi que tudo fica conectado. Quando organizo minha rotina já lembro
+          do treino, da dieta e até das contas que vencem naquela semana.”
+        </p>
+        <p className="text-[10.5px] text-muted-foreground mt-1.5 font-semibold">
+          <span className="text-[#f0a500]">★★★★★</span> — Carlos H. · 31 anos · Florianópolis, SC
+        </p>
+      </motion.div>
     </div>
   );
 }
@@ -980,10 +1066,11 @@ export default function ComecarDia14() {
                   setAnswers(a);
                   // Persiste pro paywall personalizar mesmo após OAuth/refresh
                   try { localStorage.setItem("funnel-quiz-answers", JSON.stringify(a)); } catch { /* noop */ }
-                  setStep("progress");
+                  setStep("prova");
                 }}
               />
             )}
+            {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} />}
             {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
             {step === "result" && (vitrine && area ? (
               <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />

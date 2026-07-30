@@ -11,7 +11,6 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
 
 /**
  * CÓPIA CONGELADA do paywall do DIA 14 (83c0d98, 14/07 22:30) — usada só pelo
@@ -336,25 +335,27 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
   );
 }
 
-/* ---------------------------------------------------- prova social (A/B) */
+/* ------------------------------------------------- prova social (30/07) */
 
 /**
- * BRAÇO B do teste de 30/07. Duas mudanças, as duas no paywall:
- *   1. prova social REAL (contagem do banco, via edge function prova-social)
- *   2. garantia DEPOIS do preço — "risco zero" só significa algo depois que a
- *      pessoa sabe qual é o risco. Hoje a garantia vem 2 blocos antes.
+ * DECISÃO DO DONO (29/07 à noite): sem A/B — o paywall novo entra pra 100%.
+ * O braço "a" fica no código como ROLLBACK instantâneo: PAYWALL_AB_FORCE="a"
+ * devolve o paywall de ontem inteiro (sem prova, garantia antes do preço).
  *
- * Por que A/B e não troca direta: amanhã o bid também muda (16→17). Se as duas
- * coisas entrarem pra todo mundo ao mesmo tempo, um dia ruim não diz qual das
- * duas causou. Os dois braços rodam sob o MESMO bid, então a comparação
- * paywall-vs-paywall fica limpa e o efeito do bid aparece no total do dia.
- *
- * Braço fixo por usuário (hash do id) pra ninguém ver a tela mudar. Pra forçar
- * no teste: localStorage["paywall-ab-force"] = "a" | "b".
- * Pra encerrar o teste: PAYWALL_AB_FORCE = "a" (volta ao de hoje) ou "b".
+ * A prova é a régua BitePal + Cal AI, adaptada:
+ *   - laurel ★★★★★ +500 sob o herói (Cal AI abre o paywall com laurel/nota;
+ *     "+500 pessoas" é o mesmo enunciado já usado no AppWelcome — 568 têm
+ *     acesso, arredondado PRA BAIXO);
+ *   - mural de depoimentos depois do preço (Cal AI tem uma tela só de
+ *     reviews; aqui vira seção — tela extra no funil custa ~5% de queda);
+ *   - depoimento na tela de espera (lei BitePal: a espera vira argumento);
+ *   - garantia DEPOIS do preço — risco zero só significa algo depois que a
+ *     pessoa sabe qual é o risco.
+ * O contador dinâmico "N nas últimas 24h" saiu (dono: número pequeno
+ * desconverte). A edge function prova-social segue no ar, sem uso por ora.
  */
 type PaywallArm = "a" | "b";
-const PAYWALL_AB_FORCE: PaywallArm | null = null;
+const PAYWALL_AB_FORCE: PaywallArm | null = "b";
 
 const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
   if (PAYWALL_AB_FORCE) return PAYWALL_AB_FORCE;
@@ -368,53 +369,122 @@ const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
   return Math.abs(h) % 2 === 0 ? "a" : "b";
 };
 
-/** Números REAIS de compradores. Sem número, não renderiza nada — inventar
- *  prova social é review falso, e isso não entra. */
-function useProvaSocial(ligado: boolean) {
-  const [dados, setDados] = useState<{ total: number; dia: number } | null>(null);
-  useEffect(() => {
-    if (!ligado) return;
-    let vivo = true;
-    supabase.functions.invoke("prova-social")
-      .then(({ data }) => {
-        if (vivo && data && typeof data.total === "number" && data.total > 0) {
-          setDados({ total: data.total, dia: Number(data.dia) || 0 });
-        }
-      })
-      .catch(() => { /* silêncio: a tela funciona sem isso */ });
-    return () => { vivo = false; };
-  }, [ligado]);
-  return dados;
-}
+/**
+ * Depoimentos REAIS (feedbacks do Instagram, curadoria e redação do dono,
+ * 29/07). Fotos: avatares escolhidos pelo dono pros dois destaques; o resto
+ * vai texto puro — o BitePal também mistura (o "Success stories" tem foto, os
+ * quotes do quiz não). `chip` = resultado concreto embaixo do nome, a régua
+ * do BitePal ("70 kg → 60 kg in 2,5 months"): resultado vende, elogio enfeita.
+ */
+type Depo = {
+  nome: string; meta: string; texto: string;
+  foto?: string; ini: string; cor: string; chip?: string;
+};
 
-/** Faixa fina logo abaixo do herói: quem já está dentro, e o movimento de hoje. */
-function ProvaSocialFaixa({ dados }: { dados: { total: number; dia: number } | null }) {
-  if (!dados) return null;
+const DEPO: Record<string, Depo> = {
+  mariana: { nome: "Mariana S.", meta: "22 anos · São Paulo, SP", ini: "M", cor: "#D22D80", foto: "/depoimentos/mariana.jpg", chip: "organiza a vida inteira no CORE",
+    texto: "Ameiii o app! As retrospectivas que aparecem todo mês são muito boas, o “Pergunte ao CORE” me ajuda a saber quanto posso gastar no dia sem sair do meu planejamento. Hoje organizo praticamente toda a minha vida por aqui." },
+  gabriel: { nome: "Gabriel A.", meta: "20 anos · Curitiba, PR", ini: "G", cor: "#127A56", foto: "/depoimentos/gabriel.jpg", chip: "do descontrole → guardando todo mês",
+    texto: "Gastava muito descontroladamente e nunca sabia para onde o dinheiro ia. O CORE me ajudou muito nessa questão. Hoje acompanho todos os meus gastos, sei exatamente quanto posso gastar por dia e finalmente consegui começar a guardar dinheiro." },
+  joaop: { nome: "João P.", meta: "24 anos · Campinas, SP", ini: "J", cor: "#8FB8DA",
+    texto: "Achei que seria só mais um app de finanças, mas acabei migrando praticamente minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa e isso mudou muito meus hábitos." },
+  juliana: { nome: "Juliana A.", meta: "26 anos · São Paulo, SP", ini: "J", cor: "#E4572E",
+    texto: "O “Pergunte ao CORE” é uma ideia genial. Sempre que bate dúvida de quanto ainda posso gastar no dia eu pergunto ali mesmo. Parece uma conversa e evita que eu extrapole meu orçamento." },
+  lucas: { nome: "Lucas M.", meta: "26 anos · Belo Horizonte, MG", ini: "L", cor: "#127A56", chip: "rotina que finalmente consegue seguir",
+    texto: "Consegui organizar minhas metas, dividir cada parte do meu dia por horário e criar uma rotina que realmente consigo seguir. Minha produtividade melhorou bastante e ficou muito mais fácil manter constância." },
+  beatriz: { nome: "Beatriz M.", meta: "19 anos · Goiânia, GO", ini: "B", cor: "#D22D80",
+    texto: "Comecei usando só pelas finanças e hoje uso mais a parte de rotina. Os blocos de foco, as tarefas e os hábitos me ajudaram muito na faculdade. Nunca consegui manter uma organização por tanto tempo." },
+  carlos: { nome: "Carlos H.", meta: "31 anos · Florianópolis, SC", ini: "C", cor: "#8FB8DA",
+    texto: "O que mais gostei foi que tudo fica conectado. Quando organizo minha rotina já lembro do treino, da dieta e até das contas que vencem naquela semana. Antes eu esquecia alguma coisa todo dia." },
+  fernandaR: { nome: "Fernanda R.", meta: "29 anos · Recife, PE", ini: "F", cor: "#E4572E", chip: "−5 kg em 1 mês",
+    texto: "Perdi no total 5 quilos em um mês. Meus treinos e minha dieta são todos organizados aqui, consigo registrar minhas cargas, acompanhar meu progresso e ainda gerar automaticamente a lista de compras da dieta." },
+  diego: { nome: "Diego R.", meta: "27 anos · Recife, PE", ini: "D", cor: "#127A56",
+    texto: "Treino há alguns anos e já testei vários aplicativos. O CORE foi o primeiro em que consegui registrar carga, acompanhar evolução e ainda deixar minha dieta no mesmo lugar." },
+  amanda: { nome: "Amanda L.", meta: "21 anos · Fortaleza, CE", ini: "A", cor: "#D22D80",
+    texto: "A tela inicial personalizada foi o que mais me conquistou. Deixo logo de cara minhas tarefas, quanto posso gastar, minha água, treino e alimentação. Não preciso abrir cinco aplicativos diferentes durante o dia." },
+  larissa: { nome: "Larissa F.", meta: "23 anos · Salvador, BA", ini: "L", cor: "#E4572E", chip: "hábito de leitura todo dia",
+    texto: "O módulo de Biblioteca é muito melhor do que eu imaginava. Finalmente consegui criar o hábito de ler todos os dias e acompanhar meu progresso. As metas anuais dão uma motivação enorme." },
+  gustavo: { nome: "Gustavo N.", meta: "20 anos · Curitiba, PR", ini: "G", cor: "#8FB8DA",
+    texto: "Organizei todas as provas, trabalhos e matérias da faculdade. O melhor é que consigo ver minhas tarefas junto com o restante da rotina, então fica bem mais difícil esquecer alguma entrega." },
+  patricia: { nome: "Patrícia S.", meta: "35 anos · Brasília, DF", ini: "P", cor: "#127A56",
+    texto: "O módulo Casa me salvou. Divido as tarefas com meu marido, controlo a despensa e nunca mais esqueci de comprar alguma coisa importante no mercado. É simples, mas resolve problemas do dia a dia." },
+  matheus: { nome: "Matheus V.", meta: "22 anos · Belo Horizonte, MG", ini: "M", cor: "#E4572E",
+    texto: "O que mais gostei é que o app não tenta fazer uma coisa só. Ele realmente organiza a vida inteira. Hoje não tenho mais aplicativo separado pra finanças, hábitos, tarefas, treino e leitura." },
+  fernandaO: { nome: "Fernanda O.", meta: "30 anos · Rio de Janeiro, RJ", ini: "F", cor: "#8FB8DA",
+    texto: "Dá pra perceber que o aplicativo foi pensado por alguém que realmente usa esse tipo de ferramenta. Tem muitos detalhes pequenos que fazem diferença no dia a dia. Quanto mais eu uso, mais funcionalidades descubro." },
+};
+
+/** 3 histórias casadas com a área que a pessoa escolheu no quiz (o BitePal
+ *  mostra perda de peso pra quem quer perder peso — a história certa pro
+ *  problema certo). Mariana abre em todas: é a mais completa. */
+const MURAL_POR_AREA: Record<AreaKey, Depo[]> = {
+  dinheiro: [DEPO.gabriel, DEPO.mariana, DEPO.joaop],
+  rotina: [DEPO.lucas, DEPO.mariana, DEPO.carlos],
+  corpo: [DEPO.fernandaR, DEPO.diego, DEPO.mariana],
+  saude: [DEPO.fernandaR, DEPO.amanda, DEPO.mariana],
+  metas: [DEPO.lucas, DEPO.larissa, DEPO.mariana],
+};
+const MURAL_EXTRA: Depo[] = [DEPO.matheus, DEPO.juliana, DEPO.beatriz, DEPO.gustavo, DEPO.patricia, DEPO.fernandaO];
+
+/** Laurel sob o herói — Cal AI abre o paywall com "Trusted by millions";
+ *  a nossa escala honesta é o +500 já usado no AppWelcome (568 têm acesso,
+ *  arredondado PRA BAIXO). Número dinâmico pequeno desconverte (dono, 29/07). */
+function LaurelProva() {
   return (
     <motion.div {...stagger(1)} className="flex items-center justify-center gap-2 mb-5 text-[12.5px]">
-      <span className="flex -space-x-1.5" aria-hidden>
-        {["#127A56", "#E4572E", "#8FB8DA"].map((c) => (
-          <span key={c} className="w-5 h-5 rounded-full border-2 border-white" style={{ background: c }} />
-        ))}
-      </span>
-      <span className="text-muted-foreground">
-        <strong className="text-foreground font-bold tabular-nums">{dados.total.toLocaleString("pt-BR")}</strong> pessoas já têm o CORE
-        {dados.dia > 0 && <> · <strong className="text-foreground font-bold tabular-nums">{dados.dia}</strong> nas últimas 24h</>}
-      </span>
+      <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span>
+      <span className="text-muted-foreground"><strong className="text-foreground font-bold">+500 pessoas</strong> organizando a vida no CORE</span>
     </motion.div>
   );
 }
 
-/** Reforço colado no preço — é ali que a decisão trava. */
-function ProvaSocialNoPreco({ dados }: { dados: { total: number; dia: number } | null }) {
-  if (!dados || dados.dia <= 0) return null;
+function DepoCard({ d }: { d: Depo }) {
   return (
-    <div className="flex items-center justify-center gap-2 text-[12px] text-muted-foreground mt-2">
-      <span className="relative flex h-2 w-2" aria-hidden>
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-      </span>
-      <span><strong className="text-foreground font-semibold tabular-nums">{dados.dia}</strong> pessoas entraram nas últimas 24 horas</span>
+    <div className="rounded-2xl border border-border bg-card p-4 text-left">
+      <div className="flex items-center gap-2.5">
+        {d.foto
+          ? <img src={d.foto} alt="" loading="lazy" className="w-10 h-10 rounded-full object-cover shrink-0" />
+          : <span className="grid place-items-center w-10 h-10 rounded-full text-[14px] font-bold text-white shrink-0" style={{ background: d.cor }}>{d.ini}</span>}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[13px] font-bold leading-tight truncate">{d.nome}</span>
+            <span className="text-[11px] text-[#f0a500] tracking-tight shrink-0" aria-label="5 estrelas">★★★★★</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground leading-tight">{d.meta}</div>
+        </div>
+      </div>
+      {d.chip && (
+        <div className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold px-2.5 py-1 mt-2.5">
+          <TrendingUp className="w-3 h-3" /> {d.chip}
+        </div>
+      )}
+      <p className="text-[12.5px] leading-relaxed text-foreground/90 mt-2.5">{d.texto}</p>
+    </div>
+  );
+}
+
+/** Mural dentro do paywall, depois do preço — o "Success stories from our
+ *  clients" do BitePal, com o "ver mais" fazendo o papel da tela-só-de-reviews
+ *  do Cal AI sem custar uma tela a mais no funil. */
+function MuralDepoimentos({ area }: { area: AreaKey }) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div className="text-left">
+      <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">
+        Histórias de quem já entrou
+      </div>
+      <div className="space-y-3">
+        {MURAL_POR_AREA[area].map((d) => <DepoCard key={d.nome} d={d} />)}
+        {aberto && MURAL_EXTRA.map((d) => <DepoCard key={d.nome} d={d} />)}
+      </div>
+      {!aberto && (
+        <button
+          onClick={() => { setAberto(true); trackEvent("funnel_click", { cta: "depoimentos_ver_mais" }); }}
+          className="w-full text-center text-[13px] font-semibold text-accent py-3"
+        >
+          Ver mais {MURAL_EXTRA.length} avaliações ↓
+        </button>
+      )}
     </div>
   );
 }
@@ -519,7 +589,6 @@ function LifetimeCard() {
 function OfferScreen({
   context, answers, onBuy, braco,
 }: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm }) {
-  const prova = useProvaSocial(braco === "b");
   // SEM rota de fuga (pedido do dono, 24/07): nesta cópia do dia 14 o X, o
   // popstate→roleta e o presente por inatividade saíram. A tela vende preço
   // cheio ou nada — o único caminho pra frente é o CTA do Pix.
@@ -553,7 +622,7 @@ function OfferScreen({
         Você já viu como funciona. Agora é com os seus números de verdade.
       </motion.p>
 
-      {braco === "b" && <ProvaSocialFaixa dados={prova} />}
+      {braco === "b" && <LaurelProva />}
 
       <div className="space-y-4">
         <motion.div {...stagger(2)}>
@@ -563,14 +632,13 @@ function OfferScreen({
         </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
-        {/* Braço A (hoje): garantia ANTES do preço. Braço B: preço primeiro e a
-            garantia logo abaixo dele, que é onde a objeção de risco nasce. */}
+        {/* Braço A (rollback): garantia ANTES do preço, sem mural. Braço B
+            (padrão): preço → histórias (BitePal) → garantia — o risco zero
+            responde a objeção DEPOIS que ela nasceu. */}
         {braco === "a" && <GuaranteeTimeline />}
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(10)}>
-          <LifetimeCard />
-          {braco === "b" && <ProvaSocialNoPreco dados={prova} />}
-        </motion.div>
+        <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
+        {braco === "b" && <MuralDepoimentos area={area} />}
         {braco === "b" && <GuaranteeTimeline />}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>

@@ -35,6 +35,18 @@ const log = (step: string, details?: unknown) => {
 type Stage = "h1" | "h24" | "h48" | "h72" | "d7";
 const DS_STAGES: Stage[] = ["h24", "h48", "h72"]; // estágios com oferta 14,90
 
+/* ESTÁGIOS QUE REALMENTE SAEM (29/07 — medido, não opinião).
+ * Os 3 toques novos rodaram 28-29/07: 799 e-mails, ZERO venda atribuída por
+ * clique. Se convertessem como h1/h24 esperaríamos ~5 — a chance de dar zero
+ * por azar é <1%. E cada disparo desses gasta reputação do domínio, que é o
+ * que faz h1/h24 chegarem na aba Principal.
+ * O gargalo real NÃO é quantidade de toque: 2.595 e-mails viraram 9 cliques
+ * (0,35%), e desses 9, 5 compraram (56%). Quem vê, compra. O problema é
+ * entrega/inbox — e mais volume só piora isso.
+ * Pra religar: devolve "h48","h72","d7" aqui. A copy, a migration e o SQL
+ * continuam intactos de propósito. */
+const ESTAGIOS_ATIVOS: Stage[] = ["h1", "h24"];
+
 const checkoutLink = (stage: Stage) => {
   const url = new URL("https://www.coreaplicativo.com.br/planos");
   url.searchParams.set("from", "recovery_email");
@@ -180,13 +192,20 @@ serve(async (req) => {
       return Response.json({ paused: true });
     }
 
-    const { data: candidates, error: candErr } = await supabase.rpc("recovery_email_candidates");
+    const { data: todosCandidatos, error: candErr } = await supabase.rpc("recovery_email_candidates");
     if (candErr) throw candErr;
-    if (!candidates?.length) {
+    // O SQL segue devolvendo os 5 estágios; o corte é aqui, numa linha só, pra
+    // religar sem migration. Quem for cortado simplesmente não recebe nada e
+    // continua elegível se um dia o estágio voltar.
+    // display_name nunca vem null: o SQL faz COALESCE pro prefixo do e-mail.
+    type Candidato = { user_id: string; email: string; display_name: string; stage: Stage };
+    const candidates = ((todosCandidatos ?? []) as Candidato[])
+      .filter((c) => ESTAGIOS_ATIVOS.includes(c.stage));
+    if (!candidates.length) {
       log("No candidates");
       return Response.json({ sent: 0 });
     }
-    log("Candidates", { count: candidates.length });
+    log("Candidates", { count: candidates.length, cortados: (todosCandidatos?.length ?? 0) - candidates.length });
 
     // MIRA: nos estágios com oferta, pula quem já gerou QR (a Cakto já manda
     // a régua dela pra esses — "Pague seu Pix" x5; martelar em dobro = spam).

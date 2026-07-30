@@ -171,7 +171,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // (b) o QR sai do palco (escaneiam ~5%) e fica atrás de "prefiro escanear";
   // (c) tentamos copiar sozinhos na entrada (sem gesto costuma falhar — ok,
   // o botão continua sendo o caminho).
-  const [copiadoJa, setCopiadoJa] = useState<null | "manual" | "auto">(null);
+  const [copiadoJa, setCopiadoJa] = useState(false);
   const [mostrarQR, setMostrarQR] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
@@ -374,16 +374,18 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, offer, context, pix?.orderId, braco]);
 
-  // Auto-copy na chegada do QR: quando o navegador deixa, a ação obrigatória
-  // já aconteceu. Silencioso no fracasso (Safari/Chrome mobile exigem gesto).
-  useEffect(() => {
-    if (step !== "qr" || !pix?.qrCode || copiadoJa) return;
-    navigator.clipboard?.writeText(pix.qrCode).then(() => {
-      setCopiadoJa("auto");
-      trackEvent("pix_copied", { offer, context, auto: true });
-    }).catch(() => { /* precisa de gesto — o botão resolve */ });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, pix?.qrCode]);
+  // AUTO-COPY REMOVIDO 4h depois de subir (30/07). Medição das primeiras 15
+  // cobranças: dos 4 que pagaram, os 4 fizeram cópia MANUAL; dos 5 em que só
+  // o auto disparou, ZERO pagou. Duas causas plausíveis, as duas ruins:
+  //   1. writeText() resolve mas o clipboard não recebe (mobile exige foco +
+  //      gesto) — a tela dizia "copiado pra você ✓" com a área de
+  //      transferência vazia. Mentir na hora do dinheiro é o pior caso.
+  //   2. o estado "copiado" trocava o CTA gigante por um "copiar de novo"
+  //      discreto ANTES da pessoa agir — some o botão que gera 75% de venda.
+  // O ganho era hipotético; o risco é real e imediato. O estado permanente
+  // (esse sim sustentado por dado) fica — só que disparado por toque humano.
+  // Voltar só com prova de que a escrita ocorreu (readText comparando), nunca
+  // confiando no resolve da promise.
 
   const copyCode = async () => {
     if (!pix) return;
@@ -399,7 +401,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       document.body.removeChild(ta);
     }
     setCopied(true);
-    setCopiadoJa("manual");
+    setCopiadoJa(true);
     trackEvent("pix_copied", { offer, context });
     setTimeout(() => setCopied(false), 2500);
   };
@@ -590,7 +592,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     <Check className="w-6 h-6" strokeWidth={3} />
                   </motion.div>
                   <h2 className="text-[22px] font-bold tracking-tight mb-1">
-                    {copiadoJa === "auto" ? "Código Pix copiado pra você ✓" : "Código copiado!"}
+                    Código copiado!
                   </h2>
                   <p className="text-[13px] text-muted-foreground mb-4">Agora é só colar no app do seu banco:</p>
                   <div className="text-left bg-muted/40 rounded-xl p-4 text-[14px] space-y-2.5 mb-4">

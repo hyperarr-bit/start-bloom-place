@@ -528,7 +528,10 @@ const Treino = () => {
           </div>
         </div>
         <div className="p-3">
-          <div className="grid grid-cols-[20px_1fr_auto_28px] gap-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border pb-1 mb-2">
+          {/* Cabeçalho de tabela só existe onde a linha É uma tabela (≥640px).
+              No celular a linha vira duas, e um cabeçalho de 4 colunas em cima
+              de um layout de 2 linhas alinha com nada. */}
+          <div className="hidden sm:grid grid-cols-[20px_1fr_auto_28px] gap-2 text-[10px] font-bold text-muted-foreground uppercase border-b border-border pb-1 mb-2">
             <span></span><span>Exercício</span><span className="text-center">S × R × Carga</span><span className="text-center">✓</span>
           </div>
           <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
@@ -537,15 +540,37 @@ const Treino = () => {
           </p>
           {workout.exercises.map((ex, i) => (
             <div key={i}>
-              {/* min-w-0 na coluna do nome (29/07). Sem isso a célula 1fr não
-                  encolhe abaixo do conteúdo: um exercício de nome comprido
-                  esticava a grade além dos 360px do aparelho e empurrava a 4ª
-                  coluna — o ✅ — pra fora da tela. Não dava pra marcar o
-                  treino. Bug do dono, e o pior tipo: some o CONTROLE, não o
-                  texto. */}
-              <div className={`grid grid-cols-[16px_minmax(0,1fr)_auto_28px] gap-1.5 items-center py-1.5 ${ex.done ? "opacity-60" : ""}`}>
-                <span className="text-[10px] text-muted-foreground">{i + 1}</span>
-                <div className="flex items-center gap-1 min-w-0">
+              {/*
+                DUAS LINHAS no celular (30/07) — e o porquê, pra ninguém desfazer.
+
+                Em 29/07 eu botei número, chip de tipo, nome, obs, 3 campos
+                numéricos e o ✅ numa linha só, com o nome em `minmax(0,1fr)`.
+                A conta a 360px: sobram ~100px pra coluna do nome, o chip
+                "Força" come 56 e o ícone de obs mais 12 — restam ~24px, UMA
+                LETRA. Uma usuária relatou: "agora não consigo ver o nome do
+                exercício". Ela estava certa.
+
+                Consertar o vazamento sacrificando o nome foi trocar um defeito
+                por outro pior: o exercício É a informação, os números são o
+                acessório. Não cabe tudo numa linha a 360px — então não força.
+
+                Celular: linha 1 = número + nome + obs + ✅
+                         linha 2 = chip + S × R × carga
+                ≥640px : a tabela de 4 colunas de sempre, que lá cabe.
+              */}
+              <div className={`grid gap-x-1.5 gap-y-1 items-center py-1.5 grid-cols-[16px_minmax(0,1fr)_28px] sm:grid-cols-[16px_minmax(0,1fr)_auto_28px] ${ex.done ? "opacity-60" : ""}`}>
+                <span className="col-start-1 row-start-1 text-[10px] text-muted-foreground">{i + 1}</span>
+                <div className="col-start-2 row-start-1 flex items-center gap-1 min-w-0">
+                  {/* truncate segue como rede de segurança — mas agora só entra
+                      em nome absurdo, não em todo nome. */}
+                  <span className={`min-w-0 truncate px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`} title={ex.name}>
+                    {ex.name}
+                  </span>
+                  <button onClick={() => setShowObsFor(showObsFor === `${day}-${i}` ? null : `${day}-${i}`)} className="shrink-0 text-muted-foreground hover:text-foreground">
+                    <MessageSquare className={`w-3 h-3 ${ex.obs ? "text-amber-500" : ""}`} />
+                  </button>
+                </div>
+                <div className="col-start-2 row-start-2 flex items-center gap-1 min-w-0 sm:col-start-3 sm:row-start-1">
                   <button
                     onClick={() => {
                       setWorkoutPlan(prev => {
@@ -566,15 +591,6 @@ const Treino = () => {
                     <span className="text-xs leading-none">{ex.tipo === "cardio" ? "🏃" : "🏋️"}</span>
                     {ex.tipo === "cardio" ? "Cardio" : "Força"}
                   </button>
-                  {/* truncate: nome comprido vira reticências em vez de
-                      empurrar o resto da linha pra fora da tela */}
-                  <span className={`min-w-0 truncate px-2 py-0.5 rounded text-[11px] font-medium ${exerciseColors[i % exerciseColors.length]} ${ex.done ? "line-through" : ""}`} title={ex.name}>
-                    {ex.name}
-                  </span>
-                  <button onClick={() => setShowObsFor(showObsFor === `${day}-${i}` ? null : `${day}-${i}`)} className="shrink-0 text-muted-foreground hover:text-foreground">
-                    <MessageSquare className={`w-3 h-3 ${ex.obs ? "text-amber-500" : ""}`} />
-                  </button>
-                </div>
                 {ex.tipo === "cardio" ? (
                   <div className="flex items-center gap-1">
                     <Input value={ex.duracao ?? ""} placeholder="min" inputMode="decimal" onChange={e => {
@@ -616,13 +632,17 @@ const Treino = () => {
                   }} className="text-xs h-6 w-16 text-center border-none bg-transparent p-0 font-medium" />
                 </div>
                 )}
+                </div>
+                {/* ✅ na linha do NOME (não na dos números): é a ação que
+                    fecha o exercício, tem que estar na altura em que a pessoa
+                    lê o que está marcando. */}
                 <button onClick={() => {
                   setWorkoutPlan(prev => {
                     const u = { ...prev }; u[day] = { ...u[day], exercises: [...u[day].exercises] };
                     u[day].exercises[i] = { ...u[day].exercises[i], done: !ex.done }; return u;
                   });
                   if (!ex.done && sessionStart) { setRestCountdown(restTime); setRestRunning(true); }
-                }} className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${ex.done ? "bg-green-500 border-green-500 scale-110" : "border-muted-foreground/30 hover:border-green-400"}`}>
+                }} className={`col-start-3 row-start-1 sm:col-start-4 w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-all ${ex.done ? "bg-green-500 border-green-500 scale-110" : "border-muted-foreground/30 hover:border-green-400"}`}>
                   {ex.done && <Check className="w-3 h-3 text-white" />}
                 </button>
               </div>

@@ -28,3 +28,6 @@ verify_jwt = false
 # é o header Authorization combinado no painel do RC (REVENUECAT_WEBHOOK_SECRET).
 [functions.revenuecat-webhook]
 verify_jwt = false
+
+[functions.prova-social]
+verify_jwt = false

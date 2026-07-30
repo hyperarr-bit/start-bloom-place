@@ -10,6 +10,8 @@ import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * CÓPIA CONGELADA do paywall do DIA 14 (83c0d98, 14/07 22:30) — usada só pelo
@@ -334,6 +336,89 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
   );
 }
 
+/* ---------------------------------------------------- prova social (A/B) */
+
+/**
+ * BRAÇO B do teste de 30/07. Duas mudanças, as duas no paywall:
+ *   1. prova social REAL (contagem do banco, via edge function prova-social)
+ *   2. garantia DEPOIS do preço — "risco zero" só significa algo depois que a
+ *      pessoa sabe qual é o risco. Hoje a garantia vem 2 blocos antes.
+ *
+ * Por que A/B e não troca direta: amanhã o bid também muda (16→17). Se as duas
+ * coisas entrarem pra todo mundo ao mesmo tempo, um dia ruim não diz qual das
+ * duas causou. Os dois braços rodam sob o MESMO bid, então a comparação
+ * paywall-vs-paywall fica limpa e o efeito do bid aparece no total do dia.
+ *
+ * Braço fixo por usuário (hash do id) pra ninguém ver a tela mudar. Pra forçar
+ * no teste: localStorage["paywall-ab-force"] = "a" | "b".
+ * Pra encerrar o teste: PAYWALL_AB_FORCE = "a" (volta ao de hoje) ou "b".
+ */
+type PaywallArm = "a" | "b";
+const PAYWALL_AB_FORCE: PaywallArm | null = null;
+
+const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
+  if (PAYWALL_AB_FORCE) return PAYWALL_AB_FORCE;
+  try {
+    const f = localStorage.getItem("paywall-ab-force");
+    if (f === "a" || f === "b") return f;
+  } catch { /* storage bloqueado (webview) — cai no hash */ }
+  const seed = uid || "anon";
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  return Math.abs(h) % 2 === 0 ? "a" : "b";
+};
+
+/** Números REAIS de compradores. Sem número, não renderiza nada — inventar
+ *  prova social é review falso, e isso não entra. */
+function useProvaSocial(ligado: boolean) {
+  const [dados, setDados] = useState<{ total: number; dia: number } | null>(null);
+  useEffect(() => {
+    if (!ligado) return;
+    let vivo = true;
+    supabase.functions.invoke("prova-social")
+      .then(({ data }) => {
+        if (vivo && data && typeof data.total === "number" && data.total > 0) {
+          setDados({ total: data.total, dia: Number(data.dia) || 0 });
+        }
+      })
+      .catch(() => { /* silêncio: a tela funciona sem isso */ });
+    return () => { vivo = false; };
+  }, [ligado]);
+  return dados;
+}
+
+/** Faixa fina logo abaixo do herói: quem já está dentro, e o movimento de hoje. */
+function ProvaSocialFaixa({ dados }: { dados: { total: number; dia: number } | null }) {
+  if (!dados) return null;
+  return (
+    <motion.div {...stagger(1)} className="flex items-center justify-center gap-2 mb-5 text-[12.5px]">
+      <span className="flex -space-x-1.5" aria-hidden>
+        {["#127A56", "#E4572E", "#8FB8DA"].map((c) => (
+          <span key={c} className="w-5 h-5 rounded-full border-2 border-white" style={{ background: c }} />
+        ))}
+      </span>
+      <span className="text-muted-foreground">
+        <strong className="text-foreground font-bold tabular-nums">{dados.total.toLocaleString("pt-BR")}</strong> pessoas já têm o CORE
+        {dados.dia > 0 && <> · <strong className="text-foreground font-bold tabular-nums">{dados.dia}</strong> nas últimas 24h</>}
+      </span>
+    </motion.div>
+  );
+}
+
+/** Reforço colado no preço — é ali que a decisão trava. */
+function ProvaSocialNoPreco({ dados }: { dados: { total: number; dia: number } | null }) {
+  if (!dados || dados.dia <= 0) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 text-[12px] text-muted-foreground mt-2">
+      <span className="relative flex h-2 w-2" aria-hidden>
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+      </span>
+      <span><strong className="text-foreground font-semibold tabular-nums">{dados.dia}</strong> pessoas entraram nas últimas 24 horas</span>
+    </div>
+  );
+}
+
 const TRUST_CHIPS = [
   { emoji: "🇧🇷", label: "Pix na hora" },
   { emoji: "🛡️", label: "Garantia de 7 dias" },
@@ -432,8 +517,9 @@ function LifetimeCard() {
 /* ----------------------------------------------------------------- offer */
 
 function OfferScreen({
-  context, answers, onBuy,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void }) {
+  context, answers, onBuy, braco,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm }) {
+  const prova = useProvaSocial(braco === "b");
   // SEM rota de fuga (pedido do dono, 24/07): nesta cópia do dia 14 o X, o
   // popstate→roleta e o presente por inatividade saíram. A tela vende preço
   // cheio ou nada — o único caminho pra frente é o CTA do Pix.
@@ -463,9 +549,11 @@ function OfferScreen({
       <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
         Seu plano pra<br /><span className="text-accent">{victory}</span><br />está pronto
       </motion.h1>
-      <motion.p {...stagger(1)} className="text-muted-foreground text-sm leading-relaxed mb-6">
+      <motion.p {...stagger(1)} className={`text-muted-foreground text-sm leading-relaxed ${braco === "b" ? "mb-4" : "mb-6"}`}>
         Você já viu como funciona. Agora é com os seus números de verdade.
       </motion.p>
+
+      {braco === "b" && <ProvaSocialFaixa dados={prova} />}
 
       <div className="space-y-4">
         <motion.div {...stagger(2)}>
@@ -475,9 +563,15 @@ function OfferScreen({
         </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
-        <GuaranteeTimeline />
+        {/* Braço A (hoje): garantia ANTES do preço. Braço B: preço primeiro e a
+            garantia logo abaixo dele, que é onde a objeção de risco nasce. */}
+        {braco === "a" && <GuaranteeTimeline />}
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(10)}><LifetimeCard /></motion.div>
+        <motion.div {...stagger(10)}>
+          <LifetimeCard />
+          {braco === "b" && <ProvaSocialNoPreco dados={prova} />}
+        </motion.div>
+        {braco === "b" && <GuaranteeTimeline />}
         <motion.div {...stagger(11)}><TrustChips /></motion.div>
       </div>
 
@@ -525,6 +619,10 @@ export function PaywallDia14({
   // ninguém mais SAI do app pra pagar.)
   const [pixOffer, setPixOffer] = useState<PixOffer | null>(null);
 
+  // Braço congelado no mount: ninguém vê a tela trocar de cara no meio.
+  const { user: abUser } = useAuth();
+  const [braco] = useState<PaywallArm>(() => bracoPaywall(abUser?.id));
+
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).
   const [quiz] = useState<Record<string, string>>(() => {
@@ -534,8 +632,11 @@ export function PaywallDia14({
 
   useEffect(() => {
     const name = context === "funnel" ? "funnel_view" : "paywall_view";
-    trackEvent(name, context === "funnel" ? { step: phase === "offer" ? "offer" : phase } : { phase: `v2_${phase}` });
-  }, [phase, context]);
+    // paywall_ab vai junto pra dar pra separar os dois braços na leitura do dia.
+    trackEvent(name, context === "funnel"
+      ? { step: phase === "offer" ? "offer" : phase, paywall_ab: braco }
+      : { phase: `v2_${phase}`, paywall_ab: braco });
+  }, [phase, context, braco]);
 
   const fade = {
     initial: { opacity: 0, y: 16 },
@@ -552,7 +653,7 @@ export function PaywallDia14({
       <div className="px-5">
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
-            <OfferScreen context={context} answers={quiz} onBuy={setPixOffer} />
+            <OfferScreen context={context} answers={quiz} onBuy={setPixOffer} braco={braco} />
           </motion.div>
         </AnimatePresence>
       </div>

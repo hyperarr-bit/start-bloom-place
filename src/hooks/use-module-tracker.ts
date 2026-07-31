@@ -15,6 +15,16 @@ export const useSetTrackedTab = (tabId: string) => {
 
 export const useTabReporter = () => useContext(TabTrackContext);
 
+/**
+ * Teto por visita (30/07). `visibilitychange` não dispara em todo caso — aba
+ * esquecida aberta virava "uso": medido em 26.759 visitas, a mediana é 11s e
+ * a MAIOR tem 81,5 horas; as 5% acima de 30min respondiam por 90% de todo o
+ * tempo somado, e o ranking de "quem mais usa" listava quem esqueceu a aba.
+ * 1800s é generoso (o p99 real, já inflado, é ~75min). O relatório do admin
+ * aplica o mesmo teto no histórico via LEAST().
+ */
+const TETO_VISITA_S = 1800;
+
 export const useModuleTracker = (moduleId: string) => {
   const { user } = useAuth();
   const enteredAt = useRef<Date>(new Date());
@@ -31,7 +41,7 @@ export const useModuleTracker = (moduleId: string) => {
         user_id: user.id,
         module_id: moduleId,
         entered_at: enteredAt.current.toISOString(),
-        duration_seconds: seconds,
+        duration_seconds: Math.min(seconds, TETO_VISITA_S),
         tab_id: currentTab.current,
       });
   }, [user, moduleId]);
@@ -48,7 +58,7 @@ export const useModuleTracker = (moduleId: string) => {
             user_id: user.id,
             module_id: moduleId,
             entered_at: enteredAt.current.toISOString(),
-            duration_seconds: seconds,
+            duration_seconds: Math.min(seconds, TETO_VISITA_S),
             tab_id: currentTab.current,
           });
       }

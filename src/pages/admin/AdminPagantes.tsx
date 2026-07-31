@@ -13,13 +13,53 @@ import { Panel, StatTile, EmptyState } from "./components";
 interface ModUse { id: string; seconds: number; opens: number }
 interface TabUse { module: string; tab: string; seconds: number }
 interface PayerRow {
-  email: string | null; name: string | null;
+  user_id: string; email: string | null; name: string | null;
   plan: string | null; status: string;
   subscribed_since: string; current_period_end: string | null;
   first_seen: string | null; last_seen: string | null;
   sessions: number; days_active: number; total_seconds: number; total_opens: number;
   actions: string[]; modules: ModUse[]; tabs: TabUse[];
+  /* 30/07 — sinais de acompanhamento (fuso de SP, calculados no SQL) */
+  active_today: boolean; last_7d_days: number;
+  days_since_last: number | null; days_since_buy: number;
 }
+
+/**
+ * RECORTES (30/07, pedido do dono: "sinto vontade de acompanhar mais").
+ *
+ * A lista tinha 605 linhas numa ordem só (data da compra) — dá pra ler no
+ * primeiro dia e nunca mais. Cada recorte responde uma pergunta que se
+ * pergunta de manhã, e o de MAIOR valor é "sumiram": comprou, não voltou.
+ * Só 30% dos compradores com 14+ dias abriram o app na última semana — esse
+ * é o balde onde mora churn silencioso de produto vitalício.
+ */
+type SegId = "todos" | "hoje" | "novos" | "fieis" | "sumidos" | "nunca";
+const SEGMENTOS: Array<{ id: SegId; label: string; sub: string; teste: (r: PayerRow) => boolean }> = [
+  { id: "todos", label: "Todos", sub: "todo mundo que pagou", teste: () => true },
+  { id: "hoje", label: "Usaram hoje", sub: "deram sinal hoje", teste: (r) => r.active_today },
+  { id: "novos", label: "Novos", sub: "compraram nos últimos 7 dias", teste: (r) => r.days_since_buy <= 7 },
+  { id: "fieis", label: "Fiéis", sub: "voltaram em 5+ dias diferentes", teste: (r) => r.days_active >= 5 },
+  { id: "sumidos", label: "Sumiram", sub: "compraram há 7d+ e não abrem há 7d+", teste: (r) => r.days_since_buy >= 7 && (r.days_since_last === null || r.days_since_last >= 7) },
+  { id: "nunca", label: "Nunca abriram", sub: "pagaram e nunca deram sinal", teste: (r) => r.sessions === 0 || r.days_since_last === null },
+];
+
+type SortId = "recentes" | "tempo" | "dias" | "sessoes" | "sumido";
+const ORDENS: Array<{ id: SortId; label: string; cmp: (a: PayerRow, b: PayerRow) => number }> = [
+  { id: "recentes", label: "Compra mais recente", cmp: (a, b) => +new Date(b.subscribed_since) - +new Date(a.subscribed_since) },
+  { id: "tempo", label: "Mais tempo no app", cmp: (a, b) => b.total_seconds - a.total_seconds },
+  { id: "dias", label: "Mais dias diferentes", cmp: (a, b) => b.days_active - a.days_active || b.total_seconds - a.total_seconds },
+  { id: "sessoes", label: "Mais sessões", cmp: (a, b) => b.sessions - a.sessions },
+  { id: "sumido", label: "Sumido há mais tempo", cmp: (a, b) => (b.days_since_last ?? 9999) - (a.days_since_last ?? 9999) },
+];
+
+/** "há Xd" com cor: verde hoje/ontem, âmbar até uma semana, vermelho sumido. */
+const tomDoSumico = (d: number | null) =>
+  d === null ? "text-destructive"
+    : d <= 1 ? "text-emerald-600 dark:text-emerald-400"
+      : d <= 6 ? "text-amber-600 dark:text-amber-400"
+        : "text-destructive";
+const rotuloSumico = (d: number | null) =>
+  d === null ? "nunca abriu" : d === 0 ? "hoje" : d === 1 ? "ontem" : `há ${d} dias`;
 
 // ações de ativação (o que a pessoa configurou de fato)
 const ACTION: Record<string, string> = {
@@ -75,6 +115,9 @@ export default function AdminPagantes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  const [seg, setSeg] = useState<SegId>("todos");
+  const [ordem, setOrdem] = useState<SortId>("recentes");
+  const [busca, setBusca] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -99,8 +142,27 @@ export default function AdminPagantes() {
     const topActions = Object.entries(actCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
     const activated = rows.filter((r) => (r.actions?.length ?? 0) > 0).length;
     const returned = rows.filter((r) => r.days_active > 1).length;
-    return { total: rows.length, withUse: withUse.length, topModules, avgMin, topActions, activated, returned };
+    const hoje = rows.filter((r) => r.active_today).length;
+    const semana = rows.filter((r) => r.last_7d_days > 0).length;
+    return { total: rows.length, withUse: withUse.length, topModules, avgMin, topActions, activated, returned, hoje, semana };
   }, [rows]);
+
+  /** Contagem de cada recorte — vai no próprio botão, pra decidir sem clicar. */
+  const contagens = useMemo(() => {
+    const m = {} as Record<SegId, number>;
+    for (const s of SEGMENTOS) m[s.id] = rows ? rows.filter(s.teste).length : 0;
+    return m;
+  }, [rows]);
+
+  const lista = useMemo(() => {
+    if (!rows) return [];
+    const seg_ = SEGMENTOS.find((s) => s.id === seg)!;
+    const q = busca.trim().toLowerCase();
+    return rows
+      .filter(seg_.teste)
+      .filter((r) => !q || (r.name ?? "").toLowerCase().includes(q) || (r.email ?? "").toLowerCase().includes(q))
+      .sort(ORDENS.find((o) => o.id === ordem)!.cmp);
+  }, [rows, seg, ordem, busca]);
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto w-full space-y-5">
@@ -124,10 +186,10 @@ export default function AdminPagantes() {
           {summary && (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatTile label="Pagantes" value={String(summary.total)} />
-                <StatTile label="Ativaram (configuraram algo)" value={`${summary.activated}`} sub={`${Math.round(summary.activated / summary.total * 100)}% · ${summary.total - summary.withUse} nem abriram`} />
-                <StatTile label="Voltaram outro dia" value={`${summary.returned}`} sub={`${Math.round(summary.returned / summary.total * 100)}% retenção`} />
-                <StatTile label="Tempo médio no app" value={`${summary.avgMin}min`} sub="de quem usou" />
+                <StatTile label="Usaram HOJE" value={String(summary.hoje)} sub={`${Math.round(summary.hoje / summary.total * 100)}% dos pagantes`} />
+                <StatTile label="Ativos na semana" value={String(summary.semana)} sub={`${Math.round(summary.semana / summary.total * 100)}% deram sinal em 7 dias`} />
+                <StatTile label="Pagantes" value={String(summary.total)} sub={`${summary.activated} configuraram algo · ${summary.total - summary.withUse} nem abriram`} />
+                <StatTile label="Tempo médio no app" value={`${summary.avgMin}min`} sub="visita conta até 30min" />
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 <Panel title="Módulos mais usados" sub="Soma do tempo de todos os pagantes — onde investir no produto">
@@ -168,9 +230,53 @@ export default function AdminPagantes() {
             </>
           )}
 
+          {/* RECORTES — a pergunta primeiro, a lista depois */}
+          <Panel>
+            <div className="flex flex-wrap gap-2">
+              {SEGMENTOS.map((sgm) => {
+                const on = seg === sgm.id;
+                return (
+                  <button
+                    key={sgm.id}
+                    onClick={() => { setSeg(sgm.id); setOpen(null); }}
+                    title={sgm.sub}
+                    className={`rounded-full px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
+                      on ? "bg-foreground text-background" : "bg-secondary hover:bg-muted text-foreground"}`}
+                  >
+                    {sgm.label}
+                    <span className={`ml-1.5 tabular-nums ${on ? "opacity-70" : "text-muted-foreground"}`}>{contagens[sgm.id]}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[12px] text-muted-foreground mt-2.5">{SEGMENTOS.find((s) => s.id === seg)!.sub}</p>
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome ou e-mail…"
+                className="flex-1 min-w-[180px] h-9 rounded-lg border border-border bg-background px-3 text-[13px]"
+              />
+              <select
+                value={ordem}
+                onChange={(e) => setOrdem(e.target.value as SortId)}
+                className="h-9 rounded-lg border border-border bg-background px-2.5 text-[13px] font-medium"
+              >
+                {ORDENS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+            </div>
+          </Panel>
+
+          <div className="text-[12px] text-muted-foreground">
+            Mostrando <b className="text-foreground">{lista.length}</b> de {rows.length}
+          </div>
+
           <div className="space-y-2.5">
-            {rows.map((r) => {
-              const key = r.email ?? r.subscribed_since;
+            {lista.length === 0 && <Panel><EmptyState label="Ninguém neste recorte." /></Panel>}
+            {lista.map((r) => {
+              // chave = user_id: o e-mail se repetia (mesma pessoa com 2
+              // assinaturas) e chave duplicada embaralha a lista no React.
+              const key = r.user_id;
               const isOpen = open === key;
               const used = r.total_seconds > 0;
               return (
@@ -183,6 +289,11 @@ export default function AdminPagantes() {
                       <div className="flex items-center gap-2">
                         {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
                         <span className="font-bold text-[14px] truncate">{r.name || r.email || "(sem e-mail)"}</span>
+                        {r.active_today && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
+                            hoje
+                          </span>
+                        )}
                         <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLE[r.status] ?? "bg-muted text-muted-foreground"}`}>
                           {STATUS[r.status] ?? r.status}
                         </span>
@@ -194,6 +305,9 @@ export default function AdminPagantes() {
                         <span>· último {fmtDT(r.last_seen)}</span>
                         <span>· {r.sessions} sessões</span>
                         <span className={r.days_active > 1 ? "text-emerald-600 font-semibold" : ""}>· {r.days_active} {r.days_active === 1 ? "dia" : "dias"} ativo{r.days_active === 1 ? "" : "s"}{r.days_active > 1 ? " ↩" : ""}</span>
+                        <span>· {r.last_7d_days}/7 dias na semana</span>
+                        <span className={`font-semibold ${tomDoSumico(r.days_since_last)}`}>· abriu {rotuloSumico(r.days_since_last)}</span>
+                        <span>· comprou há {r.days_since_buy}d</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">

@@ -16,9 +16,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  *   h72 (72-96h) última chamada — expira à meia-noite, último e-mail com ds
  *   d7  (7-10d)  winback frio sem oferta, preço cheio
  *
- * MIRA (28/07): h24/h48/h72 PULAM quem já gerou QR — a Cakto já martela esses
- * com a régua própria dela ("Pague seu Pix", 5 envios); e-mail duplo = spam.
- * h1 e d7 vão pra todos os candidatos.
+ * MIRA INVERTIDA (30/07): NINGUÉM é pulado. A mira de 28/07 excluía quem
+ * gerou QR dos estágios com oferta; a medição de 403 QRs (22-29/07) mostrou
+ * que 99,5% de quem não paga no mesmo dia NUNCA paga — logo, aos 24h não há
+ * venda cheia a proteger, e esse é o balde de maior intenção do funil.
+ * Detalhe do h1: preço CHEIO de propósito — é o único toque que ainda alcança
+ * a janela viva (49% dos QRs pagam no mesmo dia) e é de onde saem todas as
+ * vendas de 27,90 da régua.
  *
  * PREVIEW: POST {preview:"email@x.com"} manda os 5 estágios pra esse endereço
  * sem gravar nada — pro dono aprovar copy no próprio inbox.
@@ -61,8 +65,17 @@ const checkoutLink = (stage: Stage) => {
 const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
 const PRECO_DS = `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 27,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 14,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`;
 
+/** Primeiro nome utilizável pro assunto. O SQL faz COALESCE pro prefixo do
+ *  e-mail, então metade dos "nomes" é lixo tipo "joao.silva92" — assunto
+ *  personalizado com isso é pior que sem. Só passa o que PARECE nome. */
+const primeiroNome = (raw: string): string | null => {
+  const t = (raw || "").trim().split(/[\s._\-0-9]+/).filter(Boolean)[0] ?? "";
+  if (!/^[A-Za-zÀ-ÿ]{2,15}$/.test(t)) return null;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+};
+
 const COPY: Record<Stage, {
-  subject: string;
+  subject: (nome: string | null) => string;
   headline: string;
   intro: (name: string) => string;
   selo: string;
@@ -71,16 +84,24 @@ const COPY: Record<Stage, {
   rodape: string;
 }> = {
   h1: {
-    subject: "você esqueceu uma coisa aqui 👀",
-    headline: "Seu plano ficou pronto. Você, não.",
-    intro: (n) => `${n}, você montou seu plano no CORE e parou bem na portinha. Tá tudo guardado do jeito que você deixou — suas respostas, seu módulo, seu começo. Falta só 1 Pix pra tudo isso ser seu <b>pra sempre</b> (sem mensalidade, nunca).`,
-    selo: "SEU ACESSO VITALÍCIO TE ESPERANDO",
+    // PUNK, PREÇO CHEIO (30/07). O h1 é o único toque que ainda pega gente
+    // dentro da janela viva de compra (49% dos QRs pagam no mesmo dia, mediana
+    // 1min) — é dele que saíram TODAS as vendas de 27,90 da régua. Descontar
+    // aqui cortaria a receita pela metade e treinaria a espera.
+    // Emoji fora do assunto de propósito: a suspeita nº1 dos 0,35% de clique é
+    // aba Promoções, e emoji no assunto é gatilho clássico.
+    // NÃO anuncia o desconto de amanhã: avisar que vem desconto é ensinar a
+    // esperar — foi o que custou 7 pontos de conversão cheia no paywall.
+    subject: (nome) => nome ? `${nome}, seu plano ficou pronto. e você sumiu.` : "seu plano ficou pronto. e você sumiu.",
+    headline: "Você parou a 1 Pix de distância",
+    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 27,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 27,90 é menos que um lanche.</b> A diferença é que o lanche acaba hoje.`,
+    selo: "SEU ACESSO VITALÍCIO ESTÁ RESERVADO",
     preco: PRECO_CHEIO,
-    cta: "Continuar de onde parei →",
-    rodape: "Leva 1 minuto: entra, gera o Pix e o acesso libera na hora.",
+    cta: "Destravar meu acesso agora →",
+    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 27,90.",
   },
   h24: {
-    subject: "R$ 14,90 hoje. R$ 27,90 amanhã.",
+    subject: () => "R$ 14,90 hoje. R$ 27,90 amanhã.",
     headline: "Metade do preço. Uma vez na vida.",
     intro: (n) => `${n}, sem enrolação: como é sua primeira semana, sua condição de boas-vindas liberou o CORE vitalício por <b>R$ 14,90 — 46% off, pagamento único</b>. Essa condição vale <b>48 horas</b> e não volta. Depois é R$ 27,90 (que ainda custa menos que uma pizza — só que organiza sua vida inteira).`,
     selo: "🎁 46% OFF — VALE 48 HORAS",
@@ -89,7 +110,7 @@ const COPY: Record<Stage, {
     rodape: "O link já abre com o Pix de R$ 14,90 — paga e libera na hora.",
   },
   h48: {
-    subject: "ontem, 31 pessoas entraram. você leu o e-mail.",
+    subject: () => "ontem, 31 pessoas entraram. você leu o e-mail.",
     headline: "Enquanto você decide, todo mundo entra",
     intro: (n) => `${n}, só ontem 31 pessoas garantiram o acesso vitalício. Uma delas me escreveu essa semana: <i>"finalmente sei pra onde meu dinheiro vai"</i> — 3 dias depois de quase desistir, igual você agora. Sua condição de <b>R$ 14,90 morre amanhã à noite</b>. Depois disso, essa história é de outra pessoa.`,
     selo: "⏳ ÚLTIMO DIA COMPLETO DE OFERTA",
@@ -98,7 +119,7 @@ const COPY: Record<Stage, {
     rodape: "16 módulos, pagamento único, garantia de 7 dias.",
   },
   h72: {
-    subject: "⏰ à meia-noite isso expira (sem choro)",
+    subject: () => "à meia-noite isso expira (sem choro)",
     headline: "Última chamada — e é a última mesmo",
     intro: (n) => `${n}, hoje às 23h59 sua condição de <b>R$ 14,90 expira</b> e este é o último e-mail que oferece esse valor. Sem falsa escassez: amanhã o preço é R$ 27,90 e a gente para de escrever sobre isso. Se o CORE não é pra você, tudo certo. Se é — <b>agora ou nunca é agora</b>.`,
     selo: "🚨 EXPIRA HOJE ÀS 23H59",
@@ -107,7 +128,7 @@ const COPY: Record<Stage, {
     rodape: "Depois da meia-noite este link volta pro preço cheio.",
   },
   d7: {
-    subject: "a gente parou de escrever. teu plano, não.",
+    subject: () => "a gente parou de escrever. teu plano, não.",
     headline: "Ainda tá tudo aqui",
     intro: (n) => `${n}, faz uma semana que você montou um plano pra organizar sua vida — e o problema que te trouxe até ele provavelmente continua aí. Sem oferta, sem contagem regressiva: só um lembrete de que sua conta existe e seu plano continua guardado, esperando você voltar.`,
     selo: "ACESSO VITALÍCIO",
@@ -175,7 +196,7 @@ serve(async (req) => {
           headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
             from, to: [to],
-            subject: `[${stage}] ${COPY[stage].subject}`,
+            subject: `[${stage}] ${COPY[stage].subject("João")}`,
             html: emailHtml(stage, "João", checkoutLink(stage)),
           }),
         });
@@ -207,10 +228,26 @@ serve(async (req) => {
     }
     log("Candidates", { count: candidates.length, cortados: (todosCandidatos?.length ?? 0) - candidates.length });
 
-    // MIRA: nos estágios com oferta, pula quem já gerou QR (a Cakto já manda
-    // a régua dela pra esses — "Pague seu Pix" x5; martelar em dobro = spam).
+    /* MIRA INVERTIDA (30/07) — a de 28/07 estava apontada pro lado errado.
+     *
+     * Ela pulava quem gerou QR nos estágios com oferta, pra não martelar em
+     * dobro com a régua da Cakto. Aí eu medi as 403 pessoas que geraram QR
+     * entre 22 e 29/07:
+     *     pagaram no mesmo dia (≤12h)   198  (49%)
+     *     pagaram no dia seguinte         1  (0,2%)
+     *     pagaram depois                  1  (0,2%)
+     *     NUNCA pagaram                 203  (50%)
+     * Ou seja: quem não paga nas primeiras horas não paga nunca — nem com a
+     * régua da Cakto batendo a preço cheio. Aos 24h NÃO EXISTE venda cheia a
+     * proteger nesse balde, então o 14,90 ali não canibaliza nada; e é o
+     * segmento de MAIOR intenção do funil (chegou até o dinheiro). São ~25
+     * pessoas/dia que estavam recebendo nada de nós.
+     *
+     * Lista vazia = ninguém é pulado. Pra restaurar a mira antiga, devolve
+     * ["h24","h48","h72"] aqui — o mecanismo continua inteiro embaixo. */
+    const PULAR_QUEM_GEROU_QR: Stage[] = [];
     const idsDs = [...new Set((candidates as Array<{ user_id: string; stage: Stage }>)
-      .filter((c) => DS_STAGES.includes(c.stage)).map((c) => c.user_id))];
+      .filter((c) => PULAR_QUEM_GEROU_QR.includes(c.stage)).map((c) => c.user_id))];
     const comQR = new Set<string>();
     for (let i = 0; i < idsDs.length; i += 50) {
       const { data: qs } = await supabase
@@ -223,7 +260,7 @@ serve(async (req) => {
     for (const c of candidates) {
       try {
         const stage = c.stage as Stage;
-        if (DS_STAGES.includes(stage) && comQR.has(String(c.user_id))) {
+        if (PULAR_QUEM_GEROU_QR.includes(stage) && comQR.has(String(c.user_id))) {
           // marca como "enviado" pra régua não tentar de novo a cada 30min
           await supabase.from("funnel_recovery_emails").insert({ user_id: c.user_id, stage });
           skippedQr++;
@@ -237,7 +274,7 @@ serve(async (req) => {
           body: JSON.stringify({
             from,
             to: [c.email],
-            subject: COPY[stage].subject,
+            subject: COPY[stage].subject(primeiroNome(c.display_name)),
             html: emailHtml(stage, c.display_name, ctaUrl),
           }),
         });

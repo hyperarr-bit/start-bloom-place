@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, Syringe, AlertTriangle } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { format, differenceInDays } from "date-fns";
 
 interface HealthRecord {
@@ -115,11 +116,10 @@ export const PetHealth = () => {
             <Input placeholder="Nome (ex: V8, Antirrábica)" value={name} onChange={e => setName(e.target.value)} className="h-7 text-[11px]" />
             <div className="grid grid-cols-2 gap-1.5">
               <div className="relative">
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
-              </div>
-              <div className="relative">
-                <Input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                {!nextDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Próxima</span>}
+                <CampoData rotulo="Próxima" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
+ </div>
+ <div className="relative">
+ <Input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px]" />
               </div>
             </div>
             <button onClick={addRecord} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">

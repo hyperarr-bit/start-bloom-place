@@ -4,6 +4,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Plus, X, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { MaintenanceTask, Warranty, RoomMeasure, monthsSince } from "./types";
 
 const MaintenanceLog = () => {
@@ -111,8 +112,7 @@ const MaintenanceLog = () => {
           <div className="grid grid-cols-3 gap-2 pt-1">
             <Input value={wProduct} onChange={e => setWProduct(e.target.value)} placeholder="Produto" className="text-xs h-7 col-span-3 bg-background/70" />
             <div className="relative col-span-2">
-              <Input type="date" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 bg-background/70 appearance-none [&::-webkit-date-and-time-value]:text-left" />
-              {!wDate && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data compra</span>}
+              <CampoData rotulo="Data compra" value={wDate} onChange={e => setWDate(e.target.value)} className="text-xs h-7 bg-background/70" />
             </div>
             <Input type="number" value={wMonths} onChange={e => setWMonths(e.target.value)} placeholder="Meses" className="text-xs h-7 bg-background/70" />
           </div>

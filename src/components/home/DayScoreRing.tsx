@@ -65,10 +65,16 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
         
         {streak > 0 && (
           <motion.div
-            /* whitespace-nowrap: a 360px o selo partia em "19 dias" numa linha
-               e "consecutivos" na outra, virando uma pílula de duas alturas no
-               meio do card (foto do dono, 29/07). Selo é unidade — ou cabe
-               inteiro, ou não é selo. */
+            /* Selo é unidade — ou cabe inteiro, ou não é selo.
+             *
+             * 29/07: a 360px ele partia em "19 dias" / "consecutivos", duas
+             * alturas no meio do card. Pus `whitespace-nowrap` e resolveu ali.
+             *
+             * 30/07: a 320px o nowrap virou TRANSBORDO — "consecutivos" saía
+             * do fundo arredondado e do cartão. Trocar quebra por vazamento
+             * não é conserto. A palavra "consecutivos" é a parte dispensável:
+             * 🔥 + "20 dias" já diz sequência sozinho. Então ela só entra
+             * quando há largura pra ela. */
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/10 border border-warning/20 whitespace-nowrap max-w-full"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -76,7 +82,7 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
           >
             <Flame className="w-3.5 h-3.5 text-warning" />
             <span className="text-xs font-bold text-warning">{streak} dia{streak > 1 ? "s" : ""}</span>
-            <span className="text-[10px] text-muted-foreground">consecutivo{streak > 1 ? "s" : ""}</span>
+            <span className="hidden min-[350px]:inline text-[10px] text-muted-foreground">consecutivo{streak > 1 ? "s" : ""}</span>
           </motion.div>
         )}
       </div>

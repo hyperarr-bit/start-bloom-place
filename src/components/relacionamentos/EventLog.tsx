@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, MapPin, CheckCircle2, HelpCircle, XCircle, CalendarDays } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { format } from "date-fns";
 
 interface EventItem {
@@ -132,8 +133,7 @@ export const EventLog = () => {
             <div className="grid grid-cols-3 gap-1.5">
               <Input placeholder="Nome do evento" value={name} onChange={e => setName(e.target.value)} className="h-7 text-[11px]" />
               <div className="relative">
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                {!date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                <CampoData rotulo="Data" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
               </div>
               <Input placeholder="Local" value={location} onChange={e => setLocation(e.target.value)} className="h-7 text-[11px]" />
             </div>

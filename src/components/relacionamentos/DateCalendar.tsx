@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Trash2, CalendarHeart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { differenceInDays, setYear, format } from "date-fns";
 import { parseLocalDay } from "@/lib/utils";
 
@@ -109,8 +110,7 @@ export const DateCalendar = () => {
               <Input placeholder="Título" value={title} onChange={e => setTitle(e.target.value)} className="h-7 text-[11px] col-span-1" />
               <Input placeholder="Pessoa" value={person} onChange={e => setPerson(e.target.value)} className="h-7 text-[11px] col-span-1" list="date-people-list" />
               <div className="relative col-span-1">
-                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                {!date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                <CampoData rotulo="Data" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
               </div>
             </div>
             <datalist id="date-people-list">

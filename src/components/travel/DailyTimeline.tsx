@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ItineraryDay, TimelineItem, genId, formatCurrency } from "./types";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, MapPin, ExternalLink, Pin, Plane, Hotel, Utensils, Target, Car, ShoppingBag, Check } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -118,10 +119,9 @@ export const DailyTimeline = () => {
             <Input type="number" placeholder="Dia nº" value={inlineDay.dayNumber} onChange={e => setInlineDay(p => ({ ...p, dayNumber: Number(e.target.value) }))}
               className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60 w-16" />
             <div className="relative w-28">
-              <Input type="date" value={inlineDay.date} onChange={e => setInlineDay(p => ({ ...p, date: e.target.value }))}
-                onKeyDown={e => e.key === "Enter" && addDay()}
-                className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0 appearance-none [&::-webkit-date-and-time-value]:text-left" />
-              {!inlineDay.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Data</span>}
+              <CampoData rotulo="Data" value={inlineDay.date} onChange={e => setInlineDay(p => ({ ...p, date: e.target.value }))}
+ onKeyDown={e => e.key === "Enter" && addDay()}
+ className="h-7 text-[10px] border-none bg-transparent px-0 focus-visible:ring-0" />
             </div>
             <button onClick={addDay} className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors shrink-0">+ Dia</button>
           </div>

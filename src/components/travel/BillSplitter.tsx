@@ -4,6 +4,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { BillSplitData, BillEntry, calculateSettlement, genId, formatCurrency } from "./types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Trash2, Users, ArrowRight, Receipt } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -94,8 +95,7 @@ export const BillSplitter = () => {
               <div className="grid grid-cols-2 gap-2">
                 <Input type="number" placeholder="Valor R$" value={form.amount || ""} onChange={e => setForm(p => ({ ...p, amount: Number(e.target.value) }))} className="h-9 rounded-xl text-xs" />
                 <div className="relative">
-                  <Input type="date" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                  {!form.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                  <CampoData rotulo="Data" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs" />
                 </div>
               </div>
               <div>

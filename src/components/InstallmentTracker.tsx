@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -224,87 +225,86 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
                           </label>
                           <label className="text-[10px] text-muted-foreground">
                             1ª parcela
-                            <Input type="date" value={rascunho.date}
-                              onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
-                              className="h-9 text-xs mt-0.5" />
-                          </label>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold">Salvar</button>
-                          <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground">Cancelar</button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-                return (
-                  <tr key={inst.id} className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${isDone ? "opacity-50" : ""}`}>
-                    <td className="px-3 py-2 font-medium">
-                      <button onClick={() => comecarEdicao(inst)} aria-label={`Editar ${inst.description}`} className="text-left hover:underline">
-                        {inst.description}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`text-xs font-mono ${isDone ? "text-green-500" : ""}`}>
-                        {inst.paidInstallments}/{inst.totalInstallments}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center text-muted-foreground text-xs">
-                      {inst.date ? new Date(inst.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`category-badge ${getCardStyle(inst.cardName)}`}>
-                        {getCardLabel(inst.cardName)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      <span className={`category-badge ${getCatStyle(inst.category || "outros")}`}>
-                        {getCatLabel(inst.category || "outros")}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">
-                      R$ {inst.installmentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-3 py-2 flex items-center gap-1">
-                      {!isDone && (
-                        <Checkbox
-                          checked={false}
-                          onCheckedChange={() => payInstallment(inst.id)}
-                          className="h-4 w-4"
-                        />
-                      )}
-                      <button onClick={() => deleteInstallment(inst.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border">
-                <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={5}>TOTAL MENSAL</td>
-                <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={2}>
-                  R$ {totalMonthly.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                            <CampoData rotulo="Data" value={rascunho.date}
+ onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
+ className="h-9 text-xs mt-0.5" />
+ </label>
+ </div>
+ <div className="flex gap-2">
+ <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold">Salvar</button>
+ <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground">Cancelar</button>
+ </div>
+ </div>
+ </td>
+ </tr>
+ );
+ return (
+ <tr key={inst.id} className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${isDone ? "opacity-50" : ""}`}>
+ <td className="px-3 py-2 font-medium">
+ <button onClick={() => comecarEdicao(inst)} aria-label={`Editar ${inst.description}`} className="text-left hover:underline">
+ {inst.description}
+ </button>
+ </td>
+ <td className="px-3 py-2 text-center">
+ <span className={`text-xs font-mono ${isDone ? "text-green-500" : ""}`}>
+ {inst.paidInstallments}/{inst.totalInstallments}
+ </span>
+ </td>
+ <td className="px-3 py-2 text-center text-muted-foreground text-xs">
+ {inst.date ? new Date(inst.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+ </td>
+ <td className="px-3 py-2 text-center">
+ <span className={`category-badge ${getCardStyle(inst.cardName)}`}>
+ {getCardLabel(inst.cardName)}
+ </span>
+ </td>
+ <td className="px-3 py-2 text-center">
+ <span className={`category-badge ${getCatStyle(inst.category || "outros")}`}>
+ {getCatLabel(inst.category || "outros")}
+ </span>
+ </td>
+ <td className="px-3 py-2 text-right tabular-nums font-medium">
+ R$ {inst.installmentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+ </td>
+ <td className="px-3 py-2 flex items-center gap-1">
+ {!isDone && (
+ <Checkbox
+ checked={false}
+ onCheckedChange={() => payInstallment(inst.id)}
+ className="h-4 w-4"
+ />
+ )}
+ <button onClick={() => deleteInstallment(inst.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+ <Trash2 className="w-3.5 h-3.5" />
+ </button>
+ </td>
+ </tr>
+ );
+ })}
+ </tbody>
+ <tfoot>
+ <tr className="border-t border-border">
+ <td className="px-3 py-2 text-xs text-muted-foreground" colSpan={5}>TOTAL MENSAL</td>
+ <td className="px-3 py-2 text-right font-bold tabular-nums" colSpan={2}>
+ R$ {totalMonthly.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+ </td>
+ </tr>
+ </tfoot>
+ </table>
+ </div>
 
-        <div className="p-3 border-t border-border">
-          {showForm ? (
-            <div className="space-y-2 p-3 rounded-lg bg-muted/30">
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Nome do item" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="text-xs" />
-                <Input type="number" placeholder="Valor total" value={newItem.totalValue} onChange={(e) => setNewItem({ ...newItem, totalValue: e.target.value })} className="text-xs" />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <Input type="number" placeholder="Total parcelas" value={newItem.totalInstallments} onChange={(e) => setNewItem({ ...newItem, totalInstallments: e.target.value })} className="text-xs" />
-                <Input type="number" placeholder="Pagas" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs" />
-                <div className="relative">
-                  <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                  {!newItem.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+ <div className="p-3 border-t border-border">
+ {showForm ? (
+ <div className="space-y-2 p-3 rounded-lg bg-muted/30">
+ <div className="grid grid-cols-2 gap-2">
+ <Input placeholder="Nome do item" value={newItem.description} onChange={(e) => setNewItem({ ...newItem, description: e.target.value })} className="text-xs" />
+ <Input type="number" placeholder="Valor total" value={newItem.totalValue} onChange={(e) => setNewItem({ ...newItem, totalValue: e.target.value })} className="text-xs" />
+ </div>
+ <div className="grid grid-cols-3 gap-2">
+ <Input type="number" placeholder="Total parcelas" value={newItem.totalInstallments} onChange={(e) => setNewItem({ ...newItem, totalInstallments: e.target.value })} className="text-xs" />
+ <Input type="number" placeholder="Pagas" value={newItem.paidInstallments} onChange={(e) => setNewItem({ ...newItem, paidInstallments: e.target.value })} className="text-xs" />
+ <div className="relative">
+ <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">

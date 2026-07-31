@@ -7,6 +7,7 @@ import { isNativeShell } from "@/lib/native-shell";
 import { adicionarAoCalendario, type EventoDeCalendario } from "@/lib/calendario";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
 
 interface Appointment {
@@ -161,8 +162,7 @@ export const MedicalLog = () => {
                   <Input value={newAppt.specialty} onChange={e => setNewAppt({ ...newAppt, specialty: e.target.value })} placeholder="Especialidade (ex: Dermatologista)" className="text-xs h-9" />
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative">
-                      <Input type="date" value={newAppt.date} onChange={e => setNewAppt({ ...newAppt, date: e.target.value })} className="text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                      {!newAppt.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                      <CampoData rotulo="Data" value={newAppt.date} onChange={e => setNewAppt({ ...newAppt, date: e.target.value })} className="text-xs h-9" />
                     </div>
                     <Input type="time" value={newAppt.time} onChange={e => setNewAppt({ ...newAppt, time: e.target.value })} className="text-xs h-9" />
                   </div>
@@ -297,8 +297,7 @@ export const MedicalLog = () => {
                   <Input value={newExam.name} onChange={e => setNewExam({ ...newExam, name: e.target.value })} placeholder="Nome do exame (ex: Hemograma)" className="text-xs h-9" />
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative">
-                      <Input type="date" value={newExam.date} onChange={e => setNewExam({ ...newExam, date: e.target.value })} className="text-xs h-9 appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                      {!newExam.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Data</span>}
+                      <CampoData rotulo="Data" value={newExam.date} onChange={e => setNewExam({ ...newExam, date: e.target.value })} className="text-xs h-9" />
                     </div>
                     <Input type="time" value={newExam.time} onChange={e => setNewExam({ ...newExam, time: e.target.value })} className="text-xs h-9" />
                   </div>

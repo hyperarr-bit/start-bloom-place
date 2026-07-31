@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Trash2, Calendar, Heart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { differenceInDays, format, setYear } from "date-fns";
 
 interface Person {
@@ -63,8 +64,10 @@ export const PeoplePanel = () => {
 
         {/* Body */}
         <div className="bg-rose-50/50 dark:bg-rose-950/20 p-2 space-y-1.5">
-          {/* Table header */}
-          <div className="grid grid-cols-12 gap-1 px-2 py-1">
+          {/* Cabeçalho só onde a linha é mesmo uma tabela (≥640px) — no
+              celular a linha vira duas e um cabeçalho de 4 colunas não
+              alinha com nada. Mesma decisão do Treino (30/07). */}
+          <div className="hidden sm:grid grid-cols-12 gap-1 px-2 py-1">
             <span className="col-span-4 text-[9px] font-bold uppercase text-muted-foreground">Nome</span>
             <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Relação</span>
             <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Aniversário</span>
@@ -74,17 +77,36 @@ export const PeoplePanel = () => {
           {/* Existing items */}
           {sorted.map(p => {
             const days = getDaysUntilBirthday(p.birthday);
+            /*
+             * DUAS LINHAS no celular (30/07), mesma correção do Treino.
+             *
+             * Numa grade de 12 colunas a 360px cada coluna tem ~24px, então o
+             * nome (col-span-4) ficava com 95px: "Pedro (melhor amig…". Nome
+             * de pessoa cortado é o pior corte possível numa tela cujo
+             * assunto É a pessoa.
+             *
+             *   celular  linha 1 = nome + notas ......... dias + lixeira
+             *            linha 2 = relação · aniversário
+             *   ≥640px   a tabela de 12 colunas de sempre.
+             *
+             * `sm:contents` no invólucro da linha 2: no desktop ele some do
+             * layout e os filhos viram itens diretos da grade, ocupando as
+             * colunas próprias. Um markup só, dois layouts.
+             */
             return (
-              <div key={p.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
-                <div className="col-span-4 min-w-0">
+              <div key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 items-center bg-background/60 rounded-lg px-2 py-1.5 group sm:grid-cols-12 sm:gap-1">
+                <div className="col-start-1 row-start-1 min-w-0 sm:col-start-1 sm:col-span-4">
                   <p className="text-xs font-medium truncate">{p.name}</p>
                   {p.notes && <p className="text-[9px] text-muted-foreground truncate">{p.notes}</p>}
                 </div>
-                <span className="col-span-3 text-[10px] text-muted-foreground truncate">{p.relation || "—"}</span>
-                <span className="col-span-3 text-[10px] text-muted-foreground">
-                  {p.birthday ? format(new Date(p.birthday), "dd/MM") : "—"}
-                </span>
-                <div className="col-span-2 flex items-center justify-end gap-1">
+                <div className="col-start-1 row-start-2 flex items-center gap-1 min-w-0 sm:contents">
+                  <span className="text-[10px] text-muted-foreground truncate sm:col-start-5 sm:col-span-3">{p.relation || "—"}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0 sm:hidden">·</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0 sm:col-start-8 sm:col-span-3">
+                    {p.birthday ? format(new Date(p.birthday), "dd/MM") : "—"}
+                  </span>
+                </div>
+                <div className="col-start-2 row-start-1 flex items-center justify-end gap-1 sm:col-start-11 sm:col-span-2">
                   {days !== null && (
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                       days === 0 ? "bg-rose-500/20 text-rose-400 animate-pulse" :
@@ -115,8 +137,7 @@ export const PeoplePanel = () => {
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <div className="relative">
-                <Input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px] appearance-none [&::-webkit-date-and-time-value]:text-left" placeholder="dd/mm/aaaa" />
-                {!birthday && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground pointer-events-none">Aniversário</span>}
+                <CampoData rotulo="Aniversário" value={birthday} onChange={e => setBirthday(e.target.value)} className="h-7 text-[11px]" />
               </div>
               <Input placeholder="Notas" value={notes} onChange={e => setNotes(e.target.value)} className="h-7 text-[11px]" />
             </div>

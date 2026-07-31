@@ -3,6 +3,7 @@ import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { DiaryEntry, genId } from "./types";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
@@ -97,9 +98,8 @@ export const TravelDiary = () => {
               <Input placeholder="Viagem" value={inlineForm.tripName || ""} onChange={e => setInlineForm(p => ({ ...p, tripName: e.target.value }))}
                 className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/60" />
               <div className="relative">
-                <Input type="date" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
-                  className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30 appearance-none [&::-webkit-date-and-time-value]:text-left" />
-                {!inlineForm.date && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">Data</span>}
+                <CampoData rotulo="Data" value={inlineForm.date || ""} onChange={e => setInlineForm(p => ({ ...p, date: e.target.value }))}
+ className="h-7 text-[10px] border border-dashed border-border/60 bg-background/50 rounded-md px-2 focus-visible:ring-1 focus-visible:ring-primary/30" />
               </div>
             </div>
             <Input placeholder="✨ Melhor momento do dia..." value={inlineForm.bestThing || ""}

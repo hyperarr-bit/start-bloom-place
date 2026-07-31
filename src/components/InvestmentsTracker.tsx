@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, TrendingUp, TrendingDown, PiggyBank, Percent, Calendar, Wallet, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CampoData } from "@/components/ui/campo-data";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -292,19 +293,12 @@ export const InvestmentsTracker = ({ investments, setInvestments }: InvestmentsT
                 onChange={(e) => setNewInvestment({ ...newInvestment, expectedReturn: e.target.value === "" ? undefined : (parseFloat(e.target.value) || 0) })}
                 className="h-8 text-xs"
               />
-              <div className="relative">
-                <Input
-                  type="date"
-                  value={newInvestment.startDate || ""}
-                  onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
-                  className="h-8 text-xs appearance-none [&::-webkit-date-and-time-value]:text-left"
-                />
-                {!newInvestment.startDate && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                    Data início
-                  </span>
-                )}
-              </div>
+              <CampoData
+                rotulo="Data início"
+                value={newInvestment.startDate || ""}
+                onChange={(e) => setNewInvestment({ ...newInvestment, startDate: e.target.value })}
+                className="h-8 text-xs"
+              />
               <Input
                 placeholder="Corretora (opcional)"
                 value={newInvestment.broker || ""}

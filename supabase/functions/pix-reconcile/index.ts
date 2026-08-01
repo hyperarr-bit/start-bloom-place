@@ -187,14 +187,19 @@ serve(async (req) => {
     if (qErr) return jsonResponse({ error: `query: ${qErr.message}` }, 500);
 
     // agrupa por usuário; ignora QR sem user (não deveria existir — create exige JWT)
-    const porUser = new Map<string, Array<{ orderId: string; offer: string; criadoEm: string }>>();
+    const porUser = new Map<string, Array<{ orderId: string; offer: string; criadoEm: string; amountCents: number | null }>>();
     for (const q of qrs ?? []) {
       const uid = q.user_id as string | null;
       const oid = String(q.event_data?.order_id ?? "");
       if (!uid || !oid) continue;
       const offer = q.event_data?.offer === "downsell" ? "downsell" : "lifetime";
+      // 01/08: o VALOR REAL do pedido vem do create (amount_cents no evento).
+      // A tabela chumbada virou bug no dia em que o preço mudou (27,90→19,90):
+      // o reconcile creditou 2790 pra quem pagou 1990. Preço de tabela agora é
+      // só fallback de evento antigo sem amount.
+      const amountCents = Number(q.event_data?.amount_cents) || null;
       if (!porUser.has(uid)) porUser.set(uid, []);
-      porUser.get(uid)!.push({ orderId: oid, offer, criadoEm: String(q.created_at) });
+      porUser.get(uid)!.push({ orderId: oid, offer, criadoEm: String(q.created_at), amountCents });
     }
 
     // quem já tem assinatura ativa vitalícia sai da fila
@@ -246,7 +251,7 @@ serve(async (req) => {
           customer_email: email,
           current_period_start: inicio.toISOString(),
           current_period_end: fim.toISOString(),
-          amount_cents: PRECOS_CENTAVOS[o.offer],
+          amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer],
         };
         const { data: existing } = await admin
           .from("subscriptions").select("id").eq("user_id", uid).maybeSingle();
@@ -260,7 +265,7 @@ serve(async (req) => {
         await admin.from("analytics_events").insert({
           event_name: "pix_reconciled",
           user_id: uid,
-          event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: PRECOS_CENTAVOS[o.offer] },
+          event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer] },
         });
         creditados.push({ uid, email, ...o, status: v.status });
         jaTem.add(uid);

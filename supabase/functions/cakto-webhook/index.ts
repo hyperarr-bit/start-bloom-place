@@ -160,10 +160,14 @@ serve(async (req) => {
     if (offerCfg) {
       billingPeriod = offerCfg.billing;
     } else {
-      // recurrence_period vem em meses; preço anual é bem maior que o mensal
+      // recurrence_period vem em meses; preço anual é bem maior que o mensal.
+      // 01/08: SEM recorrência = compra única = VITALÍCIO. Antes o fallback
+      // jogava pra "monthly" por preço<30 — com o vitalício a 19,90, uma
+      // oferta desconhecida viraria assinatura mensal (acesso expirando em 30
+      // dias pra quem comprou pra sempre).
       const months = Number(sub.recurrence_period ?? 0);
       const price = Number(offer.price ?? data.amount ?? 0);
-      billingPeriod = months >= 12 || price >= 30 ? "annual" : "monthly";
+      billingPeriod = months === 0 ? "lifetime" : months >= 12 ? "annual" : "monthly";
       logStep("Unknown offer id — inferred billing period", { offerId, months, price, billingPeriod });
     }
     const isWinback = Boolean(offerCfg?.winback);

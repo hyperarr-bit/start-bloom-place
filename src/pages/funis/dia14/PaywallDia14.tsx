@@ -355,7 +355,10 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
  * desconverte). A edge function prova-social segue no ar, sem uso por ora.
  */
 type PaywallArm = "a" | "b";
-const PAYWALL_AB_FORCE: PaywallArm | null = "b";
+// 01/08 (ordem do dono): volta pro paywall de 29/07 — braço "a" = sem laurel,
+// sem mural, garantia ANTES do preço. Os componentes de prova ficam no código;
+// religar tudo = "b" nesta constante.
+const PAYWALL_AB_FORCE: PaywallArm | null = "a";
 
 const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
   if (PAYWALL_AB_FORCE) return PAYWALL_AB_FORCE;

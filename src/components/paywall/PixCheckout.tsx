@@ -164,15 +164,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [semSessao, setSemSessao] = useState(false);
   const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
-  // 30/07 — o dado que manda na tela: quem copia paga 75,4%, quem não copia
-  // paga 4,6% (383 QRs, 21-28/07). Então: (a) o estado "copiado" agora é
-  // PERMANENTE — a tela vira o passo-a-passo e fica (antes voltava ao normal
-  // em 2,5s e quem retornava do banco via uma tela igual à de antes);
-  // (b) o QR sai do palco (escaneiam ~5%) e fica atrás de "prefiro escanear";
-  // (c) tentamos copiar sozinhos na entrada (sem gesto costuma falhar — ok,
-  // o botão continua sendo o caminho).
-  const [copiadoJa, setCopiadoJa] = useState(false);
-  const [mostrarQR, setMostrarQR] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
   const cpfRef = useRef<HTMLInputElement>(null);
@@ -288,12 +279,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         const falta = PREPARO_MIN_MS - (Date.now() - t0);
         if (falta > 0) await new Promise((r) => setTimeout(r, falta));
       }
-      // CÓDIGO NOVO, ESTADO NOVO: sem isto, quem gera outro Pix depois do
-      // primeiro expirar cai numa tela que já diz "Código copiado!" — para um
-      // código que ela nunca copiou, e com o botão grande escondido. Mesma
-      // família do auto-copy: a tela afirmando algo que não aconteceu.
-      setCopiadoJa(false);
-      setMostrarQR(false);
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
       trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: braco });
@@ -380,19 +365,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, offer, context, pix?.orderId, braco]);
 
-  // AUTO-COPY REMOVIDO 4h depois de subir (30/07). Medição das primeiras 15
-  // cobranças: dos 4 que pagaram, os 4 fizeram cópia MANUAL; dos 5 em que só
-  // o auto disparou, ZERO pagou. Duas causas plausíveis, as duas ruins:
-  //   1. writeText() resolve mas o clipboard não recebe (mobile exige foco +
-  //      gesto) — a tela dizia "copiado pra você ✓" com a área de
-  //      transferência vazia. Mentir na hora do dinheiro é o pior caso.
-  //   2. o estado "copiado" trocava o CTA gigante por um "copiar de novo"
-  //      discreto ANTES da pessoa agir — some o botão que gera 75% de venda.
-  // O ganho era hipotético; o risco é real e imediato. O estado permanente
-  // (esse sim sustentado por dado) fica — só que disparado por toque humano.
-  // Voltar só com prova de que a escrita ocorreu (readText comparando), nunca
-  // confiando no resolve da promise.
-
   const copyCode = async () => {
     if (!pix) return;
     try {
@@ -407,7 +379,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       document.body.removeChild(ta);
     }
     setCopied(true);
-    setCopiadoJa(true);
     trackEvent("pix_copied", { offer, context });
     setTimeout(() => setCopied(false), 2500);
   };
@@ -586,92 +557,34 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
 
           {step === "qr" && pix && (
             <motion.div key="qr" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="w-full max-w-sm text-center">
-              {copiadoJa ? (
-                <>
-                  {/* ESTADO COPIADO — permanente. Quem foi pro banco e voltou
-                      precisa ver que a ação valeu, não a tela de antes. */}
-                  <motion.div
-                    initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 260, damping: 14 }}
-                    className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 grid place-items-center mx-auto mb-3"
-                  >
-                    <Check className="w-6 h-6" strokeWidth={3} />
-                  </motion.div>
-                  <h2 className="text-[22px] font-bold tracking-tight mb-1">
-                    Código copiado!
-                  </h2>
-                  <p className="text-[13px] text-muted-foreground mb-4">Agora é só colar no app do seu banco:</p>
-                  <div className="text-left bg-muted/40 rounded-xl p-4 text-[14px] space-y-2.5 mb-4">
-                    <p><strong className="text-foreground">1.</strong> Abra o app do seu <strong className="text-foreground">banco</strong></p>
-                    <p><strong className="text-foreground">2.</strong> Vá em <strong className="text-foreground">Pix → Copia e Cola</strong> e cole o código</p>
-                    <p><strong className="text-foreground">3.</strong> Confirme <strong className="text-foreground">R$ {fmtBRL(pix.amount)}</strong> e volte aqui — libera na hora ✨</p>
-                  </div>
-                  {/* REDE DE SEGURANÇA (30/07): esconder o QR criou um buraco —
-                      se o clipboard falhar em silêncio, a pessoa fica SEM nada
-                      pra colar. E 78% do tráfego chega pelo navegador de dentro
-                      do Instagram, onde a API de clipboard é justamente a mais
-                      furada. O código em texto selecionável é o plano B que
-                      sempre funciona: dá pra segurar e copiar na mão. */}
-                  <div className="text-left mb-4">
-                    <p className="text-[11.5px] text-muted-foreground mb-1.5">Não colou? Segura no código e copia na mão:</p>
-                    <p
-                      className="select-all break-all font-mono text-[10.5px] leading-snug bg-muted/60 border border-border rounded-lg p-2.5 text-foreground/80"
-                      onCopy={() => trackEvent("pix_copied", { offer, context, via: "selecao" })}
-                    >
-                      {pix.qrCode}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* HIERARQUIA INVERTIDA — o botão é o dinheiro (75% de
-                      conversão em quem copia); o QR serve ~5% e vira opção. */}
-                  <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
-                  <p className="text-[13px] text-muted-foreground mb-4">
-                    Copia o código, cola no app do banco e o acesso libera <strong className="text-foreground">sozinho nesta tela</strong>.
-                  </p>
-                </>
-              )}
+              <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
+              <p className="text-[13px] text-muted-foreground mb-4">
+                Assim que o Pix cair, seu acesso libera <strong className="text-foreground">sozinho nesta tela</strong>.
+              </p>
 
-              <Button
-                size="lg"
-                variant={copiadoJa ? "outline" : "default"}
-                className={`w-full ${copiadoJa ? "h-11 text-sm" : "h-14 text-base"} font-bold rounded-full mb-2`}
-                onClick={copyCode}
-              >
-                {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> {copiadoJa ? "Copiar de novo" : "Copiar código Pix"}</>}
-              </Button>
-
-              {!copiadoJa && (
-                <div className="text-left bg-muted/40 rounded-xl p-3 text-[12px] text-muted-foreground space-y-1 mb-3">
-                  <p><strong className="text-foreground">1.</strong> Abra o app do seu banco</p>
-                  <p><strong className="text-foreground">2.</strong> Escolha <strong className="text-foreground">Pix → Copia e Cola</strong> e cole o código</p>
-                  <p><strong className="text-foreground">3.</strong> Confirme e volte aqui — libera na hora ✨</p>
-                </div>
-              )}
-
-              {mostrarQR ? (
-                <div className="bg-white rounded-2xl border border-border p-4 mx-auto w-fit mb-3 shadow-sm">
-                  {pix.qrCodeBase64 ? (
-                    <img src={pix.qrCodeBase64} alt="QR Code Pix" className="w-[170px] h-[170px]" />
-                  ) : (
-                    <QRCodeSVG value={pix.qrCode} size={170} />
-                  )}
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setMostrarQR(true); trackEvent("pix_qr_reveal", { offer, context }); }}
-                  className="text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 mb-3"
-                >
-                  {copiadoJa ? "Pagar de outro celular? Mostrar QR code" : "Prefiro escanear o QR code"}
-                </button>
-              )}
+              <div className="bg-white rounded-2xl border border-border p-4 mx-auto w-fit mb-3 shadow-sm">
+                {pix.qrCodeBase64 ? (
+                  <img src={pix.qrCodeBase64} alt="QR Code Pix" className="w-[190px] h-[190px]" />
+                ) : (
+                  <QRCodeSVG value={pix.qrCode} size={190} />
+                )}
+              </div>
 
               {mm != null && (
-                <div className="block mx-auto w-fit text-[12px] font-bold tabular-nums text-accent bg-accent/10 rounded-full px-3 py-1 mb-3">
+                <div className="inline-flex items-center gap-1.5 text-[12px] font-bold tabular-nums text-accent bg-accent/10 rounded-full px-3 py-1 mb-3">
                   ⏳ Código expira em {mm}:{ss}
                 </div>
               )}
+
+              <Button size="lg" className="w-full h-[52px] text-base font-bold rounded-full mb-2" onClick={copyCode}>
+                {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> Copiar código Pix</>}
+              </Button>
+
+              <div className="text-left bg-muted/40 rounded-xl p-3 text-[12px] text-muted-foreground space-y-1 mb-3">
+                <p><strong className="text-foreground">1.</strong> Abra o app do seu banco</p>
+                <p><strong className="text-foreground">2.</strong> Escolha <strong className="text-foreground">Pix → Copia e Cola</strong> e cole o código</p>
+                <p><strong className="text-foreground">3.</strong> Confirme e volte aqui — libera na hora ✨</p>
+              </div>
 
               <p className="text-[12px] font-semibold text-muted-foreground inline-flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
@@ -679,17 +592,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
                 Aguardando seu pagamento…
-              </p>
-              <p className="text-[11px] text-muted-foreground mt-2">
-                <span className="text-[#f0a500]">★★★★★</span> +190 pessoas ativaram o CORE essa semana
-              </p>
-              {/* Mata o medo do pós-pagamento ("e se eu fechar essa tela?").
-                  Promessa VERDADEIRA: o cakto-webhook manda o welcome email
-                  com link de acesso — 78/85 vendas nos últimos 3 dias. */}
-              <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
-                📩 Pagou? Além de liberar aqui na hora, seu acesso e o passo a passo
-                também chegam <strong className="text-foreground">no seu e-mail</strong> —
-                pode fechar esta tela sem medo.
               </p>
               {v2?.missao && (
                 <p className="text-[12px] text-muted-foreground mt-2">

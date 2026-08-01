@@ -433,12 +433,6 @@ function ProofSlide({ gasto, onNext }: { gasto: string; onNext: () => void }) {
         Não é falta de disciplina — é falta de <strong className="text-foreground">visibilidade</strong>.
         Registrar no CORE leva segundos.
       </p>
-      {/* Stat de uma linha no meio do quiz (Cal AI: "90% of users say...").
-          Número REAL: ~193 compras/semana medidas em 30/07 — manter honesto,
-          atualizar se o ritmo mudar de patamar. */}
-      <p className="text-[12px] font-semibold text-accent mb-5">
-        ▲ +190 pessoas entraram e aprovaram o CORE essa semana
-      </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         Quero ver pra onde vai <ArrowRight className="w-4 h-4" />
       </Button>
@@ -468,10 +462,6 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
       <div className="rounded-2xl border-2 border-accent/25 bg-accent/[0.05] p-5 mb-5">
         <p className="text-[14px] leading-relaxed">{proof.card}</p>
       </div>
-      {/* Mesmo stat de uma linha do ramo de dinheiro (número real, 30/07). */}
-      <p className="text-[12px] font-semibold text-accent mb-5">
-        ▲ +190 pessoas entraram e aprovaram o CORE essa semana
-      </p>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
         {proof.cta} <ArrowRight className="w-4 h-4" />
       </Button>
@@ -696,24 +686,8 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
           );
         })}
       </div>
-      {/* Prova no meio da espera (lei BitePal: a espera vira argumento). O
-          /comecar já faz isso; o dia14 não fazia. Entra depois do 1º passo
-          concluído pra não competir com o número grande. */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4 }}
-        className="mt-8 max-w-xs mx-auto rounded-2xl border border-border bg-card p-3.5 text-left"
-      >
-        <p className="text-[12.5px] leading-snug">
-          “O que mais gostei foi que tudo fica conectado. Quando organizo minha rotina já lembro
-          do treino, da dieta e até das contas que vencem naquela semana.”
-        </p>
-        <div className="flex items-center gap-2 mt-2">
-          <img src="/depoimentos/carlos.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
-          <p className="text-[10.5px] text-muted-foreground font-semibold">
-            <span className="text-[#f0a500]">★★★★★</span> — Carlos H. · 31 anos · Florianópolis, SC
-          </p>
-        </div>
-      </motion.div>
+      {/* 01/08 (ordem do dono): o depoimento da espera saiu junto com o resto
+          da prova social — funil de volta ao estado de 29/07. */}
     </div>
   );
 }
@@ -1085,7 +1059,9 @@ export default function ComecarDia14() {
                   setAnswers(a);
                   // Persiste pro paywall personalizar mesmo após OAuth/refresh
                   try { localStorage.setItem("funnel-quiz-answers", JSON.stringify(a)); } catch { /* noop */ }
-                  setStep("prova");
+                  // 01/08 (ordem do dono): funil volta ao de 29/07 — a tela de
+                  // prova sai do caminho. Religar = setStep("prova") aqui.
+                  setStep("progress");
                 }}
               />
             )}

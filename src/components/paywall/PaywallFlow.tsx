@@ -35,7 +35,7 @@ import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, typ
 // no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
 const PRICING = {
-  lifetime: { total: "27,90" },
+  lifetime: { total: "19,90" },
   downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
   anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
 };
@@ -67,7 +67,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 27.9 : 14.9,
+    value: offer === "lifetime" ? 19.9 : 14.9,
     currency: "BRL",
   });
   open(offer);

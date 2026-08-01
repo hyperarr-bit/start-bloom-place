@@ -329,7 +329,7 @@ const Planos = () => {
               R$ 99,90
             </p>
             <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-bold tracking-tight">R$ 27,90</span>
+              <span className="text-5xl font-bold tracking-tight">R$ 19,90</span>
               <span className="text-muted-foreground">uma vez</span>
             </div>
             <p className="text-xs text-primary font-medium">
@@ -343,7 +343,7 @@ const Planos = () => {
             onClick={handleCheckout}
             disabled={loading || isSubscribed}
           >
-            {isSubscribed ? "Acesso já liberado" : "Gerar meu Pix de R$ 27,90"}
+            {isSubscribed ? "Acesso já liberado" : "Gerar meu Pix de R$ 19,90"}
           </Button>
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -400,7 +400,7 @@ const Planos = () => {
             <div className="leading-tight">
               <p className="text-[11px] text-muted-foreground">Vitalício</p>
               <p className="text-base font-bold">
-                R$ 27,90
+                R$ 19,90
                 <span className="text-xs font-normal text-muted-foreground"> uma vez</span>
               </p>
             </div>

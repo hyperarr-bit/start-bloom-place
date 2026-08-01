@@ -24,7 +24,7 @@ import { SubscriptionPaywall } from "@/components/paywall/SubscriptionPaywall";
 export type PixOffer = "lifetime" | "downsell";
 
 export const PIX_PRICES: Record<PixOffer, string> = {
-  lifetime: "27,90",
+  lifetime: "19,90",
   downsell: "14,90",
 };
 

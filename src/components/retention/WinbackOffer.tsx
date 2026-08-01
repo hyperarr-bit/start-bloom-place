@@ -8,7 +8,7 @@ import { PixCheckout } from "@/components/paywall/PixCheckout";
 
 // VITALÍCIO (13/07): o winback vende o mesmo prêmio do downsell — acesso
 // pra sempre por R$14,90, pagamento único no Pix (PixCheckout in-app).
-const FULL_LIFETIME = 27.90;
+const FULL_LIFETIME = 19.90;
 const OFFER_LIFETIME = 14.90;
 const SAVINGS = FULL_LIFETIME - OFFER_LIFETIME;
 

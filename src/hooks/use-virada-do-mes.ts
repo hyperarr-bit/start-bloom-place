@@ -56,19 +56,16 @@ export const useViradaDoMes = () => {
 
     /*
      * LER pelo leitor do próprio módulo de Finanças, ESCREVER pelo `set`.
-     * As duas coisas por motivos diferentes, e a primeira custou duas
-     * rodadas perdidas (02/08):
      *
-     * O `get` do useUserData responde do `store`, que é hidratado do
-     * Supabase. Mas o módulo de Finanças grava com `writeJsonForUser`, que
-     * escreve SÓ no localStorage. Então as duas cópias divergem: aqui na
-     * conta do dono o localStorage tinha 6 lançamentos e o `get` devolvia 0.
-     * Eu estava perguntando pra camada errada e concluindo "não tem nada
-     * fora do lugar" — enquanto a tela mostrava os 6.
+     * Leitura: `readMonthData` é o mesmo leitor que a tela de Finanças usa
+     * (localStorage direto). Ler pela mesma porta que a tela garante que
+     * este código enxerga exatamente o que a pessoa enxerga — o `get` fica
+     * de reserva, pro caso do store já ter o valor e o cache local não.
      *
-     * `readMonthData` é o mesmo leitor que a tela usa, então enxerga o que
-     * a pessoa enxerga. E o `set` grava nas DUAS pontas (localStorage agora,
-     * Supabase no flush), o que de quebra sincroniza o que estava só local.
+     * Escrita: `set` grava nas DUAS pontas — localStorage na hora e upsert
+     * em `user_data` no flush. `writeJsonForUser`, que o módulo usa, grava
+     * só local; arquivar por ali não viajaria com a conta e o conserto não
+     * valeria no app da loja.
      */
     const uid = user?.id ?? null;
     const lerBalde = (chave: string): Lancamento[] => {

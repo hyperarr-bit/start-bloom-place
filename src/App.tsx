@@ -22,6 +22,7 @@ import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { useLembretes } from "@/hooks/use-lembretes";
+import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
 // Capture acquisition source as early as possible (runs once at module load)
 captureLeadSource();
@@ -314,6 +315,11 @@ const AnimatedRoutes = () => {
   // Finanças muda. Aqui dentro porque precisa do Router (o toque no aviso
   // navega) e do UserDataProvider.
   useLembretes();
+  // Arquiva lançamentos de meses passados que ficaram no balde do mês
+  // corrente. Aqui em cima porque quem chega na retrospectiva pela
+  // notificação não passa por Finanças — e era essa pessoa que via o mês
+  // vazio. Ver use-virada-do-mes.ts pro diagnóstico completo.
+  useViradaDoMes();
   useEffect(() => {
     if (!isNativeShell()) return;
     import("@/lib/notificacoes")

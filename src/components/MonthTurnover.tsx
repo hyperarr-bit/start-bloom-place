@@ -115,7 +115,36 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
   const prevKey = `${prevMonth}-${prevMonthIdx === 11 ? year - 1 : year}`;
 
   const prevData = getMonthTotals(prevMonth, userId);
-  const prevHasData = prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0;
+
+  /*
+   * "O mês passado teve movimento?" precisa olhar os DOIS lugares (02/08).
+   *
+   * Perguntar só pra chave arquivada era o defeito que desligava este cartão
+   * exatamente quando ele era necessário: nada arquivava, a chave vinha
+   * vazia, ele concluía "mês passado foi parado" e não aparecia. O único
+   * escritor daquela chave era ele mesmo, na virada seguinte — círculo
+   * fechado.
+   *
+   * Agora, se ainda houver lançamento do mês passado parado no balde do mês
+   * corrente (o caso de quem abriu o app antes do arquivamento rodar), isso
+   * também conta como movimento.
+   */
+  const prevAindaNoBaldeCorrente = (() => {
+    const anoDoPrev = prevMonthIdx === 11 ? year - 1 : year;
+    const alvo = `${anoDoPrev}-${String(prevMonthIdx + 1).padStart(2, "0")}`;
+    const correntes = getFinanceStorageKeys(currentMonth);
+    const ler = (chave: string) => {
+      const v = readLocalKey(userId, chave);
+      return Array.isArray(v) ? (v as { date?: unknown }[]) : [];
+    };
+    return [...ler(correntes.expenses), ...ler(correntes.incomes)].some(
+      (i) => typeof i?.date === "string" && i.date.startsWith(alvo),
+    );
+  })();
+
+  const prevHasData =
+    prevData.receitas + prevData.custosFixos + prevData.custosVariaveis > 0 ||
+    prevAindaNoBaldeCorrente;
 
   const prevKeys = getFinanceStorageKeys(prevMonth);
   const prevFixedCount = countItems(userId, prevKeys.fixed);
@@ -149,14 +178,31 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
     lastSeenMonth === prevKey &&
     turnoverAck !== currentKey;
 
+  /*
+   * O sinal só é gasto DEPOIS da decisão (02/08).
+   *
+   * Antes, os dois aconteciam no mesmo efeito de montagem: decidir se o
+   * cartão aparece e gravar "último mês visto". Como a decisão usa os
+   * valores do PRIMEIRO render — quando os dados ainda podem não ter
+   * chegado — o cartão não aparecia e o sinal era queimado no mesmo
+   * instante. A partir dali `lastSeenMonth === prevKey` nunca mais era
+   * verdade e a virada daquele mês ficava perdida pra sempre.
+   *
+   * Agora `lastSeenMonth` só avança quando não há mais virada pendente:
+   * a pessoa confirmou, ou a janela dos 7 dias passou. Ou seja, ele passa
+   * a significar "o último mês cuja virada já foi resolvida" — que é o que
+   * o resto do componente já assumia que ele significava.
+   */
   useEffect(() => {
-    if (isTurnoverWindow) {
-      setShowRecap(true);
-    }
-    if (!lastSeenMonth || lastSeenMonth !== currentKey) {
+    if (isTurnoverWindow) setShowRecap(true);
+  }, [isTurnoverWindow]);
+
+  useEffect(() => {
+    if (isTurnoverWindow) return;
+    if (lastSeenMonth !== currentKey) {
       setLastSeenMonth(currentKey);
     }
-  }, []);
+  }, [isTurnoverWindow, lastSeenMonth, currentKey, setLastSeenMonth]);
 
 
   const savingsRate = prevData.receitas > 0

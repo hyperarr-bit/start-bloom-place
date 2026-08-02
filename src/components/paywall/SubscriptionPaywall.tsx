@@ -12,7 +12,7 @@ import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
  * quando isNativeShell() (Pix in-app viola o Play Billing no BR).
  *
  * Arquitetura de preço (decidida com pesquisa Cal AI/BitePal/RevenueCat):
- * mensal 29,90 = âncora apagada; anual 97,90 com 3 dias grátis = produto
+ * mensal 19,90 = âncora apagada; anual 97,90 com 3 dias grátis = produto
  * real (67% off vs 12× mensal). Compliance Play: preço TOTAL cobrado em
  * destaque (o Cal AI foi removido da App Store por esconder isso), renovação
  * automática explícita, botão Restaurar compras.

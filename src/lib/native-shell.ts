@@ -32,6 +32,13 @@ export const isNativeShell = (): boolean => {
  *  estes são fallback de exibição e contrato de produto.
  */
 export const APP_PRECOS = {
-  mensal: { id: "core_mensal", preco: "R$ 29,90" },
+  // 02/08: âncora passa de 29,90 → 19,90 por decisão do dono.
+  //
+  // ATENÇÃO, e isto não é detalhe: esta string é só EXIBIÇÃO. Quem cobra é o
+  // Play Billing, pelo preço do plano base do produto `core_mensal` no Play
+  // Console. Enquanto lá continuar 29,90, o app mostra 19,90 e a Google cobra
+  // 29,90 — divergência que reprova na análise e queima confiança de quem
+  // pagou. Trocar aqui SEM trocar lá é pior que não trocar.
+  mensal: { id: "core_mensal", preco: "R$ 19,90" },
   anual: { id: "core_anual", preco: "R$ 97,90", trialDias: 3, porMes: "R$ 8,16" },
 } as const;

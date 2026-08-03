@@ -324,16 +324,42 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // Polling: pagou? Cakto: o webhook grava a assinatura e a gente pergunta ao
   // check-subscription. AbacatePay (v2): perguntamos direto à abacate-pix, que
   // confirma E libera o acesso no mesmo passo (sem depender de webhook).
+  /* CHECA NA VOLTA, não só de 3 em 3 segundos (03/08).
+   *
+   * O caso real: 10 dos 42 pagantes do dia nunca viram "Pagamento confirmado"
+   * — todos com acesso ATIVO no banco. Motivo: pra pagar, a pessoa sai pro app
+   * do banco; o celular CONGELA a aba e a corrente de setTimeout para. Se o
+   * navegador mata a aba (comum em celular fraco e no navegador de dentro do
+   * Instagram, que é 78% do nosso tráfego), a corrente não recomeça sozinha e
+   * a tela fica em "Aguardando seu pagamento…" pra sempre. A pessoa conclui
+   * que deu errado e abre chamado — já pagando e já com acesso.
+   *
+   * Agora todo retorno de foco (visibilitychange/focus/pageshow-bfcache) força
+   * uma checagem imediata. Cobre também quem foi creditado pela rede de
+   * segurança enquanto estava fora: ao voltar, a tela confirma na hora.
+   */
   useEffect(() => {
     if (step !== "qr" || doneRef.current) return;
     let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Trava de concorrência que EXPIRA. Uma requisição iniciada pouco antes do
+    // congelamento pode nunca resolver (a rede morre junto com a aba) — com
+    // uma trava booleana simples ela ficaria travada pra sempre e a checagem
+    // da volta nunca rodaria. Pego no teste do ciclo, não em produção.
+    let rodandoDesde = 0;
+    const TRAVA_MS = 10000;
+    let ultima = 0;           // trava anti-rajada de troca de aba
     // asaas, abacate e pagarme confirmam E liberam no mesmo passo (check da
     // própria função); só a Cakto depende de webhook + check-subscription.
     const proprio = braco === "asaas" || braco === "abacate" || braco === "pagarme";
     const fnNome = braco === "asaas" ? "asaas-pix" : braco === "pagarme" ? "pagarme-pix" : "abacate-pix";
     const orderId = pix?.orderId;
     const poll = async () => {
+      const agora = Date.now();
       if (stopped || doneRef.current) return;
+      if (rodandoDesde && agora - rodandoDesde < TRAVA_MS) return;
+      rodandoDesde = agora;
+      ultima = agora;
       try {
         // offer: fallback de contabilidade pra cobranças antigas (o check da
         // AbacatePay não devolve valor); fbp/fbc: match da CAPI server-side.
@@ -358,10 +384,31 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           return;
         }
       } catch { /* tenta de novo */ }
-      if (!stopped) setTimeout(poll, 3000);
+      finally { rodandoDesde = 0; }
+      if (!stopped && !doneRef.current) {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(poll, 3000);
+      }
     };
-    const t = setTimeout(poll, 3000);
-    return () => { stopped = true; clearTimeout(t); };
+
+    // Voltou pra tela: checa AGORA. A corrente de timeout pode estar morta.
+    const aoVoltar = () => {
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - ultima < 1500) return;   // não vira rajada
+      void poll();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    window.addEventListener("pageshow", aoVoltar);   // volta do cache do navegador
+
+    timer = setTimeout(poll, 3000);
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+      window.removeEventListener("pageshow", aoVoltar);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, offer, context, pix?.orderId, braco]);
 

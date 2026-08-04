@@ -49,7 +49,18 @@ interface Props {
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 const brl = (v: number) =>
-  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+  v.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    /* minimumFractionDigits EXPLÍCITO (04/08): com style currency, motor de
+       WebView antigo assume mínimo 2 — e máximo 0 < mínimo 2 lança
+       "RangeError: maximumFractionDigits value is out of range". Era O crash
+       de "algo deu errado nesta seção" ao abrir a aba MEU FINANCEIRO no
+       aparelho do dono (foto com o detalhe técnico aberto, 04/08). Motor
+       novo tolera a omissão; o antigo não — os dois aceitam o explícito. */
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 
 /** Dia do mês (1-31) de uma data "YYYY-MM-DD", só se ela cair no mês corrente. */
 const dayInCurrentMonth = (date: string | undefined, now: Date): number | null => {

@@ -1052,7 +1052,12 @@ export default function ComecarRadar() {
   return (
     <div
       style={{ ...LIGHT_VARS, ...(ceuShell ? { background: CEU_SUAVE_APP } : {}) }}
-      className={`min-h-dvh ${ceuShell ? "" : "bg-white"} text-foreground flex flex-col`}
+      /* No shell, porta/quiz/progresso são telas TRAVADAS (04/08, pedido do
+         dono: "tem que ficar fixo"): cabem inteiras na tela, então altura
+         exata + overflow-hidden — nada de deslizar o quiz pra cima e pra
+         baixo. Cadastro, resultado e central continuam roláveis (lá o
+         conteúdo é maior que a tela de propósito). Web intocada. */
+      className={`min-h-dvh ${ceuShell ? "h-dvh overflow-hidden" : "bg-white"} text-foreground flex flex-col`}
     >
       {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
           pergunta no mesmo y em toda tela) + transição em slide horizontal —

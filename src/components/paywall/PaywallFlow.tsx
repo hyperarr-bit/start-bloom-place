@@ -535,7 +535,9 @@ function OfferScreen({
   // APP DAS LOJAS: o CTA abre o bottom sheet de assinatura (lógica BitePal);
   // nada de Pix, roleta ou downsell no shell — desconto só via oferta oficial.
   const nativo = isNativeShell();
-  const [sheetAberta, setSheetAberta] = useState(false);
+  /* O sheet abre já no plano que a pessoa tocou (04/08, pedido do dono:
+     "foco nas DUAS ofertas") — o mensal agora tem botão próprio NA TELA. */
+  const [sheetAberta, setSheetAberta] = useState<null | "anual" | "mensal">(null);
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -718,7 +720,7 @@ function OfferScreen({
               onClick={() => {
                 if (nativo) {
                   trackEvent("funnel_click", { cta: "app_paywall_cta", context });
-                  setSheetAberta(true);
+                  setSheetAberta("anual");
                   return;
                 }
                 openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
@@ -737,10 +739,25 @@ function OfferScreen({
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>
           </p>
+          {nativo && (
+            /* A SEGUNDA oferta na própria tela (04/08). Antes o mensal só
+               existia dentro do sheet, abaixo da dobra — na prática o paywall
+               era "só anual", exatamente a reclamação do dono. Botão fantasma
+               de propósito: visível sem competir com o CTA do trial. */
+            <button
+              onClick={() => {
+                trackEvent("funnel_click", { cta: "app_paywall_mensal", context });
+                setSheetAberta("mensal");
+              }}
+              className="mt-2.5 w-full text-center text-[13px] font-semibold text-foreground/80 underline underline-offset-4 decoration-border active:opacity-70"
+            >
+              Prefiro o mensal — {APP_PRECOS.mensal.preco}/mês
+            </button>
+          )}
         </div>
       </div>
 
-      {sheetAberta && <AppPurchaseSheet onClose={() => setSheetAberta(false)} />}
+      {sheetAberta && <AppPurchaseSheet planoInicial={sheetAberta} onClose={() => setSheetAberta(null)} />}
     </div>
   );
 }

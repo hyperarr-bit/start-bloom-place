@@ -810,6 +810,16 @@ header.sticky.top-0 {
  * Mapeado por agente com verificação adversarial; 10 piores pontos.
  */
 @supports not (inset: 0px) {
+  /* O ANEL AMARELO (04/08): todos os nossos estados de foco usam
+     :focus-visible, que WebView < Chrome 86 não conhece — nenhuma das nossas
+     regras aplica e o que aparece é o outline PADRÃO DA FABRICANTE (laranja/
+     amarelo em vários aparelhos). Sem :focus-visible não há como distinguir
+     teclado de toque; nesses WebViews o outline nativo sai de cena. */
+  input:focus, textarea:focus, select:focus, button:focus, a:focus, [tabindex]:focus {
+    outline: none;
+  }
+
+
   /* réguas de abas (todos os módulos) */
   .notion-tab + .notion-tab { margin-left: 4px; }
   header.sticky.top-0 .overflow-x-auto { gap: 0; }
@@ -855,4 +865,8 @@ header.sticky.top-0 {
 
   /* tile de emoji das opções do quiz */
   .w-11.h-11.rounded-xl { margin-right: 14px; }
+
+  /* emoji de linha de card (desafio da semana etc): sem gap ele cola no
+     texto — margem repõe (04/08, foto do dono) */
+  .text-xl.shrink-0, .text-2xl.shrink-0 { margin-right: 10px; }
 }

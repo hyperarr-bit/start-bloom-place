@@ -116,7 +116,12 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
 
 const CSS_APW = `
 .apw {
-  position: fixed; inset: 0; z-index: 50; overflow: hidden;
+  /* top/right/bottom/left por extenso, sem o shorthand inset (04/08): este
+     CSS entra em runtime via <style> e nao passa pelo cssTarget do build —
+     em WebView < Chrome 87 o shorthand era descartado e a welcome inteira
+     ficava sem posicao/invisivel: o app "nascia" direto no quiz (foto do
+     dono). Mesma classe do bug do build, porta de entrada diferente. */
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; overflow: hidden;
   display: flex; justify-content: center;
   /* fonte herdada do app (uma métrica só em todas as plataformas — o
      line-height .95 com stack própria sobrepunha linhas no SF Pro do iOS) */

@@ -215,9 +215,13 @@ const Index = () => {
           </button>
 
           <DollarSign className="w-5 h-5 text-amber-600" />
-          <h1 className="text-base font-bold tracking-tight">FINANÇAS</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+          <h1 className="text-base font-bold tracking-tight shrink-0">FINANÇAS</h1>
+          <div className="flex items-center gap-2 ml-auto min-w-0">
+            {/* truncate + nowrap (04/08): sem isto "agosto de 2026" QUEBRAVA em
+                duas linhas no aperto e caía por cima do título/chips (foto do
+                dono no aparelho de tela estreita). Mês é rótulo — ou cabe numa
+                linha, ou encurta. */}
+            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap truncate">{currentMonth}</span>
             {/* Pergunte ao CORE — disponível em qualquer aba */}
             <button
               onClick={() => setAskOpen(true)}

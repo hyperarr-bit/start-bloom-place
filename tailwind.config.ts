@@ -1,6 +1,11 @@
 import type { Config } from "tailwindcss";
 
 export default {
+  /* hover: só onde existe mouse (04/08). Em tela de toque o :hover GRUDA
+     depois do toque — era isso que deixava abas com fundo cinza permanente
+     (hover:bg-muted preso) nas fotos do dono. Envolve todo `hover:` em
+     @media (hover: hover); desktop não muda nada. */
+  future: { hoverOnlyWhenSupported: true },
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",

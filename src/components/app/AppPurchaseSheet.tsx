@@ -15,8 +15,8 @@ import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
  * Play — Cal AI foi removido por esconder isso), renovação explícita e
  * Restaurar compras. Motor: RevenueCat (mesmo do SubscriptionPaywall).
  */
-export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
-  const [plano, setPlano] = useState<"anual" | "mensal">("anual");
+export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose: () => void; planoInicial?: "anual" | "mensal" }) {
+  const [plano, setPlano] = useState<"anual" | "mensal">(planoInicial);
   const [rc, setRc] = useState(estadoRevenueCat());
   const [comprando, setComprando] = useState(false);
   const [ok, setOk] = useState(false);
@@ -125,9 +125,9 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
         <button
           aria-label="Fechar"
           onClick={() => { trackEvent("app_sheet_close", { via: "x" }); onClose(); }}
-          className="absolute right-4 top-3 w-8 h-8 rounded-full bg-muted/70 grid place-items-center text-muted-foreground"
+          className="absolute right-3.5 top-3.5 w-7 h-7 rounded-full bg-black/[0.06] grid place-items-center text-muted-foreground active:scale-95 transition-transform"
         >
-          <X className="w-4 h-4" />
+          <X className="w-[15px] h-[15px]" strokeWidth={2.25} />
         </button>
 
         {ok ? (

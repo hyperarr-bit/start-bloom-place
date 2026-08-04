@@ -747,3 +747,32 @@ header.sticky.top-0 {
   .lp-enter { opacity: 1; transform: none; animation: none; }
 }
 
+
+/*
+ * WEBVIEW ANTIGO, CAPÍTULO 2 (04/08) — as unidades dvh/svh.
+ *
+ * Mesmo aparelho da tela branca de 03/08, defeito seguinte: dvh só existe
+ * do Chrome 108 em diante. As utilitárias do Tailwind (min-h-dvh & cia)
+ * emitem SÓ a regra em dvh — parser que não conhece a unidade descarta a
+ * declaração inteira e o elemento fica com altura auto. Resultado na foto
+ * do dono: a tela do quiz encolheu pra altura do conteúdo e a tela de trás
+ * apareceu embaixo, "duas telas empilhadas".
+ *
+ * Onde dvh não existe, vale vh. O pior caso do vh (a barra de URL do
+ * navegador cobrir uns pixels) nem se aplica ao app da loja, que não tem
+ * barra. As regras do próprio index.css já fazem esse fallback na mão —
+ * este bloco cobre as classes do Tailwind.
+ */
+@supports not (height: 100dvh) {
+  .min-h-dvh,
+  .min-h-\[100dvh\] {
+    min-height: 100vh;
+  }
+  .h-dvh,
+  .h-\[100dvh\] {
+    height: 100vh;
+  }
+  .min-h-svh {
+    min-height: 100vh;
+  }
+}

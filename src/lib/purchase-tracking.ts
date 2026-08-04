@@ -40,6 +40,25 @@ const readPending = (): Pending[] => {
   }
 };
 
+/**
+ * Gerou Pix há pouco tempo? (04/08)
+ *
+ * O portão do app decide "mostrar paywall" com dois estados só: assinante ou
+ * não. Mas existe um TERCEIRO, e ele é frequente: pagou agora e o crédito
+ * ainda não chegou. Medido em 04/08 — 9 de 21 pagantes (43%) viram o paywall
+ * DEPOIS de pagar, porque chegaram no app dentro da janela de confirmação
+ * (mediana 54s, p90 3,4min). O paywall estava tecnicamente certo e
+ * comercialmente desastroso: quem acabou de pagar vê "assine agora".
+ *
+ * Esta marca já existia pro pixel; agora ela também responde "tem pagamento
+ * em confirmação". Janela curta de propósito: passou disso, é abandono real e
+ * o paywall volta a ser a resposta certa.
+ */
+export function temPixEmConfirmacao(janelaMin = 12): boolean {
+  const limite = janelaMin * 60 * 1000;
+  return readPending().some((x) => Date.now() - (x.at ?? 0) <= limite);
+}
+
 export function markPixPurchasePending(p: { offer: PendingOffer; orderId: string | null }) {
   try {
     const list = readPending().filter((x) => !x.orderId || x.orderId !== p.orderId);

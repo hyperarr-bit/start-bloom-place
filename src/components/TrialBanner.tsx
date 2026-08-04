@@ -1,15 +1,43 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Lock } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
-import { firePixPurchaseOnce } from "@/lib/purchase-tracking";
+import { firePixPurchaseOnce, temPixEmConfirmacao } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
+
+/** Tela do intervalo entre pagar e o crédito cair. Não é paywall e não é o
+ *  app: é a resposta honesta pra quem acabou de pagar e voltou. Ela some
+ *  sozinha quando isSubscribed vira true (use-auth re-checa em foco e a cada
+ *  60s), sem a pessoa precisar fazer nada. */
+const ConfirmandoPagamento = () => (
+  <motion.div
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    className="fixed inset-0 z-[310] bg-white grid place-items-center px-6 text-center"
+  >
+    <div className="max-w-sm">
+      <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 grid place-items-center mx-auto mb-5">
+        <Loader2 className="w-7 h-7 animate-spin" />
+      </div>
+      <h2 className="text-[22px] font-bold tracking-tight mb-2 text-foreground">
+        Confirmando seu pagamento…
+      </h2>
+      <p className="text-[14px] text-muted-foreground leading-relaxed">
+        Isso costuma levar menos de 1 minuto. <strong className="text-foreground">Pode deixar
+        esta tela aberta</strong> — seu acesso libera sozinho aqui.
+      </p>
+      <p className="text-[12.5px] text-muted-foreground leading-snug mt-4">
+        📩 Se preferir fechar, tudo bem: o acesso e o passo a passo também chegam no seu e-mail.
+      </p>
+    </div>
+  </motion.div>
+);
 
 export const TrialBanner = () => {
   const { user, trialExpired, noTrial, isSubscribed, subLoaded, trialDay, trialHoursLeft } = useAuth();
@@ -58,6 +86,21 @@ export const TrialBanner = () => {
     if (subLoaded && isSubscribed) firePixPurchaseOnce("rescue");
   }, [subLoaded, isSubscribed]);
 
+  // Janela de confirmação: reavalia a cada 5s pra a tela cair sozinha no
+  // paywall quando os 12 minutos passarem sem crédito.
+  const [aguardandoPix, setAguardandoPix] = useState(() => temPixEmConfirmacao());
+  useEffect(() => {
+    if (!aguardandoPix) return;
+    const t = setInterval(() => setAguardandoPix(temPixEmConfirmacao()), 5000);
+    return () => clearInterval(t);
+  }, [aguardandoPix]);
+  useEffect(() => {
+    if (aguardandoPix && !isSubscribed && subLoaded && user) {
+      trackEvent("pix_confirmando_view", {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aguardandoPix]);
+
   useEffect(() => {
     // Antes da 1ª resposta do check-subscription o status é DESCONHECIDO —
     // sem isso, assinante pago via "Trial • 1d restante" piscando a cada
@@ -81,6 +124,22 @@ export const TrialBanner = () => {
 
   if (!subLoaded || isSubscribed || !user) return null;
   if (suppressOnRoute) return null;
+
+  /* PAGOU AGORA E O CRÉDITO NÃO CHEGOU (04/08).
+   *
+   * O portão só conhecia dois estados — assinante ou não — e o terceiro é
+   * frequente: acabou de pagar, confirmação a caminho. Medição de 04/08: 9 de
+   * 21 pagantes (43%) viram este paywall DEPOIS de pagar, porque voltaram pro
+   * app dentro da janela de crédito (mediana 54s, p90 3,4min). Duas delas
+   * abriram chamado achando que tinham perdido o dinheiro — uma mandou print
+   * do paywall.
+   *
+   * Enquanto houver Pix gerado há menos de 12 minutos, a tela diz "estamos
+   * confirmando" em vez de "assine". O use-auth já re-checa a cada 60s e em
+   * todo retorno de foco; quando o crédito cai, isSubscribed vira true e o
+   * componente inteiro some sozinho. Passados os 12min é abandono real e o
+   * paywall volta — sem esconder oferta de quem não pagou. */
+  if (aguardandoPix) return <ConfirmandoPagamento />;
 
   // Conta pós-paywall (sem trial): paywall completo estilo Cal AI,
   // autocontido (planos + checkout + roleta/downsell), sem sair da tela.

@@ -39,6 +39,23 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  /*
+   * TELA BRANCA EM ANDROID ANTIGO (03/08).
+   *
+   * Sem target explícito o Vite mira "navegadores de ~2020" (Chrome 87+), e o
+   * bundle saía com sintaxe/globais que WebView velho não conhece —
+   * `globalThis` aparecia 45× e só existe no Chrome 71+. Resultado real: um
+   * aparelho de teste abriu o app numa tela branca muda, e como campanha de
+   * app mira exatamente o Android popular sem atualização, cada instalação
+   * dessas era dinheiro pago por alguém que nunca viu o paywall.
+   *
+   * es2015 é o piso de SINTAXE (esbuild transpila optional chaining, async,
+   * etc). Globais de runtime que a transpilação não cobre (globalThis & cia)
+   * têm polyfill inline no index.html, ANTES do bundle carregar.
+   */
+  build: {
+    target: "es2015",
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {

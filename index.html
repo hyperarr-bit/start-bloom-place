@@ -37,6 +37,103 @@
     </style>
 
     <script>
+      // ─── Socorro de boot (03/08) — SÓ ES5 NESTE BLOCO ───────────────────
+      //
+      // Um aparelho de teste abriu o app numa TELA BRANCA MUDA: WebView
+      // antigo, bundle com global que ele não conhece, JS morto no primeiro
+      // milissegundo e nenhum aviso pra ninguém. Este bloco é a resposta em
+      // duas partes, e roda ANTES de qualquer outro script:
+      //
+      // 1. polyfills mínimos dos globais que a transpilação (es2015 no
+      //    vite.config) não cobre;
+      // 2. um vigia: se o React não montar em 8s, ou se um erro estourar
+      //    antes disso, a pessoa vê uma tela de erro em HTML puro com o
+      //    motivo — e a gente vê o print dela em vez de adivinhar.
+      (function () {
+        // — polyfills —
+        if (typeof globalThis === "undefined") {
+          try { window.globalThis = window; } catch (e) {}
+        }
+        if (!Object.hasOwn) {
+          Object.hasOwn = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+        }
+        if (!Object.fromEntries) {
+          Object.fromEntries = function (it) {
+            var o = {};
+            var arr = Array.prototype.slice.call(it);
+            for (var i = 0; i < arr.length; i++) o[arr[i][0]] = arr[i][1];
+            return o;
+          };
+        }
+        if (!Array.prototype.flat) {
+          Array.prototype.flat = function (d) {
+            d = d === undefined ? 1 : d;
+            var out = [];
+            (function achata(a, n) {
+              for (var i = 0; i < a.length; i++) {
+                if (Array.isArray(a[i]) && n > 0) achata(a[i], n - 1);
+                else out.push(a[i]);
+              }
+            })(this, d);
+            return out;
+          };
+        }
+        if (!Array.prototype.flatMap) {
+          Array.prototype.flatMap = function (fn, self) { return this.map(fn, self).flat(1); };
+        }
+        if (!Array.prototype.at) {
+          Array.prototype.at = function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; };
+        }
+        if (!String.prototype.replaceAll) {
+          String.prototype.replaceAll = function (busca, troca) {
+            if (busca instanceof RegExp) return this.replace(busca, troca);
+            return this.split(busca).join(troca);
+          };
+        }
+        if (!Promise.allSettled) {
+          Promise.allSettled = function (ps) {
+            return Promise.all(Array.prototype.map.call(ps, function (p) {
+              return Promise.resolve(p).then(
+                function (v) { return { status: "fulfilled", value: v }; },
+                function (r) { return { status: "rejected", reason: r }; }
+              );
+            }));
+          };
+        }
+        if (typeof queueMicrotask !== "function") {
+          window.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
+        }
+
+        // — vigia —
+        var primeiroErro = null;
+        window.addEventListener("error", function (e) {
+          if (!primeiroErro) primeiroErro = (e && e.message) || "erro desconhecido";
+        });
+        window.addEventListener("unhandledrejection", function (e) {
+          if (!primeiroErro) {
+            var r = e && e.reason;
+            primeiroErro = (r && (r.message || String(r))) || "promise rejeitada";
+          }
+        });
+        setTimeout(function () {
+          var raiz = document.getElementById("root");
+          if (raiz && raiz.children && raiz.children.length > 0) return; // montou, tudo certo
+          document.body.innerHTML =
+            '<div style="font-family:sans-serif;padding:32px 24px;max-width:420px;margin:0 auto;color:#1a1a1a;background:#fff">' +
+            '<div style="font-size:40px;margin-bottom:12px">😕</div>' +
+            '<h1 style="font-size:20px;margin:0 0 8px">O app não conseguiu abrir</h1>' +
+            '<p style="font-size:14px;line-height:1.5;color:#555;margin:0 0 16px">Geralmente isso acontece quando o <b>Android System WebView</b> está desatualizado. Abra a Play Store, procure por "Android System WebView" e toque em Atualizar. Depois volte aqui.</p>' +
+            '<button onclick="location.reload()" style="font-size:15px;font-weight:bold;padding:12px 24px;border:0;border-radius:10px;background:#1a1a1a;color:#fff;width:100%">Tentar de novo</button>' +
+            (primeiroErro
+              ? '<p style="font-size:11px;color:#999;margin-top:16px;word-break:break-all">Detalhe técnico: ' +
+                String(primeiroErro).replace(/</g, "&lt;").slice(0, 200) + "</p>"
+              : "") +
+            "</div>";
+        }, 8000);
+      })();
+    </script>
+
+    <script>
       // Apply theme BEFORE React mounts to prevent FOUC (flash of light theme).
       // Keep palette table in sync with src/hooks/use-theme.tsx (paletteVars).
       (function () {

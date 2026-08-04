@@ -27,7 +27,20 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     trackEvent("app_sheet_view", {});
-    initRevenueCat().then(setRc);
+    /*
+     * Telemetria do botão CINZA (04/08). O disabled do botão depende do
+     * estadoRC, e até hoje esse estado não gerava evento nenhum: o
+     * app_compra_falhou com motivo rc_* só dispara dentro de comprar(), que
+     * nunca roda com o botão desabilitado. Resultado real: campanha com zero
+     * vendas e nenhum jeito de saber se as pessoas viram um botão morto.
+     * Agora cada abertura do sheet reporta em que estado o botão nasceu e em
+     * que estado ficou depois do init.
+     */
+    trackEvent("app_sheet_rc", { fase: "abertura", estado: estadoRevenueCat() });
+    initRevenueCat().then((e) => {
+      setRc(e);
+      trackEvent("app_sheet_rc", { fase: "apos_init", estado: e });
+    });
   }, []);
 
   const assinar = async () => {

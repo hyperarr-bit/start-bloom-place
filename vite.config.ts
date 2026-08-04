@@ -55,6 +55,29 @@ export default defineConfig(({ mode }) => ({
    */
   build: {
     target: "es2015",
+    /*
+     * cssTarget EXPLÍCITO (04/08) — o es2015 acima quase desfez a si mesmo.
+     *
+     * Sem cssTarget, o Vite herda o build.target pro CSS. Só que "es2015"
+     * não é navegador — não tem tabela de features CSS — e o esbuild PAROU
+     * de rebaixar o shorthand `inset`. O target padrão (que inclui safari14)
+     * expandia `inset: 0` em top/right/bottom/left; com es2015 o bundle
+     * passou a entregar `inset:` puro, que WebView < Chrome 87 descarta como
+     * propriedade desconhecida.
+     *
+     * O estrago no aparelho antigo (foto do dono, 04/08): todo overlay
+     * `fixed inset-0` (paywall, spotlight, dialogs) deixava de cobrir a
+     * tela, camadas de fundo `absolute inset-0` colapsavam (superfícies
+     * cruas/cinzas) e a barra de progresso do funil v2 não pintava. Ou
+     * seja: a mudança feita PARA os WebViews antigos quebrava o CSS
+     * exatamente neles.
+     *
+     * chrome61: expande o inset E converte cores hex-alpha (#RRGGBBAA, que
+     * é Chrome 62+) pra rgba() — mesmo piso do polyfill de globalThis.
+     * Verificado por diff byte a byte: fora inset e hex→rgba, o CSS é
+     * idêntico ao de antes do es2015.
+     */
+    cssTarget: "chrome61",
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

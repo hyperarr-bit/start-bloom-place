@@ -34,6 +34,7 @@
  */
 import { isNativeShell } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
+import { trackEvent } from "@/lib/analytics";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -146,15 +147,48 @@ export async function reconciliarSePreciso(): Promise<boolean> {
 
 /** Compra o produto (core_anual/core_mensal). Devolve true se a assinatura
  *  ativou E o acesso foi gravado no nosso banco. */
+/**
+ * POR QUE A COMPRA NÃO FECHOU (03/08) — telemetria que faltava.
+ *
+ * Em 02-03/08: 17 pessoas tocaram em comprar e 1 concluiu. As outras 16
+ * sumiram sem deixar rastro, porque esta função devolvia `false` em QUATRO
+ * situações completamente diferentes e nenhuma delas virava evento:
+ *   sem_chave/sem_produto  → RevenueCat nem carregou o catálogo
+ *   produto_ausente        → o id do Play Console não bate com o do código
+ *                            (acontece ao editar/recriar plano base — foi
+ *                            exatamente o que mexemos no preço)
+ *   cancelou               → a pessoa fechou a folha do Google (normal!)
+ *   billing_erro           → a Play recusou
+ * Sem separar "quebrou" de "desistiu" não dá pra decidir preço nenhum — a
+ * gente testaria oferta num botão possivelmente morto.
+ *
+ * Só vale a partir do PRÓXIMO BUILD: o app embarca o bundle (webDir "dist"),
+ * então deploy no site não alcança quem já instalou.
+ */
 export async function comprar(productId: string): Promise<boolean> {
-  if (estado !== "pronto" || !Purchases) return false;
+  if (estado !== "pronto" || !Purchases) {
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: productId });
+    return false;
+  }
   try {
     const offerings = await (Purchases as NonNullable<typeof Purchases>).getOfferings();
     const pacotes = offerings?.current?.availablePackages ?? [];
     const alvo = pacotes.find((p) => p.product?.identifier?.startsWith(productId));
-    if (!alvo) { console.warn("[RC] produto não encontrado:", productId); return false; }
+    if (!alvo) {
+      console.warn("[RC] produto não encontrado:", productId);
+      trackEvent("app_compra_falhou", {
+        motivo: "produto_ausente",
+        produto: productId,
+        // o que a loja REALMENTE oferece — mata a dúvida do id divergente
+        disponiveis: pacotes.map((p) => p.product?.identifier).filter(Boolean).slice(0, 8),
+      });
+      return false;
+    }
     const { customerInfo } = await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
-    if (!temEntitlement(customerInfo)) return false;
+    if (!temEntitlement(customerInfo)) {
+      trackEvent("app_compra_falhou", { motivo: "sem_entitlement", produto: productId });
+      return false;
+    }
     // O dinheiro já saiu: mesmo que o sync falhe agora, devolvo true (o
     // webhook e o reconciliarSePreciso pegam depois) — mas tento aqui pra
     // pessoa entrar no app na mesma hora.
@@ -163,6 +197,13 @@ export async function comprar(productId: string): Promise<boolean> {
   } catch (e) {
     // usuário cancelou a folha de compra ou erro de billing — não é crash
     console.warn("[RC] compra não concluída:", e);
+    const msg = String((e as { message?: string })?.message ?? e);
+    const cancelou = /cancel/i.test(msg) || (e as { code?: string })?.code === "1";
+    trackEvent("app_compra_falhou", {
+      motivo: cancelou ? "cancelou" : "billing_erro",
+      produto: productId,
+      erro: msg.slice(0, 160),
+    });
     return false;
   }
 }

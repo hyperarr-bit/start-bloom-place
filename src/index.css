@@ -5,6 +5,15 @@
 @tailwind utilities;
 
 @layer base {
+  /* Sem flash/caixa de toque do sistema em CONTROLE NENHUM (04/08).
+     Era só no .notion-tab; em WebView de fabricante antigo o realce padrão
+     é uma caixa cinza/amarelada que fica visível por cima do controle — a
+     "borda cinza e amarela" na seta de voltar da foto do dono. O feedback
+     de toque continua sendo o nosso (active:scale, hover, ring). */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   :root {
     color-scheme: light;
     --background: 0 0% 100%;
@@ -602,7 +611,13 @@ body,
   max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no mobile */
+  /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no mobile.
+     A linha `hidden` ANTES existe pro WebView < Chrome 90, que não conhece
+     `clip` e caía em `visible` — aí qualquer elemento vazando deixava a
+     página inteira PANORÂMICA na horizontal (botões "saindo da margem" na
+     foto do dono, 04/08). Parser velho fica com hidden; novo sobrescreve
+     com clip. */
+  overflow-x: hidden;
   overflow-x: clip;
   touch-action: auto;
   background-color: hsl(var(--background));
@@ -775,4 +790,69 @@ header.sticky.top-0 {
   .min-h-svh {
     min-height: 100vh;
   }
+}
+
+/*
+ * WEBVIEW ANTIGO, CAPÍTULO 4 (04/08) — flex gap não existe antes do Chrome 84.
+ *
+ * Sem gap, todo espaçamento de fila some: no aparelho do dono a seta de
+ * voltar colou na barra de progresso, o chip "Pergunte ao CORE" caiu em cima
+ * de "Agosto De 2026", as 9 abas de Finanças viraram um tapume contínuo e o
+ * X do aviso da demo encostou no botão de criar conta ("uma coisa batendo na
+ * outra"). Não dá pra polyfillar gap; dá pra repor MARGENS nos pontos onde a
+ * falta dele quebra toque ou leitura.
+ *
+ * O gatilho `@supports not (inset: 0px)` é um PROXY: inset é Chrome 87+, gap
+ * é 84+. Navegador moderno pula o bloco inteiro. A janelinha 84-86 (tem gap,
+ * cai aqui mesmo assim) é neutralizada zerando o gap do container antes de
+ * repor as margens — ninguém leva espaçamento dobrado.
+ *
+ * Mapeado por agente com verificação adversarial; 10 piores pontos.
+ */
+@supports not (inset: 0px) {
+  /* réguas de abas (todos os módulos) */
+  .notion-tab + .notion-tab { margin-left: 4px; }
+  header.sticky.top-0 .overflow-x-auto { gap: 0; }
+
+  /* cabeçalho dos módulos: ← título · mês · chips */
+  header.sticky.top-0 .py-3.flex.items-center { gap: 0; }
+  /* o :not(.ml-auto) preserva o empurra-pra-direita do grupo do mês */
+  header.sticky.top-0 .py-3.flex.items-center > * + *:not(.ml-auto) { margin-left: 12px; }
+  header.sticky.top-0 .ml-auto.flex.items-center { gap: 0; }
+  header.sticky.top-0 .ml-auto.flex.items-center > * + * { margin-left: 8px; }
+
+  /* nav do tour da demo */
+  .demo-tour-nav .overflow-x-auto { gap: 0; }
+  .demo-tour-nav .overflow-x-auto > * + * { margin-left: 6px; }
+
+  /* aviso da demo: X não pode colar no CTA de criar conta */
+  .pointer-events-auto.border-2.bg-card { gap: 0; }
+  .pointer-events-auto.border-2.bg-card > * + * { margin-left: 12px; }
+  [aria-label="Dispensar"] { margin-right: 0; }
+
+  /* preço ancorado riscado não emenda no preço real */
+  .items-end.justify-center > .line-through { margin-right: 8px; }
+
+  /* selos de confiança do cadastro (flex-wrap) */
+  .gap-x-4.gap-y-1.flex-wrap { column-gap: 0; row-gap: 0; }
+  .gap-x-4.gap-y-1.flex-wrap > * { margin: 2px 8px; }
+
+  /* rodapé fixo da demo: texto não encosta no botão */
+  .fixed.bottom-0.border-t .max-w-md.flex { gap: 0; }
+  .fixed.bottom-0.border-t .max-w-md.flex > * + * { margin-left: 12px; }
+
+  /* topo do quiz: voltar · barra de progresso */
+  [aria-label="Voltar"] { margin-right: 10px; }
+
+  /* banner roxo da demo */
+  .from-violet-600 .flex.items-center.justify-between { gap: 0; }
+  .from-violet-600 .flex.items-center.justify-between > * + * { margin-left: 12px; }
+
+  /* ícone nunca gruda no rótulo (Button do shadcn tem gap-2 na base);
+     :not(:only-child) protege botões só-ícone de perder a centralização */
+  button > svg:first-child:not(:only-child) { margin-right: 6px; }
+  button > svg:last-child:not(:only-child) { margin-left: 6px; }
+
+  /* tile de emoji das opções do quiz */
+  .w-11.h-11.rounded-xl { margin-right: 14px; }
 }

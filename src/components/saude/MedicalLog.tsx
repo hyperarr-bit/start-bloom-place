@@ -182,7 +182,7 @@ export const MedicalLog = () => {
       <div className="rounded-2xl border border-border overflow-hidden bg-card">
         <div className="bg-teal-200 dark:bg-teal-900/40 px-5 py-4 flex items-center justify-between">
           <h3 className="text-base font-black uppercase tracking-wide text-foreground">Consultas</h3>
-          <span className="text-3xl">🩺</span>
+          <span className="text-3xl">🏥</span>
         </div>
         {allAppts.length > 0 ? (
           <div className="overflow-x-auto">
@@ -280,7 +280,7 @@ export const MedicalLog = () => {
       <div className="rounded-2xl border border-border overflow-hidden bg-card">
         <div className="bg-rose-200 dark:bg-rose-900/40 px-5 py-4 flex items-center justify-between">
           <h3 className="text-base font-black uppercase tracking-wide text-foreground">Exames</h3>
-          <span className="text-3xl">🩸</span>
+          <span className="text-3xl">💉</span>
         </div>
         <div className="p-4">
           <button

@@ -23,7 +23,10 @@
         max-width: 100%;
         min-height: 100vh;
         min-height: 100dvh;
-        /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no mobile */
+        /* clip (não hidden): hidden cria scroller aninhado → trava de scroll no
+           mobile. hidden antes = fallback pro WebView <90 (sem clip, caía em
+           visible e a página panorâmica na horizontal). */
+        overflow-x: hidden;
         overflow-x: clip;
         touch-action: auto;
         background-color: #ffffff;

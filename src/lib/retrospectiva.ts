@@ -200,7 +200,7 @@ const perfilDoMes = (f: WrappedData | null, v: RetroVida | null): RetroMes["perf
     return { emoji: "🔥", name: "Imparável", line: `Ativo em ${v!.diasAtivos} dos ${v!.diasPossiveis} dias do mês.` };
   }
   if (v && v.diasDeDiario >= 10) {
-    return { emoji: "🪞", name: "Observador", line: `${v.diasDeDiario} dias de diário. Poucos param pra pensar.` };
+    return { emoji: "✨", name: "Observador", line: `${v.diasDeDiario} dias de diário. Poucos param pra pensar.` };
   }
   if (v && v.melhorSequencia >= 7) {
     return { emoji: "⛓️", name: "Corrente Longa", line: `${v.melhorSequencia} dias seguidos sem quebrar.` };

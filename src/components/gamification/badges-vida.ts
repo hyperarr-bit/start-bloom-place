@@ -89,7 +89,7 @@ export function buildBadgesVida(get: Leitor): Badge[] {
     fazer("rotina-1", "Primeiro Dia", "Marque 1 dia na sua rotina", "🌱", "rotina", 50, diasAtivos.length, 1),
     fazer("rotina-7", "Semana Cheia", "7 dias seguidos sem falhar", "📅", "rotina", 100, recordeRotina, 7),
     fazer("rotina-21", "Hábito Formado", "21 dias seguidos — o número que vira hábito", "🔥", "rotina", 200, recordeRotina, 21),
-    fazer("diario-7", "Reflexivo", "7 dias de diário escritos", "🪞", "rotina", 100, diasDeDiario, 7),
+    fazer("diario-7", "Reflexivo", "7 dias de diário escritos", "✨", "rotina", 100, diasDeDiario, 7),
 
     // ---- Leitura: o módulo com mais tempo por pessoa no app ----
     fazer("leitura-estante", "Estante Montada", "3 livros na sua biblioteca", "📚", "leitura", 50, livros.length, 3),

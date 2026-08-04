@@ -224,7 +224,7 @@ const Biblioteca = () => {
     { key: "lendo", label: "📖 LENDO", bg: "bg-blue-200 dark:bg-blue-800/60", body: "bg-blue-50/80 dark:bg-blue-950/20" },
     { key: "quero-ler", label: "📋 QUERO LER", bg: "bg-amber-200 dark:bg-amber-800/60", body: "bg-amber-50/80 dark:bg-amber-950/20" },
     { key: "lido", label: "✅ LIDOS", bg: "bg-green-200 dark:bg-green-800/60", body: "bg-green-50/80 dark:bg-green-950/20" },
-    { key: "abandonado", label: "🪦 ABANDONADOS", bg: "bg-gray-200 dark:bg-gray-700/60", body: "bg-gray-50/80 dark:bg-gray-900/20" },
+    { key: "abandonado", label: "⚰️ ABANDONADOS", bg: "bg-gray-200 dark:bg-gray-700/60", body: "bg-gray-50/80 dark:bg-gray-900/20" },
   ];
 
   // ── Book Form Modal ──
@@ -257,7 +257,7 @@ const Biblioteca = () => {
               <SelectItem value="quero-ler">📋 Quero Ler</SelectItem>
               <SelectItem value="lendo">📖 Lendo</SelectItem>
               <SelectItem value="lido">✅ Lido</SelectItem>
-              <SelectItem value="abandonado">🪦 Abandonado</SelectItem>
+              <SelectItem value="abandonado">⚰️ Abandonado</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -508,7 +508,7 @@ const Biblioteca = () => {
 
                 {/* Abandon button */}
                 <Button variant="outline" size="sm" className="w-full border-dashed text-muted-foreground" onClick={() => abandonBook(currentBook.id)}>
-                  🪦 Abandonar Leitura
+                  ⚰️ Abandonar Leitura
                 </Button>
               </>
             ) : (
@@ -543,7 +543,7 @@ const Biblioteca = () => {
                   <SelectItem value="lendo">📖 Lendo</SelectItem>
                   <SelectItem value="lido">✅ Lidos</SelectItem>
                   <SelectItem value="quero-ler">📋 Quero Ler</SelectItem>
-                  <SelectItem value="abandonado">🪦 Abandonados</SelectItem>
+                  <SelectItem value="abandonado">⚰️ Abandonados</SelectItem>
                 </SelectContent>
               </Select>
               <Button size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white" onClick={openNew}><Plus className="w-4 h-4" /></Button>
@@ -807,7 +807,7 @@ const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit:
           <p className="text-[9px] text-muted-foreground">{book.currentPage}/{book.pages} págs</p>
         </div>
       )}
-      {book.status === "abandonado" && <p className="text-[9px] italic text-muted-foreground mt-0.5">🪦 A vida é curta demais para livros ruins.</p>}
+      {book.status === "abandonado" && <p className="text-[9px] italic text-muted-foreground mt-0.5">⚰️ A vida é curta demais para livros ruins.</p>}
       {book.rating > 0 && <div className="mt-0.5"><StarRating value={book.rating} size="w-3 h-3" /></div>}
       {book.lentTo && <Badge className="mt-1 text-[8px] h-4 bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800">📤 {book.lentTo}</Badge>}
       {(book.quotes || []).length > 0 && <Badge variant="outline" className="mt-1 ml-1 text-[8px] h-4">💡 {book.quotes.length} citações</Badge>}

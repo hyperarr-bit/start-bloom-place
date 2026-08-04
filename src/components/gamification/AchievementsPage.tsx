@@ -72,7 +72,7 @@ function buildBadges(get: <T>(key: string, fallback: T) => T): Badge[] {
 
     // Poupança
     comProgresso({ ...base, id: "saver-20", name: "Poupador", description: "Taxa de poupança ≥ 20%", icon: "🐷", xp: XP }, savingsRate, 20),
-    comProgresso({ ...base, id: "saver-40", name: "Super Poupador", description: "Taxa de poupança ≥ 40%", icon: "🪙", xp: XP_HI }, savingsRate, 40),
+    comProgresso({ ...base, id: "saver-40", name: "Super Poupador", description: "Taxa de poupança ≥ 40%", icon: "💰", xp: XP_HI }, savingsRate, 40),
     comProgresso({ ...base, id: "saver-60", name: "Formiguinha", description: "Taxa de poupança ≥ 60%", icon: "🐜", xp: XP_TOP }, savingsRate, 60),
 
     // Investimentos

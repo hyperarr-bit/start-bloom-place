@@ -17,10 +17,10 @@ const defaultTasks: TaskItem[] = [
   { id: "walk", label: "Passeio", emoji: "🦮" },
   { id: "bath", label: "Banho", emoji: "🛁" },
   { id: "play", label: "Brincar", emoji: "🎾" },
-  { id: "brush", label: "Escovar", emoji: "🪮" },
+  { id: "brush", label: "Escovar", emoji: "✂️" },
 ];
 
-const emojiOptions = ["🍖", "💧", "🦮", "🛁", "🎾", "🪮", "💊", "🩺", "🧴", "🦷", "🐾", "🎀", "🧹", "🛏️", "🥩", "🥕"];
+const emojiOptions = ["🍖", "💧", "🦮", "🛁", "🎾", "✂️", "💊", "💉", "🧴", "🦷", "🐾", "🎀", "🧹", "🛏️", "🥩", "🥕"];
 
 const getEmoji = (species: string) => {
   const s = species.toLowerCase();

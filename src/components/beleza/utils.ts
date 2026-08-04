@@ -25,7 +25,7 @@ export const SKINCARE_STEP_ICONS: Record<string, string> = {
   "sérum": "🧴", "serum": "🧴",
   "hidratante": "🧊", "moisturizer": "🧊", "creme": "🧊",
   "protetor solar": "☀️", "fps": "☀️", "sunscreen": "☀️",
-  "óleo": "🫧", "oil": "🫧",
+  "óleo": "🧼", "oil": "🧼",
   "máscara": "🎭", "mascara": "🎭", "mask": "🎭",
   "esfoliante": "✨", "exfoliant": "✨",
   "retinol": "💎", "ácido": "⚗️", "acido": "⚗️",
@@ -111,7 +111,7 @@ export const HAIR_RESULT_TAGS = [
 ];
 
 export const WASH_STEPS = [
-  { id: "pre-shampoo", label: "Pré-shampoo", emoji: "🫧" },
+  { id: "pre-shampoo", label: "Pré-shampoo", emoji: "🧼" },
   { id: "shampoo", label: "Shampoo", emoji: "🧴" },
   { id: "mascara", label: "Máscara", emoji: "🎭" },
   { id: "condicionador", label: "Condicionador", emoji: "🧊" },

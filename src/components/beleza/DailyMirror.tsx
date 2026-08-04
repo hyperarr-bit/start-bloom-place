@@ -49,7 +49,7 @@ export const DailyMirror = () => {
       {/* Consistency Ring + Check-in — Notion-style */}
       <div className="rounded-xl border border-border overflow-hidden">
         <div className="bg-emerald-200 dark:bg-emerald-800/50 px-4 py-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider">🪞 ESPELHO DO DIA</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider">✨ ESPELHO DO DIA</span>
         </div>
         <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4">
           <div className="flex items-center gap-4">

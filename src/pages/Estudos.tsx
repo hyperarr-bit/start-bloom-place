@@ -393,7 +393,7 @@ const Estudos = () => {
           {activeTab === "grade" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">
               <div className="bg-amber-300 dark:bg-amber-700/60 px-4 py-3 text-center">
-                <span className="text-3xl">🧑‍🎓</span>
+                <span className="text-3xl">🎓</span>
                 <div className="mt-1">
                   <Input value={scheduleName} onChange={e => setScheduleName(e.target.value)}
                     className="text-center text-sm font-black uppercase tracking-wider bg-transparent border-none h-auto p-0 focus-visible:ring-0"

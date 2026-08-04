@@ -952,6 +952,19 @@ export default function ComecarRadar() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  /* Pré-carrega o chunk da DEMO enquanto a pessoa olha o "Preparando seu
+     plano…" (04/08). Num aparelho fraco o Preview levava segundos baixando
+     e parseando DEPOIS do funil terminar — a pessoa via um branco comprido
+     entre a última pergunta e a demo (relato do dono). A tela de progresso
+     já existe e dura ~4s: é exatamente a janela pra baixar o chunk. Mesmo
+     specifier do lazy() do App.tsx → mesmo chunk, o import de lá resolve
+     na hora. */
+  useEffect(() => {
+    if (step === "progress" || step === "result") {
+      import("@/pages/Preview").catch(() => {});
+    }
+  }, [step]);
   // Funil vitrine: /inicio (URL limpa dos anúncios) ou ?porta=vida (compat).
   // Criativo "app pra vida inteira". A área escolhida persiste — quem volta
   // da demo (?step=signup) segue na trilha.

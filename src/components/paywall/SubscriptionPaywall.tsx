@@ -96,7 +96,7 @@ export function SubscriptionPaywall({ onClose }: { onClose: () => void }) {
               </div>
               <div className="text-right">
                 <div className="font-extrabold text-lg">{APP_PRECOS.anual.preco}<span className="text-xs font-semibold text-muted-foreground">/ano</span></div>
-                <div className="text-[11px] text-emerald-600 font-bold">67% OFF</div>
+                <div className="text-[11px] text-emerald-600 font-bold">59% OFF</div>
               </div>
             </div>
           </button>

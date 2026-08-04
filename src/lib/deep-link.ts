@@ -74,8 +74,26 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
       if (ehRetornoDeLogin(url)) {
         const ok = await sessaoDoLink(url!);
         await fecharNavegador();
-        // depois de logar, sai da tela de login/funil pro app
-        if (ok) navegar("/");
+        /*
+         * PRA ONDE volta quem logou com Google (04/08).
+         *
+         * Antes: sempre "/" — e o RootGate mandava a conta nova pro hub.
+         * Quem se cadastrou com Google NO MEIO DO FUNIL nunca via o paywall:
+         * entrava no app "de graça" e só topava com o gate de trial depois,
+         * do nada ("o paywall aparece de novo em outra tela"). O funil já
+         * marca funnel-oauth-pending antes de abrir o Google exatamente pra
+         * isso — o handler da web usa; o do shell ignorava.
+         */
+        if (ok) {
+          let voltaPro = "/";
+          try {
+            if (localStorage.getItem("funnel-oauth-pending") === "true") {
+              localStorage.removeItem("funnel-oauth-pending");
+              voltaPro = "/app?step=offer";
+            }
+          } catch { /* noop */ }
+          navegar(voltaPro);
+        }
         return true;
       }
       const rota = rotaDoLink(url);

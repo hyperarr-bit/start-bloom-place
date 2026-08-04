@@ -2,6 +2,7 @@ import React from "react";
 import { AlertTriangle, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
+import { isNativeShell } from "@/lib/native-shell";
 
 interface Props {
   children: React.ReactNode;
@@ -109,7 +110,12 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
             </p>
           </div>
           {!chunk && this.state.error?.message && (
-            <details className="text-left text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
+            /* ABERTO por padrão no app da loja (04/08): o dono fotografou esta
+               tela num aparelho de teste e a foto veio com os detalhes
+               fechados — zero informação. No celular ninguém abre <summary>;
+               com o motivo visível, a foto do usuário É o diagnóstico. Na web
+               continua fechado (lá tem DevTools). */
+            <details open={isNativeShell()} className="text-left text-xs text-muted-foreground bg-muted/50 rounded-lg p-2">
               <summary className="cursor-pointer">Detalhes técnicos</summary>
               <pre className="whitespace-pre-wrap break-words mt-2">{this.state.error.message}</pre>
             </details>

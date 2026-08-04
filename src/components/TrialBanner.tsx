@@ -64,6 +64,16 @@ export const TrialBanner = () => {
     location.pathname.startsWith("/acesso") ||
     // /plano é o funil v3 (20/07) — paywall próprio, mesma regra do /comecar
     location.pathname.startsWith("/plano") ||
+    // /app é a PORTA DO SHELL (ENTRADA_APP) — o mesmo funil radar, com o
+    // mesmo paywall próprio no step "offer". Ficou FORA desta lista quando a
+    // porta do app ganhou rota própria (26/07) e o bug de "dois paywalls
+    // empilhados", já consertado aqui pro /comecar e /inicio, RENASCEU no
+    // app: cadastro conclui → paywall do funil pinta → ~2s depois o
+    // check-subscription resolve "sem trial" → este gate montava um SEGUNDO
+    // PaywallFlow em z-[310] por cima do primeiro, replay de todas as
+    // animações ("o paywall renasce, dá reset" — dono, 04/08) e, pior,
+    // ENTERRANDO o AppPurchaseSheet (z-[90]) de quem já tinha tocado o CTA.
+    location.pathname.startsWith("/app") ||
     location.pathname.startsWith("/preview");
 
   // "Já passou pelo tutorial?" — a régua era spotlight-done-financas, cravada

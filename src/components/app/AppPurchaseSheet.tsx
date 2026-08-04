@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { initRevenueCat, estadoRevenueCat, comprar, restaurar } from "@/lib/revenuecat";
@@ -24,6 +24,39 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
   const [msg, setMsg] = useState<string | null>(null);
   const { get } = useUserData();
   const nome = get<string>("core-user-name", "") || get<string>("user-name", "");
+
+  /*
+   * VOLTAR do Android fecha o SHEET, não o funil (04/08).
+   *
+   * Sem isto, o gesto de voltar — o jeito instintivo de fechar um bottom
+   * sheet — caía no padrão do Capacitor: history.back() do webview. E o
+   * histórico tem entradas reais (central → demo → cadastro), então o
+   * usuário não fechava o sheet: ele DESMONTAVA o funil inteiro, o step
+   * "offer" (estado de componente) evaporava e não existia caminho de volta
+   * ao paywall — "quando clicamos em assinar não dá mais pra voltar" (dono).
+   *
+   * O truque: uma entrada de histórico fantasma enquanto o sheet vive. O
+   * primeiro voltar consome a entrada e fecha o sheet; fechar pelo X ou
+   * backdrop desfaz a entrada no cleanup pra não deixar lixo no histórico.
+   */
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    let fechouPeloVoltar = false;
+    try { history.pushState({ coreSheet: true }, ""); } catch { return; }
+    const aoVoltar = () => {
+      fechouPeloVoltar = true;
+      onCloseRef.current();
+    };
+    window.addEventListener("popstate", aoVoltar);
+    return () => {
+      window.removeEventListener("popstate", aoVoltar);
+      if (!fechouPeloVoltar && (history.state as { coreSheet?: boolean } | null)?.coreSheet) {
+        try { history.back(); } catch { /* noop */ }
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     trackEvent("app_sheet_view", {});
@@ -86,6 +119,16 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
         style={{ paddingBottom: "max(1.1rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-10 h-1.5 rounded-full bg-muted mb-4" aria-hidden />
+        {/* X visível (04/08): as únicas saídas eram o backdrop (faixa
+            estreita) e o voltar do Android — que até hoje destruía o funil.
+            Sheet sem saída óbvia é gaiola, e gaiola não vende. */}
+        <button
+          aria-label="Fechar"
+          onClick={() => { trackEvent("app_sheet_close", { via: "x" }); onClose(); }}
+          className="absolute right-4 top-3 w-8 h-8 rounded-full bg-muted/70 grid place-items-center text-muted-foreground"
+        >
+          <X className="w-4 h-4" />
+        </button>
 
         {ok ? (
           <div className="py-10 text-center">
@@ -97,7 +140,14 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <>
-            <h2 className="text-[20px] font-bold tracking-tight text-center">Comece com 3 dias grátis</h2>
+            {/* DUAS ofertas de peso igual (04/08, pedido do dono: "o paywall
+                tem que ser focado nas duas ofertas, não só no anual"). O
+                mensal deixou de ser âncora apagada (opacity-75, uma linha) e
+                virou card completo. O anual segue default e com o selo do
+                trial — destaque por INFORMAÇÃO, não por apagar o irmão. */}
+            <h2 className="text-[20px] font-bold tracking-tight text-center">
+              {plano === "anual" ? "Comece com 3 dias grátis" : "CORE completo, sem fidelidade"}
+            </h2>
             <p className="text-[12.5px] text-muted-foreground text-center mt-1 mb-4">
               Acesso total agora · cancele quando quiser, direto na Play Store
             </p>
@@ -117,17 +167,26 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="text-right">
                     <div className="font-extrabold text-lg">{APP_PRECOS.anual.preco}<span className="text-xs font-semibold text-muted-foreground">/ano</span></div>
-                    <div className="text-[11px] text-emerald-600 font-bold">67% OFF</div>
+                    {/* 59%: 12 × 19,90 = 238,80 → 97,90 é 59% menos. Era "67%"
+                        calculado sobre o mensal de 29,90 — número FALSO desde
+                        a troca de preço de 02/08. Se mexer nos preços, refaz
+                        esta conta. */}
+                    <div className="text-[11px] text-emerald-600 font-bold">59% OFF</div>
                   </div>
                 </div>
               </button>
               <button
                 onClick={() => { setPlano("mensal"); trackEvent("app_sheet_plan", { plano: "mensal" }); }}
-                className={`w-full text-left rounded-2xl border-2 p-3.5 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-card opacity-75"}`}
+                className={`w-full text-left rounded-2xl border-2 p-3.5 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="font-semibold text-[15px]">Mensal</div>
-                  <div className="font-bold">{APP_PRECOS.mensal.preco}<span className="text-xs font-semibold text-muted-foreground">/mês</span></div>
+                  <div>
+                    <div className="font-bold text-[15px]">Mensal</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">sem fidelidade · cancela em 1 toque</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-extrabold text-lg">{APP_PRECOS.mensal.preco}<span className="text-xs font-semibold text-muted-foreground">/mês</span></div>
+                  </div>
                 </div>
               </button>
             </div>
@@ -146,7 +205,7 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
             >
               {comprando
                 ? <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                : plano === "anual" ? "Começar 3 dias grátis" : "Assinar mensal"}
+                : plano === "anual" ? "Começar 3 dias grátis" : `Assinar por ${APP_PRECOS.mensal.preco}/mês`}
             </button>
 
             {rc !== "pronto" && (

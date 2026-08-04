@@ -588,7 +588,7 @@ export const MonthlyWrapped = ({ retro, onClose }: Props) => {
     // único que não é performance. Depois de contar dias e números, perguntar
     // "e como você estava?" é o que faz a retrospectiva parecer sua.
     if (v && (v.humorMedio !== null || v.diasDeDiario > 0)) {
-      const carinha = v.humorMedio === null ? "🪞"
+      const carinha = v.humorMedio === null ? "✨"
         : v.humorMedio >= 4.2 ? "😄" : v.humorMedio >= 3.4 ? "🙂" : v.humorMedio >= 2.6 ? "😐" : "😕";
       s.push({
         bg: "linear-gradient(165deg, #2e1065 0%, #0c0a09 95%)",

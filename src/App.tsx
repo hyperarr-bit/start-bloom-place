@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { trackEvent } from "@/lib/analytics";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
@@ -287,6 +288,24 @@ const usarPreCarregamentoDosModulos = (ligado: boolean) => {
  * Aqui dentro do BrowserRouter (precisa do useNavigate) e fora do <Routes>:
  * monta uma vez e vive enquanto o app viver.
  */
+/**
+ * Uma linha de telemetria que responde "QUAL WebView está na minha base?"
+ * (04/08). Três dias de caça a bugs de WebView antigo (globalThis, inset,
+ * dvh, env()) foram no escuro porque ninguém sabia a versão do Chromium dos
+ * aparelhos reais. Um evento por sessão, só no shell.
+ */
+const jaReportouWebView = { atual: false };
+const TelemetriaWebView = () => {
+  useEffect(() => {
+    if (!isNativeShell() || jaReportouWebView.atual) return;
+    jaReportouWebView.atual = true;
+    const ua = navigator.userAgent;
+    const chrome = /Chrome\/(\d+)/.exec(ua)?.[1] ?? "?";
+    trackEvent("webview_info", { chrome, android: /Android (\d+)/.exec(ua)?.[1] ?? "?", ua: ua.slice(0, 160) });
+  }, []);
+  return null;
+};
+
 const DeepLinks = () => {
   const navigate = useNavigate();
   // navigate troca de identidade a cada navegação; com ele nas deps o efeito
@@ -424,6 +443,7 @@ const App = () => {
               <BrowserRouter>
                 <ScrollToTop />
                 <DeepLinks />
+                <TelemetriaWebView />
                 <GracePeriodBanner />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />

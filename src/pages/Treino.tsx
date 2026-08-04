@@ -47,8 +47,8 @@ const muscleGroups = [
 ];
 
 const muscleGroupIcons: Record<string, string> = {
-  "Peito": "🫁", "Costas": "💪", "Ombros": "🏋️", "Bíceps": "💪", "Tríceps": "💪",
-  "Pernas": "🦵", "Glúteos": "🍑", "Abdômen": "🫁", "Quadríceps": "🦵",
+  "Peito": "🏋️", "Costas": "💪", "Ombros": "🏋️", "Bíceps": "💪", "Tríceps": "💪",
+  "Pernas": "🦵", "Glúteos": "🍑", "Abdômen": "🔥", "Quadríceps": "🦵",
   "Posterior": "🦵", "Panturrilha": "🦵", "Cardio": "🏃", "Full Body": "🏋️",
 };
 

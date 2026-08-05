@@ -4,15 +4,36 @@ import { Sparkles, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 
-const SLICES = [
-  { label: "10% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
-  { label: "Tente +", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
-  { label: "30% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
-  { label: "Quase!", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
-  { label: "5% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
-  { label: "Vazio", from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" },
-  { label: "20% OFF", from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" },
-  { label: "50% OFF", from: "hsl(var(--primary))", to: "hsl(var(--primary) / 0.78)", text: "hsl(var(--primary-foreground))", winning: true },
+type Slice = { label: string; from: string; to: string; text: string; winning?: boolean };
+
+const NEUTRA = { from: "hsl(220 14% 96%)", to: "hsl(220 14% 88%)", text: "hsl(222 20% 25%)" };
+const VAZIA = { from: "hsl(var(--primary) / 0.20)", to: "hsl(var(--primary) / 0.35)", text: "hsl(var(--primary))" };
+const PREMIADA = { from: "hsl(var(--primary))", to: "hsl(var(--primary) / 0.78)", text: "hsl(var(--primary-foreground))", winning: true };
+
+const SLICES: Slice[] = [
+  { label: "10% OFF", ...NEUTRA },
+  { label: "Tente +", ...VAZIA },
+  { label: "30% OFF", ...NEUTRA },
+  { label: "Quase!", ...VAZIA },
+  { label: "5% OFF", ...NEUTRA },
+  { label: "Vazio", ...VAZIA },
+  { label: "20% OFF", ...NEUTRA },
+  { label: "50% OFF", ...PREMIADA },
+];
+
+/** Fatias do downsell do funil (05/08). O jogo de cima não serve aqui: lá a
+ *  fatia premiada é "50% OFF" e as perdedoras chegam a 30%, então trocar só o
+ *  rótulo do prêmio por "R$ 19,90" (= 29% off) deixaria fatias PERDEDORAS
+ *  parecendo melhores que a ganhadora. Aqui nenhuma perdedora passa de 20%. */
+export const SLICES_FUNIL: Slice[] = [
+  { label: "5% OFF", ...NEUTRA },
+  { label: "Tente +", ...VAZIA },
+  { label: "10% OFF", ...NEUTRA },
+  { label: "Quase!", ...VAZIA },
+  { label: "15% OFF", ...NEUTRA },
+  { label: "Vazio", ...VAZIA },
+  { label: "20% OFF", ...NEUTRA },
+  { label: "PRÊMIO", ...PREMIADA },
 ];
 
 const SLICE_DEG = 360 / SLICES.length;
@@ -44,9 +65,14 @@ interface Props {
    *  (dado 18–20/07: 112 giros → 70 chegaram no downsell). O winback de
    *  cancelamento mantém o ritmo padrão — lá a pessoa não está escapando. */
   quick?: boolean;
+  /** Conjunto de fatias. Default = winback de cancelamento; o downsell do
+   *  funil passa SLICES_FUNIL (ver comentário lá). Precisa ter 8 fatias, com
+   *  a premiada na última — o ângulo do giro é calculado em cima disso. */
+  slices?: Slice[];
 }
 
-export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick }: Props) {
+export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick, slices }: Props) {
+  const fatias = slices ?? SLICES;
   const controls = useAnimation();
   const [phase, setPhase] = useState<"spinning" | "done">("spinning");
   const startedRef = useRef(false);
@@ -167,7 +193,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick }: P
         >
           <svg viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`} className="w-full h-full">
             <defs>
-              {SLICES.map((s, i) => (
+              {fatias.map((s, i) => (
                 <linearGradient key={i} id={`slice-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor={s.from} />
                   <stop offset="100%" stopColor={s.to} />
@@ -182,7 +208,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick }: P
             <circle cx={CENTER} cy={CENTER} r={RADIUS + 8} fill="hsl(var(--primary))" />
             <circle cx={CENTER} cy={CENTER} r={RADIUS + 3} fill="hsl(var(--background))" />
 
-            {SLICES.map((s, i) => (
+            {fatias.map((s, i) => (
               <path
                 key={i}
                 d={slicePath(i)}
@@ -194,7 +220,7 @@ export function WinbackWheel({ attemptId, onSpinComplete, prizeLabel, quick }: P
 
             <circle cx={CENTER} cy={CENTER} r={RADIUS} fill="url(#wheel-shine)" pointerEvents="none" />
 
-            {SLICES.map((s, i) => {
+            {fatias.map((s, i) => {
               const angle = i * SLICE_DEG + SLICE_DEG / 2 - 90;
               const rad = (angle * Math.PI) / 180;
               const tx = CENTER + Math.cos(rad) * (RADIUS * 0.62);

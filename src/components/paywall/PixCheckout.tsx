@@ -23,14 +23,22 @@ import { SubscriptionPaywall } from "@/components/paywall/SubscriptionPaywall";
 
 export type PixOffer = "lifetime" | "downsell";
 
+/* 05/08 (ordem do dono): volta a estrutura de DOIS preços — 27,90 cheio e
+ * 19,90 no downsell da roleta. Estes valores são DISPLAY; quem cobra é a
+ * oferta da Cakto (secrets CAKTO_OFFER_LIFETIME / CAKTO_OFFER_DOWNSELL).
+ * Trocar aqui sem trocar os secrets faz a tela prometer um preço e o QR
+ * cobrar outro — os dois andam juntos ou nenhum anda. */
 export const PIX_PRICES: Record<PixOffer, string> = {
-  lifetime: "19,90",
-  downsell: "14,90",
+  lifetime: "27,90",
+  downsell: "19,90",
 };
 
 interface Props {
   offer: PixOffer;
-  onClose: () => void;
+  /** Só é chamado quando a pessoa SAI SEM PAGAR — o X não existe no passo
+   *  "confirmed". Recebe o passo em que ela desistiu, que é o que o funil usa
+   *  pra decidir se abre o downsell (05/08). */
+  onClose: (step?: Step) => void;
   context: "funnel" | "app";
   /** Skin do funil v2 (16/07). SEM essa prop o checkout fica byte-idêntico ao
    *  do funil atual (ordem do dono: o original não muda). Com ela: mascote
@@ -98,7 +106,7 @@ const PREPARO_LINHAS = [
   "Reservando sua condição de hoje",
 ];
 
-type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
+export type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
 // A API da Cakto exige phone, mas o dono mandou NÃO pedir (fricção — mesmo
 // padrão do outro SaaS dele): vai um coringa fixo. O que importa pra nota é
@@ -440,7 +448,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       <div className="min-h-full flex flex-col items-center justify-center px-5 py-8">
         {step !== "confirmed" && (
           <button
-            onClick={() => { trackEvent("pix_checkout_close", { offer, context, step }); onClose(); }}
+            onClick={() => { trackEvent("pix_checkout_close", { offer, context, step }); onClose(step); }}
             aria-label="Fechar"
             className="fixed top-3 right-3 z-10 grid place-items-center w-9 h-9 rounded-full bg-black/[0.06] text-muted-foreground/70 hover:text-foreground transition-colors"
           >

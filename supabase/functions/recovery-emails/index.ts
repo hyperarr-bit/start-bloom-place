@@ -8,10 +8,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  *   - assunto com NÚMERO específico > urgência vaga
  *   - sem desconto no 1º toque (retém 2,6x mais quem volta sem cupom)
  *   - arco: atenção → oferta → prova social/FOMO → deadline REAL → winback frio
- *   - após o h72 NENHUM e-mail volta a ofertar 14,90 (deadline honesto no canal)
+ *   - após o h72 NENHUM e-mail volta a ofertar 19,90 (deadline honesto no canal)
  *
  *   h1  (1-24h)  preço cheio, continuidade — "você esqueceu uma coisa aqui"
- *   h24 (24-48h) oferta 14,90, validade anunciada de 48h
+ *   h24 (24-48h) oferta 19,90, validade anunciada de 48h
  *   h48 (48-72h) prova social + FOMO — a oferta morre amanhã
  *   h72 (72-96h) última chamada — expira à meia-noite, último e-mail com ds
  *   d7  (7-10d)  winback frio sem oferta, preço cheio
@@ -37,7 +37,7 @@ const log = (step: string, details?: unknown) => {
 };
 
 type Stage = "h1" | "h24" | "h48" | "h72" | "d7";
-const DS_STAGES: Stage[] = ["h24", "h48", "h72"]; // estágios com oferta 14,90
+const DS_STAGES: Stage[] = ["h24", "h48", "h72"]; // estágios com oferta 19,90
 
 /* ESTÁGIOS QUE REALMENTE SAEM (29/07 — medido, não opinião).
  * Os 3 toques novos rodaram 28-29/07: 799 e-mails, ZERO venda atribuída por
@@ -62,8 +62,8 @@ const checkoutLink = (stage: Stage) => {
 
 /* ------------------------------------------------------------------ COPY */
 
-const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 19,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
-const PRECO_DS = `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 19,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 14,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`;
+const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
+const PRECO_DS = `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 27,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 19,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`;
 
 /** Primeiro nome utilizável pro assunto. O SQL faz COALESCE pro prefixo do
  *  e-mail, então metade dos "nomes" é lixo tipo "joao.silva92" — assunto
@@ -94,37 +94,37 @@ const COPY: Record<Stage, {
     // esperar — foi o que custou 7 pontos de conversão cheia no paywall.
     subject: (nome) => nome ? `${nome}, seu plano ficou pronto. e você sumiu.` : "seu plano ficou pronto. e você sumiu.",
     headline: "Você parou a 1 Pix de distância",
-    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 19,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 19,90 é menos que um lanche.</b> A diferença é que o lanche acaba hoje.`,
+    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 27,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 27,90 é menos que um lanche.</b> A diferença é que o lanche acaba hoje.`,
     selo: "SEU ACESSO VITALÍCIO ESTÁ RESERVADO",
     preco: PRECO_CHEIO,
     cta: "Destravar meu acesso agora →",
-    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 19,90.",
+    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 27,90.",
   },
   h24: {
-    subject: () => "R$ 14,90 hoje. R$ 19,90 amanhã.",
-    headline: "Metade do preço. Uma vez na vida.",
-    intro: (n) => `${n}, sem enrolação: como é sua primeira semana, sua condição de boas-vindas liberou o CORE vitalício por <b>R$ 14,90 — 25% off, pagamento único</b>. Essa condição vale <b>48 horas</b> e não volta. Depois é R$ 19,90 (que ainda custa menos que uma pizza — só que organiza sua vida inteira).`,
+    subject: () => "R$ 19,90 hoje. R$ 27,90 amanhã.",
+    headline: "R$ 8 a menos. Uma vez na vida.",
+    intro: (n) => `${n}, sem enrolação: como é sua primeira semana, sua condição de boas-vindas liberou o CORE vitalício por <b>R$ 19,90 — 29% off, pagamento único</b>. Essa condição vale <b>48 horas</b> e não volta. Depois é R$ 27,90 (que ainda custa menos que uma pizza — só que organiza sua vida inteira).`,
     selo: "🎁 OFERTA DE BOAS-VINDAS — VALE 48 HORAS",
     preco: PRECO_DS,
-    cta: "Quero por R$ 14,90 →",
-    rodape: "O link já abre com o Pix de R$ 14,90 — paga e libera na hora.",
+    cta: "Quero por R$ 19,90 →",
+    rodape: "O link já abre com o Pix de R$ 19,90 — paga e libera na hora.",
   },
   h48: {
     subject: () => "ontem, 31 pessoas entraram. você leu o e-mail.",
     headline: "Enquanto você decide, todo mundo entra",
-    intro: (n) => `${n}, só ontem 31 pessoas garantiram o acesso vitalício. Uma delas me escreveu essa semana: <i>"finalmente sei pra onde meu dinheiro vai"</i> — 3 dias depois de quase desistir, igual você agora. Sua condição de <b>R$ 14,90 morre amanhã à noite</b>. Depois disso, essa história é de outra pessoa.`,
+    intro: (n) => `${n}, só ontem 31 pessoas garantiram o acesso vitalício. Uma delas me escreveu essa semana: <i>"finalmente sei pra onde meu dinheiro vai"</i> — 3 dias depois de quase desistir, igual você agora. Sua condição de <b>R$ 19,90 morre amanhã à noite</b>. Depois disso, essa história é de outra pessoa.`,
     selo: "⏳ ÚLTIMO DIA COMPLETO DE OFERTA",
     preco: PRECO_DS,
-    cta: "Entrar por R$ 14,90 →",
+    cta: "Entrar por R$ 19,90 →",
     rodape: "16 módulos, pagamento único, garantia de 7 dias.",
   },
   h72: {
     subject: () => "à meia-noite isso expira (sem choro)",
     headline: "Última chamada — e é a última mesmo",
-    intro: (n) => `${n}, hoje às 23h59 sua condição de <b>R$ 14,90 expira</b> e este é o último e-mail que oferece esse valor. Sem falsa escassez: amanhã o preço é R$ 19,90 e a gente para de escrever sobre isso. Se o CORE não é pra você, tudo certo. Se é — <b>agora ou nunca é agora</b>.`,
+    intro: (n) => `${n}, hoje às 23h59 sua condição de <b>R$ 19,90 expira</b> e este é o último e-mail que oferece esse valor. Sem falsa escassez: amanhã o preço é R$ 27,90 e a gente para de escrever sobre isso. Se o CORE não é pra você, tudo certo. Se é — <b>agora ou nunca é agora</b>.`,
     selo: "🚨 EXPIRA HOJE ÀS 23H59",
     preco: PRECO_DS,
-    cta: "Última chance: R$ 14,90 →",
+    cta: "Última chance: R$ 19,90 →",
     rodape: "Depois da meia-noite este link volta pro preço cheio.",
   },
   d7: {
@@ -239,7 +239,7 @@ serve(async (req) => {
      *     NUNCA pagaram                 203  (50%)
      * Ou seja: quem não paga nas primeiras horas não paga nunca — nem com a
      * régua da Cakto batendo a preço cheio. Aos 24h NÃO EXISTE venda cheia a
-     * proteger nesse balde, então o 14,90 ali não canibaliza nada; e é o
+     * proteger nesse balde, então o 19,90 ali não canibaliza nada; e é o
      * segmento de MAIOR intenção do funil (chegou até o dinheiro). São ~25
      * pessoas/dia que estavam recebendo nada de nós.
      *

@@ -18,7 +18,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
-import { PixCheckout } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
 import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
@@ -209,13 +209,18 @@ const Planos = () => {
   // VITALÍCIO (13/07): pagamento único no Pix, dentro do app (PixCheckout).
   const [pixOpen, setPixOpen] = useState(false);
   // ?oferta=ds (20/07): última chamada do e-mail de recuperação (h24) com o
-  // vitalício de R$ 14,90 — mesmo prêmio da roleta do paywall. Fricção zero:
+  // vitalício de desconto — mesmo prêmio da roleta do paywall. Fricção zero:
   // o clique do e-mail cai DIRETO no QR, sem passar pela página de preços.
   // ESPERA o subLoaded: no mount isSubscribed ainda é false até o check async
   // responder — sem isso, assinante via link recebia QR de cobrança (corrida
   // pega pelo teste de guarda em 20/07).
   const querDs = searchParams.get("oferta") === "ds";
   const ofertaDs = querDs && !isSubscribed;
+  // O preço na tela TEM que ser o que o QR vai cobrar. Antes era string fixa:
+  // quem chegava pelo h24 (link com ?oferta=ds) via o preço cheio na página e
+  // o valor com desconto no QR. Enquanto o QR abre sozinho isso passa batido,
+  // mas basta fechar o QR pra ficar de cara com a contradição.
+  const precoNaTela = PIX_PRICES[ofertaDs ? "downsell" : "lifetime"];
   const dsJaAbriu = useRef(false);
   useEffect(() => {
     if (!querDs || !subLoaded || isSubscribed || dsJaAbriu.current) return;
@@ -329,7 +334,7 @@ const Planos = () => {
               R$ 99,90
             </p>
             <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-bold tracking-tight">R$ 19,90</span>
+              <span className="text-5xl font-bold tracking-tight">R$ {precoNaTela}</span>
               <span className="text-muted-foreground">uma vez</span>
             </div>
             <p className="text-xs text-primary font-medium">
@@ -343,7 +348,7 @@ const Planos = () => {
             onClick={handleCheckout}
             disabled={loading || isSubscribed}
           >
-            {isSubscribed ? "Acesso já liberado" : "Gerar meu Pix de R$ 19,90"}
+            {isSubscribed ? "Acesso já liberado" : `Gerar meu Pix de R$ ${precoNaTela}`}
           </Button>
 
           <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
@@ -400,7 +405,7 @@ const Planos = () => {
             <div className="leading-tight">
               <p className="text-[11px] text-muted-foreground">Vitalício</p>
               <p className="text-base font-bold">
-                R$ 19,90
+                R$ {precoNaTela}
                 <span className="text-xs font-normal text-muted-foreground"> uma vez</span>
               </p>
             </div>

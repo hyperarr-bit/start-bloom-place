@@ -7,9 +7,15 @@ import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
 
 // VITALÍCIO (13/07): o winback vende o mesmo prêmio do downsell — acesso
-// pra sempre por R$14,90, pagamento único no Pix (PixCheckout in-app).
-const FULL_LIFETIME = 19.90;
-const OFFER_LIFETIME = 14.90;
+// pra sempre, pagamento único no Pix (PixCheckout in-app).
+//
+// ESTES DOIS NÚMEROS SEGUEM A OFERTA `downsell` DA CAKTO (linha 64: o
+// PixCheckout abre com offer="downsell"). Quando o downsell virou 19,90
+// (05/08), deixar 14,90 aqui faria a tela prometer 14,90 e o QR cobrar
+// 19,90 — cobrar MAIS do que o anunciado. Mexeu no preço do downsell,
+// mexe aqui na mesma passada.
+const FULL_LIFETIME = 27.90;
+const OFFER_LIFETIME = 19.90;
 const SAVINGS = FULL_LIFETIME - OFFER_LIFETIME;
 
 const COUNTDOWN_SECONDS = 10 * 60;

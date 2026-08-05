@@ -167,7 +167,7 @@ export function pickDailyNudge(
           // a versão sem valor serve pros dois e só a web cita o vitalício.
           ? (isNativeShell()
               ? "Continue com tudo que você já configurou — mantenha seu acesso ativo."
-              : "Continue com tudo que você já configurou. Pague 1x (R$ 19,90) e é seu pra sempre.")
+              : "Continue com tudo que você já configurou. Pague 1x (R$ 27,90) e é seu pra sempre.")
           : "Assine agora e mantenha tudo organizado.",
         ctaLabel: "Assinar agora",
         ctaRoute: "/planos",

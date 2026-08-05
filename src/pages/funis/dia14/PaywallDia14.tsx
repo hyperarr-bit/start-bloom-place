@@ -1,14 +1,17 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, X, ShieldCheck,
+  ArrowRight, Check, X, ShieldCheck, Gift,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
+import { WinbackWheel, SLICES_FUNIL } from "@/components/retention/WinbackWheel";
+import { isNativeShell } from "@/lib/native-shell";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -29,7 +32,7 @@ import { useAuth } from "@/hooks/use-auth";
 // no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
 const PRICING = {
-  lifetime: { total: "19,90" },
+  lifetime: { total: "27,90" },
   anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
 };
 
@@ -60,7 +63,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 19.9 : 14.9,
+    value: offer === "lifetime" ? 27.9 : 19.9,
     currency: "BRL",
   });
   open(offer);
@@ -592,11 +595,24 @@ function LifetimeCard() {
 /* ----------------------------------------------------------------- offer */
 
 function OfferScreen({
-  context, answers, onBuy, braco,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm }) {
-  // SEM rota de fuga (pedido do dono, 24/07): nesta cópia do dia 14 o X, o
-  // popstate→roleta e o presente por inatividade saíram. A tela vende preço
-  // cheio ou nada — o único caminho pra frente é o CTA do Pix.
+  context, answers, onBuy, braco, onEscape,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onBuy: (o: PixOffer) => void; braco: PaywallArm; onEscape: () => void }) {
+  /* ROTA DE FUGA DE VOLTA (05/08, ordem do dono). Ela tinha saído em 24/07 e
+   * volta agora porque atrás dela existe downsell de novo: sem resgate, X é só
+   * uma porta de saída; com resgate, é o gatilho de maior volume do funil.
+   *
+   * O presente por INATIVIDADE continua fora, e isso não é descuido: o timer
+   * de 15s foi medido em 20-21/07 e derrubou venda cheia em 58% porque
+   * sequestrava quem ainda estava lendo. X e voltar são o oposto — a pessoa
+   * declarou que está indo embora.
+   *
+   * 1,8s de atraso pro X aparecer: nascer junto com a tela é convite pra sair
+   * antes de ler o preço. */
+  const [showClose, setShowClose] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowClose(true), 1800);
+    return () => clearTimeout(t);
+  }, []);
 
   // Área de entrada (funil vitrine); sem área = funil padrão de finanças.
   const area: AreaKey = answers?.area && answers.area in AREAS ? (answers.area as AreaKey) : "dinheiro";
@@ -611,6 +627,21 @@ function OfferScreen({
 
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10">
+      <AnimatePresence>
+        {showClose && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            onClick={onEscape}
+            aria-label="Fechar"
+            className="fixed top-3 right-3 z-[80] grid place-items-center w-9 h-9 rounded-full bg-black/[0.06] text-muted-foreground/70 hover:text-foreground transition-colors"
+          >
+            <X className="w-[18px] h-[18px]" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* Reveal */}
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
@@ -693,6 +724,91 @@ function OfferScreen({
   );
 }
 
+/* ---------------------------------------------------------------- prêmio */
+
+/**
+ * Tela do prêmio, depois do giro.
+ *
+ * ZERO FRICÇÃO, e isso é dado, não estilo: o mini-card antigo pedia um clique
+ * pra "resgatar" e só 11 de ~40 pessoas clicavam (18-20/07). Aqui o desconto
+ * JÁ está aplicado quando a tela abre — o único botão leva direto pro Pix.
+ *
+ * Sem contador regressivo. A condição é real (uma por sessão) e não precisa de
+ * teatro; relógio falso numa tela de desconto é o que faz a pessoa desconfiar
+ * do preço cheio que ela acabou de ver.
+ */
+function PremioScreen({
+  context, onBuy,
+}: { context: "funnel" | "app"; onBuy: (o: PixOffer) => void }) {
+  useEffect(() => { trackEvent("downsell_premio_view", { context }); }, [context]);
+
+  return (
+    <div className="relative w-full max-w-sm mx-auto text-center pt-12 pb-16">
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 220, damping: 15 }}
+        className="w-16 h-16 rounded-full bg-accent text-accent-foreground grid place-items-center mx-auto mb-5 shadow-[0_8px_28px_-6px_hsl(var(--accent)/0.55)]"
+      >
+        <Gift className="w-8 h-8" strokeWidth={2.2} />
+      </motion.div>
+
+      <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
+        Seu desconto<br /><span className="text-accent">já está aplicado</span>
+      </motion.h1>
+      <motion.p {...stagger(1)} className="text-muted-foreground text-sm leading-relaxed mb-7">
+        Não precisa de cupom nem de código. Ele já está no seu Pix.
+      </motion.p>
+
+      <motion.div
+        {...stagger(2)}
+        className="rounded-3xl border-2 border-accent/30 bg-accent/[0.04] px-6 py-7 mb-6"
+      >
+        <div className="flex items-end justify-center gap-3 mb-1">
+          <span className="text-lg text-muted-foreground line-through mb-[6px] font-semibold">
+            R$ {PRICING.lifetime.total}
+          </span>
+          <span className="text-[46px] leading-none font-extrabold tracking-tight text-accent">
+            R$ {PIX_PRICES.downsell}
+          </span>
+        </div>
+        <p className="text-[13px] font-semibold text-foreground/70">
+          pagamento único · seu pra sempre
+        </p>
+      </motion.div>
+
+      <motion.div {...stagger(3)} className="space-y-2.5 text-left mb-7">
+        {[
+          "Os 16 módulos completos — nada bloqueado",
+          "Sem mensalidade, nunca. Você paga uma vez",
+          "Garantia de 7 dias: não gostou, devolvo",
+        ].map((t) => (
+          <div key={t} className="flex items-start gap-2.5">
+            <span className="mt-[3px] shrink-0 w-[18px] h-[18px] rounded-full bg-accent/15 grid place-items-center">
+              <Check className="w-3 h-3 text-accent" strokeWidth={3.5} />
+            </span>
+            <span className="text-[14px] leading-snug text-foreground/85">{t}</span>
+          </div>
+        ))}
+      </motion.div>
+
+      <motion.div {...stagger(4)}>
+        <Button
+          size="lg"
+          className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+          onClick={() => openPixIntent("downsell", "downsell_premio", context, onBuy)}
+        >
+          Garantir por R$ {PIX_PRICES.downsell} no Pix <ArrowRight className="w-4 h-4" />
+        </Button>
+        <p className="text-[11px] text-muted-foreground text-center mt-3 flex w-full items-start justify-center gap-1.5">
+          <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
+          <span>Pix na hora · acesso liberado na hora · Garantia de 7 dias</span>
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ flow */
 
 export function PaywallDia14({
@@ -702,13 +818,78 @@ export function PaywallDia14({
   context: "funnel" | "app";
   answers?: Record<string, string>;
 }) {
-  // Uma fase só: oferta. Sem roleta, sem downsell de 14,90, sem X.
-  const phase = "offer" as const;
+  /**
+   * DOWNSELL COM ROLETA (05/08, ordem do dono). Três fases: oferta → roleta →
+   * prêmio. O X do paywall continua não existindo.
+   *
+   * O GATILHO é fechar o Pix de 27,90 SEM PAGAR — e essa escolha tem história.
+   * O idle-timer de 15s foi medido em 20-21/07 e destruiu dinheiro: roleta
+   * vista +190%, mas venda de preço cheio −58% e receita por paywall visto de
+   * R$11,16 → R$3,08. Ele sequestrava quem ainda estava LENDO. Quem fecha o
+   * checkout, não: essa pessoa já viu o preço e recusou. É a única população
+   * onde o desconto não canibaliza venda cheia.
+   *
+   * Uma vez por sessão (resgateUsado): fechar o Pix de 19,90 devolve pra tela
+   * do prêmio, não gira de novo.
+   */
+  const [phase, setPhase] = useState<"offer" | "roleta" | "premio">("offer");
   // Pix in-app: quando setado, o overlay PixCheckout cobre o paywall.
   // (O antigo "resgate do checkout_return" morreu junto com o redirect —
   // ninguém mais SAI do app pra pagar.)
   const [pixOffer, setPixOffer] = useState<PixOffer | null>(null);
+  const resgateUsado = useRef(false);
+  /* NATIVIDADE CONGELADA NO MOUNT, além da checagem ao vivo lá embaixo.
+   *
+   * isNativeShell() lê window.Capacitor.isNativePlatform(), e esse método é
+   * REESCRITO quando o @capacitor/core entra por import dinâmico — foi o que
+   * o E2E pegou: no shell simulado a resposta virava false depois que o
+   * SubscriptionPaywall carregava o plugin, e a roleta abria. No Android de
+   * verdade o valor é sempre true, então era artefato de teste; mas o custo de
+   * errar é oferecer Pix dentro do binário da loja, que reprova na revisão do
+   * Play. Duas leituras, e basta UMA dizer "nativo" pra não abrir nada. */
+  const nativoNoMount = useRef(isNativeShell());
 
+  /** Porta única do resgate — três entradas caem aqui: X da oferta, botão
+   *  voltar do navegador e fechar o Pix de 27,90 sem pagar. Uma vez por
+   *  sessão. NUNCA dentro do binário da loja: lá o Pix não existe e oferta
+   *  fora do Play Billing reprova na revisão. */
+  const abrirResgate = (origem: string) => {
+    if (resgateUsado.current) return false;
+    if (nativoNoMount.current || isNativeShell()) return false;
+    resgateUsado.current = true;
+    trackEvent("downsell_roleta_open", { origem, context });
+    setPhase("roleta");
+    return true;
+  };
+
+  const fecharPix = (step?: PixStep) => {
+    const era = pixOffer;
+    setPixOffer(null);
+    if (era !== "lifetime") return; // fechar o downsell volta pro prêmio, só
+    abrirResgate(`pix_${step ?? "?"}`);
+  };
+
+  /* VOLTAR do navegador. Empilha uma entrada boba no mount: o primeiro "voltar"
+   * consome ela e vira resgate em vez de tirar a pessoa do funil.
+   *
+   * INTERCEPTA UMA VEZ SÓ, e o E2E é que cobrou isso. Como o pushState não muda
+   * a URL, um handler que fica escutando e não faz nada deixa a pessoa PRESA:
+   * ela aperta voltar, nada acontece na tela, e o funil parece travado. Então o
+   * listener se remove no primeiro disparo — e, se o resgate já tinha sido gasto
+   * (pelo X, por exemplo), eu mesmo mando o voltar adiante. Ninguém fica preso. */
+  useEffect(() => {
+    if (nativoNoMount.current) return;
+    window.history.pushState({ paywallDia14: true }, "");
+    const onPop = () => {
+      window.removeEventListener("popstate", onPop);
+      if (!abrirResgate("voltar")) window.history.back();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const navigate = useNavigate();
   // Braço congelado no mount: ninguém vê a tela trocar de cara no meio.
   const { user: abUser } = useAuth();
   const [braco] = useState<PaywallArm>(() => bracoPaywall(abUser?.id));
@@ -738,12 +919,43 @@ export function PaywallDia14({
   return (
     <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground overflow-y-auto">
       {pixOffer && (
-        <PixCheckout offer={pixOffer} context={context} onClose={() => setPixOffer(null)} />
+        <PixCheckout offer={pixOffer} context={context} onClose={fecharPix} />
       )}
       <div className="px-5">
         <AnimatePresence mode="wait">
           <motion.div key={phase} {...fade}>
-            <OfferScreen context={context} answers={quiz} onBuy={setPixOffer} braco={braco} />
+            {phase === "offer" && (
+              <OfferScreen
+                context={context}
+                answers={quiz}
+                onBuy={setPixOffer}
+                braco={braco}
+                onEscape={() => {
+                  // Já girou uma vez? Então o X é X mesmo: entrega a pessoa ao
+                  // módulo dela (o gate de trial segura lá dentro) em vez de
+                  // deixar ela presa numa tela sem saída.
+                  if (abrirResgate("x")) return;
+                  trackEvent("funnel_click", { cta: "paywall_escape", context });
+                  if (context !== "funnel") return;
+                  const a = quiz?.area && quiz.area in AREAS ? (quiz.area as AreaKey) : "dinheiro";
+                  navigate(`/${AREAS[a].module}`);
+                }}
+              />
+            )}
+            {phase === "roleta" && (
+              <div className="min-h-dvh flex items-center justify-center">
+                <WinbackWheel
+                  attemptId={null}
+                  quick
+                  slices={SLICES_FUNIL}
+                  prizeLabel={`R$ ${PIX_PRICES.downsell}`}
+                  onSpinComplete={() => setPhase("premio")}
+                />
+              </div>
+            )}
+            {phase === "premio" && (
+              <PremioScreen context={context} onBuy={setPixOffer} />
+            )}
           </motion.div>
         </AnimatePresence>
       </div>

@@ -42,6 +42,21 @@ export const AREAS: Record<AreaKey, {
   metas: { emoji: "🎯", label: "Metas e evolução pessoal", nome: "Metas", module: "desenvolvimento", color: "hsl(215 75% 50%)" },
 };
 
+/**
+ * Área do funil → chave do TUTORIAL (05/08). Não dá pra reaproveitar
+ * `AREAS[x].module`: a rota de metas é "desenvolvimento" mas o tour dela se
+ * chama "metas" (é essa string que DesenvolvimentoPessoal passa pro
+ * SpotlightOverlay). Um mapa explícito evita o tour que nunca liga porque a
+ * chave não bate com nada.
+ */
+export const AREA_TUTORIAL: Record<AreaKey, string> = {
+  dinheiro: "financas",
+  rotina: "rotina",
+  corpo: "treino",
+  saude: "saude",
+  metas: "metas",
+};
+
 /** Áreas que aparecem na PORTA vitrine, nesta ordem. Saúde saiu da porta
  *  (dor de prevenção não abre porta fria) mas segue viva em todo o resto:
  *  chips da demo, eixo do radar e trilha (quem tem area=saude salvo funciona). */

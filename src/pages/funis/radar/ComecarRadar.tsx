@@ -22,7 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
-  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS,
+  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 
@@ -851,15 +851,31 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       return;
     }
     try { setUserData("user-name", name.trim()); } catch { /* noop */ }
-    // Tutorial forçado é o de FINANÇAS (spotlight do Index) e o wizard da Home.
-    // Quem veio do funil vitrine com outra área cai no módulo dela — o flag
-    // aqui sequestraria a 1ª visita à Home com o wizard multi-módulo.
+    /*
+     * TUTORIAL PRA QUEM ESCOLHEU QUALQUER ÁREA (05/08, medido na base).
+     *
+     * Esta marca era gravada SÓ quando a área era "dinheiro" — a ideia era
+     * que quem escolheu outra área cairia no módulo dela e o tour de lá
+     * cuidaria. Só que o tour do módulo (SpotlightOverlay) exige ESTA MESMA
+     * marca: sem ela ninguém cuida. Pior, na 1ª visita o módulo grava
+     * `spotlight-done-<modulo>` e o tour morre pra sempre.
+     *
+     * Dado de 05/08: 5 dos 20 pagantes do dia entraram sem tutorial nenhum —
+     * inclusive a primeira compra pela Play, que escolheu Saúde e nunca viu
+     * nem o assistente da Home nem o tour do módulo.
+     *
+     * Agora a marca vale pra toda área, e a escolha do funil já entra
+     * pré-selecionada no assistente (tutorial-selected-modules) — a pessoa
+     * não recomeça do zero e o tour liga no módulo que ela pediu.
+     */
     try {
       const vidaArea = localStorage.getItem(FUNNEL_AREA_KEY);
-      if (!vidaArea || vidaArea === "dinheiro") {
-        setUserData("force-new-user-tutorial", "true");
-        localStorage.setItem("force-new-user-tutorial", "true");
-      }
+      setUserData("force-new-user-tutorial", "true");
+      localStorage.setItem("force-new-user-tutorial", "true");
+      const chave = vidaArea && vidaArea in AREA_TUTORIAL
+        ? AREA_TUTORIAL[vidaArea as AreaKey]
+        : null;
+      if (chave) setUserData("tutorial-selected-modules", [chave]);
     } catch { /* noop */ }
     trackEvent("funnel_click", { cta: "signup_success", instant: !!session });
     fireMetaEvent("CompleteRegistration", { content_name: "signup" });

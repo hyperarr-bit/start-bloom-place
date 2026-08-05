@@ -17,7 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
-  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS,
+  AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 
@@ -858,15 +858,21 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       return;
     }
     try { setUserData("user-name", name.trim()); } catch { /* noop */ }
-    // Tutorial forçado é o de FINANÇAS (spotlight do Index) e o wizard da Home.
-    // Quem veio do funil vitrine com outra área cai no módulo dela — o flag
-    // aqui sequestraria a 1ª visita à Home com o wizard multi-módulo.
+    /*
+     * TUTORIAL PRA QUEM ESCOLHEU QUALQUER ÁREA (05/08) — mesma correção do
+     * funil do app (ver ComecarRadar). A marca era gravada só pra "dinheiro",
+     * mas o tour do módulo (SpotlightOverlay) depende dela: quem escolhia
+     * outra área não via assistente NEM tour, e a 1ª visita ao módulo ainda
+     * marcava o tour como visto. 5 dos 20 pagantes de 05/08 entraram assim.
+     */
     try {
       const vidaArea = localStorage.getItem(FUNNEL_AREA_KEY);
-      if (!vidaArea || vidaArea === "dinheiro") {
-        setUserData("force-new-user-tutorial", "true");
-        localStorage.setItem("force-new-user-tutorial", "true");
-      }
+      setUserData("force-new-user-tutorial", "true");
+      localStorage.setItem("force-new-user-tutorial", "true");
+      const chave = vidaArea && vidaArea in AREA_TUTORIAL
+        ? AREA_TUTORIAL[vidaArea as AreaKey]
+        : null;
+      if (chave) setUserData("tutorial-selected-modules", [chave]);
     } catch { /* noop */ }
     trackEvent("funnel_click", { cta: "signup_success", instant: !!session });
     fireMetaEvent("CompleteRegistration", { content_name: "signup" });

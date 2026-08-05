@@ -165,8 +165,18 @@ export async function reconciliarSePreciso(): Promise<boolean> {
  * Só vale a partir do PRÓXIMO BUILD: o app embarca o bundle (webDir "dist"),
  * então deploy no site não alcança quem já instalou.
  */
+/** Por que a última tentativa de compra não fechou. "cancelou" é a pessoa
+ *  fechando a folha do Google (normal, não avisa nada); o resto é defeito e
+ *  a tela precisa dizer alguma coisa — sem isso, tocar em comprar e não ver
+ *  NADA acontecer é indistinguível de app quebrado. */
+export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | null;
+let ultimoMotivo: MotivoCompra = null;
+export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
+
 export async function comprar(productId: string): Promise<boolean> {
+  ultimoMotivo = null;
   if (estado !== "pronto" || !Purchases) {
+    ultimoMotivo = "catalogo";
     trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: productId });
     return false;
   }
@@ -176,6 +186,7 @@ export async function comprar(productId: string): Promise<boolean> {
     const alvo = pacotes.find((p) => p.product?.identifier?.startsWith(productId));
     if (!alvo) {
       console.warn("[RC] produto não encontrado:", productId);
+      ultimoMotivo = "produto_ausente";
       trackEvent("app_compra_falhou", {
         motivo: "produto_ausente",
         produto: productId,
@@ -186,6 +197,7 @@ export async function comprar(productId: string): Promise<boolean> {
     }
     const { customerInfo } = await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
     if (!temEntitlement(customerInfo)) {
+      ultimoMotivo = "sem_entitlement";
       trackEvent("app_compra_falhou", { motivo: "sem_entitlement", produto: productId });
       return false;
     }
@@ -199,6 +211,7 @@ export async function comprar(productId: string): Promise<boolean> {
     console.warn("[RC] compra não concluída:", e);
     const msg = String((e as { message?: string })?.message ?? e);
     const cancelou = /cancel/i.test(msg) || (e as { code?: string })?.code === "1";
+    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
     trackEvent("app_compra_falhou", {
       motivo: cancelou ? "cancelou" : "billing_erro",
       produto: productId,

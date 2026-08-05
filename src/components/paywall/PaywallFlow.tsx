@@ -14,7 +14,7 @@ import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { TrialTimeline } from "@/components/app/TrialTimeline";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { restaurar, initRevenueCat, estadoRevenueCat, comprar } from "@/lib/revenuecat";
+import { restaurar, initRevenueCat, estadoRevenueCat, comprar, motivoUltimaCompra } from "@/lib/revenuecat";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -553,6 +553,7 @@ function OfferScreen({
      desabilitado + aviso se o init terminar SEM catálogo. */
   const [rcResolvido, setRcResolvido] = useState(false);
   const [comprando, setComprando] = useState(false);
+  const [erroCompra, setErroCompra] = useState<string | null>(null);
   const [celebrar, setCelebrar] = useState(false);
   const { get: getUserData } = useUserData();
   const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
@@ -613,11 +614,26 @@ function OfferScreen({
     }
     if (estadoAtual !== "pronto") {
       trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS[plano].id, via: "paywall_direto" });
+      setErroCompra("Não consegui falar com o Google Play agora. Tente de novo em instantes.");
       setComprando(false);
       return;
     }
+    setErroCompra(null);
     const ativou = await comprar(APP_PRECOS[plano].id);
     setComprando(false);
+    /* Sem o painel intermediário, um toque que não abre a folha do Google
+       fica INDISTINGUÍVEL de app quebrado. Cancelamento é escolha da pessoa
+       (silêncio); qualquer outro motivo vira aviso com saída. */
+    if (!ativou) {
+      const motivo = motivoUltimaCompra();
+      if (motivo && motivo !== "cancelou") {
+        setErroCompra(
+          motivo === "sem_entitlement"
+            ? "A compra foi registrada, mas o acesso ainda não liberou. Toque em Restaurar compras aqui embaixo."
+            : "Não consegui abrir o Google Play agora. Tente de novo em instantes.",
+        );
+      }
+    }
     if (ativou) {
       trackEvent("app_sheet_success", { plano, via: "paywall_direto" });
       // Celebra ANTES de navegar (27/07): o app não pode pintar primeiro,
@@ -827,10 +843,13 @@ function OfferScreen({
                       : <>Assinar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
-            {nativo && rcResolvido && rc !== "pronto" && (
+            {nativo && rcResolvido && rc !== "pronto" && !erroCompra && (
               <p className="text-[11px] text-muted-foreground text-center mt-2">
                 As compras estarão disponíveis em breve nesta versão.
               </p>
+            )}
+            {nativo && erroCompra && (
+              <p className="text-[11.5px] text-center mt-2 font-medium text-foreground/80">{erroCompra}</p>
             )}
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">

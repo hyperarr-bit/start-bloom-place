@@ -104,7 +104,7 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[300] overflow-hidden flex flex-col justify-center px-7
-                     pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,var(--app-safe-bottom))]"
+                     pt-[calc(1.5rem+env(safe-area-inset-top))] pb-[calc(1.5rem+var(--app-safe-bottom,0px))]"
           style={{ background: "linear-gradient(180deg,#FFFFFF 0%,#FFF7FB 58%,#FDEEF5 100%)" }}
         >
           {/* confete caindo atrás do conteúdo */}

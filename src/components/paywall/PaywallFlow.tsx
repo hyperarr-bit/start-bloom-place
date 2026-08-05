@@ -701,7 +701,7 @@ function OfferScreen({
         // fica opaca por mais tempo — o conteúdo some por baixo em vez de ser
         // cortado.
         className="fixed inset-x-0 bottom-0 z-[75] bg-gradient-to-t from-white from-55% via-white/90 to-transparent pt-16"
-        style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(0.9rem + env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
           {nativo && (

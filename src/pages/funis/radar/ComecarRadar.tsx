@@ -134,7 +134,7 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
   const q0 = QUIZ[0]; // "O que mais te atrapalha hoje?"
   return (
     <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
-      <h1 className="text-[clamp(28px,8vw,42px)] font-bold leading-[1.05] tracking-tight mb-2 text-center">
+      <h1 className="fs-funil-h1 font-bold leading-[1.05] tracking-tight mb-2 text-center">
         Organize sua vida financeira
       </h1>
       <p className="text-[15px] text-muted-foreground text-center mb-6">{q0.q}</p>
@@ -180,13 +180,15 @@ function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label:
     <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
       {/* Prova visual da amplitude: os 16 módulos como pano de fundo, sem virar menu */}
       <div className="grid grid-cols-8 gap-1.5 mb-5 opacity-90">
+        {/* min-h-9: aspect-square (88+) some em WebView velho e o azulejo
+            colapsava pra altura do emoji */}
         {ALL_MODULE_ICONS.map((m) => (
-          <span key={m.label} className="grid place-items-center aspect-square rounded-lg bg-secondary text-[15px]">
+          <span key={m.label} className="grid place-items-center min-h-9 aspect-square rounded-lg bg-secondary text-[15px]">
             {m.emoji}
           </span>
         ))}
       </div>
-      <h1 className="text-[clamp(27px,7.5vw,40px)] font-bold leading-[1.06] tracking-tight mb-2 text-center">
+      <h1 className="fs-porta-h1 font-bold leading-[1.06] tracking-tight mb-2 text-center">
         Um app pra<br />vida inteira
       </h1>
       <p className="text-[15px] text-muted-foreground text-center mb-6">

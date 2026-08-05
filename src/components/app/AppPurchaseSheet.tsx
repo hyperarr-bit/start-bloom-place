@@ -112,11 +112,14 @@ export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose:
         className="absolute inset-0 bg-black/45"
         onClick={() => { trackEvent("app_sheet_close", {}); onClose(); }}
       />
+      {/* calc, nao max no paddingBottom (05/08): em WebView 77 o max() e
+          rejeitado no estilo inline e o sheet colava no rodape; calc(a+env)
+          rende igual em qualquer motor. */}
       <motion.div
         initial={{ y: "100%" }} animate={{ y: 0 }}
         transition={{ type: "spring", stiffness: 320, damping: 32 }}
         className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-white px-5 pt-3 text-foreground"
-        style={{ paddingBottom: "max(1.1rem, env(safe-area-inset-bottom))" }}
+        style={{ paddingBottom: "calc(1.1rem + env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-10 h-1.5 rounded-full bg-muted mb-4" aria-hidden />
         {/* X visível (04/08): as únicas saídas eram o backdrop (faixa

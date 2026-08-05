@@ -14,6 +14,30 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /*
+   * A CAUSA-RAIZ DE TODO "CINZA" EM BOTÃO (05/08, Moto g7 WebView 77).
+   *
+   * O preflight do Tailwind zera o fundo de <button> numa regra cujo seletor
+   * usa :where() — que só existe no Chrome 88. Em qualquer WebView < 88, um
+   * seletor inválido DERRUBA A REGRA INTEIRA, e todo botão volta ao visual
+   * cru do sistema: fundo ButtonFace CINZA. Era o "quadrado na seta de
+   * voltar", as abas do módulo "cheias" em vez de outline, os cinzas em
+   * Restaurar compras — todas as fotos do dono, desde a v27. Mesma regra,
+   * seletores planos, todo motor entende. Utilities continuam ganhando
+   * (mesma layer base, especificidade baixa).
+   */
+  button, [type="button"], [type="reset"], [type="submit"] {
+    -webkit-appearance: button;
+    background-color: transparent;
+    background-image: none;
+  }
+  /* Mesmo problema: o display:none de [hidden] do preflight vem com
+     :where(:not([hidden=until-found])) — morto em < 88; elemento "hidden"
+     aparecia. Versão plana. */
+  [hidden] {
+    display: none;
+  }
+
   :root {
     color-scheme: light;
     --background: 0 0% 100%;
@@ -246,6 +270,12 @@
   .due-card {
     @apply rounded-lg p-3 border border-border;
   }
+
+  /* Títulos do funil do APP: fallback-first porque clamp() é Chrome 79+ e o
+     aparelho de teste real é WebView 77 — com text-[clamp(...)] a regra some
+     e o título caía pra 16px herdado (porta minúscula na foto do dono). */
+  .fs-funil-h1 { font-size: 34px; font-size: clamp(28px, 8vw, 42px); }
+  .fs-porta-h1 { font-size: 32px; font-size: clamp(27px, 7.5vw, 40px); }
 
   .notion-tab {
     @apply px-4 py-1.5 text-sm border border-border rounded-sm cursor-pointer transition-colors;

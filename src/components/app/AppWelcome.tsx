@@ -142,16 +142,22 @@ const CSS_APW = `
 }
 .apw-grade {
   position: relative;
-  margin: calc(3.5vh + env(safe-area-inset-top)) calc(-22px - min(3vw, 14px)) 0;
+  /* SEM min() AQUI, e nao e estilo — e sobrevivencia (05/08, provado no
+     Chromium 77 de verdade): clamp() nao parseia no 77 (fallback-first
+     funciona), mas min() PARSEIA e computa 0 — ele engole o fallback e
+     entrega margem zero. A sangria fixa de -33px fica a 3px do valor
+     "ideal" e rende IGUAL em qualquer motor. */
+  margin: calc(3.5vh + env(safe-area-inset-top)) -33px 0;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 0 8px;
 }
 .apw-tile {
-  /* min-height ANTES do aspect-ratio: aspect-ratio e Chrome 88+ e este CSS
-     nao passa pelo build (runtime <style>) — sem o fallback, em WebView 87
-     os azulejos colapsavam pra altura do emoji. Com os dois, motor novo faz
-     o quadrado e motor velho ainda mostra uma grade decente. */
-  min-height: 64px;
+  /* min-height ANTES do aspect-ratio (88+): no WebView velho os azulejos
+     colapsavam pra altura do emoji. 74px fica quase-quadrado na coluna. */
+  min-height: 74px;
   aspect-ratio: 1; border-radius: 22px; display: grid; place-items: center;
+  /* clamp e 79+ — sem o fallback o emoji caia pra 16px herdado (foto do
+     dono: azulejo grande com emoji minusculo) */
+  font-size: 38px;
   font-size: clamp(32px, 10vw, 46px);
   box-shadow: 0 18px 34px -12px rgba(20,60,110,.35);
 }
@@ -160,13 +166,19 @@ const CSS_APW = `
 .apw-corpo { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; padding-top: 1vh; }
 .apw h1 {
   margin: 0; font-weight: 900; color: #141414; letter-spacing: -.035em;
-  line-height: 1.04; font-size: clamp(42px, 13vw, 58px);
+  /* fallback primeiro: sem ele o titulo renderizava no tamanho de h1 padrao
+     em WebView < 79 (clamp descartado) */
+  line-height: 1.04; font-size: 46px; font-size: clamp(42px, 13vw, 58px);
 }
 .apw-sub { margin: 1.6vh 0 0; font-size: 16.5px; line-height: 1.45; color: #4f5a64; max-width: 24ch; }
 .apw-prova { margin: 1.4vh 0 0; font-size: 14px; color: #7d8691; }
 .apw-prova b { color: #141414; }
 .apw-st { color: #f0a500; letter-spacing: .06em; }
-.apw-rodape { display: flex; flex-direction: column; align-items: center; gap: 11px; }
+/* margens em vez de gap de proposito: gap em FLEX e Chrome 84+ — com gap, o
+   rodape colava CTA/link/termos em WebView velho. Margem rende IGUAL em
+   qualquer motor (zero divergencia emulador × aparelho). */
+.apw-rodape { display: flex; flex-direction: column; align-items: center; }
+.apw-rodape > * + * { margin-top: 11px; }
 .apw-cta {
   width: 100%; height: 58px; border: 0; border-radius: 999px;
   background: #16121c; color: #fff; font-size: 17.5px; font-weight: 800;

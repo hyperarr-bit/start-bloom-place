@@ -155,6 +155,15 @@ const Index = () => {
     : 0;
 
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  /* Versão curta pra tela estreita (05/08). Medido no motor do aparelho do
+     dono (Chromium 77, 360px): "agosto de 2026" ocupa 87px e o cabeçalho
+     precisa de 329px num espaço de 328 — por isso ele via "Agosto De 2..."
+     cortado. Abaixo de 400px entra "Ago 2026" (~50px) e o rótulo cabe
+     inteiro; daí pra cima nada muda. */
+  const mesCurto = new Date()
+    .toLocaleDateString("pt-BR", { month: "short", year: "numeric" })
+    .replace(/\.?\s*de\s*/i, " ")
+    .replace(".", "");
 
   const tabs = [
     { id: "dashboard", label: "📊 DASHBOARD" },
@@ -221,7 +230,8 @@ const Index = () => {
                 duas linhas no aperto e caía por cima do título/chips (foto do
                 dono no aparelho de tela estreita). Mês é rótulo — ou cabe numa
                 linha, ou encurta. */}
-            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap truncate">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap truncate max-[399px]:hidden">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap min-[400px]:hidden">{mesCurto}</span>
             {/* Pergunte ao CORE — disponível em qualquer aba */}
             <button
               onClick={() => setAskOpen(true)}

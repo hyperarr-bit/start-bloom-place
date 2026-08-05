@@ -33,7 +33,7 @@ export const AREAS: Record<AreaKey, {
   module: string;       // módulo do app que a demo/1ª sessão abre
   color: string;        // acento visual (radar/central)
 }> = {
-  dinheiro: { emoji: "💸", label: "Meu dinheiro", nome: "Dinheiro", module: "financas", color: "hsl(45 85% 45%)" },
+  dinheiro: { emoji: "💰", label: "Meu dinheiro", nome: "Dinheiro", module: "financas", color: "hsl(45 85% 45%)" },
   rotina: { emoji: "📅", label: "Minha rotina", nome: "Rotina", module: "rotina", color: "hsl(330 65% 50%)" },
   corpo: { emoji: "💪", label: "Treino e dieta", nome: "Corpo", module: "treino", color: "hsl(255 60% 55%)" },
   saude: { emoji: "❤️", label: "Minha saúde", nome: "Saúde", module: "saude", color: "hsl(0 70% 55%)" },
@@ -50,7 +50,10 @@ export const DOOR_AREAS: AreaKey[] = ["dinheiro", "rotina", "corpo", "metas"];
 /** Os módulos da demo curada (os 5 do criativo + Metas). */
 export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> = [
   { key: "rotina", emoji: "📅", label: "Rotina" },
-  { key: "financas", emoji: "💸", label: "Finanças" },
+  /* 💰 e não 💸 (05/08): a arte do money-with-wings na fonte de emoji do
+     Android 10 é dominada pelas ASAS BRANCAS — na pill pequena vira uma
+     mancha branca ("parece uma flor", dono, olhando a barra do tour). */
+  { key: "financas", emoji: "💰", label: "Finanças" },
   { key: "treino", emoji: "💪", label: "Treino" },
   { key: "dieta", emoji: "🥗", label: "Dieta" },
   { key: "saude", emoji: "❤️", label: "Saúde" },
@@ -59,7 +62,7 @@ export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> 
 
 /** Grade de 16 usada no "vislumbre da central" (só visual, não navega). */
 export const ALL_MODULE_ICONS: Array<{ emoji: string; label: string }> = [
-  { emoji: "💸", label: "Finanças" }, { emoji: "📅", label: "Rotina" },
+  { emoji: "💰", label: "Finanças" }, { emoji: "📅", label: "Rotina" },
   { emoji: "💪", label: "Treino" }, { emoji: "🥗", label: "Dieta" },
   { emoji: "❤️", label: "Saúde" }, { emoji: "🎯", label: "Metas" },
   { emoji: "🧠", label: "Foco" }, { emoji: "📚", label: "Estudos" },
@@ -309,7 +312,7 @@ export const QUIZ: QuizQ[] = [
     key: "atrapalha",
     q: "O que mais te atrapalha hoje?",
     opts: [
-      { emoji: "💸", label: "Gasto sem perceber" },
+      { emoji: "💳", label: "Gasto sem perceber" },
       { emoji: "📅", label: "Esqueço contas" },
       { emoji: "🏦", label: "Não consigo guardar dinheiro" },
       { emoji: "🤷", label: "Não sei pra onde meu dinheiro vai" },
@@ -333,7 +336,7 @@ export const QUIZ: QuizQ[] = [
     opts: [
       { emoji: "💰", label: "Menos de R$ 100" },
       { emoji: "💵", label: "R$ 100 a R$ 300" },
-      { emoji: "💸", label: "R$ 300 a R$ 500" },
+      { emoji: "💵", label: "R$ 300 a R$ 500" },
       { emoji: "🔥", label: "Mais de R$ 500" },
       { emoji: "🤷", label: "Não faço ideia" },
     ],

@@ -880,6 +880,12 @@ html.core-shell summary:focus {
   header.sticky.top-0 .py-3.flex.items-center { gap: 0; }
   /* o :not(.ml-auto) preserva o empurra-pra-direita do grupo do mês */
   header.sticky.top-0 .py-3.flex.items-center > * + *:not(.ml-auto) { margin-left: 12px; }
+  /* ...e o grupo do mês, excluído da regra acima, ficava com ESPAÇO ZERO
+     contra o título: "FINANÇASAgosto De 2..." grudado na foto do dono
+     (medido no Chromium 77: 0px entre o h1 e o grupo). Não dá pra usar
+     margin-left aqui — ela sobrescreve o `auto` que empurra pra direita e
+     o grupo desaba pro meio. Padding resolve sem tocar no empurrão. */
+  header.sticky.top-0 .py-3.flex.items-center > .ml-auto { padding-left: 12px; }
   header.sticky.top-0 .ml-auto.flex.items-center { gap: 0; }
   header.sticky.top-0 .ml-auto.flex.items-center > * + * { margin-left: 8px; }
 

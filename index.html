@@ -106,6 +106,39 @@
         if (typeof queueMicrotask !== "function") {
           window.queueMicrotask = function (fn) { Promise.resolve().then(fn); };
         }
+        // crypto.randomUUID só existe em WebView 92+ — no aparelho de teste
+        // (87-91) era o crash "crypto.randomUUID is not a function" ao tocar
+        // em Ideia/Pensamento/Tarefa etc (8+ arquivos criam id com ele).
+        // Um polyfill aqui cobre todos de uma vez. getRandomValues existe
+        // desde sempre; o Math.random é só rede de segurança — id de item
+        // de lista não precisa de aleatoriedade criptográfica.
+        if (window.crypto && !window.crypto.randomUUID) {
+          window.crypto.randomUUID = function () {
+            var b = new Uint8Array(16);
+            if (window.crypto.getRandomValues) window.crypto.getRandomValues(b);
+            else for (var i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+            b[6] = (b[6] & 15) | 64;  // versão 4
+            b[8] = (b[8] & 63) | 128; // variante RFC
+            var h = [];
+            for (var j = 0; j < 16; j++) h.push((b[j] + 256).toString(16).slice(1));
+            return h.slice(0, 4).join("") + "-" + h.slice(4, 6).join("") + "-" +
+              h.slice(6, 8).join("") + "-" + h.slice(8, 10).join("") + "-" + h.slice(10).join("");
+          };
+        }
+
+        // — marca "estou no app da loja" no <html> ANTES de qualquer CSS
+        // importar: o runtime do Capacitor injeta window.Capacitor antes dos
+        // scripts da página, então dá pra decidir aqui. A classe core-shell
+        // liga regras que só valem dentro do app (ex.: matar o outline de
+        // foco da fabricante que fica grudado no último botão tocado — o
+        // "quadrado cinza na seta" / "borda amarela" das fotos do dono).
+        // main.tsx repete a checagem como rede de segurança.
+        try {
+          var Cap = window.Capacitor;
+          if (Cap && Cap.isNativePlatform && Cap.isNativePlatform()) {
+            document.documentElement.className += " core-shell";
+          }
+        } catch (e2) {}
 
         // — vigia —
         var primeiroErro = null;

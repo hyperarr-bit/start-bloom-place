@@ -809,12 +809,34 @@ header.sticky.top-0 {
  *
  * Mapeado por agente com verificação adversarial; 10 piores pontos.
  */
+/*
+ * O ANEL AMARELO / QUADRADO CINZA, VERSÃO DEFINITIVA (04/08).
+ *
+ * Primeira tentativa ficou DENTRO do @supports not (inset) logo abaixo — e o
+ * aparelho do dono provou que o gate estava errado: o crash de
+ * crypto.randomUUID (só existe em 92+) + a falta de dvh (108+) cravam o
+ * WebView dele na faixa 87-91, onde `inset` EXISTE e o bloco inteiro nunca
+ * liga. Resultado: seta de voltar com quadrado cinza e CTA com borda
+ * laranja/amarela ("parece algo de desenvolvimento") mesmo com o conserto
+ * publicado.
+ *
+ * A raiz não depende de versão: em WebView de fabricante, o outline padrão
+ * de foco fica GRUDADO no último elemento tocado (não há :focus-visible se
+ * aplicando, e toque não deveria desenhar anel nenhum). Dentro do APP a
+ * classe core-shell entra no <html> no boot (index.html + main.tsx), e aqui
+ * o anel morre pra qualquer versão de WebView. A web fica intacta, com
+ * :focus-visible funcionando pra teclado.
+ */
+html.core-shell input:focus, html.core-shell textarea:focus,
+html.core-shell select:focus, html.core-shell button:focus,
+html.core-shell a:focus, html.core-shell [tabindex]:focus,
+html.core-shell summary:focus {
+  outline: none;
+}
+
 @supports not (inset: 0px) {
-  /* O ANEL AMARELO (04/08): todos os nossos estados de foco usam
-     :focus-visible, que WebView < Chrome 86 não conhece — nenhuma das nossas
-     regras aplica e o que aparece é o outline PADRÃO DA FABRICANTE (laranja/
-     amarelo em vários aparelhos). Sem :focus-visible não há como distinguir
-     teclado de toque; nesses WebViews o outline nativo sai de cena. */
+  /* Cópia da regra acima pro caso WEB em navegador pré-86 (raro). No shell
+     quem manda é o bloco html.core-shell, sem gate de versão. */
   input:focus, textarea:focus, select:focus, button:focus, a:focus, [tabindex]:focus {
     outline: none;
   }

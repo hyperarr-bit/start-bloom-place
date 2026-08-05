@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, useLayoutEffect } from "react";
-import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate, Link, Navigate } from "react-router-dom";
 import { entrarComGoogle } from "@/lib/auth-nativo";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -939,6 +939,7 @@ function ConfirmScreen({ email }: { email: string }) {
 
 export default function ComecarRadar() {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const { user, isSubscribed, subLoaded } = useAuth();
   // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
   // (?step=offer, via /auth/callback) cai direto no paywall.
@@ -984,6 +985,34 @@ export default function ComecarRadar() {
   const [welcomeVisible, setWelcomeVisible] = useState(
     () => isNativeShell() && !new URLSearchParams(window.location.search).get("step"),
   );
+  /* REABERTURA = NOVA VISITA (04/08). "O app tá abrindo no quiz, não aparece
+     a primeira tela" (dono). Não era CSS: o arranque frio SEMPRE mostra a
+     welcome — o que ele via era o Android RETOMANDO o processo vivo exatamente
+     onde ficou (no quiz). Pra quem ainda não tem conta, voltar depois de 30min
+     parado é visita nova: welcome de novo, funil do começo. Pausa curta
+     (responder WhatsApp) segue de onde estava. Cadastro, oferta e confirmação
+     NUNCA resetam — lead quente no meio do pagamento não perde o lugar. */
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  const userRef = useRef(user);
+  userRef.current = user;
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    let escondidoDesde = 0;
+    const aoMudarVisibilidade = () => {
+      if (document.visibilityState === "hidden") { escondidoDesde = Date.now(); return; }
+      if (!escondidoDesde || Date.now() - escondidoDesde < 30 * 60_000) return;
+      escondidoDesde = 0;
+      const s = stepRef.current;
+      if (userRef.current || s === "signup" || s === "offer" || s === "confirm") return;
+      trackEvent("app_welcome_reset", { de: s });
+      setAnswers({});
+      setStep("start");
+      setWelcomeVisible(true);
+    };
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+    return () => document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+  }, []);
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
       const a = localStorage.getItem(FUNNEL_AREA_KEY);
@@ -1140,13 +1169,19 @@ export default function ComecarRadar() {
                 ou outra variável". Com um esqueleto só, o teste isola a
                 variável. (SeuPlanoGauge.tsx fica no repo — voltar é uma
                 linha.) */}
+            {/* navigate(), NUNCA window.location.href (04/08): o href aqui
+                recarregava o APP INTEIRO — index.html, bundle, parse, React
+                do zero — e num aparelho fraco isso era o "branco comprido
+                sem loading" entre a última tela do funil e a demo (foto do
+                dono, 2ª reclamação). O chunk do Preview já foi pré-carregado
+                na tela de progresso; a troca SPA é instantânea. */}
             {step === "result" && (vitrine && area ? (
               <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />
             ) : (
-              <ResultScreen answers={answers} onDone={() => { window.location.href = DEMO_URL; }} />
+              <ResultScreen answers={answers} onDone={() => navigate(DEMO_URL)} />
             ))}
             {step === "central" && area && (
-              <CentralScreen area={area} onOpen={() => { window.location.href = demoUrlFor(area); }} />
+              <CentralScreen area={area} onOpen={() => navigate(demoUrlFor(area))} />
             )}
             {step === "signup" && (
               <SignupScreen

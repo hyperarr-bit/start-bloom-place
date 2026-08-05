@@ -146,6 +146,11 @@ const CSS_APW = `
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 0 8px;
 }
 .apw-tile {
+  /* min-height ANTES do aspect-ratio: aspect-ratio e Chrome 88+ e este CSS
+     nao passa pelo build (runtime <style>) — sem o fallback, em WebView 87
+     os azulejos colapsavam pra altura do emoji. Com os dois, motor novo faz
+     o quadrado e motor velho ainda mostra uma grade decente. */
+  min-height: 64px;
   aspect-ratio: 1; border-radius: 22px; display: grid; place-items: center;
   font-size: clamp(32px, 10vw, 46px);
   box-shadow: 0 18px 34px -12px rgba(20,60,110,.35);

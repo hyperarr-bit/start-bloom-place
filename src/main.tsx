@@ -3,6 +3,13 @@ import App from "./App.tsx";
 import "./index.css";
 import { trackEvent } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
+import { isNativeShell } from "@/lib/native-shell";
+
+// Rede de segurança da classe core-shell (o index.html já tenta no boot):
+// se a injeção do Capacitor chegar depois do bloco inline por qualquer
+// mudança de ordem, aqui garante antes do React montar. O CSS do shell
+// (ex.: matar outline de foco preso) depende só desta classe.
+if (isNativeShell()) document.documentElement.classList.add("core-shell");
 
 // Telemetria de crash (15/07): cliente reportou "tela branca ao pagar" e a
 // gente só tinha silêncio nos eventos — sem isso, todo crash é adivinhação.

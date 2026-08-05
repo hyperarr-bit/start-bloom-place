@@ -538,6 +538,13 @@ function OfferScreen({
   /* O sheet abre já no plano que a pessoa tocou (04/08, pedido do dono:
      "foco nas DUAS ofertas") — o mensal agora tem botão próprio NA TELA. */
   const [sheetAberta, setSheetAberta] = useState<null | "anual" | "mensal">(null);
+  /* AS DUAS OFERTAS NA TELA, PESO IGUAL (04/08, terceira cobrança do dono —
+     registro honesto: v35 pôs os cards só dentro do sheet, v36 pôs um link
+     fantasma de mensal, e nenhum dos dois era o pedido. O pedido era este:
+     dois cards selecionáveis LADO A LADO na tela do paywall, um CTA só que
+     obedece à seleção. Anual segue default e com o selo do trial — destaque
+     por informação, não por apagar o irmão. */
+  const [plano, setPlano] = useState<"anual" | "mensal">("anual");
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -621,7 +628,7 @@ function OfferScreen({
   const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
 
   return (
-    <div className="relative w-full max-w-sm mx-auto text-center pb-36 pt-10">
+    <div className={`relative w-full max-w-sm mx-auto text-center pt-10 ${nativo ? "pb-72" : "pb-36"}`}>
       <AnimatePresence>
         {showClose && (
           <motion.button
@@ -697,6 +704,30 @@ function OfferScreen({
         style={{ paddingBottom: "max(0.9rem, env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
+          {nativo && (
+            <div className="grid grid-cols-2 gap-2.5 mb-3 text-left">
+              <button
+                onClick={() => { setPlano("anual"); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "anual", context }); }}
+                className={`relative rounded-2xl border-2 p-3 pt-4 transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+              >
+                <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
+                  3 DIAS GRÁTIS
+                </span>
+                <div className="font-bold text-[14px]">Anual</div>
+                <div className="font-extrabold text-[16px] mt-0.5">{APP_PRECOS.anual.preco}<span className="text-[11px] font-semibold text-muted-foreground">/ano</span></div>
+                {/* 59%: 12 × 19,90 = 238,80 → 97,90. Refazer se preço mudar. */}
+                <div className="text-[11px] text-muted-foreground mt-0.5">{APP_PRECOS.anual.porMes}/mês · <b className="text-emerald-600">59% OFF</b></div>
+              </button>
+              <button
+                onClick={() => { setPlano("mensal"); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "mensal", context }); }}
+                className={`rounded-2xl border-2 p-3 pt-4 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+              >
+                <div className="font-bold text-[14px]">Mensal</div>
+                <div className="font-extrabold text-[16px] mt-0.5">{APP_PRECOS.mensal.preco}<span className="text-[11px] font-semibold text-muted-foreground">/mês</span></div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">sem fidelidade</div>
+              </button>
+            </div>
+          )}
           {/*
             PULSO: sai no APP, FICA na web (28/07).
 
@@ -719,15 +750,17 @@ function OfferScreen({
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
               onClick={() => {
                 if (nativo) {
-                  trackEvent("funnel_click", { cta: "app_paywall_cta", context });
-                  setSheetAberta("anual");
+                  trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano });
+                  setSheetAberta(plano);
                   return;
                 }
                 openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
               }}
             >
               {nativo
-                ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
+                ? (plano === "anual"
+                    ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
+                    : <>Assinar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
@@ -735,25 +768,12 @@ function OfferScreen({
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
               {nativo
-                ? <>3 dias grátis · depois <strong className="text-foreground font-semibold">{APP_PRECOS.anual.preco}/ano</strong> · cancele quando quiser na Play Store</>
+                ? (plano === "anual"
+                    ? <>3 dias grátis · depois <strong className="text-foreground font-semibold">{APP_PRECOS.anual.preco}/ano</strong> · cancele quando quiser na Play Store</>
+                    : <><strong className="text-foreground font-semibold">{APP_PRECOS.mensal.preco}/mês</strong> · sem fidelidade · cancele quando quiser na Play Store</>)
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>
           </p>
-          {nativo && (
-            /* A SEGUNDA oferta na própria tela (04/08). Antes o mensal só
-               existia dentro do sheet, abaixo da dobra — na prática o paywall
-               era "só anual", exatamente a reclamação do dono. Botão fantasma
-               de propósito: visível sem competir com o CTA do trial. */
-            <button
-              onClick={() => {
-                trackEvent("funnel_click", { cta: "app_paywall_mensal", context });
-                setSheetAberta("mensal");
-              }}
-              className="mt-2.5 w-full text-center text-[13px] font-semibold text-foreground/80 underline underline-offset-4 decoration-border active:opacity-70"
-            >
-              Prefiro o mensal — {APP_PRECOS.mensal.preco}/mês
-            </button>
-          )}
         </div>
       </div>
 

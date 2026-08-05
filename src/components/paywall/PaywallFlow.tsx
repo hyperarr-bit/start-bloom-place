@@ -12,10 +12,11 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
-import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { TrialTimeline } from "@/components/app/TrialTimeline";
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { restaurar } from "@/lib/revenuecat";
+import { restaurar, initRevenueCat, estadoRevenueCat, comprar } from "@/lib/revenuecat";
+import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
+import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
@@ -535,9 +536,26 @@ function OfferScreen({
   // APP DAS LOJAS: o CTA abre o bottom sheet de assinatura (lógica BitePal);
   // nada de Pix, roleta ou downsell no shell — desconto só via oferta oficial.
   const nativo = isNativeShell();
-  /* O sheet abre já no plano que a pessoa tocou (04/08, pedido do dono:
-     "foco nas DUAS ofertas") — o mensal agora tem botão próprio NA TELA. */
-  const [sheetAberta, setSheetAberta] = useState<null | "anual" | "mensal">(null);
+  /* COMPRA EM UM TOQUE (05/08, dono: "o usuário tem que confirmar 2 vezes
+     pra comprar").
+     Era: CTA → nosso bottom sheet (2º botão) → folha do Google. O sheet
+     nasceu quando o preço só existia DENTRO dele (padrão BitePal). Desde a
+     v39 a tela já tem os dois cards com preço, a seleção, a linha de
+     renovação e o Restaurar compras no rodapé — o sheet virou uma cópia do
+     que está logo acima, e cada toque a mais entre a intenção e a folha do
+     Google é gente que some. Agora o CTA compra o plano selecionado direto.
+     O sheet continua vivo em /planos ("Meu acesso"), onde não há cards. */
+  const [rc, setRc] = useState(estadoRevenueCat());
+  /* Enquanto o catálogo da loja não respondeu, o CTA fica ATIVO de propósito:
+     desabilitar por 1-2s cria um botão que não faz nada justo no instante de
+     maior intenção (a pessoa toca, não acontece nada, ela desiste). Se ela
+     tocar antes, a compra espera o init e segue sozinha. Só vira botão
+     desabilitado + aviso se o init terminar SEM catálogo. */
+  const [rcResolvido, setRcResolvido] = useState(false);
+  const [comprando, setComprando] = useState(false);
+  const [celebrar, setCelebrar] = useState(false);
+  const { get: getUserData } = useUserData();
+  const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   /* AS DUAS OFERTAS NA TELA, PESO IGUAL (04/08, terceira cobrança do dono —
      registro honesto: v35 pôs os cards só dentro do sheet, v36 pôs um link
      fantasma de mensal, e nenhum dos dois era o pedido. O pedido era este:
@@ -566,6 +584,47 @@ function OfferScreen({
     const t = setTimeout(() => setShowClose(true), 1800);
     return () => clearTimeout(t);
   }, [nativo]);
+
+  /* O motor de compra agora liga AQUI (antes vivia no sheet). Junto vem a
+     telemetria que revelou o "botão morto" de 02-03/08: sem ela, um CTA
+     desabilitado por falta de catálogo não gerava evento nenhum e a
+     campanha rodava com zero venda sem ninguém saber o porquê. */
+  useEffect(() => {
+    if (!nativo) return;
+    trackEvent("app_paywall_rc", { fase: "abertura", estado: estadoRevenueCat(), context });
+    initRevenueCat().then((e) => {
+      setRc(e);
+      setRcResolvido(true);
+      trackEvent("app_paywall_rc", { fase: "apos_init", estado: e, context });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nativo]);
+
+  const assinarDireto = async () => {
+    if (comprando) return;
+    setComprando(true);
+    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano });
+    // tocou antes do catálogo chegar: espera o init em vez de não fazer nada
+    let estadoAtual = rc;
+    if (estadoAtual !== "pronto") {
+      estadoAtual = await initRevenueCat();
+      setRc(estadoAtual);
+      setRcResolvido(true);
+    }
+    if (estadoAtual !== "pronto") {
+      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS[plano].id, via: "paywall_direto" });
+      setComprando(false);
+      return;
+    }
+    const ativou = await comprar(APP_PRECOS[plano].id);
+    setComprando(false);
+    if (ativou) {
+      trackEvent("app_sheet_success", { plano, via: "paywall_direto" });
+      // Celebra ANTES de navegar (27/07): o app não pode pintar primeiro,
+      // senão a pessoa vê o módulo cru e a comemoração chega como aviso.
+      setTimeout(() => setCelebrar(true), 700);
+    }
+  };
 
   /*
    * VOLTAR: dois caminhos, e misturá-los era o bug (27/07).
@@ -626,6 +685,12 @@ function OfferScreen({
     metas: "tirar suas metas do papel",
   };
   const victory = VICTORY_PHRASE[answers?.vitoria ?? ""] ?? AREA_VICTORY_FALLBACK[area];
+
+  // A celebração cobre a tela inteira e é ela quem navega — o app só monta
+  // depois que a pessoa toca em começar.
+  if (celebrar) {
+    return <BoasVindasPago imediato nome={nomeUsuario} onComecar={() => { window.location.href = "/"; }} />;
+  }
 
   return (
     <div className={`relative w-full max-w-sm mx-auto text-center pt-10 ${nativo ? "pb-72" : "pb-36"}`}>
@@ -747,22 +812,26 @@ function OfferScreen({
           >
             <Button
               size="lg"
-              className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
+              disabled={nativo && ((rcResolvido && rc !== "pronto") || comprando)}
+              className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)] disabled:opacity-60"
               onClick={() => {
-                if (nativo) {
-                  trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano });
-                  setSheetAberta(plano);
-                  return;
-                }
+                if (nativo) { void assinarDireto(); return; }
                 openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
               }}
             >
               {nativo
-                ? (plano === "anual"
-                    ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
-                    : <>Assinar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>)
+                ? (comprando
+                    ? <>Abrindo o Google Play…</>
+                    : plano === "anual"
+                      ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
+                      : <>Assinar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
+            {nativo && rcResolvido && rc !== "pronto" && (
+              <p className="text-[11px] text-muted-foreground text-center mt-2">
+                As compras estarão disponíveis em breve nesta versão.
+              </p>
+            )}
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
@@ -777,7 +846,6 @@ function OfferScreen({
         </div>
       </div>
 
-      {sheetAberta && <AppPurchaseSheet planoInicial={sheetAberta} onClose={() => setSheetAberta(null)} />}
     </div>
   );
 }

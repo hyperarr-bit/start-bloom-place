@@ -46,6 +46,43 @@ export const captureLandingMeta = () => {
   }
 };
 
+/**
+ * Install Referrer da Play (06/08). O 1º dia de campanha rodou CEGO: todo
+ * evento do app chega com utm vazio, então R$79 de anúncio e instalação
+ * orgânica são indistinguíveis. A Play entrega os utm do link da campanha
+ * via Install Referrer — uma vez por instalação. Emite `install_referrer`
+ * sempre (mesmo orgânico, ex.: "utm_source=google-play&utm_medium=organic")
+ * e funde utm_* no core_utm quando a campanha mandou algo e ainda não há
+ * fonte gravada. Só roda no shell; na web o plugin rejeita e fica o silêncio.
+ */
+const REFERRER_FLAG = "core_install_referrer_done";
+export const captureInstallReferrer = async () => {
+  try {
+    if (localStorage.getItem(REFERRER_FLAG)) return;
+    const { InstallReferrer } = await import("@capgo/capacitor-install-referrer");
+    const res = (await InstallReferrer.getReferrer()) as { referrer?: string };
+    // flag só depois de resolver: falha transitória do serviço da Play
+    // (raro, mas existe) tenta de novo no próximo boot.
+    localStorage.setItem(REFERRER_FLAG, "1");
+    const bruto = String(res?.referrer || "");
+    trackEvent("install_referrer", { referrer: bruto.slice(0, 400) });
+    if (!bruto.includes("utm_")) return;
+    const p = new URLSearchParams(bruto);
+    const existing = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
+    if (existing.utm_source) return; // atribuição da web (funil→app) vence
+    localStorage.setItem(UTM_KEY, JSON.stringify({
+      ...existing,
+      utm_source: p.get("utm_source") || "",
+      utm_medium: p.get("utm_medium") || "",
+      utm_campaign: p.get("utm_campaign") || "",
+      utm_content: p.get("utm_content") || "",
+      gclid: existing.gclid || p.get("gclid") || "",
+    }));
+  } catch {
+    // web / emulador sem Play Services: nada a fazer
+  }
+};
+
 /** Parâmetros de atribuição (fbclid + gclid + utm) pra repassar ao checkout. */
 export const getAttributionParams = (): Record<string, string> => {
   if (typeof window === "undefined") return {};

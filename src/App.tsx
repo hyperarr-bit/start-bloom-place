@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, captureInstallReferrer } from "@/lib/analytics";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
@@ -302,6 +302,7 @@ const TelemetriaWebView = () => {
     const ua = navigator.userAgent;
     const chrome = /Chrome\/(\d+)/.exec(ua)?.[1] ?? "?";
     trackEvent("webview_info", { chrome, android: /Android (\d+)/.exec(ua)?.[1] ?? "?", ua: ua.slice(0, 160) });
+    void captureInstallReferrer();
   }, []);
   return null;
 };

@@ -14,5 +14,8 @@ project(':capacitor-local-notifications').projectDir = new File('../node_modules
 include ':capacitor-status-bar'
 project(':capacitor-status-bar').projectDir = new File('../node_modules/@capacitor/status-bar/android')
 
+include ':capgo-capacitor-install-referrer'
+project(':capgo-capacitor-install-referrer').projectDir = new File('../node_modules/@capgo/capacitor-install-referrer/android')
+
 include ':revenuecat-purchases-capacitor'
 project(':revenuecat-purchases-capacitor').projectDir = new File('../node_modules/@revenuecat/purchases-capacitor/android')

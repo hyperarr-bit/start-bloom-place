@@ -20,6 +20,13 @@ import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
+// "9 de agosto" — mês por extenso à mão, sem depender do ICU do WebView velho.
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const dataFimTrial = () => {
+  const d = new Date(Date.now() + 3 * 864e5);
+  return `${d.getDate()} de ${MESES[d.getMonth()]}`;
+};
+
 /**
  * Paywall autocontido (padrão Cal AI: hook → âncora → desconto → backup).
  * Usado em 2 contextos:
@@ -554,6 +561,15 @@ function OfferScreen({
   const [rcResolvido, setRcResolvido] = useState(false);
   const [comprando, setComprando] = useState(false);
   const [erroCompra, setErroCompra] = useState<string | null>(null);
+  /*
+   * Resgate do "cancelou a folha do Google" (06/08). O dado do 1º dia de
+   * campanha: 12 pessoas abriram a folha, 4 assinaram — e quem cancelava
+   * voltava pra uma tela IDÊNTICA, sem uma palavra (o motivo era engolido).
+   * O medo ali é a cobrança: a folha estampa o preço do ano inteiro mesmo
+   * com trial. Zero fricção — a mensagem aparece sozinha, ninguém precisa
+   * fazer nada; no mensal ela ainda oferece o caminho sem risco (trial).
+   */
+  const [resgate, setResgate] = useState<"anual" | "mensal" | null>(null);
   const [celebrar, setCelebrar] = useState(false);
   const { get: getUserData } = useUserData();
   const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
@@ -601,10 +617,12 @@ function OfferScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativo]);
 
-  const assinarDireto = async () => {
+  const assinarDireto = async (planoAlvo?: "anual" | "mensal") => {
     if (comprando) return;
+    const alvo = planoAlvo ?? plano;
     setComprando(true);
-    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano });
+    setResgate(null);
+    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano: alvo });
     // tocou antes do catálogo chegar: espera o init em vez de não fazer nada
     let estadoAtual = rc;
     if (estadoAtual !== "pronto") {
@@ -613,20 +631,23 @@ function OfferScreen({
       setRcResolvido(true);
     }
     if (estadoAtual !== "pronto") {
-      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS[plano].id, via: "paywall_direto" });
+      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS[alvo].id, via: "paywall_direto" });
       setErroCompra("Não consegui falar com o Google Play agora. Tente de novo em instantes.");
       setComprando(false);
       return;
     }
     setErroCompra(null);
-    const ativou = await comprar(APP_PRECOS[plano].id);
+    const ativou = await comprar(APP_PRECOS[alvo].id);
     setComprando(false);
     /* Sem o painel intermediário, um toque que não abre a folha do Google
-       fica INDISTINGUÍVEL de app quebrado. Cancelamento é escolha da pessoa
-       (silêncio); qualquer outro motivo vira aviso com saída. */
+       fica INDISTINGUÍVEL de app quebrado. Cancelamento vira resgate (a
+       mensagem certa pro medo certo); qualquer outro motivo, aviso com saída. */
     if (!ativou) {
       const motivo = motivoUltimaCompra();
-      if (motivo && motivo !== "cancelou") {
+      if (motivo === "cancelou") {
+        setResgate(alvo);
+        trackEvent("app_resgate_view", { plano: alvo, context });
+      } else if (motivo) {
         setErroCompra(
           motivo === "sem_entitlement"
             ? "A compra foi registrada, mas o acesso ainda não liberou. Toque em Restaurar compras aqui embaixo."
@@ -635,7 +656,7 @@ function OfferScreen({
       }
     }
     if (ativou) {
-      trackEvent("app_sheet_success", { plano, via: "paywall_direto" });
+      trackEvent("app_sheet_success", { plano: alvo, via: "paywall_direto" });
       // Celebra ANTES de navegar (27/07): o app não pode pintar primeiro,
       // senão a pessoa vê o módulo cru e a comemoração chega como aviso.
       setTimeout(() => setCelebrar(true), 700);
@@ -785,27 +806,28 @@ function OfferScreen({
         style={{ paddingBottom: "calc(0.9rem + env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
+          {/*
+            Seletor FINO (06/08). Os dois cards altos ocupavam ~90px de rodapé
+            fixo POR CIMA dos benefícios — o dono sentiu a tela "carregada" e
+            os números do dia concordam (22 toques no anual × 6 no mensal: a
+            escolha não precisa de vitrine, precisa existir). Uma linha por
+            plano, preço junto do nome; o resto mora na linha legal, que já
+            segue a seleção. GRID com gap, nunca flex: flex-gap é Chrome 84+
+            e o piso real da base é WebView 77.
+          */}
           {nativo && (
-            <div className="grid grid-cols-2 gap-2.5 mb-3 text-left">
+            <div className="grid grid-cols-2 gap-2 mb-2.5">
               <button
-                onClick={() => { setPlano("anual"); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "anual", context }); }}
-                className={`relative rounded-2xl border-2 p-3 pt-4 transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+                onClick={() => { setPlano("anual"); setResgate(null); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "anual", context }); }}
+                className={`h-11 rounded-full border-2 px-2 text-[12.5px] leading-tight transition-colors ${plano === "anual" ? "border-accent bg-accent/5 font-bold" : "border-border bg-card font-semibold text-muted-foreground"}`}
               >
-                <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
-                  3 DIAS GRÁTIS
-                </span>
-                <div className="font-bold text-[14px]">Anual</div>
-                <div className="font-extrabold text-[16px] mt-0.5">{APP_PRECOS.anual.preco}<span className="text-[11px] font-semibold text-muted-foreground">/ano</span></div>
-                {/* 59%: 12 × 19,90 = 238,80 → 97,90. Refazer se preço mudar. */}
-                <div className="text-[11px] text-muted-foreground mt-0.5">{APP_PRECOS.anual.porMes}/mês · <b className="text-emerald-600">59% OFF</b></div>
+                Anual · {APP_PRECOS.anual.preco}<span className="block text-[10px] font-bold text-emerald-600">3 DIAS GRÁTIS</span>
               </button>
               <button
-                onClick={() => { setPlano("mensal"); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "mensal", context }); }}
-                className={`rounded-2xl border-2 p-3 pt-4 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+                onClick={() => { setPlano("mensal"); setResgate(null); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "mensal", context }); }}
+                className={`h-11 rounded-full border-2 px-2 text-[12.5px] leading-tight transition-colors ${plano === "mensal" ? "border-accent bg-accent/5 font-bold" : "border-border bg-card font-semibold text-muted-foreground"}`}
               >
-                <div className="font-bold text-[14px]">Mensal</div>
-                <div className="font-extrabold text-[16px] mt-0.5">{APP_PRECOS.mensal.preco}<span className="text-[11px] font-semibold text-muted-foreground">/mês</span></div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">sem fidelidade</div>
+                Mensal · {APP_PRECOS.mensal.preco}<span className="block text-[10px] font-medium text-muted-foreground">sem fidelidade</span>
               </button>
             </div>
           )}
@@ -851,13 +873,28 @@ function OfferScreen({
             {nativo && erroCompra && (
               <p className="text-[11.5px] text-center mt-2 font-medium text-foreground/80">{erroCompra}</p>
             )}
+            {nativo && resgate === "anual" && (
+              <p className="text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900">
+                Fica tranquilo: hoje é <b>R$ 0,00</b>. Você só paga em {dataFimTrial()} se quiser
+                continuar — cancelar leva 2 toques na Play Store.
+              </p>
+            )}
+            {nativo && resgate === "mensal" && (
+              <button
+                onClick={() => { setPlano("anual"); trackEvent("funnel_click", { cta: "app_resgate_trial", context }); void assinarDireto("anual"); }}
+                className="w-full text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900"
+              >
+                Prefere testar antes de pagar? O Anual tem 3 dias grátis —{" "}
+                <b>R$ 0,00 hoje</b>. <span className="underline font-semibold">Começar o teste</span>
+              </button>
+            )}
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
               {nativo
                 ? (plano === "anual"
-                    ? <>3 dias grátis · depois <strong className="text-foreground font-semibold">{APP_PRECOS.anual.preco}/ano</strong> · cancele quando quiser na Play Store</>
+                    ? <><strong className="text-foreground font-semibold">R$ 0,00 hoje</strong> · depois {APP_PRECOS.anual.preco}/ano ({APP_PRECOS.anual.porMes}/mês) · cancele quando quiser na Play Store</>
                     : <><strong className="text-foreground font-semibold">{APP_PRECOS.mensal.preco}/mês</strong> · sem fidelidade · cancele quando quiser na Play Store</>)
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>

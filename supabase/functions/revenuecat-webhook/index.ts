@@ -108,7 +108,9 @@ const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
  *  Bate com APP_PRECOS em src/lib/native-shell.ts. */
 const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   core_anual: { billing: "annual", cents: 9790 },
-  core_mensal: { billing: "monthly", cents: 2990 },
+  // 19,90 desde 02/08 (preço da Play conferido por API em 05/08); ficou 2990
+  // hardcoded e toda mensal entrava na tabela 50% maior.
+  core_mensal: { billing: "monthly", cents: 1990 },
 };
 
 const infoProduto = (storeId: string | null | undefined) => {

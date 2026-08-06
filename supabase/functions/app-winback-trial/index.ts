@@ -77,14 +77,17 @@ serve(async (req) => {
     return Response.json({ preview: body.preview, ok: r.ok });
   }
 
-  // 1) quem cancelou a folha 04-06/08
-  const { data: cancelou } = await supabase
+  // 1) intenção alta sem conclusão, 04/08 em diante:
+  //    - cancelou a folha do Google (app_compra_falhou)
+  //    - fechou o painel intermediário da v37 depois de tocar em assinar
+  //      (app_sheet_cta sem sucesso — o dia 06 mostrou 5 pessoas morrendo aí)
+  const { data: intencao } = await supabase
     .from("analytics_events")
-    .select("user_id")
-    .eq("event_name", "app_compra_falhou")
+    .select("user_id, event_name, event_data")
+    .in("event_name", ["app_compra_falhou", "app_sheet_cta"])
     .gte("created_at", "2026-08-04T00:00:00Z")
     .not("user_id", "is", null);
-  const alvo = [...new Set((cancelou || []).map((r: { user_id: string }) => r.user_id))];
+  const alvo = [...new Set((intencao || []).map((r: { user_id: string }) => r.user_id))];
 
   // 2) tira quem já tem assinatura (qualquer status: trial conta como dentro)
   const { data: subs } = await supabase.from("subscriptions").select("user_id").in("user_id", alvo);

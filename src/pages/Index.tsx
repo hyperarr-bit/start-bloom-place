@@ -340,9 +340,15 @@ const Index = () => {
                     />
                   </>
                 )}
-                <TrackedCard cardKey="month-turnover" tab="financeiro">
-                  <MonthTurnover onOpenMonth={setOpenMonth} />
-                </TrackedCard>
+                {/* Virada de mês NÃO existe na demo (06/08, relato do dono): o
+                    visitante do funil abria MEU FINANCEIRO e levava "Julho
+                    acabou — preparar agosto" com tudo zerado. Recap é ritual
+                    de quem TEM mês anterior; a demo é vitrine. */}
+                {!isPreview && (
+                  <TrackedCard cardKey="month-turnover" tab="financeiro">
+                    <MonthTurnover onOpenMonth={setOpenMonth} />
+                  </TrackedCard>
+                )}
                 <TrackedCard cardKey="summary" tab="financeiro">
                   <FinancialSummary
                     totalIncome={totalIncome}

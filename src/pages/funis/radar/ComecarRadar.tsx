@@ -561,14 +561,30 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
   }, [idx]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
+  /*
+   * TRAVA TRAVADA (06/08, telemetria do Moto do dono). Com o mode="wait", a
+   * pergunta que está SAINDO continua clicável durante a animação — e o
+   * handler dela carrega o idx VELHO. Toque duplo num aparelho lento:
+   * o 2º toque passava (a trava já tinha sido zerada pelo efeito do idx),
+   * gravava a resposta repetida e chamava advance() com idx defasado —
+   * setIdx virava no-op, o efeito [idx] nunca rodava de novo e a trava
+   * ficava ligada PRA SEMPRE. Sintoma: "vitória em 7 dias" com animação de
+   * toque e zero avanço; só o Voltar (sem trava) destravava.
+   * idxRef guarda o idx REAL: clique vindo de uma tela defasada é ignorado
+   * antes de tocar na trava.
+   */
+  const idxRef = useRef(idx);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
   const advance = (next: Record<string, string>) => {
     if (travaRef.current) return;
+    if (idx !== idxRef.current) return; // clique atrasado da tela em exit
     travaRef.current = true;
     if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
   const pick = (label: string) => {
     if (!q || travaRef.current) return;
+    if (idx !== idxRef.current) return; // idem: resposta da pergunta anterior
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
@@ -920,6 +936,14 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <Input placeholder="Seu nome" value={name} onFocus={focoCampo("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
         <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={focoCampo("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
         <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={focoCampo("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
+        {/* O placeholder some no 1º caractere digitado — quem digitava 4
+            letras via o botão apagado sem explicação nenhuma (06/08, relato
+            do dono). A regra fica escrita ENQUANTO não é cumprida. */}
+        {!existingAccount && password.length > 0 && password.length < 6 && (
+          <p className="text-[12px] text-muted-foreground -mt-1.5">
+            A senha precisa de pelo menos 6 caracteres ({password.length}/6).
+          </p>
+        )}
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}

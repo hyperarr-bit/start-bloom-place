@@ -112,7 +112,7 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // hardcoded e toda mensal entrava na tabela 50% maior.
   core_mensal: { billing: "monthly", cents: 1990 },
   // 06/08: app virou produto único — compra ÚNICA do Play (não assinatura).
-  core_vitalicio: { billing: "lifetime", cents: 4790 },
+  core_vitalicio: { billing: "lifetime", cents: 2790 }, // 07/08: 27,90, espelho da web
 };
 
 // Vitalício não expira; a tabela usa period_end e o acesso compara com agora,
@@ -223,7 +223,7 @@ async function reconciliarRevenueCat(
         billing_period: "lifetime",
         payment_method: "play_store",
         customer_email: email,
-        amount_cents: 4790,
+        amount_cents: 2790,
         current_period_start: v.inicio,
         current_period_end: FIM_VITALICIO,
         revenuecat_subscription_id: v.id,

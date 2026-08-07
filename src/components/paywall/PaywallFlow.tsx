@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, X, ShieldCheck, Gift,
+  ArrowRight, Check, X, ShieldCheck, Gift, Loader2,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 // (TrialTimeline saiu em 06/08 — o app vitalício usa a GuaranteeTimeline da web)
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { restaurar, initRevenueCat, estadoRevenueCat, comprarVitalicio, motivoUltimaCompra } from "@/lib/revenuecat";
+import { restaurar, initRevenueCat, estadoRevenueCat, comprarVitalicio, prefetchVitalicio, motivoUltimaCompra } from "@/lib/revenuecat";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -608,6 +608,8 @@ function OfferScreen({
       setRc(e);
       setRcResolvido(true);
       trackEvent("app_paywall_rc", { fase: "apos_init", estado: e, context });
+      // produto na memória ANTES do toque — o CTA abre a folha sem esperar rede
+      if (e === "pronto") void prefetchVitalicio();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativo]);
@@ -833,7 +835,9 @@ function OfferScreen({
             >
               {nativo
                 ? (comprando
-                    ? <>Abrindo o Google Play…</>
+                    // Spinner + texto (07/08): só trocar o rótulo era feedback
+                    // fraco demais — no Moto o dono tocou 4x achando botão morto.
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Abrindo o Google Play…</>
                     : <>Quero pra sempre — {APP_PRECOS.vitalicio.preco} <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>

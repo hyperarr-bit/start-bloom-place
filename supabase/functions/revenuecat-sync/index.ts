@@ -88,7 +88,7 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // corrigido (funções autocontidas: mexeu numa, mexe na outra).
   core_mensal: { billing: "monthly", cents: 1990 },
   // 06/08: app virou produto único — compra ÚNICA do Play (não assinatura).
-  core_vitalicio: { billing: "lifetime", cents: 4790 },
+  core_vitalicio: { billing: "lifetime", cents: 2790 }, // 07/08: 27,90, espelho da web
 };
 
 const FIM_VITALICIO = "2126-01-01T00:00:00.000Z";
@@ -193,7 +193,7 @@ async function reconciliarRevenueCat(
         billing_period: "lifetime",
         payment_method: "play_store",
         customer_email: email,
-        amount_cents: 4790,
+        amount_cents: 2790,
         current_period_start: v.inicio,
         current_period_end: FIM_VITALICIO,
         revenuecat_subscription_id: v.id,

@@ -230,6 +230,30 @@ export async function comprar(productId: string): Promise<boolean> {
  * compra feita = true, mesmo que o painel do RC ainda não tenha o produto
  * anexado a entitlement nenhum.
  */
+/*
+ * PRÉ-BUSCA do produto (07/08). O relato do dono no Moto: "cliquei umas 4
+ * vezes pro botão ir". O toque disparava DUAS idas à rede (getProducts na
+ * Play e só então a folha) — segundos de nada visível num aparelho fraco.
+ * Agora o OfferScreen chama prefetchVitalicio() assim que o RC fica pronto:
+ * quando o dedo chega no CTA o produto já está em memória e o toque abre a
+ * folha direto. O cache não expira — preço só muda com release.
+ */
+type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct;
+let produtoVitalicio: ProdutoRC | null = null;
+export async function prefetchVitalicio(): Promise<void> {
+  if (produtoVitalicio || estado !== "pronto" || !Purchases) return;
+  try {
+    const mod = await import("@revenuecat/purchases-capacitor");
+    const { products } = await Purchases.getProducts({
+      productIdentifiers: ["core_vitalicio"],
+      type: mod.PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+    });
+    produtoVitalicio = products?.[0] ?? null;
+  } catch {
+    // sem rede agora — o comprarVitalicio tenta de novo na hora do toque
+  }
+}
+
 export async function comprarVitalicio(): Promise<boolean> {
   ultimoMotivo = null;
   if (estado !== "pronto" || !Purchases) {
@@ -238,12 +262,8 @@ export async function comprarVitalicio(): Promise<boolean> {
     return false;
   }
   try {
-    const mod = await import("@revenuecat/purchases-capacitor");
-    const { products } = await Purchases.getProducts({
-      productIdentifiers: ["core_vitalicio"],
-      type: mod.PRODUCT_CATEGORY.NON_SUBSCRIPTION,
-    });
-    const produto = products?.[0];
+    if (!produtoVitalicio) await prefetchVitalicio();
+    const produto = produtoVitalicio;
     if (!produto) {
       ultimoMotivo = "produto_ausente";
       trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: "core_vitalicio" });

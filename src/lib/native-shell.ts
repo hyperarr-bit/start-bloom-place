@@ -42,8 +42,11 @@ export const APP_PRECOS = {
   mensal: { id: "core_mensal", preco: "R$ 19,90" },
   anual: { id: "core_anual", preco: "R$ 97,90", trialDias: 3, porMes: "R$ 8,16" },
   // 06/08 (decisão do dono): o app vende UM produto — vitalício, pagamento
-  // único, espelho do paywall da web. Produto `core_vitalicio` criado e
-  // ATIVO no Play via API (purchaseOption "compra", BR R$ 47,90). Mensal e
-  // anual ficam no catálogo só pra base já assinante (restore/renovação).
-  vitalicio: { id: "core_vitalicio", preco: "R$ 47,90" },
+  // único, espelho do paywall da web. Produto `core_vitalicio` ATIVO no Play
+  // via API (purchaseOption "compra"). Mensal e anual ficam no catálogo só
+  // pra base já assinante (restore/renovação).
+  // 07/08: 47,90 → 27,90 — MESMO preço da web, pedido do dono pra comparar
+  // app × web com uma variável só. Preço da Play trocado por API na mesma
+  // hora (PATCH oneTimeProducts, conferido ACTIVE/27,90 na resposta).
+  vitalicio: { id: "core_vitalicio", preco: "R$ 27,90" },
 } as const;

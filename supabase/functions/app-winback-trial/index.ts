@@ -30,16 +30,16 @@ const primeiroNome = (nome?: string | null) => {
 };
 
 const assunto = (nome: string) =>
-  nome ? `${nome}, o CORE agora tem 3 dias grátis` : "O CORE agora tem 3 dias grátis";
+  nome ? `${nome}, o CORE agora é seu pra sempre por R$ 47,90` : "O CORE agora é seu pra sempre por R$ 47,90";
 
 const emailHtml = (nome: string) => `
 <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px 20px;color:#1e2430;line-height:1.6;">
   <p>Oi${nome ? `, ${nome}` : ""}!</p>
   <p>Vi que você chegou a abrir a assinatura do CORE no Google Play e acabou não concluindo — e queria te avisar de uma coisa que mudou <b>depois</b> disso:</p>
-  <p style="font-size:17px;"><b>o plano anual agora começa com 3 dias grátis.</b></p>
-  <p>Na prática: <b>R$&nbsp;0,00 hoje</b>, você usa tudo, e se não fizer sentido é só cancelar na Play Store em 2 toques antes do fim do teste — não cobra nada.</p>
+  <p style="font-size:17px;"><b>acabou a assinatura. Agora é pagamento único: R$&nbsp;47,90, seu pra sempre.</b></p>
+  <p>Sem mensalidade, sem renovação — paga uma vez e pronto. E com <b>Garantia de 7 dias</b>: não curtiu, devolvo 100% em uma mensagem.</p>
   <p style="margin:28px 0;">
-    <a href="${PLAY_URL}" style="background:#127A56;color:#fff;text-decoration:none;padding:14px 26px;border-radius:999px;font-weight:700;display:inline-block;">Abrir o CORE e começar o teste</a>
+    <a href="${PLAY_URL}" style="background:#127A56;color:#fff;text-decoration:none;padding:14px 26px;border-radius:999px;font-weight:700;display:inline-block;">Abrir o CORE e garantir o meu</a>
   </p>
   <p>Qualquer dúvida, responde este e-mail que sou eu que leio.</p>
   <p>— João, do CORE</p>

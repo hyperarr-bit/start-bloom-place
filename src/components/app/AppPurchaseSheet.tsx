@@ -3,20 +3,17 @@ import { motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
-import { initRevenueCat, estadoRevenueCat, comprar, restaurar } from "@/lib/revenuecat";
+import { initRevenueCat, estadoRevenueCat, comprarVitalicio, restaurar } from "@/lib/revenuecat";
 import { useUserData } from "@/hooks/use-user-data";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 
 /**
- * A "ABA DE COMPRAR" DO APP (decisão do dono 23/07, lógica BitePal): o
- * OfferScreen personalizado vende; este bottom sheet só transaciona.
- * Sobe por cima do paywall quando o CTA é tocado — anual em destaque com
- * trial, mensal âncora apagada, preço TOTAL sempre visível (compliance
- * Play — Cal AI foi removido por esconder isso), renovação explícita e
- * Restaurar compras. Motor: RevenueCat (mesmo do SubscriptionPaywall).
+ * A "ABA DE COMPRAR" DO APP — desde 06/08, do VITALÍCIO (decisão do dono:
+ * produto único R$ 47,90, espelho da web). Vive só no /planos ("Meu
+ * acesso"); no funil o paywall compra em 1 toque sem passar por aqui.
+ * Preço total sempre visível + Restaurar compras (compliance Play).
  */
-export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose: () => void; planoInicial?: "anual" | "mensal" }) {
-  const [plano, setPlano] = useState<"anual" | "mensal">(planoInicial);
+export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
   const [rc, setRc] = useState(estadoRevenueCat());
   const [comprando, setComprando] = useState(false);
   const [ok, setOk] = useState(false);
@@ -79,11 +76,11 @@ export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose:
   const assinar = async () => {
     if (rc !== "pronto" || comprando) return;
     setComprando(true);
-    trackEvent("app_sheet_cta", { plano });
-    const ativou = await comprar(APP_PRECOS[plano].id);
+    trackEvent("app_sheet_cta", { plano: "vitalicio" });
+    const ativou = await comprarVitalicio();
     setComprando(false);
     if (ativou) {
-      trackEvent("app_sheet_success", { plano });
+      trackEvent("app_sheet_success", { plano: "vitalicio" });
       setOk(true);
       // Boas-vindas ANTES de navegar (27/07): o app não pode pintar primeiro,
       // senão a pessoa vê o módulo cru por um segundo e a celebração chega
@@ -138,60 +135,32 @@ export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose:
             <div className="w-14 h-14 rounded-full bg-emerald-500/10 grid place-items-center mx-auto mb-3">
               <Check className="w-8 h-8 text-emerald-500" />
             </div>
-            <h2 className="text-xl font-bold">Assinatura ativa! 🎉</h2>
+            <h2 className="text-xl font-bold">Acesso vitalício ativo! 🎉</h2>
             <p className="text-sm text-muted-foreground mt-1">Só um instante…</p>
           </div>
         ) : (
           <>
-            {/* DUAS ofertas de peso igual (04/08, pedido do dono: "o paywall
-                tem que ser focado nas duas ofertas, não só no anual"). O
-                mensal deixou de ser âncora apagada (opacity-75, uma linha) e
-                virou card completo. O anual segue default e com o selo do
-                trial — destaque por INFORMAÇÃO, não por apagar o irmão. */}
             <h2 className="text-[20px] font-bold tracking-tight text-center">
-              {plano === "anual" ? "Comece com 3 dias grátis" : "CORE completo, sem fidelidade"}
+              CORE completo, seu pra sempre
             </h2>
             <p className="text-[12.5px] text-muted-foreground text-center mt-1 mb-4">
-              Acesso total agora · cancele quando quiser, direto na Play Store
+              Pagamento único · sem mensalidade · 16 módulos
             </p>
 
-            <div className="space-y-2.5">
-              <button
-                onClick={() => { setPlano("anual"); trackEvent("app_sheet_plan", { plano: "anual" }); }}
-                className={`w-full text-left rounded-2xl border-2 p-3.5 relative transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
-              >
-                <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
-                  3 DIAS GRÁTIS
-                </span>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-[15px]">Anual</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{APP_PRECOS.anual.porMes}/mês</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-extrabold text-lg">{APP_PRECOS.anual.preco}<span className="text-xs font-semibold text-muted-foreground">/ano</span></div>
-                    {/* 59%: 12 × 19,90 = 238,80 → 97,90 é 59% menos. Era "67%"
-                        calculado sobre o mensal de 29,90 — número FALSO desde
-                        a troca de preço de 02/08. Se mexer nos preços, refaz
-                        esta conta. */}
-                    <div className="text-[11px] text-emerald-600 font-bold">59% OFF</div>
-                  </div>
+            <div className="w-full text-left rounded-2xl border-2 border-accent bg-accent/5 p-3.5 relative">
+              <span className="absolute -top-2.5 left-4 px-2 py-0.5 rounded-full bg-accent text-accent-foreground text-[10px] font-bold tracking-wide">
+                PAGAMENTO ÚNICO
+              </span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="font-bold text-[15px]">Vitalício</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">paga uma vez, usa pra sempre</div>
                 </div>
-              </button>
-              <button
-                onClick={() => { setPlano("mensal"); trackEvent("app_sheet_plan", { plano: "mensal" }); }}
-                className={`w-full text-left rounded-2xl border-2 p-3.5 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-card"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-[15px]">Mensal</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">sem fidelidade · cancela em 1 toque</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-extrabold text-lg">{APP_PRECOS.mensal.preco}<span className="text-xs font-semibold text-muted-foreground">/mês</span></div>
-                  </div>
+                <div className="text-right">
+                  <div className="font-extrabold text-lg">{APP_PRECOS.vitalicio.preco}</div>
+                  <div className="text-[11px] text-emerald-600 font-bold">1x, sem renovação</div>
                 </div>
-              </button>
+              </div>
             </div>
 
             <div className="rounded-xl bg-secondary/60 px-3 py-2.5 mt-3">
@@ -208,7 +177,7 @@ export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose:
             >
               {comprando
                 ? <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                : plano === "anual" ? "Começar 3 dias grátis" : `Assinar por ${APP_PRECOS.mensal.preco}/mês`}
+                : `Quero pra sempre — ${APP_PRECOS.vitalicio.preco}`}
             </button>
 
             {rc !== "pronto" && (
@@ -217,9 +186,8 @@ export function AppPurchaseSheet({ onClose, planoInicial = "anual" }: { onClose:
               </p>
             )}
             <p className="text-[10.5px] text-muted-foreground text-center mt-2 leading-relaxed">
-              {plano === "anual"
-                ? <>Após 3 dias grátis, <b className="text-foreground">{APP_PRECOS.anual.preco}/ano</b>. Renova automaticamente; cancele antes e não paga nada.</>
-                : <>Cobrança de <b className="text-foreground">{APP_PRECOS.mensal.preco}</b> por mês, renovação automática.</>}
+              Cobrança única de <b className="text-foreground">{APP_PRECOS.vitalicio.preco}</b> pelo Google Play.
+              Sem renovação, sem mensalidade. Garantia de 7 dias.
             </p>
             <button onClick={tentarRestaurar} className="block mx-auto mt-2 text-[11.5px] font-semibold text-muted-foreground">
               Restaurar compras

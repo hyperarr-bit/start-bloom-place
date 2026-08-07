@@ -9,7 +9,7 @@ import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
-import { SubscriptionPaywall } from "@/components/paywall/SubscriptionPaywall";
+import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 
 /**
  * Checkout Pix DENTRO do app (13/07). Substitui o redirect pro checkout
@@ -152,9 +152,10 @@ function IconInput({ Icon, inputRef, ...props }: { Icon: typeof User; inputRef?:
 export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // APP DA LOJA (22/07): dentro do shell Capacitor, Pix in-app viola o Play
   // Billing (obrigatório no BR p/ conteúdo digital). ESTE é o único ponto de
-  // bifurcação — todo funil/paywall que abre PixCheckout vira assinatura no
-  // app automaticamente, hoje e no futuro.
-  if (isNativeShell()) return <SubscriptionPaywall onClose={onClose} />;
+  // bifurcação — todo caminho que abre PixCheckout vira Play Billing no app.
+  // 06/08: o destino é o sheet do VITALÍCIO (produto único 47,90) — o
+  // SubscriptionPaywall de anual/mensal aposentou junto com a assinatura.
+  if (isNativeShell()) return <AppPurchaseSheet onClose={onClose} />;
   const { user: abUser } = useAuth();
   // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
   const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id));

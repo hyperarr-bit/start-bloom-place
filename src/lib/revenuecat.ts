@@ -221,6 +221,52 @@ export async function comprar(productId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Compra do VITALÍCIO (06/08) — produto único `core_vitalicio`, compra única
+ * do Play (INAPP), fora do sistema de offerings/packages (que é de
+ * assinatura). O acesso NÃO depende do entitlement do RevenueCat: quem manda
+ * é a linha em `subscriptions` (webhook NON_RENEWING_PURCHASE + sync leem
+ * /customers/{id}/purchases). Por isso: folha do Google fechou com sucesso =
+ * compra feita = true, mesmo que o painel do RC ainda não tenha o produto
+ * anexado a entitlement nenhum.
+ */
+export async function comprarVitalicio(): Promise<boolean> {
+  ultimoMotivo = null;
+  if (estado !== "pronto" || !Purchases) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: "core_vitalicio" });
+    return false;
+  }
+  try {
+    const mod = await import("@revenuecat/purchases-capacitor");
+    const { products } = await Purchases.getProducts({
+      productIdentifiers: ["core_vitalicio"],
+      type: mod.PRODUCT_CATEGORY.NON_SUBSCRIPTION,
+    });
+    const produto = products?.[0];
+    if (!produto) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: "core_vitalicio" });
+      return false;
+    }
+    await Purchases.purchaseStoreProduct({ product: produto });
+    // Dinheiro saiu. Sincroniza já pra pessoa entrar na hora; se o sync
+    // atrasar, webhook e reconciliarSePreciso completam.
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    const msg = String((e as { message?: string })?.message ?? e);
+    const cancelou = /cancel/i.test(msg) || (e as { code?: string })?.code === "1";
+    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
+    trackEvent("app_compra_falhou", {
+      motivo: cancelou ? "cancelou" : "billing_erro",
+      produto: "core_vitalicio",
+      erro: msg.slice(0, 160),
+    });
+    return false;
+  }
+}
+
 /** Restaurar compras (obrigatório de loja — botão no paywall). */
 export async function restaurar(): Promise<boolean> {
   if (estado !== "pronto" || !Purchases) return false;

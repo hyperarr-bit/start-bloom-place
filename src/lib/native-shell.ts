@@ -41,4 +41,9 @@ export const APP_PRECOS = {
   // pagou. Trocar aqui SEM trocar lá é pior que não trocar.
   mensal: { id: "core_mensal", preco: "R$ 19,90" },
   anual: { id: "core_anual", preco: "R$ 97,90", trialDias: 3, porMes: "R$ 8,16" },
+  // 06/08 (decisão do dono): o app vende UM produto — vitalício, pagamento
+  // único, espelho do paywall da web. Produto `core_vitalicio` criado e
+  // ATIVO no Play via API (purchaseOption "compra", BR R$ 47,90). Mensal e
+  // anual ficam no catálogo só pra base já assinante (restore/renovação).
+  vitalicio: { id: "core_vitalicio", preco: "R$ 47,90" },
 } as const;

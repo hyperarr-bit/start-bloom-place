@@ -84,8 +84,14 @@ const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
  *  Bate com APP_PRECOS em src/lib/native-shell.ts. */
 const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   core_anual: { billing: "annual", cents: 9790 },
-  core_mensal: { billing: "monthly", cents: 2990 },
+  // 19,90 desde 02/08 — o 2990 ficou aqui esquecido quando o webhook foi
+  // corrigido (funções autocontidas: mexeu numa, mexe na outra).
+  core_mensal: { billing: "monthly", cents: 1990 },
+  // 06/08: app virou produto único — compra ÚNICA do Play (não assinatura).
+  core_vitalicio: { billing: "lifetime", cents: 4790 },
 };
+
+const FIM_VITALICIO = "2126-01-01T00:00:00.000Z";
 
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
@@ -129,10 +135,26 @@ async function reconciliarRevenueCat(
   // Google e cancelamento com período pago ainda em aberto.
   const vivas = assinaturas.filter((s) => s?.gives_access === true);
 
+  // COMPRA ÚNICA (06/08, core_vitalicio): mora em /purchases, não em
+  // /subscriptions — sem isto o vitalício pagava e ficava sem acesso.
+  const respCompras = await rcGet(`/customers/${encodeURIComponent(userId)}/purchases`, secret).catch(() => null);
+  const compras: any[] = (respCompras?.items ?? []).filter(
+    (p: any) => !p?.revoked_at && p?.status !== "refunded"
+  );
+  const vitalicias: { id: string; inicio: string | null }[] = [];
+  for (const p of compras) {
+    const storeId = await storeIdDoProduto(p.product_id ?? "", secret);
+    if (!storeId.startsWith("core_vitalicio")) continue;
+    vitalicias.push({
+      id: p.id || `rcp:${userId}`,
+      inicio: p.purchased_at ? new Date(p.purchased_at).toISOString() : null,
+    });
+  }
+
   // REGRA DE OURO: esta função só mexe em linha DA LOJA (payment_method =
   // play_store). Vitalício do Pix, Cakto, cortesia — nada disso é problema
   // dela. Sem essa trava, um sync mal-humorado rebaixaria quem pagou na web.
-  if (!vivas.length) {
+  if (!vivas.length && !vitalicias.length) {
     const { data: linhas } = await admin
       .from("subscriptions")
       .select("id")
@@ -160,6 +182,27 @@ async function reconciliarRevenueCat(
   // 25/07 — duas assinaturas no RC, só uma renovou na nossa tabela.
   const idsVivos: string[] = [];
   let melhor: { fim: string | null; prod: string } | null = null;
+
+  for (const v of vitalicias) {
+    idsVivos.push(v.id);
+    const { error } = await admin.from("subscriptions").upsert(
+      {
+        user_id: userId,
+        status: "active",
+        plan: "app",
+        billing_period: "lifetime",
+        payment_method: "play_store",
+        customer_email: email,
+        amount_cents: 4790,
+        current_period_start: v.inicio,
+        current_period_end: FIM_VITALICIO,
+        revenuecat_subscription_id: v.id,
+      },
+      { onConflict: "revenuecat_subscription_id" }
+    );
+    if (error) throw new Error(`upsert vitalício falhou: ${error.message}`);
+    melhor = { fim: FIM_VITALICIO, prod: "core_vitalicio" };
+  }
 
   for (const s of vivas) {
     const fim: number | null = s.current_period_ends_at ?? s.ends_at ?? null;

@@ -12,20 +12,15 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
-import { TrialTimeline } from "@/components/app/TrialTimeline";
+// (TrialTimeline saiu em 06/08 — o app vitalício usa a GuaranteeTimeline da web)
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
-import { restaurar, initRevenueCat, estadoRevenueCat, comprar, motivoUltimaCompra } from "@/lib/revenuecat";
+import { restaurar, initRevenueCat, estadoRevenueCat, comprarVitalicio, motivoUltimaCompra } from "@/lib/revenuecat";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 
 // "9 de agosto" — mês por extenso à mão, sem depender do ICU do WebView velho.
-const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const dataFimTrial = () => {
-  const d = new Date(Date.now() + 3 * 864e5);
-  return `${d.getDate()} de ${MESES[d.getMonth()]}`;
-};
 
 /**
  * Paywall autocontido (padrão Cal AI: hook → âncora → desconto → backup).
@@ -317,10 +312,11 @@ function GuaranteeTimeline() {
  *  (shell — copy de assinatura, zero menção a vitalício no app das lojas). */
 function AnchorPriceCol() {
   if (isNativeShell()) {
+    // 06/08: app virou vitalício — mesma âncora da web, preço do Play.
     return (
       <div className="pl-3 text-center">
-        <p className="text-[11px] text-muted-foreground leading-tight mb-1">O CORE inteiro,<br />pra enxergar tudo</p>
-        <p className="text-xl font-extrabold text-accent tracking-tight">{APP_PRECOS.anual.porMes}<span className="block text-[10px] font-semibold text-muted-foreground">por mês, no plano anual</span></p>
+        <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
+        <p className="text-xl font-extrabold text-accent tracking-tight">{APP_PRECOS.vitalicio.preco}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
       </div>
     );
   }
@@ -384,7 +380,7 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">Com o CORE,<br />sai por</p>
           <p className="text-xl font-extrabold text-accent tracking-tight">
             {isNativeShell()
-              ? <>{APP_PRECOS.anual.porMes}<span className="block text-[10px] font-semibold text-muted-foreground">por mês, no plano anual</span></>
+              ? <>{APP_PRECOS.vitalicio.preco}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></>
               : <>R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></>}
           </p>
         </div>
@@ -399,10 +395,11 @@ const TRUST_CHIPS = [
   { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
-// Shell: chips de assinatura — Pix/garantia são conceitos do web vitalício.
+// Shell: vitalício igual à web — só o "Pix na hora" fica de fora (a palavra
+// Pix não pode existir dentro do app da loja; quem cobra é o Play Billing).
 const TRUST_CHIPS_APP = [
-  { emoji: "🎁", label: "3 dias grátis" },
-  { emoji: "🛡️", label: "Cancela quando quiser" },
+  { emoji: "🛡️", label: "Garantia de 7 dias" },
+  { emoji: "♾️", label: "Sem mensalidade" },
   { emoji: "📱", label: "16 módulos inclusos" },
 ];
 
@@ -569,17 +566,15 @@ function OfferScreen({
    * com trial. Zero fricção — a mensagem aparece sozinha, ninguém precisa
    * fazer nada; no mensal ela ainda oferece o caminho sem risco (trial).
    */
-  const [resgate, setResgate] = useState<"anual" | "mensal" | null>(null);
+  const [resgate, setResgate] = useState<"vitalicio" | null>(null);
   const [celebrar, setCelebrar] = useState(false);
   const { get: getUserData } = useUserData();
   const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   /* AS DUAS OFERTAS NA TELA, PESO IGUAL (04/08, terceira cobrança do dono —
      registro honesto: v35 pôs os cards só dentro do sheet, v36 pôs um link
-     fantasma de mensal, e nenhum dos dois era o pedido. O pedido era este:
-     dois cards selecionáveis LADO A LADO na tela do paywall, um CTA só que
-     obedece à seleção. Anual segue default e com o selo do trial — destaque
-     por informação, não por apagar o irmão. */
-  const [plano, setPlano] = useState<"anual" | "mensal">("anual");
+     fantasma de mensal, e nenhum dos dois era o pedido. 06/08: a história
+     acabou de outro jeito — o app virou produto ÚNICO (vitalício 47,90,
+     decisão do dono), e o seletor de planos saiu inteiro. */
   const escapeRef = useRef(onEscape);
   escapeRef.current = onEscape;
 
@@ -617,12 +612,11 @@ function OfferScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativo]);
 
-  const assinarDireto = async (planoAlvo?: "anual" | "mensal") => {
+  const assinarDireto = async () => {
     if (comprando) return;
-    const alvo = planoAlvo ?? plano;
     setComprando(true);
     setResgate(null);
-    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano: alvo });
+    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano: "vitalicio" });
     // tocou antes do catálogo chegar: espera o init em vez de não fazer nada
     let estadoAtual = rc;
     if (estadoAtual !== "pronto") {
@@ -631,13 +625,13 @@ function OfferScreen({
       setRcResolvido(true);
     }
     if (estadoAtual !== "pronto") {
-      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS[alvo].id, via: "paywall_direto" });
+      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS.vitalicio.id, via: "paywall_direto" });
       setErroCompra("Não consegui falar com o Google Play agora. Tente de novo em instantes.");
       setComprando(false);
       return;
     }
     setErroCompra(null);
-    const ativou = await comprar(APP_PRECOS[alvo].id);
+    const ativou = await comprarVitalicio();
     setComprando(false);
     /* Sem o painel intermediário, um toque que não abre a folha do Google
        fica INDISTINGUÍVEL de app quebrado. Cancelamento vira resgate (a
@@ -645,8 +639,8 @@ function OfferScreen({
     if (!ativou) {
       const motivo = motivoUltimaCompra();
       if (motivo === "cancelou") {
-        setResgate(alvo);
-        trackEvent("app_resgate_view", { plano: alvo, context });
+        setResgate("vitalicio");
+        trackEvent("app_resgate_view", { plano: "vitalicio", context });
       } else if (motivo) {
         setErroCompra(
           motivo === "sem_entitlement"
@@ -656,7 +650,7 @@ function OfferScreen({
       }
     }
     if (ativou) {
-      trackEvent("app_sheet_success", { plano: alvo, via: "paywall_direto" });
+      trackEvent("app_sheet_success", { plano: "vitalicio", via: "paywall_direto" });
       // Celebra ANTES de navegar (27/07): o app não pode pintar primeiro,
       // senão a pessoa vê o módulo cru e a comemoração chega como aviso.
       setTimeout(() => setCelebrar(true), 700);
@@ -770,7 +764,9 @@ function OfferScreen({
         </motion.div>
         <motion.div {...stagger(3)}><TransformChart label={CHART_LABEL[area]} /></motion.div>
         <ValueStack area={area} />
-        {nativo ? <TrialTimeline /> : <GuaranteeTimeline />}
+        {/* 06/08: vitalício no app → a timeline é a da GARANTIA, igual à web
+            (a do trial morreu junto com a assinatura como produto de entrada) */}
+        <GuaranteeTimeline />
         <motion.div {...stagger(9)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
         {/* Shell: o PLANO é tela própria ANTES do cadastro (ordem 23/07) —
             aqui não se repete; o paywall só vende e o sheet só cobra. */}
@@ -806,31 +802,9 @@ function OfferScreen({
         style={{ paddingBottom: "calc(0.9rem + env(safe-area-inset-bottom))" }}
       >
         <div className="max-w-sm mx-auto px-5">
-          {/*
-            Seletor FINO (06/08). Os dois cards altos ocupavam ~90px de rodapé
-            fixo POR CIMA dos benefícios — o dono sentiu a tela "carregada" e
-            os números do dia concordam (22 toques no anual × 6 no mensal: a
-            escolha não precisa de vitrine, precisa existir). Uma linha por
-            plano, preço junto do nome; o resto mora na linha legal, que já
-            segue a seleção. GRID com gap, nunca flex: flex-gap é Chrome 84+
-            e o piso real da base é WebView 77.
-          */}
-          {nativo && (
-            <div className="grid grid-cols-2 gap-2 mb-2.5">
-              <button
-                onClick={() => { setPlano("anual"); setResgate(null); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "anual", context }); }}
-                className={`h-11 rounded-full border-2 px-2 text-[12.5px] leading-tight transition-colors ${plano === "anual" ? "border-accent bg-accent/5 font-bold" : "border-border bg-card font-semibold text-muted-foreground"}`}
-              >
-                Anual · {APP_PRECOS.anual.preco}<span className="block text-[10px] font-bold text-emerald-600">3 DIAS GRÁTIS</span>
-              </button>
-              <button
-                onClick={() => { setPlano("mensal"); setResgate(null); trackEvent("funnel_click", { cta: "app_paywall_plan", plano: "mensal", context }); }}
-                className={`h-11 rounded-full border-2 px-2 text-[12.5px] leading-tight transition-colors ${plano === "mensal" ? "border-accent bg-accent/5 font-bold" : "border-border bg-card font-semibold text-muted-foreground"}`}
-              >
-                Mensal · {APP_PRECOS.mensal.preco}<span className="block text-[10px] font-medium text-muted-foreground">sem fidelidade</span>
-              </button>
-            </div>
-          )}
+          {/* 06/08 (decisão do dono): produto ÚNICO no app — vitalício
+              R$ 47,90, espelho da web. Seletor de planos morreu junto com a
+              assinatura como produto de entrada; o rodapé é só CTA + legal. */}
           {/*
             PULSO: sai no APP, FICA na web (28/07).
 
@@ -860,9 +834,7 @@ function OfferScreen({
               {nativo
                 ? (comprando
                     ? <>Abrindo o Google Play…</>
-                    : plano === "anual"
-                      ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
-                      : <>Assinar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>)
+                    : <>Quero pra sempre — {APP_PRECOS.vitalicio.preco} <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
             {nativo && rcResolvido && rc !== "pronto" && !erroCompra && (
@@ -873,29 +845,18 @@ function OfferScreen({
             {nativo && erroCompra && (
               <p className="text-[11.5px] text-center mt-2 font-medium text-foreground/80">{erroCompra}</p>
             )}
-            {nativo && resgate === "anual" && (
+            {nativo && resgate && (
               <p className="text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900">
-                Fica tranquilo: hoje é <b>R$ 0,00</b>. Você só paga em {dataFimTrial()} se quiser
-                continuar — cancelar leva 2 toques na Play Store.
+                Fica tranquilo: é <b>pagamento único</b> — nenhuma mensalidade escondida.
+                E se não curtir, a <b>Garantia de 7 dias</b> devolve 100% em 1 mensagem.
               </p>
-            )}
-            {nativo && resgate === "mensal" && (
-              <button
-                onClick={() => { setPlano("anual"); trackEvent("funnel_click", { cta: "app_resgate_trial", context }); void assinarDireto("anual"); }}
-                className="w-full text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900"
-              >
-                Prefere testar antes de pagar? O Anual tem 3 dias grátis —{" "}
-                <b>R$ 0,00 hoje</b>. <span className="underline font-semibold">Começar o teste</span>
-              </button>
             )}
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
               {nativo
-                ? (plano === "anual"
-                    ? <><strong className="text-foreground font-semibold">R$ 0,00 hoje</strong> · depois {APP_PRECOS.anual.preco}/ano ({APP_PRECOS.anual.porMes}/mês) · cancele quando quiser na Play Store</>
-                    : <><strong className="text-foreground font-semibold">{APP_PRECOS.mensal.preco}/mês</strong> · sem fidelidade · cancele quando quiser na Play Store</>)
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> de {APP_PRECOS.vitalicio.preco} · sem mensalidade · Garantia de 7 dias</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>
           </p>

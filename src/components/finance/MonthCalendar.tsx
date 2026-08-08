@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Check, Plus, X } from "lucide-react";
+import { Check, Pencil, Plus, Shield, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
@@ -26,7 +26,10 @@ interface Bill {
   id: string;
   name: string;
   paid: boolean;
+  /** Opcional de propósito: conta antiga não tem valor e não pode quebrar. */
   value?: number;
+  /** Preenchido pelo sync quando a conta nasceu de um custo fixo. */
+  fixedId?: string;
 }
 
 interface DueDay {
@@ -44,6 +47,9 @@ interface Props {
   installments: any[];
   totalIncome: number;
   monthlyOutflow: number;
+  /** Resumo da reserva de emergência — vira atalho no chip do topo. */
+  reserva?: { guardado: number; meta: number; registrada: boolean };
+  onAbrirReserva?: () => void;
 }
 
 const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
@@ -71,9 +77,16 @@ const dayInCurrentMonth = (date: string | undefined, now: Date): number | null =
   return d >= 1 && d <= 31 ? d : null;
 };
 
+/** "12,50" (teclado pt-BR) e "12.50" viram 12.5; vazio vira undefined — sem
+ *  valor a conta continua válida, como sempre foi. */
+const parseValor = (v: string): number | undefined => {
+  const n = parseFloat(String(v).replace(/\s/g, "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
 export const MonthCalendar = ({
   incomes, expenses, fixedExpenses, dueDays, setDueDays, installments,
-  totalIncome, monthlyOutflow,
+  totalIncome, monthlyOutflow, reserva, onAbrirReserva,
 }: Props) => {
   const now = new Date();
   const today = now.getDate();
@@ -83,6 +96,12 @@ export const MonthCalendar = ({
 
   const [selectedDay, setSelectedDay] = useState<number>(today);
   const [newBill, setNewBill] = useState("");
+  const [newBillValue, setNewBillValue] = useState("");
+  // Edição na própria linha, no padrão do IncomeTable: a conta manual nascia
+  // sem valor e sem jeito de corrigir nome/dia — errou uma letra, só restava
+  // apagar e recadastrar.
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({ name: "", value: "", day: "" });
 
   // mapa dia → itens (recalcula só quando os dados mudam)
   const byDay = useMemo(() => {
@@ -153,13 +172,62 @@ export const MonthCalendar = ({
   const addBill = (day: number) => {
     const name = newBill.trim();
     if (!name) return;
-    setBillsForDay(day, (bills) => [...bills, { id: Date.now().toString(), name, paid: false }]);
+    // Valor é OPCIONAL, mas quando existe deixa de ser chute: sem ele o
+    // "⏳ A vencer" cai no fallback de média dos custos fixos
+    // (computeUnpaidBillsEstimate) e mostra um número que ninguém digitou.
+    const value = parseValor(newBillValue);
+    const nova: Bill = value === undefined
+      ? { id: Date.now().toString(), name, paid: false }
+      : { id: Date.now().toString(), name, paid: false, value };
+    setBillsForDay(day, (bills) => [...bills, nova]);
     setNewBill("");
+    setNewBillValue("");
   };
   const toggleBill = (day: number, billId: string) =>
     setBillsForDay(day, (bills) => bills.map((b) => (b.id === billId ? { ...b, paid: !b.paid } : b)));
   const removeBill = (day: number, billId: string) =>
     setBillsForDay(day, (bills) => bills.filter((b) => b.id !== billId));
+
+  const comecarEdicao = (b: Bill, day: number) => {
+    setEditandoId(b.id);
+    setRascunho({
+      name: b.name,
+      value: typeof b.value === "number" && b.value > 0 ? String(b.value) : "",
+      day: String(day),
+    });
+  };
+
+  /** Salva nome/valor/dia. O dia muda de lugar na estrutura (DueDay[] é
+   *  indexado por dia), então a conta é retirada de onde estiver e devolvida
+   *  no dia escolhido — em UMA escrita só, senão o estado intermediário
+   *  chegaria a ser persistido sem a conta. */
+  const salvarEdicao = () => {
+    const name = rascunho.name.trim();
+    if (!name || !editandoId) return;
+    const value = parseValor(rascunho.value);
+    const diaEscolhido = Math.min(Math.max(parseInt(rascunho.day, 10) || selectedDay, 1), daysInMonth);
+
+    let conta: Bill | undefined;
+    const semAConta = (dueDays ?? []).map((d) => {
+      const achou = (d.bills ?? []).find((b) => b.id === editandoId);
+      if (achou) conta = achou;
+      return { ...d, bills: (d.bills ?? []).filter((b) => b.id !== editandoId) };
+    });
+    if (!conta) { setEditandoId(null); return; }
+
+    const atualizada: Bill = { ...conta, name };
+    if (value === undefined) delete atualizada.value;
+    else atualizada.value = value;
+
+    const existe = semAConta.some((d) => d.day === diaEscolhido);
+    const proximo = existe
+      ? semAConta.map((d) => (d.day === diaEscolhido ? { ...d, bills: [...d.bills, atualizada] } : d))
+      : [...semAConta, { day: diaEscolhido, color: "slate", bills: [atualizada] }];
+
+    setDueDays(proximo.sort((a, b) => a.day - b.day));
+    setSelectedDay(diaEscolhido);
+    setEditandoId(null);
+  };
 
   const sel = byDay[selectedDay] ?? { expenses: [], incomes: [], bills: [], installments: [] };
   const selSpent = sel.expenses.reduce((s, e) => s + (e.value || 0), 0);
@@ -221,6 +289,21 @@ export const MonthCalendar = ({
         <span className={`px-2.5 py-1 rounded-full bg-white border border-sky-100 shadow-sm dark:bg-slate-900 dark:border-sky-900/40 ${balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
           Saldo {brl(balance)}
         </span>
+        {/* PORTA DA RESERVA (08/08, relato: "quero registrar mas não acho onde
+            fica"). O card próprio existe logo abaixo, mas ninguém rola atrás
+            do que não sabe que existe — o chip mora onde a pessoa já olha
+            todo dia e leva direto lá. */}
+        {reserva && onAbrirReserva && (
+          <button
+            onClick={onAbrirReserva}
+            className="px-2.5 py-1 min-h-9 sm:min-h-0 rounded-full bg-white text-indigo-600 border border-sky-100 shadow-sm hover:bg-indigo-50 transition-colors dark:bg-slate-900 dark:text-indigo-300 dark:border-sky-900/40 dark:hover:bg-indigo-950/40 flex items-center gap-1"
+          >
+            <Shield className="w-3 h-3" />
+            {reserva.registrada
+              ? `Reserva ${reserva.meta > 0 ? Math.min(100, Math.round((reserva.guardado / reserva.meta) * 100)) : 0}%`
+              : "Reserva: registrar"}
+          </button>
+        )}
       </div>
 
       {/* grid do mês */}
@@ -300,24 +383,81 @@ export const MonthCalendar = ({
                 <span className="font-semibold shrink-0">−{brl(p.installmentValue || 0)}</span>
               </div>
             ))}
-            {sel.bills.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-2 text-[13px]">
-                <label className="flex items-center gap-2 min-w-0 cursor-pointer">
-                  <Checkbox checked={b.paid} onCheckedChange={() => toggleBill(selectedDay, b.id)} />
+            {sel.bills.map((b) => editandoId === b.id ? (
+              <div key={b.id} className="rounded-lg border border-sky-200 dark:border-sky-900/50 bg-sky-50/70 dark:bg-sky-950/30 p-2 space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    autoFocus
+                    value={rascunho.name}
+                    onChange={(e) => setRascunho({ ...rascunho, name: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") salvarEdicao(); }}
+                    placeholder="Nome da conta"
+                    className="h-9 text-[13px] flex-1 rounded-lg border-sky-200 dark:border-sky-900/50"
+                  />
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    value={rascunho.value}
+                    onChange={(e) => setRascunho({ ...rascunho, value: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") salvarEdicao(); }}
+                    placeholder="Valor"
+                    className="h-9 text-[13px] w-20 text-right rounded-lg border-sky-200 dark:border-sky-900/50"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="h-9 px-2 flex items-center gap-1 rounded-lg border border-sky-200 dark:border-sky-900/50 bg-background text-[12px] shrink-0">
+                    <span className="text-muted-foreground">Dia</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={daysInMonth}
+                      value={rascunho.day}
+                      onChange={(e) => setRascunho({ ...rascunho, day: e.target.value })}
+                      className="w-9 bg-transparent outline-none text-[13px] font-semibold text-center"
+                      aria-label="Dia do vencimento"
+                    />
+                  </label>
+                  <button
+                    onClick={salvarEdicao}
+                    className="h-9 flex-1 rounded-lg bg-sky-500 text-white text-[12px] font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                  >
+                    <Check className="w-3.5 h-3.5" /> Salvar
+                  </button>
+                  <button
+                    onClick={() => setEditandoId(null)}
+                    className="h-9 px-3 rounded-lg border border-sky-200 dark:border-sky-900/50 text-[12px] font-semibold text-muted-foreground"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div key={b.id} className="flex items-center justify-between gap-1 text-[13px]">
+                {/* Alvo grande e ÚNICO pra "paguei": o relato da usuária era não
+                    conseguir marcar. Editar mora no lápis ao lado, pra não
+                    roubar o toque de quem só quer dar o ✓. */}
+                <label className="flex items-center gap-2 min-w-0 flex-1 cursor-pointer py-1.5 min-h-9">
+                  <Checkbox checked={b.paid} onCheckedChange={() => toggleBill(selectedDay, b.id)} className="w-[18px] h-[18px]" />
                   <span className={`truncate ${b.paid ? "line-through text-muted-foreground" : ""}`}>
                     {b.name}{!b.paid && selectedDay < today ? " · venceu" : !b.paid && selectedDay === today ? " · vence hoje" : ""}
                   </span>
                   {b.fixedId && <span className="category-badge shrink-0">fixo</span>}
                 </label>
-                <span className="flex items-center gap-1.5 shrink-0">
+                <span className="flex items-center gap-0.5 shrink-0">
                   {typeof b.value === "number" && b.value > 0 && (
                     <span className={`font-semibold ${b.paid ? "text-muted-foreground" : ""}`}>−{brl(b.value)}</span>
                   )}
-                  {/* conta vinda de fixo se gerencia lá — só a manual tem X */}
+                  {/* conta vinda de fixo se gerencia lá — só a manual edita/apaga */}
                   {!b.fixedId && (
-                    <button onClick={() => removeBill(selectedDay, b.id)} className="text-muted-foreground hover:text-destructive" aria-label={`Remover ${b.name}`}>
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <>
+                      <button onClick={() => comecarEdicao(b, selectedDay)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-sky-600" aria-label={`Editar ${b.name}`}>
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => removeBill(selectedDay, b.id)} className="w-9 h-9 grid place-items-center text-muted-foreground hover:text-destructive" aria-label={`Remover ${b.name}`}>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </>
                   )}
                 </span>
               </div>
@@ -334,7 +474,17 @@ export const MonthCalendar = ({
               onChange={(e) => setNewBill(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") addBill(selectedDay); }}
               placeholder={`Conta que vence dia ${selectedDay} (ex: luz)`}
-              className="h-9 text-[13px] rounded-full border-sky-200 focus-visible:ring-sky-400 dark:border-sky-900/50"
+              className="h-9 text-[13px] flex-1 min-w-0 rounded-full border-sky-200 focus-visible:ring-sky-400 dark:border-sky-900/50"
+            />
+            <Input
+              type="number"
+              inputMode="decimal"
+              value={newBillValue}
+              onChange={(e) => setNewBillValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") addBill(selectedDay); }}
+              placeholder="R$"
+              aria-label="Valor da conta (opcional)"
+              className="h-9 text-[13px] w-16 text-right rounded-full border-sky-200 focus-visible:ring-sky-400 dark:border-sky-900/50"
             />
             <button
               onClick={() => addBill(selectedDay)}
@@ -346,6 +496,9 @@ export const MonthCalendar = ({
           </div>
           <p className="text-[10px] text-muted-foreground mt-1.5">
             Despesas e rendas aparecem no dia sozinhas. Custo fixo com dia vira conta aqui automaticamente.
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            O valor é opcional — com ele, o “A vencer” lá em cima vira número exato. Toque no ✏️ pra corrigir nome, valor ou dia.
           </p>
         </div>
       </div>

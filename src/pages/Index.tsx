@@ -13,6 +13,7 @@ import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
 import { MonthCalendar } from "@/components/finance/MonthCalendar";
+import { EmergencyFund, useReservaEmergencia, metaDaReserva } from "@/components/finance/EmergencyFund";
 import { Calculator } from "@/components/Calculator";
 import { Notes } from "@/components/Notes";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
@@ -139,6 +140,13 @@ const Index = () => {
   // Dashboard, Relatórios, Saúde e a barra de resumo mostram. Fonte única em
   // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
   const monthlyOutflow = computeMonthlyOutflow(totalVariableExpenses, totalFixedExpenses, monthlyInstallments);
+
+  /* Reserva de emergência DECLARADA pela pessoa (08/08). Enquanto ela não
+     registrar, o app segue estimando como antes — ver FinancialHealth. */
+  const [reservaEmergencia] = useReservaEmergencia();
+  const irParaReserva = () => {
+    document.getElementById("reserva-emergencia")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const savingsRate = computeSavingsRate(totalIncome, monthlyOutflow);
   // O alvo da reserva é 6 meses de despesa. Antes vinha de uma meta chamada
   // "emergência" — do módulo Metas, removido em 31/03 — então era sempre o
@@ -395,7 +403,24 @@ const Index = () => {
                     installments={installments}
                     totalIncome={totalIncome}
                     monthlyOutflow={monthlyOutflow}
+                    reserva={{
+                      guardado: reservaEmergencia.guardado,
+                      meta: metaDaReserva(monthlyOutflow, reservaEmergencia.meses),
+                      registrada: reservaEmergencia.registrada,
+                    }}
+                    onAbrirReserva={irParaReserva}
                   />
+                </TrackedCard>
+                {/* RESERVA logo abaixo do MEU MÊS (08/08). A pergunta que
+                    chegou foi "onde eu registro minha reserva?" — antes ela
+                    não existia como lugar, só como um número derivado na 9ª
+                    aba. Fica colada no cartão do mês porque é ali que a pessoa
+                    olha quando pensa em dinheiro do mês; o chip do MEU MÊS
+                    rola até aqui. */}
+                <TrackedCard cardKey="emergency-fund" tab="financeiro">
+                  <div id="reserva-emergencia" className="scroll-mt-20">
+                    <EmergencyFund despesaMensal={monthlyOutflow} />
+                  </div>
                 </TrackedCard>
                 <TrackedCard cardKey="installments" tab="financeiro">
                   <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />
@@ -483,6 +508,7 @@ const Index = () => {
               wishlistItems={wishlistItems}
               trips={trips}
               investments={investments}
+              reservaDeclarada={reservaEmergencia}
             />
           </TrackedCard>
         )}

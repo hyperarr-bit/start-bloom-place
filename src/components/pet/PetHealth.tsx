@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, Syringe, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Syringe, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
@@ -35,6 +35,31 @@ export const PetHealth = () => {
   };
 
   const removeRecord = (id: string) => set("pet-health", records.filter(r => r.id !== id));
+
+  /* Edição na própria linha (padrão do IncomeTable). Errar a data da próxima
+     vacina obrigava a apagar e refazer o registro — e o alerta de vencimento
+     sumia junto. O petId NÃO entra no rascunho de propósito: o vínculo com o
+     pet é o que amarra o histórico, quem errou de pet apaga e lança de novo. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<{ type: "vaccine" | "deworming" | "visit"; name: string; date: string; nextDate: string }>({ type: "vaccine", name: "", date: "", nextDate: "" });
+
+  const comecarEdicao = (r: HealthRecord) => {
+    setEditandoId(r.id);
+    setRascunho({ type: r.type, name: r.name, date: r.date, nextDate: r.nextDate || "" });
+  };
+
+  const salvarEdicao = () => {
+    const nome = rascunho.name.trim();
+    if (!nome) return;
+    set("pet-health", records.map(r => r.id !== editandoId ? r : {
+      ...r, // mantém id e petId
+      type: rascunho.type,
+      name: nome,
+      date: rascunho.date || r.date,
+      nextDate: rascunho.nextDate,
+    }));
+    setEditandoId(null);
+  };
 
   const alerts = records.filter(r => {
     if (!r.nextDate) return false;
@@ -71,28 +96,63 @@ export const PetHealth = () => {
         </div>
 
         <div className="bg-green-50/50 dark:bg-green-950/20 p-2 space-y-1.5">
-          <div className="grid grid-cols-12 gap-1 px-2 py-1">
-            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Pet</span>
-            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Tipo</span>
-            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground">Nome</span>
-            <span className="col-span-2 text-[9px] font-bold uppercase text-muted-foreground">Data</span>
-            <span className="col-span-3 text-[9px] font-bold uppercase text-muted-foreground text-right">Próxima</span>
-          </div>
-
-          {records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(r => {
+          {/* A tabela de 5 colunas saiu (mesmo motivo dos Gastos): lápis e
+              lixeira de 36px não cabem ao lado de 5 colunas num celular. */}
+          {/* cópia antes do sort: `records` vem do store do useUserData e
+              .sort() ordena NO LUGAR — ordenar em render mexia no dado guardado */}
+          {[...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(r => {
             const pet = pets.find((p: any) => p.id === r.petId);
-            return (
-              <div key={r.id} className="grid grid-cols-12 gap-1 items-center bg-background/60 rounded-lg px-2 py-1.5 group">
-                <span className="col-span-2 text-[10px] truncate">{pet?.name || "—"}</span>
-                <span className="col-span-2 text-[10px] text-muted-foreground">{typeLabels[r.type]}</span>
-                <span className="col-span-3 text-xs font-medium truncate">{r.name}</span>
-                <span className="col-span-2 text-[10px] text-muted-foreground">{format(new Date(r.date), "dd/MM")}</span>
-                <div className="col-span-3 flex items-center justify-end gap-1">
-                  <span className="text-[10px] text-muted-foreground">{r.nextDate ? format(new Date(r.nextDate), "dd/MM") : "—"}</span>
-                  <button onClick={() => removeRecord(r.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all">
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+
+            if (editandoId === r.id) {
+              return (
+                <div key={r.id} className="border border-primary/40 bg-background/70 rounded-lg p-2 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground">Editando · {pet?.name || "sem pet"}</p>
+                  <select value={rascunho.type} onChange={e => setRascunho({ ...rascunho, type: e.target.value as any })} className="h-9 w-full text-[11px] bg-background border border-input rounded-md px-2">
+                    <option value="vaccine">Vacina</option>
+                    <option value="deworming">Vermífugo</option>
+                    <option value="visit">Consulta</option>
+                  </select>
+                  <Input autoFocus placeholder="Nome (ex: V8, Antirrábica)" value={rascunho.name} onChange={e => setRascunho({ ...rascunho, name: e.target.value })} className="h-9 text-[11px]" />
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <CampoData rotulo="Data" value={rascunho.date} onChange={e => setRascunho({ ...rascunho, date: e.target.value })} className="h-9 text-[11px]" />
+                    <CampoData rotulo="Próxima" value={rascunho.nextDate} onChange={e => setRascunho({ ...rascunho, nextDate: e.target.value })} className="h-9 text-[11px]" />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
+                      <Check className="w-3.5 h-3.5" /> Salvar
+                    </button>
+                    <button onClick={() => setEditandoId(null)} className="h-9 px-3 rounded-md border border-border text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                      <X className="w-3.5 h-3.5" /> Cancelar
+                    </button>
+                  </div>
                 </div>
+              );
+            }
+
+            return (
+              <div key={r.id} className="flex items-center gap-0.5 bg-background/60 rounded-lg px-2 py-1">
+                {/* toque no texto abre a edição; os ícones ficam SEMPRE visíveis
+                    (o hover de antes não existe em tela de celular) */}
+                <button onClick={() => comecarEdicao(r)} aria-label={`Editar ${r.name}`} className="flex items-center gap-2 flex-1 min-w-0 text-left min-h-9">
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-xs font-medium truncate">{r.name}</span>
+                    <span className="block text-[10px] text-muted-foreground truncate">
+                      {[pet?.name, typeLabels[r.type], format(new Date(r.date), "dd/MM")].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  {/* a próxima data é o que a pessoa vem conferir aqui — fica
+                      com rótulo próprio em vez de virar mais um "dd/MM" solto */}
+                  <span className="text-[10px] text-right shrink-0 leading-tight">
+                    <span className="block text-[9px] uppercase text-muted-foreground">Próxima</span>
+                    <span className="block font-medium">{r.nextDate ? format(new Date(r.nextDate), "dd/MM") : "—"}</span>
+                  </span>
+                </button>
+                <button onClick={() => comecarEdicao(r)} aria-label={`Editar ${r.name}`} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                  <Pencil className="w-3 h-3" />
+                </button>
+                <button onClick={() => removeRecord(r.id)} aria-label={`Apagar ${r.name}`} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors">
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
             );
           })}
@@ -104,7 +164,10 @@ export const PetHealth = () => {
           <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
               <select value={petId} onChange={e => setPetId(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
-                <option value="">Pet</option>
+                {/* disabled hidden: sem isso o placeholder vira uma OPÇÃO
+                    clicável no select nativo do Android e a pessoa vê um pet
+                    fantasma chamado "Pet" no meio dos dela (relato 08/08). */}
+                <option value="" disabled hidden>Selecione o pet</option>
                 {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <select value={type} onChange={e => setType(e.target.value as any)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
@@ -114,13 +177,12 @@ export const PetHealth = () => {
               </select>
             </div>
             <Input placeholder="Nome (ex: V8, Antirrábica)" value={name} onChange={e => setName(e.target.value)} className="h-7 text-[11px]" />
+            {/* rótulos trocados até aqui: o 1º campo é a data DO registro e
+                aparecia como "Próxima"; o 2º (a próxima de verdade) não tinha
+                rótulo nenhum e o navegador só mostrava dd/mm/aaaa */}
             <div className="grid grid-cols-2 gap-1.5">
-              <div className="relative">
-                <CampoData rotulo="Próxima" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
- </div>
- <div className="relative">
- <Input type="date" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px]" />
-              </div>
+              <CampoData rotulo="Data" value={date} onChange={e => setDate(e.target.value)} className="h-7 text-[11px]" />
+              <CampoData rotulo="Próxima" value={nextDate} onChange={e => setNextDate(e.target.value)} className="h-7 text-[11px]" />
             </div>
             <button onClick={addRecord} className="w-full flex items-center justify-center gap-1 text-[10px] font-bold text-primary hover:bg-primary/10 rounded-md py-1 transition-colors">
               <Plus className="w-3 h-3" /> Adicionar registro

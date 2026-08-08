@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, BookOpen } from "lucide-react";
+import { Plus, Trash2, BookOpen, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,7 +36,10 @@ export const PetDiary = () => {
   const addEntry = () => {
     if (!text.trim()) return;
     const updated = [
-      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl.trim() || undefined },
+      // photoUrl começa undefined e o "limpar foto" volta pra undefined:
+      // `photoUrl.trim()` estourava TypeError e o momento NUNCA era salvo,
+      // sem aviso nenhum — sintoma idêntico a "cadastrei e sumiu" (08/08).
+      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl?.trim() || undefined },
       ...entries,
     ];
     set("pet-diary", updated);
@@ -45,6 +48,30 @@ export const PetDiary = () => {
 
   const removeEntry = (id: string) => {
     set("pet-diary", entries.filter(e => e.id !== id));
+  };
+
+  /* Edição na própria linha (padrão do IncomeTable). Diário é texto corrido:
+     erro de digitação era motivo pra apagar o momento inteiro e reescrever —
+     perdendo a data original, que é justamente o valor do diário. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState({ petName: "", text: "", mood: "😊", photoUrl: undefined as string | undefined });
+
+  const comecarEdicao = (e: DiaryEntry) => {
+    setEditandoId(e.id);
+    setRascunho({ petName: e.petName || "", text: e.text, mood: e.mood || "😊", photoUrl: e.photoUrl });
+  };
+
+  const salvarEdicao = () => {
+    const texto = rascunho.text.trim();
+    if (!texto) return;
+    set("pet-diary", entries.map(e => e.id !== editandoId ? e : {
+      ...e, // id e `date` intocados: a data é o registro do momento, não da edição
+      petName: rascunho.petName.trim(),
+      text: texto,
+      mood: rascunho.mood,
+      photoUrl: rascunho.photoUrl?.trim() || undefined,
+    }));
+    setEditandoId(null);
   };
 
   return (
@@ -59,10 +86,46 @@ export const PetDiary = () => {
         </div>
 
         <div className="bg-violet-50/50 dark:bg-violet-950/20 p-2 space-y-1.5">
-          {entries.map(entry => (
-            <div key={entry.id} className="bg-background/60 rounded-lg px-2.5 py-2 group">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
+          {entries.map(entry => editandoId === entry.id ? (
+            <div key={entry.id} className="border border-primary/40 bg-background/70 rounded-lg p-2 space-y-1.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                <Select value={rascunho.petName} onValueChange={v => setRascunho(r => ({ ...r, petName: v }))}>
+                  <SelectTrigger className="h-9 text-[11px]">
+                    <SelectValue placeholder={pets.length === 0 ? "Cadastre um pet primeiro" : "Selecionar pet"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* inclui o nome já gravado mesmo se o pet foi apagado da
+                        lista — senão o select abriria vazio e salvaria sem pet */}
+                    {Array.from(new Set([...pets.map((p: any) => p.name), ...(rascunho.petName ? [rascunho.petName] : [])])).map((nome: string) => (
+                      <SelectItem key={nome} value={nome} className="text-[11px]">{nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex gap-1 items-center">
+                  {moods.map(m => (
+                    <button key={m} onClick={() => setRascunho(r => ({ ...r, mood: m }))} aria-label={`Humor ${m}`} className={`text-sm p-1 rounded transition-all ${rascunho.mood === m ? "bg-primary/20 ring-1 ring-primary scale-110" : "opacity-50 hover:opacity-80"}`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Textarea autoFocus value={rascunho.text} onChange={e => setRascunho(r => ({ ...r, text: e.target.value }))} className="text-[11px] min-h-[60px]" rows={3} />
+              <PhotoPicker value={rascunho.photoUrl} onChange={url => setRascunho(r => ({ ...r, photoUrl: url }))} onClear={() => setRascunho(r => ({ ...r, photoUrl: undefined }))} label="Trocar foto" />
+              <div className="flex items-center gap-1.5">
+                <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-[11px] font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform">
+                  <Check className="w-3.5 h-3.5" /> Salvar
+                </button>
+                <button onClick={() => setEditandoId(null)} className="h-9 px-3 rounded-md border border-border text-[11px] font-bold text-muted-foreground flex items-center gap-1.5">
+                  <X className="w-3.5 h-3.5" /> Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div key={entry.id} className="bg-background/60 rounded-lg px-2.5 py-2">
+              <div className="flex items-start justify-between gap-1">
+                {/* o momento inteiro abre a edição; lápis e lixeira SEMPRE
+                    visíveis (hover não existe no celular) */}
+                <button onClick={() => comecarEdicao(entry)} aria-label={`Editar momento de ${entry.petName || "meu pet"}`} className="flex-1 min-w-0 text-left">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm">{entry.mood}</span>
                     <span className="text-xs font-bold">{entry.petName || "Meu pet"}</span>
@@ -72,10 +135,15 @@ export const PetDiary = () => {
                   {entry.photoUrl && (
                     <img src={entry.photoUrl} alt={`Foto de ${entry.petName || "pet"}`} className="mt-1.5 rounded-lg w-full max-h-32 object-cover" />
                   )}
-                </div>
-                <button onClick={() => removeEntry(entry.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 transition-all">
-                  <Trash2 className="w-3 h-3" />
                 </button>
+                <div className="flex flex-col shrink-0">
+                  <button onClick={() => comecarEdicao(entry)} aria-label={`Editar momento de ${entry.petName || "meu pet"}`} className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                  <button onClick={() => removeEntry(entry.id)} aria-label={`Apagar momento de ${entry.petName || "meu pet"}`} className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive transition-colors">
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           ))}

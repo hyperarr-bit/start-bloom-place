@@ -19,23 +19,49 @@ const countItems = (userId: string | null, logicalKey: string) => {
   return Array.isArray(data) ? data.length : 0;
 };
 
+/*
+ * ESCRITA QUE O REACT NÃO VIA (08/08).
+ *
+ * `copyToMonth` gravava direto no localStorage (`u:{uid}:finance-dueDays`),
+ * mas a tela de Finanças guarda esse mesmo balde num `usePersistedState` —
+ * que hidrata UMA vez (hydratedRef) e nunca mais relê a chave. Resultado: a
+ * cópia acontecia no disco, a tela continuava com o array velho em memória e
+ * o PRÓXIMO toque na UI (marcar um pago, adicionar uma conta) salvava o velho
+ * por cima. A cópia sumia sem erro nenhum — e o reset de "pago" que vinha
+ * junto ia embora com ela.
+ *
+ * Pior: `writeMonthData` grava SÓ local. Nada disso chegava ao Supabase, então
+ * a cópia também não viajava com a conta pro app da loja.
+ *
+ * `aplicar` é a porta pro estado do React do mês CORRENTE (a tela passa os
+ * setters). Quando o alvo é um mês passado — que ninguém tem em memória — o
+ * caminho antigo continua valendo.
+ */
 const copyToMonth = (
   userId: string | null,
   fromMonth: string,
   toMonth: string,
   options: {
     fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
-  }
+  },
+  aplicar?: (logicalKey: string, value: any) => boolean,
 ) => {
   const fromKeys = getFinanceStorageKeys(fromMonth);
   const toKeys = getFinanceStorageKeys(toMonth);
   const newId = () => Date.now().toString() + Math.random();
 
+  // Tenta primeiro pelo estado do React; só cai no disco se ninguém adotou a
+  // chave (mês passado, ou tela de Finanças não montada).
+  const gravar = (logicalKey: string, value: any) => {
+    if (aplicar?.(logicalKey, value)) return;
+    writeMonthData(userId, logicalKey, value);
+  };
+
   if (options.fixed) {
     const data = readLocalKey(userId, fromKeys.fixed);
     if (data) {
       const items = data.map((i: any) => ({ ...i, id: newId() }));
-      writeMonthData(userId, toKeys.fixed, items);
+      gravar(toKeys.fixed, items);
     }
   }
 
@@ -44,9 +70,9 @@ const copyToMonth = (
     if (data) {
       const days = data.map((d: any) => ({
         ...d,
-        bills: d.bills.map((b: any) => ({ ...b, id: newId(), paid: false })),
+        bills: (Array.isArray(d?.bills) ? d.bills : []).map((b: any) => ({ ...b, id: newId(), paid: false })),
       }));
-      writeMonthData(userId, toKeys.dueDays, days);
+      gravar(toKeys.dueDays, days);
     }
   }
 
@@ -58,7 +84,7 @@ const copyToMonth = (
         id: newId(),
         date: localDayKey(),
       }));
-      writeMonthData(userId, toKeys.incomes, items);
+      gravar(toKeys.incomes, items);
     }
   }
 
@@ -73,14 +99,14 @@ const copyToMonth = (
     const baseBudgets = readLocalKey(userId, "finance-category-budgets");
     const monthBudgets = readLocalKey(userId, fromKey);
     const data = monthBudgets || baseBudgets;
-    if (data) writeMonthData(userId, toKey, data);
+    if (data) gravar(toKey, data);
   }
 
   if (options.notes) {
     const data = readLocalKey(userId, fromKeys.notes);
     if (data) {
       const items = data.map((n: any) => ({ ...n, id: newId() }));
-      writeMonthData(userId, toKeys.notes, items);
+      gravar(toKeys.notes, items);
     }
   }
 };
@@ -89,9 +115,16 @@ const isCurrentMonthCheck = (month: string) => month === getCurrentMonthName();
 
 interface MonthTurnoverProps {
   onOpenMonth?: (month: string) => void;
+  /**
+   * Aplica um valor no estado do React do mês corrente. Devolve `true` quando
+   * a chave tem dono em memória (aí a gravação em disco não é feita aqui — o
+   * `usePersistedState` do dono já persiste e sincroniza). Sem esta porta a
+   * cópia é sobrescrita no toque seguinte da tela.
+   */
+  aplicarNoMesCorrente?: (logicalKey: string, value: any) => boolean;
 }
 
-export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
+export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnoverProps) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
@@ -231,7 +264,7 @@ export const MonthTurnover = ({ onOpenMonth }: MonthTurnoverProps) => {
       incomes: copyIncomes,
       categoryBudgets: copyCategoryBudgets,
       notes: copyNotes,
-    });
+    }, aplicarNoMesCorrente);
     setCopied(true);
     setTimeout(() => {
       setShowRecap(false);

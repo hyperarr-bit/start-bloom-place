@@ -4,7 +4,9 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategorySelect } from "@/components/finance/CategorySelect";
+import { CardSelect } from "@/components/finance/CardSelect";
 import { useFinanceCategories } from "@/lib/finance-categories";
+import { useFinanceCards } from "@/lib/finance-cards";
 
 interface FixedExpense {
   id: string;
@@ -33,24 +35,15 @@ const paymentMethods = [
   { value: "debito_auto", label: "Débito Automático" },
 ];
 
-const cardOptions = [
-  { value: "nubank", label: "Nubank", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "inter", label: "Inter", color: "bg-orange-500/15 text-orange-700 dark:text-orange-300" },
-  { value: "itau", label: "Itaú", color: "bg-blue-600/15 text-blue-700 dark:text-blue-300" },
-  { value: "bradesco", label: "Bradesco", color: "bg-red-600/15 text-red-700 dark:text-red-300" },
-  { value: "santander", label: "Santander", color: "bg-red-500/15 text-red-600 dark:text-red-300" },
-  { value: "c6", label: "C6 Bank", color: "bg-gray-800/15 text-gray-700 dark:text-gray-300" },
-  { value: "bb", label: "Banco do Brasil", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300" },
-  { value: "caixa", label: "Caixa", color: "bg-blue-500/15 text-blue-600 dark:text-blue-300" },
-  { value: "neon", label: "Neon", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
-  { value: "picpay", label: "PicPay", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "outro", label: "Outro", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
+// Lista de cartões: agora em @/lib/finance-cards (as 11 bandeiras + os que o
+// usuário criar, tipo Renner/Will). Estava copiada aqui, no ExpenseTable e no
+// InstallmentTracker — mudar num lugar não mudava nos outros.
 
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
 export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
+  const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
@@ -124,8 +117,6 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
     setEditandoId(null);
   };
 
-  const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
-  const getCardLabel = (v: string) => cardOptions.find((c) => c.value === v)?.label || v;
   const getPaymentLabel = (v: string) => paymentMethods.find((p) => p.value === v)?.label || v;
 
   const total = expenses.reduce((sum, e) => sum + e.value, 0);
@@ -211,10 +202,9 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
               <SelectContent>{paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
             </Select>
             {isCardPayment(newExpense.paymentMethod) && (
-              <Select value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })}>
-                <SelectTrigger className="h-8 text-xs col-span-2"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-              </Select>
+              <div className="col-span-2 min-w-0">
+                <CardSelect value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })} />
+              </div>
             )}
           </div>
         )}
@@ -269,10 +259,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
                 </div>
                 {isCardPayment(rascunho.paymentMethod) ? (
                   <div className="min-w-0">
-                    <Select value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })}>
-                      <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                      <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <CardSelect value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })} />
                   </div>
                 ) : <div />}
               </div>

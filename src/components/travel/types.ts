@@ -228,6 +228,83 @@ export type TravelTrip = {
   categories: Record<string, TravelCostItem[]>;
 };
 
+/**
+ * Carteira de viagens (usada pelo TravelBudget).
+ *
+ * Antes o orçamento morava num OBJETO ÚNICO na chave "travel-budget-v2":
+ * quem começasse a planejar a segunda viagem escrevia por cima da primeira,
+ * sem aviso nenhum. Agora é lista + qual está aberta. O `migrouDoObjetoUnico`
+ * é o carimbo de que a viagem antiga já foi puxada pra cá — sem ele a
+ * migração rodaria de novo a cada abertura e duplicaria a viagem (ou pior,
+ * ressuscitaria uma que a pessoa apagou).
+ */
+export type TravelTripsStore = {
+  trips: TravelTrip[];
+  ativoId: string;
+  migrouDoObjetoUnico: boolean;
+};
+
+/** Só vale migrar o que tem ALGUMA coisa dentro: a chave antiga era gravada
+ *  só de abrir a aba, então muita gente tem lá uma viagem em branco — e
+ *  viagem vazia na lista é lixo, não histórico. */
+export const temConteudo = (t: TravelTrip | null | undefined): t is TravelTrip => {
+  if (!t) return false;
+  if (t.destination?.trim() || t.startDate || t.endDate || t.photoUrl) return true;
+  if ((t.places || []).length > 0) return true;
+  return Object.values(t.categories || {}).some(items => (items || []).length > 0);
+};
+
+/**
+ * Redutor PURO da migração viagem-única → lista (vive aqui, fora do
+ * componente, pra poder ser testado sem montar a tela: errar isso = viagem de
+ * usuário real sumindo).
+ * Regras: migra uma vez só; não duplica viagem que já está na lista; nunca
+ * derruba o que já existe na chave nova — a antiga entra na frente.
+ */
+export const aplicarMigracao = (prev: TravelTripsStore, antiga: TravelTrip | null | undefined): TravelTripsStore => {
+  if (prev.migrouDoObjetoUnico) return prev;
+  if (!temConteudo(antiga)) return prev; // nada pra trazer (ou ainda não chegou)
+  const migrada: TravelTrip = { ...antiga, id: antiga.id || genId() };
+  if (prev.trips.some(t => t.id === migrada.id)) return { ...prev, migrouDoObjetoUnico: true };
+  return { trips: [migrada, ...prev.trips], ativoId: migrada.id, migrouDoObjetoUnico: true };
+};
+
+// ===== PASSEIOS / ROLÊS =====
+/**
+ * Entidade LEVE com data (pedido de usuária real): "às vezes é algo simples
+ * como uma ida no cinema, ou um jantar fora". Nenhuma das 10 abas atendia
+ * isso — destino da bucket list não tem data, e viagem/orçamento é peso
+ * demais pra um sábado no cinema. Aqui só o essencial: o quê, quando, tipo,
+ * e quanto custou (se a pessoa quiser anotar).
+ */
+export type OutingType = "cinema" | "jantar" | "parque" | "show" | "outro";
+
+export type Outing = {
+  id: string;
+  name: string;
+  /** Chave de dia LOCAL (localDayKey). Nunca toISOString — ver lib/utils. */
+  date: string;
+  type: OutingType;
+  /** 0 = não anotou. Custo é opcional de propósito: registrar o rolê tem que
+   *  ser mais fácil do que lembrar o preço do ingresso. */
+  cost: number;
+  notes: string;
+  photoUrl: string;
+};
+
+export const OUTING_TYPES: Record<OutingType, { label: string; emoji: string }> = {
+  cinema: { label: "Cinema", emoji: "🎬" },
+  jantar: { label: "Jantar", emoji: "🍽️" },
+  parque: { label: "Parque", emoji: "🌳" },
+  show: { label: "Show", emoji: "🎤" },
+  outro: { label: "Outro", emoji: "✨" },
+};
+
+/** Mês local ("YYYY-MM") de uma chave de dia "YYYY-MM-DD". Recorte de string
+ *  de propósito: a chave JÁ nasce local (localDayKey), então passar por Date
+ *  só reintroduziria o risco de fuso que o localDayKey existe pra evitar. */
+export const mesDaChave = (dayKey: string) => dayKey.slice(0, 7);
+
 // ===== WEATHER PREP (AI-created feature) =====
 export type WeatherPrep = {
   destination: string;

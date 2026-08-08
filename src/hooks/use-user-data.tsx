@@ -292,15 +292,36 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
         data.forEach((row: any) => {
           if (row.value === null || row.value === undefined) return;
           const size = JSON.stringify(row.value).length;
-          if (size >= HEAVY_KEY_BYTES) return;
+          /*
+           * CHAVE PESADA VAI PRA MEMÓRIA (08/08). Antes, chave ≥50KB era
+           * DESCARTADA aqui — e só voltava se alguém chamasse fetchKey, coisa
+           * que só o usePersistedState faz. Quem lê com useUserData direto
+           * (Pet, Conquistas) via a chave VAZIA, e a escrita seguinte
+           * sobrescrevia o histórico no servidor: é o "cadastro o pet e ele
+           * some", com perda definitiva.
+           *
+           * O valor JÁ VEIO nesta resposta — descartar não economizava rede,
+           * só criava o buraco. Quem tem limite apertado é o localStorage
+           * (~5MB), então a trava de tamanho fica só nele.
+           */
           map[row.key] = row.value;
-          safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
+          if (size < HEAVY_KEY_BYTES) {
+            safeSetItem(userKey(user.id, row.key), JSON.stringify(row.value));
+          }
         });
         setStore(prev => {
           const next = { ...prev };
-          Object.assign(next, map);
+          /*
+           * ESCRITA RECENTE GANHA DO SERVIDOR. A resposta é um retrato tirado
+           * ANTES desta hidratação terminar, e a gravação é debounced em
+           * 250ms: quem cadastrou algo nesse meio-tempo tinha o item apagado
+           * pelo laço abaixo (ou sobrescrito pelo valor velho) ~1-3s depois de
+           * salvar. Reaplicar pendingWrites por cima fecha a corrida.
+           */
+          Object.assign(next, map, pendingWrites.current);
           for (const k of Object.keys(prev)) {
             if (!(k in map)) {
+              if (k in pendingWrites.current) continue; // gravação a caminho
               const prevSize = JSON.stringify(prev[k] ?? "").length;
               if (prevSize < HEAVY_KEY_BYTES) {
                 delete next[k];

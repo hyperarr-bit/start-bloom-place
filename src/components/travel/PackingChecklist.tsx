@@ -4,7 +4,7 @@ import { PackingList, PackingItem, PackingTemplate, PACKING_TEMPLATES, genId } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, X, Package, Link2 } from "lucide-react";
+import { Plus, X, Package, Link2, Pencil, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
@@ -21,6 +21,10 @@ const CATEGORY_COLORS: Record<string, { header: string; body: string }> = {
 };
 
 const defaultCatColor = { header: "bg-teal-200 dark:bg-teal-800/50", body: "bg-teal-50 dark:bg-teal-950/20" };
+
+/** Categorias oferecidas na edição — as mesmas que os templates usam, senão o
+ *  item cai numa seção sem cor e some do meio da lista. */
+const CATEGORIAS_ITEM = Object.keys(CATEGORY_COLORS);
 
 export const PackingChecklist = () => {
   const [lists, setLists] = usePersistedState<PackingList[]>("travel-packing-v2", []);
@@ -56,11 +60,45 @@ export const PackingChecklist = () => {
 
   const removeItem = (listId: string, itemId: string) => {
     setLists(prev => prev.map(l => l.id === listId ? { ...l, items: l.items.filter(i => i.id !== itemId) } : l));
+    setEditandoItem(prev => (prev === itemId ? null : prev));
   };
 
   const deleteList = (id: string) => {
     setLists(prev => prev.filter(l => l.id !== id));
     if (activeList === id) setActiveList(null);
+  };
+
+  /** === EDIÇÃO (padrão da IncomeTable) ===
+   *  Item da mala escrito errado (ou salvo na categoria errada pelo "+
+   *  Adicionar item", que joga TUDO em "Extras") só se resolvia apagando e
+   *  redigitando. Mudar a categoria aqui é o que tira o item de "Extras" e
+   *  põe na seção certa — a lista é agrupada por ela. */
+  const [editandoItem, setEditandoItem] = useState<string | null>(null);
+  const [rascunhoItem, setRascunhoItem] = useState({ name: "", category: "Extras" });
+
+  const comecarEdicaoItem = (item: PackingItem) => {
+    setEditandoItem(item.id);
+    setRascunhoItem({ name: item.name, category: item.category || "Extras" });
+  };
+
+  const salvarEdicaoItem = (listId: string) => {
+    if (!rascunhoItem.name.trim()) return;
+    setLists(prev => prev.map(l => l.id !== listId ? l : {
+      ...l,
+      items: l.items.map(i => i.id !== editandoItem ? i : { ...i, name: rascunhoItem.name.trim(), category: rascunhoItem.category }),
+    }));
+    setEditandoItem(null);
+  };
+
+  /** Renomear a LISTA: o nome da viagem é o único rótulo dela; errar o nome
+   *  obrigava a recriar a lista inteira (e perder tudo que já foi marcado). */
+  const [editandoLista, setEditandoLista] = useState(false);
+  const [nomeLista, setNomeLista] = useState("");
+
+  const salvarNomeLista = (listId: string) => {
+    if (!nomeLista.trim()) return;
+    setLists(prev => prev.map(l => l.id === listId ? { ...l, tripName: nomeLista.trim() } : l));
+    setEditandoLista(false);
   };
 
   const current = lists.find(l => l.id === activeList);
@@ -150,11 +188,34 @@ export const PackingChecklist = () => {
         <div className="space-y-3">
           {/* List header - Notion-style */}
           <div className="rounded-xl border border-border overflow-hidden">
-            <div className="bg-teal-200 dark:bg-teal-800/50 px-3 py-2 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider">🧳 {current.tripName}</span>
-              <Button variant="ghost" size="sm" className="text-destructive text-[10px] h-6 px-2" onClick={() => deleteList(current.id)}>
-                Excluir
-              </Button>
+            <div className="bg-teal-200 dark:bg-teal-800/50 px-3 py-2 flex items-center gap-1">
+              {editandoLista ? (
+                <>
+                  <Input
+                    autoFocus
+                    value={nomeLista}
+                    onChange={e => setNomeLista(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") salvarNomeLista(current.id); if (e.key === "Escape") setEditandoLista(false); }}
+                    className="h-9 text-xs flex-1 bg-background/70"
+                  />
+                  <button onClick={() => salvarNomeLista(current.id)} aria-label="Salvar nome da lista" className="h-9 w-9 flex items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => setEditandoLista(false)} aria-label="Cancelar" className="h-9 w-9 flex items-center justify-center rounded-lg border border-border">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-bold uppercase tracking-wider flex-1 min-w-0 truncate">🧳 {current.tripName}</span>
+                  <button onClick={() => { setEditandoLista(true); setNomeLista(current.tripName); }} aria-label={`Renomear lista ${current.tripName}`} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/40 transition-colors">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <Button variant="ghost" size="sm" className="text-destructive text-[10px] h-9 px-2" onClick={() => deleteList(current.id)}>
+                    Excluir
+                  </Button>
+                </>
+              )}
             </div>
             <div className="bg-teal-50 dark:bg-teal-950/20 px-3 py-2">
               <div className="flex items-center justify-between mb-1">
@@ -182,13 +243,40 @@ export const PackingChecklist = () => {
                   <Badge variant="secondary" className="text-[9px] px-1.5 h-4 bg-background/50">{doneCount}/{items.length}</Badge>
                 </div>
                 <div className={`${colors.body} p-2 space-y-0.5`}>
-                  {items.map(item => (
-                    <div key={item.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-background/50 group transition-colors">
+                  {items.map(item => editandoItem === item.id ? (
+                    <div key={item.id} className="px-2 py-2 rounded-lg bg-background/60 space-y-2">
+                      <Input
+                        autoFocus
+                        value={rascunhoItem.name}
+                        onChange={e => setRascunhoItem(p => ({ ...p, name: e.target.value }))}
+                        onKeyDown={e => { if (e.key === "Enter") salvarEdicaoItem(current.id); if (e.key === "Escape") setEditandoItem(null); }}
+                        className="h-9 text-xs"
+                        placeholder="Nome do item"
+                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={rascunhoItem.category}
+                          onChange={e => setRascunhoItem(p => ({ ...p, category: e.target.value }))}
+                          aria-label="Categoria do item"
+                          className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-[11px]"
+                        >
+                          {CATEGORIAS_ITEM.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <button onClick={() => salvarEdicaoItem(current.id)} aria-label="Salvar item" className="h-9 px-3 rounded-md bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5" /> Salvar
+                        </button>
+                        <button onClick={() => setEditandoItem(null)} aria-label="Cancelar" className="h-9 w-9 rounded-md border border-border text-muted-foreground flex items-center justify-center">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={item.id} className="flex items-center gap-2 px-2 rounded-lg hover:bg-background/50 transition-colors">
                       <Checkbox
                         checked={item.packed}
                         onCheckedChange={() => toggleItem(current.id, item.id)}
                       />
-                      <span className={`text-xs flex-1 ${item.packed ? "line-through text-muted-foreground" : ""}`}>
+                      <span className={`text-xs flex-1 py-1.5 ${item.packed ? "line-through text-muted-foreground" : ""}`}>
                         {item.name}
                       </span>
                       {item.linkedToSkincare && (
@@ -196,8 +284,12 @@ export const PackingChecklist = () => {
                           <Link2 className="w-3 h-3" /> Skincare
                         </span>
                       )}
-                      <button onClick={() => removeItem(current.id, item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <X className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                      {/* Ações sempre visíveis: hover não existe no celular. */}
+                      <button onClick={() => comecarEdicaoItem(item)} aria-label={`Editar ${item.name}`} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/60 transition-colors">
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                      </button>
+                      <button onClick={() => removeItem(current.id, item.id)} aria-label={`Apagar ${item.name}`} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/60 transition-colors">
+                        <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
                       </button>
                     </div>
                   ))}

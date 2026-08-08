@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ItineraryDay, TimelineItem, genId, formatCurrency } from "./types";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, MapPin, ExternalLink, Pin, Plane, Hotel, Utensils, Target, Car, ShoppingBag, Check } from "lucide-react";
+import { Plus, Trash2, MapPin, ExternalLink, Pin, Plane, Hotel, Utensils, Target, Car, ShoppingBag, Check, Pencil, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const TYPE_CONFIG = {
@@ -16,6 +16,37 @@ const TYPE_CONFIG = {
   transporte: { icon: Car, label: "Transporte", color: "bg-yellow-200 dark:bg-yellow-800/50", bodyColor: "bg-yellow-50 dark:bg-yellow-950/20" },
   compras: { icon: ShoppingBag, label: "Compras", color: "bg-pink-200 dark:bg-pink-800/50", bodyColor: "bg-pink-50 dark:bg-pink-950/20" },
 };
+
+/** Campos de uma atividade — os MESMOS no adicionar e no editar (senão a
+ *  edição vira um segundo formulário, com outro jeito de errar). Fica no topo
+ *  do módulo pra não remontar a cada tecla e roubar o foco do input. */
+const CamposItem = ({
+  valor,
+  aoMudar,
+}: {
+  valor: Partial<TimelineItem>;
+  aoMudar: (patch: Partial<TimelineItem>) => void;
+}) => (
+  <>
+    <div className="grid grid-cols-2 gap-2">
+      <Input placeholder="Título" value={valor.title || ""} onChange={e => aoMudar({ title: e.target.value })} className="h-9 rounded-lg text-xs" />
+      {/* A HORA é editável: item de roteiro que atrasou meia hora não pode
+          exigir apagar e redigitar tudo. */}
+      <Input type="time" value={valor.time || ""} onChange={e => aoMudar({ time: e.target.value })} className="h-9 rounded-lg text-xs" />
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <Input placeholder="Local" value={valor.location || ""} onChange={e => aoMudar({ location: e.target.value })} className="h-9 rounded-lg text-xs" />
+      <Select value={valor.type || "atividade"} onValueChange={v => aoMudar({ type: v as TimelineItem["type"] })}>
+        <SelectTrigger className="h-9 rounded-lg text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>{Object.entries(TYPE_CONFIG).map(([k, c]) => (<SelectItem key={k} value={k}>{c.label}</SelectItem>))}</SelectContent>
+      </Select>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <Input placeholder="Link Maps (opcional)" value={valor.mapsLink || ""} onChange={e => aoMudar({ mapsLink: e.target.value })} className="h-9 rounded-lg text-xs" />
+      <Input type="number" inputMode="decimal" placeholder="Custo R$" value={valor.estimatedCost || ""} onChange={e => aoMudar({ estimatedCost: Number(e.target.value) })} className="h-9 rounded-lg text-xs" />
+    </div>
+  </>
+);
 
 export const DailyTimeline = () => {
   const [days, setDays] = usePersistedState<ItineraryDay[]>("travel-timeline-v2", []);
@@ -54,11 +85,59 @@ export const DailyTimeline = () => {
 
   const removeItem = (dayId: string, itemId: string) => {
     setDays(prev => prev.map(d => d.id === dayId ? { ...d, items: d.items.filter(i => i.id !== itemId) } : d));
+    setEditandoItem(prev => (prev === itemId ? null : prev));
   };
 
   const removeDay = (dayId: string) => {
     setDays(prev => prev.filter(d => d.id !== dayId));
     if (activeDay === dayId) setActiveDay(null);
+  };
+
+  /** === EDIÇÃO (padrão da IncomeTable: rascunho + salvar/cancelar) ===
+   *  O roteiro é o campo que MAIS muda: o voo atrasa, o restaurante troca, o
+   *  custo estimado vira outro. Sem editar, cada ajuste desses obrigava a
+   *  apagar o item e digitar as 6 informações de novo. */
+  const [editandoItem, setEditandoItem] = useState<string | null>(null);
+  const [rascunhoItem, setRascunhoItem] = useState<Partial<TimelineItem>>({});
+
+  const comecarEdicaoItem = (item: TimelineItem) => {
+    setEditandoItem(item.id);
+    setRascunhoItem({ ...item });
+  };
+
+  const salvarEdicaoItem = (dayId: string) => {
+    if (!rascunhoItem.title?.trim()) return;
+    setDays(prev => prev.map(d => d.id !== dayId ? d : {
+      ...d,
+      items: d.items.map(i => i.id !== editandoItem ? i : {
+        ...i,
+        title: rascunhoItem.title?.trim() || i.title,
+        time: rascunhoItem.time || "",
+        location: rascunhoItem.location || "",
+        mapsLink: rascunhoItem.mapsLink || "",
+        estimatedCost: rascunhoItem.estimatedCost || 0,
+        type: rascunhoItem.type || i.type,
+      }),
+    }));
+    setEditandoItem(null);
+  };
+
+  /** Editar o DIA (número e data) — errar a data do dia 3 desalinhava o
+   *  roteiro inteiro e a única saída era excluir o dia com tudo dentro. */
+  const [editandoDia, setEditandoDia] = useState(false);
+  const [rascunhoDia, setRascunhoDia] = useState({ dayNumber: 1, date: "", tripId: "" });
+
+  const comecarEdicaoDia = (d: ItineraryDay) => {
+    setEditandoDia(true);
+    setRascunhoDia({ dayNumber: d.dayNumber, date: d.date, tripId: d.tripId });
+  };
+
+  const salvarEdicaoDia = (dayId: string) => {
+    if (!rascunhoDia.date) return;
+    setDays(prev => prev.map(d => d.id !== dayId ? d : {
+      ...d, dayNumber: rascunhoDia.dayNumber, date: rascunhoDia.date, tripId: rascunhoDia.tripId,
+    }));
+    setEditandoDia(false);
   };
 
   const currentDay = days.find(d => d.id === activeDay);
@@ -102,7 +181,7 @@ export const DailyTimeline = () => {
                       : "border-border bg-card hover:border-foreground/30"
                   }`}>
                   <p className="text-xs font-bold">Dia {d.dayNumber}</p>
-                  <p className="text-[9px] opacity-70">{new Date(d.date + "T12:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</p>
+                  <p className="text-[9px] opacity-70">{parseLocalDay(d.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}</p>
                 </button>
               ))}
             </div>
@@ -152,12 +231,36 @@ export const DailyTimeline = () => {
       {currentDay && (
         <div className="space-y-3">
           <div className="rounded-xl border border-border overflow-hidden">
-            <div className="bg-sky-200 dark:bg-sky-800/50 px-3 py-2 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider">
-                🗓️ DIA {currentDay.dayNumber} — {new Date(currentDay.date + "T12:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
+            <div className="bg-sky-200 dark:bg-sky-800/50 px-3 py-2 flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider flex-1 min-w-0 truncate">
+                🗓️ DIA {currentDay.dayNumber} — {parseLocalDay(currentDay.date).toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })}
               </span>
-              <Button variant="ghost" size="sm" className="text-destructive text-[10px] h-6 px-2" onClick={() => removeDay(currentDay.id)}>Excluir</Button>
+              <button
+                onClick={() => editandoDia ? setEditandoDia(false) : comecarEdicaoDia(currentDay)}
+                aria-label={`Editar dia ${currentDay.dayNumber}`}
+                className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/40 transition-colors"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <Button variant="ghost" size="sm" className="text-destructive text-[10px] h-9 px-2" onClick={() => removeDay(currentDay.id)}>Excluir</Button>
             </div>
+            {editandoDia && (
+              <div className="bg-sky-50 dark:bg-sky-950/20 p-3 space-y-2 border-b border-border">
+                <div className="flex gap-2">
+                  <Input placeholder="Viagem" value={rascunhoDia.tripId} onChange={e => setRascunhoDia(p => ({ ...p, tripId: e.target.value }))} className="h-9 text-xs flex-1" />
+                  <Input type="number" placeholder="Dia nº" value={rascunhoDia.dayNumber} onChange={e => setRascunhoDia(p => ({ ...p, dayNumber: Number(e.target.value) }))} className="h-9 text-xs w-20" />
+                </div>
+                <CampoData rotulo="Data" value={rascunhoDia.date} onChange={e => setRascunhoDia(p => ({ ...p, date: e.target.value }))} className="h-9 text-xs" />
+                <div className="flex items-center gap-2">
+                  <button onClick={() => salvarEdicaoDia(currentDay.id)} className="h-9 flex-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" /> Salvar dia
+                  </button>
+                  <button onClick={() => setEditandoDia(false)} className="h-9 px-4 rounded-lg border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <X className="w-3.5 h-3.5" /> Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
             {dayTotal > 0 && (
               <div className="bg-sky-50 dark:bg-sky-950/20 px-3 py-1.5">
                 <p className="text-[10px] text-muted-foreground">💰 Custo estimado: <span className="font-bold text-foreground">{formatCurrency(dayTotal)}</span></p>
@@ -169,6 +272,22 @@ export const DailyTimeline = () => {
             {sortedItems.map(item => {
               const config = TYPE_CONFIG[item.type];
               const Icon = config.icon;
+              if (editandoItem === item.id) {
+                return (
+                  <div key={item.id} className="rounded-xl border border-border bg-card p-3 space-y-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">✏️ Editando atividade</p>
+                    <CamposItem valor={rascunhoItem} aoMudar={patch => setRascunhoItem(p => ({ ...p, ...patch }))} />
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => salvarEdicaoItem(currentDay.id)} className="h-9 flex-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+                        <Check className="w-3.5 h-3.5" /> Salvar
+                      </button>
+                      <button onClick={() => setEditandoItem(null)} className="h-9 px-4 rounded-lg border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                        <X className="w-3.5 h-3.5" /> Cancelar
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={item.id} className={`rounded-xl border border-border overflow-hidden transition-all group ${item.done ? "opacity-60" : "hover:shadow-md"}`}>
                   <div className={`${config.color} px-3 py-1 flex items-center justify-between`}>
@@ -190,10 +309,13 @@ export const DailyTimeline = () => {
                         )}
                         {item.estimatedCost > 0 && <p className="text-[9px] text-muted-foreground mt-0.5">💰 {formatCurrency(item.estimatedCost)}</p>}
                       </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={() => togglePin(currentDay.id, item.id)}><Pin className={`w-3 h-3 ${item.pinned ? "text-foreground fill-foreground" : "text-muted-foreground"}`} /></button>
-                        <button onClick={() => toggleDone(currentDay.id, item.id)}><Check className={`w-3.5 h-3.5 ${item.done ? "text-emerald-500" : "text-muted-foreground"}`} /></button>
-                        <button onClick={() => removeItem(currentDay.id, item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" /></button>
+                      {/* Alvos de 36px e SEM opacity-0/group-hover: no celular
+                          o hover nunca acontece — a lixeira ficava invisível. */}
+                      <div className="flex items-center shrink-0">
+                        <button onClick={() => togglePin(currentDay.id, item.id)} aria-label={`Fixar ${item.title}`} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors"><Pin className={`w-3.5 h-3.5 ${item.pinned ? "text-foreground fill-foreground" : "text-muted-foreground"}`} /></button>
+                        <button onClick={() => toggleDone(currentDay.id, item.id)} aria-label={`Concluir ${item.title}`} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors"><Check className={`w-3.5 h-3.5 ${item.done ? "text-emerald-500" : "text-muted-foreground"}`} /></button>
+                        <button onClick={() => comecarEdicaoItem(item)} aria-label={`Editar ${item.title}`} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors"><Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" /></button>
+                        <button onClick={() => removeItem(currentDay.id, item.id)} aria-label={`Apagar ${item.title}`} className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors"><Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" /></button>
                       </div>
                     </div>
                   </div>
@@ -208,22 +330,8 @@ export const DailyTimeline = () => {
 
           {showAddItem && (
             <div className="rounded-xl border border-border bg-card p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Título" value={itemForm.title || ""} onChange={e => setItemForm(p => ({ ...p, title: e.target.value }))} className="h-8 rounded-lg text-xs" />
-                <Input type="time" value={itemForm.time || ""} onChange={e => setItemForm(p => ({ ...p, time: e.target.value }))} className="h-8 rounded-lg text-xs" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Local" value={itemForm.location || ""} onChange={e => setItemForm(p => ({ ...p, location: e.target.value }))} className="h-8 rounded-lg text-xs" />
-                <Select value={itemForm.type || "atividade"} onValueChange={v => setItemForm(p => ({ ...p, type: v as TimelineItem["type"] }))}>
-                  <SelectTrigger className="h-8 rounded-lg text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{Object.entries(TYPE_CONFIG).map(([k, c]) => (<SelectItem key={k} value={k}>{c.label}</SelectItem>))}</SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="Link Maps (opcional)" value={itemForm.mapsLink || ""} onChange={e => setItemForm(p => ({ ...p, mapsLink: e.target.value }))} className="h-8 rounded-lg text-xs" />
-                <Input type="number" placeholder="Custo R$" value={itemForm.estimatedCost || ""} onChange={e => setItemForm(p => ({ ...p, estimatedCost: Number(e.target.value) }))} className="h-8 rounded-lg text-xs" />
-              </div>
-              <Button onClick={() => addItem(currentDay.id)} className="w-full rounded-lg h-7 text-xs">Adicionar</Button>
+              <CamposItem valor={itemForm} aoMudar={patch => setItemForm(p => ({ ...p, ...patch }))} />
+              <Button onClick={() => addItem(currentDay.id)} className="w-full rounded-lg h-9 text-xs">Adicionar</Button>
             </div>
           )}
         </div>

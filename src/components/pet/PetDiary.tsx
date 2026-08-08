@@ -36,7 +36,10 @@ export const PetDiary = () => {
   const addEntry = () => {
     if (!text.trim()) return;
     const updated = [
-      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl.trim() || undefined },
+      // photoUrl começa undefined e o "limpar foto" volta pra undefined:
+      // `photoUrl.trim()` estourava TypeError e o momento NUNCA era salvo,
+      // sem aviso nenhum — sintoma idêntico a "cadastrei e sumiu" (08/08).
+      { id: Date.now().toString(), petName: petName.trim(), date: new Date().toISOString(), text: text.trim(), mood, photoUrl: photoUrl?.trim() || undefined },
       ...entries,
     ];
     set("pet-diary", updated);

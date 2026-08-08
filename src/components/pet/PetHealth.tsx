@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, Syringe, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Syringe, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
@@ -35,6 +35,31 @@ export const PetHealth = () => {
   };
 
   const removeRecord = (id: string) => set("pet-health", records.filter(r => r.id !== id));
+
+  /* Edição na própria linha (padrão do IncomeTable). Errar a data da próxima
+     vacina obrigava a apagar e refazer o registro — e o alerta de vencimento
+     sumia junto. O petId NÃO entra no rascunho de propósito: o vínculo com o
+     pet é o que amarra o histórico, quem errou de pet apaga e lança de novo. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<{ type: "vaccine" | "deworming" | "visit"; name: string; date: string; nextDate: string }>({ type: "vaccine", name: "", date: "", nextDate: "" });
+
+  const comecarEdicao = (r: HealthRecord) => {
+    setEditandoId(r.id);
+    setRascunho({ type: r.type, name: r.name, date: r.date, nextDate: r.nextDate || "" });
+  };
+
+  const salvarEdicao = () => {
+    const nome = rascunho.name.trim();
+    if (!nome) return;
+    set("pet-health", records.map(r => r.id !== editandoId ? r : {
+      ...r, // mantém id e petId
+      type: rascunho.type,
+      name: nome,
+      date: rascunho.date || r.date,
+      nextDate: rascunho.nextDate,
+    }));
+    setEditandoId(null);
+  };
 
   const alerts = records.filter(r => {
     if (!r.nextDate) return false;
@@ -104,7 +129,10 @@ export const PetHealth = () => {
           <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
               <select value={petId} onChange={e => setPetId(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
-                <option value="">Pet</option>
+                {/* disabled hidden: sem isso o placeholder vira uma OPÇÃO
+                    clicável no select nativo do Android e a pessoa vê um pet
+                    fantasma chamado "Pet" no meio dos dela (relato 08/08). */}
+                <option value="" disabled hidden>Selecione o pet</option>
                 {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <select value={type} onChange={e => setType(e.target.value as any)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">

@@ -36,7 +36,10 @@ export const PetExpenses = () => {
 
   const removeExpense = (id: string) => set("pet-expenses", expenses.filter(e => e.id !== id));
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  // Mês pelo fuso LOCAL: com toISOString, das 21h do dia 30 em diante o mês
+  // virava antes da hora e o gasto lançado (que usa localDayKey) sumia do
+  // extrato. É a regra fixada depois do bug de datas de julho.
+  const currentMonth = localDayKey().slice(0, 7);
   const monthExpenses = expenses.filter(e => e.date.startsWith(currentMonth));
   const totalMonth = monthExpenses.reduce((s, e) => s + e.value, 0);
 
@@ -105,7 +108,8 @@ export const PetExpenses = () => {
           <div className="border border-dashed border-border/60 bg-background/50 rounded-lg p-2 space-y-1.5">
             <div className="grid grid-cols-2 gap-1.5">
               <select value={petId} onChange={e => setPetId(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">
-                <option value="">Pet</option>
+                {/* idem PetHealth: placeholder virava "pet fantasma" na lista */}
+                <option value="" disabled hidden>Selecione o pet</option>
                 {pets.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <select value={category} onChange={e => setCategory(e.target.value)} className="h-7 text-[11px] bg-background border border-input rounded-md px-2">

@@ -171,7 +171,23 @@ async function mandarCompraProMeta(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  let d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  if (!Object.keys(d).length) {
+    // Quem está em build anterior à v48 não emite app_device_info. O
+    // webview_info (que existe desde a v37) carrega o UA — dá SO e modelo,
+    // que é o que mais pesa no pareamento.
+    const { data: wv } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "webview_info")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ua = String(((wv as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).ua ?? "");
+    const m = /Android (\d+(?:\.\d+)?); ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua);
+    d = m ? { os: m[1], modelo: m[2] } : {};
+  }
   const s = (k: string) => String(d[k] ?? "");
   const n = (k: string) => Number(d[k] ?? 0) || 0;
   const extinfo = [

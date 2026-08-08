@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2 } from "lucide-react";
+import { Trash2, Pencil, Check, X } from "lucide-react";
 
 const MOODS = [
   { emoji: "🤩", label: "Incrível" },
@@ -32,7 +32,34 @@ export const TravelDiary = () => {
     setInlineForm({ mood: "🤩", date: localDayKey() });
   };
 
-  const remove = (id: string) => setEntries(prev => prev.filter(e => e.id !== id));
+  const remove = (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    setEditandoId(prev => (prev === id ? null : prev));
+  };
+
+  /** Edição inline (padrão da IncomeTable). Diário é texto escrito à mão: um
+   *  erro de digitação obrigava a apagar a entrada inteira e escrever tudo de
+   *  novo — o jeito mais rápido de a pessoa simplesmente parar de escrever. */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<Partial<DiaryEntry>>({});
+
+  const comecarEdicao = (e: DiaryEntry) => {
+    setEditandoId(e.id);
+    setRascunho({ ...e });
+  };
+
+  const salvarEdicao = () => {
+    if (!rascunho.bestThing?.trim()) return;
+    setEntries(prev => prev.map(e => e.id !== editandoId ? e : {
+      ...e,
+      tripName: rascunho.tripName || "",
+      date: rascunho.date || e.date,
+      bestThing: rascunho.bestThing?.trim() || e.bestThing,
+      wouldNotDoAgain: rascunho.wouldNotDoAgain || "",
+      mood: rascunho.mood || e.mood,
+    }));
+    setEditandoId(null);
+  };
 
   const trips = [...new Set(entries.map(e => e.tripName).filter(Boolean))];
   const [tripFilter, setTripFilter] = useState("all");
@@ -121,10 +148,44 @@ export const TravelDiary = () => {
             </div>
           )}
           <div className="divide-y divide-border">
-            {filtered.map(entry => (
-              <div key={entry.id} className="p-3 hover:bg-background/30 transition-colors group">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
+            {filtered.map(entry => editandoId === entry.id ? (
+              <div key={entry.id} className="p-3 bg-background/40 space-y-2">
+                <div className="flex gap-1.5 flex-wrap">
+                  {MOODS.map(m => (
+                    <button key={m.emoji} onClick={() => setRascunho(p => ({ ...p, mood: m.emoji }))}
+                      aria-label={m.label}
+                      className={`h-9 w-9 rounded-lg text-sm border transition-all flex items-center justify-center ${
+                        rascunho.mood === m.emoji ? "border-foreground bg-background/60" : "border-transparent hover:border-border"
+                      }`}>
+                      {m.emoji}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="Viagem" value={rascunho.tripName || ""} onChange={e => setRascunho(p => ({ ...p, tripName: e.target.value }))} className="h-9 text-xs" />
+                  <CampoData rotulo="Data" value={rascunho.date || ""} onChange={e => setRascunho(p => ({ ...p, date: e.target.value }))} className="h-9 text-xs" />
+                </div>
+                <Input placeholder="✨ Melhor momento do dia..." value={rascunho.bestThing || ""}
+                  onChange={e => setRascunho(p => ({ ...p, bestThing: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && salvarEdicao()}
+                  className="h-9 text-xs" />
+                <Input placeholder="🚫 Não faria de novo (opcional)" value={rascunho.wouldNotDoAgain || ""}
+                  onChange={e => setRascunho(p => ({ ...p, wouldNotDoAgain: e.target.value }))}
+                  onKeyDown={e => e.key === "Enter" && salvarEdicao()}
+                  className="h-9 text-xs" />
+                <div className="flex items-center gap-2">
+                  <button onClick={salvarEdicao} className="h-9 flex-1 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+                    <Check className="w-3.5 h-3.5" /> Salvar
+                  </button>
+                  <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-lg border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                    <X className="w-3.5 h-3.5" /> Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div key={entry.id} className="p-3 hover:bg-background/30 transition-colors">
+                <div className="flex items-start justify-between gap-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="text-sm">{entry.mood}</span>
                       <span className="text-[10px] font-medium">{parseLocalDay(entry.date).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}</span>
@@ -143,9 +204,15 @@ export const TravelDiary = () => {
                       </div>
                     )}
                   </div>
-                  <button onClick={() => remove(entry.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
-                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
-                  </button>
+                  {/* Ações sempre visíveis (hover não existe no toque). */}
+                  <div className="flex items-center shrink-0">
+                    <button onClick={() => comecarEdicao(entry)} aria-label="Editar entrada do diário" className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors">
+                      <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                    <button onClick={() => remove(entry.id)} aria-label="Apagar entrada do diário" className="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors">
+                      <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

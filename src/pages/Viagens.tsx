@@ -16,10 +16,15 @@ import { CurrencyConverter } from "@/components/travel/CurrencyConverter";
 import { TravelDiary } from "@/components/travel/TravelDiary";
 import { TravelBudget } from "@/components/travel/TravelBudget";
 import { BucketList } from "@/components/travel/BucketList";
+import { Outings } from "@/components/travel/Outings";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 
+// "Passeios" fica em SEGUNDO, colado em Destinos: é a aba do uso mais comum
+// (cinema no sábado, jantar fora) e a barra rola na horizontal — quem entra
+// no módulo tem que ver a opção leve sem precisar arrastar atrás dela.
 const tabs = [
   { id: "destinos", label: "Destinos", icon: "🧭" },
+  { id: "passeios", label: "Passeios", icon: "🎟️" },
   { id: "cronograma", label: "Roteiro", icon: "🗺️" },
   { id: "mala", label: "Mala", icon: "🎒" },
   { id: "budget", label: "Budget", icon: "💰" },
@@ -84,6 +89,7 @@ const Viagens = () => {
         <ModuleTip
           moduleId="viagens"
           tips={[
+            "Passeios: registre o rolê simples (cinema, jantar, parque) com data e custo",
             "Adicione destinos dos seus sonhos na bucket list",
             "Monte roteiros dia a dia com horários e custos",
             "Divida contas com amigos no Rachar Conta",
@@ -93,6 +99,7 @@ const Viagens = () => {
         />
 
         {activeTab === "destinos" && <BucketList />}
+        {activeTab === "passeios" && <Outings />}
         {activeTab === "cronograma" && <DailyTimeline />}
         {activeTab === "mala" && <PackingChecklist />}
         {activeTab === "budget" && <TravelBudget />}

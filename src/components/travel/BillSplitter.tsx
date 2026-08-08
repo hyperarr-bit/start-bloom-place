@@ -6,8 +6,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Users, ArrowRight, Receipt } from "lucide-react";
+import { Plus, Trash2, Users, ArrowRight, Receipt, Pencil, Check, X } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+
+/** Campos de uma despesa — os MESMOS no adicionar e no editar. No topo do
+ *  módulo pra não remontar a cada tecla e roubar o foco do input. */
+const CamposDespesa = ({
+  valor,
+  pessoas,
+  aoMudar,
+  aoAlternarDivisao,
+}: {
+  valor: Partial<BillEntry>;
+  pessoas: string[];
+  aoMudar: (patch: Partial<BillEntry>) => void;
+  aoAlternarDivisao: (pessoa: string) => void;
+}) => (
+  <>
+    <Input placeholder="Descrição (ex: Jantar)" value={valor.description || ""} onChange={e => aoMudar({ description: e.target.value })} className="h-9 rounded-xl text-xs" />
+    <div className="grid grid-cols-2 gap-2">
+      <Input type="number" inputMode="decimal" placeholder="Valor R$" value={valor.amount || ""} onChange={e => aoMudar({ amount: Number(e.target.value) })} className="h-9 rounded-xl text-xs" />
+      <CampoData rotulo="Data" value={valor.date || ""} onChange={e => aoMudar({ date: e.target.value })} className="h-9 rounded-xl text-xs" />
+    </div>
+    <div>
+      <p className="text-[10px] text-muted-foreground mb-1.5">Quem pagou?</p>
+      <div className="flex flex-wrap gap-1.5">
+        {pessoas.map(p => (
+          <button key={p} onClick={() => aoMudar({ paidBy: p })}
+            aria-pressed={valor.paidBy === p}
+            className={`h-9 rounded-lg px-3 text-xs border transition-all ${valor.paidBy === p ? "border-foreground bg-foreground text-background font-medium" : "border-border hover:border-foreground/30"}`}>
+            {p}
+          </button>
+        ))}
+      </div>
+    </div>
+    <div>
+      <p className="text-[10px] text-muted-foreground mb-1.5">Dividir entre:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {pessoas.map(p => (
+          <label key={p} className="h-9 flex items-center gap-1.5 rounded-lg px-3 border border-border text-xs cursor-pointer hover:border-foreground/30">
+            <Checkbox checked={valor.splitBetween?.includes(p)} onCheckedChange={() => aoAlternarDivisao(p)} className="h-3.5 w-3.5" />
+            {p}
+          </label>
+        ))}
+      </div>
+    </div>
+  </>
+);
+
+/** Marca/desmarca uma pessoa na divisão — mesma regra pro form de adicionar e
+ *  pro rascunho de edição. */
+const alternarNaDivisao = (prev: Partial<BillEntry>, pessoa: string): Partial<BillEntry> => ({
+  ...prev,
+  splitBetween: prev.splitBetween?.includes(pessoa)
+    ? prev.splitBetween.filter(p => p !== pessoa)
+    : [...(prev.splitBetween || []), pessoa],
+});
 
 export const BillSplitter = () => {
   const [data, setData] = usePersistedState<BillSplitData>("travel-bill-split", { tripName: "", people: [], entries: [] });
@@ -39,15 +93,69 @@ export const BillSplitter = () => {
     setShowExpenseForm(false);
   };
 
-  const removeEntry = (id: string) => setData(prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== id) }));
+  const removeEntry = (id: string) => {
+    setData(prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== id) }));
+    setEditandoId(prev => (prev === id ? null : prev));
+  };
 
-  const toggleSplit = (person: string) => {
+  const toggleSplit = (person: string) => setForm(prev => alternarNaDivisao(prev, person));
+
+  /** === EDIÇÃO DE DESPESA (padrão da IncomeTable) ===
+   *  Aqui o erro custa dinheiro: valor digitado errado ou "quem pagou" trocado
+   *  desandava o ACERTO FINAL inteiro, e a única saída era apagar a despesa e
+   *  remontá-la (descrição, valor, pagante e a lista de quem divide). */
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [rascunho, setRascunho] = useState<Partial<BillEntry>>({ splitBetween: [] });
+
+  const comecarEdicao = (e: BillEntry) => {
+    setEditandoId(e.id);
+    setRascunho({ ...e, splitBetween: [...e.splitBetween] });
+  };
+
+  const salvarEdicao = () => {
+    if (!rascunho.description?.trim() || !rascunho.amount || !rascunho.paidBy || !rascunho.splitBetween?.length) return;
+    setData(prev => ({
+      ...prev,
+      entries: prev.entries.map(e => e.id !== editandoId ? e : {
+        ...e,
+        description: rascunho.description!.trim(),
+        amount: rascunho.amount!,
+        paidBy: rascunho.paidBy!,
+        splitBetween: rascunho.splitBetween!,
+        date: rascunho.date || e.date,
+      }),
+    }));
+    setEditandoId(null);
+  };
+
+  /** === RENOMEAR PARTICIPANTE ===
+   *  O nome é a CHAVE das despesas (paidBy e splitBetween guardam a string).
+   *  Por isso renomear tem que propagar: trocar só na lista de pessoas
+   *  deixaria as despesas apontando pra um fantasma e o acerto final sairia
+   *  errado. Antes disso, um nome digitado torto só se resolvia removendo a
+   *  pessoa — o que APAGA todas as despesas que ela pagou. */
+  const [editandoPessoa, setEditandoPessoa] = useState<string | null>(null);
+  const [nomePessoa, setNomePessoa] = useState("");
+
+  const salvarPessoa = () => {
+    const novo = nomePessoa.trim();
+    if (!novo || !editandoPessoa) return;
+    if (novo !== editandoPessoa && data.people.includes(novo)) return; // nome repetido embaralharia os saldos
+    setData(prev => ({
+      ...prev,
+      people: prev.people.map(p => (p === editandoPessoa ? novo : p)),
+      entries: prev.entries.map(e => ({
+        ...e,
+        paidBy: e.paidBy === editandoPessoa ? novo : e.paidBy,
+        splitBetween: e.splitBetween.map(p => (p === editandoPessoa ? novo : p)),
+      })),
+    }));
     setForm(prev => ({
       ...prev,
-      splitBetween: prev.splitBetween?.includes(person)
-        ? prev.splitBetween.filter(p => p !== person)
-        : [...(prev.splitBetween || []), person],
+      paidBy: prev.paidBy === editandoPessoa ? novo : prev.paidBy,
+      splitBetween: prev.splitBetween?.map(p => (p === editandoPessoa ? novo : p)),
     }));
+    setEditandoPessoa(null);
   };
 
   const settlements = calculateSettlement(data);
@@ -70,11 +178,30 @@ export const BillSplitter = () => {
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 p-3 space-y-2">
           <div className="flex flex-wrap gap-1.5">
-            {data.people.map(p => (
-              <Badge key={p} variant="secondary" className="text-xs px-2 py-1 gap-1 rounded-lg">
+            {data.people.map(p => editandoPessoa === p ? (
+              <div key={p} className="flex items-center gap-1">
+                <Input
+                  autoFocus
+                  value={nomePessoa}
+                  onChange={e => setNomePessoa(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") salvarPessoa(); if (e.key === "Escape") setEditandoPessoa(null); }}
+                  className="h-9 w-32 rounded-xl text-xs"
+                />
+                <button onClick={salvarPessoa} aria-label={`Salvar nome de ${p}`} className="h-9 w-9 flex items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => setEditandoPessoa(null)} aria-label="Cancelar" className="h-9 w-9 flex items-center justify-center rounded-lg border border-border text-muted-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <Badge key={p} variant="secondary" className="text-xs pl-3 pr-1 py-0 h-9 gap-0.5 rounded-lg">
                 {p}
-                <button onClick={() => removePerson(p)}>
-                  <Trash2 className="w-2.5 h-2.5 text-muted-foreground hover:text-destructive" />
+                <button onClick={() => { setEditandoPessoa(p); setNomePessoa(p); }} aria-label={`Renomear ${p}`} className="h-9 w-8 flex items-center justify-center">
+                  <Pencil className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                </button>
+                <button onClick={() => removePerson(p)} aria-label={`Remover ${p} (apaga as despesas que ela pagou)`} className="h-9 w-8 flex items-center justify-center">
+                  <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
                 </button>
               </Badge>
             ))}
@@ -91,38 +218,15 @@ export const BillSplitter = () => {
         <>
           {showExpenseForm && (
             <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-              <Input placeholder="Descrição (ex: Jantar)" value={form.description || ""} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} className="h-9 rounded-xl text-xs" />
-              <div className="grid grid-cols-2 gap-2">
-                <Input type="number" placeholder="Valor R$" value={form.amount || ""} onChange={e => setForm(p => ({ ...p, amount: Number(e.target.value) }))} className="h-9 rounded-xl text-xs" />
-                <div className="relative">
-                  <CampoData rotulo="Data" value={form.date || ""} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} className="h-9 rounded-xl text-xs" />
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-1.5">Quem pagou?</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.people.map(p => (
-                    <button key={p} onClick={() => setForm(prev => ({ ...prev, paidBy: p }))}
-                      className={`rounded-lg px-3 py-1 text-xs border transition-all ${form.paidBy === p ? "border-foreground bg-foreground text-background font-medium" : "border-border hover:border-foreground/30"}`}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-1.5">Dividir entre:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {data.people.map(p => (
-                    <label key={p} className="flex items-center gap-1.5 rounded-lg px-2 py-1 border border-border text-xs cursor-pointer hover:border-foreground/30">
-                      <Checkbox checked={form.splitBetween?.includes(p)} onCheckedChange={() => toggleSplit(p)} className="h-3 w-3" />
-                      {p}
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <CamposDespesa
+                valor={form}
+                pessoas={data.people}
+                aoMudar={patch => setForm(p => ({ ...p, ...patch }))}
+                aoAlternarDivisao={toggleSplit}
+              />
               <div className="flex gap-2">
-                <Button onClick={addEntry} className="flex-1 rounded-xl h-8 text-xs">Adicionar</Button>
-                <Button variant="ghost" onClick={() => setShowExpenseForm(false)} className="rounded-xl h-8 text-xs">Cancelar</Button>
+                <Button onClick={addEntry} className="flex-1 rounded-xl h-9 text-xs">Adicionar</Button>
+                <Button variant="ghost" onClick={() => setShowExpenseForm(false)} className="rounded-xl h-9 text-xs">Cancelar</Button>
               </div>
             </div>
           )}
@@ -142,20 +246,39 @@ export const BillSplitter = () => {
                   <p className="text-xs text-muted-foreground">Nenhuma despesa ainda</p>
                 </div>
               )}
-              {data.entries.map(e => (
-                <div key={e.id} className="flex items-center justify-between px-3 py-2 group">
-                  <div>
-                    <p className="text-xs font-medium">{e.description}</p>
+              {data.entries.map(e => editandoId === e.id ? (
+                <div key={e.id} className="p-3 bg-background/40 space-y-3">
+                  <CamposDespesa
+                    valor={rascunho}
+                    pessoas={data.people}
+                    aoMudar={patch => setRascunho(p => ({ ...p, ...patch }))}
+                    aoAlternarDivisao={pessoa => setRascunho(p => alternarNaDivisao(p, pessoa))}
+                  />
+                  <div className="flex items-center gap-2">
+                    <button onClick={salvarEdicao} className="h-9 flex-1 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center justify-center gap-1.5">
+                      <Check className="w-3.5 h-3.5" /> Salvar
+                    </button>
+                    <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-xl border border-border text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                      <X className="w-3.5 h-3.5" /> Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div key={e.id} className="flex items-center gap-1 px-3 py-1.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{e.description}</p>
                     <p className="text-[9px] text-muted-foreground">
                       Pago por <span className="font-medium text-foreground">{e.paidBy}</span> • dividido entre {e.splitBetween.length}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold">{formatCurrency(e.amount)}</span>
-                    <button onClick={() => removeEntry(e.id)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
-                    </button>
-                  </div>
+                  <span className="text-xs font-bold whitespace-nowrap">{formatCurrency(e.amount)}</span>
+                  {/* Ações sempre visíveis: hover não existe no celular. */}
+                  <button onClick={() => comecarEdicao(e)} aria-label={`Editar ${e.description}`} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors">
+                    <Pencil className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                  </button>
+                  <button onClick={() => removeEntry(e.id)} aria-label={`Apagar ${e.description}`} className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-background/50 transition-colors">
+                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                  </button>
                 </div>
               ))}
             </div>

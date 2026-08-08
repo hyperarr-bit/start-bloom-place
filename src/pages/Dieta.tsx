@@ -509,7 +509,9 @@ const Dieta = () => {
       if (categoriasSelecionaveis.some(n => n.toLowerCase() === nome.toLowerCase())) return { error: "Já existe uma categoria com esse nome." };
       if (minhasCategorias.length >= MAX_CUSTOM_RECIPE_CATS) return { error: `Limite de ${MAX_CUSTOM_RECIPE_CATS} categorias suas.` };
       setCustomCategories([...minhasCategorias, { name: nome, palette: proximaPaleta }]);
-      return { name };
+      // `{ name }` (sem o valor) pegava o `window.name` do navegador — string
+      // vazia — e a categoria recém-criada não vinha selecionada.
+      return { name: nome };
     },
     remove: (nome: string) => {
       setCustomCategories(minhasCategorias.filter(c => c.name !== nome));

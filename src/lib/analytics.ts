@@ -83,6 +83,48 @@ export const captureInstallReferrer = async () => {
   }
 };
 
+/**
+ * FICHA DO APARELHO pro CAPI de app da Meta (08/08).
+ *
+ * A Meta EXIGE `extinfo` em evento de app — um array de 16 posições com
+ * pacote, versão, SO, modelo, locale, fuso e tela. Quem manda o evento é o
+ * servidor (revenuecat-webhook), porque a compra fecha com o app FECHADO:
+ * a Patricia gerou o Pix às 16h e pagou 7h41 do dia seguinte; evento
+ * disparado pelo celular teria perdido a venda. Então o app só deixa a
+ * ficha gravada aqui, e o servidor monta o extinfo na hora da compra.
+ *
+ * Campos que o WebView não sabe (operadora, disco) vão vazios — a Meta
+ * aceita parcial desde que a estrutura venha completa.
+ */
+export const capturarDispositivoApp = async () => {
+  try {
+    const ua = navigator.userAgent;
+    let versao = "", build = "", pacote = "br.com.coreaplicativo.app";
+    try {
+      const { App } = await import("@capacitor/app");
+      const info = await App.getInfo();
+      versao = info.version ?? "";
+      build = info.build ?? "";
+      pacote = info.id ?? pacote;
+    } catch { /* sem plugin: segue com o que dá pra ler do UA */ }
+    trackEvent("app_device_info", {
+      pacote,
+      versao,
+      build,
+      os: /Android (\d+(?:\.\d+)?)/.exec(ua)?.[1] ?? "",
+      modelo: /Android [^;]+; ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua)?.[1] ?? "",
+      locale: navigator.language || "pt-BR",
+      fuso: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
+      tela_l: window.screen?.width ?? 0,
+      tela_a: window.screen?.height ?? 0,
+      densidade: window.devicePixelRatio ?? 1,
+      nucleos: navigator.hardwareConcurrency ?? 0,
+    });
+  } catch {
+    // telemetria nunca derruba o app
+  }
+};
+
 /** Parâmetros de atribuição (fbclid + gclid + utm) pra repassar ao checkout. */
 export const getAttributionParams = (): Record<string, string> => {
   if (typeof window === "undefined") return {};

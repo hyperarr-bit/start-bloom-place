@@ -119,6 +119,124 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
 // então "não expira" vira uma data que nenhum de nós vai ver.
 const FIM_VITALICIO = "2126-01-01T00:00:00.000Z";
 
+// ---------------------------------------------------------------------------
+// CAPI DE APP DA META (08/08).
+//
+// Por que sai DAQUI e não do celular: a compra do app fecha com o app
+// FECHADO. A 1ª compradora real gerou o Pix na folha do Google às 16h23 e
+// pagou 7h41 do dia seguinte — evento disparado pelo aparelho teria perdido
+// a venda (e todo reembolso também). O servidor é o único lugar que enxerga
+// o fato consumado.
+//
+// Dataset do APP ≠ pixel do site: são fontes de dados separadas no
+// Gerenciador de Eventos, de propósito — o dono compara app × web, e juntar
+// os dois num dataset só destrói a comparação.
+//
+// Dormente sem META_APP_DATASET_ID/META_APP_CAPI_TOKEN.
+// ---------------------------------------------------------------------------
+const sha256 = async (txt: string): Promise<string> => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+async function mandarCompraProMeta(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const dataset = Deno.env.get("META_APP_DATASET_ID");
+  const token = Deno.env.get("META_APP_CAPI_TOKEN");
+  if (!dataset || !token) return;
+
+  // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
+  // o webhook (ele reenvia em qualquer 500 nosso).
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "meta_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
+  const { data: dev } = await admin
+    .from("analytics_events")
+    .select("event_data")
+    .eq("event_name", "app_device_info")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  const s = (k: string) => String(d[k] ?? "");
+  const n = (k: string) => Number(d[k] ?? 0) || 0;
+  const extinfo = [
+    "a2",                                    // versão do extinfo (Android)
+    s("pacote") || "br.com.coreaplicativo.app",
+    s("build"),
+    s("versao"),
+    s("os"),
+    s("modelo"),
+    s("locale") || "pt-BR",
+    "",                                      // fuso abreviado: não temos
+    "",                                      // operadora: não temos
+    n("tela_l"),
+    n("tela_a"),
+    String(d.densidade ?? ""),
+    n("nucleos"),
+    0,                                       // disco total
+    0,                                       // disco livre
+    s("fuso") || "America/Sao_Paulo",
+  ];
+
+  const user_data: Record<string, unknown> = { external_id: await sha256(userId) };
+  if (email) user_data.em = await sha256(email.trim().toLowerCase());
+
+  const payload: Record<string, unknown> = {
+    data: [{
+      event_name: "Purchase",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId,                        // dedup, igual ao padrão da web
+      action_source: "app",
+      user_data,
+      app_data: {
+        // NÃO coletamos o ID de publicidade do aparelho (exigiria permissão
+        // AD_ID e mudar a declaração de Segurança de Dados da Play). O
+        // pareamento é por e-mail/external_id — dado de primeira mão.
+        advertiser_tracking_enabled: false,
+        application_tracking_enabled: true,
+        extinfo,
+      },
+      custom_data: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${dataset}/events?access_token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "meta_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("meta capi app ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
+
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
   const chave = Object.keys(PRODUTOS).find((k) => id.startsWith(k));
@@ -232,6 +350,7 @@ async function reconciliarRevenueCat(
     );
     if (error) throw new Error(`upsert vitalício falhou: ${error.message}`);
     melhor = { fim: FIM_VITALICIO, prod: "core_vitalicio" };
+    await mandarCompraProMeta(admin, userId, email, 2790, v.id, v.inicio);
   }
 
   for (const s of vivas) {

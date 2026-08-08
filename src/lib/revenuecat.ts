@@ -169,7 +169,7 @@ export async function reconciliarSePreciso(): Promise<boolean> {
  *  fechando a folha do Google (normal, não avisa nada); o resto é defeito e
  *  a tela precisa dizer alguma coisa — sem isso, tocar em comprar e não ver
  *  NADA acontecer é indistinguível de app quebrado. */
-export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | null;
+export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | "pendente" | null;
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 
@@ -276,7 +276,22 @@ export async function comprarVitalicio(): Promise<boolean> {
     return true;
   } catch (e) {
     const msg = String((e as { message?: string })?.message ?? e);
-    const cancelou = /cancel/i.test(msg) || (e as { code?: string })?.code === "1";
+    const codigo = String((e as { code?: string })?.code ?? "");
+    /*
+     * PIX/BOLETO DA FOLHA DO GOOGLE (08/08). Escolher Pix na folha cria uma
+     * compra PENDENTE: não é sucesso nem cancelamento — o plugin lança
+     * PAYMENT_PENDING_ERROR ("20"). Até ontem isso caía como "billing_erro"
+     * ou silêncio: a pessoa gerava o código, saía pra pagar e o app nunca
+     * dizia "paga que libera sozinho". O teste do dono (Pix pago, acesso em
+     * 64s via webhook) provou que o caminho pendente→pago fecha sozinho —
+     * só faltava o app EXPLICAR isso.
+     */
+    if (codigo === "20" || /pending/i.test(msg)) {
+      ultimoMotivo = "pendente";
+      trackEvent("app_compra_pendente", { produto: "core_vitalicio" });
+      return false;
+    }
+    const cancelou = /cancel/i.test(msg) || codigo === "1";
     ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
     trackEvent("app_compra_falhou", {
       motivo: cancelou ? "cancelou" : "billing_erro",

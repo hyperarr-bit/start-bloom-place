@@ -567,6 +567,9 @@ function OfferScreen({
    * fazer nada; no mensal ela ainda oferece o caminho sem risco (trial).
    */
   const [resgate, setResgate] = useState<"vitalicio" | null>(null);
+  // Pix/boleto escolhido na folha do Google: compra fica pendente até o
+  // pagamento cair — o app precisa DIZER isso em vez do silêncio de antes.
+  const [pendente, setPendente] = useState(false);
   const [celebrar, setCelebrar] = useState(false);
   const { get: getUserData } = useUserData();
   const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
@@ -640,7 +643,9 @@ function OfferScreen({
        mensagem certa pro medo certo); qualquer outro motivo, aviso com saída. */
     if (!ativou) {
       const motivo = motivoUltimaCompra();
-      if (motivo === "cancelou") {
+      if (motivo === "pendente") {
+        setPendente(true);
+      } else if (motivo === "cancelou") {
         setResgate("vitalicio");
         trackEvent("app_resgate_view", { plano: "vitalicio", context });
       } else if (motivo) {
@@ -849,11 +854,24 @@ function OfferScreen({
             {nativo && erroCompra && (
               <p className="text-[11.5px] text-center mt-2 font-medium text-foreground/80">{erroCompra}</p>
             )}
-            {nativo && resgate && (
+            {nativo && resgate && !pendente && (
               <p className="text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900">
                 Fica tranquilo: é <b>pagamento único</b> — nenhuma mensalidade escondida.
                 E se não curtir, a <b>Garantia de 7 dias</b> devolve 100% em 1 mensagem.
               </p>
+            )}
+            {nativo && pendente && (
+              <div className="text-[11.5px] text-center mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
+                <b>Pagamento em processamento no Google.</b> Se você gerou um Pix,
+                é só pagar no app do seu banco — o acesso libera aqui <b>sozinho</b> assim
+                que confirmar.
+                <button
+                  onClick={async () => { if (await restaurar()) setCelebrar(true); }}
+                  className="block mx-auto mt-1 underline font-semibold"
+                >
+                  Já paguei — atualizar
+                </button>
+              </div>
             )}
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">

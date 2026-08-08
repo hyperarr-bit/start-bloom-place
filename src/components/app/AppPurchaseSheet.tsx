@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
-import { initRevenueCat, estadoRevenueCat, comprarVitalicio, restaurar } from "@/lib/revenuecat";
+import { initRevenueCat, estadoRevenueCat, comprarVitalicio, restaurar, motivoUltimaCompra } from "@/lib/revenuecat";
 import { useUserData } from "@/hooks/use-user-data";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 
@@ -79,6 +79,10 @@ export function AppPurchaseSheet({ onClose }: { onClose: () => void }) {
     trackEvent("app_sheet_cta", { plano: "vitalicio" });
     const ativou = await comprarVitalicio();
     setComprando(false);
+    if (!ativou && motivoUltimaCompra() === "pendente") {
+      setMsg("Pagamento em processamento no Google. Se você gerou um Pix, pague no app do seu banco — o acesso libera sozinho assim que confirmar.");
+      return;
+    }
     if (ativou) {
       trackEvent("app_sheet_success", { plano: "vitalicio" });
       setOk(true);

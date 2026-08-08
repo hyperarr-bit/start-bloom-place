@@ -4,6 +4,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { mesclarSemDuplicar, separarPorMes, type Lancamento } from "@/lib/virada-do-mes";
+import {
+  aplicarViradaDeContas,
+  viradaDeContas,
+  temContas,
+  CHAVE_CARIMBO_CONTAS,
+  CHAVE_CONTAS,
+  type DiaDeContas,
+} from "@/lib/virada-contas";
 
 /**
  * Aplica a separação por mês assim que os dados carregam (01/08).
@@ -89,7 +97,12 @@ export const useViradaDoMes = () => {
      * Custo de esperar: ler dois arrays pequenos.
      */
     const carregados = BALDES.map((b) => lerBalde(b.corrente));
-    if (carregados.every((itens) => itens.length === 0)) return;
+    // As contas do mês entram na MESMA espera: elas moram num balde sem data
+    // por item (`finance-dueDays`) e são o motivo de o ✓ de "pago" sobreviver
+    // à virada — ver lib/virada-contas.ts.
+    const contas = (readMonthData(uid, CHAVE_CONTAS) ??
+      get<DiaDeContas[]>(CHAVE_CONTAS, [])) as DiaDeContas[];
+    if (carregados.every((itens) => itens.length === 0) && !temContas(contas)) return;
     feitoPara.current = quem;
 
     for (let i = 0; i < BALDES.length; i++) {
@@ -116,6 +129,25 @@ export const useViradaDoMes = () => {
         movidos: movidosTotal,
         meses: [...mesesTocados].join(","),
       });
+    }
+
+    /*
+     * CONTAS DO MÊS: o ✓ de "pago" expira, a conta não.
+     *
+     * Aqui a separação NÃO pode ser por data do lançamento (conta não tem
+     * data, tem DIA — ela é recorrente). Quem diz de que mês são os ✓ é o
+     * carimbo `finance-dueDays-mes`. Tudo que decide isso está em
+     * lib/virada-contas.ts, compartilhado com a tela de Finanças: os dois
+     * chamadores rodam, os dois são idempotentes.
+     */
+    const virada = viradaDeContas(contas, get<string>(CHAVE_CARIMBO_CONTAS, ""), hoje);
+    if (virada) {
+      const r = aplicarViradaDeContas(virada, {
+        ler: (chave, padrao) => get(chave, padrao),
+        gravar: (chave, valor) => set(chave, valor),
+        gravarContas: (zeradas) => set(CHAVE_CONTAS, zeradas),
+      });
+      if (r.zerou) trackEvent("virada_mes_zerou_contas", { arquivou: r.arquivou ? 1 : 0 });
     }
   }, [loaded, user?.id, get, set]);
 };

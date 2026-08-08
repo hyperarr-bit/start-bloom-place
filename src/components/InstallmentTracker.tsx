@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CardSelect } from "@/components/finance/CardSelect";
+import { CategorySelect } from "@/components/finance/CategorySelect";
+import { useFinanceCards } from "@/lib/finance-cards";
+import { useFinanceCategories } from "@/lib/finance-categories";
 
-interface Installment {
+/** Formato gravado em `finance-installments` — exportado porque o ExpenseTable
+ *  cria parcelamento no MESMO formato (uma porta de entrada, um só formato). */
+export interface Installment {
   id: string;
   description: string;
   totalValue: number;
@@ -25,42 +30,52 @@ interface InstallmentTrackerProps {
   variableExpenses?: any[];
 }
 
-const cardOptions = [
-  { value: "nubank", label: "Nubank", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "inter", label: "Inter", color: "bg-orange-500/15 text-orange-700 dark:text-orange-300" },
-  { value: "itau", label: "Itaú", color: "bg-blue-600/15 text-blue-700 dark:text-blue-300" },
-  { value: "bradesco", label: "Bradesco", color: "bg-red-600/15 text-red-700 dark:text-red-300" },
-  { value: "santander", label: "Santander", color: "bg-red-500/15 text-red-600 dark:text-red-300" },
-  { value: "c6", label: "C6 Bank", color: "bg-gray-800/15 text-gray-700 dark:text-gray-300" },
-  { value: "bb", label: "Banco do Brasil", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300" },
-  { value: "caixa", label: "Caixa", color: "bg-blue-500/15 text-blue-600 dark:text-blue-300" },
-  { value: "neon", label: "Neon", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
-  { value: "picpay", label: "PicPay", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "outro", label: "Outro", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
+/**
+ * PONTE DO PARCELAMENTO (08/08). O ExpenseTable manda a parcela pra CÁ em vez
+ * de escrever em `finance-installments` por conta própria, por dois motivos
+ * concretos:
+ *  1. quem manda na lista é o pai (Index/MonthlySheet, via usePersistedState),
+ *     e esse hook hidrata UMA vez — escrita de fora ficaria invisível na tela
+ *     até recarregar (e a próxima gravação do pai apagaria a parcela nova);
+ *  2. dentro da planilha de um mês antigo a chave é outra
+ *     (`finance-2026-junho-installments`) — escrever "na mão" gravaria no mês
+ *     errado. Quem está montado na tela é sempre o dono da chave certa.
+ * `handled` avisa a origem que alguém recebeu (dispatchEvent é síncrono).
+ */
+export const NOVO_PARCELAMENTO_EVENT = "core:novo-parcelamento";
+export type NovoParcelamentoDetalhe = { installment: Installment; handled: boolean };
 
-const installmentCategories = [
-  { value: "roupa", label: "Roupa", color: "bg-blue-500/15 text-blue-700 dark:text-blue-300" },
-  { value: "beleza", label: "Beleza", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "eletronicos", label: "Eletrônicos", color: "bg-red-500/15 text-red-600 dark:text-red-300" },
-  { value: "saude", label: "Saúde", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "pets", label: "Pets", color: "bg-slate-800/15 text-slate-700 dark:text-slate-300" },
-  { value: "casa", label: "Casa", color: "bg-amber-500/15 text-amber-700 dark:text-amber-300" },
-  { value: "educacao", label: "Educação", color: "bg-teal-500/15 text-teal-700 dark:text-teal-300" },
-  { value: "lazer", label: "Lazer", color: "bg-violet-500/15 text-violet-700 dark:text-violet-300" },
-  { value: "outros", label: "Outros", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
-
-const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
-const getCardLabel = (v: string) => cardOptions.find((c) => c.value === v)?.label || v;
-const getCatStyle = (v: string) => installmentCategories.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
-const getCatLabel = (v: string) => installmentCategories.find((c) => c.value === v)?.label || v;
+/**
+ * Este card tinha lista PRÓPRIA de categorias (roupa/beleza/eletrônicos…), que
+ * ignorava as personalizadas do resto do financeiro — parcelar era um app à
+ * parte. Agora usa o CategorySelect compartilhado. Das antigas, só "roupa" não
+ * existe na lista comum: vira "vestuario" SÓ NA EXIBIÇÃO. O dado gravado
+ * continua "roupa" — não se reescreve histórico de assinante.
+ */
+const CAT_LEGADA: Record<string, string> = { roupa: "vestuario" };
+const catValue = (v?: string) => (v ? CAT_LEGADA[v] ?? v : "outros");
 
 export const InstallmentTracker = ({ installments, setInstallments, variableExpenses = [] }: InstallmentTrackerProps) => {
+  const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
+  const { labelOf: getCatLabel, styleOf: getCatStyle } = useFinanceCategories();
   const [showForm, setShowForm] = useState(false);
   const [newItem, setNewItem] = useState({
     description: "", totalValue: "", totalInstallments: "", paidInstallments: "", cardName: "", category: "", date: "",
   });
+
+  // Recebe o parcelamento criado lá no "+ Novo gasto" (ver NOVO_PARCELAMENTO_EVENT).
+  // A lista entra pelo setInstallments do pai, então total mensal, dívidas,
+  // calendário e conquistas recalculam na hora, sem recarregar.
+  useEffect(() => {
+    const onNovo = (e: Event) => {
+      const detalhe = (e as CustomEvent<NovoParcelamentoDetalhe>).detail;
+      if (!detalhe?.installment) return;
+      detalhe.handled = true;
+      setInstallments([...installments, detalhe.installment]);
+    };
+    window.addEventListener(NOVO_PARCELAMENTO_EVENT, onNovo);
+    return () => window.removeEventListener(NOVO_PARCELAMENTO_EVENT, onNovo);
+  }, [installments, setInstallments]);
 
   const addInstallment = () => {
     if (newItem.description && newItem.totalValue && newItem.totalInstallments) {
@@ -95,10 +110,15 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
    * O único ajuste possível era o checkbox de "paguei mais uma" — que só
    * AVANÇA. Quem marcou pago por engano não voltava, e quem errou o número de
    * parcelas ou o valor tinha que apagar a dívida inteira e recadastrar.
+   *
+   * 08/08: entram CARTÃO e CATEGORIA no rascunho. Faltavam justamente os dois
+   * campos que a pessoa erra ao cadastrar rápido — e errar o cartão estraga o
+   * "TOTAL POR CARTÃO NO MÊS", que é o número conferido contra a fatura.
+   * Apagar e refazer a dívida só por causa disso não fazia sentido.
    */
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState({
-    description: "", installmentValue: "", paidInstallments: "", totalInstallments: "", date: "",
+    description: "", installmentValue: "", paidInstallments: "", totalInstallments: "", date: "", cardName: "", category: "",
   });
 
   const comecarEdicao = (i: Installment) => {
@@ -109,6 +129,10 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
       paidInstallments: String(i.paidInstallments),
       totalInstallments: String(i.totalInstallments),
       date: i.date ?? "",
+      cardName: i.cardName || "outro",
+      // categoria legada ("roupa") entra no seletor já como o value comum, pra
+      // não abrir a edição mostrando um campo vazio
+      category: catValue(i.category),
     });
   };
 
@@ -128,6 +152,8 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
       paidInstallments: pagasOk,
       totalValue: valor * total,
       date: rascunho.date || i.date,
+      cardName: rascunho.cardName || i.cardName || "outro",
+      category: rascunho.category || i.category || "outros",
     }));
     setEditandoId(null);
   };
@@ -226,11 +252,28 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
                           <label className="text-[10px] text-muted-foreground">
                             1ª parcela
                             <CampoData rotulo="Data" value={rascunho.date}
- onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
- className="h-9 text-xs mt-0.5" />
- </label>
- </div>
- <div className="flex gap-2">
+                              onChange={(e) => setRascunho({ ...rascunho, date: e.target.value })}
+                              className="h-9 text-xs mt-0.5" />
+                          </label>
+                        </div>
+                        {/* Cartão e categoria também se corrigem aqui (08/08).
+                            Legenda em <span>: um <label> em volta do gatilho do
+                            Select reenvia o clique e o menu abre e fecha junto. */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-muted-foreground">Cartão</span>
+                            <div className="mt-0.5">
+                              <CardSelect value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })} className="h-9 text-xs w-full" />
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-muted-foreground">Categoria</span>
+                            <div className="mt-0.5">
+                              <CategorySelect kind="variable" value={rascunho.category} onValueChange={(v) => setRascunho({ ...rascunho, category: v })} className="h-9 text-xs w-full" />
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
  <button onClick={salvarEdicao} className="h-9 flex-1 rounded-md bg-primary text-primary-foreground text-xs font-semibold">Salvar</button>
  <button onClick={() => setEditandoId(null)} className="h-9 px-4 rounded-md border border-border text-xs font-semibold text-muted-foreground">Cancelar</button>
  </div>
@@ -259,8 +302,8 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
  </span>
  </td>
  <td className="px-3 py-2 text-center">
- <span className={`category-badge ${getCatStyle(inst.category || "outros")}`}>
- {getCatLabel(inst.category || "outros")}
+ <span className={`category-badge ${getCatStyle(catValue(inst.category))}`}>
+ {getCatLabel(catValue(inst.category))}
  </span>
  </td>
  <td className="px-3 py-2 text-right tabular-nums font-medium">
@@ -307,15 +350,12 @@ export const InstallmentTracker = ({ installments, setInstallments, variableExpe
  <Input type="date" value={newItem.date} onChange={(e) => setNewItem({ ...newItem, date: e.target.value })} className="text-xs" />
                 </div>
               </div>
+              {/* Mesmos seletores do resto do financeiro: o cartão aceita os
+                  personalizados (Renner, Will…) e a categoria é a lista comum,
+                  com as que o usuário criou. */}
               <div className="grid grid-cols-2 gap-2">
-                <Select value={newItem.cardName} onValueChange={(v) => setNewItem({ ...newItem, cardName: v })}>
-                  <SelectTrigger className="text-xs"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                  <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={newItem.category} onValueChange={(v) => setNewItem({ ...newItem, category: v })}>
-                  <SelectTrigger className="text-xs"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                  <SelectContent>{installmentCategories.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <CardSelect value={newItem.cardName} onValueChange={(v) => setNewItem({ ...newItem, cardName: v })} className="h-9 text-xs w-full" />
+                <CategorySelect kind="variable" value={newItem.category} onValueChange={(v) => setNewItem({ ...newItem, category: v })} className="h-9 text-xs w-full" />
               </div>
               <div className="flex gap-2">
                 <Button onClick={addInstallment} size="sm" className="flex-1 text-xs">Salvar</Button>

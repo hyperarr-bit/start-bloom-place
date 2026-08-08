@@ -63,6 +63,11 @@ interface FinancialHealthProps {
   wishlistItems: WishlistItem[];
   trips: Trip[];
   investments: Investment[];
+  /* Reserva DECLARADA pela pessoa (08/08). Enquanto ela não registrar, o
+     score segue estimando pelo total investido — que era a única definição
+     possível antes de existir onde declarar. Depois de registrada, manda ela:
+     quem investe em cripto/ação não tinha como dizer "isso NÃO é reserva". */
+  reservaDeclarada?: { guardado: number; meses: number; registrada: boolean };
 }
 
 export const FinancialHealth = ({
@@ -78,6 +83,7 @@ export const FinancialHealth = ({
   wishlistItems,
   trips,
   investments,
+  reservaDeclarada,
 }: FinancialHealthProps) => {
   // === METRICS ===
   // Mesmas funções do Index/Relatórios (lib/finance-totals) — a taxa daqui TEM
@@ -99,8 +105,10 @@ export const FinancialHealth = ({
    * perde a confiança de quem lê. O alvo continua 6 meses de despesa — o
    * clássico — enquanto a conquista pede 3; cada um coerente consigo.
    */
-  const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * 6 : emergencyFundGoal;
-  const emergencyProgress = realEmergencyGoal > 0 ? (totalInvestments / realEmergencyGoal) * 100 : 0;
+  const mesesDeReserva = reservaDeclarada?.registrada ? reservaDeclarada.meses : 6;
+  const realEmergencyGoal = totalRealExpenses > 0 ? totalRealExpenses * mesesDeReserva : emergencyFundGoal;
+  const reservaAtual = reservaDeclarada?.registrada ? reservaDeclarada.guardado : totalInvestments;
+  const emergencyProgress = realEmergencyGoal > 0 ? (reservaAtual / realEmergencyGoal) * 100 : 0;
   const monthlyContributions = investments.reduce((s, i) => s + i.monthlyContribution, 0);
   const investmentRate = totalIncome > 0 ? (monthlyContributions / totalIncome) * 100 : 0;
 
@@ -423,7 +431,7 @@ export const FinancialHealth = ({
         <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/10 rounded-lg border border-blue-500/30 p-3 cursor-pointer hover:border-blue-500/50 transition-colors">
           <p className="text-xs font-bold text-blue-400 mb-1">💰 Reserva de Emergência</p>
           <p className="text-[10px] text-muted-foreground">
-            R$ {totalInvestments.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
+            R$ {reservaAtual.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} de R$ {realEmergencyGoal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ({emergencyProgress.toFixed(0)}%)
           </p>
         </div>
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/10 rounded-lg border border-purple-500/30 p-3 cursor-pointer hover:border-purple-500/50 transition-colors">

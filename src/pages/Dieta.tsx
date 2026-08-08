@@ -8,17 +8,18 @@ import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
   Apple, ChefHat, Calendar, Heart, Settings,
   ArrowUp, ArrowDown, Copy, Search, BookOpen,
-  ShoppingCart, Send, UtensilsCrossed
+  ShoppingCart, Send, UtensilsCrossed, Pencil, Link2, ExternalLink, Tag
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -45,6 +46,243 @@ const defaultMealColors: Record<string, string> = {
   "Café da Tarde": "bg-teal-100 dark:bg-teal-500/10 border-teal-300 dark:border-teal-500/30",
 };
 const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-Treino", "Pós-Treino", "Ceia", "Café da Tarde"];
+
+/* =========================== RECEITAS: CATEGORIAS ===========================
+ * FONTE ÚNICA. Antes a lista de categorias vivia em QUATRO lugares — os chips
+ * de filtro, o <Select> do formulário, o mapa de cor da borda do formulário e
+ * o mapa de cor dos cards. Mexer num não refletia nos outros, e "Sobremesa"
+ * era a prova viva disso: tinha cor nos DOIS mapas e não existia em NENHUMA
+ * lista selecionável — uma categoria fantasma, impossível de escolher.
+ *
+ * Decisão sobre a órfã: MANTER "Sobremesa" e torná-la selecionável. Ela é
+ * óbvia num caderno de receitas e, como nunca foi escolhível, nenhuma receita
+ * de cliente pode estar nela hoje — incluir é 100% aditivo, zero risco. Só
+ * troquei o rosa dela por rose: dividir a cor exata com "Doce Fit" fazia as
+ * duas parecerem a mesma coisa na lista.
+ *
+ * As classes são LITERAIS de propósito: o Tailwind só gera o CSS do que
+ * enxerga escrito no código — string de cor montada em runtime não existe no
+ * bundle final e a cor sairia sem efeito.
+ * ========================================================================== */
+type RecipeCatStyle = { border: string; bg: string; darkBg: string; text: string };
+type RecipeCategory = RecipeCatStyle & { name: string };
+
+const RECIPE_CATEGORIES: RecipeCategory[] = [
+  { name: "Café", border: "border-l-amber-400", bg: "bg-amber-50 dark:bg-amber-500/10", darkBg: "dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400" },
+  { name: "Almoço", border: "border-l-green-400", bg: "bg-green-50 dark:bg-green-500/10", darkBg: "dark:bg-green-950/30", text: "text-green-700 dark:text-green-400" },
+  { name: "Janta", border: "border-l-blue-400", bg: "bg-blue-50 dark:bg-blue-500/10", darkBg: "dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400" },
+  { name: "Lanche", border: "border-l-orange-400", bg: "bg-orange-50 dark:bg-orange-500/10", darkBg: "dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400" },
+  { name: "Doce Fit", border: "border-l-pink-400", bg: "bg-pink-50 dark:bg-pink-500/10", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
+  { name: "Sobremesa", border: "border-l-rose-400", bg: "bg-rose-50 dark:bg-rose-500/10", darkBg: "dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-400" },
+  { name: "Fitness", border: "border-l-purple-400", bg: "bg-purple-50 dark:bg-purple-500/10", darkBg: "dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400" },
+  { name: "Salgado", border: "border-l-red-400", bg: "bg-red-50 dark:bg-red-500/10", darkBg: "dark:bg-red-950/30", text: "text-red-700 dark:text-red-400" },
+  { name: "Shake", border: "border-l-cyan-400", bg: "bg-cyan-50 dark:bg-cyan-500/10", darkBg: "dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400" },
+  { name: "Receita Rápida", border: "border-l-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", darkBg: "dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400" },
+];
+
+// Paleta das categorias que o USUÁRIO cria. A cor sai por índice salvo junto
+// da categoria (e não pela posição na lista): assim ela não troca de cor
+// quando o usuário cria ou apaga outra categoria.
+const CUSTOM_RECIPE_PALETTE: RecipeCatStyle[] = [
+  { border: "border-l-teal-400", bg: "bg-teal-50 dark:bg-teal-500/10", darkBg: "dark:bg-teal-950/30", text: "text-teal-700 dark:text-teal-400" },
+  { border: "border-l-violet-400", bg: "bg-violet-50 dark:bg-violet-500/10", darkBg: "dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-400" },
+  { border: "border-l-sky-400", bg: "bg-sky-50 dark:bg-sky-500/10", darkBg: "dark:bg-sky-950/30", text: "text-sky-700 dark:text-sky-400" },
+  { border: "border-l-lime-400", bg: "bg-lime-50 dark:bg-lime-500/10", darkBg: "dark:bg-lime-950/30", text: "text-lime-700 dark:text-lime-400" },
+  { border: "border-l-fuchsia-400", bg: "bg-fuchsia-50 dark:bg-fuchsia-500/10", darkBg: "dark:bg-fuchsia-950/30", text: "text-fuchsia-700 dark:text-fuchsia-400" },
+  { border: "border-l-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-500/10", darkBg: "dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-400" },
+  { border: "border-l-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-500/10", darkBg: "dark:bg-indigo-950/30", text: "text-indigo-700 dark:text-indigo-400" },
+  { border: "border-l-stone-400", bg: "bg-stone-50 dark:bg-stone-500/10", darkBg: "dark:bg-stone-950/30", text: "text-stone-700 dark:text-stone-400" },
+];
+const DEFAULT_RECIPE_STYLE: RecipeCatStyle = { border: "border-l-primary", bg: "bg-muted/30", darkBg: "", text: "text-primary" };
+const paletteStyle = (i: number) => {
+  const n = CUSTOM_RECIPE_PALETTE.length;
+  return CUSTOM_RECIPE_PALETTE[((i % n) + n) % n];
+};
+
+/** Categoria criada pelo usuário. A identidade é o NOME porque é o nome que a
+ *  receita guarda em `category` (mesmo formato das categorias padrão) — sem
+ *  id nenhum pra traduzir, e o dado antigo continua legível do jeito que está. */
+type CustomRecipeCategory = { name: string; palette: number };
+const MAX_CUSTOM_RECIPE_CATS = 20;
+
+/** Tudo que o formulário precisa saber sobre categorias, num objeto só. */
+type CategoryCatalog = {
+  selectable: string[];
+  custom: CustomRecipeCategory[];
+  styleOf: (name: string) => RecipeCatStyle;
+  add: (raw: string) => { name?: string; error?: string };
+  remove: (name: string) => void;
+  nextStyle: RecipeCatStyle;
+};
+
+/** Receita. `link` é OPCIONAL de propósito: receita já salva por cliente real
+ *  não tem esse campo, e torná-lo obrigatório quebraria a leitura de
+ *  `dieta-recipes-v2` (chave com dado real — nome e formato preservados). */
+type Recipe = {
+  id: string; name: string; ingredients: string; instructions: string;
+  category: string; favorite: boolean; prepTime: string; servings: string;
+  link?: string;
+};
+
+/** O que o formulário edita. `favorite` fica de fora de propósito: o coração
+ *  mora no card, e editar uma receita não pode desfavoritar sem querer. */
+type RecipeDraft = {
+  name: string; ingredients: string; instructions: string;
+  category: string; prepTime: string; servings: string; link: string;
+};
+const EMPTY_RECIPE_DRAFT: RecipeDraft = {
+  name: "", ingredients: "", instructions: "", category: "Almoço",
+  prepTime: "", servings: "", link: "",
+};
+
+/**
+ * Colar link no celular quase sempre vem sem "https://" ("youtube.com/…", o
+ * que o Instagram compartilha etc). Sem esquema, o href vira caminho RELATIVO
+ * e o toque abriria o PRÓPRIO app numa rota que não existe. Prefixar também
+ * neutraliza "javascript:" colado à mão — vira uma URL https inofensiva.
+ * Vazio devolve undefined pra receita sem link não carregar campo à toa.
+ */
+const normalizeLink = (raw: string): string | undefined => {
+  const v = raw.trim();
+  if (!v) return undefined;
+  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+};
+
+const NOVA_CATEGORIA = "__nova_categoria__";
+
+/**
+ * Campos da receita — os MESMOS no "nova receita" e na edição inline (uma
+ * tela só pra manter, e o que muda num muda no outro).
+ *
+ * Declarado FORA do componente da página de propósito: lá dentro, o React
+ * criaria uma identidade nova a cada tecla digitada, remontaria o formulário
+ * e o teclado do celular fecharia sozinho a cada letra.
+ */
+const RecipeFields = ({ draft, setDraft, cats, onSave, onCancel, saveLabel, className = "" }: {
+  draft: RecipeDraft;
+  setDraft: (updater: (prev: RecipeDraft) => RecipeDraft) => void;
+  cats: CategoryCatalog;
+  onSave: () => void;
+  onCancel: () => void;
+  saveLabel: string;
+  className?: string;
+}) => {
+  const [criando, setCriando] = useState(false);
+  const [novoNome, setNovoNome] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+
+  const estilo = cats.styleOf(draft.category);
+  // Se a receita está numa categoria que não está mais na lista (o usuário
+  // apagou a categoria dele), ela entra como opção mesmo assim: sem isso o
+  // <Select> abriria em branco e salvar trocaria a categoria sem a pessoa ver.
+  const opcoes = draft.category && !cats.selectable.includes(draft.category)
+    ? [draft.category, ...cats.selectable]
+    : cats.selectable;
+
+  const criarCategoria = () => {
+    const { name, error } = cats.add(novoNome);
+    if (error || !name) { setErro(error ?? "Não consegui criar a categoria."); return; }
+    setDraft(p => ({ ...p, category: name }));
+    setCriando(false); setNovoNome(""); setErro(null);
+  };
+
+  return (
+    <div className={`bg-muted/30 rounded-xl p-3 border border-border border-l-4 ${estilo.border} space-y-2 ${className}`}>
+      <Input value={draft.name} onChange={e => setDraft(p => ({ ...p, name: e.target.value }))} placeholder="Nome da receita" className="text-xs h-9 font-bold" />
+      <div className="grid grid-cols-3 gap-2">
+        <Select
+          value={draft.category}
+          onValueChange={v => {
+            if (v === NOVA_CATEGORIA) { setNovoNome(""); setErro(null); setCriando(true); return; }
+            setDraft(p => ({ ...p, category: v }));
+          }}
+        >
+          <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {opcoes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <SelectSeparator />
+            <SelectItem value={NOVA_CATEGORIA} className="text-primary font-semibold">+ Nova categoria…</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input value={draft.prepTime} onChange={e => setDraft(p => ({ ...p, prepTime: e.target.value }))} placeholder="⏱ Tempo (20min)" className="text-xs h-9" />
+        <Input value={draft.servings} onChange={e => setDraft(p => ({ ...p, servings: e.target.value }))} placeholder="🍽 Porções" className="text-xs h-9" />
+      </div>
+      {/* Link (pedido de cliente): muita receita boa já tem o modo de preparo
+          pronto na internet — em vez de obrigar a redigitar tudo, guarda-se o
+          endereço e o card abre direto lá. */}
+      <Input
+        value={draft.link}
+        onChange={e => setDraft(p => ({ ...p, link: e.target.value }))}
+        placeholder="🔗 Link da receita (opcional)"
+        type="url"
+        inputMode="url"
+        autoCapitalize="none"
+        autoCorrect="off"
+        className="text-xs h-9"
+      />
+      <Textarea value={draft.ingredients} onChange={e => setDraft(p => ({ ...p, ingredients: e.target.value }))} placeholder={"1 banana madura\n2 ovos\n3 col sopa de aveia\n1 scoop whey"} className="text-xs min-h-[80px]" />
+      <Textarea value={draft.instructions} onChange={e => setDraft(p => ({ ...p, instructions: e.target.value }))} placeholder={"Bata tudo no liquidificador\nDespeje na frigideira\nCozinhe 3min de cada lado"} className="text-xs min-h-[80px]" />
+      <div className="flex gap-2">
+        <Button size="sm" className="flex-1 h-9" onClick={onSave}>{saveLabel}</Button>
+        <Button size="sm" variant="outline" className="h-9" onClick={onCancel}>Cancelar</Button>
+      </div>
+
+      <Dialog open={criando} onOpenChange={setCriando}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base"><Tag className="w-4 h-4" /> Nova categoria</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Input
+              value={novoNome}
+              onChange={e => { setNovoNome(e.target.value); setErro(null); }}
+              placeholder="Ex: Air Fryer, Marmita, Low carb…"
+              maxLength={20}
+              autoFocus
+              className="h-9"
+              onKeyDown={e => e.key === "Enter" && criarCategoria()}
+            />
+            <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2.5">
+              <span className="text-[11px] text-muted-foreground">Vai aparecer assim:</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${cats.nextStyle.bg} ${cats.nextStyle.text}`}>
+                {novoNome.trim() || "Sua categoria"}
+              </span>
+            </div>
+            {erro && <p className="text-[11px] text-destructive">{erro}</p>}
+
+            {/* Apagar categoria própria: some do seletor, mas a receita já
+                salva nela NÃO muda — o nome continua no card e vira um chip
+                de filtro "órfão". Nada do usuário se perde. */}
+            {cats.custom.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-bold text-muted-foreground">SUAS CATEGORIAS</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {cats.custom.map(c => (
+                    <span key={c.name} className={`flex items-center gap-1 pl-2 rounded-full border text-[10px] font-bold ${paletteStyle(c.palette).bg} ${paletteStyle(c.palette).text}`}>
+                      {c.name}
+                      <button
+                        onClick={() => cats.remove(c.name)}
+                        aria-label={`Remover categoria ${c.name}`}
+                        className="w-8 h-9 flex items-center justify-center rounded-full hover:opacity-70"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 h-9" onClick={() => setCriando(false)}>Cancelar</Button>
+              <Button className="flex-1 h-9" onClick={criarCategoria} disabled={novoNome.trim().length < 2}>Criar categoria</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
 
 const Dieta = () => {
   const navigate = useNavigate();
@@ -84,12 +322,18 @@ const Dieta = () => {
   const [fastingElapsed, setFastingElapsed] = useState(0);
 
   // RECIPES
-  const [recipes, setRecipes] = usePersistedState<{id: string; name: string; ingredients: string; instructions: string; category: string; favorite: boolean; prepTime: string; servings: string}[]>("dieta-recipes-v2", []);
+  const [recipes, setRecipes] = usePersistedState<Recipe[]>("dieta-recipes-v2", []);
   const [showRecipeForm, setShowRecipeForm] = useState(false);
-  const [recipeForm, setRecipeForm] = useState({ name: "", ingredients: "", instructions: "", category: "Almoço", prepTime: "", servings: "", favorite: false });
+  const [recipeForm, setRecipeForm] = useState<RecipeDraft>(EMPTY_RECIPE_DRAFT);
   const [recipeFilter, setRecipeFilter] = useState("Todas");
   const [checkedIngredients, setCheckedIngredients] = usePersistedState<Record<string, string[]>>("dieta-recipe-checked", {});
   const [expandedRecipe, setExpandedRecipe] = useState<string | null>(null);
+  // Categorias criadas pelo usuário (pedido de cliente: "não só as
+  // pré-definidas"). Chave NOVA — as chaves antigas seguem intocadas.
+  const [customCategories, setCustomCategories] = usePersistedState<CustomRecipeCategory[]>("dieta-custom-categories", []);
+  // Edição inline da receita (mesmo padrão de IncomeTable/ExpenseTable)
+  const [editingRecipeId, setEditingRecipeId] = useState<string | null>(null);
+  const [recipeDraft, setRecipeDraft] = useState<RecipeDraft>(EMPTY_RECIPE_DRAFT);
 
   // DIÁRIO v2
   const [diaryDate, setDiaryDate] = useState(localDayKey());
@@ -227,6 +471,100 @@ const Dieta = () => {
       dietaCat.items = [...dietaCat.items, ...newItems.map(i => ({ id: Date.now().toString() + Math.random(), text: i.text, done: false }))];
       return updated.map(c => c.id === dietaCat!.id ? dietaCat! : c);
     });
+  };
+
+  // ---------------------- RECEITAS: categorias e edição ----------------------
+  // Defensivo como no resto da casa: a chave é nova, mas um valor fora do
+  // formato não pode derrubar a aba inteira do cliente.
+  const minhasCategorias = Array.isArray(customCategories) ? customCategories : [];
+
+  const estiloDaCategoria = (nome: string): RecipeCatStyle => {
+    const padrao = RECIPE_CATEGORIES.find(c => c.name === nome);
+    if (padrao) return padrao;
+    const propria = minhasCategorias.find(c => c.name === nome);
+    return propria ? paletteStyle(propria.palette) : DEFAULT_RECIPE_STYLE;
+  };
+
+  const categoriasSelecionaveis = [...RECIPE_CATEGORIES.map(c => c.name), ...minhasCategorias.map(c => c.name)];
+
+  // Chips de filtro = selecionáveis + as ÓRFÃS (receita salva numa categoria
+  // que o usuário depois apagou, ou vinda de versão antiga). Sem isso a
+  // receita continuava existindo mas não havia como filtrar até ela.
+  const nomesDeCategoria = [...categoriasSelecionaveis];
+  recipes.forEach(r => { if (r.category && !nomesDeCategoria.includes(r.category)) nomesDeCategoria.push(r.category); });
+
+  // Próximo índice de cor: MAIOR já usado + 1, não a quantidade — usar o
+  // tamanho da lista fazia a categoria criada depois de uma exclusão nascer
+  // com a mesma cor de uma que já existia.
+  const proximaPaleta = minhasCategorias.length ? Math.max(...minhasCategorias.map(c => c.palette)) + 1 : 0;
+
+  const catalogoCategorias: CategoryCatalog = {
+    selectable: categoriasSelecionaveis,
+    custom: minhasCategorias,
+    styleOf: estiloDaCategoria,
+    nextStyle: paletteStyle(proximaPaleta),
+    add: (raw: string) => {
+      const nome = raw.trim().replace(/\s+/g, " ");
+      if (nome.length < 2 || nome.length > 20) return { error: "O nome precisa ter de 2 a 20 caracteres." };
+      if (categoriasSelecionaveis.some(n => n.toLowerCase() === nome.toLowerCase())) return { error: "Já existe uma categoria com esse nome." };
+      if (minhasCategorias.length >= MAX_CUSTOM_RECIPE_CATS) return { error: `Limite de ${MAX_CUSTOM_RECIPE_CATS} categorias suas.` };
+      setCustomCategories([...minhasCategorias, { name: nome, palette: proximaPaleta }]);
+      return { name };
+    },
+    remove: (nome: string) => {
+      setCustomCategories(minhasCategorias.filter(c => c.name !== nome));
+      // se o filtro estava nela, a lista ficaria vazia sem explicação
+      setRecipeFilter(f => (f === nome ? "Todas" : f));
+    },
+  };
+
+  const salvarNovaReceita = () => {
+    const nome = recipeForm.name.trim();
+    if (!nome) return; // igual às tabelas de finanças: melhor o botão não responder do que gravar receita sem nome
+    setRecipes(prev => [...prev, {
+      id: Date.now().toString(),
+      ...recipeForm,
+      name: nome,
+      link: normalizeLink(recipeForm.link),
+      favorite: false,
+    }]);
+    setRecipeForm(EMPTY_RECIPE_DRAFT);
+    setShowRecipeForm(false);
+  };
+
+  const comecarEdicaoReceita = (r: Recipe) => {
+    setShowRecipeForm(false); // dois formulários abertos ao mesmo tempo confunde
+    setEditingRecipeId(r.id);
+    setRecipeDraft({
+      name: r.name, ingredients: r.ingredients, instructions: r.instructions,
+      category: r.category, prepTime: r.prepTime, servings: r.servings, link: r.link ?? "",
+    });
+  };
+
+  const salvarEdicaoReceita = () => {
+    const nome = recipeDraft.name.trim();
+    if (!nome || !editingRecipeId) return;
+    const id = editingRecipeId;
+    setRecipes(prev => prev.map(r => r.id !== id ? r : {
+      ...r, // favorite e id preservados: o coração é do card, não do formulário
+      name: nome,
+      ingredients: recipeDraft.ingredients,
+      instructions: recipeDraft.instructions,
+      category: recipeDraft.category,
+      prepTime: recipeDraft.prepTime,
+      servings: recipeDraft.servings,
+      link: normalizeLink(recipeDraft.link),
+    }));
+    // Os ingredientes marcados são guardados pelo TEXTO da linha. Se a edição
+    // apagou ou reescreveu uma linha marcada, o contador do card passava a
+    // mostrar coisa impossível ("3/2 ✓") — aqui some quem não existe mais.
+    setCheckedIngredients(prev => {
+      const marcados = prev[id];
+      if (!marcados?.length) return prev;
+      const atuais = new Set(recipeDraft.ingredients.split("\n").map(l => l.trim()).filter(Boolean));
+      return { ...prev, [id]: marcados.filter(x => atuais.has(x)) };
+    });
+    setEditingRecipeId(null);
   };
 
   return (
@@ -511,9 +849,9 @@ const Dieta = () => {
 
           {/* ========== RECEITAS ========== */}
           {activeTab === "receitas" && <div className="space-y-4">
-            {/* Category filter chips */}
+            {/* Chips de filtro — saem da MESMA fonte do formulário */}
             <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {["Todas", "Café", "Almoço", "Janta", "Lanche", "Doce Fit", "Fitness", "Salgado", "Shake", "Receita Rápida"].map(cat => (
+              {["Todas", ...nomesDeCategoria].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setRecipeFilter(cat)}
@@ -530,60 +868,23 @@ const Dieta = () => {
 
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold flex items-center gap-2"><ChefHat className="w-4 h-4" /> MINHAS RECEITAS</h3>
-              <Button size="sm" onClick={() => setShowRecipeForm(true)}><Plus className="w-3 h-3 mr-1" /> Nova</Button>
+              <Button size="sm" onClick={() => { setRecipeForm(EMPTY_RECIPE_DRAFT); setEditingRecipeId(null); setShowRecipeForm(true); }}><Plus className="w-3 h-3 mr-1" /> Nova</Button>
             </div>
 
-            {showRecipeForm && (() => {
-              const catColors: Record<string, string> = {
-                "Café": "border-l-amber-400", "Almoço": "border-l-green-400", "Janta": "border-l-blue-400",
-                "Lanche": "border-l-orange-400", "Doce Fit": "border-l-pink-400", "Fitness": "border-l-purple-400",
-                "Salgado": "border-l-red-400", "Shake": "border-l-cyan-400", "Receita Rápida": "border-l-emerald-400", "Sobremesa": "border-l-pink-400",
-              };
-              return (
-                <div className={`bg-muted/30 rounded-lg p-3 border border-border border-l-4 ${catColors[recipeForm.category] || "border-l-primary"} mb-3 space-y-2`}>
-                  <Input value={recipeForm.name} onChange={e => setRecipeForm(p => ({...p, name: e.target.value}))} placeholder="Nome da receita" className="text-xs h-8 font-bold" />
-                  <div className="grid grid-cols-3 gap-2">
-                    <Select value={recipeForm.category} onValueChange={v => setRecipeForm(p => ({...p, category: v}))}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {["Café", "Almoço", "Janta", "Lanche", "Doce Fit", "Fitness", "Salgado", "Shake", "Receita Rápida"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input value={recipeForm.prepTime} onChange={e => setRecipeForm(p => ({...p, prepTime: e.target.value}))} placeholder="⏱ Tempo (20min)" className="text-xs h-8" />
-                    <Input value={recipeForm.servings} onChange={e => setRecipeForm(p => ({...p, servings: e.target.value}))} placeholder="🍽 Porções" className="text-xs h-8" />
-                  </div>
-                  <Textarea value={recipeForm.ingredients} onChange={e => setRecipeForm(p => ({...p, ingredients: e.target.value}))} placeholder={"1 banana madura\n2 ovos\n3 col sopa de aveia\n1 scoop whey"} className="text-xs min-h-[80px]" />
-                  <Textarea value={recipeForm.instructions} onChange={e => setRecipeForm(p => ({...p, instructions: e.target.value}))} placeholder={"Bata tudo no liquidificador\nDespeje na frigideira\nCozinhe 3min de cada lado"} className="text-xs min-h-[80px]" />
-                  <div className="flex gap-2">
-                    <Button size="sm" className="flex-1" onClick={() => {
-                      if (recipeForm.name.trim()) {
-                        setRecipes(prev => [...prev, { id: Date.now().toString(), ...recipeForm }]);
-                        setRecipeForm({ name: "", ingredients: "", instructions: "", category: "Almoço", prepTime: "", servings: "", favorite: false });
-                        setShowRecipeForm(false);
-                      }
-                    }}>Salvar Receita</Button>
-                    <Button size="sm" variant="outline" onClick={() => setShowRecipeForm(false)}>Cancelar</Button>
-                  </div>
-                </div>
-              );
-            })()}
+            {showRecipeForm && (
+              <RecipeFields
+                draft={recipeForm}
+                setDraft={setRecipeForm}
+                cats={catalogoCategorias}
+                saveLabel="Salvar Receita"
+                onSave={salvarNovaReceita}
+                onCancel={() => setShowRecipeForm(false)}
+                className="mb-3"
+              />
+            )}
 
             {/* Recipe cards */}
             {(() => {
-              const catColors: Record<string, { bg: string; border: string; darkBg: string; text: string }> = {
-                "Café": { bg: "bg-amber-50 dark:bg-amber-500/10", border: "border-l-amber-400", darkBg: "dark:bg-amber-950/30", text: "text-amber-700 dark:text-amber-400" },
-                "Almoço": { bg: "bg-green-50 dark:bg-green-500/10", border: "border-l-green-400", darkBg: "dark:bg-green-950/30", text: "text-green-700 dark:text-green-400" },
-                "Janta": { bg: "bg-blue-50 dark:bg-blue-500/10", border: "border-l-blue-400", darkBg: "dark:bg-blue-950/30", text: "text-blue-700 dark:text-blue-400" },
-                "Lanche": { bg: "bg-orange-50 dark:bg-orange-500/10", border: "border-l-orange-400", darkBg: "dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-400" },
-                "Doce Fit": { bg: "bg-pink-50 dark:bg-pink-500/10", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
-                "Fitness": { bg: "bg-purple-50 dark:bg-purple-500/10", border: "border-l-purple-400", darkBg: "dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-400" },
-                "Salgado": { bg: "bg-red-50 dark:bg-red-500/10", border: "border-l-red-400", darkBg: "dark:bg-red-950/30", text: "text-red-700 dark:text-red-400" },
-                "Shake": { bg: "bg-cyan-50 dark:bg-cyan-500/10", border: "border-l-cyan-400", darkBg: "dark:bg-cyan-950/30", text: "text-cyan-700 dark:text-cyan-400" },
-                "Receita Rápida": { bg: "bg-emerald-50 dark:bg-emerald-500/10", border: "border-l-emerald-400", darkBg: "dark:bg-emerald-950/30", text: "text-emerald-700 dark:text-emerald-400" },
-                "Sobremesa": { bg: "bg-pink-50 dark:bg-pink-500/10", border: "border-l-pink-400", darkBg: "dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-400" },
-              };
-              const defaultColor = { bg: "bg-muted/30", border: "border-l-primary", darkBg: "", text: "text-primary" };
-
               const filtered = recipes.filter(r => recipeFilter === "Todas" || r.category === recipeFilter);
               const favorites = filtered.filter(r => r.favorite);
               const others = filtered.filter(r => !r.favorite);
@@ -601,7 +902,23 @@ const Dieta = () => {
               return (
                 <div className="space-y-3">
                   {sorted.map(r => {
-                    const colors = catColors[r.category] || defaultColor;
+                    // EDIÇÃO INLINE (pedido de cliente; mesmo padrão de
+                    // IncomeTable/ExpenseTable): o formulário nasce NO LUGAR
+                    // do card. No formulário lá do topo, tocar numa receita do
+                    // fim da lista pareceria "não ter feito nada".
+                    if (editingRecipeId === r.id) return (
+                      <RecipeFields
+                        key={r.id}
+                        draft={recipeDraft}
+                        setDraft={setRecipeDraft}
+                        cats={catalogoCategorias}
+                        saveLabel="Salvar alterações"
+                        onSave={salvarEdicaoReceita}
+                        onCancel={() => setEditingRecipeId(null)}
+                      />
+                    );
+
+                    const colors = estiloDaCategoria(r.category);
                     const isExpanded = expandedRecipe === r.id;
                     const ingredients = r.ingredients ? r.ingredients.split("\n").filter(l => l.trim()) : [];
                     const steps = r.instructions ? r.instructions.split("\n").filter(l => l.trim()) : [];
@@ -631,14 +948,40 @@ const Dieta = () => {
                                     {checked.length}/{ingredients.length} ✓
                                   </span>
                                 )}
+                                {/* Marca discreta de "tem link": dá pra saber
+                                    que o preparo está na internet sem abrir */}
+                                {r.link && (
+                                  <span className="text-muted-foreground flex items-center" title="Tem link do preparo">
+                                    <Link2 className="w-3 h-3" />
+                                  </span>
+                                )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 ml-2">
-                              <button onClick={e => { e.stopPropagation(); setRecipes(prev => prev.map(x => x.id === r.id ? {...x, favorite: !x.favorite} : x)); }}>
+                            {/* Ações sempre visíveis e com alvo de 36px: no
+                                celular não existe hover pra revelar botão. O
+                                lápis é explícito porque o toque no card já tem
+                                dono — abrir/fechar a receita. */}
+                            <div className="flex items-center gap-0.5 ml-2">
+                              <button
+                                onClick={e => { e.stopPropagation(); comecarEdicaoReceita(r); }}
+                                aria-label={`Editar ${r.name}`}
+                                className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); setRecipes(prev => prev.map(x => x.id === r.id ? {...x, favorite: !x.favorite} : x)); }}
+                                aria-label={r.favorite ? `Desfavoritar ${r.name}` : `Favoritar ${r.name}`}
+                                className="w-9 h-9 flex items-center justify-center rounded-lg"
+                              >
                                 <Heart className={`w-4 h-4 ${r.favorite ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
                               </button>
-                              <button onClick={e => { e.stopPropagation(); setRecipes(prev => prev.filter(x => x.id !== r.id)); }}>
-                                <Trash2 className="w-3.5 h-3.5 text-muted-foreground" />
+                              <button
+                                onClick={e => { e.stopPropagation(); setRecipes(prev => prev.filter(x => x.id !== r.id)); }}
+                                aria-label={`Apagar ${r.name}`}
+                                className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -647,6 +990,21 @@ const Dieta = () => {
                         {/* Expanded content */}
                         {isExpanded && (
                           <div className="border-t border-border/50 p-3 space-y-3">
+                            {/* Link primeiro: quando a pessoa salvou a receita
+                                POR causa do link, é ele o modo de preparo —
+                                tem que estar na mão, não no fim da rolagem. */}
+                            {r.link && (
+                              <a
+                                href={r.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="h-9 px-3 rounded-lg border border-border bg-card/60 flex items-center gap-2 text-xs font-bold hover:bg-muted/50 transition-colors"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">Abrir receita no site</span>
+                              </a>
+                            )}
+
                             {/* Ingredients with checkboxes */}
                             {ingredients.length > 0 && (
                               <div>

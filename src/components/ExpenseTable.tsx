@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Check, X, CreditCard } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CategorySelect } from "@/components/finance/CategorySelect";
+import { CardSelect } from "@/components/finance/CardSelect";
 import { useFinanceCategories } from "@/lib/finance-categories";
+import { useFinanceCards } from "@/lib/finance-cards";
+import { NOVO_PARCELAMENTO_EVENT, type Installment, type NovoParcelamentoDetalhe } from "@/components/InstallmentTracker";
 
 interface Expense {
   id: string;
@@ -29,31 +33,89 @@ const paymentMethods = [
   { value: "boleto", label: "Boleto" },
 ];
 
-const cardOptions = [
-  { value: "nubank", label: "Nubank", color: "bg-purple-500/15 text-purple-700 dark:text-purple-300" },
-  { value: "inter", label: "Inter", color: "bg-orange-500/15 text-orange-700 dark:text-orange-300" },
-  { value: "itau", label: "Itaú", color: "bg-blue-600/15 text-blue-700 dark:text-blue-300" },
-  { value: "bradesco", label: "Bradesco", color: "bg-red-600/15 text-red-700 dark:text-red-300" },
-  { value: "santander", label: "Santander", color: "bg-red-500/15 text-red-600 dark:text-red-300" },
-  { value: "c6", label: "C6 Bank", color: "bg-gray-800/15 text-gray-700 dark:text-gray-300" },
-  { value: "bb", label: "Banco do Brasil", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300" },
-  { value: "caixa", label: "Caixa", color: "bg-blue-500/15 text-blue-600 dark:text-blue-300" },
-  { value: "neon", label: "Neon", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300" },
-  { value: "picpay", label: "PicPay", color: "bg-green-500/15 text-green-700 dark:text-green-300" },
-  { value: "outro", label: "Outro", color: "bg-gray-500/15 text-gray-700 dark:text-gray-300" },
-];
+// A lista de cartões (as 11 bandeiras + os que o usuário criar) mora em
+// @/lib/finance-cards — estava copiada aqui, no FixedExpensesTable e no
+// InstallmentTracker.
 
 const isCardPayment = (method: string) => method === "credito" || method === "debito";
 
+const brl = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
+  const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
   });
   const [showMore, setShowMore] = useState(expenses.length === 0);
 
+  /**
+   * PARCELAR PELO FLUXO NORMAL (08/08, feedback de assinante: "senti falta da
+   * opção de compras parceladas, seria legal poder pôr o valor total e um campo
+   * com número de parcelas").
+   *
+   * O recurso JÁ EXISTIA — no card "Cartão de Crédito — Parcelamentos", lá
+   * embaixo, com vocabulário próprio. Ela simplesmente não achou: quem compra
+   * parcelado pensa "vou lançar um gasto", não "vou cadastrar um parcelamento".
+   * Então a porta passa a ser esta, a mesma de sempre, com um botão do lado do
+   * valor. O que se cria continua sendo UM registro de `finance-installments`
+   * (mesmo formato do card) — nada de um segundo sistema paralelo, com números
+   * que depois brigariam entre si.
+   */
+  const [parcelando, setParcelando] = useState(false);
+  const [parcelas, setParcelas] = useState("");
+  const [cardParcela, setCardParcela] = useState("");
+
+  const nParcelas = parseInt(parcelas, 10);
+  const totalDigitado = parseFloat(newExpense.value);
+  const previaParcela =
+    Number.isInteger(nParcelas) && nParcelas >= 2 && Number.isFinite(totalDigitado) && totalDigitado > 0
+      ? `${nParcelas}x de R$ ${brl(totalDigitado / nParcelas)}`
+      : null;
+
+  const limparForm = () => setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
+
+  const lancarParcelamento = (total: number) => {
+    if (!Number.isFinite(total) || total <= 0) { toast.error("Informe o valor TOTAL da compra."); return; }
+    if (!Number.isInteger(nParcelas) || nParcelas < 2 || nParcelas > 99) {
+      toast.error("Diga em quantas vezes (de 2 a 99).");
+      return;
+    }
+    const nova: Installment = {
+      id: Date.now().toString(),
+      description: newExpense.description.trim(),
+      totalValue: total,
+      // o card guarda o valor da PARCELA e o total; derivar aqui evita a conta
+      // na cabeça (é exatamente o que ela pediu: total + nº de parcelas)
+      installmentValue: total / nParcelas,
+      paidInstallments: 0,
+      totalInstallments: nParcelas,
+      cardName: cardParcela || newExpense.cardName || "outro",
+      category: newExpense.category || "outros",
+      date: newExpense.date || localDayKey(),
+    };
+    // Quem grava é o card de parcelamentos (dono da chave do mês aberto) —
+    // ver NOVO_PARCELAMENTO_EVENT. `handled` volta true de forma síncrona.
+    const detalhe: NovoParcelamentoDetalhe = { installment: nova, handled: false };
+    window.dispatchEvent(new CustomEvent(NOVO_PARCELAMENTO_EVENT, { detail: detalhe }));
+    if (!detalhe.handled) {
+      // Ninguém ouviu (card fora da tela). Escrever a chave por fora daqui
+      // gravaria no mês errado ou por cima de dívida já salva — melhor avisar.
+      toast.error("Não consegui criar o parcelamento agora.", { description: "Use o card “Cartão de Crédito — Parcelamentos”." });
+      return;
+    }
+    toast.success(`Parcelado em ${nParcelas}x de R$ ${brl(total / nParcelas)}`, {
+      description: "Está no card CARTÃO DE CRÉDITO — PARCELAMENTOS, logo abaixo.",
+    });
+    limparForm();
+    setParcelas("");
+    setParcelando(false); // volta pro modo gasto normal: o próximo lançamento é o comum
+  };
+
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {
+      // mesma tecla, dois destinos: parcelado vira dívida, à vista vira gasto
+      if (parcelando) { lancarParcelamento(parseFloat(newExpense.value)); return; }
       setExpenses([
         ...expenses,
         {
@@ -66,8 +128,8 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
           cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
         },
       ]);
-      setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
-      
+      limparForm();
+
     }
   };
 
@@ -120,8 +182,6 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
     setEditandoId(null);
   };
 
-  const getCardStyle = (v: string) => cardOptions.find((c) => c.value === v)?.color || "bg-gray-500/15 text-gray-700";
-  const getCardLabel = (v: string) => cardOptions.find((c) => c.value === v)?.label || v;
   const getPaymentLabel = (v: string) => paymentMethods.find((p) => p.value === v)?.label || v;
 
   const total = expenses.reduce((sum, e) => sum + e.value, 0);
@@ -144,7 +204,8 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
           <Input
             type="number"
             inputMode="decimal"
-            placeholder="Valor"
+            placeholder={parcelando ? "Total" : "Valor"}
+            title={parcelando ? "Valor TOTAL da compra — o app divide pelas parcelas" : undefined}
             value={newExpense.value}
             onChange={(e) => setNewExpense({ ...newExpense, value: e.target.value })}
             className="h-9 text-xs w-20 text-right"
@@ -152,20 +213,73 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
           <button
             onClick={addExpense}
             data-spotlight="add-expense"
-            aria-label="Adicionar gasto"
+            aria-label={parcelando ? "Adicionar compra parcelada" : "Adicionar gasto"}
             className="h-9 w-9 flex-shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
           </button>
         </div>
 
-        <button
-          onClick={() => setShowMore((s) => !s)}
-          className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-        >
-          <ChevronDown className={`w-3 h-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
-          {showMore ? "Menos opções" : "Mais opções (categoria, data, pagamento)"}
-        </button>
+        {/* "Parcelar" fica AQUI, visível sem abrir nada: escondê-lo dentro de
+            "Mais opções" repetiria o problema original (o recurso existia e
+            ninguém achava). */}
+        <div className="flex items-center justify-between gap-2">
+          <button
+            onClick={() => setShowMore((s) => !s)}
+            className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            <ChevronDown className={`w-3 h-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
+            {showMore ? "Menos opções" : "Mais opções (categoria, data, pagamento)"}
+          </button>
+          <button
+            onClick={() => setParcelando((p) => !p)}
+            aria-pressed={parcelando}
+            className={`h-9 px-3 flex-shrink-0 rounded-full text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
+              parcelando
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            {parcelando ? "Parcelado" : "Parcelar"}
+          </button>
+        </div>
+
+        {parcelando && (
+          <div className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[10px] text-muted-foreground">
+                Em quantas vezes
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={2}
+                  max={99}
+                  placeholder="Ex: 10"
+                  value={parcelas}
+                  onChange={(e) => setParcelas(e.target.value)}
+                  className="h-9 text-xs mt-0.5"
+                />
+              </label>
+              {/* legenda em <span> e não <label>: envolver o gatilho do Select
+                  num label faz o clique ser reenviado ao botão e o menu abre e
+                  fecha na mesma batida */}
+              <div className="min-w-0">
+                <span className="text-[10px] text-muted-foreground">Cartão</span>
+                <div className="mt-0.5">
+                  <CardSelect value={cardParcela} onValueChange={setCardParcela} className="h-9 text-xs w-full" />
+                </div>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              {previaParcela ? (
+                <>Vai virar <strong className="text-foreground">{previaParcela}</strong> no card de parcelamentos (o valor acima é o <strong>total</strong> da compra).</>
+              ) : (
+                <>Digite o <strong>total</strong> da compra ali em cima e em quantas vezes — o app divide as parcelas.</>
+              )}
+            </p>
+          </div>
+        )}
 
         {showMore && (
           <div className="grid grid-cols-2 gap-2 pt-1">
@@ -189,10 +303,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
             </div>
             {isCardPayment(newExpense.paymentMethod) ? (
               <div className="min-w-0">
-                <Select value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })}>
-                  <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                  <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                </Select>
+                <CardSelect value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })} />
               </div>
             ) : (
               <div />
@@ -249,10 +360,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
                 </div>
                 {isCardPayment(rascunho.paymentMethod) ? (
                   <div className="min-w-0">
-                    <Select value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })}>
-                      <SelectTrigger className="h-8 text-xs w-full"><SelectValue placeholder="Cartão" /></SelectTrigger>
-                      <SelectContent>{cardOptions.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-                    </Select>
+                    <CardSelect value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })} />
                   </div>
                 ) : <div />}
               </div>

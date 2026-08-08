@@ -82,13 +82,29 @@ describe("Passeios", () => {
  * conferir que virou UMA coisa editada, e não uma cópia nova.
  */
 describe("Editar nas abas que não tinham", () => {
-  const casos: { nome: string; ui: () => React.ReactElement; store: Record<string, unknown>; antes: () => void; rotuloEditar: string; valorAtual: string; novoValor: string; botaoSalvar: string }[] = [
+  type Caso = {
+    nome: string;
+    ui: () => React.ReactElement;
+    store: Record<string, unknown>;
+    antes: () => void;
+    rotuloEditar: string;
+    valorAtual: string;
+    novoValor: string;
+    botaoSalvar: string;
+    /** o que ficou salvo — é aqui que se vê se editou ou duplicou */
+    salvos: (dados: Record<string, unknown>) => string[];
+  };
+
+  const lista = <T,>(dados: Record<string, unknown>, chave: string) => (dados[chave] || []) as T[];
+
+  const casos: Caso[] = [
     {
       nome: "Destinos",
       ui: () => <BucketList />,
       store: { "travel-bucket": [{ id: "d1", name: "Tóquio", country: "Japão", continent: "Ásia", notes: "", visited: false, rating: 0, photoUrl: "", priority: "sonho" }] },
       antes: () => {},
       rotuloEditar: "Editar Tóquio", valorAtual: "Tóquio", novoValor: "Tóquio + Kyoto", botaoSalvar: "Salvar",
+      salvos: d => lista<{ name: string }>(d, "travel-bucket").map(x => x.name),
     },
     {
       nome: "Roteiro (inclui a HORA)",
@@ -96,6 +112,7 @@ describe("Editar nas abas que não tinham", () => {
       store: { "travel-timeline-v2": [{ id: "dia1", tripId: "", dayNumber: 1, date: localDayKey(), items: [{ id: "i1", time: "09:00", title: "Museu", location: "", mapsLink: "", estimatedCost: 0, type: "atividade", done: false, pinned: false }] }] },
       antes: () => {},
       rotuloEditar: "Editar Museu", valorAtual: "Museu", novoValor: "Museu Nacional", botaoSalvar: "Salvar",
+      salvos: d => lista<{ items: { title: string }[] }>(d, "travel-timeline-v2").flatMap(dia => dia.items.map(i => i.title)),
     },
     {
       nome: "Timer",
@@ -103,6 +120,7 @@ describe("Editar nas abas que não tinham", () => {
       store: { "travel-countdowns": [{ id: "c1", tripName: "Chile", departureDate: "2027-01-10", photoUrl: "" }] },
       antes: () => {},
       rotuloEditar: "Editar Chile", valorAtual: "Chile", novoValor: "Chile com a família", botaoSalvar: "Salvar",
+      salvos: d => lista<{ tripName: string }>(d, "travel-countdowns").map(c => c.tripName),
     },
     {
       nome: "Diário",
@@ -110,6 +128,7 @@ describe("Editar nas abas que não tinham", () => {
       store: { "travel-diary-v2": [{ id: "e1", tripName: "", date: localDayKey(), bestThing: "Pôr do sol", wouldNotDoAgain: "", photoUrl: "", mood: "🤩" }] },
       antes: () => {},
       rotuloEditar: "Editar entrada do diário", valorAtual: "Pôr do sol", novoValor: "Pôr do sol na praia", botaoSalvar: "Salvar",
+      salvos: d => lista<{ bestThing: string }>(d, "travel-diary-v2").map(e => e.bestThing),
     },
     {
       nome: "Lugares",
@@ -117,6 +136,7 @@ describe("Editar nas abas que não tinham", () => {
       store: { "travel-places-v2": [{ id: "p1", name: "Caminito", category: "turistico", address: "", mapsLink: "", status: "quero_ir", notes: "", city: "Buenos Aires" }] },
       antes: () => {},
       rotuloEditar: "Editar Caminito", valorAtual: "Caminito", novoValor: "Caminito (La Boca)", botaoSalvar: "Salvar",
+      salvos: d => lista<{ name: string }>(d, "travel-places-v2").map(p => p.name),
     },
     {
       nome: "Rachar",
@@ -124,6 +144,7 @@ describe("Editar nas abas que não tinham", () => {
       store: { "travel-bill-split": { tripName: "", people: ["Ana", "Léo"], entries: [{ id: "b1", description: "Jantar", amount: 100, paidBy: "Ana", splitBetween: ["Ana", "Léo"], date: localDayKey() }] } },
       antes: () => {},
       rotuloEditar: "Editar Jantar", valorAtual: "Jantar", novoValor: "Jantar de sábado", botaoSalvar: "Salvar",
+      salvos: d => ((d["travel-bill-split"] as { entries: { description: string }[] }).entries).map(e => e.description),
     },
     {
       nome: "Mala",
@@ -132,6 +153,7 @@ describe("Editar nas abas que não tinham", () => {
       // a lista precisa estar aberta pra ver os itens
       antes: () => fireEvent.click(screen.getByText("Praia")),
       rotuloEditar: "Editar Protetor", valorAtual: "Protetor", novoValor: "Protetor solar 50", botaoSalvar: "Salvar item",
+      salvos: d => lista<{ items: { name: string }[] }>(d, "travel-packing-v2").flatMap(l => l.items.map(i => i.name)),
     },
   ];
 
@@ -145,8 +167,9 @@ describe("Editar nas abas que não tinham", () => {
       fireEvent.change(screen.getByDisplayValue(caso.valorAtual), { target: { value: caso.novoValor } });
       fireEvent.click(screen.getByRole("button", { name: caso.botaoSalvar }));
 
-      expect(screen.getByText(caso.novoValor)).toBeInTheDocument();
-      expect(screen.queryByText(caso.valorAtual)).not.toBeInTheDocument(); // editou, não duplicou
+      // apareceu na tela e, no que ficou salvo, é UM item editado — não uma cópia
+      expect(document.body.textContent).toContain(caso.novoValor);
+      expect(caso.salvos(store.dados)).toEqual([caso.novoValor]);
     });
   });
 

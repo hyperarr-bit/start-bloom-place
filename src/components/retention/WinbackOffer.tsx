@@ -14,8 +14,8 @@ import { PixCheckout } from "@/components/paywall/PixCheckout";
 // (05/08), deixar 14,90 aqui faria a tela prometer 14,90 e o QR cobrar
 // 19,90 — cobrar MAIS do que o anunciado. Mexeu no preço do downsell,
 // mexe aqui na mesma passada.
-const FULL_LIFETIME = 27.90;
-const OFFER_LIFETIME = 19.90;
+const FULL_LIFETIME = 19.90;
+const OFFER_LIFETIME = 14.90;
 const SAVINGS = FULL_LIFETIME - OFFER_LIFETIME;
 
 const COUNTDOWN_SECONDS = 10 * 60;

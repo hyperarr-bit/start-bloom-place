@@ -29,8 +29,8 @@ export type PixOffer = "lifetime" | "downsell";
  * Trocar aqui sem trocar os secrets faz a tela prometer um preço e o QR
  * cobrar outro — os dois andam juntos ou nenhum anda. */
 export const PIX_PRICES: Record<PixOffer, string> = {
-  lifetime: "27,90",
-  downsell: "19,90",
+  lifetime: "19,90",
+  downsell: "14,90",
 };
 
 interface Props {

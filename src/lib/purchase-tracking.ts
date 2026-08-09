@@ -96,7 +96,7 @@ export async function firePixPurchaseOnce(source: "checkout" | "rescue"): Promis
     } catch { /* fica no último gerado */ }
   }
 
-  const value = chosen.offer === "lifetime" ? 27.9 : 19.9;
+  const value = chosen.offer === "lifetime" ? 19.9 : 14.9;
   fireMetaEvent(
     "Purchase",
     { value, currency: "BRL", content_name: chosen.offer },

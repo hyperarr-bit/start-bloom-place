@@ -171,7 +171,9 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
   // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
   // Corrigido de passagem.
   const to = isNativeShell()
-    ? "/app?step=signup"
+    // 09/08: no shell o cadastro passou pra DEPOIS da compra — a demo devolve
+    // direto pro paywall. Na web nada muda.
+    ? "/app?step=offer"
     : (from && voltaFunilTeste(from, tour))
       ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
   return (
@@ -202,7 +204,8 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   // No shell o destino é a porta do app; na web, o funil de origem. Fallback
   // em ?step=signup (o "plano" saiu — ver DemoCta).
   const to = isNativeShell()
-    ? "/app?step=signup"
+    // 09/08: shell compra antes de cadastrar — nudge também cai no paywall.
+    ? "/app?step=offer"
     : (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
   if (!show) return null;
   const dismiss = () => {

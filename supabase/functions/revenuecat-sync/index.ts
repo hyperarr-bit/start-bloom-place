@@ -88,6 +88,11 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // corrigido (funções autocontidas: mexeu numa, mexe na outra).
   core_mensal: { billing: "monthly", cents: 1990 },
   // 06/08: app virou produto único — compra ÚNICA do Play (não assinatura).
+  // 09/08: downsell 19,90 (core_vitalicio_19). ANTES do core_vitalicio de
+  // propósito: o infoProduto casa por startsWith e "core_vitalicio_19"
+  // começa com "core_vitalicio" — na ordem errada, todo downsell entraria
+  // na tabela (e no Meta) como 27,90.
+  core_vitalicio_19: { billing: "lifetime", cents: 1990 },
   core_vitalicio: { billing: "lifetime", cents: 2790 }, // 07/08: 27,90, espelho da web
 };
 
@@ -141,13 +146,16 @@ async function reconciliarRevenueCat(
   const compras: any[] = (respCompras?.items ?? []).filter(
     (p: any) => !p?.revoked_at && p?.status !== "refunded"
   );
-  const vitalicias: { id: string; inicio: string | null }[] = [];
+  const vitalicias: { id: string; inicio: string | null; storeId: string }[] = [];
   for (const p of compras) {
     const storeId = await storeIdDoProduto(p.product_id ?? "", secret);
     if (!storeId.startsWith("core_vitalicio")) continue;
     vitalicias.push({
       id: p.id || `rcp:${userId}`,
       inicio: p.purchased_at ? new Date(p.purchased_at).toISOString() : null,
+      // 09/08: existe vitalício de 27,90 e de 19,90 (downsell) — o valor da
+      // linha sai do produto, não de constante.
+      storeId,
     });
   }
 
@@ -193,7 +201,7 @@ async function reconciliarRevenueCat(
         billing_period: "lifetime",
         payment_method: "play_store",
         customer_email: email,
-        amount_cents: 2790,
+        amount_cents: infoProduto(v.storeId).cents ?? 2790,
         current_period_start: v.inicio,
         current_period_end: FIM_VITALICIO,
         revenuecat_subscription_id: v.id,
@@ -201,7 +209,7 @@ async function reconciliarRevenueCat(
       { onConflict: "revenuecat_subscription_id" }
     );
     if (error) throw new Error(`upsert vitalício falhou: ${error.message}`);
-    melhor = { fim: FIM_VITALICIO, prod: "core_vitalicio" };
+    melhor = { fim: FIM_VITALICIO, prod: v.storeId };
   }
 
   for (const s of vivas) {

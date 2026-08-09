@@ -49,4 +49,9 @@ export const APP_PRECOS = {
   // app × web com uma variável só. Preço da Play trocado por API na mesma
   // hora (PATCH oneTimeProducts, conferido ACTIVE/27,90 na resposta).
   vitalicio: { id: "core_vitalicio", preco: "R$ 27,90" },
+  // 09/08 (dono): downsell do app — mesma compra vitalícia por 19,90 pra quem
+  // CANCELOU a folha do Google no preço cheio. Produto próprio no Play
+  // (`core_vitalicio_19`, ACTIVE via API, schema espelho do core_vitalicio),
+  // porque a folha não aceita desconto dinâmico em compra única.
+  vitalicio19: { id: "core_vitalicio_19", preco: "R$ 19,90" },
 } as const;

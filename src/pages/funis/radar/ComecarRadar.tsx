@@ -7,6 +7,7 @@ import {
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
+import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { PortaPerguntaApp } from "@/components/app/PortaPerguntaApp";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { CtaFixo } from "./CtaFixo";
@@ -29,6 +30,9 @@ import {
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
 export const FUNNEL_OAUTH_KEY = "funnel-oauth-pending";
+// Cadastro PÓS-COMPRA via Google (09/08): o OAuth devolve o app em
+// ?step=offer — esta flag diz "já pagou, cai no liberando, não no paywall".
+export const POS_COMPRA_OAUTH_KEY = "core-pos-compra-oauth";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -48,7 +52,10 @@ const GoogleIcon = () => (
  * que tem um CTA "Quase lá" voltando pra cá em ?step=signup.
  */
 
-type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm";
+// "liberando" (09/08): pós-cadastro de quem JÁ PAGOU — espera o acesso ser
+// gravado no banco antes de soltar a pessoa no app (cadastro vem depois da
+// compra no shell).
+type Step = "start" | "quiz" | "progress" | "result" | "central" | "signup" | "offer" | "confirm" | "liberando";
 
 const DEMO_URL = "/preview/financas?funnel=1&from=radar";
 /** Demo do funil vitrine: abre no módulo da área escolhida, com a barra de
@@ -111,11 +118,22 @@ const RESULT_ITEMS = [
   "Testar um painel financeiro simples no dia a dia",
 ];
 
-const TrustRow = () => (
+const TrustRow = ({ posCompra }: { posCompra?: boolean }) => (
   <div className="flex items-center justify-center gap-x-4 gap-y-1 flex-wrap text-[11px] text-muted-foreground">
     <span className="inline-flex items-center gap-1"><Lock className="w-3 h-3" /> Dados criptografados</span>
-    <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Sem cartão agora</span>
-    <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Cancele quando quiser</span>
+    {posCompra ? (
+      // Quem JÁ PAGOU não pode ler "sem cartão agora"/"cancele quando quiser"
+      // — o medo daqui é outro: perder o que acabou de comprar.
+      <>
+        <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Acesso vitalício garantido</span>
+        <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Garantia de 7 dias</span>
+      </>
+    ) : (
+      <>
+        <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Sem cartão agora</span>
+        <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Cancele quando quiser</span>
+      </>
+    )}
   </div>
 );
 
@@ -759,7 +777,7 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
   );
 }
 
-function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfirm: (email: string) => void }) {
+function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: () => void; onConfirm: (email: string) => void; posCompra?: boolean }) {
   const { signUp, signIn } = useAuth();
   const { set: setUserData } = useUserData();
   const [name, setName] = useState("");
@@ -793,8 +811,13 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     if (loading || googleLoading) return;
     setErr(null);
     setGoogleLoading(true);
-    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp });
-    try { localStorage.setItem(FUNNEL_OAUTH_KEY, "true"); } catch { /* noop */ }
+    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp, pos_compra: !!posCompra });
+    try {
+      localStorage.setItem(FUNNEL_OAUTH_KEY, "true");
+      // A volta do OAuth cai em ?step=offer — a flag corrige o pouso pra
+      // "liberando" quando o cadastro é de quem JÁ pagou.
+      if (posCompra) localStorage.setItem(POS_COMPRA_OAUTH_KEY, "1");
+    } catch { /* noop */ }
     // web igual ao que sempre foi; app vai por Custom Tab e volta em
     // core://auth (antes voltava no SITE e deixava o app deslogado)
     const { error } = await entrarComGoogle();
@@ -902,14 +925,33 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
   return (
     <div className="w-full max-w-sm mx-auto">
+      {/* PÓS-COMPRA (09/08): a pessoa JÁ PAGOU — o form não pede permissão,
+          guarda o que é dela. O verde confirma a compra antes de pedir
+          qualquer coisa. */}
       <div className="text-center mb-7">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
-          <Sparkles className="w-3.5 h-3.5" /> Último passo
-        </div>
-        <h2 className="text-[26px] font-bold tracking-tight leading-tight">
-          Só falta 1 passo pra você<br />começar a usar o CORE.
-        </h2>
-        <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
+        {posCompra ? (
+          <>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-3">
+              <Check className="w-3.5 h-3.5" strokeWidth={3} /> Pagamento confirmado
+            </div>
+            <h2 className="text-[26px] font-bold tracking-tight leading-tight">
+              Agora crie sua conta pra<br />guardar seu acesso.
+            </h2>
+            <p className="text-muted-foreground text-sm mt-2">
+              Seu vitalício fica guardado nela — é com ela que você entra em qualquer aparelho, pra sempre.
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-xs font-semibold mb-3">
+              <Sparkles className="w-3.5 h-3.5" /> Último passo
+            </div>
+            <h2 className="text-[26px] font-bold tracking-tight leading-tight">
+              Só falta 1 passo pra você<br />começar a usar o CORE.
+            </h2>
+            <p className="text-muted-foreground text-sm mt-2">Crie sua conta pra destravar seu plano personalizado.</p>
+          </>
+        )}
       </div>
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
@@ -946,7 +988,13 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         )}
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
+          {loading
+            ? <Loader2 className="w-4 h-4 animate-spin" />
+            : existingAccount
+              ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></>
+              : posCompra
+                ? <>Salvar meu acesso <ArrowRight className="w-4 h-4" /></>
+                : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
         {existingAccount && (
           <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
@@ -954,7 +1002,58 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
           </button>
         )}
       </form>
-      <div className="mt-5"><TrustRow /></div>
+      <div className="mt-5"><TrustRow posCompra={posCompra} /></div>
+    </div>
+  );
+}
+
+/**
+ * LIBERANDO (09/08) — a ponte entre "criou a conta" e "app aberto" de quem
+ * pagou ANTES de ter conta. O que acontece por baixo: o use-auth já fez
+ * Purchases.logIn (a compra anônima vira da conta), aqui o servidor confere
+ * no RevenueCat e grava a linha em `subscriptions`. Se o sync não achar de
+ * primeira (a Play leva uns segundos pra propagar), restaura e tenta de
+ * novo — e SÓ ENTÃO celebra e solta no app. Sem esta espera, a pessoa caía
+ * no gate ainda "sem assinatura" e via paywall DE NOVO depois de pagar.
+ */
+function LiberandoScreen() {
+  // mesmo par de chaves que o OfferScreen usa pra saudação da celebração
+  const { get: getUserData } = useUserData();
+  const nome = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
+  const [demorou, setDemorou] = useState(false);
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    const t = setTimeout(() => { if (vivo) setDemorou(true); }, 9000);
+    (async () => {
+      const rc = await import("@/lib/revenuecat");
+      await rc.initRevenueCat();
+      let ok = await rc.sincronizarAssinatura(3);
+      if (!ok) {
+        // a folha fechou mas o RC ainda não viu a transação nesta conta:
+        // restaurar força a leitura do recibo da Play e re-sincroniza
+        await rc.restaurar();
+        ok = await rc.sincronizarAssinatura(3);
+      }
+      trackEvent("app_pos_compra_liberado", { ok });
+      if (vivo) setPronto(true);
+    })();
+    return () => { vivo = false; clearTimeout(t); };
+  }, []);
+  if (pronto) {
+    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
+  }
+  return (
+    <div className="w-full max-w-sm mx-auto text-center py-16">
+      <Loader2 className="w-10 h-10 animate-spin text-accent mx-auto mb-5" />
+      <h2 className="text-[24px] font-bold tracking-tight leading-tight mb-2">
+        Guardando seu acesso…
+      </h2>
+      <p className="text-muted-foreground text-sm leading-relaxed">
+        {demorou
+          ? "Quase lá — o Google leva alguns segundos pra confirmar."
+          : "Vinculando sua compra à sua conta nova."}
+      </p>
     </div>
   );
 }
@@ -982,7 +1081,7 @@ function ConfirmScreen({ email }: { email: string }) {
 export default function ComecarRadar() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isSubscribed, subLoaded } = useAuth();
+  const { user, isSubscribed, subLoaded, loading: authLoading } = useAuth();
   // Volta da demo (?step=signup) cai no cadastro; volta do OAuth Google
   // (?step=offer, via /auth/callback) cai direto no paywall.
   // ("trial" é aceito por compat com links antigos.)
@@ -995,6 +1094,13 @@ export default function ComecarRadar() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  /* CADASTRO DEPOIS DA COMPRA (09/08). No shell a ordem virou: paywall →
+     folha do Google → PAGOU → cadastro "salvar seu acesso" → liberando →
+     celebração. O dado que mandou: o form comia 38% de quem chegava nele
+     ANTES do paywall — fricção antes do desejo, a lei que o BitePal não
+     quebra. `posCompra` muda a cara do cadastro (a pessoa já pagou; o form
+     agora é guardar o acesso, não pedir permissão). */
+  const [posCompra, setPosCompra] = useState(false);
 
   /* Pré-carrega o chunk da DEMO enquanto a pessoa olha o "Preparando seu
      plano…" (04/08). Num aparelho fraco o Preview levava segundos baixando
@@ -1046,7 +1152,7 @@ export default function ComecarRadar() {
       if (!escondidoDesde || Date.now() - escondidoDesde < 30 * 60_000) return;
       escondidoDesde = 0;
       const s = stepRef.current;
-      if (userRef.current || s === "signup" || s === "offer" || s === "confirm") return;
+      if (userRef.current || s === "signup" || s === "offer" || s === "confirm" || s === "liberando") return;
       trackEvent("app_welcome_reset", { de: s });
       setAnswers({});
       setStep("start");
@@ -1055,6 +1161,41 @@ export default function ComecarRadar() {
     document.addEventListener("visibilitychange", aoMudarVisibilidade);
     return () => document.removeEventListener("visibilitychange", aoMudarVisibilidade);
   }, []);
+
+  /* Os dois retornos do "pagou e ainda não tem conta" (09/08):
+     1) OAuth do cadastro pós-compra: o Google devolve o app em ?step=offer
+        (rota do AuthCallback) — a flag diz "isso era um cadastro PÓS-COMPRA"
+        e a pessoa cai no "liberando", nunca de volta no paywall que ela já
+        pagou.
+     2) App morto entre a folha do Google e o cadastro: o RevenueCat guarda a
+        compra no usuário anônimo local — reabertura cai direto no cadastro
+        de salvar acesso, sem welcome, sem paywall. */
+  useEffect(() => {
+    if (!isNativeShell() || authLoading) return;
+    if (user) {
+      let flagOauth = false;
+      try { flagOauth = localStorage.getItem(POS_COMPRA_OAUTH_KEY) === "1"; } catch { /* noop */ }
+      if (flagOauth) {
+        try { localStorage.removeItem(POS_COMPRA_OAUTH_KEY); } catch { /* noop */ }
+        setPosCompra(true);
+        setStep("liberando");
+      }
+      return;
+    }
+    let vivo = true;
+    import("@/lib/revenuecat")
+      .then((m) => m.compraVitaliciaLocal())
+      .then((tem) => {
+        if (!vivo || !tem || userRef.current) return;
+        trackEvent("app_pos_compra_retomada", {});
+        setPosCompra(true);
+        setStep("signup");
+        setWelcomeVisible(false);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user]);
   const [area, setArea] = useState<AreaKey | null>(() => {
     try {
       const a = localStorage.getItem(FUNNEL_AREA_KEY);
@@ -1106,15 +1247,29 @@ export default function ComecarRadar() {
   // que ele escolheu. Caso real de 12/07: pagante voltou pro /inicio pelo
   // link do anúncio, reviu o quiz, tentou recriar a conta ("User already
   // registered") e cancelou achando que era problema técnico.
-  if (user && subLoaded && isSubscribed) {
+  // "liberando" fica FORA do redirect de assinante: é justamente o momento em
+  // que a linha da assinatura acabou de nascer — o redirect roubaria a
+  // celebração e jogaria a pessoa no app sem cerimônia.
+  if (user && subLoaded && isSubscribed && step !== "liberando") {
     // No app o destino é o HUB, não o módulo — mesma razão do RootGate
     // (27/07): o app não nasce dentro de finanças. Na web, nada muda.
     if (isNativeShell()) return <Navigate to="/home" replace />;
     return <Navigate to={area && area !== "dinheiro" ? `/${AREAS[area].module}` : "/financas"} replace />;
   }
 
+  if (step === "liberando") return <LiberandoScreen />;
+
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
-  if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;
+  if (step === "offer") {
+    return (
+      <PaywallFlow
+        context="funnel"
+        answers={answers}
+        // Só no shell: pagou sem conta → cadastro de salvar acesso.
+        onPagoSemConta={isNativeShell() ? () => { setPosCompra(true); setStep("signup"); } : undefined}
+      />
+    );
+  }
 
   // Shell: céu suave da porta até o loading; branco do radar em diante
   // (régua de cor: céu forte no welcome → suave no corredor → app assume).
@@ -1227,7 +1382,10 @@ export default function ComecarRadar() {
             )}
             {step === "signup" && (
               <SignupScreen
-                onSession={() => setStep("offer")}
+                posCompra={posCompra}
+                // Pós-compra: conta criada → liberando (grava o acesso e
+                // celebra). Pré-compra (web e links antigos): paywall.
+                onSession={() => setStep(posCompra ? "liberando" : "offer")}
                 onConfirm={(e) => { setConfirmEmail(e); setStep("confirm"); }}
               />
             )}

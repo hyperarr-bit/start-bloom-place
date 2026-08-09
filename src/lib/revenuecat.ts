@@ -114,6 +114,11 @@ export async function identificarRevenueCat(userId: string | null): Promise<void
  *  algumas vezes porque o RevenueCat leva um instante pra registrar a compra
  *  recém-feita do lado dele. */
 export async function sincronizarAssinatura(tentativas = 3): Promise<boolean> {
+  // Compra ANÔNIMA (cadastro depois da compra, 09/08): sem sessão não existe
+  // pra quem gravar linha — o sync de verdade roda no "liberando", depois que
+  // a conta nasce. Retornar já evita 3 retries de 401 (~4s de espera morta
+  // entre a folha do Google e a tela de cadastro).
+  if (!(await idDoUsuario())) return false;
   for (let i = 0; i < tentativas; i++) {
     try {
       const { data, error } = await supabase.functions.invoke("revenuecat-sync");
@@ -239,34 +244,42 @@ export async function comprar(productId: string): Promise<boolean> {
  * folha direto. O cache não expira — preço só muda com release.
  */
 type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct;
-let produtoVitalicio: ProdutoRC | null = null;
+// 09/08: virou dois produtos (27,90 cheio + 19,90 downsell) — o cache é por
+// id e a pré-busca traz os dois numa ida só à Play.
+const IDS_VITALICIOS = ["core_vitalicio", "core_vitalicio_19"] as const;
+export type IdVitalicio = (typeof IDS_VITALICIOS)[number];
+const produtosVitalicios: Partial<Record<IdVitalicio, ProdutoRC>> = {};
 export async function prefetchVitalicio(): Promise<void> {
-  if (produtoVitalicio || estado !== "pronto" || !Purchases) return;
+  if (produtosVitalicios.core_vitalicio && produtosVitalicios.core_vitalicio_19) return;
+  if (estado !== "pronto" || !Purchases) return;
   try {
     const mod = await import("@revenuecat/purchases-capacitor");
     const { products } = await Purchases.getProducts({
-      productIdentifiers: ["core_vitalicio"],
+      productIdentifiers: [...IDS_VITALICIOS],
       type: mod.PRODUCT_CATEGORY.NON_SUBSCRIPTION,
     });
-    produtoVitalicio = products?.[0] ?? null;
+    for (const p of products ?? []) {
+      const id = IDS_VITALICIOS.find((i) => p?.identifier?.startsWith(i + ":") || p?.identifier === i);
+      if (id) produtosVitalicios[id] = p;
+    }
   } catch {
     // sem rede agora — o comprarVitalicio tenta de novo na hora do toque
   }
 }
 
-export async function comprarVitalicio(): Promise<boolean> {
+export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"): Promise<boolean> {
   ultimoMotivo = null;
   if (estado !== "pronto" || !Purchases) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: "core_vitalicio" });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: produtoId });
     return false;
   }
   try {
-    if (!produtoVitalicio) await prefetchVitalicio();
-    const produto = produtoVitalicio;
+    if (!produtosVitalicios[produtoId]) await prefetchVitalicio();
+    const produto = produtosVitalicios[produtoId];
     if (!produto) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: "core_vitalicio" });
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: produtoId });
       return false;
     }
     await Purchases.purchaseStoreProduct({ product: produto });
@@ -288,16 +301,37 @@ export async function comprarVitalicio(): Promise<boolean> {
      */
     if (codigo === "20" || /pending/i.test(msg)) {
       ultimoMotivo = "pendente";
-      trackEvent("app_compra_pendente", { produto: "core_vitalicio" });
+      trackEvent("app_compra_pendente", { produto: produtoId });
       return false;
     }
     const cancelou = /cancel/i.test(msg) || codigo === "1";
     ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
     trackEvent("app_compra_falhou", {
       motivo: cancelou ? "cancelou" : "billing_erro",
-      produto: "core_vitalicio",
+      produto: produtoId,
       erro: msg.slice(0, 160),
     });
+    return false;
+  }
+}
+
+/**
+ * A pessoa COMPROU neste aparelho mas ainda não tem conta? (09/08 — cadastro
+ * passou pra DEPOIS da compra no app.) O RevenueCat guarda a transação no
+ * usuário anônimo local; se o app morrer entre a folha do Google e o
+ * cadastro, é isto que deixa a reabertura cair direto no "salvar seu acesso"
+ * em vez de mostrar paywall pra quem já pagou.
+ */
+export async function compraVitaliciaLocal(): Promise<boolean> {
+  if (!isNativeShell()) return false;
+  if (!configurado) await initRevenueCat();
+  if (!Purchases || !configurado) return false;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    const compras = (customerInfo as unknown as { nonSubscriptionTransactions?: { productIdentifier?: string; productId?: string }[] })
+      ?.nonSubscriptionTransactions ?? [];
+    return compras.some((t) => String(t?.productIdentifier ?? t?.productId ?? "").startsWith("core_vitalicio"));
+  } catch {
     return false;
   }
 }

@@ -83,6 +83,13 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // APK de TESTE (RC_MOCK=1, setado só pelo `npm run loja -- --teste`):
+      // troca o plugin do RevenueCat por uma loja simulada controlável, pra
+      // validar cancelamento/downsell/compra/cadastro-pós-compra no emulador.
+      // O build de PRODUÇÃO aborta se RC_MOCK existir (preparar-loja.mjs).
+      ...(process.env.RC_MOCK === "1"
+        ? { "@revenuecat/purchases-capacitor": path.resolve(__dirname, "./src/dev/rc-plugin-mock.ts") }
+        : {}),
     },
   },
 }));

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowRight, Check, X, ShieldCheck, Gift, Loader2,
+  ArrowRight, Check, X, ShieldCheck, Gift, Loader2, CreditCard,
   Wallet, BellRing, Target, BarChart3, Unlock, MessageCircleHeart, TrendingUp, FileDown,
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
@@ -534,8 +534,8 @@ function AppLegalFooter() {
 }
 
 function OfferScreen({
-  context, answers, onEscape, onBuy,
-}: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void }) {
+  context, answers, onEscape, onBuy, onPagoSemConta,
+}: { context: "funnel" | "app"; answers: Record<string, string>; onEscape: () => void; onBuy: (o: PixOffer) => void; onPagoSemConta?: () => void }) {
   const [showClose, setShowClose] = useState(false);
   // APP DAS LOJAS: o CTA abre o bottom sheet de assinatura (lógica BitePal);
   // nada de Pix, roleta ou downsell no shell — desconto só via oferta oficial.
@@ -559,19 +559,31 @@ function OfferScreen({
   const [comprando, setComprando] = useState(false);
   const [erroCompra, setErroCompra] = useState<string | null>(null);
   /*
-   * Resgate do "cancelou a folha do Google" (06/08). O dado do 1º dia de
-   * campanha: 12 pessoas abriram a folha, 4 assinaram — e quem cancelava
-   * voltava pra uma tela IDÊNTICA, sem uma palavra (o motivo era engolido).
-   * O medo ali é a cobrança: a folha estampa o preço do ano inteiro mesmo
-   * com trial. Zero fricção — a mensagem aparece sozinha, ninguém precisa
-   * fazer nada; no mensal ela ainda oferece o caminho sem risco (trial).
+   * Resgate do "cancelou a folha do Google" (06/08) → DOWNSELL 19,90 (09/08).
+   * O dado que mandou aqui: em 4 dias, 57 pessoas abriram a folha e 35
+   * cancelaram pra nunca mais voltar — metade em MENOS DE 15 SEGUNDOS. Quem
+   * cancela já disse sim ao paywall; o não é pra folha (preço/forma de
+   * pagamento). Resposta em duas camadas, zero fricção (aparece sozinha):
+   *  - a oferta INTEIRA da tela vira 19,90 (produto próprio core_vitalicio_19
+   *    no Play — folha não aceita desconto dinâmico em compra única);
+   *  - o lembrete de que dá pra pagar no Pix DENTRO do Google.
+   * Uma decisão por tela: o CTA principal é que muda de preço — nada de dois
+   * botões competindo.
    */
-  const [resgate, setResgate] = useState<"vitalicio" | null>(null);
+  const [oferta, setOferta] = useState<"cheia" | "downsell">("cheia");
+  const plano = oferta === "downsell" ? APP_PRECOS.vitalicio19 : APP_PRECOS.vitalicio;
+  // Pré-folha (09/08, pedido do dono): metade dos cancelamentos era gente que
+  // não sabia que a folha do Google aceita Pix. Antes de abrir a folha, a
+  // pessoa escolhe o caminho (Pix ganha um guia de 2 passos; cartão vai
+  // direto) — a folha deixa de ser surpresa.
+  const [preFolha, setPreFolha] = useState(false);
   // Pix/boleto escolhido na folha do Google: compra fica pendente até o
   // pagamento cair — o app precisa DIZER isso em vez do silêncio de antes.
   const [pendente, setPendente] = useState(false);
   const [celebrar, setCelebrar] = useState(false);
   const { get: getUserData } = useUserData();
+  // Cadastro depois da compra (09/08): sem conta + pagou → onPagoSemConta.
+  const { user } = useAuth();
   const nomeUsuario = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   /* AS DUAS OFERTAS NA TELA, PESO IGUAL (04/08, terceira cobrança do dono —
      registro honesto: v35 pôs os cards só dentro do sheet, v36 pôs um link
@@ -617,11 +629,11 @@ function OfferScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nativo]);
 
-  const assinarDireto = async () => {
+  const assinarDireto = async (metodo?: "pix" | "cartao") => {
     if (comprando) return;
     setComprando(true);
-    setResgate(null);
-    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano: "vitalicio" });
+    const rotuloPlano = oferta === "downsell" ? "vitalicio_19" : "vitalicio";
+    trackEvent("funnel_click", { cta: "app_paywall_cta", context, plano: rotuloPlano, metodo: metodo ?? "" });
     // tocou antes do catálogo chegar: espera o init em vez de não fazer nada
     let estadoAtual = rc;
     if (estadoAtual !== "pronto") {
@@ -630,24 +642,29 @@ function OfferScreen({
       setRcResolvido(true);
     }
     if (estadoAtual !== "pronto") {
-      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: APP_PRECOS.vitalicio.id, via: "paywall_direto" });
+      trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: plano.id, via: "paywall_direto" });
       setErroCompra("Não consegui falar com o Google Play agora. Tente de novo em instantes.");
       setComprando(false);
       return;
     }
     setErroCompra(null);
-    const ativou = await comprarVitalicio();
+    const ativou = await comprarVitalicio(plano.id);
     setComprando(false);
     /* Sem o painel intermediário, um toque que não abre a folha do Google
-       fica INDISTINGUÍVEL de app quebrado. Cancelamento vira resgate (a
-       mensagem certa pro medo certo); qualquer outro motivo, aviso com saída. */
+       fica INDISTINGUÍVEL de app quebrado. Cancelamento no preço cheio vira
+       DOWNSELL 19,90 (auto, zero fricção); no downsell, reforço do Pix;
+       qualquer outro motivo, aviso com saída. */
     if (!ativou) {
       const motivo = motivoUltimaCompra();
       if (motivo === "pendente") {
         setPendente(true);
       } else if (motivo === "cancelou") {
-        setResgate("vitalicio");
-        trackEvent("app_resgate_view", { plano: "vitalicio", context });
+        if (oferta === "cheia") {
+          setOferta("downsell");
+          trackEvent("app_downsell_view", { plano: "vitalicio_19", context, origem: "cancelou_folha" });
+        } else {
+          trackEvent("app_resgate_view", { plano: rotuloPlano, context });
+        }
       } else if (motivo) {
         setErroCompra(
           motivo === "sem_entitlement"
@@ -657,7 +674,14 @@ function OfferScreen({
       }
     }
     if (ativou) {
-      trackEvent("app_sheet_success", { plano: "vitalicio", via: "paywall_direto" });
+      trackEvent("app_sheet_success", { plano: rotuloPlano, via: "paywall_direto", metodo: metodo ?? "" });
+      // CADASTRO DEPOIS DA COMPRA (09/08): quem pagou sem conta vai criar a
+      // conta AGORA — o funil troca pro cadastro "salvar seu acesso" e a
+      // celebração fica pro fim (senão ela promete o app e entrega um form).
+      if (onPagoSemConta && nativo && !user) {
+        onPagoSemConta();
+        return;
+      }
       // Celebra ANTES de navegar (27/07): o app não pode pintar primeiro,
       // senão a pessoa vê o módulo cru e a comemoração chega como aviso.
       setTimeout(() => setCelebrar(true), 700);
@@ -829,12 +853,43 @@ function OfferScreen({
           <motion.div
             {...(nativo ? {} : { animate: { scale: [1, 1.02, 1] }, transition: { duration: 1.9, repeat: Infinity, ease: "easeInOut" } })}
           >
+            {/* DOWNSELL automático (09/08): cancelou a folha no preço cheio →
+                a oferta da tela INTEIRA cai pra 19,90. Card em cima do CTA,
+                nada pra clicar além do próprio CTA — zero fricção. */}
+            {nativo && oferta === "downsell" && !pendente && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                // fundo SÓLIDO (não accent/7% translúcido): o card mora na zona
+                // de fade do rodapé e o gráfico de trás vazava pra dentro dele
+                className="mb-2.5 rounded-2xl border border-accent/30 bg-[#FDF3F8] px-4 py-3 text-left shadow-[0_6px_20px_-8px_rgba(0,0,0,0.18)]"
+              >
+                <p className="text-[13px] font-bold leading-snug">
+                  Tá, sem pressão — fica <span className="text-accent">{APP_PRECOS.vitalicio19.preco}</span>{" "}
+                  <span className="text-muted-foreground font-semibold line-through text-[11.5px]">{APP_PRECOS.vitalicio.preco}</span>
+                </p>
+                <p className="text-[11.5px] text-muted-foreground leading-snug mt-0.5">
+                  Mesmo acesso, pra sempre. E dá pra pagar com <b className="text-foreground">Pix</b> ali
+                  dentro do Google — sem cartão.
+                </p>
+              </motion.div>
+            )}
             <Button
               size="lg"
-              disabled={nativo && ((rcResolvido && rc !== "pronto") || comprando)}
+              // 09/08: o CTA não morre mais quando o catálogo falha — ele abre a
+              // pré-folha, e é ELA que explica indisponibilidade (superfície
+              // viva > botão morto; o aviso continua embaixo do CTA também).
+              disabled={nativo && comprando}
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)] disabled:opacity-60"
               onClick={() => {
-                if (nativo) { void assinarDireto(); return; }
+                if (nativo) {
+                  // Pré-folha primeiro: a pessoa escolhe Pix ou cartão e SÓ
+                  // então a folha do Google abre — fim da folha-surpresa.
+                  trackEvent("app_prefolha_view", { plano: oferta === "downsell" ? "vitalicio_19" : "vitalicio", context });
+                  setPreFolha(true);
+                  return;
+                }
                 openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
               }}
             >
@@ -843,7 +898,7 @@ function OfferScreen({
                     // Spinner + texto (07/08): só trocar o rótulo era feedback
                     // fraco demais — no Moto o dono tocou 4x achando botão morto.
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Abrindo o Google Play…</>
-                    : <>Quero pra sempre — {APP_PRECOS.vitalicio.preco} <ArrowRight className="w-4 h-4" /></>)
+                    : <>Quero pra sempre — {plano.preco} <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
             {nativo && rcResolvido && rc !== "pronto" && !erroCompra && (
@@ -853,12 +908,6 @@ function OfferScreen({
             )}
             {nativo && erroCompra && (
               <p className="text-[11.5px] text-center mt-2 font-medium text-foreground/80">{erroCompra}</p>
-            )}
-            {nativo && resgate && !pendente && (
-              <p className="text-[11.5px] text-center mt-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-emerald-900">
-                Fica tranquilo: é <b>pagamento único</b> — nenhuma mensalidade escondida.
-                E se não curtir, a <b>Garantia de 7 dias</b> devolve 100% em 1 mensagem.
-              </p>
             )}
             {nativo && pendente && (
               <div className="text-[11.5px] text-center mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
@@ -878,13 +927,178 @@ function OfferScreen({
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
               {nativo
-                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> de {APP_PRECOS.vitalicio.preco} · sem mensalidade · Garantia de 7 dias</>
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> de {plano.preco} · Pix ou cartão · Garantia de 7 dias</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> de R$ {PRICING.lifetime.total} no Pix · sem mensalidade · Garantia de 7 dias</>}
             </span>
           </p>
         </div>
       </div>
 
+      {/* Pré-folha por cima de tudo; fechar volta pro paywall sem punição. */}
+      <AnimatePresence>
+        {nativo && preFolha && (
+          <PreFolhaPagamento
+            preco={plano.preco}
+            indisponivel={rcResolvido && rc !== "pronto"}
+            onEscolha={(metodo) => { setPreFolha(false); void assinarDireto(metodo); }}
+            onFechar={() => {
+              trackEvent("app_prefolha_fechou", { plano: oferta === "downsell" ? "vitalicio_19" : "vitalicio" });
+              setPreFolha(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------- pré-folha */
+
+/** Losango do Pix (traço oficial simplificado, inline pra não depender de
+ *  asset externo — o app embarca o bundle). Verde da marca Pix. */
+function PixLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M6.3 7.6 4 9.9a3 3 0 0 0 0 4.2l2.3 2.3a2.6 2.6 0 0 0 1.9.8h.9c.5 0 1-.2 1.4-.6l2-2a.7.7 0 0 1 1 0l2 2c.4.4.9.6 1.4.6h.9c.7 0 1.4-.3 1.9-.8l2.3-2.3a3 3 0 0 0 0-4.2l-2.3-2.3a2.6 2.6 0 0 0-1.9-.8h-.9c-.5 0-1 .2-1.4.6l-2 2a.7.7 0 0 1-1 0l-2-2a1.9 1.9 0 0 0-1.4-.6h-.9c-.7 0-1.4.3-1.9.8Z"
+        stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"
+      />
+      <path
+        d="M9.4 4.5 11 2.9a1.4 1.4 0 0 1 2 0l1.6 1.6M9.4 19.5 11 21.1a1.4 1.4 0 0 0 2 0l1.6-1.6"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/**
+ * PRÉ-FOLHA (09/08, pedido do dono depois do dado dos 4 dias: 57 abriram a
+ * folha do Google, 35 cancelaram — metade em <15s). A folha abre com o cartão
+ * na frente e MUITA gente aqui não tem cartão: ela fecha achando que é o
+ * único jeito. Esta tela conserta a expectativa ANTES: dá os dois caminhos
+ * com o mesmo peso — Pix (com guia de 2 passos, porque ele fica atrás de um
+ * toque na folha) e cartão (vai direto). Fechar não pune: volta pro paywall.
+ */
+function PreFolhaPagamento({
+  preco, onEscolha, onFechar, indisponivel,
+}: { preco: string; onEscolha: (m: "pix" | "cartao") => void; onFechar: () => void; indisponivel?: boolean }) {
+  const [guiaPix, setGuiaPix] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[90]">
+      <motion.button
+        aria-label="Fechar"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        onClick={onFechar}
+        className="absolute inset-0 w-full bg-black/45"
+      />
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 340, damping: 32 }}
+        className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white text-foreground shadow-[0_-18px_60px_-12px_rgba(0,0,0,0.35)]"
+        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto mt-2.5 h-1.5 w-10 rounded-full bg-muted" />
+        <div className="px-5 pt-4 max-w-sm mx-auto">
+          {indisponivel ? (
+            <>
+              <h3 className="text-[19px] font-bold tracking-tight leading-tight text-center">
+                As compras estão chegando
+              </h3>
+              <p className="text-[13px] text-muted-foreground text-center mt-2 mb-4 leading-relaxed">
+                Esta versão ainda não consegue falar com o Google Play.
+                Atualize o CORE na Play Store e volte aqui — leva 1 minuto.
+              </p>
+              <Button size="lg" onClick={onFechar} variant="outline" className="w-full h-[52px] rounded-full text-[15px] font-bold">
+                Entendi
+              </Button>
+            </>
+          ) : !guiaPix ? (
+            <>
+              <h3 className="text-[19px] font-bold tracking-tight leading-tight text-center">
+                Como você prefere pagar?
+              </h3>
+              <p className="text-[12.5px] text-muted-foreground text-center mt-1 mb-4">
+                Pagamento único de <b className="text-foreground">{preco}</b>, processado pelo Google Play.
+              </p>
+
+              <button
+                onClick={() => { trackEvent("app_prefolha_escolha", { metodo: "pix" }); setGuiaPix(true); }}
+                className="w-full flex items-center gap-3.5 rounded-2xl border-2 border-[#32BCAD]/45 bg-[#32BCAD]/[0.07] px-4 py-3.5 text-left active:scale-[0.985] transition-transform"
+              >
+                <span className="grid place-items-center w-11 h-11 rounded-xl bg-[#32BCAD] text-white shrink-0">
+                  <PixLogo className="w-6 h-6" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="flex items-center gap-2">
+                    <b className="text-[15px]">Pix</b>
+                    <span className="text-[9.5px] font-bold uppercase tracking-wide rounded-full bg-[#32BCAD] text-white px-2 py-0.5">aprova na hora</span>
+                  </span>
+                  <span className="block text-[12px] text-muted-foreground leading-snug mt-0.5">
+                    Sem cartão — você paga no app do seu banco
+                  </span>
+                </span>
+                <ArrowRight className="w-[18px] h-[18px] text-[#2aa396] shrink-0" />
+              </button>
+
+              <button
+                onClick={() => { trackEvent("app_prefolha_escolha", { metodo: "cartao" }); onEscolha("cartao"); }}
+                className="mt-2.5 w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card px-4 py-3.5 text-left active:scale-[0.985] transition-transform"
+              >
+                <span className="grid place-items-center w-11 h-11 rounded-xl bg-foreground text-background shrink-0">
+                  <CreditCard className="w-[22px] h-[22px]" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <b className="text-[15px]">Cartão de crédito ou débito</b>
+                  <span className="block text-[12px] text-muted-foreground leading-snug mt-0.5">
+                    Visa, Mastercard, Elo e outros
+                  </span>
+                </span>
+                <ArrowRight className="w-[18px] h-[18px] text-muted-foreground shrink-0" />
+              </button>
+
+              <p className="text-[11px] text-muted-foreground text-center mt-3.5 flex items-center justify-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                Garantia de 7 dias — devolvemos 100% em 1 mensagem
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-[19px] font-bold tracking-tight leading-tight text-center">
+                Pagar com Pix é assim:
+              </h3>
+              <div className="mt-4 space-y-2.5">
+                <div className="flex items-start gap-3 rounded-2xl bg-muted/60 px-4 py-3">
+                  <span className="grid place-items-center w-6 h-6 rounded-full bg-foreground text-background text-[12px] font-bold shrink-0 mt-0.5">1</span>
+                  <p className="text-[13px] leading-snug">
+                    Na tela do Google que vai abrir, toque na <b>forma de pagamento</b>
+                    {" "}e escolha <b className="text-[#2aa396]">Pix</b>
+                  </p>
+                </div>
+                <div className="flex items-start gap-3 rounded-2xl bg-muted/60 px-4 py-3">
+                  <span className="grid place-items-center w-6 h-6 rounded-full bg-foreground text-background text-[12px] font-bold shrink-0 mt-0.5">2</span>
+                  <p className="text-[13px] leading-snug">
+                    Confirme no app do seu banco — o acesso libera <b>sozinho</b> aqui
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="lg"
+                onClick={() => onEscolha("pix")}
+                className="mt-4 w-full h-[52px] rounded-full text-[15px] font-bold"
+              >
+                Entendi — abrir o Google Play <ArrowRight className="w-4 h-4" />
+              </Button>
+              <button
+                onClick={() => setGuiaPix(false)}
+                className="block mx-auto mt-2.5 text-[12px] text-muted-foreground underline underline-offset-2"
+              >
+                Voltar
+              </button>
+            </>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -983,9 +1197,13 @@ function DownsellWeb({ context, onDismiss, onBuy }: PropsDownsell) {
 export function PaywallFlow({
   context,
   answers,
+  onPagoSemConta,
 }: {
   context: "funnel" | "app";
   answers?: Record<string, string>;
+  /** App das lojas, cadastro depois da compra (09/08): pagou sem conta →
+   *  o funil troca pro cadastro "salvar seu acesso" em vez da celebração. */
+  onPagoSemConta?: () => void;
 }) {
   const navigate = useNavigate();
   const [phase, setPhase] = useState<"offer" | "wheel" | "downsell">("offer");
@@ -1034,6 +1252,7 @@ export function PaywallFlow({
               <OfferScreen
                 context={context}
                 answers={quiz}
+                onPagoSemConta={onPagoSemConta}
                 onEscape={() => {
                   // DOWNSELL OFF (23/07, fase 1 da reforma): sem roleta/14,90
                   // em lugar NENHUM — X/voltar entra no app (o gate de trial

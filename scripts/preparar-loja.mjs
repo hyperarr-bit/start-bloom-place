@@ -68,8 +68,19 @@ if (!teste && !chave.startsWith("goog_")) {
 }
 console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build de TESTE)" : "(produção)"}`);
 
+// Trava dupla do mock da loja (09/08): o build de teste liga RC_MOCK=1 (o
+// vite troca o plugin do RevenueCat por uma loja simulada — ver
+// src/dev/rc-plugin-mock.ts); o de produção ABORTA se a flag vazar do
+// ambiente, porque um binário de loja com loja de mentira dentro é o app
+// inteiro sem caixa.
+if (!teste && process.env.RC_MOCK === "1") {
+  console.error("\n✗ RC_MOCK=1 no ambiente de um build de PRODUÇÃO — o binário sairia com a loja simulada.");
+  console.error("  Rode sem RC_MOCK, ou use `npm run loja -- --teste` se é build de teste.\n");
+  process.exit(1);
+}
+
 // 2. build + sync
-sh("npm run build");
+sh(teste ? "RC_MOCK=1 npm run build" : "npm run build");
 sh("npx cap sync android");
 
 // 3. tira os rastreadores de anúncio do index.html do binário

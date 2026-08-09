@@ -258,6 +258,82 @@ async function mandarCompraProMeta(
   }
 }
 
+/**
+ * TikTok Events API (09/08) — mesma ideia do mandarCompraProMeta: manda a
+ * compra pro TikTok DEPOIS que o Google já confirmou o pagamento (servidor,
+ * não SDK no app). Decisão de arquitetura, não só preguiça de escrever Java:
+ * este binário tem política deliberada de não embutir rastreador/SDK de
+ * anúncio (ver preparar-loja.mjs — é a mesma razão por trás de nunca
+ * coletar GAID). Server-side mantém essa política intacta.
+ *
+ * AVISO DE CONFIANÇA: montei este payload cruzando a documentação do TikTok
+ * for Business (blog do endpoint consolidado) com integrações de terceiros
+ * (Apphud, Stape, Tealium) — o portal oficial (business-api.tiktok.com) é
+ * uma SPA que não dá pra ler direto. O endpoint, `event_source`/
+ * `event_source_id` e o nome do evento ("CompletePayment") saíram
+ * confirmados em mais de uma fonte independente; o formato exato de
+ * `user`/`properties` é o melhor palpite seguindo o padrão do Meta CAPI
+ * ao lado. Só confia nisso depois de ver UM evento de teste chegar certo
+ * no Events Manager — mesma regra do catálogo: causa provada, não suposta.
+ */
+async function mandarCompraProTikTok(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const appId = Deno.env.get("TIKTOK_APP_ID"); // event_source_id, do Events Manager
+  const token = Deno.env.get("TIKTOK_ACCESS_TOKEN"); // gerado no Events Manager, NÃO é o "app secret" do SDK
+  if (!appId || !token) return;
+
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "tiktok_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  const payload: Record<string, unknown> = {
+    event_source: "app",
+    event_source_id: appId,
+    data: [{
+      event: "CompletePayment",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId, // dedup: mesma chave (event_source_id, event, event_id) por 48h
+      user: {
+        external_id: await sha256(userId),
+        ...(email ? { email: await sha256(email.trim().toLowerCase()) } : {}),
+      },
+      properties: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("TIKTOK_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Access-Token": token },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("tiktok events api", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "tiktok_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("tiktok events api ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
+
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
   const chave = Object.keys(PRODUTOS).find((k) => id.startsWith(k));
@@ -375,6 +451,7 @@ async function reconciliarRevenueCat(
     if (error) throw new Error(`upsert vitalício falhou: ${error.message}`);
     melhor = { fim: FIM_VITALICIO, prod: v.storeId };
     await mandarCompraProMeta(admin, userId, email, centsVitalicio, v.id, v.inicio);
+    await mandarCompraProTikTok(admin, userId, email, centsVitalicio, v.id, v.inicio);
   }
 
   for (const s of vivas) {

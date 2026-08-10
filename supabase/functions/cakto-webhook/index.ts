@@ -587,16 +587,69 @@ serve(async (req) => {
         const eventId = String(ordem?.event_data?.order_id ?? purchaseId ?? `${userId}-${Date.now()}`);
         const offerKind = String(ordem?.event_data?.offer ?? (offerId === DOWNSELL_OFFER.toLowerCase() ? "downsell" : "lifetime"));
         const amountCents = Number(ordem?.event_data?.amount_cents) || Math.round(Number(data.amount ?? 0) * 100) || (offerKind === "downsell" ? 1490 : 2790);
+        /* ENRIQUECIMENTO DO MATCH (10/08). Antes ia só em+external_id+fbc, e a
+         * cobertura caiu de 100% (05/08) pra 78% (10/08) — a Meta deixava de
+         * casar 1 em cada 5 vendas. Isso não é só relatório feio: ela otimiza
+         * e aplica a trava de ROAS sobre o que enxerga, então subcontar
+         * estrangula a entrega (campanha via ROAS 1,49 contra piso de 1,30
+         * quando o real era 1,92).
+         *
+         * Agora vão junto os sinais capturados no create (cakto-pix grava em
+         * pix_order_created): fbp, IP do comprador e user-agent. Dois detalhes
+         * que a doc da Meta trata como regra:
+         *   - client_ip_address e client_user_agent só valem EM PAR;
+         *     mandar um sozinho é descartado.
+         *   - fbc só existe se a pessoa chegou com fbclid (68% das vendas);
+         *     por isso o fallback pelo evento mais antigo com fbclid continua.
+         *
+         * event_time passa a ser a hora REAL da compra (paid_at/created), não
+         * a hora em que o webhook rodou — a Meta usa isso pra casar com a
+         * janela do clique, e o atraso do webhook empurrava o evento pra fora. */
         const fbHit = rows.find((r) => r.event_data?.fbclid);
-        const fbc = fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null;
+        const fbcCookie = ordem?.event_data?.fbc ?? null;
+        const fbc = fbcCookie
+          || (fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null);
+        const fbp = ordem?.event_data?.fbp ?? null;
+        const ip = ordem?.event_data?.client_ip ?? null;
+        const ua = ordem?.event_data?.user_agent ?? null;
+        const sourceUrl = ordem?.event_data?.source_url ?? APP_URL;
+
+        // Telefone do perfil (ph): mais um identificador quando existe. O
+        // coringa do checkout (DUMMY_PHONE) é lixo pra match — descartado.
+        let phoneHash: string | null = null;
+        try {
+          const { data: prof } = await supabaseClient
+            .from("profiles").select("phone").eq("id", userId).maybeSingle();
+          const raw = String((prof as { phone?: string } | null)?.phone ?? "").replace(/\D/g, "");
+          if (raw.length >= 10 && !raw.endsWith("11999999999")) {
+            phoneHash = await sha(raw.startsWith("55") ? raw : `55${raw}`);
+          }
+        } catch { /* segue sem telefone */ }
+
+        const quandoPagou = data?.paid_at ?? data?.paidAt ?? data?.created_at ?? null;
+        const eventTime = quandoPagou && !Number.isNaN(new Date(quandoPagou).getTime())
+          ? Math.floor(new Date(quandoPagou).getTime() / 1000)
+          : Math.floor(Date.now() / 1000);
+
         const payload = {
           data: [{
-            event_name: "Purchase", event_time: Math.floor(Date.now() / 1000), event_id: eventId,
-            action_source: "website", event_source_url: APP_URL,
-            user_data: { ...(customerEmail ? { em: [await sha(customerEmail)] } : {}), external_id: [await sha(userId)], ...(fbc ? { fbc } : {}) },
+            event_name: "Purchase", event_time: eventTime, event_id: eventId,
+            action_source: "website", event_source_url: sourceUrl,
+            user_data: {
+              ...(customerEmail ? { em: [await sha(customerEmail)] } : {}),
+              ...(phoneHash ? { ph: [phoneHash] } : {}),
+              external_id: [await sha(userId)],
+              ...(fbc ? { fbc } : {}),
+              ...(fbp ? { fbp } : {}),
+              // par obrigatório: um sem o outro a Meta ignora
+              ...(ip && ua ? { client_ip_address: ip, client_user_agent: ua } : {}),
+            },
             custom_data: { value: amountCents / 100, currency: "BRL", content_name: offerKind === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício" },
           }],
         };
+        logStep("Meta CAPI match signals", {
+          em: !!customerEmail, ph: !!phoneHash, fbc: !!fbc, fbp: !!fbp, ip_ua: !!(ip && ua),
+        });
         const res = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${token}`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
         });

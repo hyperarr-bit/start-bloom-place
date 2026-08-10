@@ -269,6 +269,20 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           }
         } catch { /* segue sem — a edge function manda UUID */ }
 
+        /* fbp/fbc/sourceUrl NO CREATE (10/08) — o braço Asaas já mandava, o
+         * Cakto não, e é o Cakto que vende. Sem esses cookies a CAPI do
+         * webhook manda Purchase só com e-mail hasheado, e a Meta casa menos:
+         * a cobertura medida caiu de 100% (05/08) pra 78% (10/08). Como ela
+         * otimiza e aplica a trava de ROAS em cima do que ENXERGA, subcontar
+         * vira entrega estrangulada — a campanha via ROAS 1,49 num piso de
+         * 1,30 enquanto o real era 1,92.
+         *
+         * Capturados AQUI e não no confirm porque metade dos pagantes sai pro
+         * app do banco e nunca volta pra tela — no create o navegador ainda
+         * está aberto e os cookies existem. */
+        const cookie = (n: string) =>
+          document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
+
         ({ data, error } = await supabase.functions.invoke("cakto-pix", {
           body: {
             offer,
@@ -276,6 +290,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             fingerprint,
             antifraudRef,
             attribution: getAttributionParams(),
+            fbp: cookie("_fbp"),
+            fbc: cookie("_fbc"),
+            sourceUrl: window.location.href,
           },
         }));
       }

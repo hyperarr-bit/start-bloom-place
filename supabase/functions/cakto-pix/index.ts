@@ -126,6 +126,10 @@ serve(async (req) => {
           utm_content: z.string().max(200).optional(),
         })
         .optional(),
+      // Sinais de match da CAPI (10/08) — ver comentário no insert abaixo.
+      fbp: z.string().max(200).nullable().optional(),
+      fbc: z.string().max(500).nullable().optional(),
+      sourceUrl: z.string().max(500).nullable().optional(),
     });
 
     let rawBody: unknown;
@@ -241,6 +245,22 @@ serve(async (req) => {
     // Registro server-side do create (24/07, padrão dos outros 3 gateways):
     // é o que o pix-reconcile varre — sem ele, cobrança cakto paga com
     // webhook mudo viraria pago-sem-acesso invisível. amount vem em reais.
+    /* SINAIS DE MATCH DA META CAPI (10/08). O webhook manda o Purchase server-
+     * side, mas só tinha e-mail hasheado pra casar — e a cobertura medida caiu
+     * de 100% (05/08) pra 78% (10/08). Como a Meta otimiza (e aplica a trava de
+     * ROAS) sobre o que ENXERGA, subcontar vira entrega estrangulada.
+     *
+     * fbp/fbc vêm do navegador (cookie só existe lá). IP e user-agent só
+     * existem AQUI — o webhook é chamado pela Cakto, então lá o IP seria o do
+     * servidor deles, não o do comprador. Guardar no create é a única janela.
+     *
+     * A Meta exige client_ip_address e client_user_agent SEMPRE JUNTOS; um
+     * sozinho é descartado. x-forwarded-for pode vir com vários IPs — o
+     * primeiro é o do cliente. */
+    const ipBruto = req.headers.get("x-forwarded-for") ?? req.headers.get("cf-connecting-ip") ?? "";
+    const clientIp = ipBruto.split(",")[0]?.trim() || null;
+    const userAgent = req.headers.get("user-agent") ?? null;
+
     await supabaseAdmin.from("analytics_events").insert({
       event_name: "pix_order_created",
       user_id: user.id,
@@ -248,6 +268,11 @@ serve(async (req) => {
         order_id: data.id, offer: body.offer, gateway: "cakto",
         amount_cents: Math.round(Number(data.amount ?? 0) * 100) || null,
         ref_id: data.refId ?? null,
+        fbp: body.fbp ?? null,
+        fbc: body.fbc ?? null,
+        client_ip: clientIp,
+        user_agent: userAgent ? userAgent.slice(0, 400) : null,
+        source_url: body.sourceUrl ?? null,
       },
     });
     return jsonResponse({

@@ -114,7 +114,15 @@ const RootGate = () => {
         return <Navigate to={`${isNativeShell() ? ENTRADA_APP : "/inicio"}?step=analise`} replace />;
     } catch { /* noop */ }
   }
-  if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/comecar"} replace />;
+  /* Visitante deslogado na raiz vai pro funil VITRINE, não pro de finanças.
+   *
+   * Até 10/08 esta linha mandava pra "/comecar" — resquício de quando ele era
+   * a entrada. Quem digitava coreaplicativo.com.br sem caminho caía no funil
+   * ANTIGO (só finanças, "O que mais te atrapalha hoje?") enquanto 86% do
+   * tráfego pago já entrava pelo /inicio com a porta das 5 áreas. Dois funis
+   * diferentes vendendo o mesmo produto, e o pior deles atendendo quem chega
+   * pela marca (tráfego mais quente: veio pelo nome, não pelo anúncio). */
+  if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/inicio"} replace />;
 
   const area = getFunnelArea();
   let landed = true;

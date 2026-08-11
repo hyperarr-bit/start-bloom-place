@@ -32,7 +32,7 @@ import { useAuth } from "@/hooks/use-auth";
 // no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
 const PRICING = {
-  lifetime: { total: "19,90" },
+  lifetime: { total: "27,90" },
   anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
 };
 
@@ -63,7 +63,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 19.9 : 14.9,
+    value: offer === "lifetime" ? 27.9 : 19.9,
     currency: "BRL",
   });
   open(offer);
@@ -358,10 +358,13 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
  * desconverte). A edge function prova-social segue no ar, sem uso por ora.
  */
 type PaywallArm = "a" | "b";
-// 01/08 (ordem do dono): volta pro paywall de 29/07 — braço "a" = sem laurel,
-// sem mural, garantia ANTES do preço. Os componentes de prova ficam no código;
-// religar tudo = "b" nesta constante.
-const PAYWALL_AB_FORCE: PaywallArm | null = "a";
+// 10/08 (ordem do dono): volta pro braço "b". O que mudou desde o desligamento
+// de 01/08 é que a prova social do ANÚNCIO morreu junto com o Instagram — antes
+// o criativo chegava com ~3.000 reações fazendo o convencimento antes do clique.
+// Medido: paywall→Pix era 21-23% (04-07/08) e caiu pra 8,8-12,1% (09-10/08),
+// no preço BARATO, então não é preço. A prova migra do anúncio pro paywall.
+// Rollback instantâneo = "a" nesta constante.
+const PAYWALL_AB_FORCE: PaywallArm | null = "b";
 
 const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
   if (PAYWALL_AB_FORCE) return PAYWALL_AB_FORCE;

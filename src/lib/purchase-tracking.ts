@@ -17,7 +17,27 @@ import { trackEvent } from "@/lib/analytics";
  * primeiro. Marca "último gerado vence" disparou 27,90 pra uma venda de
  * 14,90. Solução: guardamos TODOS os Pix gerados e, na hora de disparar,
  * lemos qual pedido o webhook gravou na assinatura (abacatepay_billing_id =
- * order id da Cakto) e casamos o certo. Sem match, cai no último gerado.
+ * order id da Cakto) e casamos o certo.
+ *
+ * Problema 3 (caso real de 11/08, e o motivo desta revisão): a Meta contou
+ * 2 compras num dia de 1 venda, e R$47,80 onde entraram R$19,90. O usuário
+ * 0c8dcc53 pagou o pedido edeb2c33 (downsell, 19,90); o pixel disparou com
+ * 05461621 — pedido LIFETIME de OUTRA conta (1bde700e), gerado no MESMO
+ * aparelho. Três defeitos somados:
+ *
+ *   a) o localStorage é do APARELHO, não da conta. Duas sessões no mesmo
+ *      celular misturam pedidos, e nada marcava de quem era cada um.
+ *   b) a consulta da assinatura não filtrava por user_id — lia "a última
+ *      assinatura que der pra ver", que pode não ser a de quem está logado.
+ *   c) sem match, caía no "último gerado vence". Fallback é a hora ERRADA de
+ *      adivinhar: o event_id sai diferente do que o CAPI mandou, a Meta não
+ *      deduplica e conta duas vezes — com o valor do pedido errado.
+ *
+ * Agora: filtra por dono, consulta escopada em user_id, e SEM fallback. Se
+ * não dá pra afirmar qual pedido foi pago, o pixel NÃO dispara — o Purchase
+ * server-side (CAPI do cakto-webhook) sempre tem o pedido certo e cobre o
+ * caso sozinho. Não disparar custa zero; disparar errado polui a receita que
+ * o ROAS mínimo usa pra decidir entrega.
  *
  * Marca-única + eventID = orderId ⇒ Meta deduplica se dois caminhos correrem.
  */
@@ -25,7 +45,7 @@ import { trackEvent } from "@/lib/analytics";
 const KEY = "pix-purchase-pending";
 
 type PendingOffer = "lifetime" | "downsell";
-type Pending = { offer: PendingOffer; orderId: string | null; at: number };
+type Pending = { offer: PendingOffer; orderId: string | null; at: number; uid?: string | null };
 
 const readPending = (): Pending[] => {
   try {
@@ -59,19 +79,41 @@ export function temPixEmConfirmacao(janelaMin = 12): boolean {
   return readPending().some((x) => Date.now() - (x.at ?? 0) <= limite);
 }
 
+const writePending = (list: Pending[]) => {
+  try { localStorage.setItem(KEY, JSON.stringify(list.slice(-5))); } catch { /* ignore */ }
+};
+
 export function markPixPurchasePending(p: { offer: PendingOffer; orderId: string | null }) {
-  try {
-    const list = readPending().filter((x) => !x.orderId || x.orderId !== p.orderId);
-    list.push({ ...p, at: Date.now() });
-    localStorage.setItem(KEY, JSON.stringify(list.slice(-5)));
-  } catch { /* ignore */ }
+  const list = readPending().filter((x) => !x.orderId || x.orderId !== p.orderId);
+  list.push({ ...p, at: Date.now(), uid: null });
+  // grava JÁ, síncrono: temPixEmConfirmacao pode ser consultado no próximo
+  // render (o portão do app), e um await aqui abriria janela pra mostrar
+  // paywall pra quem acabou de gerar o Pix.
+  writePending(list);
+  // ...e carimba o dono logo em seguida. getSession é local (não vai na rede);
+  // getUser iria. Sem isso, dois logins no mesmo aparelho viram um pedido só.
+  supabase.auth.getSession().then(({ data }) => {
+    const uid = data?.session?.user?.id ?? null;
+    if (!uid) return;
+    const atual = readPending();
+    const i = atual.findIndex((x) => x.orderId === p.orderId && x.uid == null);
+    if (i < 0) return;
+    atual[i] = { ...atual[i], uid };
+    writePending(atual);
+  }).catch(() => { /* fica sem dono; o fire trata isso */ });
 }
 
 /**
- * Se existe intenção pendente, dispara Purchase (uma vez) e limpa a marca.
- * Com mais de um Pix gerado, consulta a assinatura recém-gravada pra saber
- * QUAL pedido foi pago (valor certo no gerenciador). Ignora marcas com mais
- * de 24h (Pix expira muito antes; evita disparo tardio num login futuro).
+ * Dispara Purchase (uma vez) SE der pra provar qual pedido foi pago.
+ *
+ * A prova é o cruzamento de três coisas: a marca é desta conta, o pedido está
+ * na janela de 24h (Pix expira muito antes — evita disparo tardio num login
+ * futuro) e o order id bate com o `abacatepay_billing_id` que o webhook gravou
+ * na assinatura DESTA conta. Faltou qualquer uma, não dispara.
+ *
+ * A marca é limpa ANTES do disparo, de propósito: se algo falhar não repete em
+ * loop. O custo é que um skip não tem segunda chance — e tudo bem, porque o
+ * Purchase server-side (CAPI) não depende desta função pra acontecer.
  */
 export async function firePixPurchaseOnce(source: "checkout" | "rescue"): Promise<boolean> {
   const list = readPending();
@@ -79,21 +121,46 @@ export async function firePixPurchaseOnce(source: "checkout" | "rescue"): Promis
   // limpa ANTES de disparar — se algo falhar, não repete em loop
   try { localStorage.removeItem(KEY); } catch { /* ignore */ }
 
-  const fresh = list.filter((x) => Date.now() - (x.at ?? 0) <= 24 * 60 * 60 * 1000);
+  const recentes = list.filter((x) => Date.now() - (x.at ?? 0) <= 24 * 60 * 60 * 1000);
+  if (!recentes.length) return false;
+
+  const { data: sess } = await supabase.auth.getSession();
+  const uid = sess?.session?.user?.id ?? null;
+  if (!uid) return false; // sem saber quem é, não dá pra afirmar nada
+
+  // Pedidos de OUTRA conta no mesmo aparelho saem daqui. Os sem dono (marca
+  // antiga, ou o carimbo não chegou a rodar) continuam elegíveis — mas só
+  // vencem pelo match com a assinatura, nunca por chute.
+  const fresh = recentes.filter((x) => x.uid == null || x.uid === uid);
   if (!fresh.length) return false;
 
-  let chosen = fresh[fresh.length - 1];
-  if (fresh.length > 1) {
-    try {
-      const { data } = await supabase
-        .from("subscriptions")
-        .select("abacatepay_billing_id")
-        .order("current_period_end", { ascending: false })
-        .limit(1);
-      const paidOrderId = data?.[0]?.abacatepay_billing_id;
-      const match = paidOrderId ? fresh.find((x) => x.orderId === paidOrderId) : null;
-      if (match) chosen = match;
-    } catch { /* fica no último gerado */ }
+  /* O pedido pago é o que o webhook gravou na assinatura DESTA conta —
+   * medido 11/08: 416 de 416 vendas Pix web desde 01/08 têm o campo
+   * preenchido (100%), então exigir o match não custa disparo nenhum. Sem
+   * isso um Pix gerado e NÃO pago viraria Purchase quando a pessoa virasse
+   * assinante por outra via (loja, cortesia). */
+  let chosen: Pending | null = null;
+  try {
+    const { data } = await supabase
+      .from("subscriptions")
+      .select("abacatepay_billing_id")
+      .eq("user_id", uid)
+      .limit(5);
+    const pagos = new Set((data ?? []).map((r) => r.abacatepay_billing_id).filter(Boolean));
+    chosen = fresh.find((x) => x.orderId && pagos.has(x.orderId)) ?? null;
+  } catch { /* sem a consulta não dá pra afirmar — cai no skip abaixo */ }
+
+  // SEM FALLBACK. Antes aqui tinha "último gerado vence" e foi ele que mandou
+  // o pedido de outra conta pra Meta em 11/08. Preferimos perder o disparo do
+  // browser: o CAPI do webhook manda o Purchase com o order_id certo.
+  if (!chosen) {
+    trackEvent("pix_purchase_skipped", {
+      source,
+      motivo: "pedido_pago_nao_confirmado",
+      candidatos: fresh.length,
+      sem_dono: fresh.filter((x) => x.uid == null).length,
+    });
+    return false;
   }
 
   const value = chosen.offer === "lifetime" ? 27.9 : 19.9;

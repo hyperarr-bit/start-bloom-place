@@ -611,7 +611,7 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
       </div>
       <div className="text-[15px] tracking-wide text-[#f0a500] mb-2" aria-label="5 estrelas">★★★★★</div>
       <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-2">
-        Junte-se a <span className="text-accent">+500 pessoas</span><br />organizando a vida
+        Junte-se a <span className="text-accent">+1000 pessoas</span><br />organizando a vida
       </h2>
       <p className="text-sm text-muted-foreground leading-relaxed mb-6">
         Gente que também cansou de app separado pra cada coisa.

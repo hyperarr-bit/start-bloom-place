@@ -82,7 +82,7 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.4 }}
           >
-            <span className="apw-st">★★★★★</span> <b>+500 pessoas</b> organizando a vida
+            <span className="apw-st">★★★★★</span> <b>+1000 pessoas</b> organizando a vida
           </motion.p>
         </div>
 

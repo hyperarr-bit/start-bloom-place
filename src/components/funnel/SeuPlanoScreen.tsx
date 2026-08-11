@@ -174,7 +174,7 @@ export function SeuPlanoScreen({ area, answers, onCommit }: {
 
       {/* prova no pico (BitePal: 10k ★ na tela de compromisso) */}
       <motion.p {...stag(7)} className="text-[12.5px] mt-3">
-        <span className="text-[#f0a500] tracking-wide">★★★★★</span> <b>+500 pessoas</b> <span className="text-muted-foreground">já organizando a vida</span>
+        <span className="text-[#f0a500] tracking-wide">★★★★★</span> <b>+1000 pessoas</b> <span className="text-muted-foreground">já organizando a vida</span>
       </motion.p>
 
       {/* CTA do compromisso. No SHELL (24/07, pedido do dono no teste do

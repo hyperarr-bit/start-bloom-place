@@ -346,9 +346,9 @@ function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
  * devolve o paywall de ontem inteiro (sem prova, garantia antes do preço).
  *
  * A prova é a régua BitePal + Cal AI, adaptada:
- *   - laurel ★★★★★ +500 sob o herói (Cal AI abre o paywall com laurel/nota;
- *     "+500 pessoas" é o mesmo enunciado já usado no AppWelcome — 568 têm
- *     acesso, arredondado PRA BAIXO);
+ *   - laurel ★★★★★ +1000 sob o herói (Cal AI abre o paywall com laurel/nota;
+ *     mesmo enunciado do AppWelcome/ComecarDia14/SeuPlanoScreen — os quatro
+ *     andam juntos, senão a mesma pessoa vê +500 numa tela e +1000 na outra);
  *   - mural de depoimentos depois do preço (Cal AI tem uma tela só de
  *     reviews; aqui vira seção — tela extra no funil custa ~5% de queda);
  *   - depoimento na tela de espera (lei BitePal: a espera vira argumento);
@@ -437,14 +437,19 @@ const MURAL_POR_AREA: Record<AreaKey, Depo[]> = {
 };
 const MURAL_EXTRA: Depo[] = [DEPO.matheus, DEPO.rafael, DEPO.juliana, DEPO.beatriz, DEPO.gustavo, DEPO.patricia, DEPO.fernandaO];
 
-/** Laurel sob o herói — Cal AI abre o paywall com "Trusted by millions";
- *  a nossa escala honesta é o +500 já usado no AppWelcome (568 têm acesso,
- *  arredondado PRA BAIXO). Número dinâmico pequeno desconverte (dono, 29/07). */
+/** Laurel sob o herói — Cal AI abre o paywall com "Trusted by millions".
+ *  10/08: +1000, medido no banco antes de subir (1.058 assinaturas, 920 delas
+ *  compra Pix na web), arredondado PRA BAIXO. Número dinâmico pequeno
+ *  desconverte (dono, 29/07). Se mexer aqui, mexe nas outras três telas. */
 function LaurelProva() {
   return (
     <motion.div {...stagger(1)} className="flex items-center justify-center gap-2 mb-5 text-[12.5px]">
       <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span>
-      <span className="text-muted-foreground"><strong className="text-foreground font-bold">+500 pessoas</strong> organizando a vida no CORE</span>
+      {/* 10/08 (dono): +500 → +1000. Conferido no banco antes de escrever —
+          1.058 assinaturas, 920 delas compra Pix na web. Se o patamar mudar,
+          este número muda junto; número inflado aqui é o tipo de coisa que a
+          pessoa checa. */}
+      <span className="text-muted-foreground"><strong className="text-foreground font-bold">+1000 pessoas</strong> aprovaram o CORE</span>
     </motion.div>
   );
 }
@@ -685,13 +690,16 @@ function OfferScreen({
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
               <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>
-              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">+500</div>
-              <div className="text-[10.5px] text-muted-foreground font-semibold">pessoas no CORE</div>
+              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">+1000</div>
+              <div className="text-[10.5px] text-muted-foreground font-semibold">aprovaram o CORE</div>
             </div>
+            {/* 10/08 (dono): "+190 esta semana" saiu — número de janela curta
+                envelhece sozinho e depende do tráfego do dia. No lugar entra a
+                garantia, que é fato permanente e responde objeção de risco. */}
             <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
-              <div className="text-[13px]" aria-hidden>📈</div>
-              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">+190</div>
-              <div className="text-[10.5px] text-muted-foreground font-semibold">entraram esta semana</div>
+              <div className="text-[13px]" aria-hidden>🛡️</div>
+              <div className="text-[17px] font-extrabold tracking-tight leading-tight mt-0.5">7 dias</div>
+              <div className="text-[10.5px] text-muted-foreground font-semibold">de garantia</div>
             </div>
           </div>
         )}

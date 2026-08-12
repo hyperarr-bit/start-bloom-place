@@ -98,6 +98,201 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
 
 const FIM_VITALICIO = "2126-01-01T00:00:00.000Z";
 
+const sha256 = async (txt: string): Promise<string> => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+async function mandarCompraProMeta(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const dataset = Deno.env.get("META_APP_DATASET_ID");
+  const token = Deno.env.get("META_APP_CAPI_TOKEN");
+  if (!dataset || !token) return;
+
+  // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
+  // o webhook (ele reenvia em qualquer 500 nosso).
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "meta_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
+  const { data: dev } = await admin
+    .from("analytics_events")
+    .select("event_data")
+    .eq("event_name", "app_device_info")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  if (!Object.keys(d).length) {
+    // Quem está em build anterior à v48 não emite app_device_info. O
+    // webview_info (que existe desde a v37) carrega o UA — dá SO e modelo,
+    // que é o que mais pesa no pareamento.
+    const { data: wv } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "webview_info")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ua = String(((wv as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).ua ?? "");
+    const m = /Android (\d+(?:\.\d+)?); ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua);
+    d = m ? { os: m[1], modelo: m[2] } : {};
+  }
+  const s = (k: string) => String(d[k] ?? "");
+  const n = (k: string) => Number(d[k] ?? 0) || 0;
+  const extinfo = [
+    "a2",                                    // versão do extinfo (Android)
+    s("pacote") || "br.com.coreaplicativo.app",
+    s("build"),
+    s("versao"),
+    s("os"),
+    s("modelo"),
+    s("locale") || "pt-BR",
+    "",                                      // fuso abreviado: não temos
+    "",                                      // operadora: não temos
+    n("tela_l"),
+    n("tela_a"),
+    String(d.densidade ?? ""),
+    n("nucleos"),
+    0,                                       // disco total
+    0,                                       // disco livre
+    s("fuso") || "America/Sao_Paulo",
+  ];
+
+  const user_data: Record<string, unknown> = { external_id: await sha256(userId) };
+  if (email) user_data.em = await sha256(email.trim().toLowerCase());
+
+  const payload: Record<string, unknown> = {
+    data: [{
+      event_name: "Purchase",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId,                        // dedup, igual ao padrão da web
+      action_source: "app",
+      user_data,
+      app_data: {
+        // NÃO coletamos o ID de publicidade do aparelho (exigiria permissão
+        // AD_ID e mudar a declaração de Segurança de Dados da Play). O
+        // pareamento é por e-mail/external_id — dado de primeira mão.
+        advertiser_tracking_enabled: false,
+        application_tracking_enabled: true,
+        extinfo,
+      },
+      custom_data: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${dataset}/events?access_token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "meta_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("meta capi app ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
+
+/**
+ * TikTok Events API (09/08) — mesma ideia do mandarCompraProMeta: manda a
+ * compra pro TikTok DEPOIS que o Google já confirmou o pagamento (servidor,
+ * não SDK no app). Decisão de arquitetura, não só preguiça de escrever Java:
+ * este binário tem política deliberada de não embutir rastreador/SDK de
+ * anúncio (ver preparar-loja.mjs — é a mesma razão por trás de nunca
+ * coletar GAID). Server-side mantém essa política intacta.
+ *
+ * AVISO DE CONFIANÇA: montei este payload cruzando a documentação do TikTok
+ * for Business (blog do endpoint consolidado) com integrações de terceiros
+ * (Apphud, Stape, Tealium) — o portal oficial (business-api.tiktok.com) é
+ * uma SPA que não dá pra ler direto. O endpoint, `event_source`/
+ * `event_source_id` e o nome do evento ("CompletePayment") saíram
+ * confirmados em mais de uma fonte independente; o formato exato de
+ * `user`/`properties` é o melhor palpite seguindo o padrão do Meta CAPI
+ * ao lado. Só confia nisso depois de ver UM evento de teste chegar certo
+ * no Events Manager — mesma regra do catálogo: causa provada, não suposta.
+ */
+async function mandarCompraProTikTok(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const appId = Deno.env.get("TIKTOK_APP_ID"); // event_source_id, do Events Manager
+  const token = Deno.env.get("TIKTOK_ACCESS_TOKEN"); // gerado no Events Manager, NÃO é o "app secret" do SDK
+  if (!appId || !token) return;
+
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "tiktok_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  const payload: Record<string, unknown> = {
+    event_source: "app",
+    event_source_id: appId,
+    data: [{
+      event: "CompletePayment",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId, // dedup: mesma chave (event_source_id, event, event_id) por 48h
+      user: {
+        external_id: await sha256(userId),
+        ...(email ? { email: await sha256(email.trim().toLowerCase()) } : {}),
+      },
+      properties: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("TIKTOK_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Access-Token": token },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("tiktok events api", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "tiktok_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("tiktok events api ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
+
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
   const chave = Object.keys(PRODUTOS).find((k) => id.startsWith(k));
@@ -210,6 +405,22 @@ async function reconciliarRevenueCat(
     );
     if (error) throw new Error(`upsert vitalício falhou: ${error.message}`);
     melhor = { fim: FIM_VITALICIO, prod: v.storeId };
+    /*
+     * AVISAR A META DAQUI TAMBÉM (11/08) — regressão da v48.
+     *
+     * Com o cadastro DEPOIS da compra, a pessoa compra ANÔNIMA: o webhook do
+     * RevenueCat chega com `$RCAnonymousID:…`, que não é UUID, e ele desiste
+     * cedo ("ignored: anonimo") — então `mandarCompraProMeta` nunca rodava.
+     * Quem grava a venda nesse caminho é ESTE sync, chamado depois que a
+     * conta nasce. Sem esta linha, a Meta só enxergava as compras de quem já
+     * estava logado: em 11/08, 2 de 6. Otimização e relatório de criativo em
+     * cima de um terço da verdade.
+     *
+     * A idempotência (marcador `meta_capi_app_enviado` com o tx) impede
+     * evento dobrado quando o webhook TAMBÉM roda pro mesmo usuário.
+     */
+    await mandarCompraProMeta(admin, userId, email, centsVitalicio, v.id, v.inicio);
+    await mandarCompraProTikTok(admin, userId, email, centsVitalicio, v.id, v.inicio);
   }
 
   for (const s of vivas) {

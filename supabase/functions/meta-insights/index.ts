@@ -61,6 +61,58 @@ serve(async (req) => {
       return jsonResponse({ error: "invalid_range" }, 400);
     }
 
+    /*
+     * NÍVEL DE ANÚNCIO (11/08) — "de qual criativo veio a venda?".
+     *
+     * O install_referrer NÃO responde isso: o anúncio vem dentro de
+     * `utm_content.source.data`, criptografado, e só a Meta descriptografa.
+     * Quem sabe é a Meta — então a resposta vem daqui, pedindo `level=ad` e
+     * o campo `actions`, onde chegam as compras que o nosso CAPI mandou.
+     *
+     * Ou seja: esta rota só diz a verdade se os eventos de compra estiverem
+     * chegando no dataset. Ver mandarCompraProMeta no revenuecat-webhook E
+     * no revenuecat-sync (a v48 compra anônimo — sem o sync, 2/3 das vendas
+     * ficavam invisíveis pra Meta e este relatório mentiria pra menos).
+     */
+    const nivel = body?.nivel === "ad" ? "ad" : "campaign";
+    if (nivel === "ad") {
+      const adUrl = new URL(`https://graph.facebook.com/v21.0/${account}/insights`);
+      adUrl.searchParams.set("level", "ad");
+      adUrl.searchParams.set(
+        "fields",
+        "ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type",
+      );
+      adUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
+      adUrl.searchParams.set("limit", "500");
+      adUrl.searchParams.set("access_token", token);
+      const r = await fetch(adUrl);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        return jsonResponse({ error: "meta_error", detail: d?.error?.message ?? `HTTP ${r.status}` });
+      }
+      // A Meta devolve TODAS as ações (view, install, add_to_cart…) num array
+      // só. Aqui interessa instalação e compra — o resto é ruído no terminal.
+      const acao = (linha: Record<string, unknown>, tipos: string[]) => {
+        const lista = (linha.actions ?? []) as { action_type: string; value: string }[];
+        return lista
+          .filter((a) => tipos.includes(a.action_type))
+          .reduce((t, a) => t + Number(a.value || 0), 0);
+      };
+      const anuncios = ((d.data ?? []) as Record<string, unknown>[]).map((l) => ({
+        ad_id: l.ad_id,
+        criativo: l.ad_name,
+        conjunto: l.adset_name,
+        campanha: l.campaign_name,
+        gasto: Number(l.spend ?? 0),
+        impressoes: Number(l.impressions ?? 0),
+        cliques: Number(l.clicks ?? 0),
+        ctr: Number(l.ctr ?? 0),
+        instalacoes: acao(l, ["mobile_app_install", "app_install", "omni_app_install"]),
+        compras: acao(l, ["purchase", "omni_purchase", "app_custom_event.fb_mobile_purchase"]),
+      }));
+      return jsonResponse({ nivel: "ad", since, until, anuncios });
+    }
+
     const cacheKey = `${since}|${until}`;
     if (cache && cache.key === cacheKey && Date.now() - cache.at < 120_000) {
       return jsonResponse({ cached: true, ...(cache.data as Record<string, unknown>) });

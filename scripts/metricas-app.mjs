@@ -405,6 +405,57 @@ if (gasto != null) {
   L();
 }
 
+/* --------------------------------------------------- por criativo (Meta) */
+
+/* "De qual criativo veio a venda?" só a Meta responde: o anúncio viaja
+ * criptografado dentro do install_referrer (`source.data`) e nenhuma chave
+ * nossa abre aquilo. Então o número vem da Graph API, nível `ad`.
+ *
+ * ⚠ Isto só é verdade se as compras estiverem CHEGANDO no dataset. Em 11/08
+ * apenas 2 de 6 chegaram, porque a v48 compra anônimo e o webhook desiste de
+ * id anônimo — o `revenuecat-sync` passou a avisar a Meta também. Se as
+ * compras aqui vierem bem abaixo das vendas do relatório acima, é este cano
+ * que está entupido, não o criativo que é ruim. */
+if (flags.has("--criativos")) {
+  L("▸ POR CRIATIVO (dados da Meta)");
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/meta-insights`, {
+    method: "POST",
+    headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ since: de, until: ate, nivel: "ad" }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (d.error) {
+    L(`   ✗ ${d.error}${d.detail ? `: ${d.detail}` : ""}`);
+  } else if (!d.anuncios?.length) {
+    L("   (a Meta não devolveu anúncio com entrega neste período)");
+  } else {
+    // A CAMPANHA vai junto de propósito: a conta tem anúncio de web e de app
+    // ao mesmo tempo, e sem essa coluna a compra da web parece do app.
+    const ordenados = d.anuncios.filter((a) => a.gasto > 0 || a.compras > 0).sort((a, b) => b.gasto - a.gasto);
+    L(`   ${"campanha".padEnd(26)} ${"criativo".padEnd(26)} ${"gasto".padStart(9)} ${"inst".padStart(5)} ${"compras".padStart(8)} ${"CPA".padStart(9)}`);
+    for (const a of ordenados) {
+      const cpa = a.compras ? reais(a.gasto / a.compras) : "—";
+      L(`   ${String(a.campanha ?? "?").slice(0, 26).padEnd(26)} ${String(a.criativo ?? "?").slice(0, 26).padEnd(26)} ${reais(a.gasto).padStart(9)} ${String(a.instalacoes).padStart(5)} ${String(a.compras).padStart(8)} ${cpa.padStart(9)}`);
+    }
+    const nomes = new Set(ordenados.map((a) => a.criativo));
+    if (ordenados.length > 1 && nomes.size < ordenados.length) {
+      L(`   ⚠ há criativos com o MESMO nome — teste A/B fica ilegível. Renomeie no`);
+      L(`     Gerenciador (o nome do anúncio é a única etiqueta que chega aqui).`);
+    }
+    if (ordenados.every((a) => a.instalacoes === 0)) {
+      L(`   ⚠ nenhuma campanha reporta instalação. Campanha de Vendas/site apontada`);
+      L(`     pra Play NÃO conta install nem otimiza por evento do app — só`);
+      L(`     App Promotion faz isso.`);
+    }
+    const totalCompras = ordenados.reduce((t, a) => t + a.compras, 0);
+    if (totalCompras < vendasApp.length) {
+      L(`   ⚠ a Meta contou ${totalCompras} compra(s), nosso banco tem ${vendasApp.length}.`);
+      L(`     Diferença = evento que não chegou no dataset (ver mandarCompraProMeta).`);
+    }
+  }
+  L();
+}
+
 // RevenueCat é opcional — a tabela `subscriptions` já espelha o essencial.
 // Ele serve pro que a nossa tabela NÃO guarda: reembolso, sandbox, entitlement.
 if (env.REVENUECAT_SECRET_KEY) {

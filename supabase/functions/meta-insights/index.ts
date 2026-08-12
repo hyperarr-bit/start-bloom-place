@@ -74,7 +74,22 @@ serve(async (req) => {
      * no revenuecat-sync (a v48 compra anônimo — sem o sync, 2/3 das vendas
      * ficavam invisíveis pra Meta e este relatório mentiria pra menos).
      */
-    const nivel = body?.nivel === "ad" ? "ad" : "campaign";
+    const nivel = body?.nivel === "ad" ? "ad" : body?.nivel === "campanhas" ? "campanhas" : "campaign";
+
+    /* Lista crua de campanhas com OBJETIVO — a pergunta "isso é App Promotion
+     * ou Vendas?" não se responde pelo nome, só pelo objective. E App
+     * Promotion é o que faz a Meta contar install e otimizar por evento do
+     * app; campanha de Vendas apontada pra Play traz gente mas mede errado. */
+    if (nivel === "campanhas") {
+      const u = new URL(`https://graph.facebook.com/v21.0/${account}/campaigns`);
+      u.searchParams.set("fields", "id,name,objective,effective_status,daily_budget,created_time");
+      u.searchParams.set("limit", "200");
+      u.searchParams.set("access_token", token);
+      const r = await fetch(u);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return jsonResponse({ error: "meta_error", detail: d?.error?.message ?? `HTTP ${r.status}` });
+      return jsonResponse({ conta: account, campanhas: d.data ?? [] });
+    }
     if (nivel === "ad") {
       const adUrl = new URL(`https://graph.facebook.com/v21.0/${account}/insights`);
       adUrl.searchParams.set("level", "ad");

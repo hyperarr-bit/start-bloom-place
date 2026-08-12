@@ -418,12 +418,22 @@ if (gasto != null) {
  * que está entupido, não o criativo que é ruim. */
 if (flags.has("--criativos")) {
   L("▸ POR CRIATIVO (dados da Meta)");
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/meta-insights`, {
-    method: "POST",
-    headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ since: de, until: ate, nivel: "ad" }),
-  });
-  const d = await r.json().catch(() => ({}));
+  const chamaMeta = async (nivel) => {
+    const r = await fetch(`${SUPABASE_URL}/functions/v1/meta-insights`, {
+      method: "POST",
+      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ since: de, until: ate, nivel }),
+    });
+    return await r.json().catch(() => ({}));
+  };
+  const d = await chamaMeta("ad");
+  // O OBJETIVO separa campanha de app de campanha de web — e não dá pra
+  // deduzir pelo nome (aqui as duas se chamam "tempo perdido"). Sem isso a
+  // venda da web parece do app e a leitura inteira vira ficção.
+  const objs = {};
+  for (const c of (await chamaMeta("campanhas")).campanhas ?? []) {
+    objs[c.name] = String(c.objective ?? "").replace("OUTCOME_", "");
+  }
   if (d.error) {
     L(`   ✗ ${d.error}${d.detail ? `: ${d.detail}` : ""}`);
   } else if (!d.anuncios?.length) {
@@ -432,21 +442,34 @@ if (flags.has("--criativos")) {
     // A CAMPANHA vai junto de propósito: a conta tem anúncio de web e de app
     // ao mesmo tempo, e sem essa coluna a compra da web parece do app.
     const ordenados = d.anuncios.filter((a) => a.gasto > 0 || a.compras > 0).sort((a, b) => b.gasto - a.gasto);
-    L(`   ${"campanha".padEnd(26)} ${"criativo".padEnd(26)} ${"gasto".padStart(9)} ${"inst".padStart(5)} ${"compras".padStart(8)} ${"CPA".padStart(9)}`);
+    L(`   ${"campanha".padEnd(24)} ${"tipo".padEnd(14)} ${"criativo".padEnd(22)} ${"gasto".padStart(9)} ${"compras".padStart(8)} ${"CPA".padStart(9)}`);
+    let gastoApp = 0, gastoWeb = 0, comprasApp = 0;
     for (const a of ordenados) {
+      const tipo = objs[a.campanha] ?? "?";
+      const ehApp = tipo === "APP_PROMOTION";
+      if (ehApp) { gastoApp += a.gasto; comprasApp += a.compras; } else gastoWeb += a.gasto;
       const cpa = a.compras ? reais(a.gasto / a.compras) : "—";
-      L(`   ${String(a.campanha ?? "?").slice(0, 26).padEnd(26)} ${String(a.criativo ?? "?").slice(0, 26).padEnd(26)} ${reais(a.gasto).padStart(9)} ${String(a.instalacoes).padStart(5)} ${String(a.compras).padStart(8)} ${cpa.padStart(9)}`);
+      L(`   ${String(a.campanha ?? "?").slice(0, 24).padEnd(24)} ${tipo.slice(0, 14).padEnd(14)} ${String(a.criativo ?? "?").slice(0, 22).padEnd(22)} ${reais(a.gasto).padStart(9)} ${String(a.compras).padStart(8)} ${cpa.padStart(9)}`);
+    }
+    L();
+    L(`   gasto em APP_PROMOTION: ${reais(gastoApp)}  ·  em Vendas/web: ${reais(gastoWeb)}`);
+    if (gastoApp > 0 && comprasApp < vendasApp.length) {
+      L(`   ⚠ a Meta atribuiu ${comprasApp} compra(s) às campanhas de app, mas o banco`);
+      L(`     tem ${vendasApp.length} venda(s) no app. Ou o evento não chegou no dataset, ou`);
+      L(`     a Meta não conseguiu casar a pessoa (sem SDK, o pareamento é por`);
+      L(`     e-mail/external_id — mais fraco). Relatório da Meta também atrasa horas.`);
     }
     const nomes = new Set(ordenados.map((a) => a.criativo));
     if (ordenados.length > 1 && nomes.size < ordenados.length) {
       L(`   ⚠ há criativos com o MESMO nome — teste A/B fica ilegível. Renomeie no`);
       L(`     Gerenciador (o nome do anúncio é a única etiqueta que chega aqui).`);
     }
-    if (ordenados.every((a) => a.instalacoes === 0)) {
-      L(`   ⚠ nenhuma campanha reporta instalação. Campanha de Vendas/site apontada`);
-      L(`     pra Play NÃO conta install nem otimiza por evento do app — só`);
-      L(`     App Promotion faz isso.`);
-    }
+    // Instalação some de propósito: a Meta só conta install com SDK dela (ou
+    // MMP) dentro do app, e este binário não embarca rastreador nenhum por
+    // decisão de Data Safety. O número REAL de instalações é o do relatório
+    // acima, que sai do install_referrer da própria Play.
+    L(`   (a Meta não conta instalação: o app não embarca SDK dela — use o número`);
+    L(`    de instalações do relatório acima, que vem do install_referrer da Play.)`);
     const totalCompras = ordenados.reduce((t, a) => t + a.compras, 0);
     if (totalCompras < vendasApp.length) {
       L(`   ⚠ a Meta contou ${totalCompras} compra(s), nosso banco tem ${vendasApp.length}.`);

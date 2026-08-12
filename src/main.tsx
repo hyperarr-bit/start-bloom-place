@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
 
@@ -84,5 +84,16 @@ if ("serviceWorker" in navigator) {
 // cedo e só dispara uma vez). Sem service worker: o bloco acima continua
 // desregistrando qualquer SW — Chrome instala só com o manifest.
 initPwaInstall();
+
+/* UTM/fbclid no BOOT, antes do router (12/08). A captura vivia só no
+ * useEffect das páginas de funil — e efeito roda DEPOIS do commit, quando o
+ * <Navigate replace> de quem já é logado/assinante (ComecarDia14) ou da raiz
+ * (RootGate) já limpou a URL. Resultado medido hoje: 6 de 10 vendas web "sem
+ * utm" no banco e na UTMify — todas de gente com conta antiga que clicou no
+ * anúncio de novo — enquanto o pixel da Meta (que lê a URL no boot, antes do
+ * redirect) atribuía normalmente. Aqui é síncrono e ANTES do createRoot:
+ * nenhum redirect corre antes. As chamadas nas páginas ficam — são no-op
+ * inofensivo (a linha 40 da analytics não sobrescreve pago com vazio). */
+captureLandingMeta();
 
 createRoot(document.getElementById("root")!).render(<App />);

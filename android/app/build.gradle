@@ -18,8 +18,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // O Play recusa reenviar o mesmo versionCode: 1, 2 e 3 já foram pro
         // teste interno, então todo upload novo sobe este número.
-        versionCode 48
-        versionName "1.0.47"
+        versionCode 49
+        versionName "1.0.48"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -60,6 +60,15 @@ dependencies {
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     implementation project(':capacitor-android')
+    // SDK da Meta (12/08, decisão do dono — reverte a política "sem rastreador
+    // no binário"): sem ele a Meta não mede instalação nem compra do app, e
+    // campanha de App Promotion otimiza no escuro. facebook-core é o módulo
+    // mínimo (App Events) — sem Login, sem Share, sem Audience Network.
+    implementation 'com.facebook.android:facebook-core:18.3.0'
+    // GAID pro CAPI do servidor: a compra fecha com o app FECHADO (Pix pago
+    // horas depois), então quem manda o Purchase é o servidor — e o madid é
+    // o que deixa a Meta casar essa compra com o clique no anúncio.
+    implementation 'com.google.android.gms:play-services-ads-identifier:18.1.0'
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"

@@ -14,4 +14,14 @@
     <string name="atalho_habito_longo">Marcar hábito</string>
     <string name="atalho_leitura_curto">Leitura</string>
     <string name="atalho_leitura_longo">Continuar leitura</string>
+
+    <!-- SDK da Meta (12/08, decisão do dono): campanha de App Promotion só
+         otimiza se a Meta enxergar instalação e compra — e ela só enxerga
+         com o SDK dentro do binário. O app id é o mesmo dos conjuntos de
+         anúncio (promoted_object.application_id). O client token vem de
+         developers.facebook.com → Configurações → Avançado; NÃO é segredo
+         (a Meta desenha ele pra ser embarcado no APK), mas sem ele o SDK
+         não sobe — o preparar-loja barra build de produção com ele vazio. -->
+    <string name="facebook_app_id">1693551238598114</string>
+    <string name="facebook_client_token"></string>
 </resources>

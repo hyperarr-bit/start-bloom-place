@@ -31,12 +31,15 @@ const ASSETS = "android/app/src/main/assets/public";
 const MORTO = ["v3-hero.mp4", "v3-hero-poster.jpg", "videos", "hero-phones.png", "hero-phones.webp", "images"];
 
 // Rastreadores de anúncio que moram no index.html da WEB e vinham de carona
-// pro binário (o Capacitor copia a pasta public inteira). Dentro do app eles
-// não têm função nenhuma — a venda é pelo Play Billing, não pelo pixel — e
-// custam caro: com eles o Data Safety da Play vira "compartilha dados com
-// terceiros para publicidade" num app de saúde e finanças, que é declaração
-// de risco e some com o app se for declarada errado. O código que os chama
-// (meta-pixel.ts, google-ads.ts) já é no-op quando o global não existe.
+// pro binário (o Capacitor copia a pasta public inteira).
+//
+// HISTÓRIA DA POLÍTICA: até 11/08 a regra era "nenhum rastreador no binário"
+// pra manter o Data Safety da Play limpo. Em 12/08 o dono reverteu — o SDK
+// NATIVO da Meta entrou no APK (MainActivity.java), porque sem ele campanha
+// de App Promotion não mede instalação/compra e otimiza no escuro. O strip
+// abaixo CONTINUA valendo mesmo assim: estes são os pixels JS da WEB, que
+// dentro do app duplicariam evento com o SDK nativo (Purchase contado 2x
+// estraga o CPA) e disparariam PageView de funil que não existe no app.
 const ASSINATURAS = [
   { nome: "UTMify", re: /cdn\.utmify\.com\.br/i },
   { nome: "TikTok Pixel", re: /TiktokAnalyticsObject|analytics\.tiktok\.com/i },
@@ -67,6 +70,22 @@ if (!teste && !chave.startsWith("goog_")) {
   process.exit(1);
 }
 console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build de TESTE)" : "(produção)"}`);
+
+// SDK da Meta (12/08): a MainActivity só liga o SDK se o client token estiver
+// preenchido no strings.xml. Ou seja, build de produção com token vazio não
+// quebra nada visível — o app funciona e a campanha volta a ficar CEGA em
+// silêncio. Esse tipo de silêncio é o que barra aqui.
+if (!teste) {
+  const strings = readFileSync("android/app/src/main/res/values/strings.xml", "utf8");
+  const clientToken = strings.match(/name="facebook_client_token">([^<]*)</)?.[1]?.trim() ?? "";
+  if (!clientToken) {
+    console.error("\n✗ facebook_client_token vazio em android/.../values/strings.xml.");
+    console.error("  Sem ele o SDK da Meta não liga e a atribuição de campanha morre em silêncio.");
+    console.error("  Pegue em developers.facebook.com → Configurações → Avançado → Token de cliente.\n");
+    process.exit(1);
+  }
+  console.log(`✓ client token da Meta: ${clientToken.slice(0, 6)}…`);
+}
 
 // Trava dupla do mock da loja (09/08): o build de teste liga RC_MOCK=1 (o
 // vite troca o plugin do RevenueCat por uma loja simulada — ver

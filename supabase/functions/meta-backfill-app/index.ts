@@ -103,6 +103,11 @@ async function mandarCompraProMeta(
 
   const user_data: Record<string, unknown> = { external_id: await sha256(userId) };
   if (email) user_data.em = await sha256(email.trim().toLowerCase());
+  // GAID (12/08): a v49 grava o ID de publicidade na ficha app_device_info.
+  // Como madid, é o que casa a compra com o CLIQUE no anúncio — e-mail só
+  // casa com quem a Meta conhece; o aparelho ela conhece sempre.
+  const gaid = s("gaid").toLowerCase();
+  if (gaid) user_data.madid = gaid;
 
   const payload: Record<string, unknown> = {
     data: [{
@@ -112,10 +117,11 @@ async function mandarCompraProMeta(
       action_source: "app",
       user_data,
       app_data: {
-        // NÃO coletamos o ID de publicidade do aparelho (exigiria permissão
-        // AD_ID e mudar a declaração de Segurança de Dados da Play). O
-        // pareamento é por e-mail/external_id — dado de primeira mão.
-        advertiser_tracking_enabled: false,
+        // Até a v48 NÃO se coletava o ID de publicidade (política de Data
+        // Safety). 12/08, decisão do dono: v49 embarca o SDK da Meta e coleta
+        // o GAID — quem está em build antigo (ou fez opt-out) segue sem, e o
+        // pareamento cai pra e-mail/external_id.
+        advertiser_tracking_enabled: !!gaid,
         application_tracking_enabled: true,
         extinfo,
       },

@@ -107,7 +107,17 @@ export const capturarDispositivoApp = async () => {
       build = info.build ?? "";
       pacote = info.id ?? pacote;
     } catch { /* sem plugin: segue com o que dá pra ler do UA */ }
+    // GAID (12/08): o servidor anexa como `madid` no Purchase do CAPI — é o
+    // que deixa a Meta casar a compra com o clique no anúncio. Vem do plugin
+    // nativo MetaAds; fora do app (ou com opt-out do usuário) fica vazio.
+    let gaid = "";
+    try {
+      const { registerPlugin } = await import("@capacitor/core");
+      const MetaAds = registerPlugin<{ idPublicidade(): Promise<{ gaid: string }> }>("MetaAds");
+      gaid = (await MetaAds.idPublicidade()).gaid ?? "";
+    } catch { /* web / build antigo sem o plugin */ }
     trackEvent("app_device_info", {
+      ...(gaid ? { gaid } : {}),
       pacote,
       versao,
       build,

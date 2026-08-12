@@ -1,0 +1,244 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+
+/**
+ * meta-backfill-app — reenvia pra Meta compras do app que ficaram pra trás.
+ *
+ * POR QUE ISTO EXISTE (11/08): a v48 passou a vender ANTES do cadastro. O
+ * webhook do RevenueCat chega com `$RCAnonymousID:…`, não reconhece como
+ * usuário e desiste — então a Meta nunca soube. Em 11/08 foram 4 de 6 vendas
+ * invisíveis, e campanha otimiza pelo que enxerga. O caminho já foi
+ * consertado no `revenuecat-sync`, mas o que passou precisa ser reposto: a
+ * Meta aceita evento de até 7 DIAS.
+ *
+ * Admin-only. Idempotente pelo marcador `meta_capi_app_enviado` + tx — rodar
+ * duas vezes não duplica evento (e evento duplicado estraga o CPA no painel).
+ *
+ * POST { "de": "2026-08-11", "ate": "2026-08-11" }   (datas em BRT)
+ */
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+const json = (b: unknown, s = 200) =>
+  new Response(JSON.stringify(b), { headers: { ...cors, "Content-Type": "application/json" }, status: s });
+const log = (p: string, d?: unknown) =>
+  console.log(`[META-BACKFILL] ${p}${d ? ` - ${JSON.stringify(d)}` : ""}`);
+
+const sha256 = async (txt: string): Promise<string> => {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+};
+
+async function mandarCompraProMeta(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const dataset = Deno.env.get("META_APP_DATASET_ID");
+  const token = Deno.env.get("META_APP_CAPI_TOKEN");
+  if (!dataset || !token) return;
+
+  // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
+  // o webhook (ele reenvia em qualquer 500 nosso).
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "meta_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
+  const { data: dev } = await admin
+    .from("analytics_events")
+    .select("event_data")
+    .eq("event_name", "app_device_info")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+  if (!Object.keys(d).length) {
+    // Quem está em build anterior à v48 não emite app_device_info. O
+    // webview_info (que existe desde a v37) carrega o UA — dá SO e modelo,
+    // que é o que mais pesa no pareamento.
+    const { data: wv } = await admin
+      .from("analytics_events")
+      .select("event_data")
+      .eq("event_name", "webview_info")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const ua = String(((wv as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).ua ?? "");
+    const m = /Android (\d+(?:\.\d+)?); ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua);
+    d = m ? { os: m[1], modelo: m[2] } : {};
+  }
+  const s = (k: string) => String(d[k] ?? "");
+  const n = (k: string) => Number(d[k] ?? 0) || 0;
+  const extinfo = [
+    "a2",                                    // versão do extinfo (Android)
+    s("pacote") || "br.com.coreaplicativo.app",
+    s("build"),
+    s("versao"),
+    s("os"),
+    s("modelo"),
+    s("locale") || "pt-BR",
+    "",                                      // fuso abreviado: não temos
+    "",                                      // operadora: não temos
+    n("tela_l"),
+    n("tela_a"),
+    String(d.densidade ?? ""),
+    n("nucleos"),
+    0,                                       // disco total
+    0,                                       // disco livre
+    s("fuso") || "America/Sao_Paulo",
+  ];
+
+  const user_data: Record<string, unknown> = { external_id: await sha256(userId) };
+  if (email) user_data.em = await sha256(email.trim().toLowerCase());
+
+  const payload: Record<string, unknown> = {
+    data: [{
+      event_name: "Purchase",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId,                        // dedup, igual ao padrão da web
+      action_source: "app",
+      user_data,
+      app_data: {
+        // NÃO coletamos o ID de publicidade do aparelho (exigiria permissão
+        // AD_ID e mudar a declaração de Segurança de Dados da Play). O
+        // pareamento é por e-mail/external_id — dado de primeira mão.
+        advertiser_tracking_enabled: false,
+        application_tracking_enabled: true,
+        extinfo,
+      },
+      custom_data: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${dataset}/events?access_token=${token}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "meta_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("meta capi app ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
+
+/**
+ * TikTok Events API (09/08) — mesma ideia do mandarCompraProMeta: manda a
+ * compra pro TikTok DEPOIS que o Google já confirmou o pagamento (servidor,
+ * não SDK no app). Decisão de arquitetura, não só preguiça de escrever Java:
+ * este binário tem política deliberada de não embutir rastreador/SDK de
+ * anúncio (ver preparar-loja.mjs — é a mesma razão por trás de nunca
+ * coletar GAID). Server-side mantém essa política intacta.
+ *
+ * AVISO DE CONFIANÇA: montei este payload cruzando a documentação do TikTok
+ * for Business (blog do endpoint consolidado) com integrações de terceiros
+ * (Apphud, Stape, Tealium) — o portal oficial (business-api.tiktok.com) é
+ * uma SPA que não dá pra ler direto. O endpoint, `event_source`/
+ * `event_source_id` e o nome do evento ("CompletePayment") saíram
+ * confirmados em mais de uma fonte independente; o formato exato de
+ * `user`/`properties` é o melhor palpite seguindo o padrão do Meta CAPI
+ * ao lado. Só confia nisso depois de ver UM evento de teste chegar certo
+ * no Events Manager — mesma regra do catálogo: causa provada, não suposta.
+ */
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
+  try {
+    const url = Deno.env.get("SUPABASE_URL") ?? "";
+    const anon = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") ?? "");
+    const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", {
+      auth: { persistSession: false },
+    });
+
+    const auth = req.headers.get("Authorization");
+    if (!auth) return json({ error: "unauthorized" }, 401);
+    const { data: u } = await anon.auth.getUser(auth.replace("Bearer ", ""));
+    const uid = u?.user?.id;
+    if (!uid) return json({ error: "unauthorized" }, 401);
+    const { data: role } = await admin
+      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle();
+    if (!role) return json({ error: "forbidden" }, 403);
+
+    const body = await req.json().catch(() => ({}));
+    const de = String(body?.de ?? "").slice(0, 10);
+    const ate = String(body?.ate ?? de).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(de)) return json({ error: "informe de/ate em YYYY-MM-DD" }, 400);
+    // Janela BRT: o dia vai de 03:00Z a 03:00Z do dia seguinte.
+    const inicio = `${de}T03:00:00Z`;
+    const fim = new Date(Date.parse(`${ate}T03:00:00Z`) + 86400_000).toISOString();
+
+    const { data: vendas } = await admin
+      .from("subscriptions")
+      .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,created_at")
+      .eq("payment_method", "play_store")
+      .not("revenuecat_subscription_id", "is", null)
+      .gte("created_at", inicio)
+      .lt("created_at", fim)
+      .order("created_at", { ascending: true });
+
+    /* Compra de TESTE não vai pra Meta: ela não veio de anúncio nenhum, então
+     * só suja o aprendizado do algoritmo (e o CPA do painel). Já tinha sido
+     * excluída à mão num backfill anterior; aqui vira regra. */
+    const EH_TESTE = (email?: string | null) =>
+      !!email && /(^|[+.])teste|testeghg|jv20101958/i.test(email);
+
+    const feitos: unknown[] = [];
+    for (const v of vendas ?? []) {
+      if (EH_TESTE(v.customer_email)) {
+        feitos.push({ tx: v.revenuecat_subscription_id, email: v.customer_email, resultado: "pulado_teste" });
+        continue;
+      }
+      const antes = await admin
+        .from("analytics_events").select("id")
+        .eq("event_name", "meta_capi_app_enviado")
+        .eq("user_id", v.user_id)
+        .contains("event_data", { tx: v.revenuecat_subscription_id })
+        .maybeSingle();
+      if (antes.data) { feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" }); continue; }
+      await mandarCompraProMeta(
+        admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
+        v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
+      );
+      const depois = await admin
+        .from("analytics_events").select("id")
+        .eq("event_name", "meta_capi_app_enviado")
+        .eq("user_id", v.user_id)
+        .contains("event_data", { tx: v.revenuecat_subscription_id })
+        .maybeSingle();
+      feitos.push({
+        tx: v.revenuecat_subscription_id,
+        email: v.customer_email,
+        resultado: depois.data ? "enviado" : "falhou",
+      });
+    }
+    log("fim", { de, ate, total: feitos.length });
+    return json({ de, ate, vendas: (vendas ?? []).length, resultados: feitos });
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    log("ERRO", { m });
+    return json({ error: m }, 500);
+  }
+});

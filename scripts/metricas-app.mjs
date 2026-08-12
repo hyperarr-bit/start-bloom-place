@@ -48,6 +48,7 @@
  *     REVENUECAT_SECRET_KEY=sk_...   (RevenueCat → Project Settings → API keys → Secret v2)
  */
 import { readFileSync, existsSync } from "node:fs";
+import { createDecipheriv } from "node:crypto";
 
 const SUPABASE_URL = "https://itoylenzvahbscgjgtqf.supabase.co";
 // Chave anônima: pública por natureza (vai no bundle do site). Sozinha não lê
@@ -226,6 +227,48 @@ const lerReferrer = (raw = "") => {
   return { fonte, clique: m ? Number(m[1]) * 1000 : null };
 };
 
+/* ------------------------------------------- de qual CRIATIVO veio (Meta) */
+
+/*
+ * O ANÚNCIO EXATO ESTÁ NO REFERRER — só vem trancado (12/08).
+ *
+ * Eu tinha dito que era impossível saber o criativo pelos nossos dados,
+ * porque `utm_content.source.data` vem criptografado. Estava errado pela
+ * metade: a Meta entrega a CHAVE de descriptografia no painel de
+ * desenvolvedor (Settings → Basic → Android, 64 caracteres hex, uma por app).
+ * Com ela, o blob abre e sai campanha, conjunto e anúncio.
+ *
+ * Isso importa muito: significa atribuição por criativo DENTRO da nossa base,
+ * sem SDK da Meta no binário — ou seja, sem mexer na declaração de Segurança
+ * de Dados da Play, que é justamente o que impede a gente de embarcar
+ * rastreador (app de saúde e finanças). E funciona pra trás, em todo referrer
+ * já guardado.
+ *
+ * Formato: AES-256-GCM. `data` e `nonce` são hex; os ÚLTIMOS 16 BYTES de
+ * `data` são a tag de autenticação (o libsodium anexa na hora de cifrar), não
+ * conteúdo — sem separar isso, a decifragem falha.
+ */
+const abrirReferrer = (raw = "") => {
+  const chave = env.META_INSTALL_REFERRER_KEY;
+  if (!chave) return null;
+  try {
+    const texto = decodeURIComponent(String(raw));
+    const m = /utm_content=(\{.*\})/.exec(texto);
+    if (!m) return null;
+    const fonte = JSON.parse(m[1])?.source;
+    if (!fonte?.data || !fonte?.nonce) return null;
+    const bruto = Buffer.from(fonte.data, "hex");
+    const corpo = bruto.subarray(0, -16);
+    const tag = bruto.subarray(-16);
+    const d = createDecipheriv("aes-256-gcm", Buffer.from(chave.trim(), "hex"), Buffer.from(fonte.nonce, "hex"));
+    d.setAuthTag(tag);
+    const aberto = Buffer.concat([d.update(corpo), d.final()]);
+    return JSON.parse(aberto.toString());
+  } catch {
+    return null;
+  }
+};
+
 /* ------------------------------------------------------------------ main */
 
 const token = await entrar();
@@ -268,7 +311,8 @@ for (const [sid, evs] of sessoesApp) {
   const registro = { sid, marcos: m, parouEm: ultima, pagou: m.has("pagou") };
   if (!ref) { retorno.push(registro); continue; }
   const { fonte, clique } = lerReferrer(ref.event_data?.referrer ?? "");
-  instalacoes.push({ ...registro, fonte, clique, instalou: Date.parse(ref.created_at) });
+  const anuncio = abrirReferrer(ref.event_data?.referrer ?? "");
+  instalacoes.push({ ...registro, fonte, clique, anuncio, instalou: Date.parse(ref.created_at) });
 }
 
 // ---- funil da coorte de instalação
@@ -387,6 +431,44 @@ if (cauda.length) {
   L(`   → cauda comprovada: campanha de app rende dias depois do gasto.`);
   for (const i of cauda.filter((x) => x.pagou)) {
     L(`     • clicou ${brt(new Date(i.clique).toISOString())}, instalou ${brt(new Date(i.instalou).toISOString())}, COMPROU`);
+  }
+}
+L();
+
+/* Atribuição por CRIATIVO saída da NOSSA base (não da Meta): cada instalação
+ * carrega, dentro do referrer, a campanha/conjunto/anúncio que a trouxe. É o
+ * único caminho que liga anúncio → venda sem SDK no app. */
+L("▸ POR CRIATIVO (do install referrer, base própria)");
+if (!env.META_INSTALL_REFERRER_KEY) {
+  L("   (desligado) Falta a CHAVE DE DESCRIPTOGRAFIA do install referrer.");
+  L("   Pegue em: developers.facebook.com → seu app → Configurações → Básico →");
+  L("   seção Android → \"Chave de descriptografia do install referrer\" (64 caracteres).");
+  L("   Ponha no .env.local como META_INSTALL_REFERRER_KEY=<64 hex>.");
+  L("   Com ela sai campanha, conjunto e ANÚNCIO de cada instalação — sem SDK");
+  L("   no binário, e vale pra trás em todo referrer já guardado.");
+} else {
+  const comAnuncio = instalacoes.filter((i) => i.anuncio);
+  const semAnuncio = instalacoes.filter((i) => !i.anuncio && i.fonte !== "orgânico" && i.fonte !== "desconhecido");
+  if (!comAnuncio.length) {
+    L(`   ✗ nenhum referrer abriu (${instalacoes.length} instalação(ões) no período).`);
+    L("     Chave errada, ou os installs do período não vieram de anúncio Meta.");
+  } else {
+    const porAd = new Map();
+    for (const i of comAnuncio) {
+      const k = `${i.anuncio.campaign_name ?? "?"}|${i.anuncio.adgroup_name ?? "?"}|${i.anuncio.ad_id ?? "?"}`;
+      if (!porAd.has(k)) porAd.set(k, { campanha: i.anuncio.campaign_name, conjunto: i.anuncio.adgroup_name, ad: i.anuncio.ad_id, instalou: 0, pagou: 0 });
+      const r = porAd.get(k);
+      r.instalou++;
+      if (i.pagou) r.pagou++;
+    }
+    L(`   ${"campanha".padEnd(24)} ${"conjunto".padEnd(22)} ${"anúncio".padEnd(18)} ${"inst".padStart(5)} ${"vendas".padStart(7)}`);
+    for (const r of [...porAd.values()].sort((a, b) => b.instalou - a.instalou)) {
+      L(`   ${String(r.campanha ?? "?").slice(0, 24).padEnd(24)} ${String(r.conjunto ?? "?").slice(0, 22).padEnd(22)} ${String(r.ad ?? "?").slice(0, 18).padEnd(18)} ${String(r.instalou).padStart(5)} ${String(r.pagou).padStart(7)}`);
+    }
+    if (semAnuncio.length) L(`   (${semAnuncio.length} referrer de anúncio não abriu — chave ou formato)`);
+    L(`   ⚠ "vendas" aqui é quem instalou E comprou na MESMA sessão. A cauda de`);
+    L(`     dias (comprovada) não aparece nesta coluna — pra ela, cruze o ad_id`);
+    L(`     da instalação com a venda depois.`);
   }
 }
 L();

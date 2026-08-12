@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "loja": "node scripts/preparar-loja.mjs"
+    "loja": "node scripts/preparar-loja.mjs",
+    "metricas": "node scripts/metricas-app.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

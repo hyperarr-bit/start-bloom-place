@@ -74,12 +74,28 @@ serve(async (req) => {
      * no revenuecat-sync (a v48 compra anônimo — sem o sync, 2/3 das vendas
      * ficavam invisíveis pra Meta e este relatório mentiria pra menos).
      */
-    const nivel = body?.nivel === "ad" ? "ad" : body?.nivel === "campanhas" ? "campanhas" : "campaign";
+    const nivel = ["ad", "campanhas", "conjuntos"].includes(String(body?.nivel)) ? String(body?.nivel) : "campaign";
 
     /* Lista crua de campanhas com OBJETIVO — a pergunta "isso é App Promotion
      * ou Vendas?" não se responde pelo nome, só pelo objective. E App
      * Promotion é o que faz a Meta contar install e otimizar por evento do
      * app; campanha de Vendas apontada pra Play traz gente mas mede errado. */
+    /* Conjuntos com `promoted_object` — é ali que a campanha de app declara
+     * QUAL app e QUAL dataset de eventos ela usa. Se vier vazio ou apontando
+     * pra outro lugar, a Meta não tem como creditar a compra do app à
+     * campanha, por mais que o CAPI entregue o evento. Foi a checagem que
+     * explicou "70 compras na campanha de web e 0 nas de app" (12/08). */
+    if (nivel === "conjuntos") {
+      const u = new URL(`https://graph.facebook.com/v21.0/${account}/adsets`);
+      u.searchParams.set("fields", "id,name,campaign{name,objective},effective_status,promoted_object,optimization_goal");
+      u.searchParams.set("limit", "200");
+      u.searchParams.set("access_token", token);
+      const r = await fetch(u);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) return jsonResponse({ error: "meta_error", detail: d?.error?.message ?? `HTTP ${r.status}` });
+      return jsonResponse({ conjuntos: d.data ?? [] });
+    }
+
     if (nivel === "campanhas") {
       const u = new URL(`https://graph.facebook.com/v21.0/${account}/campaigns`);
       u.searchParams.set("fields", "id,name,objective,effective_status,daily_budget,created_time");

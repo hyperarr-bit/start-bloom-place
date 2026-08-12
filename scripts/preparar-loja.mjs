@@ -76,10 +76,13 @@ console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build
 // quebra nada visível — o app funciona e a campanha volta a ficar CEGA em
 // silêncio. Esse tipo de silêncio é o que barra aqui.
 if (!teste) {
-  const strings = readFileSync("android/app/src/main/res/values/strings.xml", "utf8");
-  const clientToken = strings.match(/name="facebook_client_token">([^<]*)</)?.[1]?.trim() ?? "";
+  // Mora no key.properties (gitignored) e não no strings.xml: o repo é
+  // público, e token vazado vira evento falso no nosso dataset.
+  const props = existsSync("android/key.properties")
+    ? readFileSync("android/key.properties", "utf8") : "";
+  const clientToken = props.match(/^\s*metaClientToken\s*=\s*(.+)$/m)?.[1]?.trim() ?? "";
   if (!clientToken) {
-    console.error("\n✗ facebook_client_token vazio em android/.../values/strings.xml.");
+    console.error("\n✗ metaClientToken não está em android/key.properties.");
     console.error("  Sem ele o SDK da Meta não liga e a atribuição de campanha morre em silêncio.");
     console.error("  Pegue em developers.facebook.com → Configurações → Avançado → Token de cliente.\n");
     process.exit(1);

@@ -17,11 +17,15 @@
 
     <!-- SDK da Meta (12/08, decisão do dono): campanha de App Promotion só
          otimiza se a Meta enxergar instalação e compra — e ela só enxerga
-         com o SDK dentro do binário. O app id é o mesmo dos conjuntos de
-         anúncio (promoted_object.application_id). O client token vem de
-         developers.facebook.com → Configurações → Avançado; NÃO é segredo
-         (a Meta desenha ele pra ser embarcado no APK), mas sem ele o SDK
-         não sobe — o preparar-loja barra build de produção com ele vazio. -->
+         com o SDK dentro do binário. O app id não é segredo: ele já aparece
+         no promoted_object de todo conjunto de anúncio.
+
+         O CLIENT TOKEN NÃO MORA AQUI. Ele vai pro binário de qualquer jeito
+         (a Meta desenha assim), mas ESTE REPOSITÓRIO É PÚBLICO — e token em
+         repo público é token varrido por robô. Quem tem ele manda evento
+         falso pro nosso dataset, ou seja, envenena justamente a otimização
+         que este SDK veio ligar. Fica em android/key.properties (gitignored,
+         mesmo lugar da senha do keystore) e o build.gradle injeta o recurso
+         `facebook_client_token` via resValue. -->
     <string name="facebook_app_id">1693551238598114</string>
-    <string name="facebook_client_token"></string>
 </resources>

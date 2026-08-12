@@ -20,6 +20,12 @@ android {
         // teste interno, então todo upload novo sobe este número.
         versionCode 49
         versionName "1.0.48"
+        // Client token da Meta: fora do código versionado (repo é PÚBLICO —
+        // ver comentário no strings.xml). Ausente, o recurso nasce vazio e a
+        // MainActivity simplesmente não liga o SDK; o preparar-loja barra
+        // build de produção nessa situação.
+        resValue "string", "facebook_client_token",
+                 (keystoreProperties['metaClientToken'] ?: "")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -142,7 +142,10 @@ export function WinbackOffer({ attemptId, onDismiss }: Props) {
         disabled={loading || secondsLeft === 0}
         className="w-full h-14 text-base font-bold"
       >
-        {"GARANTIR VITALÍCIO POR R$ 14,90"}
+        {/* preço vem da constante — a string fixa ficou pra trás no degrau de
+            05/08 e prometia 14,90 com o QR cobrando 19,90 (achado da auditoria
+            de 12/08). Cobrar mais que o anunciado, nunca. */}
+        {`GARANTIR VITALÍCIO POR R$ ${OFFER_LIFETIME.toFixed(2).replace(".", ",")}`}
       </Button>
 
       <p className="text-[10px] text-muted-foreground text-center leading-relaxed">

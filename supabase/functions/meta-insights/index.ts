@@ -121,13 +121,27 @@ serve(async (req) => {
       if (!r.ok) {
         return jsonResponse({ error: "meta_error", detail: d?.error?.message ?? `HTTP ${r.status}` });
       }
-      // A Meta devolve TODAS as ações (view, install, add_to_cart…) num array
-      // só. Aqui interessa instalação e compra — o resto é ruído no terminal.
+      /*
+       * PRIMEIRO RÓTULO QUE EXISTIR — NUNCA A SOMA (corrigido 13/08).
+       *
+       * A Meta reporta a MESMA conversão sob vários nomes ao mesmo tempo. Uma
+       * venda de app aparece como purchase, omni_purchase, onsite_app_purchase,
+       * app_custom_event.fb_mobile_purchase… todos com o mesmo valor. Somar
+       * três deles triplicava: 3 vendas reais viravam "9 compras" no relatório,
+       * e eu quase mandei o dono publicar uma versão nova do app pra consertar
+       * uma duplicação que só existia aqui. Instalação tinha o mesmo defeito
+       * (mobile_app_install + omni_app_install = o dobro).
+       *
+       * A ordem abaixo é da métrica mais agregada pra mais específica: omni_*
+       * é o total já deduplicado da Meta entre superfícies.
+       */
       const acao = (linha: Record<string, unknown>, tipos: string[]) => {
         const lista = (linha.actions ?? []) as { action_type: string; value: string }[];
-        return lista
-          .filter((a) => tipos.includes(a.action_type))
-          .reduce((t, a) => t + Number(a.value || 0), 0);
+        for (const t of tipos) {
+          const achou = lista.find((a) => a.action_type === t);
+          if (achou) return Number(achou.value || 0);
+        }
+        return 0;
       };
       const anuncios = ((d.data ?? []) as Record<string, unknown>[]).map((l) => ({
         ad_id: l.ad_id,
@@ -138,8 +152,17 @@ serve(async (req) => {
         impressoes: Number(l.impressions ?? 0),
         cliques: Number(l.clicks ?? 0),
         ctr: Number(l.ctr ?? 0),
-        instalacoes: acao(l, ["mobile_app_install", "app_install", "omni_app_install"]),
-        compras: acao(l, ["purchase", "omni_purchase", "app_custom_event.fb_mobile_purchase"]),
+        instalacoes: acao(l, ["omni_app_install", "mobile_app_install", "app_install"]),
+        compras: acao(l, [
+          "omni_purchase", "purchase",
+          "app_custom_event.fb_mobile_purchase", "offsite_conversion.fb_pixel_purchase",
+        ]),
+        // Ações cruas sob demanda: a Meta manda a MESMA conversão em vários
+        // rótulos (purchase, omni_purchase, app_custom_event.fb_mobile_purchase),
+        // então somar os três triplica. Sem poder olhar o array, um relatório
+        // inflado é indistinguível de venda duplicada no app — e a diferença
+        // entre os dois é uma versão nova do app à toa.
+        ...(body?.bruto ? { acoes: l.actions } : {}),
       }));
       return jsonResponse({ nivel: "ad", since, until, anuncios });
     }

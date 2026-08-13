@@ -183,14 +183,41 @@ serve(async (req) => {
     if (!auth) return json({ error: "unauthorized" }, 401);
     const { data: u } = await anon.auth.getUser(auth.replace("Bearer ", ""));
     const uid = u?.user?.id;
-    if (!uid) return json({ error: "unauthorized" }, 401);
-    const { data: role } = await admin
-      .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle();
-    if (!role) return json({ error: "forbidden" }, 403);
+    let ehAdmin = false;
+    if (uid) {
+      const { data: role } = await admin
+        .from("user_roles").select("role").eq("user_id", uid).eq("role", "admin").maybeSingle();
+      ehAdmin = !!role;
+    }
 
     const body = await req.json().catch(() => ({}));
-    const de = String(body?.de ?? "").slice(0, 10);
-    const ate = String(body?.ate ?? de).slice(0, 10);
+
+    /*
+     * MODO CRON (13/08) — sem sessão de admin, roda a varredura dos últimos
+     * dias sozinho. É o conserto do vazamento achado hoje: NENHUMA venda do
+     * fluxo anônimo (v48+, que virou o padrão) se auto-envia — 5 de 5 falharam,
+     * enquanto 3 de 3 de quem já estava logado passaram. A causa provável é a
+     * compra ser gravada ANTES da ficha do aparelho existir (19s de diferença
+     * na venda da ingrid), e o evento sair sem extinfo. Mas a correção certa
+     * não depende de acertar a causa: a Meta aceita evento de até 7 DIAS, então
+     * varrer de tempos em tempos recupera o que o caminho ao vivo perder — seja
+     * qual for o motivo. Sem isso, campanha de app otimiza pela metade da
+     * verdade (foi o que aconteceu em 11/08: 10 de 22 vendas invisíveis).
+     *
+     * Seguro com chave anônima pela mesma razão do pix-reconcile: não aceita
+     * janela do chamador, é idempotente pelo marcador + tx (chamar 100x não
+     * duplica evento) e NÃO devolve e-mail de ninguém. O pior que um terceiro
+     * consegue é fazer a Meta receber vendas que realmente aconteceram.
+     */
+    const cron = !ehAdmin;
+    if (cron && String(body?.modo ?? "") !== "cron") return json({ error: "forbidden" }, 403);
+
+    const hoje = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    // Janela do cron: 3 dias pra trás (folga confortável dentro do teto de 7
+    // dias da Meta, mesmo se o cron ficar horas fora do ar).
+    const de = cron ? iso(new Date(hoje.getTime() - 3 * 86400_000)) : String(body?.de ?? "").slice(0, 10);
+    const ate = cron ? iso(hoje) : String(body?.ate ?? de).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(de)) return json({ error: "informe de/ate em YYYY-MM-DD" }, 400);
     // Janela BRT: o dia vai de 03:00Z a 03:00Z do dia seguinte.
     const inicio = `${de}T03:00:00Z`;
@@ -240,7 +267,18 @@ serve(async (req) => {
         resultado: depois.data ? "enviado" : "falhou",
       });
     }
-    log("fim", { de, ate, total: feitos.length });
+    log("fim", { de, ate, total: feitos.length, cron });
+    if (cron) {
+      // Resposta sem e-mail: este caminho é alcançável com chave anônima.
+      const conta = (r: string) => feitos.filter((f) => (f as { resultado: string }).resultado === r).length;
+      return json({
+        modo: "cron", de, ate,
+        vendas: (vendas ?? []).length,
+        enviados: conta("enviado"),
+        ja_enviados: conta("ja_enviado"),
+        falhas: conta("falhou"),
+      });
+    }
     return json({ de, ate, vendas: (vendas ?? []).length, resultados: feitos });
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);

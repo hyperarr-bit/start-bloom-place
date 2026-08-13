@@ -172,7 +172,15 @@ const MARCAS_DE_APP = [
   "app_prefolha_view", "app_downsell_view",
 ];
 
-/** O funil do app na ordem real das telas (v48). */
+/**
+ * O funil do app na ordem real das telas.
+ *
+ * `prefolha` é OPCIONAL desde 13/08: a pré-folha saiu do caminho de quem
+ * compra (o CTA abre a folha do Google direto) e a etapa deixou de existir.
+ * Sem esse cuidado o relatório mostraria "Escolheu forma de pagamento: 0 —
+ * perde 100%" e leria como colapso justamente a melhoria. Etapa com zero
+ * ocorrência na janela some do funil; janelas antigas seguem mostrando ela.
+ */
 const ETAPAS = [
   ["welcome", "Abriu o app"],
   ["porta", "Escolheu a área"],
@@ -183,7 +191,7 @@ const ETAPAS = [
   ["demo", "Entrou na demo"],
   ["paywall", "Viu o paywall"],
   ["cta", "Tocou em comprar"],
-  ["prefolha", "Escolheu forma de pagamento"],
+  ["prefolha", "Escolheu forma de pagamento", { opcional: true }],
   ["folha", "Abriu a folha do Google"],
   ["pagou", "PAGOU"],
 ];
@@ -346,6 +354,57 @@ const vendas = await buscar("subscriptions", {
 const noPer = vendas.filter((v) => v.created_at < FIM);
 const vendasApp = noPer.filter((v) => v.revenuecat_subscription_id);
 const vendasWeb = noPer.filter((v) => !v.revenuecat_subscription_id);
+
+/*
+ * DE QUAL ANÚNCIO VEIO **ESTA** VENDA (13/08, bronca do dono: "tu tá chutando
+ * de que campanha veio").
+ *
+ * Relatório por dia não decide anúncio: quando duas campanhas estão no ar, a
+ * venda das 19:57 pode ser de qualquer uma, e responder por probabilidade não
+ * serve pra mover orçamento. Aqui a venda é ligada à INSTALAÇÃO da pessoa, e a
+ * instalação carrega o `ad_id` dentro do install referrer.
+ *
+ * A costura tem dois pulos, porque a v48 vende ANTES do cadastro:
+ *  1. venda → sessões do user_id (o que existe depois que a conta nasce)
+ *  2. sessão → install_referrer (o evento é anônimo, mas mora na MESMA sessão)
+ * Quando a compra acontece dias depois da instalação (cauda comprovada), a
+ * sessão é outra: aí o elo é o GAID da ficha do aparelho, que é o mesmo em
+ * qualquer sessão do mesmo celular.
+ */
+const sessoesDoUsuario = new Map();   // user_id → Set(session_id)
+const gaidDoUsuario = new Map();      // user_id → gaid
+for (const e of noPeriodo) {
+  if (!e.user_id) continue;
+  if (!sessoesDoUsuario.has(e.user_id)) sessoesDoUsuario.set(e.user_id, new Set());
+  sessoesDoUsuario.get(e.user_id).add(e.session_id);
+  const g = e.event_data?.gaid;
+  if (g) gaidDoUsuario.set(e.user_id, g);
+}
+const refDaSessao = new Map();        // session_id → referrer cru
+const gaidDaSessao = new Map();       // session_id → gaid
+for (const [sid, evs] of sessoesApp) {
+  const r = evs.find((x) => x.event_name === "install_referrer");
+  if (r) refDaSessao.set(sid, r.event_data?.referrer ?? "");
+  const g = evs.find((x) => x.event_data?.gaid)?.event_data?.gaid;
+  if (g) gaidDaSessao.set(sid, g);
+}
+const anuncioDaVenda = (v) => {
+  const sess = sessoesDoUsuario.get(v.user_id) ?? new Set();
+  for (const s of sess) {
+    const cru = refDaSessao.get(s);
+    if (cru) return { ...lerReferrer(cru), anuncio: abrirReferrer(cru), via: "mesma sessão" };
+  }
+  // cauda: instalou noutro dia/sessão — casa pelo aparelho
+  const g = gaidDoUsuario.get(v.user_id) ?? [...sess].map((s) => gaidDaSessao.get(s)).find(Boolean);
+  if (g) {
+    for (const [sid, gg] of gaidDaSessao) {
+      if (gg !== g) continue;
+      const cru = refDaSessao.get(sid);
+      if (cru) return { ...lerReferrer(cru), anuncio: abrirReferrer(cru), via: "mesmo aparelho" };
+    }
+  }
+  return null;
+};
 const bruto = vendasApp.reduce((t, v) => t + (v.amount_cents ?? 0), 0) / 100;
 const liquido = bruto * 0.85; // o Play fica com 15% (programa de pequenos negócios)
 
@@ -373,8 +432,11 @@ L();
 L(`▸ FUNIL DE AQUISIÇÃO — as ${instalacoes.length} pessoas que INSTALARAM no período`);
 const base = instalacoes.length || 1;
 let anterior = base;
-for (const [k, rotulo] of ETAPAS) {
+for (const [k, rotulo, opts] of ETAPAS) {
   const v = alcancou[k];
+  // Etapa opcional zerada = tela que não existe mais nesta janela; imprimir
+  // faria a melhoria parecer despencamento (ver comentário em ETAPAS).
+  if (!v && opts?.opcional) continue;
   const queda = anterior > v ? `  ↓ perde ${pct(anterior - v, anterior)}` : "";
   L(`   ${rotulo.padEnd(28)} ${String(v).padStart(4)}  ${pct(v, base).padStart(6)}${queda}`);
   if (v) anterior = v;
@@ -411,7 +473,19 @@ L();
 
 L("▸ DINHEIRO (tabela subscriptions — a verdade)");
 L(`   APP: ${vendasApp.length} vendas · ${reais(bruto)} bruto · ${reais(liquido)} líquido (Play fica com 15%)`);
-for (const v of vendasApp) L(`      ${brt(v.created_at)}  ${(v.customer_email ?? "").padEnd(34)} ${reais((v.amount_cents ?? 0) / 100)}`);
+for (const v of vendasApp) {
+  L(`      ${brt(v.created_at)}  ${(v.customer_email ?? "").padEnd(34)} ${reais((v.amount_cents ?? 0) / 100)}`);
+  // De qual ANÚNCIO veio esta venda — sem a chave sai a fonte e o horário do
+  // clique, que já elimina "veio de campanha?"; com a chave sai o ad_id.
+  const o = anuncioDaVenda(v);
+  if (!o) { L(`         ↳ origem: sem referrer (orgânico, ou instalou antes da telemetria)`); continue; }
+  const quando = o.clique ? ` · clicou ${brt(new Date(o.clique).toISOString())}` : "";
+  if (o.anuncio) {
+    L(`         ↳ ${o.anuncio.campaign_name ?? "?"} / ${o.anuncio.adgroup_name ?? "?"} / anúncio ${o.anuncio.ad_id ?? "?"}${quando} (${o.via})`);
+  } else {
+    L(`         ↳ ${o.fonte}${quando} (${o.via}) — anúncio exato exige META_INSTALL_REFERRER_KEY`);
+  }
+}
 L(`   WEB: ${vendasWeb.length} vendas · ${reais(vendasWeb.reduce((t, v) => t + (v.amount_cents ?? 0), 0) / 100)}`);
 const semEvento = vendasApp.length - alcancou.pagou;
 if (semEvento > 0) {

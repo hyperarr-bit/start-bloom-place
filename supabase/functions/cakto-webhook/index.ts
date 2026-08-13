@@ -583,10 +583,32 @@ serve(async (req) => {
           .select("event_data, created_at, event_name").eq("user_id", userId)
           .order("created_at", { ascending: false }).limit(80);
         const rows = (evs ?? []) as Array<{ event_data: Record<string, string>; created_at: string; event_name: string }>;
-        const ordem = rows.find((r) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto");
-        const eventId = String(ordem?.event_data?.order_id ?? purchaseId ?? `${userId}-${Date.now()}`);
-        const offerKind = String(ordem?.event_data?.offer ?? (offerId === DOWNSELL_OFFER.toLowerCase() ? "downsell" : "lifetime"));
-        const amountCents = Number(ordem?.event_data?.amount_cents) || Math.round(Number(data.amount ?? 0) * 100) || (offerKind === "downsell" ? 1490 : 2790);
+        /* PEDIDO PAGO primeiro, "mais recente" só como muleta (12/08,
+         * auditoria). O bug: quem gera 2 QRs (roleta downsell, reabrir
+         * checkout) tinha o CAPI saindo com event_id do pedido MAIS NOVO —
+         * enquanto o pixel do navegador dispara com o pedido PAGO (casado via
+         * abacatepay_billing_id). event_id diferente = dedup falha = Meta
+         * conta 2 compras. É o irmão server-side do bug de 11/08 no cliente.
+         *
+         * Regra agora:
+         *   - event_id: SEMPRE o purchaseId do webhook (o pedido pago de
+         *     verdade) — é o mesmo que o pixel usa.
+         *   - valor/oferta: da linha CASADA com o purchaseId; sem match, do
+         *     próprio webhook (data.amount / offerId), NUNCA de linha alheia.
+         *   - sinais de match (fbp/ip/ua/fbc/source_url): a linha mais recente
+         *     serve como fallback — mesma pessoa/aparelho, só melhora o match
+         *     e não toca em event_id/valor. */
+        const ordemExata = rows.find((r) =>
+          r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto" &&
+          purchaseId != null && String(r.event_data?.order_id ?? "") === String(purchaseId));
+        const ordem = ordemExata ?? rows.find((r) => r.event_name === "pix_order_created" && r.event_data?.gateway === "cakto");
+        const eventId = String(purchaseId ?? ordem?.event_data?.order_id ?? `${userId}-${Date.now()}`);
+        const offerKind = String(ordemExata?.event_data?.offer
+          ?? (offerId === DOWNSELL_OFFER.toLowerCase() ? "downsell" : "lifetime"));
+        // 1490 era o downsell de julho; desde 10/08 a roleta cobra 1990.
+        const amountCents = Number(ordemExata?.event_data?.amount_cents)
+          || Math.round(Number(data.amount ?? 0) * 100)
+          || (offerKind === "downsell" ? 1990 : 2790);
         /* ENRIQUECIMENTO DO MATCH (10/08). Antes ia só em+external_id+fbc, e a
          * cobertura caiu de 100% (05/08) pra 78% (10/08) — a Meta deixava de
          * casar 1 em cada 5 vendas. Isso não é só relatório feio: ela otimiza
@@ -605,10 +627,10 @@ serve(async (req) => {
          * event_time passa a ser a hora REAL da compra (paid_at/created), não
          * a hora em que o webhook rodou — a Meta usa isso pra casar com a
          * janela do clique, e o atraso do webhook empurrava o evento pra fora. */
-        const fbHit = rows.find((r) => r.event_data?.fbclid);
+        const fbHit = rows.find((r) => r.event_data?.fbclid) ?? null;
         const fbcCookie = ordem?.event_data?.fbc ?? null;
-        const fbc = fbcCookie
-          || (fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null);
+        // fbc reconstruído é montado DEPOIS do eventTime (precisa do clamp) —
+        // ver bloco abaixo do quandoPagou.
         const fbp = ordem?.event_data?.fbp ?? null;
         const ip = ordem?.event_data?.client_ip ?? null;
         const ua = ordem?.event_data?.user_agent ?? null;
@@ -630,6 +652,26 @@ serve(async (req) => {
         const eventTime = quandoPagou && !Number.isNaN(new Date(quandoPagou).getTime())
           ? Math.floor(new Date(quandoPagou).getTime() / 1000)
           : Math.floor(Date.now() / 1000);
+
+        /* fbc reconstruído (12/08, auditoria): dois defeitos no formato antigo.
+         * (1) rows vêm DESC e o trackEvent carimba o fbclid do storage em todo
+         * evento — o timestamp saía da observação mais NOVA (≈ agora), não da
+         * chegada do clique; o comentário dizia "mais antigo" e o código fazia
+         * o oposto. (2) eventos da tela de confirmação rodam DEPOIS do paid_at,
+         * então o fbc podia nascer "mais novo" que o próprio evento — e a Meta
+         * DESCARTA fbc com criação posterior ao event_time, exatamente no
+         * caminho que existia pra salvar o sinal de clique.
+         * Agora: mantém o fbclid mais recente (clique atual), mas o timestamp
+         * é a PRIMEIRA observação DESSE fbclid, com teto no event_time. */
+        let fbc = fbcCookie;
+        if (!fbc && fbHit) {
+          let primeira = fbHit;
+          for (let i = rows.length - 1; i >= 0; i--) {
+            if (rows[i].event_data?.fbclid === fbHit.event_data.fbclid) { primeira = rows[i]; break; }
+          }
+          const fbcTs = Math.min(new Date(primeira.created_at).getTime(), eventTime * 1000);
+          fbc = `fb.1.${fbcTs}.${fbHit.event_data.fbclid}`;
+        }
 
         const payload = {
           data: [{

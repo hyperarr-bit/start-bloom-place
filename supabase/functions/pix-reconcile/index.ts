@@ -15,8 +15,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  * - Chamada: POST com { token } == RECONCILE_TOKEN (cron externo ou manual);
  *   opcional { hours } (janela, default 48, máx 168) e { dryRun: true }.
  *
- * NÃO dispara UTMify/CAPI: venda reconciliada chega tarde demais pra otimizar
- * leilão e arriscaria duplicar Purchase — prioridade aqui é acesso + caixa.
+ * CAPI (12/08, auditoria): venda reconciliada AGORA dispara Purchase pra Meta.
+ * A justificativa antiga ("arriscaria duplicar") estava errada — o event_id =
+ * order_id existe exatamente pra deduplicar, e o cron roda a cada 15min, bem
+ * dentro da janela de 7 dias que a CAPI aceita evento retroativo. Sem isso,
+ * toda venda resgatada aqui era INVISÍVEL pro leilão (8 vendas desde 01/08):
+ * com ~10 vendas/dia, cada uma é ~10% do sinal diário jogado fora. UTMify
+ * continua de fora (painel secundário; prioridade é o algoritmo da Meta).
  */
 
 const corsHeaders = {
@@ -28,7 +33,10 @@ const ABACATE_API = "https://api.abacatepay.com/v2";
 const ASAAS_API = "https://api.asaas.com/v3";
 const PAGARME_API = "https://api.pagar.me/core/v5";
 const CAKTO_API = "https://api.cakto.com.br/public_api";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+// 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
+// 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
+// errado credita/reporta valor errado no dia em que for usado.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1990 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
 const logStep = (step: string, details?: unknown) => {
@@ -187,7 +195,12 @@ serve(async (req) => {
     if (qErr) return jsonResponse({ error: `query: ${qErr.message}` }, 500);
 
     // agrupa por usuário; ignora QR sem user (não deveria existir — create exige JWT)
-    const porUser = new Map<string, Array<{ orderId: string; offer: string; criadoEm: string; amountCents: number | null }>>();
+    type Ordem = {
+      orderId: string; offer: string; criadoEm: string; amountCents: number | null;
+      // sinais de match pro CAPI — o cakto-pix grava tudo isso no create (10/08)
+      fbp: string | null; fbc: string | null; ip: string | null; ua: string | null; sourceUrl: string | null;
+    };
+    const porUser = new Map<string, Ordem[]>();
     for (const q of qrs ?? []) {
       const uid = q.user_id as string | null;
       const oid = String(q.event_data?.order_id ?? "");
@@ -199,7 +212,14 @@ serve(async (req) => {
       // só fallback de evento antigo sem amount.
       const amountCents = Number(q.event_data?.amount_cents) || null;
       if (!porUser.has(uid)) porUser.set(uid, []);
-      porUser.get(uid)!.push({ orderId: oid, offer, criadoEm: String(q.created_at), amountCents });
+      porUser.get(uid)!.push({
+        orderId: oid, offer, criadoEm: String(q.created_at), amountCents,
+        fbp: q.event_data?.fbp ?? null,
+        fbc: q.event_data?.fbc ?? null,
+        ip: q.event_data?.client_ip ?? null,
+        ua: q.event_data?.user_agent ?? null,
+        sourceUrl: q.event_data?.source_url ?? null,
+      });
     }
 
     // quem já tem assinatura ativa vitalícia sai da fila
@@ -262,12 +282,60 @@ serve(async (req) => {
           falhas.push({ orderId: o.orderId, erro: gErr.message.slice(0, 120) });
           continue;
         }
+        /* Purchase pra Meta (12/08). Mesmo formato do sendMetaCapi do
+         * cakto-webhook: event_id = order_id pago (dedup mata qualquer corrida
+         * rara com o webhook/pixel), event_time = criação do QR (Pix expira em
+         * 30min — o pagamento real está a minutos dali, e criadoEm é sempre
+         * ≤ agora, nunca no futuro), sinais do próprio pix_order_created.
+         * Falha aqui NUNCA derruba o grant — acesso primeiro, sinal depois. */
+        let capi = "skipped_no_secrets";
+        const pixelId = Deno.env.get("META_PIXEL_ID");
+        const capiToken = Deno.env.get("META_CAPI_TOKEN");
+        if (pixelId && capiToken) {
+          try {
+            const sha = async (val: string) => {
+              const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(val.trim().toLowerCase()));
+              return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+            };
+            const cents = o.amountCents ?? PRECOS_CENTAVOS[o.offer];
+            const capiPayload = {
+              data: [{
+                event_name: "Purchase",
+                event_time: Math.floor(new Date(o.criadoEm).getTime() / 1000),
+                event_id: o.orderId,
+                action_source: "website",
+                event_source_url: o.sourceUrl ?? "https://www.coreaplicativo.com.br",
+                user_data: {
+                  ...(email ? { em: [await sha(email)] } : {}),
+                  external_id: [await sha(uid)],
+                  ...(o.fbc ? { fbc: o.fbc } : {}),
+                  ...(o.fbp ? { fbp: o.fbp } : {}),
+                  // par obrigatório: um sem o outro a Meta descarta
+                  ...(o.ip && o.ua ? { client_ip_address: o.ip, client_user_agent: o.ua } : {}),
+                },
+                custom_data: {
+                  value: cents / 100, currency: "BRL",
+                  content_name: o.offer === "downsell" ? "CORE Vitalício (oferta)" : "CORE Vitalício",
+                },
+              }],
+            };
+            const capiRes = await fetch(`https://graph.facebook.com/v19.0/${pixelId}/events?access_token=${capiToken}`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(capiPayload),
+            });
+            const capiOut = await capiRes.json().catch(() => ({}));
+            capi = capiRes.ok ? "sent" : `error_${capiRes.status}`;
+            logStep(capiRes.ok ? "Meta CAPI sent" : "Meta CAPI error", { orderId: o.orderId, status: capiRes.status, body: JSON.stringify(capiOut).slice(0, 140) });
+          } catch (e) {
+            capi = "error_throw";
+            logStep("Meta CAPI failed", { orderId: o.orderId, e: String(e).slice(0, 120) });
+          }
+        }
         await admin.from("analytics_events").insert({
           event_name: "pix_reconciled",
           user_id: uid,
-          event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer] },
+          event_data: { order_id: o.orderId, offer: o.offer, gateway_status: v.status, amount_cents: o.amountCents ?? PRECOS_CENTAVOS[o.offer], meta_capi: capi },
         });
-        creditados.push({ uid, email, ...o, status: v.status });
+        creditados.push({ uid, email, orderId: o.orderId, offer: o.offer, criadoEm: o.criadoEm, status: v.status, capi });
         jaTem.add(uid);
         break; // 1 grant por usuário basta (vitalício)
       }

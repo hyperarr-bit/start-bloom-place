@@ -221,6 +221,12 @@ async function mandarCompraProMeta(
   // casa com quem a Meta conhece; o aparelho ela conhece sempre.
   const gaid = s("gaid").toLowerCase();
   if (gaid) user_data.madid = gaid;
+  // anon_id (13/08): o id que a PRÓPRIA Meta gerou pro aparelho, capturado do
+  // SDK. É o elo mais forte que existe pra evento de app — amarra esta compra
+  // ao mesmo aparelho que ela viu clicar no anúncio, e continua valendo pra
+  // quem desligou o ID de publicidade (aí o madid vem vazio).
+  const anonId = s("anon_id");
+  if (anonId) user_data.anon_id = anonId;
 
   const payload: Record<string, unknown> = {
     data: [{

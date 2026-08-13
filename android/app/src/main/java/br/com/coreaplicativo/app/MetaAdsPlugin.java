@@ -5,6 +5,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.facebook.appevents.AppEventsLogger;
 import com.google.android.gms.ads.identifier.AdvertisingIdClient;
 
 import java.util.concurrent.Executors;
@@ -44,6 +45,20 @@ public class MetaAdsPlugin extends Plugin {
                 // sem Play Services (emulador pelado) — segue vazio
             }
             ret.put("gaid", gaid);
+            /*
+             * anon_id — o identificador que a PRÓPRIA Meta gerou pra este
+             * aparelho (o "XZ…" que aparece no ping de instalação). Vale mais
+             * que o GAID pra atribuição: é o mesmo id que o SDK usou quando
+             * registrou instalação e abertura, então mandar ele no Purchase do
+             * servidor amarra a compra ao MESMO aparelho que a Meta já viu
+             * clicar no anúncio. E sobrevive a quem desliga o ID de
+             * publicidade, caso em que o GAID vem vazio.
+             */
+            try {
+                ret.put("anonId", AppEventsLogger.getAnonymousAppDeviceGUID(getContext()));
+            } catch (Exception | NoClassDefFoundError e) {
+                // SDK não inicializado (client token ausente): segue sem
+            }
             call.resolve(ret);
         });
     }

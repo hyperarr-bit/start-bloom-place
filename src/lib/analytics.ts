@@ -65,7 +65,16 @@ export const captureInstallReferrer = async () => {
     // (raro, mas existe) tenta de novo no próximo boot.
     localStorage.setItem(REFERRER_FLAG, "1");
     const bruto = String(res?.referrer || "");
-    trackEvent("install_referrer", { referrer: bruto.slice(0, 400) });
+    /*
+     * INTEIRO, sem cortar (13/08). O `slice(0, 400)` daqui cortava o referrer
+     * no meio do payload criptografado: dentro de `utm_content.source.data` a
+     * Meta manda campanha, conjunto e ad_id cifrados, e esse blob sozinho
+     * passa de 400 caracteres. Resultado: com a chave de descriptografia em
+     * mãos, NENHUM referrer abria — o JSON chegava sem fechamento. Meses de
+     * instalação sem saber de qual anúncio vieram, e o dado não volta.
+     * 2000 é folga sobre o maior referrer real (~700) sem virar campo aberto.
+     */
+    trackEvent("install_referrer", { referrer: bruto.slice(0, 2000) });
     if (!bruto.includes("utm_")) return;
     const p = new URLSearchParams(bruto);
     const existing = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
@@ -110,14 +119,21 @@ export const capturarDispositivoApp = async () => {
     // GAID (12/08): o servidor anexa como `madid` no Purchase do CAPI — é o
     // que deixa a Meta casar a compra com o clique no anúncio. Vem do plugin
     // nativo MetaAds; fora do app (ou com opt-out do usuário) fica vazio.
-    let gaid = "";
+    // `anonId` é o identificador que a PRÓPRIA Meta deu a este aparelho (o
+    // mesmo que o SDK usou pra registrar instalação e abertura). Mandado no
+    // Purchase do servidor, amarra a compra ao aparelho que a Meta viu clicar
+    // no anúncio — e funciona mesmo pra quem desligou o ID de publicidade.
+    let gaid = "", anonId = "";
     try {
       const { registerPlugin } = await import("@capacitor/core");
-      const MetaAds = registerPlugin<{ idPublicidade(): Promise<{ gaid: string }> }>("MetaAds");
-      gaid = (await MetaAds.idPublicidade()).gaid ?? "";
+      const MetaAds = registerPlugin<{ idPublicidade(): Promise<{ gaid: string; anonId?: string }> }>("MetaAds");
+      const r = await MetaAds.idPublicidade();
+      gaid = r.gaid ?? "";
+      anonId = r.anonId ?? "";
     } catch { /* web / build antigo sem o plugin */ }
     trackEvent("app_device_info", {
       ...(gaid ? { gaid } : {}),
+      ...(anonId ? { anon_id: anonId } : {}),
       pacote,
       versao,
       build,
@@ -192,6 +208,47 @@ export const trackEvent = (
   } catch {
     // swallow
   }
+};
+
+/**
+ * trackEvent que SOBREVIVE à navegação (13/08). O trackEvent normal morre
+ * quando a página descarrega no instante seguinte — foi por isso que o
+ * abandono da roleta nunca chegava ao banco: quem sai VOLTANDO derruba o
+ * fetch junto. `keepalive: true` entrega o POST mesmo com a página morrendo
+ * (limite de 64KB, muito acima do nosso payload). Usar só em evento de
+ * despedida (unmount/saída); o caminho normal continua no trackEvent — o
+ * keepalive tem cota por origem e não deve virar padrão.
+ * getSession (local) em vez de getUser (rede): na despedida não há tempo.
+ */
+export const trackEventBeacon = (eventName: string, data: Record<string, unknown> = {}) => {
+  try {
+    const meta = getStoredMeta();
+    const corpo = (userId: string | null) => JSON.stringify({
+      user_id: userId,
+      event_name: eventName,
+      event_data: { ...meta, ...data },
+      trial_day: null,
+      session_id: getSessionId(),
+    });
+    const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
+    const manda = (uid: string | null) => {
+      fetch("https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events", {
+        method: "POST",
+        keepalive: true,
+        headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: "return=minimal" },
+        body: corpo(uid),
+      }).catch(() => { /* despedida é melhor-esforço */ });
+    };
+    // getSession lê do storage local — resolve no mesmo tick na prática; se
+    // ainda assim a página morrer antes, manda anônimo em vez de nada.
+    let mandou = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (mandou) return;
+      mandou = true;
+      manda(data?.session?.user?.id ?? null);
+    }).catch(() => { if (!mandou) { mandou = true; manda(null); } });
+    setTimeout(() => { if (!mandou) { mandou = true; manda(null); } }, 60);
+  } catch { /* swallow */ }
 };
 
 /**

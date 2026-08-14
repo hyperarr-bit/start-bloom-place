@@ -86,8 +86,28 @@ serve(async (req) => {
      * campanha, por mais que o CAPI entregue o evento. Foi a checagem que
      * explicou "70 compras na campanha de web e 0 nas de app" (12/08). */
     if (nivel === "conjuntos") {
-      const u = new URL(`https://graph.facebook.com/v21.0/${account}/adsets`);
-      u.searchParams.set("fields", "id,name,campaign{name,objective},effective_status,promoted_object,optimization_goal");
+      // Por campanha quando pedido: o /adsets da CONTA tem centenas de
+      // conjuntos velhos e o limite corta os que estão no ar (já devolveu
+      // "0 conjuntos ativos" numa conta com campanha entregando).
+      const u = body?.campanhaId
+        ? new URL(`https://graph.facebook.com/v21.0/${String(body.campanhaId)}/adsets`)
+        : new URL(`https://graph.facebook.com/v21.0/${account}/adsets`);
+      // bid_strategy/bid_amount + orçamento: é o que separa "está travado no
+      // orçamento" (sobe orçamento) de "está travado no lance" (sobe lance).
+      // Sem esses campos a recomendação vira palpite.
+      u.searchParams.set(
+        "fields",
+        "id,name,campaign{name,objective,daily_budget,bid_strategy},effective_status,promoted_object," +
+        "optimization_goal,bid_strategy,bid_amount,daily_budget,lifetime_budget,billing_event",
+      );
+      // A conta tem centenas de conjuntos velhos; sem filtrar, o limite corta
+      // justamente os que estão no ar (aconteceu: 0 conjuntos ativos numa
+      // conta com campanha rodando). `ativos: true` pede só os que entregam.
+      if (body?.ativos) {
+        u.searchParams.set("filtering", JSON.stringify(
+          [{ field: "effective_status", operator: "IN", value: ["ACTIVE"] }],
+        ));
+      }
       u.searchParams.set("limit", "200");
       u.searchParams.set("access_token", token);
       const r = await fetch(u);

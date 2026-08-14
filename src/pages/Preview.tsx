@@ -116,7 +116,10 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
             key={m.key}
             to={`/preview/${m.key}?funnel=1&tour=vida${from ? `&from=${from}` : ""}`}
             onClick={() => trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key })}
-            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+            // min-h-11 (44px): a auditoria de toque de 14/08 pegou estas
+            // pílulas com 31px de altura — são a navegação mais tocada da
+            // demo, e alvo curto vira "área não clicável" na avaliação.
+            className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 min-h-11 text-[12.5px] font-semibold transition-colors ${
               active
                 ? "bg-primary text-primary-foreground"
                 : "bg-secondary text-foreground hover:bg-secondary/70"

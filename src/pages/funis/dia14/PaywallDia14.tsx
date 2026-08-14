@@ -7,7 +7,7 @@ import {
   CalendarDays, Flame, Dumbbell, Salad, HeartPulse, LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { PixCheckout, PIX_PRICES, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
 import { WinbackWheel, SLICES_FUNIL } from "@/components/retention/WinbackWheel";
@@ -748,6 +748,44 @@ function OfferScreen({
  * teatro; relógio falso numa tela de desconto é o que faz a pessoa desconfiar
  * do preço cheio que ela acabou de ver.
  */
+/** Roleta com telemetria de abandono (13/08). Medido 10-12/08: 34 aberturas →
+ *  só 12 chegaram no prêmio, e a gente não sabe ONDE as outras 22 morrem — o
+ *  giro é automático de ~3s, ninguém deveria se perder aqui. Este wrapper
+ *  carimba o desfecho: `downsell_roleta_girou` (com ms até completar) quando o
+ *  giro termina, `downsell_roleta_abandono` (com ms de vida) se o componente
+ *  desmonta antes — voltar do navegador, X, aba fechada com unmount. Se os
+ *  abandonos vierem com ms < 3000, o problema é gente saindo DURANTE o giro
+ *  (giro longo demais); se nem o abandono aparecer, é aba morta/travamento em
+ *  aparelho fraco — cada causa tem conserto diferente, por isso medir antes. */
+function RoletaComTelemetria({ context, onDone }: { context: "funnel" | "app"; onDone: () => void }) {
+  const t0 = useRef(Date.now());
+  const completou = useRef(false);
+  useEffect(() => {
+    const inicio = t0.current;
+    return () => {
+      if (!completou.current) {
+        // beacon, não trackEvent: quem abandona a roleta costuma estar SAINDO
+        // da página (voltar/fechar) e o insert normal morre com a navegação —
+        // era por isso que 22 de 34 sumiam sem deixar rastro.
+        trackEventBeacon("downsell_roleta_abandono", { context, ms: Date.now() - inicio });
+      }
+    };
+  }, [context]);
+  return (
+    <WinbackWheel
+      attemptId={null}
+      quick
+      slices={SLICES_FUNIL}
+      prizeLabel={`R$ ${PIX_PRICES.downsell}`}
+      onSpinComplete={() => {
+        completou.current = true;
+        trackEvent("downsell_roleta_girou", { context, ms: Date.now() - t0.current });
+        onDone();
+      }}
+    />
+  );
+}
+
 function PremioScreen({
   context, onBuy,
 }: { context: "funnel" | "app"; onBuy: (o: PixOffer) => void }) {
@@ -955,13 +993,7 @@ export function PaywallDia14({
             )}
             {phase === "roleta" && (
               <div className="min-h-dvh flex items-center justify-center">
-                <WinbackWheel
-                  attemptId={null}
-                  quick
-                  slices={SLICES_FUNIL}
-                  prizeLabel={`R$ ${PIX_PRICES.downsell}`}
-                  onSpinComplete={() => setPhase("premio")}
-                />
+                <RoletaComTelemetria context={context} onDone={() => setPhase("premio")} />
               </div>
             )}
             {phase === "premio" && (

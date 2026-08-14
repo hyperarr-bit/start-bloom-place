@@ -277,8 +277,25 @@
   .fs-funil-h1 { font-size: 34px; font-size: clamp(28px, 8vw, 42px); }
   .fs-porta-h1 { font-size: 32px; font-size: clamp(27px, 7.5vw, 40px); }
 
+  /*
+   * ALVO DE TOQUE MÍNIMO (14/08) — veio de avaliação de 3 estrelas na Play:
+   * "muitos erros, muitas áreas não clicáveis".
+   *
+   * Auditei o app rodando no APK: NENHUM elemento estava coberto por outro. O
+   * problema era tamanho — 136 controles abaixo de 44px, mediana de 31px de
+   * altura, o menor com 12px. A aba de módulo (a coisa mais tocada do app)
+   * tinha 31px. Dedo adulto erra isso o tempo todo, e quem erra não conclui
+   * "o alvo é pequeno", conclui "o app não funciona".
+   *
+   * 44px é o mínimo do WCAG 2.1 (o Material pede 48). Cresce só a ALTURA:
+   * as abas vivem em linha rolável, então esticar na horizontal faria uma
+   * roubar o toque da vizinha — trocaria um defeito por outro pior.
+   */
   .notion-tab {
-    @apply px-4 py-1.5 text-sm border border-border rounded-sm cursor-pointer transition-colors;
+    @apply px-4 text-sm border border-border rounded-sm cursor-pointer transition-colors;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     scroll-margin-inline: 16px;
@@ -927,4 +944,55 @@ html.core-shell summary:focus {
   /* emoji de linha de card (desafio da semana etc): sem gap ele cola no
      texto — margem repõe (04/08, foto do dono) */
   .text-xl.shrink-0, .text-2xl.shrink-0 { margin-right: 10px; }
+}
+
+/* ============================================================
+   ÁREA DE TOQUE MÍNIMA — SÓ NO APP (14/08)
+
+   Origem: avaliação de 3 estrelas na Play, "muitas áreas não clicáveis".
+   Auditei o app rodando dentro do APK, elemento por elemento: NENHUM estava
+   coberto por outro. O que existia era alvo pequeno — 136 controles abaixo de
+   44px, mediana de 31px de altura, o menor com 12px. Quem erra o toque não
+   conclui "o alvo é pequeno", conclui "o app está quebrado".
+
+   A regra abaixo estica a área SENSÍVEL sem mexer em um pixel do desenho: um
+   ::after transparente centralizado, com altura mínima de 44px (mínimo do
+   WCAG 2.1; o Material pede 48). Pseudo-elemento não é alvo de evento
+   próprio — o toque continua indo pro botão que o contém.
+
+   Cresce só na VERTICAL de propósito. As abas e pílulas vivem em linha
+   rolável com poucos pixels entre elas; esticar na horizontal faria uma
+   roubar o toque da vizinha, trocando um defeito por outro pior.
+
+   Fora em grade densa (calendário, seletor de cor): ali os vizinhos ficam
+   colados e a expansão sobreporia mesmo na vertical. Use
+   data-sem-expansao-toque pra desligar caso a caso.
+
+   Escopo core-shell (só o binário da loja): a web não tem essa reclamação e
+   repontar comportamento nos dois de uma vez já quebrou o app antes.
+   ============================================================ */
+html.core-shell :is(button, a[href], [role="button"]) {
+  position: relative;
+}
+
+html.core-shell :is(button, a[href], [role="button"])::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 100%;
+  min-height: 44px;
+  /* SEM `pointer-events: auto` de propósito: forçar auto ressuscitaria o
+     toque dentro de camadas marcadas como `pointer-events-none` (o CTA
+     flutuante da demo é uma delas). Herdar mantém a intenção de cada
+     container e a expansão continua valendo onde o toque já era permitido. */
+}
+
+/* Grade densa e opt-out explícito: sem expansão. */
+html.core-shell .grid > :is(button, a[href], [role="button"])::after,
+html.core-shell [data-sem-expansao-toque]::after,
+html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"])::after {
+  display: none;
 }

@@ -6,6 +6,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
+import { useAuth } from "@/hooks/use-auth";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import {
   parseExtrato, suggestCategory, suggestPaymentMethod, ruleTokenOf, type ParsedTx,
 } from "@/lib/extrato-parser";
@@ -58,6 +60,7 @@ interface Props {
  */
 export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Props) => {
   const { get, set } = useUserData();
+  const { isSubscribed } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [busy, setBusy] = useState(false);
@@ -146,6 +149,24 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
         (learnedCount > 0 ? ` · ${learnedCount} regra${learnedCount > 1 ? "s" : ""} aprendida${learnedCount > 1 ? "s" : ""}` : ""),
     );
     setRows(null);
+
+    /*
+     * MOMENTO DE VALOR (14/08) — é aqui que o app entrega o "uau": o mês
+     * inteiro categorizado sem digitar nada. Pedir avaliação logo depois pega
+     * a pessoa com a prova na tela, e não no meio de uma tarefa.
+     *
+     * Atrasado 1,2s de propósito: primeiro ela vê o toast com o resultado; a
+     * caixa do Google entrando por cima do próprio resultado apagaria a razão
+     * de dar cinco estrelas. Quem pagou é convidado na primeira importação;
+     * quem não pagou, só a partir da segunda (`vezes`) — nota de quem mal
+     * usou não ajuda ninguém. Todas as travas (cota, 90 dias, 3 na vida,
+     * só no app) moram em pedirAvaliacaoSePuder.
+     */
+    const importacoes = Number(localStorage.getItem("core-extratos-importados") ?? 0) + 1;
+    try { localStorage.setItem("core-extratos-importados", String(importacoes)); } catch { /* modo privado */ }
+    setTimeout(() => {
+      void pedirAvaliacaoSePuder("extrato_importado", { pagante: isSubscribed, vezes: importacoes });
+    }, 1200);
   };
 
   const fmtBR = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;

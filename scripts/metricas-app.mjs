@@ -189,6 +189,9 @@ const ETAPAS = [
   ["result", "Viu o diagnóstico"],
   ["central", "Viu os 16 módulos"],
   ["demo", "Entrou na demo"],
+  // 14/08 (v52): degrau de compromisso entre a demo e o preço — projeção com
+  // data + "Assumir meu objetivo". Opcional: antes da v52 a etapa não existia.
+  ["compromisso", "Assumiu o objetivo", { opcional: true }],
   ["paywall", "Viu o paywall"],
   ["cta", "Tocou em comprar"],
   ["prefolha", "Escolheu forma de pagamento", { opcional: true }],
@@ -212,6 +215,7 @@ const etapasDaSessao = (evs) => {
     if (n === "funnel_view" && s === "demo") m.add("demo");
     if (n === "funnel_view" && s === "offer") m.add("paywall");
     if (n === "app_paywall_rc" || n === "paywall_view") m.add("paywall");
+    if (n === "funnel_click" && c === "compromisso_assumir") m.add("compromisso");
     if (n === "funnel_click" && c === "app_paywall_cta") m.add("cta");
     if (n === "app_prefolha_view") m.add("cta");           // a pré-folha só abre pelo CTA
     if (n === "app_prefolha_escolha") m.add("prefolha");

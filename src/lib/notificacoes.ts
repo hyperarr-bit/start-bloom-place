@@ -499,3 +499,67 @@ export async function ligarToqueNaNotificacao(navegar: (rota: string) => void): 
     });
   } catch { /* sem listener, o toque só abre o app */ }
 }
+
+/* ------------------------------------------------------ resgate do paywall */
+
+const BASE_RESGATE = 700000;
+
+/**
+ * RESGATE DE QUEM ABANDONOU O PAYWALL (14/08).
+ *
+ * Todo dia ~120 pessoas veem a oferta no app e saem sem comprar — e não
+ * recebem MAIS NADA: o cadastro é pós-compra, então não há e-mail. Mas há
+ * algo melhor que e-mail: o app instalado. Estas duas notificações locais
+ * (2h e 24h depois) são o único canal de volta que existe.
+ *
+ * Regras:
+ *  - SÓ agenda se a permissão JÁ foi dada. Pedir permissão na cara do
+ *    paywall trocaria conversão por notificação — nunca.
+ *  - Reentrar no paywall REAGENDA (limparFaixa primeiro): a régua conta a
+ *    partir da última vez que a pessoa viu a oferta.
+ *  - Quem paga tem tudo cancelado na hora (PaywallFlow chama o cancelar nos
+ *    dois desfechos de compra) — notificação de venda depois de vender é o
+ *    jeito mais rápido de virar spam.
+ *  - Copy sem pressão falsa: preço real, garantia real, zero "última chance".
+ */
+export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  if (!(await temPermissao())) return;
+  await garantirCanal();
+  await limparFaixa(BASE_RESGATE);
+  const { LN } = p;
+  const daArea = nomeArea ? ` de ${nomeArea}` : "";
+  const avisos = [
+    {
+      id: BASE_RESGATE + 1,
+      at: new Date(Date.now() + 2 * 3600_000),
+      title: `Seu plano${daArea} ficou salvo`,
+      body: "Tudo que você montou continua aqui. R$ 27,90 uma vez — garantia de 7 dias.",
+    },
+    {
+      id: BASE_RESGATE + 2,
+      at: new Date(Date.now() + 24 * 3600_000),
+      title: "Ainda dá tempo de começar hoje",
+      body: `Seu plano${daArea} te espera do jeito que você deixou. Pagamento único, acesso pra sempre.`,
+    },
+  ];
+  try {
+    await LN.schedule({
+      notifications: avisos.map((a) => ({
+        id: a.id,
+        title: a.title,
+        body: a.body,
+        schedule: { at: a.at, allowWhileIdle: true },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { rota: "/app?step=offer" },
+      })),
+    });
+  } catch { /* agendar aviso nunca pode quebrar o paywall */ }
+}
+
+export async function cancelarResgateDoPlano(): Promise<void> {
+  await limparFaixa(BASE_RESGATE);
+}

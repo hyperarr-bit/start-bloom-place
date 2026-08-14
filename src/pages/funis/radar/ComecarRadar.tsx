@@ -24,8 +24,11 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
   AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL,
+  VICTORY_PHRASE,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { agendarResgateDoPlano, cancelarResgateDoPlano } from "@/lib/notificacoes";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -373,6 +376,135 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
   );
 }
 
+/**
+ * TELA DE COMPROMISSO (14/08) — o degrau que faltava entre a demo e o preço.
+ *
+ * Nasceu de assistir os funis do BitePal, Cal AI e Brainrot quadro a quadro:
+ * NENHUM deles vai do produto direto pro paywall. Os três têm, imediatamente
+ * antes do preço, uma PROJEÇÃO PESSOAL COM DATA seguida de um compromisso —
+ * "Reach 50kg by 27 October" + botão "Commit to my goal" (BitePal), "goal in
+ * 22 days" (Cal AI), "tap 5x to break the chain" (Brainrot). O nosso ia da
+ * demo ("Quase lá") direto pra tela de preço — e 71 pessoas/dia saíam do
+ * paywall em menos de 5 segundos, que é a cara de quem levou preço na cara
+ * quando esperava outra coisa.
+ *
+ * Tudo aqui deriva da ÁREA escolhida na porta e das respostas do quiz: a
+ * vitória vira a meta com data (+30 dias), o marco do dia 30 fala a língua da
+ * área (dinheiro usa a âncora de R$ que a própria pessoa deu), e a cor do
+ * acento é a da área. Genérico aqui mataria a razão de existir.
+ *
+ * Aparece UMA vez (localStorage core-compromisso-visto): compromisso repetido
+ * em toda visita ao paywall viraria fricção — e quem volta pelo resgate cai
+ * direto na oferta, que é onde deve cair.
+ */
+function CompromissoScreen({ area, answers: answersProp, onAssumir }: {
+  area: AreaKey;
+  answers: Record<string, string>;
+  onAssumir: () => void;
+}) {
+  const a = AREAS[area];
+  // Mesmo fallback do PaywallFlow: o estado do funil zera em reaberturas
+  // (welcome de novo etc.), mas as respostas ficam no aparelho — sem isso a
+  // vitória personalizada degrada pro genérico justo na tela que existe pra
+  // ecoar o que a pessoa disse.
+  const [answers] = useState<Record<string, string>>(() => {
+    if (answersProp && Object.keys(answersProp).length) return answersProp;
+    try { return JSON.parse(localStorage.getItem("funnel-quiz-answers") || "{}"); } catch { return {}; }
+  });
+  useEffect(() => { trackEvent("funnel_view", { step: "compromisso", area }); }, [area]);
+
+  const dataAlvo = new Date(Date.now() + 30 * 86400_000)
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+  const vitoriaCrua = answers.vitoria ? (VICTORY_PHRASE[answers.vitoria] ?? answers.vitoria.toLowerCase()) : null;
+  const vitoria = vitoriaCrua ?? `colocar ${a.nome.toLowerCase()} sob controle`;
+  const anchor = area === "dinheiro" ? GASTO_ANCHOR[answers.gasto ?? ""] : null;
+
+  const marco30: Record<AreaKey, string> = {
+    dinheiro: anchor
+      ? `${anchor.year} por ano deixando de sumir sem explicação`
+      : "um mês inteiro de gastos visíveis — cada real com destino",
+    rotina: "30 dias de hábitos marcados — sua maior sequência até hoje",
+    corpo: "um mês de treino e dieta registrados, sem recomeçar do zero",
+    saude: "água, sono e vitaminas rodando no automático",
+    metas: "30 dias de progresso visível — a meta finalmente andando",
+  };
+  const marcos = [
+    { rotulo: "Hoje", texto: "5 minutos e seu painel está no ar", agora: true },
+    { rotulo: "Dia 7", texto: `Primeira vitória: ${vitoria}`, agora: false },
+    { rotulo: "Dia 30", texto: marco30[area], agora: false },
+  ];
+
+  // Ecos do quiz: a pessoa reconhece as PRÓPRIAS respostas no plano.
+  const chips = [
+    answers.atrapalha ? `Seu foco: ${answers.atrapalha.toLowerCase()}` : null,
+    "5 min por dia",
+    `Começa por ${a.nome}`,
+  ].filter(Boolean) as string[];
+
+  return (
+    <div className="min-h-[100dvh] bg-background flex flex-col app-safe-shell">
+      <div className="flex-1 flex flex-col justify-center px-5 py-10">
+        <div className="w-full max-w-sm mx-auto text-center">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="text-[11px] font-bold uppercase tracking-widest mb-3" style={{ color: a.color }}>
+            O seu compromisso
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+            className="text-[27px] font-bold tracking-tight leading-[1.15] mb-2"
+          >
+            {vitoria.charAt(0).toUpperCase() + vitoria.slice(1)}
+          </motion.h1>
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.18 }}
+            className="text-muted-foreground text-sm mb-7">
+            até <strong className="text-foreground">{dataAlvo}</strong> — começando hoje, por {a.nome}.
+          </motion.p>
+
+          {/* A linha do tempo: o plano com data, não uma lista de features. */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}>
+            <Card className="p-4 text-left mb-4">
+              {marcos.map((m, i) => (
+                <div key={m.rotulo} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={`grid place-items-center w-6 h-6 rounded-full text-[10px] font-black shrink-0 ${m.agora ? "text-white" : "bg-muted text-muted-foreground"}`}
+                      style={m.agora ? { background: a.color } : undefined}
+                    >
+                      {m.agora ? <Check className="w-3.5 h-3.5" strokeWidth={3.5} /> : i + 1}
+                    </span>
+                    {i < marcos.length - 1 && <span className="w-px flex-1 my-1 bg-border" />}
+                  </div>
+                  <div className={i < marcos.length - 1 ? "pb-4" : ""}>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{m.rotulo}</div>
+                    <div className="text-[14px] leading-snug mt-0.5">{m.texto}</div>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+            className="flex flex-wrap justify-center gap-1.5 mb-2">
+            {chips.map((c) => (
+              <span key={c} className="text-[11.5px] font-semibold rounded-full border border-border bg-card px-3 py-1.5 text-muted-foreground">
+                {c}
+              </span>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+      <CtaFixo
+        label={<>Assumir meu objetivo <ArrowRight className="w-4 h-4" /></>}
+        sub="Seu plano começa hoje · Garantia de 7 dias"
+        onClick={() => {
+          trackEvent("funnel_click", { cta: "compromisso_assumir", area, vitoria: answers.vitoria ?? "" });
+          onAssumir();
+        }}
+      />
+    </div>
+  );
+}
+
 /** Vislumbre da central: prova a amplitude (16 módulos) por 3 segundos de
  *  tela — trailer, não mapa. A demo continua guiada (5 módulos do vídeo). */
 function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
@@ -707,6 +839,15 @@ function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; st
           );
         })}
       </div>
+      {/* Prova social DENTRO da espera (14/08, padrão Cal AI: o loading deles
+          carrega um depoimento junto dos checkmarks). Mesma alegação que a
+          welcome já usa — nenhum número novo inventado aqui. */}
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.6 }}
+        className="mt-9 flex items-center justify-center gap-1.5 text-[12.5px] text-muted-foreground"
+      >
+        <span className="text-amber-500">★★★★★</span> +1000 pessoas organizando a vida
+      </motion.div>
     </div>
   );
 }
@@ -1202,6 +1343,36 @@ export default function ComecarRadar() {
       return a && a in AREAS ? (a as AreaKey) : null;
     } catch { return null; }
   });
+
+  /* Compromisso assumido? (14/08). Aparece UMA vez, entre a demo e o paywall
+     — ver o comentário do CompromissoScreen. Em erro de storage o default é
+     TRUE: pior mostrar de novo pra sempre do que nunca mostrar. */
+  const [compromissoOk, setCompromissoOk] = useState(() => {
+    try { return localStorage.getItem("core-compromisso-visto") === "1"; } catch { return true; }
+  });
+
+  /* AVALIAÇÃO NO PICO (14/08): BitePal e Brainrot disparam a caixinha da loja
+     na tela do diagnóstico — o segundo de maior empolgação, ANTES do preço.
+     O atraso deixa o radar terminar de desenhar; as travas (1x/90 dias, 3 na
+     vida, só no shell) moram em pedirAvaliacaoSePuder. */
+  useEffect(() => {
+    if (step !== "result") return;
+    const t = setTimeout(() => { void pedirAvaliacaoSePuder("plano_pronto", { forte: true }); }, 2600);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  /* RESGATE (14/08): entrou no paywall do funil = agenda os avisos de 2h/24h
+     (só se a permissão de notificação JÁ existe — nunca pedir aqui). Quem
+     paga tem tudo cancelado pelo PaywallFlow; assinante que reabre também. */
+  useEffect(() => {
+    if (step === "offer" && compromissoOk && !posCompra) {
+      void agendarResgateDoPlano(area ? AREAS[area].nome : null);
+    }
+  }, [step, compromissoOk, posCompra, area]);
+  useEffect(() => {
+    if (isSubscribed) void cancelarResgateDoPlano();
+  }, [isSubscribed]);
+
   const track: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
   // Trilhas de vida ganham a tela de PICO depois da pergunta de consistência.
   const trackItems = vitrine && area && area !== "dinheiro"
@@ -1261,6 +1432,20 @@ export default function ComecarRadar() {
 
   // Paywall é full-bleed (tem fundo, padding e CTA sticky próprios)
   if (step === "offer") {
+    // O degrau de compromisso vem ANTES do preço — uma vez só, nunca pra quem
+    // já pagou (posCompra) nem pra quem volta pelo resgate/gate (flag salva).
+    if (!posCompra && !compromissoOk && area) {
+      return (
+        <CompromissoScreen
+          area={area}
+          answers={answers}
+          onAssumir={() => {
+            try { localStorage.setItem("core-compromisso-visto", "1"); } catch { /* segue */ }
+            setCompromissoOk(true);
+          }}
+        />
+      );
+    }
     return (
       <PaywallFlow
         context="funnel"

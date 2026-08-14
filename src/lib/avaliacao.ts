@@ -38,7 +38,12 @@ export type MotivoAvaliacao =
   | "desafio_concluido"
   | "sequencia_habito"
   | "extrato_importado"
-  | "meta_batida";
+  | "meta_batida"
+  // Pico do funil: a tela "seu mapa da vida está pronto". BitePal e Brainrot
+  // disparam a caixinha EXATAMENTE aí (dá pra ver no vídeo dos funis deles,
+  // 14/08) — é o segundo de maior empolgação e vem ANTES de qualquer atrito
+  // de preço. É como esses apps acumulam milhares de avaliações.
+  | "plano_pronto";
 
 const lerNumero = (chave: string): number => {
   try {
@@ -59,14 +64,17 @@ const lerNumero = (chave: string): number => {
  * @param pagante quem já comprou tem prioridade — passou pelo produto inteiro
  *   e tem opinião formada. Quem está no gratuito só é convidado depois de dois
  *   momentos de valor (`vezes`), pra não pedir nota de quem mal usou.
+ * @param forte pico único da jornada (ex.: diagnóstico do funil) — dispensa a
+ *   regra das duas vezes, porque esse momento só acontece uma vez e é
+ *   exatamente onde os concorrentes colhem as avaliações deles.
  */
 export async function pedirAvaliacaoSePuder(
   motivo: MotivoAvaliacao,
-  { pagante = false, vezes = 1 }: { pagante?: boolean; vezes?: number } = {},
+  { pagante = false, vezes = 1, forte = false }: { pagante?: boolean; vezes?: number; forte?: boolean } = {},
 ): Promise<boolean> {
   // Só no app da loja: na web a caixa não existe (e o plugin rejeita).
   if (!isNativeShell()) return false;
-  if (!pagante && vezes < 2) return false;
+  if (!pagante && !forte && vezes < 2) return false;
 
   const total = lerNumero(CHAVE_TOTAL);
   if (total >= MAXIMO_NA_VIDA) return false;

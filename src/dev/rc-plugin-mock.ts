@@ -54,9 +54,17 @@ export const Purchases: any = {
   async logIn(_: any) { return info(); },
   async logOut() { return info(); },
   async getOfferings() {
+    // É AQUI que nasce o estado "sem_produto" do initRevenueCat (ele só chama
+    // de "pronto" se existir pacote). Esvaziar só o getProducts não simulava
+    // nada — o app seguia achando que tinha o que vender.
+    if (modo() === "catalogo_vazio") return { current: { availablePackages: [] } };
     return { current: { availablePackages: [{ product: { identifier: "core_vitalicio:base" } }] } };
   },
   async getProducts({ productIdentifiers }: { productIdentifiers: string[] }) {
+    // 13/08: catálogo vazio é um estado REAL (build velha, Play fora do ar) e
+    // tem tela própria ("As compras estão chegando"). Sem simular, o único
+    // caminho em que a pré-folha ainda aparece ficava sem teste.
+    if (modo() === "catalogo_vazio") return { products: [] };
     return {
       products: productIdentifiers.map((id) => ({
         identifier: id,

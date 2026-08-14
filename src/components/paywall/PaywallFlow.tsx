@@ -643,7 +643,13 @@ function OfferScreen({
     }
     if (estadoAtual !== "pronto") {
       trackEvent("app_compra_falhou", { motivo: "rc_" + estadoAtual, produto: plano.id, via: "paywall_direto" });
-      setErroCompra("Não consegui falar com o Google Play agora. Tente de novo em instantes.");
+      // "sem_produto" é o catálogo vazio — quase sempre build velha demais pro
+      // produto que está no ar. "Tente de novo em instantes" é conselho ERRADO
+      // aí: por mais que ela tente, não vai aparecer sem atualizar. Medido no
+      // emulador com a loja simulada devolvendo catálogo vazio.
+      setErroCompra(estadoAtual === "sem_produto"
+        ? "Esta versão do app ainda não vê a compra. Atualize o CORE na Play Store — leva 1 minuto."
+        : "Não consegui falar com o Google Play agora. Tente de novo em instantes.");
       setComprando(false);
       return;
     }
@@ -884,10 +890,41 @@ function OfferScreen({
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)] disabled:opacity-60"
               onClick={() => {
                 if (nativo) {
-                  // Pré-folha primeiro: a pessoa escolhe Pix ou cartão e SÓ
-                  // então a folha do Google abre — fim da folha-surpresa.
-                  trackEvent("app_prefolha_view", { plano: oferta === "downsell" ? "vitalicio_19" : "vitalicio", context });
-                  setPreFolha(true);
+                  /*
+                   * 13/08 — O CTA VOLTA A ABRIR A FOLHA DIRETO.
+                   *
+                   * A pré-folha (09/08) partia de um diagnóstico certo — muita
+                   * gente não sabe que dá pra pagar com Pix — mas o remédio saiu
+                   * mais caro que a doença: de 99 pessoas que tocaram em comprar
+                   * entre 11 e 13/08, só 25 escolheram uma forma. 3 de cada 4
+                   * sumiam ali.
+                   *
+                   * E o relógio diz que NÃO era preço: quem desistiu levou 3,2s
+                   * de mediana e NENHUMA passou de 15 segundos. Hesitação de
+                   * preço deixa a pessoa parada na tela; isso aqui é gente que
+                   * já tinha decidido comprar batendo numa porta que não
+                   * esperava. Some ainda o guia do Pix, que era uma TERCEIRA
+                   * tela antes do pagamento.
+                   *
+                   * O que a pré-folha ensinava sobrevive na linha logo abaixo do
+                   * botão (onde o Pix mora dentro da folha do Google) — a
+                   * educação fica, o pedágio sai.
+                   *
+                   * ROLLBACK: trocar esta chamada por setPreFolha(true) + o
+                   * trackEvent("app_prefolha_view") que existia aqui.
+                   */
+                  if (rcResolvido && rc !== "pronto") {
+                    // Catálogo fora do ar é o ÚNICO caso que ainda merece a
+                    // folha própria: ela explica o que fazer (atualizar o app),
+                    // coisa que a folha do Google não sabe dizer.
+                    trackEvent("app_prefolha_view", {
+                      plano: oferta === "downsell" ? "vitalicio_19" : "vitalicio",
+                      context, motivo: "indisponivel",
+                    });
+                    setPreFolha(true);
+                    return;
+                  }
+                  void assinarDireto();
                   return;
                 }
                 openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
@@ -901,6 +938,25 @@ function OfferScreen({
                     : <>Quero pra sempre — {plano.preco} <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
+            {/*
+              O RECADO QUE SOBROU DA PRÉ-FOLHA (13/08). Sem ele, tirar a tela
+              intermediária levaria junto a única coisa que ela fazia de útil:
+              avisar que o Pix existe e que ele fica ESCONDIDO atrás de um toque
+              em "forma de pagamento" na folha do Google. Quem não sabe disso vê
+              cartão na frente, conclui que é o único jeito e fecha — que era o
+              diagnóstico original dos 4 dias de 09/08.
+            */}
+            {nativo && !comprando && !(rcResolvido && rc !== "pronto") && (
+              <p className="mt-2.5 flex items-center justify-center gap-1.5 text-[11.5px] leading-snug text-muted-foreground">
+                <span className="grid place-items-center w-[18px] h-[18px] rounded-md bg-[#32BCAD] text-white shrink-0">
+                  <PixLogo className="w-3 h-3" />
+                </span>
+                <span>
+                  Vai pagar com <b className="text-foreground">Pix</b>? Toque em{" "}
+                  <b className="text-foreground">forma de pagamento</b> na tela do Google.
+                </span>
+              </p>
+            )}
             {nativo && rcResolvido && rc !== "pronto" && !erroCompra && (
               <p className="text-[11px] text-muted-foreground text-center mt-2">
                 As compras estarão disponíveis em breve nesta versão.
@@ -973,12 +1029,20 @@ function PixLogo({ className }: { className?: string }) {
 }
 
 /**
- * PRÉ-FOLHA (09/08, pedido do dono depois do dado dos 4 dias: 57 abriram a
- * folha do Google, 35 cancelaram — metade em <15s). A folha abre com o cartão
- * na frente e MUITA gente aqui não tem cartão: ela fecha achando que é o
- * único jeito. Esta tela conserta a expectativa ANTES: dá os dois caminhos
- * com o mesmo peso — Pix (com guia de 2 passos, porque ele fica atrás de um
- * toque na folha) e cartão (vai direto). Fechar não pune: volta pro paywall.
+ * PRÉ-FOLHA — hoje só sobrevive pro caso CATÁLOGO INDISPONÍVEL.
+ *
+ * Nasceu em 09/08 contra um diagnóstico certo (a folha do Google abre com
+ * cartão na frente, e quem não tem cartão fecha achando que é o único jeito).
+ * Em 13/08 foi tirada do caminho de quem compra: media 25 escolhas em 99
+ * toques no CTA, com mediana de 3,2s pra desistir e ninguém passando de 15s —
+ * ou seja, cobrava pedágio de quem já tinha decidido. O aviso sobre onde o Pix
+ * mora virou uma linha embaixo do CTA.
+ *
+ * Continua aqui porque quando o catálogo não responde ela é a única superfície
+ * que sabe dizer o que fazer ("atualize o CORE na Play Store") — a folha do
+ * Google, nesse caso, simplesmente não abre. Os caminhos de Pix e cartão
+ * seguem no arquivo de propósito: é o rollback, e o caso indisponível
+ * reaproveita o mesmo componente.
  */
 function PreFolhaPagamento({
   preco, onEscolha, onFechar, indisponivel,

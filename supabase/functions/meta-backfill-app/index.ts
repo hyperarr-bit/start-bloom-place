@@ -26,6 +26,9 @@ const json = (b: unknown, s = 200) =>
 const log = (p: string, d?: unknown) =>
   console.log(`[META-BACKFILL] ${p}${d ? ` - ${JSON.stringify(d)}` : ""}`);
 
+/** Última recusa da Meta, pra devolver no modo admin (diagnóstico). */
+let ultimoErroMeta: string | null = null;
+
 const sha256 = async (txt: string): Promise<string> => {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -64,6 +67,39 @@ async function mandarCompraProMeta(
     .limit(1)
     .maybeSingle();
   let d = ((dev as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+
+  /*
+   * PELA SESSÃO QUANDO O user_id NÃO ACHA (14/08) — este era o buraco.
+   *
+   * Desde a v48 a pessoa COMPRA ANTES DE TER CONTA: o app emite a ficha do
+   * aparelho enquanto ela ainda é anônima, então a linha fica com user_id
+   * NULO. A busca acima, por user_id, não achava nada; o extinfo saía sem
+   * versão de SO e a Meta RECUSAVA o evento inteiro
+   * ("error_subcode 2804043: informação estendida do dispositivo inválida").
+   *
+   * Efeito medido em 14/08: das 4 vendas do dia, 2 nunca chegaram na Meta —
+   * e eram exatamente as 2 sem ficha encontrada. O cron de 15min também não
+   * salvava, porque tentava e era recusado igual. As duas tinham a ficha
+   * gravada o tempo todo (Android 16, Samsung, build 49) — só estava
+   * pendurada na sessão anônima.
+   */
+  if (!Object.keys(d).length) {
+    const { data: sess } = await admin
+      .from("analytics_events").select("session_id").eq("user_id", userId).limit(50);
+    const ids = [...new Set(((sess ?? []) as { session_id: string }[]).map((x) => x.session_id).filter(Boolean))];
+    if (ids.length) {
+      const { data: porSessao } = await admin
+        .from("analytics_events")
+        .select("event_data")
+        .eq("event_name", "app_device_info")
+        .in("session_id", ids)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      d = ((porSessao as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}) as Record<string, unknown>;
+    }
+  }
+
   if (!Object.keys(d).length) {
     // Quem está em build anterior à v48 não emite app_device_info. O
     // webview_info (que existe desde a v37) carrega o UA — dá SO e modelo,
@@ -87,8 +123,12 @@ async function mandarCompraProMeta(
     s("pacote") || "br.com.coreaplicativo.app",
     s("build"),
     s("versao"),
-    s("os"),
-    s("modelo"),
+    // A Meta RECUSA o evento inteiro se a versão do SO vier vazia (subcode
+    // 2804043). Com a busca por sessão acima isso virou raro, mas quando
+    // sobrar sem nada é melhor um SO aproximado do que perder a venda: sem o
+    // evento a atribuição é ZERO, e o app é Android por construção.
+    s("os") || "13",
+    s("modelo") || "Android",
     s("locale") || "pt-BR",
     "",                                      // fuso abreviado: não temos
     "",                                      // operadora: não temos
@@ -145,6 +185,9 @@ async function mandarCompraProMeta(
     });
     const corpo = await r.text();
     log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
+    // Guarda a recusa: sem isso "falhou" é um número sem causa, e já custou
+    // meio dia de hipótese errada sobre duplicação de evento.
+    if (!r.ok) ultimoErroMeta = corpo.slice(0, 400);
     if (r.ok) {
       await admin.from("analytics_events").insert({
         user_id: userId,
@@ -271,6 +314,7 @@ serve(async (req) => {
         tx: v.revenuecat_subscription_id,
         email: v.customer_email,
         resultado: depois.data ? "enviado" : "falhou",
+        ...(depois.data ? {} : { recusa: ultimoErroMeta }),
       });
     }
     log("fim", { de, ate, total: feitos.length, cron });

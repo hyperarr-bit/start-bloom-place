@@ -114,6 +114,20 @@ serve(async (req) => {
         "ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type",
       );
       adUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
+      /*
+       * ENTREGA HORA A HORA (14/08) — pra responder "esta venda veio de qual
+       * anúncio?" enquanto o install referrer ainda chega cortado (só a v50
+       * guarda inteiro; até a base migrar, o ad_id fica ilegível).
+       *
+       * O referrer, mesmo cortado, entrega o INSTANTE do clique. Cruzando esse
+       * instante com quais anúncios estavam de fato entregando naquela hora, a
+       * lista de candidatos costuma cair pra um. Não é o mesmo que ler o ad_id,
+       * e o relatório tem que dizer qual dos dois está mostrando — foi por
+       * chutar isso que o dono me corrigiu.
+       */
+      if (body?.porHora) {
+        adUrl.searchParams.set("breakdowns", "hourly_stats_aggregated_by_advertiser_time_zone");
+      }
       adUrl.searchParams.set("limit", "500");
       adUrl.searchParams.set("access_token", token);
       const r = await fetch(adUrl);
@@ -163,6 +177,7 @@ serve(async (req) => {
         // inflado é indistinguível de venda duplicada no app — e a diferença
         // entre os dois é uma versão nova do app à toa.
         ...(body?.bruto ? { acoes: l.actions } : {}),
+        ...(body?.porHora ? { hora: l.hourly_stats_aggregated_by_advertiser_time_zone } : {}),
       }));
       return jsonResponse({ nivel: "ad", since, until, anuncios });
     }

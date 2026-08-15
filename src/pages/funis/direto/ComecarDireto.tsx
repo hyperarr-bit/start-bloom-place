@@ -67,7 +67,7 @@ const GoogleIcon = () => (
  * Todo evento sai com `funil: "direto"` pra separar do /inicio no relatório.
  */
 
-type Step = "start" | "quiz" | "prova" | "progress" | "result" | "central" | "compromisso" | "signup" | "offer" | "confirm";
+type Step = "start" | "eco" | "quiz" | "prova" | "progress" | "result" | "central" | "plano" | "primeira" | "compromisso" | "signup" | "offer" | "confirm";
 
 /** Etiqueta em TODO evento — é o que deixa comparar /direto x /inicio. */
 const FUNIL = "direto";
@@ -595,7 +595,7 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
 
 // Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
 // após a pergunta de gasto. As trilhas das outras áreas não têm proof.
-type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
+type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" } | { kind: "edu" } | { kind: "lembrete" };
 const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
   questions.flatMap((q, i) => {
     const item: QuizItem[] = [{ kind: "q", qIdx: i }];
@@ -663,13 +663,28 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={item.kind === "q" ? q!.key : "proof"} {...slide}>
+        <motion.div key={item.kind === "q" ? q!.key : item.kind} {...slide}>
           {item.kind === "proof" ? (
             proofArea && proofArea !== "dinheiro" ? (
               <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} onNext={() => advance(answers)} />
             ) : (
               <ProofSlide gasto={answers.gasto ?? ""} onNext={() => advance(answers)} />
             )
+          ) : item.kind === "edu" ? (
+            <EducacaoSlide area={proofArea ?? "dinheiro"} onNext={() => advance(answers)} />
+          ) : item.kind === "lembrete" ? (
+            <LembreteSlide
+              horario={answers.horario ?? ""}
+              onEscolha={(quer) => {
+                const next = { ...answers, lembrete: quer ? "sim" : "nao" };
+                setAnswers(next);
+                trackEvent("funnel_quiz_answer", { q: "lembrete", answer: quer ? "sim" : "nao" });
+                try {
+                  localStorage.setItem("core-lembrete-intencao", JSON.stringify({ quer, horario: answers.horario ?? "", quando: Date.now() }));
+                } catch { /* noop */ }
+                advance(next);
+              }}
+            />
           ) : (
             <>
               <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q!.q}</h2>
@@ -692,6 +707,395 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
           )}
         </motion.div>
       </AnimatePresence>
+    </div>
+  );
+}
+
+/* ============================================================
+   AS TELAS NOVAS DO /direto (15/08) — o que faltava pro funil
+   ter o arco do Cal AI/BitePal: pergunta → recompensa → pergunta,
+   pico com DATA, e uma vitória tocável antes do preço.
+   ============================================================ */
+
+/** T2 — ECO da porta: reação imediata à escolha (BitePal: o mascote reage;
+ *  nós reagimos com a promessa da área). Sem estatística inventada. */
+const ECO_AREA: Record<AreaKey, { titulo: string; sub: string }> = {
+  dinheiro: { titulo: "Dinheiro. Boa escolha.", sub: "É a área que mais aperta — e a que dá alívio mais rápido quando entra nos trilhos." },
+  rotina: { titulo: "Rotina. Boa escolha.", sub: "Quando o dia tem dono, todo o resto fica mais fácil — é efeito dominó." },
+  corpo: { titulo: "Treino e dieta. Boa escolha.", sub: "Constância vem de ter tudo num lugar só — não de força de vontade." },
+  saude: { titulo: "Saúde. Boa escolha.", sub: "As coisas pequenas — água, sono, vitamina — são as que mais mudam como você se sente." },
+  metas: { titulo: "Metas. Boa escolha.", sub: "A diferença entre desejo e conquista é um plano que você VÊ todo dia." },
+};
+
+function EcoScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const a = AREAS[area];
+  const eco = ECO_AREA[area];
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 220, damping: 15 }}
+        className="w-20 h-20 rounded-3xl grid place-items-center mx-auto mb-6 text-4xl"
+        style={{ background: `${a.color.replace(")", " / 0.12)")}` }}
+      >
+        {a.emoji}
+      </motion.div>
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-3">{eco.titulo}</h2>
+      <p className="text-muted-foreground text-[15px] leading-relaxed mb-8">{eco.sub}</p>
+      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
+        Montar meu plano de {a.nome} <ArrowRight className="w-4 h-4" />
+      </Button>
+      <p className="text-xs text-muted-foreground mt-3">Leva menos de 2 minutos</p>
+    </div>
+  );
+}
+
+/** T4 — EDUCAÇÃO ("por que funciona"): o "willpower doesn\'t work" do
+ *  Brainrot, na língua de cada área. Vem cedo no quiz de propósito — reframe
+ *  ANTES das perguntas de fracasso, pra resposta vir sem culpa. */
+const EDUCACAO: Record<AreaKey, { destaque: string; resto: string; pontos: string[] }> = {
+  dinheiro: {
+    destaque: "Não é falta de disciplina.",
+    resto: "É falta de visibilidade.",
+    pontos: [
+      "Gasto que você não vê, você repete",
+      "Anotar \"depois\" morre em 3 dias — tem que levar segundos",
+      "Quem enxerga o mês inteiro decide diferente",
+    ],
+  },
+  rotina: {
+    destaque: "Força de vontade acaba.",
+    resto: "Sistema, não.",
+    pontos: [
+      "Motivação é pico; sistema é piso",
+      "Hábito pega quando existe ONDE marcar",
+      "É a sequência visível que segura você no dia fraco",
+    ],
+  },
+  corpo: {
+    destaque: "Recomeçar cansa mais",
+    resto: "que treinar.",
+    pontos: [
+      "O problema nunca foi o treino — foi treino e dieta espalhados",
+      "Progresso que você VÊ vira combustível",
+      "Constância ganha de intensidade, sempre",
+    ],
+  },
+  saude: {
+    destaque: "O corpo cobra",
+    resto: "o que a rotina não cuida.",
+    pontos: [
+      "Água, sono e vitamina não falham por serem difíceis — falham por serem esquecíveis",
+      "No automático, o cuidado acontece sem pensar",
+      "Prevenir é mais barato que remediar — em todo sentido",
+    ],
+  },
+  metas: {
+    destaque: "Meta sem plano visível",
+    resto: "é só um desejo.",
+    pontos: [
+      "O que fica só na cabeça, a rotina engole",
+      "Passo pequeno visível ganha de plano perfeito invisível",
+      "Ver o progresso é o que mantém a meta viva em março",
+    ],
+  },
+};
+
+function EducacaoSlide({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const e = EDUCACAO[area];
+  return (
+    <div className="text-center pt-2">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 14 }}
+        className="w-14 h-14 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-5 text-2xl"
+      >
+        🧠
+      </motion.div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-6">
+        <span className="text-accent">{e.destaque}</span><br />{e.resto}
+      </h2>
+      <div className="space-y-2.5 mb-7">
+        {e.pontos.map((ptx, i) => (
+          <motion.div
+            key={ptx}
+            initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.25 + i * 0.15 }}
+            className="rounded-2xl border border-border bg-card p-3.5 text-left text-[14px] leading-snug flex items-start gap-2.5"
+          >
+            <span className="mt-0.5 w-5 h-5 rounded-full bg-accent/15 text-accent grid place-items-center shrink-0">
+              <Check className="w-3 h-3" strokeWidth={3} />
+            </span>
+            {ptx}
+          </motion.div>
+        ))}
+      </div>
+      <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>
+        Faz sentido <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+/** T7/T8 — perguntas de CALIBRAÇÃO (universais): viram parte do plano e dão
+ *  credibilidade à "geração" (Cal AI pede nascimento pelo mesmo motivo). */
+const PERGUNTA_TEMPO: QuizQ = {
+  key: "tempo",
+  q: "Quanto tempo por dia você topa investir?",
+  opts: [
+    { emoji: "⚡", label: "5 minutos" },
+    { emoji: "🎯", label: "10 minutos" },
+    { emoji: "🚀", label: "15 minutos ou mais" },
+  ],
+};
+const PERGUNTA_HORARIO: QuizQ = {
+  key: "horario",
+  q: "Que horário do dia funciona melhor pra você?",
+  opts: [
+    { emoji: "🌅", label: "De manhã, começando o dia" },
+    { emoji: "☀️", label: "Na pausa do almoço" },
+    { emoji: "🌙", label: "À noite, fechando o dia" },
+  ],
+};
+
+/** T9 — LEMBRETE no meio do funil (BitePal literal): intenção com o horário
+ *  que a própria pessoa escolheu. Na web NÃO pedimos permissão de navegador
+ *  (o in-app browser do Instagram nem suporta) — guardamos a intenção e o
+ *  app cobra a permissão de verdade na primeira sessão. */
+function LembreteSlide({ horario, onEscolha }: { horario: string; onEscolha: (quer: boolean) => void }) {
+  const rotulo = /manhã/i.test(horario) ? "de manhã" : /almoço/i.test(horario) ? "na hora do almoço" : /noite/i.test(horario) ? "à noite" : "no seu horário";
+  return (
+    <div className="text-center pt-2">
+      <motion.div
+        initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 14 }}
+        className="w-14 h-14 rounded-2xl bg-accent/10 text-accent grid place-items-center mx-auto mb-5 text-2xl"
+      >
+        🔔
+      </motion.div>
+      <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-3">
+        Quer que a gente te<br />lembre <span className="text-accent">{rotulo}</span>?
+      </h2>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-7">
+        Um toque por dia, no máximo. É o que separa quem mantém de quem esquece.
+      </p>
+      <div className="space-y-3">
+        <Button size="lg" className="w-full h-12 text-base" onClick={() => onEscolha(true)}>
+          Sim, me lembra <ArrowRight className="w-4 h-4" />
+        </Button>
+        <button
+          onClick={() => onEscolha(false)}
+          className="w-full text-sm text-muted-foreground underline underline-offset-2 py-2"
+        >
+          Prefiro sem lembrete
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** T12 — O PLANO: pico com DATA (BitePal "Reach 50kg by 27 October") + a
+ *  primeira semana desenhada + amplitude dos 16 módulos, tudo numa tela. */
+const SEMANA_AREA: Record<AreaKey, Array<{ dia: string; txt: string }>> = {
+  dinheiro: [
+    { dia: "Dia 1", txt: "Seu painel no ar + primeiro gasto registrado" },
+    { dia: "Dia 3", txt: "Primeira leitura real: pra onde o dinheiro foi" },
+    { dia: "Dia 7", txt: "Semana fechada — e a primeira decisão com número" },
+  ],
+  rotina: [
+    { dia: "Dia 1", txt: "Seu primeiro hábito criado e marcado" },
+    { dia: "Dia 3", txt: "Sequência de 3 dias — o hábito começando a pegar" },
+    { dia: "Dia 7", txt: "Uma semana inteira sua, no painel" },
+  ],
+  corpo: [
+    { dia: "Dia 1", txt: "Treino e dieta do dia, num lugar só" },
+    { dia: "Dia 3", txt: "Terceiro registro — sem recomeçar do zero" },
+    { dia: "Dia 7", txt: "Primeira semana completa, com progresso visível" },
+  ],
+  saude: [
+    { dia: "Dia 1", txt: "Água, sono e vitaminas no radar" },
+    { dia: "Dia 3", txt: "Terceiro dia de cuidado no automático" },
+    { dia: "Dia 7", txt: "Uma semana se sentindo mais no controle" },
+  ],
+  metas: [
+    { dia: "Dia 1", txt: "Sua meta sai da cabeça e vira plano" },
+    { dia: "Dia 3", txt: "Primeiros passos dados — e visíveis" },
+    { dia: "Dia 7", txt: "Uma semana de progresso real na meta" },
+  ],
+};
+
+function PlanoScreen({ area, answers, onNext }: { area: AreaKey; answers: Record<string, string>; onNext: () => void }) {
+  const a = AREAS[area];
+  const dataAlvo = new Date(Date.now() + 30 * 86400_000)
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "long" });
+  const vitoriaCrua = answers.vitoria ? (VICTORY_PHRASE[answers.vitoria] ?? answers.vitoria.toLowerCase()) : null;
+  const vitoria = vitoriaCrua ?? `colocar ${a.nome.toLowerCase()} sob controle`;
+  const tempo = answers.tempo ?? "5 minutos";
+  return (
+    <div className="w-full max-w-sm mx-auto text-center">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Análise concluída</div>
+      <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-1">Seu plano<br />está pronto</h2>
+      <LifeRadar area={area} />
+      {/* A META COM DATA — o pico. */}
+      <Card className="p-4 text-left mb-3 border-2" style={{ borderColor: `${a.color.replace(")", " / 0.35)")}` }}>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Sua meta</div>
+        <p className="text-[16px] font-bold leading-snug">
+          {vitoria.charAt(0).toUpperCase() + vitoria.slice(1)}
+          <span className="font-semibold text-muted-foreground"> até </span>
+          <span style={{ color: a.color }}>{dataAlvo}</span>
+        </p>
+        <p className="text-[12px] text-muted-foreground mt-1">Com {tempo.toLowerCase()} por dia. Só isso.</p>
+      </Card>
+      {/* A PRIMEIRA SEMANA, DESENHADA */}
+      <Card className="p-4 text-left mb-3">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Sua primeira semana</div>
+        {SEMANA_AREA[area].map((m, i) => (
+          <div key={m.dia} className="flex gap-3">
+            <div className="flex flex-col items-center">
+              <span className={`grid place-items-center w-6 h-6 rounded-full text-[10px] font-black shrink-0 ${i === 0 ? "text-white" : "bg-muted text-muted-foreground"}`}
+                style={i === 0 ? { background: a.color } : undefined}>
+                {i === 0 ? <Check className="w-3.5 h-3.5" strokeWidth={3.5} /> : i + 1}
+              </span>
+              {i < SEMANA_AREA[area].length - 1 && <span className="w-px flex-1 my-1 bg-border" />}
+            </div>
+            <div className={i < SEMANA_AREA[area].length - 1 ? "pb-3.5" : ""}>
+              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{m.dia}</div>
+              <div className="text-[13.5px] leading-snug mt-0.5">{m.txt}</div>
+            </div>
+          </div>
+        ))}
+      </Card>
+      <p className="text-[11px] text-accent font-semibold mb-6 inline-flex items-center justify-center gap-1 w-full">
+        <Check className="w-3.5 h-3.5" strokeWidth={3} /> E os 16 módulos inclusos — {a.nome} é só o começo
+      </p>
+      <Button size="lg" className="w-full h-12 text-base" onClick={() => { trackEvent("funnel_click", { cta: "plano_ver_comeco", area, funil: FUNIL }); onNext(); }}>
+        Ver como começa hoje <ArrowRight className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+}
+
+/** T13 — PRIMEIRA VITÓRIA: a prova tocável que substitui a demo. Uma ação
+ *  real, guiada, com celebração — o "see for yourself" do Brainrot, sem
+ *  soltar a pessoa num sandbox. A escolha fica salva e o app abre com ela. */
+const PRIMEIRA_VITORIA: Record<AreaKey, {
+  titulo: string; sub: string; opcoes: Array<{ emoji: string; label: string }>; cta: string; done: string;
+}> = {
+  dinheiro: {
+    titulo: "Registra teu primeiro gasto",
+    sub: "O de hoje mais cedo — café, transporte, qualquer um. É assim que a visibilidade começa.",
+    opcoes: [
+      { emoji: "☕", label: "Café / lanche" },
+      { emoji: "🚗", label: "Transporte" },
+      { emoji: "🛒", label: "Mercado" },
+      { emoji: "📦", label: "Compra online" },
+    ],
+    cta: "Registrar meu 1º gasto",
+    done: "Primeiro gasto registrado. Ele já está no seu painel.",
+  },
+  rotina: {
+    titulo: "Escolhe teu primeiro hábito",
+    sub: "Um só. O resto entra depois — sequência se constrói um de cada vez.",
+    opcoes: [
+      { emoji: "🌅", label: "Acordar no horário" },
+      { emoji: "💧", label: "Beber água" },
+      { emoji: "📖", label: "Ler 10 minutos" },
+      { emoji: "🏃", label: "Me mexer todo dia" },
+    ],
+    cta: "Criar meu 1º hábito",
+    done: "Hábito criado. Amanhã é o dia 1 da sua sequência.",
+  },
+  corpo: {
+    titulo: "Escolhe teu foco do dia 1",
+    sub: "Começar pequeno é o que impede o recomeço número 47.",
+    opcoes: [
+      { emoji: "🏠", label: "Treino em casa" },
+      { emoji: "🏋️", label: "Academia" },
+      { emoji: "🥗", label: "Arrumar a alimentação" },
+      { emoji: "🚶", label: "Só me mexer mais" },
+    ],
+    cta: "Montar meu dia 1",
+    done: "Dia 1 montado. Treino e dieta juntos, finalmente.",
+  },
+  saude: {
+    titulo: "Escolhe teu primeiro cuidado",
+    sub: "O que mais faz falta hoje. O resto entra no automático depois.",
+    opcoes: [
+      { emoji: "💧", label: "Bater a meta de água" },
+      { emoji: "😴", label: "Dormir no horário" },
+      { emoji: "💊", label: "Vitaminas em dia" },
+      { emoji: "🧘", label: "Um respiro por dia" },
+    ],
+    cta: "Ativar meu 1º cuidado",
+    done: "Cuidado ativado. Seu corpo agradece em 7 dias.",
+  },
+  metas: {
+    titulo: "Qual meta sai do papel primeiro?",
+    sub: "A que mais te espera. Ela vira plano com passos hoje.",
+    opcoes: [
+      { emoji: "💰", label: "Juntar dinheiro" },
+      { emoji: "✈️", label: "Uma viagem" },
+      { emoji: "📚", label: "Estudar / carreira" },
+      { emoji: "💪", label: "Corpo e saúde" },
+    ],
+    cta: "Tirar do papel agora",
+    done: "Meta registrada. O plano dela te espera lá dentro.",
+  },
+};
+
+function PrimeiraVitoriaScreen({ area, onDone }: { area: AreaKey; onDone: () => void }) {
+  const a = AREAS[area];
+  const pv = PRIMEIRA_VITORIA[area];
+  const [escolha, setEscolha] = useState<string | null>(null);
+  const [feito, setFeito] = useState(false);
+  if (feito) {
+    return (
+      <div className="w-full max-w-sm mx-auto text-center">
+        <motion.div
+          initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 260, damping: 16 }}
+          className="w-20 h-20 rounded-full grid place-items-center mx-auto mb-6 text-white"
+          style={{ background: a.color }}
+        >
+          <Check className="w-10 h-10" strokeWidth={3} />
+        </motion.div>
+        <h2 className="text-[26px] font-bold tracking-tight leading-[1.15] mb-3">Primeira vitória ✓</h2>
+        <p className="text-[15px] text-muted-foreground leading-relaxed mb-8">{pv.done}</p>
+        <Button size="lg" className="w-full h-12 text-base" onClick={onDone}>
+          Continuar <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="w-full max-w-md mx-auto">
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-2 text-center">{pv.titulo}</h2>
+      <p className="text-sm text-muted-foreground leading-relaxed mb-6 text-center">{pv.sub}</p>
+      <div className="space-y-3 mb-6">
+        {pv.opcoes.map((o) => (
+          <button
+            key={o.label}
+            onClick={() => setEscolha(o.label)}
+            className={`group w-full flex items-center gap-3.5 rounded-2xl border-2 p-3.5 text-left active:scale-[0.99] transition-all ${escolha === o.label ? "border-accent bg-accent/[0.06]" : "border-border bg-card"}`}
+          >
+            <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+            <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+            <span className={`grid place-items-center w-6 h-6 rounded-full border-2 transition-colors shrink-0 ${escolha === o.label ? "border-accent bg-accent text-white" : "border-border"}`}>
+              {escolha === o.label && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+            </span>
+          </button>
+        ))}
+      </div>
+      <Button
+        size="lg" disabled={!escolha} className="w-full h-12 text-base"
+        onClick={() => {
+          trackEvent("funnel_click", { cta: "primeira_vitoria", area, escolha: escolha ?? "", funil: FUNIL });
+          try { localStorage.setItem("funnel-primeira-vitoria", JSON.stringify({ area, escolha, quando: Date.now() })); } catch { /* noop */ }
+          setFeito(true);
+        }}
+      >
+        {pv.cta} <ArrowRight className="w-4 h-4" />
+      </Button>
     </div>
   );
 }
@@ -1109,10 +1513,33 @@ export default function ComecarDia14() {
       return a && a in AREAS ? (a as AreaKey) : null;
     } catch { return null; }
   });
-  const track: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
-  // Trilhas de vida ganham a tela de PICO depois da pergunta de consistência.
-  const trackItems = vitrine && area && area !== "dinheiro"
-    ? buildQuizItems(track, "consistencia")
+  /*
+   * A TRILHA DO /direto (15/08) — pergunta → recompensa → pergunta, nunca
+   * duas cruas seguidas (lei dos três funis de referência):
+   *
+   *   dor → EDUCAÇÃO → tentativas → VALIDAÇÃO(proof) → tempo → horário
+   *   → LEMBRETE → vitória
+   *
+   * As perguntas por área vêm do AREA_TRACKS/QUIZ compartilhado (sem mexer no
+   * /inicio); a pergunta antiga de compromisso ("topa 5 min?") SAI porque a
+   * calibração de tempo pergunta a mesma coisa com resposta que vira plano.
+   * Cópias locais (slice/filter) — mutar o array compartilhado quebraria o
+   * /inicio junto.
+   */
+  const trilhaBase: QuizQ[] = vitrine && area && area !== "dinheiro" ? AREA_TRACKS[area] : QUIZ;
+  const track: QuizQ[] = vitrine
+    ? [...trilhaBase.filter((q) => q.key !== "compromisso"), PERGUNTA_TEMPO, PERGUNTA_HORARIO]
+        // vitória por último: é ela que intitula o plano
+        .sort((qa, qb) => (qa.key === "vitoria" ? 1 : 0) - (qb.key === "vitoria" ? 1 : 0))
+    : QUIZ;
+  const trackItems: QuizItem[] = vitrine
+    ? track.flatMap((q, i): QuizItem[] => {
+        const item: QuizItem[] = [{ kind: "q", qIdx: i }];
+        if (q.key === "atrapalha") item.push({ kind: "edu" });
+        if (q.key === "consistencia" || q.key === "gasto") item.push({ kind: "proof" });
+        if (q.key === "horario") item.push({ kind: "lembrete" });
+        return item;
+      })
     : QUIZ_ITEMS;
   const vidaPrepSteps = area
     ? ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[area].nome}`, "Finalizando seu plano personalizado"]
@@ -1169,7 +1596,7 @@ export default function ComecarDia14() {
                   try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
                   trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked , funil: FUNIL });
                   trackEvent("funnel_quiz_answer", { q: "area", answer: label });
-                  setStep("quiz");
+                  setStep("eco");
                 }}
               />
             ) : (
@@ -1187,6 +1614,9 @@ export default function ComecarDia14() {
                 }}
               />
             ))}
+            {step === "eco" && area && (
+              <EcoScreen area={area} onNext={() => setStep("quiz")} />
+            )}
             {step === "quiz" && (
               <QuizScreen
                 questions={track}
@@ -1199,25 +1629,28 @@ export default function ComecarDia14() {
                   setAnswers(a);
                   // Persiste pro paywall personalizar mesmo após OAuth/refresh
                   try { localStorage.setItem("funnel-quiz-answers", JSON.stringify(a)); } catch { /* noop */ }
-                  // 01/08 (ordem do dono): funil volta ao de 29/07 — a tela de
-                  // prova sai do caminho. Religar = setStep("prova") aqui.
-                  setStep("progress");
+                  // /direto (15/08): a prova social VOLTA — é a tela que o
+                  // Cal AI põe exatamente aqui (fim do quiz, antes do plano).
+                  setStep(vitrine ? "prova" : "progress");
                 }}
               />
             )}
             {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} />}
-            {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep("result")} />}
+            {step === "progress" && <ProgressScreen steps={vitrine ? vidaPrepSteps : PREP_STEPS} onDone={() => setStep(vitrine && area ? "plano" : "result")} />}
             {step === "result" && (vitrine && area ? (
               <RadarResultScreen answers={answers} area={area} onDone={() => setStep("central")} />
             ) : (
-              <ResultScreen answers={answers} onDone={() => setStep("central")} />
+              <ResultScreen answers={answers} onDone={() => setStep("signup")} />
             ))}
             {/* A DEMO SAÍA DAQUI: os dois caminhos mandavam pro /preview com
                 window.location — saída do funil. Agora o resultado cai na
                 central (o vislumbre dos 16 módulos continua sendo a prova de
                 amplitude) e a central entrega direto pro compromisso. */}
-            {step === "central" && area && (
-              <CentralScreen area={area} onOpen={() => setStep("compromisso")} />
+            {step === "plano" && area && (
+              <PlanoScreen area={area} answers={answers} onNext={() => setStep("primeira")} />
+            )}
+            {step === "primeira" && area && (
+              <PrimeiraVitoriaScreen area={area} onDone={() => setStep("compromisso")} />
             )}
             {step === "compromisso" && area && (
               <CompromissoScreen area={area} answers={answers} onAssumir={() => setStep("signup")} />

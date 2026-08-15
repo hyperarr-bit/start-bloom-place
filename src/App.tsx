@@ -221,6 +221,9 @@ const Notificacoes = lazy(() => import("./pages/Notificacoes"));
 const Preview = lazy(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
 const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
+// /direto (15/08): o funil do dia 14 SEM A DEMO + tela de compromisso. Teste
+// do dono contra o /inicio, que segue intocado como controle.
+const ComecarDireto = lazy(() => import("./pages/funis/direto/ComecarDireto"));
 const PlanoV3 = lazy(() => import("./pages/v3/Plano"));
 // Funis CONGELADOS pra teste (24/07, pedido do dono). Cada um é uma cópia de
 // uma versão que já rodou, num diretório próprio e com chunk próprio: abrir
@@ -379,6 +382,7 @@ const AnimatedRoutes = () => {
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
+        <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

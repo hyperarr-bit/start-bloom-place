@@ -36,11 +36,27 @@ export const HydrationTracker = () => {
   const mlCurrent = current * copoMl;
   const mlGoal = waterGoal * copoMl;
 
-  const addWater = () => {
-    const n = Math.min(current + 1, 20);
-    setWaterLog(prev => ({ ...prev, [today]: n }));
-    setWaterLogRotina(prev => ({ ...prev, [today]: n }));
+  /*
+   * ERROU O TOQUE? DÁ PRA VOLTAR (16/08). Até hoje `addWater` era a ÚNICA
+   * escrita do consumo: quem tocasse "+" sem querer (ou registrasse 3 quando
+   * bebeu 1) ficava com o número travado até o dia virar. Avaliação da
+   * Amanda, palavra por palavra: "não estou conseguindo redefinir a
+   * quantidade de água tomada... a opção de apagar e colocar de novo as
+   * informações do dia. Não estou conseguindo editar o que é inserido, ou
+   * apagar." Registrar é fácil, corrigir era impossível.
+   *
+   * As duas chaves andam juntas (a Rotina conta pela `water-log`) — mexer só
+   * numa fazia o `Math.max` do `current` ressuscitar o valor antigo, que é
+   * exatamente por que o "−" do widget da Home não funcionava.
+   */
+  const setPorcoes = (n: number) => {
+    const v = Math.min(20, Math.max(0, n));
+    setWaterLog(prev => ({ ...prev, [today]: v }));
+    setWaterLogRotina(prev => ({ ...prev, [today]: v }));
   };
+  const addWater = () => setPorcoes(current + 1);
+  const removeWater = () => setPorcoes(current - 1);
+  const zerarDia = () => setPorcoes(0);
   const ajustaMeta = (delta: number) => setWaterGoal(Math.min(20, Math.max(1, waterGoal + delta)));
 
   return (
@@ -170,14 +186,33 @@ export const HydrationTracker = () => {
             ))}
           </div>
 
-          {/* Add button */}
-          <button
-            onClick={addWater}
-            data-spotlight="add-water"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[hsl(var(--saude-blue)/0.12)] hover:bg-[hsl(var(--saude-blue)/0.2)] text-[hsl(var(--saude-blue))] text-xs font-bold transition-colors w-full justify-center border border-[hsl(var(--saude-blue)/0.2)]"
-          >
-            <Plus className="w-3.5 h-3.5" /> +{copoMl}ml
-          </button>
+          {/* Registrar E corrigir na mesma linha: o "−" fica do lado do "+"
+              porque errar o toque é tão comum quanto acertar. */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={removeWater}
+              disabled={current <= 0}
+              aria-label={`Tirar um registro de ${copoMl}ml`}
+              className="w-11 h-10 shrink-0 rounded-lg border border-border bg-card flex items-center justify-center disabled:opacity-30"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              onClick={addWater}
+              data-spotlight="add-water"
+              className="flex items-center gap-2 px-4 py-2 min-h-10 rounded-lg bg-[hsl(var(--saude-blue)/0.12)] hover:bg-[hsl(var(--saude-blue)/0.2)] text-[hsl(var(--saude-blue))] text-xs font-bold transition-colors flex-1 justify-center border border-[hsl(var(--saude-blue)/0.2)]"
+            >
+              <Plus className="w-3.5 h-3.5" /> +{copoMl}ml
+            </button>
+          </div>
+          {current > 0 && (
+            <button
+              onClick={zerarDia}
+              className="w-full text-center text-[11px] text-muted-foreground underline underline-offset-2 py-1"
+            >
+              Zerar o dia e começar de novo
+            </button>
+          )}
 
         </div>
       </div>

@@ -971,7 +971,24 @@ html.core-shell summary:focus {
    Escopo core-shell (só o binário da loja): a web não tem essa reclamação e
    repontar comportamento nos dois de uma vez já quebrou o app antes.
    ============================================================ */
-html.core-shell :is(button, a[href], [role="button"]) {
+/* `static` → `relative` APENAS, nunca mexendo em quem já se posiciona.
+ *
+ * BUG DE 16/08 (medido no APK, getComputedStyle): a versão anterior desta
+ * regra era `position: relative` seca. A especificidade dela (0-1-2) ganha
+ * das classes do Tailwind (`.absolute`/`.fixed`, 0-1-0), então TODO botão
+ * posicionado do app virava relative dentro do shell: os X de fechar
+ * (WinbackFlow, MonthlyWrapped, QuickStart, ModuleTip, PwaInstallCard) e os
+ * botões de REMOVER (PhotoPicker, GoalsBoardV2) saíam do canto e caíam no
+ * fluxo — invisíveis ou fora da tela. É a cara das avaliações 3★ de agosto:
+ * "muitas áreas não clicáveis", "não consigo apagar".
+ *
+ * O conserto não é brigar por especificidade (a regra ganharia de novo): é
+ * NÃO CASAR com quem já se posiciona. Quem tem classe de posição fica de
+ * fora e o Tailwind aplica o que o componente pediu; o ::after desses ainda
+ * funciona, porque um elemento absolute/fixed já é contexto de
+ * posicionamento pro próprio pseudo-elemento. Estilo inline não é afetado
+ * (declaração inline vence qualquer seletor). */
+html.core-shell :is(button, a[href], [role="button"]):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]) {
   position: relative;
 }
 
@@ -995,4 +1012,34 @@ html.core-shell .grid > :is(button, a[href], [role="button"])::after,
 html.core-shell [data-sem-expansao-toque]::after,
 html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"])::after {
   display: none;
+}
+
+/* ============================================================
+   BOTÃO DE APAGAR EM TELA DE TOQUE (16/08) — a causa raiz das 3 avaliações
+   de agosto.
+
+   `future.hoverOnlyWhenSupported` (tailwind.config.ts:8) envolve TODA
+   variante hover em `@media (hover: hover) and (pointer: fine)`. Em WebView
+   Android isso NUNCA casa — nem hover, nem pointer fine. Os 47 botões
+   escritos como `opacity-0 group-hover:opacity-100` (apagar tarefa, apagar
+   anotação, remover foto, remover refeição…) ficam com opacity:0
+   PERMANENTE: invisíveis, mas ainda tocáveis — então o toque na borda da
+   linha apaga sem aviso, e quem procura o botão conclui que o app não
+   deixa apagar. É literalmente o texto das avaliações: "gostaria de poder
+   apagar uma tarefa que já foi feita" (thayla, v49), "não estou
+   conseguindo editar o que é inserido, ou apagar" (Amanda, v50), "muitas
+   áreas não clicáveis" (ingrid, v49).
+
+   A flag do Tailwind FICA: tirar ela traz de volta o hover grudado que o
+   dono reclamou em 04/08 (botão cinza preso depois do toque). O conserto é
+   aqui: onde não existe hover, o botão simplesmente aparece.
+
+   Classe dobrada pra ganhar de `.opacity-0` sem !important (não mexe no
+   transition). Desktop não muda: (hover: none) não casa com mouse.
+   ============================================================ */
+@media (hover: none) {
+  .group-hover\:opacity-100.group-hover\:opacity-100,
+  .group-hover\/img\:opacity-100.group-hover\/img\:opacity-100 {
+    opacity: 1;
+  }
 }

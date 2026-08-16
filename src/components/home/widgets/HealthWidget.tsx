@@ -13,12 +13,24 @@ export const HealthWidget = ({ size = "small" }: { size?: WidgetSize }) => {
 
   const todayStr = localDayKey();
 
+  /*
+   * O "−" ERA UM BOTÃO MORTO (corrigido 16/08). Ele mexia só em
+   * `core-saude-water`, mas o número na tela vem do useLifeHubData, que
+   * pega o MAIOR entre `core-saude-water` e `water-log` (a chave que a
+   * Rotina usa). Diminuir uma e deixar a outra intacta fazia o `Math.max`
+   * ressuscitar o valor antigo: a pessoa apertava o "−" várias vezes e o
+   * número não mudava um dígito. "Não estou conseguindo redefinir a
+   * quantidade de água tomada" (avaliação da Amanda, v50).
+   * As duas chaves andam juntas agora — mesma regra do HydrationTracker.
+   */
   const adjustWater = (delta: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    const log = get<any>("core-saude-water", {});
-    const current = log[todayStr] || 0;
-    const next = Math.max(0, current + delta);
+    const log = get<any>("core-saude-water", {}) ?? {};
+    const logRotina = get<any>("water-log", {}) ?? {};
+    const current = Math.max(log[todayStr] || 0, logRotina[todayStr] || 0);
+    const next = Math.min(20, Math.max(0, current + delta));
     set("core-saude-water", { ...log, [todayStr]: next });
+    set("water-log", { ...logRotina, [todayStr]: next });
   };
 
   if (size === "small") {

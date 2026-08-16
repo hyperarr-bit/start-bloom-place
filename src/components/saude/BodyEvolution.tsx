@@ -150,18 +150,30 @@ export const BodyEvolution = () => {
         </div>
         <div className="p-4">
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {photos.slice(-8).map((p, i) => (
+            {/* APAGAVA A FOTO ERRADA (corrigido 16/08): o map era sobre
+                `photos.slice(-8)`, então `i` era o índice DENTRO da fatia,
+                mas o filter rodava no array COMPLETO. Com mais de 8 fotos,
+                tocar na primeira visível apagava uma foto antiga que nem
+                estava na tela. Mapeando o array inteiro e fatiando a SAÍDA,
+                `i` volta a ser o índice real (conserta o key={i} junto).
+                E a confirmação existe porque foto pessoal ninguém recupera —
+                até 16/08 o botão era invisível no Android (opacity-0 +
+                group-hover, ver index.css) mas continuava tocável: dava pra
+                apagar uma foto sem ver nada. */}
+            {photos.map((p, i) => (
               <div key={i} className="relative flex-shrink-0 w-20 h-28 rounded-xl overflow-hidden group">
                 <img src={p.url} alt="Progress" className="w-full h-full object-cover" />
                 <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1.5 py-0.5">
                   <span className="text-[8px] text-white">{new Date(p.date + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}</span>
                 </div>
-                <button onClick={() => setPhotos(prev => prev.filter((_, j) => j !== i))}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Trash2 className="w-2.5 h-2.5" />
+                <button
+                  aria-label="Apagar foto"
+                  onClick={() => { if (window.confirm("Apagar esta foto?")) setPhotos(prev => prev.filter((_, j) => j !== i)); }}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Trash2 className="w-3 h-3" />
                 </button>
               </div>
-            ))}
+            )).slice(-8)}
             <button onClick={() => fileRef.current?.click()} disabled={uploading}
               className="flex-shrink-0 w-20 h-28 rounded-xl border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-1 hover:border-primary/50 transition-colors">
               {uploading ? <span className="text-[10px] text-muted-foreground">Enviando...</span> : (

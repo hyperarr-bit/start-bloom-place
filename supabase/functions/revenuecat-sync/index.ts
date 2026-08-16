@@ -88,7 +88,11 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // propósito: o match é por startsWith e "core_mensal:coremensalpix"
   // começa com "core_mensal" — na ordem errada, todo downsell Pix entraria
   // na tabela (e no Meta) como 24,90. Mesma armadilha do vitalicio_19.
-  "core_mensal:coremensalpix": { billing: "monthly", cents: 1990 },
+  // PRÉ-PAGO: 30 dias e acabou, renovação MANUAL. Billing próprio porque
+  // "monthly" fazia a tela "Meu acesso" prometer renovação automática
+  // pra quem pagou 1 mês avulso no Pix — a pessoa perderia o acesso na
+  // data que o app disse que ia renovar sozinho.
+  "core_mensal:coremensalpix": { billing: "monthly_prepaid", cents: 1990 },
   core_anual: { billing: "annual", cents: 15990 },
   core_mensal: { billing: "monthly", cents: 2490 },
   // Era do produto único (06-08/08): seguem no mapa pra base vitalícia

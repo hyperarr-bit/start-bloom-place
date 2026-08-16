@@ -265,6 +265,19 @@ const TodoList = () => {
   const toggleTodo = (id: string) => setTodos(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
   const removeTodo = (id: string) => setTodos(prev => prev.filter(t => t.id !== id));
 
+  /* EDITAR A TAREFA (16/08): o texto era um <span> — errou de digitar, ou
+     escreveu pela metade, e o único caminho era apagar e refazer (com o X
+     invisível no Android, ver index.css). Padrão já usado no Notes.tsx: o
+     texto É o botão que abre a edição inline. */
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const salvarEdicao = () => {
+    if (!editId) return;
+    const txt = editText.trim();
+    if (txt) setTodos(prev => prev.map(t => t.id === editId ? { ...t, text: txt } : t));
+    setEditId(null);
+  };
+
   const priorityColors = {
     alta: "bg-red-100 dark:bg-[hsl(0,55%,16%)] text-red-700 dark:text-red-300 border-red-200 dark:border-[hsl(0,50%,30%)]",
     media: "bg-yellow-100 dark:bg-[hsl(45,55%,14%)] text-yellow-700 dark:text-yellow-200 border-yellow-200 dark:border-[hsl(45,55%,28%)]",
@@ -329,10 +342,31 @@ const TodoList = () => {
             <div key={t.id} className={`flex items-center gap-2 p-2 rounded-md group transition-colors ${t.done ? "bg-muted/30 dark:bg-[hsl(var(--rt-card-2))]" : "bg-background dark:bg-[hsl(var(--rt-card))]"}`}>
               <div className={`w-2 h-2 rounded-full ${priorityDot[t.priority]}`} />
               <Checkbox checked={t.done} onCheckedChange={() => toggleTodo(t.id)} className="h-3.5 w-3.5" />
-              <span className={`flex-1 text-xs ${t.done ? "line-through text-muted-foreground" : ""}`}>{t.text}</span>
+              {editId === t.id ? (
+                <Input
+                  autoFocus
+                  value={editText}
+                  onChange={e => setEditText(e.target.value)}
+                  onBlur={salvarEdicao}
+                  onKeyDown={e => { if (e.key === "Enter") salvarEdicao(); if (e.key === "Escape") setEditId(null); }}
+                  className="h-8 text-xs flex-1"
+                />
+              ) : (
+                <button
+                  onClick={() => { setEditId(t.id); setEditText(t.text); }}
+                  aria-label={`Editar tarefa: ${t.text}`}
+                  className={`flex-1 text-xs text-left py-1.5 ${t.done ? "line-through text-muted-foreground" : ""}`}
+                >
+                  {t.text}
+                </button>
+              )}
               <span className={`text-[9px] px-1.5 py-0.5 rounded border ${priorityColors[t.priority]}`}>{t.priority}</span>
-              <button onClick={() => removeTodo(t.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity">
-                <X className="w-3 h-3" />
+              <button
+                onClick={() => removeTodo(t.id)}
+                aria-label={`Apagar tarefa: ${t.text}`}
+                className="w-8 h-8 shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}

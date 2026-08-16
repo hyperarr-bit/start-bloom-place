@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { useUserData } from "@/hooks/use-user-data";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
+import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { firePixPurchaseOnce, temPixEmConfirmacao } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
@@ -165,7 +166,15 @@ export const TrialBanner = () => {
       >
         {/* Boundary: crash/chunk velho aqui era TELA BRANCA na hora de pagar */}
         <RouteErrorBoundary routeName="paywall-gate">
-          <PaywallFlow context="app" />
+          {/* v53 (16/08): no APP este gate vendia o PaywallFlow — o paywall do
+              VITALÍCIO R$27,90. Desde o pivot pra assinatura isso era preço
+              divergente do catálogo da Play dentro do próprio binário (motivo
+              de reprovação na análise) e uma segunda oferta competindo com a
+              do funil. A web segue no PaywallFlow: lá o produto continua sendo
+              o vitalício no Pix. */}
+          {isNativeShell()
+            ? <div className="px-5 py-10"><PaywallAssinatura contexto="gate" /></div>
+            : <PaywallFlow context="app" />}
         </RouteErrorBoundary>
       </motion.div>
     );

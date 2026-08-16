@@ -96,17 +96,26 @@ export const QuickActions = () => {
   const addWater = () => {
     const tStr = todayStr();
     const waterLog = get<Record<string, number>>("core-saude-water", {});
-    const current = waterLog[tStr] || 0;
-    set("core-saude-water", { ...waterLog, [tStr]: current + 1 });
-    // FIX 16/07: espelha no water-log (a chave dos MÓDULOS Rotina/Saúde) —
-    // sem isso o copo do hub não aparecia lá, e vice-versa
     const waterLogModulo = get<Record<string, number>>("water-log", {});
-    set("water-log", { ...waterLogModulo, [tStr]: (Number(waterLogModulo[tStr]) || 0) + 1 });
+    /*
+     * 16/08 — dois defeitos que apareciam juntos aqui:
+     *  1. cada chave era incrementada a partir do PRÓPRIO valor. Como quem
+     *     lê usa o MAIOR das duas, elas desincronizavam e o contador pulava.
+     *     Agora as duas partem do mesmo `current` e terminam no mesmo valor.
+     *  2. o toast dizia 200ml CRAVADO, ignorando o tamanho de copo que a
+     *     pessoa configurou no Saúde ("configurei 500ml e aqui diz 200").
+     */
+    const current = Math.max(waterLog[tStr] || 0, Number(waterLogModulo[tStr]) || 0);
+    const proximo = Math.min(20, current + 1);
+    set("core-saude-water", { ...waterLog, [tStr]: proximo });
+    set("water-log", { ...waterLogModulo, [tStr]: proximo });
+    const copoMl = Math.min(2000, Math.max(50, Math.round(Number(get<number>("core-saude-copo-ml", 250)) || 250)));
     vibrate();
     showSuccess("water");
     setWaterSplash(true);
     setTimeout(() => setWaterSplash(false), 800);
-    toast.success(`💧 ${(current + 1) * 200}ml — ${lifeData.waterGoal - current - 1 > 0 ? `faltam ${lifeData.waterGoal - current - 1} copos` : "meta batida! 🎉"}`);
+    const faltam = lifeData.waterGoal - proximo;
+    toast.success(`💧 ${proximo * copoMl}ml — ${faltam > 0 ? `faltam ${faltam} copos` : "meta batida! 🎉"}`);
   };
 
   const markWorkout = () => {

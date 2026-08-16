@@ -38,7 +38,9 @@ import {
 import {
   SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY,
 } from "@/pages/funis/radar/ComecarRadar";
-import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+// A venda de assinatura mora num componente só (as 3 superfícies do app usam
+// o mesmo) — ver o cabeçalho do PaywallAssinatura.
+import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 
 const FUNIL = "teste";
 
@@ -337,211 +339,6 @@ function NotifScreen({ area, hora, onDone }: { area: AreaKey; hora: string | nul
   );
 }
 
-/* ------------------------------------------------------- paywall do D3 */
-
-type Recap = { texto: string };
-
-/** Recap REAL do que a pessoa construiu no teste (guest storage). Se não fez
- *  nada, degrada pra semente/promessa — sempre há algo a perder. */
-function useRecap(area: AreaKey | null): Recap[] {
-  const { get } = useUserData();
-  const linhas: Recap[] = [];
-  try {
-    const dueDays = get<Array<{ bills?: unknown[] }>>("finance-dueDays", []) ?? [];
-    const contas = dueDays.reduce((n, d) => n + (Array.isArray(d?.bills) ? d.bills.length : 0), 0);
-    if (contas > 0) linhas.push({ texto: `${contas} conta${contas > 1 ? "s" : ""} armada${contas > 1 ? "s" : ""} com lembrete` });
-    const habitos = get<string[]>("rotina-habits", []) ?? [];
-    if (habitos.length > 0) linhas.push({ texto: `${habitos.length} hábito${habitos.length > 1 ? "s" : ""} no painel` });
-    const metas = get<unknown[]>("goals-board-v2", []) ?? [];
-    if (metas.length > 0) linhas.push({ texto: `${metas.length} meta${metas.length > 1 ? "s" : ""} saindo do papel` });
-    const treinos = get<unknown[]>("saude-workouts-v2", []) ?? [];
-    if (Array.isArray(treinos) && treinos.length > 0) linhas.push({ texto: "Plano de treino montado" });
-  } catch { /* recap nunca derruba o paywall */ }
-  if (linhas.length === 0) {
-    linhas.push({ texto: area ? `Seu painel de ${AREAS[area].nome} te esperando` : "Seu painel te esperando do jeito que você deixou" });
-  }
-  linhas.push({ texto: "Seus 3 dias de progresso — tudo fica salvo" });
-  return linhas.slice(0, 3);
-}
-
-function PaywallTeste({ area, d3, onPagoSemConta }: { area: AreaKey | null; d3: boolean; onPagoSemConta: () => void }) {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const recap = useRecap(area);
-  const teste = estadoTeste();
-  const [plano, setPlano] = useState<"anual" | "mensal">("anual");
-  const [oferta, setOferta] = useState<"cheia" | "downsell">("cheia");
-  const [comprando, setComprando] = useState(false);
-  const [pendente, setPendente] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const cancelamentos = useRef(0);
-
-  useEffect(() => {
-    trackEvent("app_paywall_view", { funil: FUNIL, modo: "assinatura", d3, dia: teste.fase === "ativo" ? teste.dia : teste.fase });
-    // Aquece catálogo + pré-pago: quando o dedo chegar no CTA o produto já
-    // está em memória (lição do Moto fraco, 07/08).
-    void (async () => {
-      const rc = await import("@/lib/revenuecat");
-      await rc.initRevenueCat();
-      await rc.prefetchAssinaturas();
-    })();
-    // Abandonou o paywall do D3? As 2 notificações de resgate são o único
-    // canal de volta (cadastro é pós-compra: não existe e-mail ainda).
-    void agendarResgateDoPlano(area ? AREAS[area].nome : null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const pagou = async (fn: () => Promise<boolean>, produto: string) => {
-    if (comprando) return;
-    setComprando(true);
-    setErro(null);
-    setPendente(false);
-    trackEvent("funnel_click", { cta: "app_paywall_cta", funil: FUNIL, produto, oferta });
-    const rc = await import("@/lib/revenuecat");
-    const ok = await fn();
-    if (ok) {
-      trackEvent("app_sheet_success", { funil: FUNIL, produto });
-      void cancelarResgateDoPlano();
-      void cancelarReguaDoTeste();
-      if (!user) { onPagoSemConta(); return; }
-      window.location.href = "/";
-      return;
-    }
-    const motivo = rc.motivoUltimaCompra();
-    if (motivo === "pendente") {
-      setPendente(true);
-    } else if (motivo === "cancelou") {
-      cancelamentos.current += 1;
-      if (oferta === "cheia" && rc.temMensalPix()) {
-        setOferta("downsell");
-        trackEvent("app_downsell_view", { plano: "mensal_pix", origem: "cancelou_folha", funil: FUNIL });
-      } else if (cancelamentos.current >= 2) {
-        trackEvent("app_resgate_view", { funil: FUNIL });
-      }
-    } else if (motivo === "produto_ausente" || motivo === "catalogo") {
-      setErro("Atualize o CORE na Play Store pra assinar — esta versão ficou sem o catálogo.");
-    } else if (motivo) {
-      setErro("O Google não concluiu o pagamento. Tenta de novo em instantes.");
-    }
-    setComprando(false);
-  };
-
-  const precoAnual = APP_PRECOS.anual.preco;
-  const precoMensal = APP_PRECOS.mensal.preco;
-
-  return (
-    <div className="w-full max-w-sm mx-auto pb-6">
-      <div className="text-center mb-5">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider mb-3">
-          {d3 || teste.fase === "expirado" ? "Seu teste terminou" : `Dia ${teste.fase === "ativo" ? teste.dia : 3} do seu teste`}
-        </div>
-        <h2 className="text-[26px] font-bold tracking-tight leading-tight">Seus 3 dias no CORE</h2>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-white p-4 mb-4">
-        <div className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">O que você construiu</div>
-        {recap.map((r) => (
-          <div key={r.texto} className="flex items-center gap-2.5 text-[13.5px] font-semibold py-1">
-            <span className="w-5 h-5 rounded-full bg-emerald-500 text-white grid place-items-center shrink-0">
-              <Check className="w-3 h-3" strokeWidth={3.5} />
-            </span>
-            {r.texto}
-          </div>
-        ))}
-      </div>
-
-      {oferta === "downsell" ? (
-        <div className="rounded-2xl border-2 border-accent bg-accent/5 p-4 mb-4">
-          <div className="text-[11px] font-extrabold uppercase tracking-wider text-accent mb-1">Sem cartão? Sem problema</div>
-          <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-bold">1 mês de CORE</span>
-            <span className="text-[20px] font-extrabold">{APP_PRECOS.mensalPix.preco}</span>
-          </div>
-          <p className="text-[12.5px] text-muted-foreground leading-snug mt-1.5">
-            Paga no <b className="text-foreground">Pix, dentro do Google</b> — vale 30 dias e renova
-            <b className="text-foreground"> só se você quiser</b>. Sem assinatura presa no cartão.
-          </p>
-        </div>
-      ) : (
-        <>
-          <p className="text-[13px] text-muted-foreground text-center mb-3">
-            <b className="text-foreground">Tudo isso fica salvo</b> se você continuar. Escolhe como:
-          </p>
-          <button
-            onClick={() => setPlano("anual")}
-            className={`w-full text-left rounded-2xl border-2 p-4 mb-2.5 relative transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-white"}`}
-          >
-            <span className="absolute -top-2.5 left-4 bg-accent text-white text-[9.5px] font-extrabold px-2.5 py-0.5 rounded-full tracking-wide">MAIS ESCOLHIDO</span>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[15px] font-extrabold">Anual</span>
-              <span className="text-[19px] font-extrabold">{precoAnual}<small className="text-[11px] font-bold text-muted-foreground">/ano</small></span>
-            </div>
-            <div className="text-[12px] font-semibold text-muted-foreground mt-0.5">
-              = {APP_PRECOS.anual.porMes}/mês · economiza {APP_PRECOS.anual.economiaAno} no ano
-            </div>
-          </button>
-          <button
-            onClick={() => setPlano("mensal")}
-            className={`w-full text-left rounded-2xl border-2 p-3.5 mb-4 transition-colors ${plano === "mensal" ? "border-accent bg-accent/5" : "border-border bg-white"}`}
-          >
-            <div className="flex items-baseline justify-between">
-              <span className="text-[14px] font-bold">Mensal</span>
-              <span className="text-[16px] font-extrabold">{precoMensal}<small className="text-[11px] font-bold text-muted-foreground">/mês</small></span>
-            </div>
-            <div className="text-[11.5px] font-medium text-muted-foreground mt-0.5">cancele quando quiser</div>
-          </button>
-        </>
-      )}
-
-      {pendente && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12.5px] leading-snug p-3 mb-3">
-          <b>Pagamento em processamento no Google.</b> Se você gerou um Pix, paga no app do seu banco —
-          o acesso libera sozinho aqui.
-          <button
-            className="block w-full text-center font-bold underline underline-offset-2 mt-1.5"
-            onClick={async () => {
-              const rc = await import("@/lib/revenuecat");
-              await rc.restaurar();
-              const ok = await rc.sincronizarAssinatura(2);
-              if (ok) { void cancelarResgateDoPlano(); void cancelarReguaDoTeste(); if (!user) onPagoSemConta(); else window.location.href = "/"; }
-            }}
-          >
-            Já paguei — atualizar
-          </button>
-        </div>
-      )}
-      {erro && <p className="text-[12.5px] text-destructive text-center mb-3">{erro}</p>}
-
-      <Button
-        size="lg"
-        className="w-full min-h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
-        disabled={comprando}
-        onClick={async () => {
-          const rc = await import("@/lib/revenuecat");
-          if (oferta === "downsell") void pagou(() => rc.comprarMensalPix(), APP_PRECOS.mensalPix.id);
-          else void pagou(() => rc.comprar(APP_PRECOS[plano].id), APP_PRECOS[plano].id);
-        }}
-      >
-        {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : oferta === "downsell"
-          ? <>Pagar 1 mês no Pix <ArrowRight className="w-4 h-4" /></>
-          : <>Continuar com meu CORE <ArrowRight className="w-4 h-4" /></>}
-      </Button>
-      <p className="text-[10.5px] text-muted-foreground text-center mt-2">
-        {oferta === "downsell"
-          ? "Pagamento único pelo Google Play · 30 dias de acesso · renovação manual"
-          : "Pagamento pelo Google Play · cancele quando quiser"}
-      </p>
-      {teste.fase === "ativo" && !d3 && (
-        <button onClick={() => navigate("/home")} className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-3 py-1">
-          Continuar meu teste — decido no dia 3
-        </button>
-      )}
-      <div className="mt-4">
-        <AppLegalFooter />
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------- orquestra */
 
@@ -686,7 +483,8 @@ export default function ComecarTeste() {
             )}
             {step === "notif" && <NotifScreen area={area ?? "dinheiro"} hora={hora} onDone={abrirApp} />}
             {step === "offer" && (
-              <PaywallTeste
+              <PaywallAssinatura
+                contexto="funil"
                 area={area}
                 d3={d3}
                 onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}

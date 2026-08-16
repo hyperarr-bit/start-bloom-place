@@ -103,6 +103,11 @@ export const AccountDrawer = ({
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
+        // 16/08: no teste grátis de 3 dias o convidado usa o app inteiro sem
+        // conta — e o menu não tinha nenhuma porta pro plano. Quem decidia
+        // assinar no meio do teste só tinha a faixa fina do rodapé, que some
+        // nas telas de funil. Quem quer pagar precisa de caminho.
+        { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
       ]
     : [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },

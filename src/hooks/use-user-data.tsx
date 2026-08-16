@@ -233,12 +233,33 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
       const guestData = readAllGuestData();
       const guestKeys = Object.keys(guestData);
       if (guestKeys.length > 0) {
+        /*
+         * MIGRAÇÃO QUE APAGAVA OS DADOS (corrigido 16/08). Dois defeitos que
+         * só aparecem quando a rede falha — e ficou muito mais grave com o
+         * teste grátis da v53, onde TUDO que a pessoa constrói nos 3 dias
+         * nasce em `guest:` e só vira conta depois do pagamento.
+         *
+         *  1. o supabase-js NÃO LANÇA em falha de rede/RLS: ele RETORNA
+         *     {error} (postgrest-js com shouldThrowOnError=false). O
+         *     try/catch nunca disparava pras falhas reais, e o
+         *     `finally { clearAllGuestData() }` apagava a origem mesmo com a
+         *     gravação tendo falhado. Dado perdido, sem retry.
+         *  2. o erro do SELECT era ignorado: sem a lista do servidor,
+         *     `existingSet` fica vazio, todas as chaves passam no filtro e o
+         *     upsert grava o snapshot do convidado POR CIMA da conta.
+         *
+         * Agora: erro de leitura ou de escrita = migração falhou, os
+         * `guest:*` FICAM no aparelho e a próxima abertura tenta de novo (o
+         * upsert é idempotente por onConflict user_id,key).
+         */
+        let migrou = false;
         try {
-          const { data: existing } = await (supabase as any)
+          const { data: existing, error: selErro } = await (supabase as any)
             .from("user_data")
             .select("key")
             .eq("user_id", user.id)
             .in("key", guestKeys);
+          if (selErro) throw selErro;
           const existingSet = new Set<string>((existing ?? []).map((r: any) => r.key));
 
           const toUpsert = guestKeys
@@ -249,16 +270,17 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
             // Chunk to avoid huge payloads.
             const CHUNK = 50;
             for (let i = 0; i < toUpsert.length; i += CHUNK) {
-              await (supabase as any)
+              const { error: upErro } = await (supabase as any)
                 .from("user_data")
                 .upsert(toUpsert.slice(i, i + CHUNK), { onConflict: "user_id,key" });
+              if (upErro) throw upErro;
             }
           }
+          migrou = true;
         } catch (e) {
-          console.error("[user-data] guest→account migration failed:", e);
-        } finally {
-          clearAllGuestData();
+          console.error("[user-data] migração convidado→conta falhou (dados mantidos pra tentar de novo):", e);
         }
+        if (migrou) clearAllGuestData();
       }
 
       // Step 1: instant hydration from per-user localStorage cache.

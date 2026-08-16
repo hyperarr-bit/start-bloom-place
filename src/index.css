@@ -1001,6 +1001,26 @@ html.core-shell :is(button, a[href], [role="button"])::after {
   transform: translateY(-50%);
   height: 100%;
   min-height: 44px;
+  /*
+   * O ::after ROUBAVA O TOQUE DO VIZINHO DE CIMA — e apagava dado (16/08).
+   *
+   * O comentário acima dizia "pseudo-elemento não é alvo de evento próprio".
+   * Isso está ERRADO na parte que importa: o ::after não recebe o evento,
+   * mas SEQUESTRA o ponto e redireciona pro elemento dono. Sendo o último
+   * na ordem da árvore e posicionado, ele pintava na frente dos irmãos
+   * anteriores. Num par empilhado de 24px com 2px de gap (Editar em cima,
+   * Apagar embaixo), o ::after do Apagar tem 44px centrados: sobe 10px além
+   * do próprio topo e invade 8px do Editar. Medido com clique real no
+   * app: tocar no terço de baixo do "Editar" APAGAVA o investimento, sem
+   * confirmação. Também trocava mês por mês na lista, chip por chip nos
+   * limites e anotação por anotação.
+   *
+   * `z-index: -1` põe o pseudo numa camada que nunca fica na frente do que
+   * já foi pintado: a expansão continua valendo onde não há mais nada
+   * (verificado no aparelho, inclusive dentro de card com fundo e dentro de
+   * contexto de empilhamento), e some onde havia outro controle.
+   */
+  z-index: -1;
   /* SEM `pointer-events: auto` de propósito: forçar auto ressuscitaria o
      toque dentro de camadas marcadas como `pointer-events-none` (o CTA
      flutuante da demo é uma delas). Herdar mantém a intenção de cada

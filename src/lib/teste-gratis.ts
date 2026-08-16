@@ -66,37 +66,79 @@ export function iniciarTeste(area: string | null): EstadoTeste {
   return estadoTeste();
 }
 
-/* --------------------------------------------------- semente guiada (v53) */
+/* ----------------------------------------- trilha do teste (v53 → v55) */
 
 /**
- * A SEMENTE acontece DENTRO do módulo real (toque do dono 16/08: "nada de
- * mini-demo com cara de fictício — botar o próprio app com a instrução do
- * passo"). O funil termina navegando pro módulo com este guia armado; a
- * faixa (GuiaSemente) instrui o único passo e escuta o evento core:activation
- * que o useUserData já dispara na primeira escrita de verdade.
+ * A TRILHA DE 3 PASSOS — a evolução da semente (16/08, decisão do dono com
+ * dado da própria base). A semente sozinha não bastava: na base de 1.498
+ * usuários com ativação, quem faz 1 ação distinta paga 5%; 2 ações, 42%;
+ * 3-4, 69%. E 96% de quem nunca pagou parou EXATAMENTE na 1ª ação. A
+ * primeira compradora da assinatura (16/08, 14:50) fez o arco completo:
+ * semente → mais ações → pagou em 30 min.
+ *
+ * Tudo acontece DENTRO dos módulos reais (toque do dono: "nada de mini-demo
+ * com cara de fictício") — a faixa (TrilhaDoTeste) instrui UM passo por vez
+ * e escuta o core:activation que o useUserData já dispara na primeira
+ * escrita de verdade. Os degraus por área vêm da 2ª ação NATURAL medida na
+ * base (quem começa por corpo vai pro dinheiro em 57%; rotina monta a
+ * agenda em 64%; o dinheiro é o ímã universal).
+ *
+ * A chave de storage continua "core-guia-semente" de propósito: quem está
+ * NO MEIO do teste hoje (formato antigo {area, status}) migra sem perder o
+ * lugar — status "feita" do formato velho vira passo 2 pendente.
  */
 const CHAVE_GUIA = "core-guia-semente";
 
-export type Guia = { area: string; status: "pendente" | "feita" };
+export type Guia = { area: string; passo: 1 | 2 | 3; status: "pendente" | "feita"; ultimaChave?: string };
 
 export function guiaSemente(): Guia | null {
   try {
     const raw = localStorage.getItem(CHAVE_GUIA);
     if (!raw) return null;
-    const g = JSON.parse(raw) as Guia;
-    return g && typeof g.area === "string" ? g : null;
+    const g = JSON.parse(raw) as Guia & { passo?: number };
+    if (!g || typeof g.area !== "string") return null;
+    // Formato v53 (sem `passo`): a pessoa já plantou a semente → entra na
+    // trilha no passo 2; ainda não plantou → passo 1. Persistimos a migração
+    // pra não reavaliar a cada leitura.
+    if (typeof g.passo !== "number") {
+      const migrado: Guia = g.status === "feita"
+        ? { area: g.area, passo: 2, status: "pendente" }
+        : { area: g.area, passo: 1, status: "pendente" };
+      try { localStorage.setItem(CHAVE_GUIA, JSON.stringify(migrado)); } catch { /* noop */ }
+      return migrado;
+    }
+    return g as Guia;
   } catch {
     return null;
   }
 }
 
 export function armarGuiaSemente(area: string): void {
-  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify({ area, status: "pendente" } satisfies Guia)); } catch { /* sem guia, o app segue */ }
+  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify({ area, passo: 1, status: "pendente" } satisfies Guia)); } catch { /* sem guia, o app segue */ }
 }
 
-export function concluirGuiaSemente(): void {
+/**
+ * Conclui o passo ATUAL. Passos 1 e 2 avançam pro próximo (a faixa celebra e
+ * mostra a instrução seguinte); o 3 fecha a trilha de vez. Devolve o estado
+ * novo pra faixa decidir o que renderizar.
+ */
+export function concluirPassoDaTrilha(chave?: string): Guia | null {
   const g = guiaSemente();
-  if (!g || g.status === "feita") return;
-  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify({ ...g, status: "feita" } satisfies Guia)); } catch { /* noop */ }
-  trackEvent("semente_plantada", { area: g.area, funil: "teste" });
+  if (!g || g.status === "feita") return g;
+  // semente_plantada continua existindo com o mesmo nome/formato: é a métrica
+  // que o funil v53 já acompanha — mudar o nome quebraria a série histórica.
+  if (g.passo === 1) trackEvent("semente_plantada", { area: g.area, funil: "teste" });
+  trackEvent("trilha_passo", { passo: g.passo, area: g.area, funil: "teste" });
+  const novo: Guia = g.passo >= 3
+    ? { ...g, status: "feita", ultimaChave: chave }
+    : { ...g, passo: (g.passo + 1) as 2 | 3, ultimaChave: chave };
+  if (novo.status === "feita") trackEvent("trilha_completa", { area: g.area, funil: "teste" });
+  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify(novo)); } catch { /* noop */ }
+  return novo;
+}
+
+/** Comprou/restaurou: a trilha morreu — assinante não precisa de guia de
+ *  teste, e a faixa penduraria pra sempre (review 16/08). */
+export function limparGuiaSemente(): void {
+  try { localStorage.removeItem(CHAVE_GUIA); } catch { /* noop */ }
 }

@@ -598,6 +598,22 @@ const COPY_TESTE: Record<string, { d1t: string; d1b: string }> = {
  *  horário, não num offset cego. */
 const HORA_PREFERIDA: Record<string, number> = { manha: 8.5, almoco: 12.5, noite: 19.5 };
 
+/**
+ * Pra onde o TOQUE de cada dia leva (corrigido 16/08). O D1 diz "anota o
+ * gasto de hoje" e o D2 diz "olha o que você montou" — até hoje os dois
+ * abriam o PAYWALL (/app?step=offer&d3=1): a notificação prometia uso e
+ * entregava cobrança, a receita exata da avaliação 1★. Agora D1 e D2 abrem
+ * o MÓDULO da área (onde a faixa da trilha continua o trabalho); só o D3,
+ * que é o aviso da decisão, abre a oferta.
+ */
+const ROTA_DA_AREA: Record<string, string> = {
+  dinheiro: "/financas",
+  rotina: "/rotina",
+  corpo: "/treino",
+  saude: "/saude",
+  metas: "/desenvolvimento",
+};
+
 export async function agendarReguaDoTeste(area: string | null, inicioMs: number, preferencia?: string | null): Promise<void> {
   const p = await plugin();
   if (!p) return;
@@ -619,11 +635,14 @@ export async function agendarReguaDoTeste(area: string | null, inicioMs: number,
     d1 = alvo.getTime();
   }
   const d2 = hora != null ? d1 + 24 * 3600_000 : inicioMs + 44 * 3600_000;
+  // D1/D2 abrem o MÓDULO (a trilha continua lá); só o D3 abre a decisão —
+  // ver o comentário do ROTA_DA_AREA.
+  const rotaModulo = ROTA_DA_AREA[area ?? ""] ?? "/home";
   // v53: copy de assinatura (24,90/mês · anual = R$ 13,32/mês) — preço real.
   const avisos = [
-    { id: BASE_TESTE + 1, at: new Date(d1), title: c.d1t, body: c.d1b },
-    { id: BASE_TESTE + 2, at: new Date(d2), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, a partir de R$ 13,32/mês no anual. Se não, sem drama." },
-    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com a assinatura. A partir de R$ 13,32/mês — cancele quando quiser." },
+    { id: BASE_TESTE + 1, at: new Date(d1), title: c.d1t, body: c.d1b, rota: rotaModulo },
+    { id: BASE_TESTE + 2, at: new Date(d2), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, a partir de R$ 13,32/mês no anual. Se não, sem drama.", rota: rotaModulo },
+    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com a assinatura. A partir de R$ 13,32/mês — cancele quando quiser.", rota: "/app?step=offer&d3=1" },
   ];
   try {
     await LN.schedule({
@@ -631,7 +650,7 @@ export async function agendarReguaDoTeste(area: string | null, inicioMs: number,
         id: a.id, title: a.title, body: a.body,
         schedule: { at: a.at, allowWhileIdle: true },
         channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
-        extra: { rota: "/app?step=offer&d3=1" },
+        extra: { rota: a.rota },
       })),
     });
   } catch { /* régua nunca derruba o funil */ }

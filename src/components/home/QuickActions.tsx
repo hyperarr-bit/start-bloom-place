@@ -121,9 +121,10 @@ export const QuickActions = () => {
   const markWorkout = () => {
     const tStr = todayStr();
     const log = get<string[]>("saude-workout-log", []);
-    if (!log.includes(tStr)) {
-      set("saude-workout-log", [...log, tStr]);
-    }
+    // escreve SEMPRE (sem duplicar o dia): o set re-dispara core:activation
+    // e a trilha do teste credita o passo mesmo quando o treino de hoje já
+    // estava marcado — antes o if engolia o gesto (review 16/08)
+    set("saude-workout-log", log.includes(tStr) ? [...log] : [...log, tStr]);
     vibrate();
     showSuccess("workout");
     toast.success("💪 Treino do dia registrado!", { action: { label: "Ver Treino", onClick: () => navigate("/treino") } });

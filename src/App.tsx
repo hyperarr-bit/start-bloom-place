@@ -23,7 +23,7 @@ import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { testeLiberado } from "@/lib/teste-gratis";
-import { TesteBanner, GuiaSemente, RetomadaPosCompra } from "@/components/teste/TesteGratis";
+import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
@@ -511,7 +511,7 @@ const App = () => {
                     "Dia X de 3" (comprador quente) e a semente guiada por cima
                     do módulo real. Ambas se auto-anulam fora do shell. */}
                 <TesteBanner />
-                <GuiaSemente />
+                <TrilhaDoTeste />
                 <RetomadaPosCompra />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}

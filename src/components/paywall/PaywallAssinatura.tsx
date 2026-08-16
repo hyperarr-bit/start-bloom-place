@@ -32,6 +32,7 @@ import { trackEvent } from "@/lib/analytics";
 import { estadoTeste } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
+import { limparGuiaSemente } from "@/lib/teste-gratis";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
@@ -107,6 +108,7 @@ export function PaywallAssinatura({
       trackEvent("app_sheet_success", { contexto, produto });
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
+      limparGuiaSemente();
       // Sem conta = fluxo v48: cadastro DEPOIS do pagamento. Quem chegou aqui
       // pelo /planos ou pelo gate já tem conta — recarrega e o gate abre.
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
@@ -240,6 +242,7 @@ export function PaywallAssinatura({
               if (!ok) return;
               void cancelarResgateDoPlano();
               void cancelarReguaDoTeste();
+              limparGuiaSemente();
               if (!user && onPagoSemConta) onPagoSemConta();
               else window.location.href = "/";
             }}

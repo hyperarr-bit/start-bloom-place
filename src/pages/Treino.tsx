@@ -1208,7 +1208,13 @@ const Treino = () => {
       </main>
 
       {/* ===== BOTTOM ACTION BAR ===== */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border">
+      {/* bottom via var: no teste grátis a faixa "Dia X de 3" ocupa o rodapé
+          e cobria o Iniciar Sessão/Finalizar — a var (setada pelo TesteBanner)
+          empurra a barra pra cima só enquanto a faixa existe. */}
+      <div
+        className="fixed left-0 right-0 z-40 bg-card/95 backdrop-blur border-t border-border"
+        style={{ bottom: "var(--teste-banner-h, 0px)" }}
+      >
         <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             {!sessionStart ? (

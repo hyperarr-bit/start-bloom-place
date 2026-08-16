@@ -117,10 +117,10 @@ export const useViradaDoMes = () => {
       // pior cenário é lançamento duplicado (que a mesclagem por id resolve na
       // próxima passada), nunca lançamento perdido.
       for (const [chave, itens] of Object.entries(arquivar)) {
-        set(chave, mesclarSemDuplicar(lerBalde(chave), itens));
+        set(chave, mesclarSemDuplicar(lerBalde(chave), itens), { system: true });
         mesesTocados.add(chave.split("-").slice(1, 3).join("/"));
       }
-      set(balde.corrente, ficam);
+      set(balde.corrente, ficam, { system: true });
       movidosTotal += movidos;
     }
 
@@ -144,8 +144,8 @@ export const useViradaDoMes = () => {
     if (virada) {
       const r = aplicarViradaDeContas(virada, {
         ler: (chave, padrao) => get(chave, padrao),
-        gravar: (chave, valor) => set(chave, valor),
-        gravarContas: (zeradas) => set(CHAVE_CONTAS, zeradas),
+        gravar: (chave, valor) => set(chave, valor, { system: true }),
+        gravarContas: (zeradas) => set(CHAVE_CONTAS, zeradas, { system: true }),
       });
       if (r.zerou) trackEvent("virada_mes_zerou_contas", { arquivou: r.arquivou ? 1 : 0 });
     }

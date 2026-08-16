@@ -167,7 +167,7 @@ export const purgeUserLocalCache = () => {
 
 interface UserDataContextType {
   get: <T>(key: string, fallback: T) => T;
-  set: (key: string, value: any) => void;
+  set: (key: string, value: any, opts?: { system?: boolean }) => void;
   loaded: boolean;
   /** True when running without an authenticated user (data is local-only). */
   isGuest: boolean;
@@ -438,7 +438,7 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     try { return JSON.parse(raw) as T; } catch { return fallback; }
   }, [store, loaded]);
 
-  const set = useCallback((key: string, value: any) => {
+  const set = useCallback((key: string, value: any, opts?: { system?: boolean }) => {
     if (process.env.NODE_ENV !== "production") {
       try {
         const size = JSON.stringify(value ?? "").length;
@@ -464,7 +464,10 @@ export const UserDataProvider = ({ children }: { children: ReactNode }) => {
     }
     // Activation events fire for both guests and authed users so the
     // spotlight tutorial can advance during the pre-signup flow.
-    checkActivation(key, value);
+    // Escrita de SISTEMA (virada do mês etc.) não é gesto do usuário:
+    // não dispara ativação — senão a trilha do teste e o spotlight
+    // celebram degrau no BOOT, sem ninguém ter feito nada (review 16/08).
+    if (!opts?.system) checkActivation(key, value);
   }, [flush]);
 
   // Force flush on tab hide / unload.

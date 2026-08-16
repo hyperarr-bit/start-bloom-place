@@ -21,12 +21,16 @@ interface State {
 //
 // AS TRÊS CARAS QUE FALTAVAM (16/08, achadas no painel de route_error):
 //  - "Cannot read properties of undefined (reading 'default')": o chunk do
-//    React.lazy resolveu SEM lançar — o servidor respondeu o index.html
-//    (fallback de SPA) no lugar do JS sumido, o parser aceitou e o módulo
-//    veio vazio. Sintoma nº1 em 7 dias: 11 telas quebradas em /casa, 10
-//    pessoas DIFERENTES. Não era dado velho de usuário: era deploy.
-//  - "'text/html' is not a valid JavaScript MIME type": o mesmo fallback,
-//    quando o navegador é rígido e recusa o HTML.
+//    React.lazy resolveu com `undefined` SEM lançar. A causa não era o
+//    servidor (HTML não passa por parser de módulo — isso dá erro de MIME,
+//    abaixo): era o NOSSO listener de vite:preloadError chamando
+//    preventDefault, o que faz o `.catch` do Vite resolver vazio. Corrigido
+//    na origem em main.tsx; o padrão fica aqui como rede de segurança.
+//    Sintoma nº1 em 7 dias: 11 telas quebradas em /casa, 10 pessoas
+//    DIFERENTES. Não era dado velho de usuário: era deploy.
+//  - "'text/html' is not a valid JavaScript MIME type": o servidor devolveu
+//    o index.html (fallback de SPA) no lugar do JS sumido e o navegador
+//    recusou — é a mesma família, chunk que não existe mais.
 //  - "Unable to preload CSS for /assets/*.css": irmão do anterior no CSS.
 // Nenhuma delas casava com o regex, então o boundary não recarregava —
 // mostrava "Algo deu errado nesta seção" e a pessoa ficava presa numa tela

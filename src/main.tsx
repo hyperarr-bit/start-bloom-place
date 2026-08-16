@@ -61,10 +61,19 @@ window.addEventListener("unhandledrejection", (e) => {
 // Deixando o erro subir, a rejeição chega com a mensagem verdadeira
 // ("dynamically imported module"), que o RouteErrorBoundary já sabe tratar.
 //
-// Chave PRÓPRIA de propósito: usar a mesma do boundary gravaria o timestamp
-// milissegundos antes dele rodar e mataria o auto-reload de lá.
+// A chave é COMPARTILHADA com o RouteErrorBoundary de propósito — ela é o
+// LOCK entre os dois donos de reload, não uma colisão. Sem o preventDefault
+// os dois acordam no mesmo tick: aqui o `replace()` com cache-buster, lá o
+// `reload()` puro. O reload do boundary commitaria PRIMEIRO (o retry do lazy
+// é microtask; navegação precisa de rede) e abortaria a navegação com o
+// cache-buster, recarregando a URL velha — que é exatamente o Safari
+// devolvendo o mesmo index.html do cache, o bug da demo branca de 21/07.
+// Com a chave única: este listener grava e navega; o boundary vê o carimbo
+// fresco e se cala, porque o reload melhor já está a caminho. Erro de chunk
+// que não passa pelo preloadError não escreve a chave, então o auto-reload
+// de lá continua funcionando normalmente.
 window.addEventListener("vite:preloadError", () => {
-  const KEY = "core-preload-reload-at";
+  const KEY = "core-chunk-reload-at";
   try {
     const last = Number(sessionStorage.getItem(KEY) || 0);
     if (Date.now() - last < 30_000) return; // já tentou há pouco — não vira loop

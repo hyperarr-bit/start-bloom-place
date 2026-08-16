@@ -19,7 +19,7 @@ import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
 import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
-import { cancelarResgateDoPlano } from "@/lib/notificacoes";
+import { cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
 
 // "9 de agosto" — mês por extenso à mão, sem depender do ICU do WebView velho.
 
@@ -682,9 +682,10 @@ function OfferScreen({
     }
     if (ativou) {
       trackEvent("app_sheet_success", { plano: rotuloPlano, via: "paywall_direto", metodo: metodo ?? "" });
-      // Pagou → os avisos de resgate morrem AGORA. Notificação de "volta pro
-      // plano" chegando depois da compra é spam com o nome do app em cima.
+      // Pagou → os avisos de resgate E a régua do teste morrem AGORA.
+      // Notificação de venda depois de vender é spam com o nome do app.
       void cancelarResgateDoPlano();
+      void cancelarReguaDoTeste();
       // CADASTRO DEPOIS DA COMPRA (09/08): quem pagou sem conta vai criar a
       // conta AGORA — o funil troca pro cadastro "salvar seu acesso" e a
       // celebração fica pro fim (senão ela promete o app e entrega um form).
@@ -975,7 +976,7 @@ function OfferScreen({
                 é só pagar no app do seu banco — o acesso libera aqui <b>sozinho</b> assim
                 que confirmar.
                 <button
-                  onClick={async () => { if (await restaurar()) { void cancelarResgateDoPlano(); setCelebrar(true); } }}
+                  onClick={async () => { if (await restaurar()) { void cancelarResgateDoPlano(); void cancelarReguaDoTeste(); setCelebrar(true); } }}
                   className="block mx-auto mt-1 underline font-semibold"
                 >
                   Já paguei — atualizar

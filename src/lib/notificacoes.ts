@@ -563,3 +563,59 @@ export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<v
 export async function cancelarResgateDoPlano(): Promise<void> {
   await limparFaixa(BASE_RESGATE);
 }
+
+/* ------------------------------------------------------- régua do teste 3d */
+
+const BASE_TESTE = 800000;
+
+/**
+ * RÉGUA DO TESTE GRÁTIS (16/08) — as três notificações que sustentam os 3
+ * dias e fazem o paywall do D3 chegar em gente quente, não esquecida:
+ *
+ *   D1 (+20h) — cumpre a promessa da tela de notificações do funil: o
+ *      primeiro lembrete é DA ÁREA que a pessoa escolheu, não genérico.
+ *   D2 (+44h) — honestidade que protege a nota na loja: "amanhã fecha".
+ *      Cobrança-surpresa é a mãe da avaliação 1 estrela (as nossas duas
+ *      3★ vieram de surpresa/frustração).
+ *   D3 (+68h) — a decisão, com o endowment na frente: o que ela construiu
+ *      fica se ela ficar.
+ *
+ * Toque → /app?step=offer&d3=1 (o paywall do dia 3 com recap).
+ * Compra cancela a faixa inteira (junto do resgate).
+ */
+const COPY_TESTE: Record<string, { d1t: string; d1b: string }> = {
+  dinheiro: { d1t: "Suas contas estão no radar 👀", d1b: "A conta que você registrou já tem lembrete. Que tal anotar o gasto de hoje? Leva 10 segundos." },
+  rotina: { d1t: "Dia 1 do seu hábito", d1b: "Marca o de hoje e a sequência começa — é ela que segura você no dia fraco." },
+  corpo: { d1t: "Treino e dieta te esperando", d1b: "Registra o de hoje — dia 1 é o que separa essa tentativa das outras." },
+  saude: { d1t: "Seu cuidado de hoje", d1b: "Água, sono, vitamina — marca o que você já fez hoje. 10 segundos." },
+  metas: { d1t: "Sua meta saiu do papel ontem", d1b: "Dá o primeiro passo de hoje — progresso visível é o que mantém ela viva." },
+};
+
+export async function agendarReguaDoTeste(area: string | null, inicioMs: number): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  if (!(await temPermissao())) return;
+  await garantirCanal();
+  await limparFaixa(BASE_TESTE);
+  const { LN } = p;
+  const c = COPY_TESTE[area ?? ""] ?? COPY_TESTE.rotina;
+  const avisos = [
+    { id: BASE_TESTE + 1, at: new Date(inicioMs + 20 * 3600_000), title: c.d1t, body: c.d1b },
+    { id: BASE_TESTE + 2, at: new Date(inicioMs + 44 * 3600_000), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, é R$ 27,90 UMA vez — pra sempre. Se não, sem drama." },
+    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com o vitalício. Um pagamento, sem mensalidade." },
+  ];
+  try {
+    await LN.schedule({
+      notifications: avisos.map((a) => ({
+        id: a.id, title: a.title, body: a.body,
+        schedule: { at: a.at, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: "/app?step=offer&d3=1" },
+      })),
+    });
+  } catch { /* régua nunca derruba o funil */ }
+}
+
+export async function cancelarReguaDoTeste(): Promise<void> {
+  await limparFaixa(BASE_TESTE);
+}

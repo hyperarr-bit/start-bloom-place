@@ -22,6 +22,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
+import { testeLiberado } from "@/lib/teste-gratis";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
@@ -102,7 +103,14 @@ const RootGate = () => {
   // "grade viva" é um overlay DENTRO do funil (rota própria causava flash
   // branco na transição). PWA continua indo pro login (quem instala PWA já
   // comprou).
-  if (!user && isNativeShell()) return <Navigate to={ENTRADA_APP} replace />;
+  if (!user && isNativeShell()) {
+    // TESTE GRÁTIS ATIVO (16/08): convidado com teste rodando abre no HUB —
+    // ele já passou pelo funil e plantou a semente; devolver pro funil seria
+    // recomeçar a venda pra quem está no meio do teste. Expirado, o
+    // ProtectedRoute manda pro paywall do dia 3.
+    if (testeLiberado()) return <Navigate to="/home" replace />;
+    return <Navigate to={ENTRADA_APP} replace />;
+  }
   // Fugiu da demo do tour vitrine pela seta ← (que aponta pra "/")? Devolve
   // pro funil do vitrine na PONTE, não pro /comecar de finanças (bug 24/07).
   if (!user) {

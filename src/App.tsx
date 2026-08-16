@@ -199,62 +199,79 @@ import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
 // bundle inicial e carregam sob demanda — a LP/anônimo carrega leve.
-const Planos = lazy(() => import("./pages/Planos"));
+//
+// BLINDAGEM (16/08): se um import dinâmico resolver VAZIO — chunk apagado por
+// deploy, servidor devolvendo o index.html no lugar do JS (fallback de SPA),
+// ou alguém engolindo o vite:preloadError — o React lê `undefined.default` e
+// o boundary recebe um TypeError genérico que ele não reconhece como erro de
+// chunk: a pessoa fica presa numa tela morta que um F5 resolveria. Aqui o
+// módulo vazio vira um erro de chunk DE VERDADE, com o texto que o
+// RouteErrorBoundary já sabe identificar pra recarregar sozinho.
+const lazyPage = <T,>(carregar: () => Promise<T>) =>
+  lazy(async () => {
+    const mod = (await carregar()) as { default?: unknown } | undefined;
+    if (mod && typeof mod.default !== "undefined") {
+      return mod as { default: React.ComponentType<unknown> };
+    }
+    throw new Error("Failed to fetch dynamically imported module (módulo resolveu vazio)");
+  });
+
+const Planos = lazyPage(() => import("./pages/Planos"));
 // A /planos do SHELL (24/07): a web vende vitalício no Pix, e Pix dentro do
 // binário da loja é pagamento externo — motivo exato da remoção do Cal AI.
-const PlanosApp = lazy(() => import("./pages/PlanosApp"));
+const PlanosApp = lazyPage(() => import("./pages/PlanosApp"));
 // Páginas legais exigidas pelo Play (política, termos, exclusão de conta).
-const Privacidade = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Privacidade })));
-const Termos = lazy(() => import("./pages/Legal").then((m) => ({ default: m.Termos })));
-const ExcluirConta = lazy(() => import("./pages/Legal").then((m) => ({ default: m.ExcluirConta })));
-const Index = lazy(() => import("./pages/Index"));
-const Home = lazy(() => import("./pages/Home"));
-const Rotina = lazy(() => import("./pages/Rotina"));
-const DesenvolvimentoPessoal = lazy(() => import("./pages/DesenvolvimentoPessoal"));
-const Saude = lazy(() => import("./pages/Saude"));
-const Casa = lazy(() => import("./pages/Casa"));
-const Estudos = lazy(() => import("./pages/Estudos"));
-const Biblioteca = lazy(() => import("./pages/Biblioteca"));
-const Beleza = lazy(() => import("./pages/Beleza"));
-const Viagens = lazy(() => import("./pages/Viagens"));
-const Carreira = lazy(() => import("./pages/Carreira"));
-const Treino = lazy(() => import("./pages/Treino"));
-const Dieta = lazy(() => import("./pages/Dieta"));
-const Hiperfoco = lazy(() => import("./pages/Hiperfoco"));
-const Relacionamentos = lazy(() => import("./pages/Relacionamentos"));
-const PetPage = lazy(() => import("./pages/Pet"));
-const Detox = lazy(() => import("./pages/Detox"));
-const Conquistas = lazy(() => import("./pages/Conquistas"));
-const Retrospectiva = lazy(() => import("./pages/Retrospectiva"));
-const Notificacoes = lazy(() => import("./pages/Notificacoes"));
-const Preview = lazy(() => import("./pages/Preview"));
+const Privacidade = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.Privacidade })));
+const Termos = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.Termos })));
+const ExcluirConta = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.ExcluirConta })));
+const Index = lazyPage(() => import("./pages/Index"));
+const Home = lazyPage(() => import("./pages/Home"));
+const Rotina = lazyPage(() => import("./pages/Rotina"));
+const DesenvolvimentoPessoal = lazyPage(() => import("./pages/DesenvolvimentoPessoal"));
+const Saude = lazyPage(() => import("./pages/Saude"));
+const Casa = lazyPage(() => import("./pages/Casa"));
+const Estudos = lazyPage(() => import("./pages/Estudos"));
+const Biblioteca = lazyPage(() => import("./pages/Biblioteca"));
+const Beleza = lazyPage(() => import("./pages/Beleza"));
+const Viagens = lazyPage(() => import("./pages/Viagens"));
+const Carreira = lazyPage(() => import("./pages/Carreira"));
+const Treino = lazyPage(() => import("./pages/Treino"));
+const Dieta = lazyPage(() => import("./pages/Dieta"));
+const Hiperfoco = lazyPage(() => import("./pages/Hiperfoco"));
+const Relacionamentos = lazyPage(() => import("./pages/Relacionamentos"));
+const PetPage = lazyPage(() => import("./pages/Pet"));
+const Detox = lazyPage(() => import("./pages/Detox"));
+const Conquistas = lazyPage(() => import("./pages/Conquistas"));
+const Retrospectiva = lazyPage(() => import("./pages/Retrospectiva"));
+const Notificacoes = lazyPage(() => import("./pages/Notificacoes"));
+const Preview = lazyPage(() => import("./pages/Preview"));
 // Funil V2 (experimento 15/07): rota paralela, chunk próprio — não pesa no funil atual.
-const ComecarV2 = lazy(() => import("./pages/v2/ComecarV2"));
+const ComecarV2 = lazyPage(() => import("./pages/v2/ComecarV2"));
 // /direto (15/08): o funil do dia 14 SEM A DEMO + tela de compromisso. Teste
 // do dono contra o /inicio, que segue intocado como controle.
-const ComecarDireto = lazy(() => import("./pages/funis/direto/ComecarDireto"));
-const PlanoV3 = lazy(() => import("./pages/v3/Plano"));
+const ComecarDireto = lazyPage(() => import("./pages/funis/direto/ComecarDireto"));
+const PlanoV3 = lazyPage(() => import("./pages/v3/Plano"));
 // Funis CONGELADOS pra teste (24/07, pedido do dono). Cada um é uma cópia de
 // uma versão que já rodou, num diretório próprio e com chunk próprio: abrir
 // /funil-* não muda NADA no /comecar e /inicio que estão vendendo.
 //   dia14 → 83c0d98 (14/07 22:30), sem downsell e sem X no paywall
 //   radar → baae257 (23/07 20:20), ordem radar→demo→PLANO com o gráfico 3,6→8,5
 //   v1    → d18e4fd (20/07 23:12), o último antes da ordem mudar
-const ComecarDia14 = lazy(() => import("./pages/funis/dia14/ComecarDia14"));
-const ComecarRadar = lazy(() => import("./pages/funis/radar/ComecarRadar"));
+const ComecarDia14 = lazyPage(() => import("./pages/funis/dia14/ComecarDia14"));
+const ComecarRadar = lazyPage(() => import("./pages/funis/radar/ComecarRadar"));
 // v53 (16/08): o funil do TESTE GRÁTIS — a porta nova do shell. A web nunca
 // o vê (a rota /app bifurca por isNativeShell); o radar segue na web como era.
-const ComecarTeste = lazy(() => import("./pages/funis/teste/ComecarTeste"));
-const ComecarFunilV1 = lazy(() => import("./pages/funis/v1/ComecarV1"));
+const ComecarTeste = lazyPage(() => import("./pages/funis/teste/ComecarTeste"));
+const ComecarFunilV1 = lazyPage(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
-const BemVindo = lazy(() => import("./pages/BemVindo"));
+const BemVindo = lazyPage(() => import("./pages/BemVindo"));
 
-const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
-const AdminLayout = lazy(() => import("./pages/admin/AdminLayout"));
-const AdminFunnel = lazy(() => import("./pages/admin/AdminFunnel"));
-const AdminCampaigns = lazy(() => import("./pages/admin/AdminCampaigns"));
-const AdminUsuarios = lazy(() => import("./pages/admin/AdminUsuarios"));
-const AdminPagantes = lazy(() => import("./pages/admin/AdminPagantes"));
+const AdminLogin = lazyPage(() => import("./pages/admin/AdminLogin"));
+const AdminLayout = lazyPage(() => import("./pages/admin/AdminLayout"));
+const AdminFunnel = lazyPage(() => import("./pages/admin/AdminFunnel"));
+const AdminCampaigns = lazyPage(() => import("./pages/admin/AdminCampaigns"));
+const AdminUsuarios = lazyPage(() => import("./pages/admin/AdminUsuarios"));
+const AdminPagantes = lazyPage(() => import("./pages/admin/AdminPagantes"));
 
 const queryClient = new QueryClient();
 

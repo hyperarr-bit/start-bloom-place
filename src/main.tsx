@@ -4,12 +4,18 @@ import "./index.css";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
+import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
 // mudança de ordem, aqui garante antes do React montar. O CSS do shell
 // (ex.: matar outline de foco preso) depende só desta classe.
 if (isNativeShell()) document.documentElement.classList.add("core-shell");
+
+// Navegador/WebView sem ResizeObserver derrubava o módulo Finanças INTEIRO
+// (o Recharts exige, e o throw sobe até o RouteErrorBoundary). Instala antes
+// do React montar; em navegador moderno isto é um `if` e nada mais.
+instalarResizeObserverSePreciso();
 
 // Telemetria de crash (15/07): cliente reportou "tela branca ao pagar" e a
 // gente só tinha silêncio nos eventos — sem isso, todo crash é adivinhação.
@@ -42,14 +48,28 @@ window.addEventListener("unhandledrejection", (e) => {
 // cliente travada no "vou pagar e fica branco"). O Vite emite vite:preloadError
 // nesses casos — recarrega 1x pra pegar a versão nova. Guarda em sessionStorage
 // evita loop se o reload não resolver.
-window.addEventListener("vite:preloadError", (event) => {
-  const KEY = "core-chunk-reload-at";
+//
+// NUNCA chamar event.preventDefault() aqui (16/08 — era o crash nº1 de
+// produção, 11 telas quebradas em /casa e 10 pessoas DIFERENTES em 7 dias).
+// O helper do Vite é `carrega().catch(aoFalhar)`, e `aoFalhar` só RELANÇA se
+// ninguém tiver chamado preventDefault. Com o preventDefault, aquele catch
+// RESOLVE `undefined` — o React.lazy guarda _result=undefined e o
+// lazyInitializer lê `undefined.default`, estourando
+// "Cannot read properties of undefined (reading 'default')". Ou seja: a
+// proteção contra tela branca estava CRIANDO um crash pior, porque o
+// TypeError genérico não parece erro de chunk e o boundary não recarregava.
+// Deixando o erro subir, a rejeição chega com a mensagem verdadeira
+// ("dynamically imported module"), que o RouteErrorBoundary já sabe tratar.
+//
+// Chave PRÓPRIA de propósito: usar a mesma do boundary gravaria o timestamp
+// milissegundos antes dele rodar e mataria o auto-reload de lá.
+window.addEventListener("vite:preloadError", () => {
+  const KEY = "core-preload-reload-at";
   try {
     const last = Number(sessionStorage.getItem(KEY) || 0);
-    if (Date.now() - last < 30_000) return; // já tentou há pouco — deixa o erro subir
+    if (Date.now() - last < 30_000) return; // já tentou há pouco — não vira loop
     sessionStorage.setItem(KEY, String(Date.now()));
   } catch { /* segue e recarrega mesmo assim */ }
-  event.preventDefault();
   // reload() puro pode devolver o MESMO index.html velho do cache do Safari
   // (caso da demo branca de 21/07). O param novo muda a URL → cache miss →
   // HTML fresco com os chunks novos. O param é inerte pro app.

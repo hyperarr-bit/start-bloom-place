@@ -18,8 +18,21 @@ interface State {
 // carregar um JS que não existe mais e o lazy import explode. Caso real de
 // 12/07: o dono (e possivelmente um pagante às 16:20, que marcou "problema
 // técnico" e cancelou) viu a tela de erro em /financas logo após deploys.
+//
+// AS TRÊS CARAS QUE FALTAVAM (16/08, achadas no painel de route_error):
+//  - "Cannot read properties of undefined (reading 'default')": o chunk do
+//    React.lazy resolveu SEM lançar — o servidor respondeu o index.html
+//    (fallback de SPA) no lugar do JS sumido, o parser aceitou e o módulo
+//    veio vazio. Sintoma nº1 em 7 dias: 11 telas quebradas em /casa, 10
+//    pessoas DIFERENTES. Não era dado velho de usuário: era deploy.
+//  - "'text/html' is not a valid JavaScript MIME type": o mesmo fallback,
+//    quando o navegador é rígido e recusa o HTML.
+//  - "Unable to preload CSS for /assets/*.css": irmão do anterior no CSS.
+// Nenhuma delas casava com o regex, então o boundary não recarregava —
+// mostrava "Algo deu errado nesta seção" e a pessoa ficava presa numa tela
+// morta que um F5 resolveria.
 const isChunkError = (error: Error | null) =>
-  !!error && /dynamically imported module|module script failed|ChunkLoadError|Loading chunk .* failed|Loading CSS chunk/i.test(
+  !!error && /dynamically imported module|module script failed|ChunkLoadError|Loading chunk .* failed|Loading CSS chunk|Unable to preload CSS|is not a valid JavaScript MIME type|reading 'default'|of undefined \(reading "default"\)/i.test(
     `${error.name} ${error.message}`,
   );
 

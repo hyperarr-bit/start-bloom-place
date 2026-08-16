@@ -645,7 +645,7 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
     if (!q || travaRef.current) return;
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
-    trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
+    trackEvent("funnel_quiz_answer", { q: q.key, answer: label , funil: FUNIL });
     advance(next);
   };
   return (
@@ -678,7 +678,7 @@ function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirs
               onEscolha={(quer) => {
                 const next = { ...answers, lembrete: quer ? "sim" : "nao" };
                 setAnswers(next);
-                trackEvent("funnel_quiz_answer", { q: "lembrete", answer: quer ? "sim" : "nao" });
+                trackEvent("funnel_quiz_answer", { q: "lembrete", answer: quer ? "sim" : "nao" , funil: FUNIL });
                 try {
                   localStorage.setItem("core-lembrete-intencao", JSON.stringify({ quer, horario: answers.horario ?? "", quando: Date.now() }));
                 } catch { /* noop */ }
@@ -1559,6 +1559,11 @@ export default function ComecarDia14() {
     if (step !== "quiz" && step !== "offer") {
       trackEvent("funnel_view", {
         step,
+        // A etiqueta que separa este funil do /inicio no relatório. O regex
+        // que etiquetou os outros eventos (15/08) só pegava chamadas de uma
+        // linha — esta, multilinha, escapou, e as views de tela saíram
+        // indistinguíveis do /inicio até 15/08 23h.
+        funil: FUNIL,
         // Segmenta o funil vitrine ("vida") do funil padrão (finanças) no admin.
         ...(vitrine ? { porta: "vida" } : {}),
         // Só na 1ª tela: sinal pra distinguir visita real de pré-carregamento
@@ -1595,7 +1600,7 @@ export default function ComecarDia14() {
                   setAnswers(first);
                   try { localStorage.setItem(FUNNEL_AREA_KEY, picked); } catch { /* noop */ }
                   trackEvent("funnel_click", { cta: "start", porta: "vida", area: picked , funil: FUNIL });
-                  trackEvent("funnel_quiz_answer", { q: "area", answer: label });
+                  trackEvent("funnel_quiz_answer", { q: "area", answer: label , funil: FUNIL });
                   setStep("eco");
                 }}
               />
@@ -1609,7 +1614,7 @@ export default function ComecarDia14() {
                   // passo "Quiz 1" do admin continuar contando (o QuizScreen
                   // agora começa no quiz_2).
                   trackEvent("funnel_view", { step: "quiz_1" , funil: FUNIL });
-                  trackEvent("funnel_quiz_answer", { q: QUIZ[0].key, answer: firstAnswer });
+                  trackEvent("funnel_quiz_answer", { q: QUIZ[0].key, answer: firstAnswer , funil: FUNIL });
                   setStep("quiz");
                 }}
               />

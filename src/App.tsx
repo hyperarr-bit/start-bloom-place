@@ -23,6 +23,7 @@ import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { testeLiberado } from "@/lib/teste-gratis";
+import { TesteBanner, GuiaSemente, RetomadaPosCompra } from "@/components/teste/TesteGratis";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
@@ -241,6 +242,9 @@ const PlanoV3 = lazy(() => import("./pages/v3/Plano"));
 //   v1    → d18e4fd (20/07 23:12), o último antes da ordem mudar
 const ComecarDia14 = lazy(() => import("./pages/funis/dia14/ComecarDia14"));
 const ComecarRadar = lazy(() => import("./pages/funis/radar/ComecarRadar"));
+// v53 (16/08): o funil do TESTE GRÁTIS — a porta nova do shell. A web nunca
+// o vê (a rota /app bifurca por isNativeShell); o radar segue na web como era.
+const ComecarTeste = lazy(() => import("./pages/funis/teste/ComecarTeste"));
 const ComecarFunilV1 = lazy(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazy(() => import("./pages/BemVindo"));
@@ -395,11 +399,13 @@ const AnimatedRoutes = () => {
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-radar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-radar"><ComecarRadar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        {/* ENTRADA_APP: mesmo funil do /funil-radar, mas SEM a trava SoNaWeb
-            — esta é a porta do app da loja. O radar é seguro no shell: o
-            paywall dele é o PaywallFlow, que bifurca pra assinatura e
-            esconde o card de vitalício quando isNativeShell(). */}
-        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app"><ComecarRadar /></RouteErrorBoundary></PageTransition>} />
+        {/* ENTRADA_APP: a porta do app da loja. v53 (16/08): no SHELL renderiza
+            o funil do TESTE GRÁTIS (4 perguntas → app real em modo guiado →
+            paywall de assinatura no dia 3). Na web, /app continua o radar de
+            sempre — a bifurcação é pelo ELEMENTO da rota, nunca pela rota
+            (lição do /inicio de 26/07: reapontar rota compartilhada quebrou
+            o app junto). */}
+        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app">{isNativeShell() ? <ComecarTeste /> : <ComecarRadar />}</RouteErrorBoundary></PageTransition>} />
         <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />
@@ -484,6 +490,12 @@ const App = () => {
                   <Route path="*" element={<AnimatedRoutes />} />
                 </Routes>
                 <TrialBanner />
+                {/* v53: as duas superfícies do teste grátis do shell — a faixa
+                    "Dia X de 3" (comprador quente) e a semente guiada por cima
+                    do módulo real. Ambas se auto-anulam fora do shell. */}
+                <TesteBanner />
+                <GuiaSemente />
+                <RetomadaPosCompra />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}
                 <PortaoBoasVindas />

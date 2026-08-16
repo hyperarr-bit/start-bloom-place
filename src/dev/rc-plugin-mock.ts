@@ -33,16 +33,24 @@ const gravarCompra = (id: string) => {
 
 const modo = (): string => (window as any).__rcModo || "compra";
 
+// v53: o mock separa compra ÚNICA (vitalício) de ASSINATURA — o boot-check
+// do cadastro pós-compra olha nonSubscriptionTransactions pro vitalício e
+// activeSubscriptions pras assinaturas (compraAssinaturaLocal).
+const ehVitalicio = (id: string) => id.startsWith("core_vitalicio");
 const info = () => ({
   customerInfo: {
     entitlements: { active: {} },
-    nonSubscriptionTransactions: compras().map((id) => ({ productIdentifier: id })),
+    nonSubscriptionTransactions: compras().filter(ehVitalicio).map((id) => ({ productIdentifier: id })),
+    activeSubscriptions: compras().filter((id) => !ehVitalicio(id)),
   },
 });
 
 const PRECOS: Record<string, string> = {
   core_vitalicio: "R$ 27,90",
   core_vitalicio_19: "R$ 19,90",
+  "core_anual:coreanual": "R$ 159,90",
+  "core_mensal:coremensal": "R$ 24,90",
+  "core_mensal:coremensalpix": "R$ 19,90",
 };
 
 export const PRODUCT_CATEGORY = { NON_SUBSCRIPTION: "NON_SUBSCRIPTION", SUBSCRIPTION: "SUBSCRIPTION" } as const;
@@ -58,7 +66,15 @@ export const Purchases: any = {
     // de "pronto" se existir pacote). Esvaziar só o getProducts não simulava
     // nada — o app seguia achando que tinha o que vender.
     if (modo() === "catalogo_vazio") return { current: { availablePackages: [] } };
-    return { current: { availablePackages: [{ product: { identifier: "core_vitalicio:base" } }] } };
+    // v53: offering de assinatura ($rc_annual/$rc_monthly), como na loja real.
+    return {
+      current: {
+        availablePackages: [
+          { identifier: "$rc_annual", product: { identifier: "core_anual:coreanual", priceString: PRECOS["core_anual:coreanual"] } },
+          { identifier: "$rc_monthly", product: { identifier: "core_mensal:coremensal", priceString: PRECOS["core_mensal:coremensal"] } },
+        ],
+      },
+    };
   },
   async getProducts({ productIdentifiers }: { productIdentifiers: string[] }) {
     // 13/08: catálogo vazio é um estado REAL (build velha, Play fora do ar) e
@@ -80,9 +96,11 @@ export const Purchases: any = {
     gravarCompra(product.identifier);
     return info();
   },
-  async purchasePackage(_: any) {
+  async purchasePackage({ aPackage }: { aPackage?: { product?: { identifier?: string } } } = {}) {
     const m = modo();
     if (m === "cancela") throw { code: "1", message: "Purchase was cancelled. (mock)" };
+    if (m === "pendente") throw { code: "20", message: "PAYMENT_PENDING_ERROR (mock)" };
+    gravarCompra(aPackage?.product?.identifier ?? "core_anual:coreanual");
     return info();
   },
   async getCustomerInfo() { return info(); },

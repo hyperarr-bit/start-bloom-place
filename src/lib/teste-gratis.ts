@@ -65,3 +65,38 @@ export function iniciarTeste(area: string | null): EstadoTeste {
   trackEvent("teste_iniciado", { area: area ?? "", dias: 3, shell: isNativeShell() });
   return estadoTeste();
 }
+
+/* --------------------------------------------------- semente guiada (v53) */
+
+/**
+ * A SEMENTE acontece DENTRO do módulo real (toque do dono 16/08: "nada de
+ * mini-demo com cara de fictício — botar o próprio app com a instrução do
+ * passo"). O funil termina navegando pro módulo com este guia armado; a
+ * faixa (GuiaSemente) instrui o único passo e escuta o evento core:activation
+ * que o useUserData já dispara na primeira escrita de verdade.
+ */
+const CHAVE_GUIA = "core-guia-semente";
+
+export type Guia = { area: string; status: "pendente" | "feita" };
+
+export function guiaSemente(): Guia | null {
+  try {
+    const raw = localStorage.getItem(CHAVE_GUIA);
+    if (!raw) return null;
+    const g = JSON.parse(raw) as Guia;
+    return g && typeof g.area === "string" ? g : null;
+  } catch {
+    return null;
+  }
+}
+
+export function armarGuiaSemente(area: string): void {
+  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify({ area, status: "pendente" } satisfies Guia)); } catch { /* sem guia, o app segue */ }
+}
+
+export function concluirGuiaSemente(): void {
+  const g = guiaSemente();
+  if (!g || g.status === "feita") return;
+  try { localStorage.setItem(CHAVE_GUIA, JSON.stringify({ ...g, status: "feita" } satisfies Guia)); } catch { /* noop */ }
+  trackEvent("semente_plantada", { area: g.area, funil: "teste" });
+}

@@ -32,15 +32,23 @@ export const isNativeShell = (): boolean => {
  *  estes são fallback de exibição e contrato de produto.
  */
 export const APP_PRECOS = {
-  // 02/08: âncora passa de 29,90 → 19,90 por decisão do dono.
+  // 16/08 (v53, decisão do dono): o app volta a ser ASSINATURA — mensal 24,90
+  // e anual 159,90 (= R$ 13,32/mês, economia real de R$ 138 vs 12× mensal).
+  // O teste grátis agora é NOSSO (3 dias sem cartão, teste-gratis.ts), então
+  // a oferta coretrial do Play sai do anual — a folha cobra na hora.
   //
   // ATENÇÃO, e isto não é detalhe: esta string é só EXIBIÇÃO. Quem cobra é o
-  // Play Billing, pelo preço do plano base do produto `core_mensal` no Play
-  // Console. Enquanto lá continuar 29,90, o app mostra 19,90 e a Google cobra
-  // 29,90 — divergência que reprova na análise e queima confiança de quem
+  // Play Billing, pelo preço do plano base do produto no Play Console.
+  // Divergência entre os dois reprova na análise e queima confiança de quem
   // pagou. Trocar aqui SEM trocar lá é pior que não trocar.
-  mensal: { id: "core_mensal", preco: "R$ 19,90" },
-  anual: { id: "core_anual", preco: "R$ 97,90", trialDias: 3, porMes: "R$ 8,16" },
+  mensal: { id: "core_mensal", preco: "R$ 24,90" },
+  anual: { id: "core_anual", preco: "R$ 159,90", porMes: "R$ 13,32", economiaAno: "R$ 138" },
+  // 16/08 (dono): downsell do D3 = "R$ 19,90 o mês, no Pix, renova quando
+  // você quiser" — base plan PRÉ-PAGO de 30 dias no MESMO produto core_mensal
+  // (Play cobra o Pix na folha e controla a expiração; renovação é manual por
+  // natureza do pré-pago). Só aparece pra quem CANCELOU a folha no preço
+  // cheio — exposto no paywall canibalizaria o mensal 24,90 do cartão.
+  mensalPix: { id: "core_mensal:coremensalpix", preco: "R$ 19,90" },
   // 06/08 (decisão do dono): o app vende UM produto — vitalício, pagamento
   // único, espelho do paywall da web. Produto `core_vitalicio` ATIVO no Play
   // via API (purchaseOption "compra"). Mensal e anual ficam no catálogo só

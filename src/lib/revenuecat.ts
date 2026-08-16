@@ -200,28 +200,132 @@ export async function comprar(productId: string): Promise<boolean> {
       });
       return false;
     }
-    const { customerInfo } = await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
-    if (!temEntitlement(customerInfo)) {
-      ultimoMotivo = "sem_entitlement";
-      trackEvent("app_compra_falhou", { motivo: "sem_entitlement", produto: productId });
-      return false;
-    }
-    // O dinheiro já saiu: mesmo que o sync falhe agora, devolvo true (o
-    // webhook e o reconciliarSePreciso pegam depois) — mas tento aqui pra
-    // pessoa entrar no app na mesma hora.
+    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
+    // Folha fechou com sucesso = dinheiro saiu. Como no vitalício, o acesso
+    // NÃO depende do entitlement do RC (quem manda é a linha em
+    // `subscriptions` via sync/webhook) — o check de entitlement aqui já
+    // derrubou compra real como "sem_entitlement" na era v37.
     await sincronizarAssinatura();
     return true;
   } catch (e) {
     // usuário cancelou a folha de compra ou erro de billing — não é crash
     console.warn("[RC] compra não concluída:", e);
     const msg = String((e as { message?: string })?.message ?? e);
-    const cancelou = /cancel/i.test(msg) || (e as { code?: string })?.code === "1";
+    const codigo = String((e as { code?: string })?.code ?? "");
+    // Pix/boleto escolhido NA FOLHA (pré-pago aceita): compra fica pendente.
+    if (codigo === "20" || /pending/i.test(msg)) {
+      ultimoMotivo = "pendente";
+      trackEvent("app_compra_pendente", { produto: productId });
+      return false;
+    }
+    const cancelou = /cancel/i.test(msg) || codigo === "1";
     ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
     trackEvent("app_compra_falhou", {
       motivo: cancelou ? "cancelou" : "billing_erro",
       produto: productId,
       erro: msg.slice(0, 160),
     });
+    return false;
+  }
+}
+
+/**
+ * ASSINATURA v53 (16/08) — o app volta a vender core_anual/core_mensal, agora
+ * com o teste de 3 dias NOSSO na frente (sem trial do Google). A compra dos
+ * dois planos principais vai por offerings/packages (`comprar` acima). O
+ * DOWNSELL é diferente: base plan PRÉ-PAGO `core_mensal:coremensalpix`
+ * (R$ 19,90 → 30 dias, Pix na folha, renovação manual) — pré-pago não entra
+ * em package, então vai por getProducts + purchaseStoreProduct, com pré-busca
+ * igual à do vitalício (aparelho fraco = segundos de nada visível sem cache).
+ */
+const ID_MENSAL_PIX = "core_mensal:coremensalpix";
+let produtoMensalPix: ProdutoRC | null = null;
+const precosAssinatura: Partial<Record<"anual" | "mensal" | "mensalPix", string>> = {};
+
+/** Preços REAIS da loja (moeda local) pro paywall exibir — APP_PRECOS é só
+ *  fallback. Preenchido pela pré-busca; devolve o que já chegou. */
+export const precoLoja = (plano: "anual" | "mensal" | "mensalPix"): string | null =>
+  precosAssinatura[plano] ?? null;
+
+export async function prefetchAssinaturas(): Promise<void> {
+  if (estado !== "pronto" || !Purchases) return;
+  try {
+    const offerings = await Purchases.getOfferings();
+    for (const p of offerings?.current?.availablePackages ?? []) {
+      const id = String(p.product?.identifier ?? "");
+      const preco = (p.product as { priceString?: string })?.priceString;
+      if (!preco) continue;
+      if (id.startsWith("core_anual")) precosAssinatura.anual = preco;
+      else if (id.startsWith("core_mensal")) precosAssinatura.mensal = preco;
+    }
+  } catch { /* paywall usa o fallback do APP_PRECOS */ }
+  try {
+    if (!produtoMensalPix) {
+      const mod = await import("@revenuecat/purchases-capacitor");
+      const { products } = await Purchases.getProducts({
+        productIdentifiers: [ID_MENSAL_PIX],
+        type: mod.PRODUCT_CATEGORY.SUBSCRIPTION,
+      });
+      produtoMensalPix = (products ?? []).find((p) => String(p?.identifier ?? "").startsWith("core_mensal")) ?? null;
+      const preco = (produtoMensalPix as { priceString?: string } | null)?.priceString;
+      if (preco) precosAssinatura.mensalPix = preco;
+    }
+  } catch { /* sem o pré-pago no catálogo o downsell simplesmente não aparece */ }
+}
+
+/** O downsell Pix só é oferecido se o base plan pré-pago existir no catálogo
+ *  da loja (build velha/catálogo antigo → esconde, nunca botão morto). */
+export const temMensalPix = (): boolean => produtoMensalPix !== null;
+
+export async function comprarMensalPix(): Promise<boolean> {
+  ultimoMotivo = null;
+  if (estado !== "pronto" || !Purchases) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_MENSAL_PIX });
+    return false;
+  }
+  try {
+    if (!produtoMensalPix) await prefetchAssinaturas();
+    if (!produtoMensalPix) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_MENSAL_PIX });
+      return false;
+    }
+    await Purchases.purchaseStoreProduct({ product: produtoMensalPix });
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    const msg = String((e as { message?: string })?.message ?? e);
+    const codigo = String((e as { code?: string })?.code ?? "");
+    if (codigo === "20" || /pending/i.test(msg)) {
+      // Pix gerado na folha: paga no banco → webhook libera sozinho.
+      ultimoMotivo = "pendente";
+      trackEvent("app_compra_pendente", { produto: ID_MENSAL_PIX });
+      return false;
+    }
+    const cancelou = /cancel/i.test(msg) || codigo === "1";
+    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
+    trackEvent("app_compra_falhou", {
+      motivo: cancelou ? "cancelou" : "billing_erro",
+      produto: ID_MENSAL_PIX,
+      erro: msg.slice(0, 160),
+    });
+    return false;
+  }
+}
+
+/** Irmã da compraVitaliciaLocal pro mundo assinatura: a pessoa ASSINOU neste
+ *  aparelho (folha fechou) mas ainda não tem conta? A reabertura cai direto
+ *  no "salvar seu acesso" em vez de paywall pra quem já pagou. */
+export async function compraAssinaturaLocal(): Promise<boolean> {
+  if (!isNativeShell()) return false;
+  if (!configurado) await initRevenueCat();
+  if (!Purchases || !configurado) return false;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    const ativos = (customerInfo as unknown as { activeSubscriptions?: string[] })?.activeSubscriptions ?? [];
+    return ativos.some((id) => String(id).startsWith("core_"));
+  } catch {
     return false;
   }
 }

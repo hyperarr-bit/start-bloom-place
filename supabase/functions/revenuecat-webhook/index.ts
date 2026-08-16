@@ -107,15 +107,17 @@ const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
 /** Preço em centavos por produto — a API não devolve valor em BRL.
  *  Bate com APP_PRECOS em src/lib/native-shell.ts. */
 const PRODUTOS: Record<string, { billing: string; cents: number }> = {
-  core_anual: { billing: "annual", cents: 9790 },
-  // 19,90 desde 02/08 (preço da Play conferido por API em 05/08); ficou 2990
-  // hardcoded e toda mensal entrava na tabela 50% maior.
-  core_mensal: { billing: "monthly", cents: 1990 },
-  // 06/08: app virou produto único — compra ÚNICA do Play (não assinatura).
-  // 09/08: downsell 19,90 (core_vitalicio_19). ANTES do core_vitalicio de
-  // propósito: o infoProduto casa por startsWith e "core_vitalicio_19"
-  // começa com "core_vitalicio" — na ordem errada, todo downsell entraria
-  // na tabela (e no Meta) como 27,90.
+  // v53 (16/08): app voltou a ser ASSINATURA — anual 159,90 / mensal 24,90.
+  // O pré-pago Pix (downsell 19,90 → 30 dias) vem ANTES do core_mensal de
+  // propósito: o match é por startsWith e "core_mensal:coremensalpix"
+  // começa com "core_mensal" — na ordem errada, todo downsell Pix entraria
+  // na tabela (e no Meta) como 24,90. Mesma armadilha do vitalicio_19.
+  "core_mensal:coremensalpix": { billing: "monthly", cents: 1990 },
+  core_anual: { billing: "annual", cents: 15990 },
+  core_mensal: { billing: "monthly", cents: 2490 },
+  // 06/08: era do produto único — compra ÚNICA do Play (não assinatura).
+  // Continuam no mapa pra base que comprou vitalício (renovação de acesso,
+  // restore, reembolso). 09/08: downsell 19,90 ANTES do cheio (startsWith).
   core_vitalicio_19: { billing: "lifetime", cents: 1990 },
   core_vitalicio: { billing: "lifetime", cents: 2790 }, // 07/08: 27,90, espelho da web
 };

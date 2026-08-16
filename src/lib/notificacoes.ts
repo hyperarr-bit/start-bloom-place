@@ -530,18 +530,20 @@ export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<v
   await limparFaixa(BASE_RESGATE);
   const { LN } = p;
   const daArea = nomeArea ? ` de ${nomeArea}` : "";
+  // v53 (16/08): copy virou assinatura — o produto do app é 24,90/mês ou
+  // 159,90/ano (= R$ 13,32/mês). Preço real, zero pressão falsa.
   const avisos = [
     {
       id: BASE_RESGATE + 1,
       at: new Date(Date.now() + 2 * 3600_000),
       title: `Seu plano${daArea} ficou salvo`,
-      body: "Tudo que você montou continua aqui. R$ 27,90 uma vez — garantia de 7 dias.",
+      body: "Tudo que você montou continua aqui. A partir de R$ 13,32/mês no anual.",
     },
     {
       id: BASE_RESGATE + 2,
       at: new Date(Date.now() + 24 * 3600_000),
       title: "Ainda dá tempo de começar hoje",
-      body: `Seu plano${daArea} te espera do jeito que você deixou. Pagamento único, acesso pra sempre.`,
+      body: `Seu plano${daArea} te espera do jeito que você deixou. Cancele quando quiser.`,
     },
   ];
   try {
@@ -591,7 +593,12 @@ const COPY_TESTE: Record<string, { d1t: string; d1b: string }> = {
   metas: { d1t: "Sua meta saiu do papel ontem", d1b: "Dá o primeiro passo de hoje — progresso visível é o que mantém ela viva." },
 };
 
-export async function agendarReguaDoTeste(area: string | null, inicioMs: number): Promise<void> {
+/** Horário preferido da T3 do funil ("que horário funciona melhor?") →
+ *  hora local do dia. A pergunta nunca é decorativa: o D1 e o D2 caem NESSE
+ *  horário, não num offset cego. */
+const HORA_PREFERIDA: Record<string, number> = { manha: 8.5, almoco: 12.5, noite: 19.5 };
+
+export async function agendarReguaDoTeste(area: string | null, inicioMs: number, preferencia?: string | null): Promise<void> {
   const p = await plugin();
   if (!p) return;
   if (!(await temPermissao())) return;
@@ -599,10 +606,24 @@ export async function agendarReguaDoTeste(area: string | null, inicioMs: number)
   await limparFaixa(BASE_TESTE);
   const { LN } = p;
   const c = COPY_TESTE[area ?? ""] ?? COPY_TESTE.rotina;
+  // D1 no horário que a pessoa escolheu (primeira ocorrência ≥ +16h do
+  // início), D2 = D1 + 24h; sem preferência, offsets padrão (+20h/+44h).
+  // D3 fica fixo em +68h: é o aviso da DECISÃO, tem que chegar antes do gate
+  // fechar (+72h), não importa o gosto de horário.
+  const hora = HORA_PREFERIDA[preferencia ?? ""];
+  let d1 = inicioMs + 20 * 3600_000;
+  if (hora != null) {
+    const alvo = new Date(inicioMs + 16 * 3600_000);
+    alvo.setHours(Math.floor(hora), Math.round((hora % 1) * 60), 0, 0);
+    while (alvo.getTime() < inicioMs + 16 * 3600_000) alvo.setDate(alvo.getDate() + 1);
+    d1 = alvo.getTime();
+  }
+  const d2 = hora != null ? d1 + 24 * 3600_000 : inicioMs + 44 * 3600_000;
+  // v53: copy de assinatura (24,90/mês · anual = R$ 13,32/mês) — preço real.
   const avisos = [
-    { id: BASE_TESTE + 1, at: new Date(inicioMs + 20 * 3600_000), title: c.d1t, body: c.d1b },
-    { id: BASE_TESTE + 2, at: new Date(inicioMs + 44 * 3600_000), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, é R$ 27,90 UMA vez — pra sempre. Se não, sem drama." },
-    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com o vitalício. Um pagamento, sem mensalidade." },
+    { id: BASE_TESTE + 1, at: new Date(d1), title: c.d1t, body: c.d1b },
+    { id: BASE_TESTE + 2, at: new Date(d2), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, a partir de R$ 13,32/mês no anual. Se não, sem drama." },
+    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com a assinatura. A partir de R$ 13,32/mês — cancele quando quiser." },
   ];
   try {
     await LN.schedule({

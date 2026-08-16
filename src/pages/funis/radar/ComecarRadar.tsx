@@ -128,7 +128,10 @@ const TrustRow = ({ posCompra }: { posCompra?: boolean }) => (
       // Quem JÁ PAGOU não pode ler "sem cartão agora"/"cancele quando quiser"
       // — o medo daqui é outro: perder o que acabou de comprar.
       <>
-        <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Acesso vitalício garantido</span>
+        {/* v53: "vitalício garantido" saiu — o app vende ASSINATURA agora e
+            prometer vitalício pra quem pagou mensal é estorno na certa. A
+            frase nova é verdadeira pros dois produtos. */}
+        <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Compra protegida na sua conta</span>
         <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Garantia de 7 dias</span>
       </>
     ) : (
@@ -918,7 +921,9 @@ function ResultScreen({ answers, onDone }: { answers: Record<string, string>; on
   );
 }
 
-function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: () => void; onConfirm: (email: string) => void; posCompra?: boolean }) {
+// exportada: o funil do teste (v53, ComecarTeste) reusa o MESMO cadastro
+// pós-compra provado com dinheiro — comportamento idêntico nos dois funis.
+export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: () => void; onConfirm: (email: string) => void; posCompra?: boolean }) {
   const { signUp, signIn } = useAuth();
   const { set: setUserData } = useUserData();
   const [name, setName] = useState("");
@@ -1079,7 +1084,7 @@ function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: () => vo
               Agora crie sua conta pra<br />guardar seu acesso.
             </h2>
             <p className="text-muted-foreground text-sm mt-2">
-              Seu vitalício fica guardado nela — é com ela que você entra em qualquer aparelho, pra sempre.
+              Seu acesso fica guardado nela — é com ela que você entra em qualquer aparelho.
             </p>
           </>
         ) : (
@@ -1157,7 +1162,7 @@ function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: () => vo
  * novo — e SÓ ENTÃO celebra e solta no app. Sem esta espera, a pessoa caía
  * no gate ainda "sem assinatura" e via paywall DE NOVO depois de pagar.
  */
-function LiberandoScreen() {
+export function LiberandoScreen() {
   // mesmo par de chaves que o OfferScreen usa pra saudação da celebração
   const { get: getUserData } = useUserData();
   const nome = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
@@ -1199,7 +1204,7 @@ function LiberandoScreen() {
   );
 }
 
-function ConfirmScreen({ email }: { email: string }) {
+export function ConfirmScreen({ email }: { email: string }) {
   return (
     <div className="w-full max-w-sm mx-auto text-center">
       <div className="w-20 h-20 rounded-full bg-accent/10 text-accent flex items-center justify-center mx-auto mb-5">

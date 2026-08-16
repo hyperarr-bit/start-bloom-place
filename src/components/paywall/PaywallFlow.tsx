@@ -501,7 +501,9 @@ function LifetimeCard() {
  *  2. Quem não assina fica PRESO neste gate: sem esta saída, a exclusão de
  *     conta do menu é inalcançável, e o Google exige caminho in-app pra
  *     apagar conta. Aqui o não-pagante (e o revisor) consegue apagar. */
-function AppLegalFooter() {
+// exportado: o paywall do teste (v53) precisa das MESMAS exigências de loja
+// (Restaurar/Privacidade/Termos/Excluir conta) sem duplicar o componente.
+export function AppLegalFooter() {
   const { user } = useAuth();
   const [excluirAberto, setExcluirAberto] = useState(false);
   return (

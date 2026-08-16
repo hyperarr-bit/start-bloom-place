@@ -30,11 +30,19 @@ export const MonthlySheet = ({ month, onClose }: MonthlySheetProps) => {
   const [notes, setNotes] = usePersistedState(keys.notes, [] as any[]);
   const [installments, setInstallments] = usePersistedState(keys.installments, [] as any[]);
 
-  const totalIncome = incomes.reduce((sum: number, i: any) => sum + i.value, 0);
-  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + e.value, 0);
-  const totalFixed = fixedExpenses.reduce((sum: number, e: any) => sum + e.value, 0);
+  /* Campo quebrado não pode SUMIR com dinheiro da conta (16/08). Um
+     parcelamento gravado com valor inválido (é o que acontece quando o
+     total é dividido por 0 parcelas: vira Infinity e o JSON.stringify do
+     storage devolve `null`) fazia `(t - p) * null` = 0 — sem crash, mas a
+     dívida inteira desaparecia deste total e o saldo do mês ficava bom
+     demais. `n()` mantém o número quando ele é válido e trata o resto como
+     0 explicitamente, em vez de deixar a coerção decidir calada. */
+  const n = (v: unknown) => (Number.isFinite(Number(v)) && v !== null ? Number(v) : 0);
+  const totalIncome = incomes.reduce((sum: number, i: any) => sum + n(i.value), 0);
+  const totalExpenses = expenses.reduce((sum: number, e: any) => sum + n(e.value), 0);
+  const totalFixed = fixedExpenses.reduce((sum: number, e: any) => sum + n(e.value), 0);
   const totalDebts = installments.reduce(
-    (sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0
+    (sum: number, i: any) => sum + Math.max(0, n(i.totalInstallments) - n(i.paidInstallments)) * n(i.installmentValue), 0
   );
   const balance = totalIncome - totalExpenses - totalFixed - totalDebts;
 

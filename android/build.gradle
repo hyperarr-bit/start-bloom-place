@@ -21,6 +21,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // SDK do TikTok: publicado só no JitPack (github.com/tiktok/
+        // tiktok-business-android-sdk) — não existe no mavenCentral.
+        maven { url 'https://jitpack.io' }
     }
 }
 

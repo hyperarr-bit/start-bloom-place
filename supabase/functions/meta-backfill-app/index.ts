@@ -201,12 +201,11 @@ async function mandarCompraProMeta(
 }
 
 /**
- * TikTok Events API (09/08) — mesma ideia do mandarCompraProMeta: manda a
- * compra pro TikTok DEPOIS que o Google já confirmou o pagamento (servidor,
- * não SDK no app). Decisão de arquitetura, não só preguiça de escrever Java:
- * este binário tem política deliberada de não embutir rastreador/SDK de
- * anúncio (ver preparar-loja.mjs — é a mesma razão por trás de nunca
- * coletar GAID). Server-side mantém essa política intacta.
+ * TikTok Events API (16/08) — cópia do enviador do webhook/sync, pendurada
+ * AQUI porque este cron de 15min é a única rede que pega TODAS as vendas da
+ * loja (o caminho ao vivo só cobre vitalício; assinatura nova cai só aqui).
+ * Mesma divisão de trabalho da Meta: o SDK do TikTok embarcado no app (v55)
+ * manda SÓ instalação/abertura; a compra sai do servidor, dedup por tx.
  *
  * AVISO DE CONFIANÇA: montei este payload cruzando a documentação do TikTok
  * for Business (blog do endpoint consolidado) com integrações de terceiros
@@ -218,6 +217,88 @@ async function mandarCompraProMeta(
  * ao lado. Só confia nisso depois de ver UM evento de teste chegar certo
  * no Events Manager — mesma regra do catálogo: causa provada, não suposta.
  */
+async function mandarCompraProTikTok(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  email: string | null,
+  cents: number,
+  txId: string,
+  quando: string | null,
+) {
+  const appId = Deno.env.get("TIKTOK_APP_ID"); // event_source_id, do Events Manager
+  const token = Deno.env.get("TIKTOK_ACCESS_TOKEN"); // gerado no Events Manager, NÃO é o "app secret" do SDK
+  if (!appId || !token) return;
+
+  const { data: jaFoi } = await admin
+    .from("analytics_events")
+    .select("id")
+    .eq("event_name", "tiktok_capi_app_enviado")
+    .eq("user_id", userId)
+    .contains("event_data", { tx: txId })
+    .maybeSingle();
+  if (jaFoi) return;
+
+  // GAID (16/08): é o que deixa o TikTok casar a compra com o CLIQUE no
+  // anúncio — e-mail só acerta quem usa o mesmo e-mail no TikTok. Vai
+  // SHA-256 (é como os conectores oficiais mandam; diferente do madid da
+  // Meta, que vai cru). Ficha por user_id; se não achar, pela sessão — a
+  // compra anônima (v48+) deixa a ficha pendurada em user_id nulo.
+  let gaid = "";
+  const { data: devTt } = await admin
+    .from("analytics_events").select("event_data")
+    .eq("event_name", "app_device_info").eq("user_id", userId)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  gaid = String(((devTt as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).gaid ?? "").toLowerCase();
+  if (!gaid) {
+    const { data: sessTt } = await admin
+      .from("analytics_events").select("session_id").eq("user_id", userId).limit(50);
+    const idsTt = [...new Set(((sessTt ?? []) as { session_id: string | null }[]).map((x) => x.session_id).filter(Boolean))];
+    if (idsTt.length) {
+      const { data: porSessaoTt } = await admin
+        .from("analytics_events").select("event_data")
+        .eq("event_name", "app_device_info").in("session_id", idsTt)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      gaid = String(((porSessaoTt as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).gaid ?? "").toLowerCase();
+    }
+  }
+
+  const payload: Record<string, unknown> = {
+    event_source: "app",
+    event_source_id: appId,
+    data: [{
+      event: "CompletePayment",
+      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      event_id: txId, // dedup: mesma chave (event_source_id, event, event_id) por 48h
+      user: {
+        external_id: await sha256(userId),
+        ...(email ? { email: await sha256(email.trim().toLowerCase()) } : {}),
+        ...(gaid ? { gaid: await sha256(gaid) } : {}),
+      },
+      properties: { currency: "BRL", value: cents / 100 },
+    }],
+  };
+  const teste = Deno.env.get("TIKTOK_TEST_EVENT_CODE");
+  if (teste) payload.test_event_code = teste;
+
+  try {
+    const r = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Access-Token": token },
+      body: JSON.stringify(payload),
+    });
+    const corpo = await r.text();
+    log("tiktok events api", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
+    if (r.ok) {
+      await admin.from("analytics_events").insert({
+        user_id: userId,
+        event_name: "tiktok_capi_app_enviado",
+        event_data: { tx: txId, valor: cents / 100 },
+      });
+    }
+  } catch (e) {
+    log("tiktok events api ERRO", { msg: String(e).slice(0, 150) });
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
@@ -293,6 +374,14 @@ serve(async (req) => {
         feitos.push({ tx: v.revenuecat_subscription_id, email: v.customer_email, resultado: "pulado_teste" });
         continue;
       }
+      // TikTok ANTES do `continue` da Meta: os marcadores são separados, e a
+      // venda que a Meta já recebeu ainda pode dever o evento pro TikTok
+      // (aconteceu com TODAS até 16/08 — o enviador nem existia neste cron).
+      // A própria função checa o marcador dela e os secrets; dormente sem eles.
+      await mandarCompraProTikTok(
+        admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
+        v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
+      );
       const antes = await admin
         .from("analytics_events").select("id")
         .eq("event_name", "meta_capi_app_enviado")

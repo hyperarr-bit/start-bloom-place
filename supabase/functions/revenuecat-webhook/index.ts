@@ -314,12 +314,11 @@ async function mandarCompraProMeta(
 }
 
 /**
- * TikTok Events API (09/08) — mesma ideia do mandarCompraProMeta: manda a
- * compra pro TikTok DEPOIS que o Google já confirmou o pagamento (servidor,
- * não SDK no app). Decisão de arquitetura, não só preguiça de escrever Java:
- * este binário tem política deliberada de não embutir rastreador/SDK de
- * anúncio (ver preparar-loja.mjs — é a mesma razão por trás de nunca
- * coletar GAID). Server-side mantém essa política intacta.
+ * TikTok Events API (09/08; GAID 16/08) — mesma ideia do mandarCompraProMeta:
+ * manda a compra pro TikTok DEPOIS que o Google confirmou o pagamento. Mesma
+ * divisão de trabalho da Meta: o SDK do TikTok embarcado no app (v55) manda
+ * SÓ instalação/abertura; a compra sai DAQUI porque pode fechar com o app
+ * fechado (folha/Pix paga depois) e porque o dedup por tx vive no servidor.
  *
  * AVISO DE CONFIANÇA: montei este payload cruzando a documentação do TikTok
  * for Business (blog do endpoint consolidado) com integrações de terceiros
@@ -352,6 +351,30 @@ async function mandarCompraProTikTok(
     .maybeSingle();
   if (jaFoi) return;
 
+  // GAID (16/08): é o que deixa o TikTok casar a compra com o CLIQUE no
+  // anúncio — e-mail só acerta quem usa o mesmo e-mail no TikTok. Vai
+  // SHA-256 (é como os conectores oficiais mandam; diferente do madid da
+  // Meta, que vai cru). Ficha por user_id; se não achar, pela sessão — a
+  // compra anônima (v48+) deixa a ficha pendurada em user_id nulo.
+  let gaid = "";
+  const { data: devTt } = await admin
+    .from("analytics_events").select("event_data")
+    .eq("event_name", "app_device_info").eq("user_id", userId)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  gaid = String(((devTt as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).gaid ?? "").toLowerCase();
+  if (!gaid) {
+    const { data: sessTt } = await admin
+      .from("analytics_events").select("session_id").eq("user_id", userId).limit(50);
+    const idsTt = [...new Set(((sessTt ?? []) as { session_id: string | null }[]).map((x) => x.session_id).filter(Boolean))];
+    if (idsTt.length) {
+      const { data: porSessaoTt } = await admin
+        .from("analytics_events").select("event_data")
+        .eq("event_name", "app_device_info").in("session_id", idsTt)
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      gaid = String(((porSessaoTt as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).gaid ?? "").toLowerCase();
+    }
+  }
+
   const payload: Record<string, unknown> = {
     event_source: "app",
     event_source_id: appId,
@@ -362,6 +385,7 @@ async function mandarCompraProTikTok(
       user: {
         external_id: await sha256(userId),
         ...(email ? { email: await sha256(email.trim().toLowerCase()) } : {}),
+        ...(gaid ? { gaid: await sha256(gaid) } : {}),
       },
       properties: { currency: "BRL", value: cents / 100 },
     }],

@@ -6,6 +6,7 @@ import com.facebook.FacebookSdk;
 import com.facebook.LoggingBehavior;
 import com.facebook.appevents.AppEventsLogger;
 import com.getcapacitor.BridgeActivity;
+import com.tiktok.TikTokBusinessSdk;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -16,6 +17,14 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CalendarioPlugin.class);
         registerPlugin(MetaAdsPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Só no APK de teste: cospe requisição e RESPOSTA das plataformas no
+        // logcat. Sem isto, "evento saiu" e "evento foi aceito" parecem
+        // iguais — e a diferença entre os dois é a campanha inteira.
+        // (FLAG_DEBUGGABLE em vez de BuildConfig: o AGP deste projeto não
+        // gera a classe BuildConfig.)
+        boolean debuggavel = (getApplicationInfo().flags
+                & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
 
         // SDK da Meta (12/08, decisão do dono): é o que faz a campanha de App
         // Promotion enxergar instalação/abertura e otimizar. Só liga se o
@@ -30,13 +39,6 @@ public class MainActivity extends BridgeActivity {
             // único jeito de ela casar a instalação com o clique no anúncio.
             // Era essa a razão de embarcar o SDK; nascer sem isso é o defeito
             // silencioso que anula a mudança inteira.
-            // Só no APK de teste: cospe a requisição e a RESPOSTA da Meta no
-            // logcat. Sem isto, "evento saiu" e "evento foi aceito" parecem
-            // iguais — e a diferença entre os dois é a campanha inteira.
-            // (FLAG_DEBUGGABLE em vez de BuildConfig: o AGP deste projeto não
-            // gera a classe BuildConfig.)
-            boolean debuggavel = (getApplicationInfo().flags
-                    & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
             if (debuggavel) {
                 FacebookSdk.setIsDebugEnabled(true);
                 FacebookSdk.addLoggingBehavior(LoggingBehavior.APP_EVENTS);
@@ -53,6 +55,29 @@ public class MainActivity extends BridgeActivity {
             // Instalação (fb_mobile_first_app_launch) + abertura
             // (fb_mobile_activate_app) automáticos a partir daqui.
             AppEventsLogger.activateApp(getApplication());
+        }
+
+        // SDK do TikTok (16/08, decisão do dono): campanha de app rodando no
+        // TikTok sem ele = otimização cega (não etiqueta o referrer da Play e
+        // não tem MMP). InstallApp/LaunchApp saem automáticos daqui; Purchase
+        // NÃO — auto-IAP desligado de propósito, quem manda compra é o
+        // servidor (Events API, dedup por tx), mesma divisão usada com a
+        // Meta pra nunca duplicar evento de dinheiro. Credenciais vêm do
+        // key.properties (gitignored); ausentes, o SDK nem liga.
+        String ttAppId = getString(R.string.tiktok_app_id);
+        String ttSecret = getString(R.string.tiktok_app_secret);
+        if (!ttAppId.isEmpty() && !ttSecret.isEmpty()) {
+            TikTokBusinessSdk.TTConfig ttConfig =
+                    new TikTokBusinessSdk.TTConfig(getApplicationContext(), ttSecret)
+                            .setAppId("br.com.coreaplicativo.app")
+                            .setTTAppId(ttAppId)
+                            .disableAutoIapTrack();
+            if (debuggavel) {
+                ttConfig.openDebugMode()
+                        .setLogLevel(TikTokBusinessSdk.LogLevel.DEBUG);
+            }
+            TikTokBusinessSdk.initializeSdk(ttConfig);
+            TikTokBusinessSdk.startTrack();
         }
     }
 }

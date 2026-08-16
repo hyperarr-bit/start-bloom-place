@@ -309,6 +309,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             attribution: getAttributionParams(),
             fbp: cookie("_fbp"),
             fbc: cookie("_fbc"),
+            // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
+            // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
+            // dentro de attribution (getAttributionParams).
+            ttp: cookie("_ttp"),
             sourceUrl: window.location.href,
           },
         }));

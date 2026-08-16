@@ -697,6 +697,65 @@ serve(async (req) => {
         });
         const out = await res.json().catch(() => ({}));
         logStep(res.ok ? "Meta CAPI sent" : "Meta CAPI error", { status: res.status, eventId, body: JSON.stringify(out).slice(0, 160) });
+
+        /* TIKTOK EVENTS API (16/08) — dentro do mesmo try porque reaproveita
+         * TUDO que já foi buscado acima (pedido pago, sinais de match, hora
+         * real do pagamento). Sai depois do Meta de propósito: se o TikTok
+         * falhar, o Meta já foi.
+         *
+         * Por que existe: o pixel do TikTok estava no site desde sempre com
+         * SÓ ttq.page() — nenhum evento de compra. A campanha de lá otimizava
+         * por clique, cega pra quem paga. Mesmo buraco que estrangulou a Meta
+         * até 10/08.
+         *
+         * event_id = MESMO orderId do pixel do navegador; a dedup do TikTok é
+         * (event_source_id, event, event_id) por 48h. E o evento chama
+         * "CompletePayment": mandar "Purchase" entra como evento customizado
+         * e NÃO conta como conversão pra otimização. */
+        const ttPixel = Deno.env.get("TIKTOK_PIXEL_ID");
+        const ttToken = Deno.env.get("TIKTOK_ACCESS_TOKEN");
+        if (ttPixel && ttToken) {
+          const ttPayload: Record<string, unknown> = {
+            event_source: "web",
+            event_source_id: ttPixel,
+            data: [{
+              event: "CompletePayment",
+              event_time: eventTime,
+              event_id: eventId,
+              user: {
+                ...(customerEmail ? { email: await sha(customerEmail) } : {}),
+                ...(phoneHash ? { phone: phoneHash } : {}),
+                external_id: await sha(userId),
+                ...(ordem?.event_data?.ttclid ? { ttclid: ordem.event_data.ttclid } : {}),
+                ...(ordem?.event_data?.ttp ? { ttp: ordem.event_data.ttp } : {}),
+                ...(ip ? { ip } : {}),
+                ...(ua ? { user_agent: ua } : {}),
+              },
+              page: { url: sourceUrl },
+              properties: {
+                currency: "BRL",
+                value: amountCents / 100,
+                content_type: "product",
+                content_id: offerKind,
+              },
+            }],
+          };
+          const ttTeste = Deno.env.get("TIKTOK_TEST_EVENT_CODE");
+          if (ttTeste) ttPayload.test_event_code = ttTeste;
+          try {
+            const ttRes = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Access-Token": ttToken },
+              body: JSON.stringify(ttPayload),
+            });
+            const ttOut = await ttRes.text();
+            logStep(ttRes.ok ? "TikTok API sent" : "TikTok API error", {
+              status: ttRes.status, eventId,
+              ttclid: !!ordem?.event_data?.ttclid, ttp: !!ordem?.event_data?.ttp,
+              body: ttOut.slice(0, 200),
+            });
+          } catch (e) { logStep("TikTok API failed", { message: String(e).slice(0, 150) }); }
+        }
       } catch (e) { logStep("Meta CAPI failed", { message: String(e).slice(0, 150) }); }
     }
 

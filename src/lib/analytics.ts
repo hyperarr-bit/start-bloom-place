@@ -27,6 +27,10 @@ export const captureLandingMeta = () => {
       // ID do clique do Meta Ads — repassado até o checkout da Cakto pra
       // fechar a atribuição da compra com o anúncio exato.
       fbclid: params.get("fbclid") || "",
+      // ttclid = o fbclid do TikTok (16/08). Sem ele o Events API casa a
+      // compra só por e-mail/IP e a atribuição ao ANÚNCIO se perde — mesmo
+      // buraco que a gente tapou na Meta em 12/08.
+      ttclid: params.get("ttclid") || "",
       // IDs de clique do Google Ads. gclid é o padrão; gbraid/wbraid são os
       // equivalentes que o Google manda no iOS/Safari quando não pode usar gclid.
       gclid: params.get("gclid") || "",
@@ -37,7 +41,7 @@ export const captureLandingMeta = () => {
     };
     // Só persiste se vier algo de novo (não sobrescreve UTM original com vazio)
     const existing = localStorage.getItem(UTM_KEY);
-    if (!existing || utm.utm_source || utm.fbclid || utm.gclid || utm.gbraid || utm.wbraid) {
+    if (!existing || utm.utm_source || utm.fbclid || utm.ttclid || utm.gclid || utm.gbraid || utm.wbraid) {
       localStorage.setItem(UTM_KEY, JSON.stringify(utm));
     }
     return utm;
@@ -157,7 +161,7 @@ export const getAttributionParams = (): Record<string, string> => {
   try {
     const m = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
     const out: Record<string, string> = {};
-    for (const k of ["fbclid", "gclid", "gbraid", "wbraid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
+    for (const k of ["fbclid", "ttclid", "gclid", "gbraid", "wbraid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
       if (m[k]) out[k] = m[k];
     }
     return out;

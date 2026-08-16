@@ -119,6 +119,7 @@ serve(async (req) => {
       attribution: z
         .object({
           fbclid: z.string().max(500).optional(),
+          ttclid: z.string().max(500).optional(),
           gclid: z.string().max(500).optional(),
           utm_source: z.string().max(200).optional(),
           utm_medium: z.string().max(200).optional(),
@@ -129,6 +130,8 @@ serve(async (req) => {
       // Sinais de match da CAPI (10/08) — ver comentário no insert abaixo.
       fbp: z.string().max(200).nullable().optional(),
       fbc: z.string().max(500).nullable().optional(),
+      // TikTok (16/08): _ttp é o cookie de navegador deles (par do _fbp).
+      ttp: z.string().max(200).nullable().optional(),
       sourceUrl: z.string().max(500).nullable().optional(),
     });
 
@@ -212,6 +215,7 @@ serve(async (req) => {
         ...(attribution.utm_campaign ? { utm_campaign: attribution.utm_campaign } : {}),
         ...(attribution.utm_content ? { utm_content: attribution.utm_content } : {}),
         ...(attribution.fbclid ? { fbclid: attribution.fbclid } : {}),
+        ...(attribution.ttclid ? { ttclid: attribution.ttclid } : {}),
         ...(attribution.gclid ? { gclid: attribution.gclid } : {}),
       },
     };
@@ -270,6 +274,8 @@ serve(async (req) => {
         ref_id: data.refId ?? null,
         fbp: body.fbp ?? null,
         fbc: body.fbc ?? null,
+        ttp: body.ttp ?? null,
+        ttclid: attribution.ttclid ?? null,
         client_ip: clientIp,
         user_agent: userAgent ? userAgent.slice(0, 400) : null,
         source_url: body.sourceUrl ?? null,

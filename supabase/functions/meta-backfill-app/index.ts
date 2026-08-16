@@ -28,6 +28,7 @@ const log = (p: string, d?: unknown) =>
 
 /** Última recusa da Meta, pra devolver no modo admin (diagnóstico). */
 let ultimoErroMeta: string | null = null;
+let ultimoErroTikTok: string | null = null;
 
 const sha256 = async (txt: string): Promise<string> => {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
@@ -226,7 +227,11 @@ async function mandarCompraProTikTok(
   quando: string | null,
 ) {
   const appId = Deno.env.get("TIKTOK_APP_ID"); // event_source_id, do Events Manager
-  const token = Deno.env.get("TIKTOK_ACCESS_TOKEN"); // gerado no Events Manager, NÃO é o "app secret" do SDK
+  // Token ESCOPADO POR FONTE (provado 16/08): o token do pixel da web
+  // devolve 401 40001 "No permission to operate event source id" pro app.
+  // Mesmo padrão da Meta (META_CAPI_TOKEN web ≠ META_APP_CAPI_TOKEN app):
+  // gerar o token DENTRO do app no Events Manager. NÃO é o "app secret" do SDK.
+  const token = Deno.env.get("TIKTOK_APP_ACCESS_TOKEN") ?? Deno.env.get("TIKTOK_ACCESS_TOKEN");
   if (!appId || !token) return;
 
   const { data: jaFoi } = await admin
@@ -288,15 +293,23 @@ async function mandarCompraProTikTok(
     });
     const corpo = await r.text();
     log("tiktok events api", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
-    if (r.ok) {
+    // O TikTok pode responder HTTP 200 com `code` de erro no corpo (ex.:
+    // token sem permissão) — marcador só nasce com code:0, senão a venda
+    // seria dada como entregue sem nunca ter chegado.
+    let codeTt = -1;
+    try { codeTt = JSON.parse(corpo)?.code ?? -1; } catch { /* corpo não-JSON */ }
+    if (r.ok && codeTt === 0) {
       await admin.from("analytics_events").insert({
         user_id: userId,
         event_name: "tiktok_capi_app_enviado",
         event_data: { tx: txId, valor: cents / 100 },
       });
+    } else {
+      ultimoErroTikTok = `HTTP ${r.status} ${corpo.slice(0, 300)}`;
     }
   } catch (e) {
     log("tiktok events api ERRO", { msg: String(e).slice(0, 150) });
+    ultimoErroTikTok = String(e).slice(0, 200);
   }
 }
 
@@ -418,7 +431,7 @@ serve(async (req) => {
         falhas: conta("falhou"),
       });
     }
-    return json({ de, ate, vendas: (vendas ?? []).length, resultados: feitos });
+    return json({ de, ate, vendas: (vendas ?? []).length, tiktok_ultimo_erro: ultimoErroTikTok, resultados: feitos });
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);
     log("ERRO", { m });

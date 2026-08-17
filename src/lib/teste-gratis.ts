@@ -89,7 +89,23 @@ export function iniciarTeste(area: string | null): EstadoTeste {
  */
 const CHAVE_GUIA = "core-guia-semente";
 
-export type Guia = { area: string; passo: 1 | 2 | 3; status: "pendente" | "feita"; ultimaChave?: string };
+export type Guia = {
+  area: string;
+  passo: 1 | 2 | 3;
+  status: "pendente" | "feita";
+  ultimaChave?: string;
+  // v56: toda chave que JÁ subiu degrau. O degrau sobe por AÇÃO DISTINTA
+  // (qualquer uma das 3 do mapa da área, em qualquer ordem) — medido 17/08:
+  // gente fazia a ação "do passo 2" durante o passo 1 (gasto antes de conta
+  // fixa) e a trilha não acendia nada. A tese é nº de ações distintas
+  // (1=5%, 2=42%, 3+=69% pagam), não a ordem delas.
+  chavesCreditadas?: string[];
+};
+
+/** Chaves que já pontuaram — cobre guia gravado pela v55 (só ultimaChave). */
+export function chavesCreditadasDoGuia(g: Guia): string[] {
+  return g.chavesCreditadas ?? (g.ultimaChave ? [g.ultimaChave] : []);
+}
 
 export function guiaSemente(): Guia | null {
   try {
@@ -129,9 +145,12 @@ export function concluirPassoDaTrilha(chave?: string): Guia | null {
   // que o funil v53 já acompanha — mudar o nome quebraria a série histórica.
   if (g.passo === 1) trackEvent("semente_plantada", { area: g.area, funil: "teste" });
   trackEvent("trilha_passo", { passo: g.passo, area: g.area, funil: "teste" });
+  const creditadas = chave
+    ? [...chavesCreditadasDoGuia(g), chave]
+    : chavesCreditadasDoGuia(g);
   const novo: Guia = g.passo >= 3
-    ? { ...g, status: "feita", ultimaChave: chave }
-    : { ...g, passo: (g.passo + 1) as 2 | 3, ultimaChave: chave };
+    ? { ...g, status: "feita", ultimaChave: chave, chavesCreditadas: creditadas }
+    : { ...g, passo: (g.passo + 1) as 2 | 3, ultimaChave: chave, chavesCreditadas: creditadas };
   if (novo.status === "feita") trackEvent("trilha_completa", { area: g.area, funil: "teste" });
   try { localStorage.setItem(CHAVE_GUIA, JSON.stringify(novo)); } catch { /* noop */ }
   return novo;

@@ -20,7 +20,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Sprout } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
-import { estadoTeste, guiaSemente, concluirPassoDaTrilha } from "@/lib/teste-gratis";
+import { estadoTeste, guiaSemente, concluirPassoDaTrilha, chavesCreditadasDoGuia } from "@/lib/teste-gratis";
 import { type AreaKey } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 
@@ -256,10 +256,18 @@ export function TrilhaDoTeste() {
       const g = guiaSemente();
       if (!g || g.status !== "pendente" || !(g.area in TRILHA)) return;
       const key = String((e as CustomEvent).detail?.key ?? "");
-      if (!TRILHA[g.area as AreaKey][g.passo - 1].chaves.test(key)) return;
-      // editar/apagar o registro que JÁ pontuou reescreve a mesma chave —
-      // não é ação nova, não sobe degrau (review 16/08)
-      if (g.ultimaChave === key) return;
+      // v56: ação DISTINTA sobe degrau, em qualquer ordem — qualquer uma das
+      // 3 chaves do mapa da área conta, não só a do passo atual. Medido
+      // 17/08: em dinheiro a pessoa registrava um GASTO (chave do passo 2)
+      // durante o passo 1 e a trilha ficava apagada — agiu e não foi
+      // celebrada. A instrução do passo segue guiando; o crédito não pune
+      // quem fez outra coisa útil.
+      if (!TRILHA[g.area as AreaKey].some((p) => p.chaves.test(key))) return;
+      // editar/apagar registro que JÁ pontuou reescreve a mesma chave — não
+      // é ação nova, não sobe degrau (review 16/08; v56 guarda TODAS as que
+      // pontuaram, não só a última — senão alternar entre 2 chaves subiria
+      // a trilha inteira com 2 ações repetidas)
+      if (chavesCreditadasDoGuia(g).includes(key)) return;
       const vencido = g.passo;
       ultimoAvanco.current = Date.now();
       concluirPassoDaTrilha(key);

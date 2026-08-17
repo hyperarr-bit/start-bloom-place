@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { markActivation } from "@/lib/analytics";
+import { markActivation, trackEvent } from "@/lib/analytics";
 
 // Map user_data keys → activation action_key. Triggered first time a key is written
 // with non-empty value.
@@ -43,6 +43,13 @@ const isMeaningful = (value: any): boolean => {
   return Boolean(value);
 };
 
+// uso_modulo (v56): a ÚNICA visão server-side de uso do CONVIDADO. O dado de
+// convidado vive só no localStorage (nada em user_data até criar conta) e o
+// key_action_completed exige login — então "quantos do teste grátis usaram de
+// verdade?" era irrespondível (medido 17/08: 14 de 40 'mexeram' sem deixar
+// rastro nenhum). Uma vez por chave por sessão pra não inundar o banco.
+const usoJaContado = new Set<string>();
+
 const checkActivation = (key: string, value: any) => {
   if (!isMeaningful(value)) return;
   if (key.startsWith("spotlight-") || key.startsWith("quickstart-") || key.startsWith("core-")) return;
@@ -50,6 +57,13 @@ const checkActivation = (key: string, value: any) => {
     if (rule.match.test(key)) {
       if (rule.meaningful && !rule.meaningful(value)) return;
       markActivation(rule.action, { source_key: key });
+      // *-last-seen-* é escrita de ABERTURA do módulo (marcador de navegação,
+      // não ação da pessoa) — provado no emulador 17/08: abrir /financas já
+      // emitia uso_modulo sem nenhum toque. Uso = ação, não visita.
+      if (!usoJaContado.has(key) && !/last-seen/.test(key)) {
+        usoJaContado.add(key);
+        trackEvent("uso_modulo", { key, action: rule.action });
+      }
       try {
         window.dispatchEvent(new CustomEvent("core:activation", { detail: { action: rule.action, key } }));
       } catch {}

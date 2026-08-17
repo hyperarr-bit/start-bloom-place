@@ -36,11 +36,21 @@ const AuthCallback = () => {
           }
         }
 
-        // Veio do funil (/comecar → Google)? Usuário NOVO volta pro paywall
-        // do funil com o tutorial armado; usuário antigo segue pro app.
-        let fromFunnel = false;
+        /* Veio do funil? A flag agora carrega O CAMINHO do funil (17/08):
+         * "/inicio", "/comecar"… — o valor legado "true" vira /comecar pra
+         * não quebrar aba antiga. Dois defeitos consertados aqui, achados na
+         * investigação do "User already registered" (23 sessões/semana, 8
+         * morriam):
+         *   1. usuário EXISTENTE vindo do funil ia pro app ("/") em vez da
+         *      OFERTA — a pessoa estava a um passo de pagar e a gente a
+         *      mandava passear no app;
+         *   2. quem voltava, voltava pro /comecar fixo — funil VELHO — mesmo
+         *      tendo saído do /inicio (o que vende hoje).
+         * Tutorial só arma pra conta nova, como antes. */
+        let funnelPath: string | null = null;
         try {
-          fromFunnel = localStorage.getItem("funnel-oauth-pending") === "true";
+          const flag = localStorage.getItem("funnel-oauth-pending");
+          if (flag) funnelPath = flag === "true" ? "/comecar" : flag;
           localStorage.removeItem("funnel-oauth-pending");
         } catch { /* noop */ }
 
@@ -49,12 +59,17 @@ const AuthCallback = () => {
         const isNewUser = createdAt > 0 && Date.now() - createdAt < 10 * 60 * 1000;
         if (isNewUser && u?.user?.id) await persistLeadSource(supabase, u.user.id);
 
-        if (fromFunnel && isNewUser) {
-          trackEvent("signup_completed", { method: "google" });
-          trackEvent("funnel_click", { cta: "signup_success", method: "google" });
-          try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
-          window.history.replaceState({}, "", "/comecar?step=offer");
-          navigate("/comecar?step=offer", { replace: true });
+        if (funnelPath) {
+          if (isNewUser) {
+            trackEvent("signup_completed", { method: "google" });
+            trackEvent("funnel_click", { cta: "signup_success", method: "google" });
+            try { localStorage.setItem("force-new-user-tutorial", "true"); } catch { /* noop */ }
+          } else {
+            trackEvent("funnel_click", { cta: "signup_success", via: "existing_callback" });
+          }
+          const destino = `${funnelPath}?step=offer`;
+          window.history.replaceState({}, "", destino);
+          navigate(destino, { replace: true });
           return;
         }
 

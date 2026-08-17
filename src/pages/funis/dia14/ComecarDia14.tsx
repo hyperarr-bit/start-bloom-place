@@ -770,6 +770,11 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
   const [existingAccount, setExistingAccount] = useState(false);
+  // Link mágico (17/08): dos 23 "User already registered"/semana, 8 morriam —
+  // todos no mesmo lugar: não lembram a senha (5 clicaram em "recuperar" e
+  // nunca voltaram do e-mail). O link mágico corta a senha do caminho:
+  // um clique no e-mail e a pessoa volta LOGADA direto na oferta.
+  const [magicSent, setMagicSent] = useState(false);
   const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 6 && (existingAccount || !!name.trim());
   // Webview do Instagram/Facebook: o Google trava o OAuth ali (dados de 11/07:
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
@@ -784,7 +789,9 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     setErr(null);
     setGoogleLoading(true);
     trackEvent("funnel_click", { cta: "signup_google", inapp: inApp });
-    try { localStorage.setItem(FUNNEL_OAUTH_KEY, "true"); } catch { /* noop */ }
+    // O VALOR é o caminho do funil (17/08): o AuthCallback usa pra voltar pro
+    // funil CERTO — antes voltava fixo pro /comecar, o funil velho.
+    try { localStorage.setItem(FUNNEL_OAUTH_KEY, window.location.pathname); } catch { /* noop */ }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
@@ -806,6 +813,27 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     trackEvent("funnel_click", { cta: "signup_reset_password" });
     if (error) setErr(error.message);
     else setErr("Enviamos um link de recuperação pro seu e-mail. ✓");
+  };
+
+  const handleMagicLink = async () => {
+    if (!/\S+@\S+\.\S+/.test(email)) { setErr("Digite seu e-mail pra receber o link."); return; }
+    setErr(null);
+    trackEvent("funnel_click", { cta: "signup_magic_link", inapp: inApp });
+    // Mesmo caminho de volta do Google: /auth/callback lê a flag e devolve
+    // pra oferta. Se o e-mail abrir em OUTRO navegador (comum no webview do
+    // Instagram), a flag não existe lá e a pessoa cai logada no app — pior
+    // que a oferta, melhor que morrer na senha.
+    try { localStorage.setItem(FUNNEL_OAUTH_KEY, window.location.pathname); } catch { /* noop */ }
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: getAuthRedirectUrl("/auth/callback"), shouldCreateUser: false },
+    });
+    if (error) {
+      trackEvent("funnel_error", { where: "signup_magic_link", message: (error.message || "").slice(0, 200) });
+      setErr(error.message || "Não consegui enviar o link. Tente a senha ou a recuperação.");
+      return;
+    }
+    setMagicSent(true);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -921,10 +949,25 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
-        {existingAccount && (
-          <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
-            Esqueci minha senha
-          </button>
+        {existingAccount && !magicSent && (
+          <>
+            {/* O caminho SEM SENHA vem primeiro e com cara de botão: quem cai
+                aqui não lembra a senha (8 mortes/semana medidas, todas neste
+                ponto). "Esqueci minha senha" (reset) fica como plano C — exige
+                trocar a senha; o link mágico só exige 1 clique. */}
+            <Button type="button" variant="outline" size="lg" className="w-full h-12 text-base" onClick={handleMagicLink}>
+              Entrar sem senha (link por e-mail)
+            </Button>
+            <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
+              Esqueci minha senha
+            </button>
+          </>
+        )}
+        {magicSent && (
+          <p className="text-[13.5px] text-center leading-relaxed rounded-xl bg-muted/50 border border-border p-3">
+            📩 Link enviado pra <strong>{email.trim().toLowerCase()}</strong>.<br />
+            Abre teu e-mail e clica — você volta <strong>logado, direto na oferta</strong>.
+          </p>
         )}
       </form>
       <div className="mt-5"><TrustRow /></div>

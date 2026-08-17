@@ -87,7 +87,10 @@ export async function ligarDeepLinks(navegar: (rota: string) => void): Promise<(
         if (ok) {
           let voltaPro = "/";
           try {
-            if (localStorage.getItem("funnel-oauth-pending") === "true") {
+            // 17/08: a flag passou a carregar o CAMINHO do funil (a web usa
+            // pra voltar pro funil certo). No shell o destino continua o
+            // mesmo de sempre — só a checagem vira "existe", não "=== true".
+            if (localStorage.getItem("funnel-oauth-pending")) {
               localStorage.removeItem("funnel-oauth-pending");
               voltaPro = "/app?step=offer";
             }

@@ -103,6 +103,11 @@ export const AccountDrawer = ({
   const menuItems = isGuest
     ? [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
+        // 17/08 (reclamação real): convidado definia o nome uma vez (lápis da
+        // saudação, que some depois) e NUNCA MAIS conseguia alterar — a seção
+        // "Nome" só existia na aba de conta, que convidado não tem. O nome é
+        // local (core-user-name), não precisa de conta pra editar.
+        { icon: Pencil, label: "Alterar meu nome", onClick: () => setShowNameDialog(true) },
         // 16/08: no teste grátis de 3 dias o convidado usa o app inteiro sem
         // conta — e o menu não tinha nenhuma porta pro plano. Quem decidia
         // assinar no meio do teste só tinha a faixa fina do rodapé, que some

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,18 @@ interface NameEditDialogProps {
 export const NameEditDialog = ({ open, onOpenChange, currentName, onSave }: NameEditDialogProps) => {
   const [name, setName] = useState(currentName);
 
+  // Re-hidrata a CADA abertura (17/08, reclamação real de "alterar nome
+  // bugado"): useState só roda na montagem da página, quando o nome ainda
+  // nem tinha carregado — o dialog abria vazio/velho, e o Salvar em cima
+  // do vazio APAGAVA o nome da pessoa.
+  useEffect(() => {
+    if (open) setName(currentName);
+  }, [open, currentName]);
+
+  const trimmed = name.trim();
+
   const handleSave = () => {
-    const trimmed = name.trim();
+    if (!trimmed) return; // salvar vazio = apagar nome sem querer
     onSave(trimmed);
     onOpenChange(false);
   };
@@ -42,7 +52,7 @@ export const NameEditDialog = ({ open, onOpenChange, currentName, onSave }: Name
             <Button variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button className="flex-1" onClick={handleSave}>
+            <Button className="flex-1" onClick={handleSave} disabled={!trimmed}>
               Salvar
             </Button>
           </div>

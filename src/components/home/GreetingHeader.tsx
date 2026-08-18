@@ -156,15 +156,19 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
         <NameEditDialog
           open={showNameDialog}
           onOpenChange={setShowNameDialog}
-          currentName={displayName}
+          currentName={nomeCompleto}
           onSave={handleNameSave}
         />
       )}
 
+      {/* nomeCompleto, não displayName (17/08): displayName é SÓ o primeiro
+          nome (corte visual da saudação). Passar ele pro drawer/dialog fazia
+          "alterar nome" abrir com "João" pra quem é "João Victor" — e salvar
+          dali comia o sobrenome em silêncio. */}
       <AccountDrawer
         open={showAccount}
         onOpenChange={setShowAccount}
-        displayName={displayName}
+        displayName={nomeCompleto}
         onNameChange={onNameChange}
         onReplayTutorial={onReplayTutorial}
       />

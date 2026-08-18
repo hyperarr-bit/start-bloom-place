@@ -21,7 +21,7 @@ import { initRevenueCat, restaurar } from "@/lib/revenuecat";
  * nenhum — prova fica nas estrelas. "Restaurar compras" cobre reinstalação
  * de assinante (guideline de loja) e degrada silencioso sem chave RC.
  */
-export function AppWelcome({ onComecar }: { onComecar: () => void }) {
+export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onEntrar?: () => void }) {
   const navigate = useNavigate();
   const [restaurando, setRestaurando] = useState(false);
   const [msgRestore, setMsgRestore] = useState<string | null>(null);
@@ -97,7 +97,10 @@ export function AppWelcome({ onComecar }: { onComecar: () => void }) {
           >
             Começar
           </button>
-          <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); navigate("/entrar"); }}>
+          {/* v60: no funil do teste o login fica DENTRO do funil (SignupScreen
+              tem a esteira de conta existente); /entrar é o fallback do uso
+              antigo em Comecar/Radar. */}
+          <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
             Já tenho conta? <b>Entrar</b>
           </button>
           {isNativeShell() && (

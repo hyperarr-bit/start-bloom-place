@@ -18,8 +18,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // O Play recusa reenviar o mesmo versionCode: 1, 2 e 3 já foram pro
         // teste interno, então todo upload novo sobe este número.
-        versionCode 59
-        versionName "1.0.58"
+        versionCode 60
+        versionName "1.0.59"
         // Client token da Meta: fora do código versionado (repo é PÚBLICO —
         // ver comentário no strings.xml). Ausente, o recurso nasce vazio e a
         // MainActivity simplesmente não liga o SDK; o preparar-loja barra

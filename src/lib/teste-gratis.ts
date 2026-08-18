@@ -161,3 +161,24 @@ export function concluirPassoDaTrilha(chave?: string): Guia | null {
 export function limparGuiaSemente(): void {
   try { localStorage.removeItem(CHAVE_GUIA); } catch { /* noop */ }
 }
+
+/* ------------------------------------------------------- trial com cartão
+ * v60 (18/08): o trial da folha do Google torna a pessoa ASSINANTE na hora —
+ * e o cinto `isSubscribed` escondia a Trilha exatamente de quem mais precisa
+ * dela (usar 2+ vezes nos 3 dias é o que evita o cancelamento). O marcador
+ * local diz "esse assinante está nos 3 dias de teste do cartão": a Trilha
+ * continua visível até ele expirar, e aí some sozinha. */
+const CHAVE_TRIAL_CARTAO = "core-trial-cartao-fim";
+
+export function marcarTrialCartao(): void {
+  try { localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + 3 * 86_400_000)); } catch { /* noop */ }
+}
+
+export function trialCartaoAtivo(): boolean {
+  try {
+    const fim = Number(localStorage.getItem(CHAVE_TRIAL_CARTAO));
+    return Number.isFinite(fim) && fim > 0 && Date.now() < fim;
+  } catch {
+    return false;
+  }
+}

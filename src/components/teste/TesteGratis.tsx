@@ -20,7 +20,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, Sprout } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
-import { estadoTeste, guiaSemente, concluirPassoDaTrilha, chavesCreditadasDoGuia } from "@/lib/teste-gratis";
+import { estadoTeste, guiaSemente, concluirPassoDaTrilha, chavesCreditadasDoGuia, trialCartaoAtivo } from "@/lib/teste-gratis";
 import { type AreaKey } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 
@@ -286,7 +286,10 @@ export function TrilhaDoTeste() {
   if (!isNativeShell() || fora(pathname)) return null;
   // Assinante não tem trilha de teste — cobre chave residual de quem pagou
   // por caminho que não passou pelo limparGuiaSemente (restore antigo etc.).
-  if (isSubscribed) return null;
+  // EXCETO o trial do cartão (v60): esses 3 dias são exatamente quando a
+  // trilha mais paga o aluguel — 2+ usos = não cancela. O marcador expira
+  // sozinho e o cinto volta a valer.
+  if (isSubscribed && !trialCartaoAtivo()) return null;
   const area = (guia && guia.area in TRILHA ? guia.area : null) as AreaKey | null;
   if (!area || !guia) return null;
   const pendente = guia.status === "pendente";

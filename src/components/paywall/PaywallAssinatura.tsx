@@ -23,7 +23,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Loader2, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowRight, Bell, Check, Loader2, Star, Unlock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
@@ -32,7 +33,7 @@ import { trackEvent } from "@/lib/analytics";
 import { estadoTeste } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
-import { limparGuiaSemente } from "@/lib/teste-gratis";
+import { limparGuiaSemente, armarGuiaSemente, marcarTrialCartao } from "@/lib/teste-gratis";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
@@ -119,6 +120,13 @@ export function PaywallAssinatura({
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
       limparGuiaSemente();
+      // v60: quem começou o TRIAL entra com a Trilha armada — usar 2+ vezes
+      // nos 3 dias é o que evita o cancelamento (nosso dado: 2 ações = 42%
+      // pagam; aqui "paga" = deixa a cobrança do dia 3 acontecer).
+      if (trial && oferta !== "downsell") {
+        marcarTrialCartao();
+        armarGuiaSemente(area ?? "dinheiro");
+      }
       // Sem conta = fluxo v48: cadastro DEPOIS do pagamento. Quem chegou aqui
       // pelo /planos ou pelo gate já tem conta — recarrega e o gate abre.
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
@@ -211,21 +219,44 @@ export function PaywallAssinatura({
         </div>
       ) : (
         <>
-          <p className="text-[13px] text-muted-foreground text-center mb-3">
-            {trial ? (
-              <>
-                <b className="text-foreground">3 dias com o app inteiro, de graça.</b>{" "}
-                Não curtiu? Cancela na Play antes do dia 3 e não paga nada.
-              </>
-            ) : (
-              <>
-                <b className="text-foreground">
-                  {teste.fase === "nunca" && contexto !== "funil" ? "Os 16 módulos liberados" : "Tudo isso fica salvo"}
-                </b>{" "}
-                se você continuar. Escolhe como:
-              </>
-            )}
-          </p>
+          {trial ? (
+            /* v60 — a timeline do trial é a ESTRELA da tela (padrão "How your
+               free trial works" do BitePal): fio vertical que se desenha +
+               linhas em cascata. Era um rodapé espremido na porta. */
+            <div className="relative rounded-2xl border border-border bg-white p-4 mb-4">
+              <motion.span
+                className="absolute left-[31px] top-[30px] bottom-[30px] w-[2px] bg-black/[0.08] origin-top"
+                initial={{ scaleY: 0 }} animate={{ scaleY: 1 }} transition={{ duration: 0.7, delay: 0.35 }}
+              />
+              {([
+                [Unlock, "Hoje", "App inteiro liberado — os 16 módulos"],
+                [Bell, "Dia 2", "A gente te lembra que o teste tá acabando"],
+                [Star, "Dia 3", "Vira assinatura — cancela antes na Play e não paga nada"],
+              ] as Array<[typeof Unlock, string, string]>).map(([Ico, t, s], i) => (
+                <motion.div
+                  key={t}
+                  className="relative flex items-start gap-3 py-1.5"
+                  initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.12 + i * 0.2, type: "spring", stiffness: 300, damping: 24 }}
+                >
+                  <span className="w-8 h-8 rounded-full bg-secondary border border-border grid place-items-center shrink-0 relative z-[1]">
+                    <Ico className="w-3.5 h-3.5" strokeWidth={2.4} />
+                  </span>
+                  <span className="text-[13px] leading-snug pt-0.5">
+                    <b className="block text-foreground text-[13.5px]">{t}</b>
+                    <span className="text-muted-foreground">{s}</span>
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[13px] text-muted-foreground text-center mb-3">
+              <b className="text-foreground">
+                {teste.fase === "nunca" && contexto !== "funil" ? "Os 16 módulos liberados" : "Tudo isso fica salvo"}
+              </b>{" "}
+              se você continuar. Escolhe como:
+            </p>
+          )}
           <button
             onClick={() => setPlano("anual")}
             className={`w-full text-left rounded-2xl border-2 p-4 mb-2.5 relative transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-white"}`}
@@ -282,9 +313,17 @@ export function PaywallAssinatura({
       )}
       {erro && <p className="text-[12.5px] text-destructive text-center mb-3">{erro}</p>}
 
+      {trial && (
+        <p className="text-center text-[12px] text-muted-foreground mb-2.5">
+          <span className="text-[#f0a500]">★★★★★</span> <b className="text-foreground">+1000 pessoas</b> organizando a vida
+        </p>
+      )}
+
+      {/* CTA grafite (v60): a tela de dinheiro fala a cor da welcome e do
+          BitePal (pill preta) — magenta ficou pra seleção e badge. */}
       <Button
         size="lg"
-        className="w-full min-h-12 text-base font-bold bg-accent hover:bg-accent/90 text-accent-foreground"
+        className="w-full min-h-[54px] rounded-full text-base font-extrabold bg-[#16121c] hover:bg-[#16121c]/90 text-white shadow-[0_18px_38px_-10px_rgba(22,18,28,.5)]"
         disabled={comprando}
         onClick={async () => {
           const rc = await import("@/lib/revenuecat");

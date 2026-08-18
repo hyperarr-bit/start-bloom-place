@@ -182,7 +182,7 @@ function Progresso({ n }: { n: 1 | 2 | 3 | 4 }) {
  *  18/08 (decisão do dono, dado da coorte de 17/08: só 7% voltavam no D1 e
  *  0 vendas de anúncio): o teste virou SÓ COM CARTÃO, estilo Cal AI — a
  *  timeline conta a verdade: dia 3 COBRA, cancela antes se não curtir. */
-function PortaTeste({ onPick }: { onPick: (a: AreaKey | "tudo") => void }) {
+function PortaTeste({ onPick, onEntrar }: { onPick: (a: AreaKey | "tudo") => void; onEntrar: () => void }) {
   const [sel, setSel] = useState<AreaKey | "tudo" | null>(null);
   return (
     <div className="w-full flex-1 flex flex-col">
@@ -190,9 +190,21 @@ function PortaTeste({ onPick }: { onPick: (a: AreaKey | "tudo") => void }) {
       <h1 className="text-[24px] font-bold tracking-tight leading-tight">
         Qual área tá mais fora de<br />controle hoje?
       </h1>
-      <p className="text-muted-foreground text-[13.5px] mt-1.5 mb-5">
+      <p className="text-muted-foreground text-[13.5px] mt-1.5 mb-1">
         Seu teste grátis começa por ela. As outras 15 vêm junto.
       </p>
+      {/* Porta do LOGIN (18/08, avaliação 2★): pagante do site/conta antiga
+          cai NESTA tela ao abrir o app — sem este link, o único caminho era o
+          funil de venda e o "Restaurar compras" (que só olha a Play). NO TOPO
+          de propósito: a tela é h-dvh overflow-hidden, e no rodapé o link
+          caía além da dobra — visível no DOM, INALCANÇÁVEL pro dedo (pego
+          por hit-test; el.click() de teste passava reto). */}
+      <button
+        onClick={() => { trackEvent("funnel_click", { cta: "porta_ja_tenho_conta", funil: FUNIL }); onEntrar(); }}
+        className="self-start text-[12px] text-muted-foreground mb-4 py-0.5"
+      >
+        Já tenho conta — <span className="underline underline-offset-2 font-semibold text-foreground">entrar</span>
+      </button>
       <div className="space-y-2.5">
         {PORTA_OPCOES.map((o, i) => (
           <button
@@ -464,6 +476,7 @@ export default function ComecarTeste() {
                   try { localStorage.setItem(FUNNEL_AREA_KEY, a); } catch { /* noop */ }
                   setStep("dor");
                 }}
+                onEntrar={() => setStep("signup")}
               />
             )}
             {step === "dor" && (
@@ -494,6 +507,7 @@ export default function ComecarTeste() {
                 d3={d3}
                 trial={trialGate}
                 onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
+                onEntrar={() => setStep("signup")}
               />
             )}
             {step === "signup" && (

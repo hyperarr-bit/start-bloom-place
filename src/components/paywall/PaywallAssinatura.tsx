@@ -60,7 +60,7 @@ export function useRecap(area: AreaKey | null): string[] {
 }
 
 export function PaywallAssinatura({
-  contexto, area = null, d3 = false, trial = false, onPagoSemConta, onFechar,
+  contexto, area = null, d3 = false, trial = false, onPagoSemConta, onFechar, onEntrar,
 }: {
   contexto: ContextoPaywall;
   area?: AreaKey | null;
@@ -72,6 +72,11 @@ export function PaywallAssinatura({
   trial?: boolean;
   onPagoSemConta?: () => void;
   onFechar?: () => void;
+  /** Porta pro LOGIN de quem já tem conta (18/08, avaliação 2★ real): a
+   *  pagante do vitalício da WEB ficou presa no funil apertando "Restaurar
+   *  compras" 25× — restaurar só olha a Play, e o acesso dela vive na conta.
+   *  Sem esta porta, todo pagante da web que instala o app fica de fora. */
+  onEntrar?: () => void;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -308,6 +313,21 @@ export function PaywallAssinatura({
           className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-3 py-1"
         >
           Continuar meu teste — decido no dia 3
+        </button>
+      )}
+
+      {/* Já é cliente (site vitalício, conta antiga)? O acesso vive na CONTA,
+          não na Play — "Restaurar compras" não resolve pra essa pessoa. */}
+      {!user && contexto === "funil" && (
+        <button
+          onClick={() => {
+            trackEvent("funnel_click", { cta: "paywall_ja_tenho_conta", contexto });
+            if (onEntrar) onEntrar();
+            else navigate("/app?step=signup");
+          }}
+          className="w-full text-center text-[12px] text-muted-foreground mt-3 py-1"
+        >
+          Já tenho conta (comprei no site) — <span className="underline underline-offset-2 font-semibold text-foreground">entrar</span>
         </button>
       )}
 

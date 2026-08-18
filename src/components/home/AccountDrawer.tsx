@@ -107,7 +107,11 @@ export const AccountDrawer = ({
         // saudação, que some depois) e NUNCA MAIS conseguia alterar — a seção
         // "Nome" só existia na aba de conta, que convidado não tem. O nome é
         // local (core-user-name), não precisa de conta pra editar.
-        { icon: Pencil, label: "Alterar meu nome", onClick: () => setShowNameDialog(true) },
+        // FECHA a gaveta antes (18/08, print do dono no iPhone): o dialog tem
+        // z-50 e a gaveta z-300 — com as duas abertas, o TOQUE no Salvar morre
+        // na camada da gaveta (digitar funciona, salvar não). Clique via JS no
+        // emulador não enxerga disputa de z-index; só hit-test pega.
+        { icon: Pencil, label: "Alterar meu nome", onClick: () => { onOpenChange(false); setShowNameDialog(true); } },
         // 16/08: no teste grátis de 3 dias o convidado usa o app inteiro sem
         // conta — e o menu não tinha nenhuma porta pro plano. Quem decidia
         // assinar no meio do teste só tinha a faixa fina do rodapé, que some
@@ -211,7 +215,7 @@ export const AccountDrawer = ({
                 <div>
                   <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground mb-1.5 pl-1">Nome</p>
                   <button
-                    onClick={() => setShowNameDialog(true)}
+                    onClick={() => { onOpenChange(false); setShowNameDialog(true); }}
                     className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground hover:bg-muted/50 transition-colors"
                   >
                     <span className="truncate">{displayName || "Adicionar nome"}</span>

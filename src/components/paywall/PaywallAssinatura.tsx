@@ -60,11 +60,16 @@ export function useRecap(area: AreaKey | null): string[] {
 }
 
 export function PaywallAssinatura({
-  contexto, area = null, d3 = false, onPagoSemConta, onFechar,
+  contexto, area = null, d3 = false, trial = false, onPagoSemConta, onFechar,
 }: {
   contexto: ContextoPaywall;
   area?: AreaKey | null;
   d3?: boolean;
+  /** 18/08 (decisão do dono): teste SÓ com cartão, estilo Cal AI. O funil
+   *  desemboca aqui ANTES de qualquer uso — a folha do anual abre com a
+   *  oferta coretrial (3 dias grátis, Play aplica sozinho pra assinante
+   *  novo) e a cobrança do dia 3 é automática, cancelável na Play. */
+  trial?: boolean;
   onPagoSemConta?: () => void;
   onFechar?: () => void;
 }) {
@@ -81,7 +86,7 @@ export function PaywallAssinatura({
 
   useEffect(() => {
     trackEvent("app_paywall_view", {
-      contexto, modo: "assinatura", d3,
+      contexto, modo: "assinatura", d3, trial,
       dia: teste.fase === "ativo" ? teste.dia : teste.fase,
     });
     void (async () => {
@@ -137,12 +142,15 @@ export function PaywallAssinatura({
 
   // O selo de cima conta a verdade do estado da pessoa.
   const selo = (() => {
+    if (trial) return "Último passo";
     if (contexto === "planos") return "Escolha seu plano";
     if (d3 || teste.fase === "expirado") return "Seu teste terminou";
     if (teste.fase === "ativo") return `Dia ${teste.dia} do seu teste`;
     return "Seu acesso ao CORE";
   })();
-  const titulo = teste.fase === "nunca" && contexto !== "funil"
+  const titulo = trial
+    ? "Destrave seus 3 dias grátis"
+    : teste.fase === "nunca" && contexto !== "funil"
     ? "Sua vida inteira organizada"
     : "Seus 3 dias no CORE";
 
@@ -166,8 +174,9 @@ export function PaywallAssinatura({
       </div>
 
       {/* O recap é o endowment: primeiro o que ela tem, depois o preço. No
-          /planos de quem nunca testou não há o que recapitular. */}
-      {!(contexto === "planos" && teste.fase === "nunca") && (
+          /planos de quem nunca testou não há o que recapitular — e no gate
+          de trial (D0) também não: a pessoa ainda não construiu nada. */}
+      {!trial && !(contexto === "planos" && teste.fase === "nunca") && (
         <div className="rounded-2xl border border-border bg-white p-4 mb-4">
           <div className="text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground mb-2.5">
             O que você construiu
@@ -198,22 +207,35 @@ export function PaywallAssinatura({
       ) : (
         <>
           <p className="text-[13px] text-muted-foreground text-center mb-3">
-            <b className="text-foreground">
-              {teste.fase === "nunca" && contexto !== "funil" ? "Os 16 módulos liberados" : "Tudo isso fica salvo"}
-            </b>{" "}
-            se você continuar. Escolhe como:
+            {trial ? (
+              <>
+                <b className="text-foreground">3 dias com o app inteiro, de graça.</b>{" "}
+                Não curtiu? Cancela na Play antes do dia 3 e não paga nada.
+              </>
+            ) : (
+              <>
+                <b className="text-foreground">
+                  {teste.fase === "nunca" && contexto !== "funil" ? "Os 16 módulos liberados" : "Tudo isso fica salvo"}
+                </b>{" "}
+                se você continuar. Escolhe como:
+              </>
+            )}
           </p>
           <button
             onClick={() => setPlano("anual")}
             className={`w-full text-left rounded-2xl border-2 p-4 mb-2.5 relative transition-colors ${plano === "anual" ? "border-accent bg-accent/5" : "border-border bg-white"}`}
           >
-            <span className="absolute -top-2.5 left-4 bg-accent text-white text-[9.5px] font-extrabold px-2.5 py-0.5 rounded-full tracking-wide">MAIS ESCOLHIDO</span>
+            <span className="absolute -top-2.5 left-4 bg-accent text-white text-[9.5px] font-extrabold px-2.5 py-0.5 rounded-full tracking-wide">
+              {trial ? "3 DIAS GRÁTIS" : "MAIS ESCOLHIDO"}
+            </span>
             <div className="flex items-baseline justify-between">
               <span className="text-[15px] font-extrabold">Anual</span>
               <span className="text-[19px] font-extrabold">{APP_PRECOS.anual.preco}<small className="text-[11px] font-bold text-muted-foreground">/ano</small></span>
             </div>
             <div className="text-[12px] font-semibold text-muted-foreground mt-0.5">
-              = {APP_PRECOS.anual.porMes}/mês · economiza {APP_PRECOS.anual.economiaAno} no ano
+              {trial
+                ? <>primeiros 3 dias grátis · depois = {APP_PRECOS.anual.porMes}/mês</>
+                : <>= {APP_PRECOS.anual.porMes}/mês · economiza {APP_PRECOS.anual.economiaAno} no ano</>}
             </div>
           </button>
           <button
@@ -224,7 +246,9 @@ export function PaywallAssinatura({
               <span className="text-[14px] font-bold">Mensal</span>
               <span className="text-[16px] font-extrabold">{APP_PRECOS.mensal.preco}<small className="text-[11px] font-bold text-muted-foreground">/mês</small></span>
             </div>
-            <div className="text-[11.5px] font-medium text-muted-foreground mt-0.5">cancele quando quiser</div>
+            <div className="text-[11.5px] font-medium text-muted-foreground mt-0.5">
+              {trial ? "começa cobrando hoje — sem os 3 dias grátis" : "cancele quando quiser"}
+            </div>
           </button>
         </>
       )}
@@ -265,11 +289,15 @@ export function PaywallAssinatura({
       >
         {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : oferta === "downsell"
           ? <>Pagar 1 mês no Pix <ArrowRight className="w-4 h-4" /></>
+          : trial && plano === "anual"
+          ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
           : <>Continuar com meu CORE <ArrowRight className="w-4 h-4" /></>}
       </Button>
       <p className="text-[10.5px] text-muted-foreground text-center mt-2">
         {oferta === "downsell"
           ? "Pagamento único pelo Google Play · 30 dias de acesso · renovação manual"
+          : trial && plano === "anual"
+          ? `3 dias grátis, depois ${APP_PRECOS.anual.preco}/ano · cancele na Play quando quiser`
           : "Pagamento pelo Google Play · cancele quando quiser"}
       </p>
 

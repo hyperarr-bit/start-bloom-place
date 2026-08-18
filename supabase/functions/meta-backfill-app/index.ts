@@ -368,7 +368,7 @@ serve(async (req) => {
 
     const { data: vendas } = await admin
       .from("subscriptions")
-      .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,created_at")
+      .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,current_period_end,created_at")
       .eq("payment_method", "play_store")
       .not("revenuecat_subscription_id", "is", null)
       .gte("created_at", inicio)
@@ -385,6 +385,20 @@ serve(async (req) => {
     for (const v of vendas ?? []) {
       if (EH_TESTE(v.customer_email)) {
         feitos.push({ tx: v.revenuecat_subscription_id, email: v.customer_email, resultado: "pulado_teste" });
+        continue;
+      }
+      /* TRIAL NÃO É COMPRA (18/08, coretrial religada): a assinatura em
+       * período de teste entra na tabela com amount_cents cheio (159,90) mas
+       * NENHUM dinheiro existiu — mandar Purchase agora envenenaria a
+       * otimização da Meta/TikTok com receita falsa. Detector: período atual
+       * mais curto que 5 dias = trial (anual/mensal reais duram 30-365d;
+       * vitalício tem fim em 2126; o prepaid de 30d passa). Quando o Google
+       * COBRAR no dia 3, o sync reescreve a linha com período de 1 ano, o
+       * detector deixa passar e o tx (inédito) sobe como Purchase de verdade. */
+      const ini = v.current_period_start ? Date.parse(v.current_period_start) : null;
+      const fim = v.current_period_end ? Date.parse(v.current_period_end) : null;
+      if (ini && fim && fim - ini < 5 * 86400_000 && fim - ini > 0) {
+        feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_pulado" });
         continue;
       }
       // TikTok ANTES do `continue` da Meta: os marcadores são separados, e a

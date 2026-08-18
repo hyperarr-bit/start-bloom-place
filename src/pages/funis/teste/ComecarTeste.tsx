@@ -30,11 +30,10 @@ import { AREAS, DOOR_AREAS, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { estadoTeste, iniciarTeste, armarGuiaSemente } from "@/lib/teste-gratis";
-import {
-  agendarReguaDoTeste, agendarResgateDoPlano, cancelarReguaDoTeste,
-  cancelarResgateDoPlano, pedirPermissao,
-} from "@/lib/notificacoes";
+// 18/08: iniciarTeste/armarGuiaSemente/agendarReguaDoTeste saíram — o teste
+// caseiro morreu pra entrada nova (trial é da folha do Google agora).
+import { estadoTeste } from "@/lib/teste-gratis";
+import { pedirPermissao } from "@/lib/notificacoes";
 import {
   SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY,
 } from "@/pages/funis/radar/ComecarRadar";
@@ -180,8 +179,9 @@ function Progresso({ n }: { n: 1 | 2 | 3 | 4 }) {
 }
 
 /** T1 — a única decisão da tela + a promessa do teste no 1º toque.
- *  A timeline "como funciona" volta da era assinatura (saiu 06/08 com o
- *  vitalício), adaptada: sem cartão, o Dia 3 é DECISÃO, não cobrança. */
+ *  18/08 (decisão do dono, dado da coorte de 17/08: só 7% voltavam no D1 e
+ *  0 vendas de anúncio): o teste virou SÓ COM CARTÃO, estilo Cal AI — a
+ *  timeline conta a verdade: dia 3 COBRA, cancela antes se não curtir. */
 function PortaTeste({ onPick }: { onPick: (a: AreaKey | "tudo") => void }) {
   const [sel, setSel] = useState<AreaKey | "tudo" | null>(null);
   return (
@@ -224,9 +224,9 @@ function PortaTeste({ onPick }: { onPick: (a: AreaKey | "tudo") => void }) {
         </Button>
         <div className="mt-3.5 pt-3 border-t border-dashed border-black/10 space-y-1.5">
           {[
-            ["Hoje", "tudo liberado — sem cartão, sem cadastro"],
-            ["Dia 2", "a gente te avisa que tá acabando"],
-            ["Dia 3", "você decide. Sem cartão = impossível te cobrar"],
+            ["Hoje", "3 dias grátis — o app inteiro liberado"],
+            ["Dia 2", "a gente te lembra que o teste tá acabando"],
+            ["Dia 3", "vira assinatura — cancela antes na Play e não paga nada"],
           ].map(([t, s]) => (
             <div key={t} className="flex gap-2.5 text-[11.5px] leading-snug">
               <b className="w-9 shrink-0 font-extrabold text-foreground">{t}</b>
@@ -332,7 +332,7 @@ function NotifScreen({ area, hora, onDone }: { area: AreaKey; hora: string | nul
           {indo ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Ativar meus lembretes <Bell className="w-4 h-4" /></>}
         </Button>
         <button onClick={() => void seguir(false)} disabled={indo} className="w-full text-center text-[12.5px] text-muted-foreground mt-3 py-1">
-          Agora não — abrir meu app
+          Agora não — continuar
         </button>
       </div>
     </div>
@@ -364,6 +364,10 @@ export default function ComecarTeste() {
     try { return localStorage.getItem("core-lembrete-hora"); } catch { return null; }
   });
   const [posCompra, setPosCompra] = useState(false);
+  // Veio do quiz (D0) → paywall em modo TRIAL (3 dias grátis no anual).
+  // D3/expirado do teste caseiro antigo chega com trialGate=false e vê a
+  // oferta normal ("seu teste terminou").
+  const [trialGate, setTrialGate] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState("");
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -371,7 +375,8 @@ export default function ComecarTeste() {
   userRef.current = user;
 
   useEffect(() => {
-    trackEvent("funnel_view", { step: step === "offer" ? "offer_d3" : step, funil: FUNIL });
+    trackEvent("funnel_view", { step: step === "offer" ? (trialGate ? "offer_trial" : "offer_d3") : step, funil: FUNIL });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   /* Retomadas do "pagou e ainda não tem conta" — mesmo desenho da v48:
@@ -428,18 +433,18 @@ export default function ComecarTeste() {
     return <Navigate to="/home" replace />;
   }
 
-  /** Fim do funil: liga o relógio, agenda a régua e abre o MÓDULO REAL em
-   *  modo guiado. A ordem importa — o gate das rotas de módulo só deixa
-   *  convidado passar com teste ATIVO. */
-  const abrirApp = (pediuNotif: boolean) => {
+  /** Fim do funil (18/08, teste SÓ com cartão): nada de teste caseiro — o
+   *  trial nasce NA FOLHA do Google (oferta coretrial no anual, 3 dias
+   *  grátis, cobrança automática no dia 3). Não liga iniciarTeste, não
+   *  agenda régua caseira, não arma trilha: quem aprovar o cartão entra
+   *  como ASSINANTE (em trial) pelo fluxo pós-compra normal (signup →
+   *  liberando). Quem estava NO MEIO do teste caseiro antigo continua
+   *  respeitado pelos guards de estadoTeste acima. */
+  const abrirApp = (_pediuNotif: boolean) => {
     const a = area ?? "dinheiro";
-    const estado = iniciarTeste(a);
-    if (pediuNotif && estado.fase === "ativo") {
-      void agendarReguaDoTeste(a, estado.inicio, hora);
-    }
-    armarGuiaSemente(a);
-    trackEvent("funnel_click", { cta: "teste_abrir_app", area: a, funil: FUNIL });
-    navigate(`/${AREAS[a].module}`, { replace: true });
+    trackEvent("funnel_click", { cta: "teste_gate_cartao", area: a, funil: FUNIL });
+    setTrialGate(true);
+    setStep("offer");
   };
 
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
@@ -487,6 +492,7 @@ export default function ComecarTeste() {
                 contexto="funil"
                 area={area}
                 d3={d3}
+                trial={trialGate}
                 onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
               />
             )}

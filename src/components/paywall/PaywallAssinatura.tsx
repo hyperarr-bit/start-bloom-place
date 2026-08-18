@@ -252,7 +252,7 @@ export function PaywallAssinatura({
               <span className="text-[16px] font-extrabold">{APP_PRECOS.mensal.preco}<small className="text-[11px] font-bold text-muted-foreground">/mês</small></span>
             </div>
             <div className="text-[11.5px] font-medium text-muted-foreground mt-0.5">
-              {trial ? "começa cobrando hoje — sem os 3 dias grátis" : "cancele quando quiser"}
+              {trial ? "3 dias grátis também · cancela quando quiser" : "cancele quando quiser"}
             </div>
           </button>
         </>
@@ -294,15 +294,15 @@ export function PaywallAssinatura({
       >
         {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : oferta === "downsell"
           ? <>Pagar 1 mês no Pix <ArrowRight className="w-4 h-4" /></>
-          : trial && plano === "anual"
+          : trial
           ? <>Começar meus 3 dias grátis <ArrowRight className="w-4 h-4" /></>
           : <>Continuar com meu CORE <ArrowRight className="w-4 h-4" /></>}
       </Button>
       <p className="text-[10.5px] text-muted-foreground text-center mt-2">
         {oferta === "downsell"
           ? "Pagamento único pelo Google Play · 30 dias de acesso · renovação manual"
-          : trial && plano === "anual"
-          ? `3 dias grátis, depois ${APP_PRECOS.anual.preco}/ano · cancele na Play quando quiser`
+          : trial
+          ? `3 dias grátis, depois ${plano === "anual" ? `${APP_PRECOS.anual.preco}/ano` : `${APP_PRECOS.mensal.preco}/mês`} · cancele na Play quando quiser`
           : "Pagamento pelo Google Play · cancele quando quiser"}
       </p>
 

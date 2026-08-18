@@ -42,17 +42,24 @@ async function mandarCompraProMeta(
   cents: number,
   txId: string,
   quando: string | null,
+  // "trial" (18/08): manda StartTrial em vez de Purchase — é o evento que a
+  // campanha AEO otimiza enquanto a cobrança do dia 3 não existe. Marcador
+  // próprio: o MESMO tx manda StartTrial hoje e Purchase quando o Google
+  // cobrar (dedup da Meta é por (event_name, event_id), não colide).
+  tipo: "purchase" | "trial" = "purchase",
 ) {
   const dataset = Deno.env.get("META_APP_DATASET_ID");
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
   if (!dataset || !token) return;
+  const nomeEvento = tipo === "trial" ? "StartTrial" : "Purchase";
+  const marcador = tipo === "trial" ? "meta_capi_trial_enviado" : "meta_capi_app_enviado";
 
   // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
   // o webhook (ele reenvia em qualquer 500 nosso).
   const { data: jaFoi } = await admin
     .from("analytics_events")
     .select("id")
-    .eq("event_name", "meta_capi_app_enviado")
+    .eq("event_name", marcador)
     .eq("user_id", userId)
     .contains("event_data", { tx: txId })
     .maybeSingle();
@@ -158,7 +165,7 @@ async function mandarCompraProMeta(
 
   const payload: Record<string, unknown> = {
     data: [{
-      event_name: "Purchase",
+      event_name: nomeEvento,
       event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
       event_id: txId,                        // dedup, igual ao padrão da web
       action_source: "app",
@@ -172,7 +179,9 @@ async function mandarCompraProMeta(
         application_tracking_enabled: true,
         extinfo,
       },
-      custom_data: { currency: "BRL", value: cents / 100 },
+      // Trial não tem dinheiro (ainda): valor 0 pra não inventar receita no
+      // painel — o Purchase da cobrança real leva o valor cheio depois.
+      custom_data: { currency: "BRL", value: tipo === "trial" ? 0 : cents / 100 },
     }],
   };
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
@@ -192,8 +201,8 @@ async function mandarCompraProMeta(
     if (r.ok) {
       await admin.from("analytics_events").insert({
         user_id: userId,
-        event_name: "meta_capi_app_enviado",
-        event_data: { tx: txId, valor: cents / 100 },
+        event_name: marcador,
+        event_data: { tx: txId, valor: tipo === "trial" ? 0 : cents / 100 },
       });
     }
   } catch (e) {
@@ -398,7 +407,16 @@ serve(async (req) => {
       const ini = v.current_period_start ? Date.parse(v.current_period_start) : null;
       const fim = v.current_period_end ? Date.parse(v.current_period_end) : null;
       if (ini && fim && fim - ini < 5 * 86400_000 && fim - ini > 0) {
-        feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_pulado" });
+        // Purchase NÃO (dinheiro ainda não existe) — mas StartTrial SIM
+        // (18/08): folha aprovada com cartão preso é o sinal de intenção que
+        // a campanha AEO otimiza enquanto a cobrança do dia 3 não chega.
+        // Idempotente pelo marcador meta_capi_trial_enviado.
+        await mandarCompraProMeta(
+          admin, v.user_id, v.customer_email, v.amount_cents ?? 15990,
+          v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
+          "trial",
+        );
+        feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_starttrial" });
         continue;
       }
       // TikTok ANTES do `continue` da Meta: os marcadores são separados, e a

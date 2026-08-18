@@ -87,6 +87,13 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   // tela aparece logo antes de um location.href e não dá tempo de sincronizar
   // com o servidor. Fora daqui, a varredura apagaria e a tela voltaria.
   "core-boas-vindas-visto",
+  // v61: trial do cartão + Missão dos 3 dias — nascem ANÔNIMOS (compra antes
+  // do cadastro) e o login vem logo depois; fora da lista, a vassoura levava
+  // exatamente quando passam a importar (pego no emulador 19/08).
+  "core-trial-cartao-fim",
+  "core-missao",
+  "core-lembrete-hora",
+  "core-funnel-area",
 ]);
 
 const userKey = (userId: string, key: string) => `u:${userId}:${key}`;

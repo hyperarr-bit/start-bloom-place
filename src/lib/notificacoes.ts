@@ -659,3 +659,60 @@ export async function agendarReguaDoTeste(area: string | null, inicioMs: number,
 export async function cancelarReguaDoTeste(): Promise<void> {
   await limparFaixa(BASE_TESTE);
 }
+
+/* ----------------------------------------------------- régua da MISSÃO
+ * v61 (19/08): o trial do cartão tem 72h e o dado é brutal — 0 dos 8
+ * cancelados voltaram depois do D0 (vs 55% dos ativos). Estes 2 toques
+ * são a ponte do retorno: PROGRESSO + missão, nunca "seu trial acaba"
+ * seco (RCD: progress email; Duolingo: cobrar quando há algo a proteger).
+ * D1 abre o MÓDULO (não paywall — receita da avaliação 1★, ver
+ * ROTA_DA_AREA); a véspera é honesta: endowment + como cancelar. */
+const BASE_MISSAO = 900000;
+
+export async function agendarReguaDaMissao(area: string | null, nomeArea: string, preferencia?: string | null): Promise<void> {
+  const p = await plugin();
+  if (!p) return;
+  if (!(await temPermissao())) return;
+  await garantirCanal();
+  await limparFaixa(BASE_MISSAO);
+  const { LN } = p;
+  const inicioMs = Date.now();
+  const rotaModulo = ROTA_DA_AREA[area ?? ""] ?? "/home";
+  // Dia 2 na hora que a pessoa escolheu (primeira ocorrência ≥ +14h);
+  // véspera da cobrança fixa em +52h ~ manhã do dia 3 (a cobrança é +72h).
+  const hora = HORA_PREFERIDA[preferencia ?? ""] ?? 8.5;
+  const alvo = new Date(inicioMs + 14 * 3600_000);
+  alvo.setHours(Math.floor(hora), Math.round((hora % 1) * 60), 0, 0);
+  while (alvo.getTime() < inicioMs + 14 * 3600_000) alvo.setDate(alvo.getDate() + 1);
+  const vespera = new Date(inicioMs + 52 * 3600_000);
+  vespera.setHours(8, 30, 0, 0);
+  if (vespera.getTime() < inicioMs + 44 * 3600_000) vespera.setTime(inicioMs + 52 * 3600_000);
+  const avisos = [
+    {
+      id: BASE_MISSAO + 1, at: alvo,
+      title: "Dia 2 da sua missão 🔥",
+      body: `Ontem você começou ${nomeArea}. Fechar o dia de hoje leva 1 minuto.`,
+      rota: rotaModulo,
+    },
+    {
+      id: BASE_MISSAO + 2, at: vespera,
+      title: "Amanhã seu teste vira assinatura",
+      body: "Tudo que você registrou fica com você. Continua de onde parou — ou cancela na Play sem custo.",
+      rota: rotaModulo,
+    },
+  ];
+  try {
+    await LN.schedule({
+      notifications: avisos.map((a) => ({
+        id: a.id, title: a.title, body: a.body,
+        schedule: { at: a.at, allowWhileIdle: true },
+        channelId: CANAL, smallIcon: ICONE, iconColor: COR_MARCA,
+        extra: { rota: a.rota },
+      })),
+    });
+  } catch { /* régua nunca derruba o app */ }
+}
+
+export async function cancelarReguaDaMissao(): Promise<void> {
+  await limparFaixa(BASE_MISSAO);
+}

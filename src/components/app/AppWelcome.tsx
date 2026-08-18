@@ -21,6 +21,30 @@ import { initRevenueCat, restaurar } from "@/lib/revenuecat";
  * nenhum — prova fica nas estrelas. "Restaurar compras" cobre reinstalação
  * de assinante (guideline de loja) e degrada silencioso sem chave RC.
  */
+/** v61: o "+1000" conta de 0 a 1000 (~900ms) — número que se move recebe o
+ *  olhar (número-herói). rAF com ease-out cúbico; respeita reduced-motion. */
+function Contador({ ate }: { ate: number }) {
+  const [n, setN] = useState(ate);
+  useEffect(() => {
+    try {
+      if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    } catch { /* segue animando */ }
+    setN(0);
+    let raf = 0;
+    let t0 = 0;
+    const dur = 900;
+    const passo = (t: number) => {
+      if (!t0) t0 = t;
+      const p = Math.min(1, (t - t0) / dur);
+      setN(Math.round(ate * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(passo);
+    };
+    const atraso = window.setTimeout(() => { raf = requestAnimationFrame(passo); }, 650);
+    return () => { window.clearTimeout(atraso); cancelAnimationFrame(raf); };
+  }, [ate]);
+  return <>+{n}</>;
+}
+
 export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onEntrar?: () => void }) {
   const navigate = useNavigate();
   const [restaurando, setRestaurando] = useState(false);
@@ -55,10 +79,23 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
         {TILES.map(([emo, cor], i) => (
           <motion.span
             key={emo} className="apw-tile" style={{ background: cor }}
+            /* v61: layoutId casa com o tile da MESMA área na porta do funil —
+               ao tocar Começar, o tile VOA e vira o card do quiz (shared
+               element). Fora do funil não existe par montado: inofensivo. */
+            layoutId={`apw-tile-${emo}`}
             initial={{ opacity: 0, y: -18, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ delay: 0.06 + i * 0.055, type: "spring", stiffness: 300, damping: 22 }}
-          >{emo}</motion.span>
+          >
+            {/* v61: depois da cascata, o tile RESPIRA (flutuação defasada) —
+                tela congelada após 1s parecia morta. Camada interna pra não
+                brigar com o spring de entrada. */}
+            <motion.span
+              style={{ display: "block" }}
+              animate={{ y: [0, -3.5, 0] }}
+              transition={{ duration: 3 + (i % 4) * 0.5, repeat: Infinity, ease: "easeInOut", delay: 1 + i * 0.22 }}
+            >{emo}</motion.span>
+          </motion.span>
         ))}
       </div>
 
@@ -75,14 +112,16 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.45, duration: 0.4 }}
           >
-            Finanças, rotina, corpo, metas — tudo organizado num lugar só.
+            {/* v61: o "16" é o diferencial nº1 (23% escolhem "Tudo" na porta)
+                e não aparecia na tela */}
+            Finanças, rotina, corpo, metas — <b>16 módulos</b> num lugar só.
           </motion.p>
           <motion.p
             className="apw-prova"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.4 }}
           >
-            <span className="apw-st">★★★★★</span> <b>+1000 pessoas</b> organizando a vida
+            <span className="apw-st">★★★★★</span> <b><Contador ate={1000} /> pessoas</b> organizando a vida
           </motion.p>
         </div>
 
@@ -92,11 +131,13 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           transition={{ delay: 0.72, duration: 0.4 }}
         >
           <button
-            className="apw-cta"
+            className="apw-cta btn-shine"
             onClick={() => { trackEvent("app_welcome_start", {}); onComecar(); }}
           >
             Começar
           </button>
+          {/* v61: prima o trial ANTES do gate — menos choque na folha */}
+          <span className="apw-trial">3 dias grátis · cancela quando quiser</span>
           {/* v60: no funil do teste o login fica DENTRO do funil (SignupScreen
               tem a esteira de conta existente); /entrar é o fallback do uso
               antigo em Comecar/Radar. */}
@@ -195,4 +236,5 @@ const CSS_APW = `
 .apw-restore:disabled { opacity: .6; }
 .apw-msg { font-size: 11.5px; color: #4f5a64; }
 .apw-termos { font-size: 11px; color: #9aa6b1; text-align: center; line-height: 1.5; }
+.apw-trial { display: block; text-align: center; font-size: 11.5px; color: #4f5a64; font-weight: 600; margin-top: -2px; }
 `;

@@ -22,7 +22,7 @@
  */
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { ArrowRight, Bell, Check, Loader2, Moon, Sun, Sunrise } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
@@ -281,14 +281,18 @@ function PortaTeste({ onPick, onEntrar }: { onPick: (a: AreaKey | "tudo") => voi
             } ${sel && sel !== o.key ? "opacity-45" : ""} transition-opacity`}
             whileTap={{ scale: 0.97 }}
           >
-            <span
+            {/* layoutId casa com o tile da welcome: no Começar ele VOA da
+                grade pro card (shared element). "tudo" não tem par — entra
+                normal pela cascata. */}
+            <motion.span
+              layoutId={o.key === "tudo" ? undefined : `apw-tile-${o.emoji}`}
               className="w-10 h-10 rounded-xl grid place-items-center text-[19px] shrink-0 shadow-[0_10px_18px_-10px_rgba(20,60,110,.4)]"
               style={{ background: TILE_CORES[i % TILE_CORES.length], rotate: i % 2 ? "3deg" : "-3deg" }}
             >
               {o.key === "tudo" ? (
                 <span className="grid grid-cols-2 text-[9px] leading-[1.05]"><span>💰</span><span>📅</span><span>💪</span><span>🎯</span></span>
               ) : o.emoji}
-            </span>
+            </motion.span>
             {o.label}
             {sel === o.key && (
               <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 18 }} className="ml-auto">
@@ -792,6 +796,7 @@ export default function ComecarTeste() {
   // branco = venda/conta.
   const escura = step === "mecanismo" || step === "notif";
   return (
+    <LayoutGroup>
     <div
       style={{
         ...LIGHT_VARS,
@@ -886,5 +891,6 @@ export default function ComecarTeste() {
         </AnimatePresence>
       </div>
     </div>
+    </LayoutGroup>
   );
 }

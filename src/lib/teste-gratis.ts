@@ -182,3 +182,43 @@ export function trialCartaoAtivo(): boolean {
     return false;
   }
 }
+
+/* ------------------------------------------------------------- a MISSÃO
+ * v61 (19/08): o tutorial pós-pago do trial. Dado que mandou no desenho:
+ * comprador ativa sozinho em 2 min (97% agem no D0) — o que separa quem
+ * fica de quem cancela é VOLTAR (0/8 cancelados voltaram no D1 vs 55%
+ * dos ativos). A missão empacota o padrão do pagante que fica: 1 ação
+ * guiada agora + a volta do dia 2 + a véspera honesta. */
+export type Missao = {
+  inicio: number;
+  area: string;
+  d1: boolean; d2: boolean; d3: boolean;
+  vista: boolean;                       // B1 (boas-vindas do pagante) já foi mostrada
+  holofote: "pendente" | "feito" | "dispensado";
+};
+const CHAVE_MISSAO = "core-missao";
+
+export function missaoAtual(): Missao | null {
+  try {
+    const raw = localStorage.getItem(CHAVE_MISSAO);
+    if (!raw) return null;
+    const m = JSON.parse(raw) as Missao;
+    return m && typeof m.inicio === "number" ? m : null;
+  } catch { return null; }
+}
+
+export function iniciarMissao(area: string): Missao {
+  const m: Missao = { inicio: Date.now(), area, d1: false, d2: false, d3: false, vista: false, holofote: "pendente" };
+  try { localStorage.setItem(CHAVE_MISSAO, JSON.stringify(m)); } catch { /* noop */ }
+  return m;
+}
+
+export function salvarMissao(m: Missao): void {
+  try { localStorage.setItem(CHAVE_MISSAO, JSON.stringify(m)); } catch { /* noop */ }
+}
+
+/** Dia da missão em que a pessoa está (1..3), pelo relógio dela. */
+export function diaDaMissao(m: Missao): 1 | 2 | 3 {
+  const d = Math.floor((Date.now() - m.inicio) / 86_400_000) + 1;
+  return (d < 1 ? 1 : d > 3 ? 3 : d) as 1 | 2 | 3;
+}

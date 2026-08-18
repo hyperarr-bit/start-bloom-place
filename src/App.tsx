@@ -24,6 +24,9 @@ import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
+// v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
+// pagante, B2 holofote fail-open, B3 celebração por dia vencido.
+import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
@@ -513,6 +516,7 @@ const App = () => {
                 <TesteBanner />
                 <TrilhaDoTeste />
                 <RetomadaPosCompra />
+                <MissaoDoTrial />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}
                 <PortaoBoasVindas />

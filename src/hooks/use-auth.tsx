@@ -16,7 +16,11 @@ const purgeLocalUserCache = () => {
     // core-boas-vindas-visto: marca de dispositivo da comemoração pós-compra.
     // Tem que estar nas DUAS listas (esta e a de use-user-data) — chave nova
     // que começa com "core-" e fica fora some na primeira troca de conta.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto"]);
+    // core-trial-cartao-fim + core-missao (v61): o trial do cartão COMEÇA
+    // anônimo (compra antes do cadastro) e a pessoa loga em seguida — a
+    // vassoura levava a flag e a Missão junto, no exato segundo em que elas
+    // passam a importar. Pego no emulador em 19/08, mesmo caso do core-pwa.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);

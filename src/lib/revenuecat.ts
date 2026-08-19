@@ -200,7 +200,30 @@ export async function comprar(productId: string): Promise<boolean> {
       });
       return false;
     }
-    await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
+    /* v61.1 (19/08, foto do dono: folha veio SEM os 3 dias grátis): não
+     * confiar mais na escolha IMPLÍCITA do purchasePackage — procurar
+     * explicitamente a opção com fase GRÁTIS (coretrial/coretrialmensal) e
+     * comprá-la via purchaseSubscriptionOption. A Play só devolve as ofertas
+     * que ESTA conta pode usar (ex-assinante não vê trial — by design), e
+     * oferta recém-ativada demora horas pra propagar: o evento
+     * app_compra_opcao conta EXATAMENTE o que a loja serviu no aparelho,
+     * então "não veio trial" deixa de ser adivinhação. */
+    type Opcao = { id?: string; freePhase?: unknown; isBasePlan?: boolean };
+    const opcoes: Opcao[] = ((alvo.product as { subscriptionOptions?: Opcao[] })?.subscriptionOptions ?? []);
+    const comTrial = opcoes.find((o) => !!o?.freePhase && !o?.isBasePlan);
+    trackEvent("app_compra_opcao", {
+      produto: productId,
+      servidas: opcoes.map((o) => o?.id).filter(Boolean).slice(0, 6),
+      escolhida: comTrial?.id ?? "package_default",
+      temGratis: !!comTrial,
+    });
+    if (comTrial) {
+      await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({
+        subscriptionOption: comTrial as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
+      });
+    } else {
+      await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
+    }
     // Folha fechou com sucesso = dinheiro saiu. Como no vitalício, o acesso
     // NÃO depende do entitlement do RC (quem manda é a linha em
     // `subscriptions` via sync/webhook) — o check de entitlement aqui já

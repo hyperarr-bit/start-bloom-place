@@ -28,8 +28,11 @@ export const EMPRESA = {
   /** Razão social exata do contrato social / cartão CNPJ / D-U-N-S. */
   razaoSocial: "NATALIA DE JESUS E SILVA SANTOS LTDA",
   cnpj: "55.041.112/0001-82",
-  /** Endereço da matriz no cartão CNPJ, em uma linha. */
-  endereco: "Inácio Magalhães Júnior, 3 — Parque Piauí, Teresina/PI, CEP 64025-050",
+  /** Endereço da matriz no cartão CNPJ, em uma linha. O tipo do logradouro
+   *  ("Rua") veio do registro do D&B que a Apple preencheu sozinha na
+   *  inscrição — a Receita não guarda esse campo. Manter idêntico ao que
+   *  está no D-U-N-S: a Apple compara o site com o cadastro. */
+  endereco: "Rua Inácio Magalhães Júnior, 3 — Parque Piauí, Teresina/PI, CEP 64025-050",
   /** Caixa real (Google Workspace no domínio). A Apple testa este e-mail. */
   email: "suporte@coreaplicativo.com.br",
   /** Prazo declarado de resposta — promessa pública, manter honesta. */

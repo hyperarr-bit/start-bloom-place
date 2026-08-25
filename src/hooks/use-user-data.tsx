@@ -93,6 +93,13 @@ const GLOBAL_KEY_ALLOWLIST = new Set<string>([
   "core-trial-cartao-fim",
   "core-missao",
   "core-lembrete-hora",
+  // Tema escuro + paleta de cores (20/08, reviews ★4/★3 independentes): são
+  // preferência do DISPOSITIVO — fora daqui, a vassoura resetava o visual a
+  // cada logout e a pessoa configurava tudo de novo.
+  "core-theme-mode",
+  "core-theme-palette",
+  // save-offer do trial cancelado: 1x por pessoa, marca de DISPOSITIVO
+  "core-save-offer-visto",
   "core-funnel-area",
 ]);
 

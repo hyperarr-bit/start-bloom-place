@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -10,6 +10,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
+import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
@@ -110,6 +111,17 @@ const SleepCard = () => {
   const [val, setVal] = useState(String(sleepLog[today] || ""));
 
   const sleepToday = sleepLog[today] || 0;
+  /* CAMPO VAZIO COM DADO GRAVADO (23/08, achado ao testar a série no APK): o
+   * useState acima lê UMA vez, no mount — e nesse instante o storage ainda não
+   * hidratou (get() devolve o fallback até `loaded`). O valor real chegava
+   * depois e o input ficava eternamente em branco: a série mostrava "6h hoje"
+   * e o campo, nada. É o mesmo padrão do bug de dados sumindo de 07/2026.
+   * Aqui o campo re-sincroniza quando o dado chega — exceto enquanto a pessoa
+   * está digitando, senão o cursor apanha a cada tecla. */
+  const digitando = useRef(false);
+  useEffect(() => {
+    if (!digitando.current) setVal(sleepToday ? String(sleepToday) : "");
+  }, [sleepToday]);
   const debtHours = Math.max(0, sleepGoal - sleepToday);
 
   return (
@@ -128,6 +140,8 @@ const SleepCard = () => {
             max="24"
             placeholder="Horas"
             value={val}
+            onFocus={() => { digitando.current = true; }}
+            onBlur={() => { digitando.current = false; }}
             onChange={e => {
               setVal(e.target.value);
               const n = parseFloat(e.target.value);
@@ -142,6 +156,18 @@ const SleepCard = () => {
           {sleepToday > 0 ? (debtHours > 0 ? `Faltam ${debtHours}h para a meta` : "Meta atingida ✓") : ""}
         </div>
       </div>
+
+      {/* Sono é o caso mais gritante do pedido da Elaine: uma noite isolada não
+          diz nada — o que importa é a semana. O dado já estava gravado por
+          data desde sempre; só faltava mostrar. */}
+      <SerieHistorico
+        registros={sleepLog}
+        meta={sleepGoal}
+        cor="hsl(var(--saude-blue))"
+        id="sono"
+        unidade="h"
+        formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+      />
     </div>
   );
 };

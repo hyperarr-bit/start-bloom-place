@@ -35,6 +35,7 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
+import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
 let estado: EstadoRC = "sem_chave";
@@ -132,6 +133,56 @@ export async function sincronizarAssinatura(tentativas = 3): Promise<boolean> {
   return false;
 }
 
+/** O tutorial pós-pago (Missão B1 → holofote → celebração) liga pelo
+ *  marcador local do trial — que só nascia no callback de sucesso da compra.
+ *  Quem virou assinante sem o app SABER que era trial ficava sem tutorial
+ *  (19/08: 1 dos 3 trials do dia — v61 de compra implícita; o Android
+ *  matando o app na folha produziria o mesmo buraco no v62+). Aqui o
+ *  assinante tem o periodType conferido direto no RevenueCat: TRIAL = marca
+ *  o fim REAL do período. Chamada pelo use-auth uma vez por sessão, só no
+ *  app da loja, só pra quem o banco já diz que é assinante. */
+export async function conferirTrialCartao(): Promise<void> {
+  if (!isNativeShell()) return;
+  if (trialCartaoAtivo()) return; // a compra na própria sessão já marcou
+  if (!configurado) await initRevenueCat();
+  if (!Purchases || !configurado) return;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    const ativos =
+      ((customerInfo as unknown as {
+        entitlements?: { active?: Record<string, { periodType?: string; expirationDateMillis?: number | null }> };
+      })?.entitlements?.active) ?? {};
+    for (const e of Object.values(ativos)) {
+      if (e?.periodType === "TRIAL") {
+        // fallback 7d (23/08): o único trial da vitrine nova é o anual de 7
+        // dias — o fim REAL continua vindo do expirationDateMillis.
+        marcarTrialCartaoAte(e.expirationDateMillis ?? Date.now() + 7 * 86_400_000);
+        return;
+      }
+    }
+  } catch { /* rede de segurança: nunca pode quebrar o boot */ }
+}
+
+/** Trial que NÃO vai renovar (cancelou, acesso ainda vivo): periodType TRIAL
+ *  + willRenew false. É o gatilho da save-offer de downgrade (22/08, caso
+ *  raquel: cancelou o anual 4h antes do débito — churn de preço, não de
+ *  produto). 100% cliente, sem servidor. */
+export async function estadoTrialCancelado(): Promise<boolean> {
+  if (!isNativeShell()) return false;
+  if (!configurado) await initRevenueCat();
+  if (!Purchases || !configurado) return false;
+  try {
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    const ativos =
+      ((customerInfo as unknown as {
+        entitlements?: { active?: Record<string, { periodType?: string; willRenew?: boolean }> };
+      })?.entitlements?.active) ?? {};
+    return Object.values(ativos).some((e) => e?.periodType === "TRIAL" && e?.willRenew === false);
+  } catch {
+    return false;
+  }
+}
+
 /** Se o RevenueCat diz que tem assinatura ativa mas o nosso banco não sabe,
  *  conserta sozinho. Roda no boot e a cada checagem de assinatura — é a rede
  *  de segurança pra webhook perdido/atrasado. */
@@ -174,11 +225,20 @@ export async function reconciliarSePreciso(): Promise<boolean> {
  *  fechando a folha do Google (normal, não avisa nada); o resto é defeito e
  *  a tela precisa dizer alguma coisa — sem isso, tocar em comprar e não ver
  *  NADA acontecer é indistinguível de app quebrado. */
+/** O que a Play REALMENTE serviu pra esta conta (preenchido no prefetch).
+ *  null = catálogo ainda não consultado — o paywall NÃO rebaixa a promessa
+ *  por falha de rede, só com um "não" positivo da loja. */
+const trialServidoCache: Record<string, boolean> = {};
+export const temTrialServido = (productId: string): boolean | null => {
+  for (const [k, v] of Object.entries(trialServidoCache)) if (productId.startsWith(k) || k.startsWith(productId)) return v;
+  return null;
+};
+
 export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | "pendente" | null;
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 
-export async function comprar(productId: string): Promise<boolean> {
+export async function comprar(productId: string, opts?: { semTrial?: boolean }): Promise<boolean> {
   ultimoMotivo = null;
   if (estado !== "pronto" || !Purchases) {
     ultimoMotivo = "catalogo";
@@ -210,16 +270,35 @@ export async function comprar(productId: string): Promise<boolean> {
      * então "não veio trial" deixa de ser adivinhação. */
     type Opcao = { id?: string; freePhase?: unknown; isBasePlan?: boolean };
     const opcoes: Opcao[] = ((alvo.product as { subscriptionOptions?: Opcao[] })?.subscriptionOptions ?? []);
-    const comTrial = opcoes.find((o) => !!o?.freePhase && !o?.isBasePlan);
+    // semTrial (22/08, save-offer): quem cancelou o trial ANUAL e aceita o
+    // mensal tem que pagar AGORA — sem isso o comprar() acharia o
+    // coretrialmensal e daria mais 3 dias grátis + nova janela de cancelar,
+    // contradizendo a copy ("R$ 24,90/mês") e o objetivo da tela.
+    const comTrial = opts?.semTrial ? undefined : opcoes.find((o) => !!o?.freePhase && !o?.isBasePlan);
+    /* VARREDURA 23/08 (bytecode do purchases-android 10.13.0): purchasePackage
+     * compra a defaultOption do produto = findLongestFreeTrial — ou seja, com
+     * semTrial o fallback antigo ainda dava FASE GRÁTIS pra conta elegível
+     * (coretrialmensal segue ativa pros APKs velhos). semTrial agora compra o
+     * PLANO BASE explicitamente; sem plano base identificável, FALHA FECHADA
+     * (produto_ausente) — melhor não vender do que prometer "cobra hoje" e a
+     * folha abrir com teste grátis (a foto do dono de 19/08, invertida). */
+    const baseSemTrial = opts?.semTrial ? opcoes.find((o) => !!o?.isBasePlan) : undefined;
     trackEvent("app_compra_opcao", {
       produto: productId,
       servidas: opcoes.map((o) => o?.id).filter(Boolean).slice(0, 6),
-      escolhida: comTrial?.id ?? "package_default",
+      escolhida: comTrial?.id ?? baseSemTrial?.id ?? "package_default",
       temGratis: !!comTrial,
+      semTrial: !!opts?.semTrial,
     });
-    if (comTrial) {
+    if (opts?.semTrial && !baseSemTrial) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "sem_base_plan", produto: productId });
+      return false;
+    }
+    const escolhida = comTrial ?? baseSemTrial;
+    if (escolhida) {
       await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({
-        subscriptionOption: comTrial as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
+        subscriptionOption: escolhida as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
       });
     } else {
       await (Purchases as NonNullable<typeof Purchases>).purchasePackage({ aPackage: alvo });
@@ -262,13 +341,46 @@ export async function comprar(productId: string): Promise<boolean> {
  * igual à do vitalício (aparelho fraco = segundos de nada visível sem cache).
  */
 const ID_MENSAL_PIX = "core_mensal:coremensalpix";
-let produtoMensalPix: ProdutoRC | null = null;
-const precosAssinatura: Partial<Record<"anual" | "mensal" | "mensalPix", string>> = {};
+// 23/08: vitrine nova — mensal À VISTA (24,90, pré-pago irmão do 19,90).
+// O 19,90 vira degrau final do resgate; o 24,90 é card da vitrine.
+const ID_MENSAL_VISTA = "core_mensal:coremensalvista";
+// 23/08 noite (pivô à vista): anual pré-pago P1Y na vitrine + o 97,90 da
+// caixa de presente. Tudo compra pelo MESMO botão do 19,90 (purchaseStore-
+// Product → folha com Pix → liquida na hora) — o único que já virou dinheiro.
+const ID_ANUAL_VISTA = "core_anual:coreanualvista";
+const ID_ANUAL_97 = "core_anual:coreanual97";
+type IdPrepago = typeof ID_MENSAL_PIX | typeof ID_MENSAL_VISTA | typeof ID_ANUAL_VISTA | typeof ID_ANUAL_97;
+const IDS_PREPAGOS: IdPrepago[] = [ID_MENSAL_PIX, ID_MENSAL_VISTA, ID_ANUAL_VISTA, ID_ANUAL_97];
+const produtosPrepagos: Partial<Record<IdPrepago, ProdutoRC>> = {};
+const precosAssinatura: Partial<Record<"anual" | "mensal" | "mensalPix" | "mensalVista", string>> = {};
 
 /** Preços REAIS da loja (moeda local) pro paywall exibir — APP_PRECOS é só
  *  fallback. Preenchido pela pré-busca; devolve o que já chegou. */
-export const precoLoja = (plano: "anual" | "mensal" | "mensalPix"): string | null =>
+export const precoLoja = (plano: "anual" | "mensal" | "mensalPix" | "mensalVista"): string | null =>
   precosAssinatura[plano] ?? null;
+
+/** Dias de fase GRÁTIS que a loja serviu pra ESTA conta (null = não sabe).
+ *  A vitrine promete "N dias grátis" com o N da folha, não do código: o
+ *  catálogo muda por API (3→7 dias em 23/08) e APK não acompanha deploy. */
+const trialDiasCache: Record<string, number> = {};
+export const trialDiasServido = (productId: string): number | null =>
+  trialDiasCache[productId] ?? null;
+
+const diasDaFase = (fase: unknown): number | null => {
+  const f = fase as { billingPeriod?: { iso8601?: string; value?: number; unit?: string } } | undefined;
+  const iso = f?.billingPeriod?.iso8601;
+  const m = typeof iso === "string" ? iso.match(/^P(\d+)([DWMY])$/i) : null;
+  if (m) {
+    const n = Number(m[1]);
+    const mult = { D: 1, W: 7, M: 30, Y: 365 }[m[2].toUpperCase() as "D" | "W" | "M" | "Y"];
+    return n * (mult ?? 1);
+  }
+  if (typeof f?.billingPeriod?.value === "number" && f.billingPeriod.value > 0) {
+    const mult = { DAY: 1, WEEK: 7, MONTH: 30, YEAR: 365 }[String(f.billingPeriod.unit ?? "DAY").toUpperCase()] ?? 1;
+    return f.billingPeriod.value * mult;
+  }
+  return null;
+};
 
 export async function prefetchAssinaturas(): Promise<void> {
   if (estado !== "pronto" || !Purchases) return;
@@ -278,43 +390,72 @@ export async function prefetchAssinaturas(): Promise<void> {
       const id = String(p.product?.identifier ?? "");
       const preco = (p.product as { priceString?: string })?.priceString;
       if (!preco) continue;
-      if (id.startsWith("core_anual")) precosAssinatura.anual = preco;
-      else if (id.startsWith("core_mensal")) precosAssinatura.mensal = preco;
+      // CTA honesto (21/08): a Play decide o trial POR CONTA — ex-assinante
+      // não ganha de novo, e o botão prometia "3 dias grátis" com a folha
+      // cobrando NA HORA (foto do dono, 19/08). Anota o que ESTA conta
+      // realmente recebeu; o paywall rebaixa a promessa só com um NÃO
+      // positivo daqui.
+      type Opcao = { freePhase?: unknown; isBasePlan?: boolean };
+      const opcoes: Opcao[] = ((p.product as { subscriptionOptions?: Opcao[] })?.subscriptionOptions ?? []);
+      const gratis = opcoes.find((o) => !!o?.freePhase && !o?.isBasePlan);
+      if (id.startsWith("core_anual")) {
+        precosAssinatura.anual = preco;
+        trialServidoCache["core_anual"] = !!gratis;
+        const dias = gratis ? diasDaFase((gratis as { freePhase?: unknown }).freePhase) : null;
+        if (dias) trialDiasCache["core_anual"] = dias;
+      } else if (id.startsWith("core_mensal")) {
+        precosAssinatura.mensal = preco;
+        trialServidoCache["core_mensal"] = !!gratis;
+      }
     }
   } catch { /* paywall usa o fallback do APP_PRECOS */ }
   try {
-    if (!produtoMensalPix) {
+    if (IDS_PREPAGOS.some((id) => !produtosPrepagos[id])) {
       const mod = await import("@revenuecat/purchases-capacitor");
       const { products } = await Purchases.getProducts({
-        productIdentifiers: [ID_MENSAL_PIX],
+        productIdentifiers: [...IDS_PREPAGOS],
         type: mod.PRODUCT_CATEGORY.SUBSCRIPTION,
       });
-      produtoMensalPix = (products ?? []).find((p) => String(p?.identifier ?? "").startsWith("core_mensal")) ?? null;
-      const preco = (produtoMensalPix as { priceString?: string } | null)?.priceString;
-      if (preco) precosAssinatura.mensalPix = preco;
+      // Vários pré-pagos dividem o MESMO produto (core_mensal/core_anual) —
+      // casar pelo id INTEIRO, senão o 19,90 entra no lugar do 24,90.
+      for (const p of products ?? []) {
+        const id = String(p?.identifier ?? "");
+        const alvo = IDS_PREPAGOS.find((i) => id === i || id.startsWith(i));
+        if (alvo) produtosPrepagos[alvo] = p;
+      }
+      const preco = (id: IdPrepago) => (produtosPrepagos[id] as { priceString?: string } | undefined)?.priceString;
+      if (preco(ID_MENSAL_PIX)) precosAssinatura.mensalPix = preco(ID_MENSAL_PIX);
+      if (preco(ID_MENSAL_VISTA)) precosAssinatura.mensalVista = preco(ID_MENSAL_VISTA);
     }
-  } catch { /* sem o pré-pago no catálogo o downsell simplesmente não aparece */ }
+  } catch { /* sem o pré-pago no catálogo a superfície some, nunca botão morto */ }
 }
 
-/** O downsell Pix só é oferecido se o base plan pré-pago existir no catálogo
- *  da loja (build velha/catálogo antigo → esconde, nunca botão morto). */
-export const temMensalPix = (): boolean => produtoMensalPix !== null;
+/** O degrau 19,90 do resgate só é oferecido se o base plan existir no
+ *  catálogo da loja (build velha/catálogo antigo → esconde, nunca botão morto). */
+export const temMensalPix = (): boolean => !!produtosPrepagos[ID_MENSAL_PIX];
+/** Card "1 mês à vista" (24,90) da vitrine — mesma regra de existência. */
+export const temMensalVista = (): boolean => !!produtosPrepagos[ID_MENSAL_VISTA];
+/** Anual à vista (159,90) — herói da vitrine do pivô 23/08. */
+export const temAnualVista = (): boolean => !!produtosPrepagos[ID_ANUAL_VISTA];
+/** Caixa de presente (anual 97,90) — só na escada de saída. */
+export const temAnual97 = (): boolean => !!produtosPrepagos[ID_ANUAL_97];
 
-export async function comprarMensalPix(): Promise<boolean> {
+async function comprarPrepago(id: IdPrepago): Promise<boolean> {
   ultimoMotivo = null;
   if (estado !== "pronto" || !Purchases) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_MENSAL_PIX });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: id });
     return false;
   }
   try {
-    if (!produtoMensalPix) await prefetchAssinaturas();
-    if (!produtoMensalPix) {
+    if (!produtosPrepagos[id]) await prefetchAssinaturas();
+    const produto = produtosPrepagos[id];
+    if (!produto) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_MENSAL_PIX });
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: id });
       return false;
     }
-    await Purchases.purchaseStoreProduct({ product: produtoMensalPix });
+    await Purchases.purchaseStoreProduct({ product: produto });
     await sincronizarAssinatura();
     return true;
   } catch (e) {
@@ -323,19 +464,24 @@ export async function comprarMensalPix(): Promise<boolean> {
     if (codigo === "20" || /pending/i.test(msg)) {
       // Pix gerado na folha: paga no banco → webhook libera sozinho.
       ultimoMotivo = "pendente";
-      trackEvent("app_compra_pendente", { produto: ID_MENSAL_PIX });
+      trackEvent("app_compra_pendente", { produto: id });
       return false;
     }
     const cancelou = /cancel/i.test(msg) || codigo === "1";
     ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
     trackEvent("app_compra_falhou", {
       motivo: cancelou ? "cancelou" : "billing_erro",
-      produto: ID_MENSAL_PIX,
+      produto: id,
       erro: msg.slice(0, 160),
     });
     return false;
   }
 }
+
+export const comprarMensalPix = (): Promise<boolean> => comprarPrepago(ID_MENSAL_PIX);
+export const comprarMensalVista = (): Promise<boolean> => comprarPrepago(ID_MENSAL_VISTA);
+export const comprarAnualVista = (): Promise<boolean> => comprarPrepago(ID_ANUAL_VISTA);
+export const comprarAnual97 = (): Promise<boolean> => comprarPrepago(ID_ANUAL_97);
 
 /** Irmã da compraVitaliciaLocal pro mundo assinatura: a pessoa ASSINOU neste
  *  aparelho (folha fechou) mas ainda não tem conta? A reabertura cai direto

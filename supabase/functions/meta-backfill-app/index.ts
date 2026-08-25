@@ -56,14 +56,17 @@ async function mandarCompraProMeta(
 
   // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
   // o webhook (ele reenvia em qualquer 500 nosso).
-  const { data: jaFoi } = await admin
+  const { data: jaFoi, error: erroJaFoi } = await admin
     .from("analytics_events")
     .select("id")
     .eq("event_name", marcador)
     .eq("user_id", userId)
     .contains("event_data", { tx: txId })
-    .maybeSingle();
-  if (jaFoi) return;
+    .limit(2);
+  // maybeSingle() com marcador DUPLICADO devolvia erro (PGRST116) que era
+  // ignorado -> data null -> reenvio ETERNO a cada cron (caso real 17-19/08:
+  // meta_capi_app_enviado x96/dia). Na duvida (erro OU 1+ marcador), NAO reenvia.
+  if (erroJaFoi || (jaFoi?.length ?? 0) > 0) return;
 
   // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
   const { data: dev } = await admin
@@ -166,7 +169,15 @@ async function mandarCompraProMeta(
   const payload: Record<string, unknown> = {
     data: [{
       event_name: nomeEvento,
-      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+      // Clamp de 6,5 dias (23/08): a conversão do trial de 7d chega aqui com
+      // current_period_start = INÍCIO do trial (≥7d atrás) e a Meta recusa
+      // evento com mais de 7 dias — a cobrança real de 159,90 NUNCA entrava.
+      // O instante honesto da cobrança ≈ quando o cron a viu (15min de tick);
+      // pra linha velha, trava em now-6,5d e o evento entra em vez de sumir.
+      event_time: Math.max(
+        Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
+        Math.floor(Date.now() / 1000) - Math.floor(6.5 * 86400),
+      ),
       event_id: txId,                        // dedup, igual ao padrão da web
       action_source: "app",
       user_data,
@@ -179,11 +190,35 @@ async function mandarCompraProMeta(
         application_tracking_enabled: true,
         extinfo,
       },
-      // Trial não tem dinheiro (ainda): valor 0 pra não inventar receita no
-      // painel — o Purchase da cobrança real leva o valor cheio depois.
-      custom_data: { currency: "BRL", value: tipo === "trial" ? 0 : cents / 100 },
+      // StartTrial LEVA O VALOR DO PLANO (20/08, decisão do dono): receita e
+      // ROAS no painel vêm SÓ do Purchase — valor aqui não vira caixa, vira
+      // SINAL: com histórico de evento valorado, dá pra otimizar conjunto por
+      // "maximizar valor" e a Meta caçar o anual (159,90 pesa 6,4× o mensal)
+      // em vez de achar por sorte. O Purchase da cobrança real segue igual.
+      custom_data: { currency: "BRL", value: cents / 100 },
     }],
   };
+  // COMPRA_AVISTA (23/08, pivô à vista): evento NOVO de compra com histórico
+  // LIMPO — o Purchase padrão ficou envenenado pelos reenvios ×36-50/venda de
+  // 17-22/08 (bug do dedup). A campanha nova otimiza por ELE (promoted_object:
+  // custom_event_type OTHER + custom_event_str "compra_avista"); o Purchase
+  // segue junto pra painel/ROAS. Mesma tx, event_id próprio pro dedup da Meta.
+  if (tipo === "purchase") {
+    const base = (payload.data as Record<string, unknown>[])[0];
+    const eventos = payload.data as Record<string, unknown>[];
+    // compra_avista = TODAS as vendas, com valor no custom_data — é o evento
+    // do conjunto "os 2 juntos": otimização por VALOR (a Meta pesa 159,90
+    // contra 24,90 sozinha quando o conjunto maximiza valor de conversão).
+    eventos.push({ ...base, event_name: "compra_avista", event_id: `${txId}_av` });
+    // Eventos POR PLANO (23/08, pedido do dono): campanha do mensal otimiza
+    // por compra_mensal, a do anual por compra_anual — sem depender da Meta
+    // separar por valor. Classificação pelo PREÇO do catálogo à vista
+    // (mensal 19,90/24,90 · anual 97,90/159,90); valor fora do catálogo
+    // (vitalício legado dos APKs antigos) fica só nos eventos de cima.
+    const porPlano = cents === 1990 || cents === 2490 ? "compra_mensal"
+      : cents === 9790 || cents === 15990 ? "compra_anual" : null;
+    if (porPlano) eventos.push({ ...base, event_name: porPlano, event_id: `${txId}_${porPlano === "compra_mensal" ? "m" : "a"}` });
+  }
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
   if (teste) payload.test_event_code = teste;
 
@@ -202,7 +237,7 @@ async function mandarCompraProMeta(
       await admin.from("analytics_events").insert({
         user_id: userId,
         event_name: marcador,
-        event_data: { tx: txId, valor: tipo === "trial" ? 0 : cents / 100 },
+        event_data: { tx: txId, valor: cents / 100 },
       });
     }
   } catch (e) {
@@ -230,33 +265,41 @@ async function mandarCompraProMeta(
 async function mandarCompraProTikTok(
   admin: ReturnType<typeof createClient>,
   userId: string,
-  email: string | null,
+  _email: string | null,
   cents: number,
   txId: string,
   quando: string | null,
+  ehTrial = false,
 ) {
-  const appId = Deno.env.get("TIKTOK_APP_ID"); // event_source_id, do Events Manager
-  // Token ESCOPADO POR FONTE (provado 16/08): o token do pixel da web
-  // devolve 401 40001 "No permission to operate event source id" pro app.
-  // Mesmo padrão da Meta (META_CAPI_TOKEN web ≠ META_APP_CAPI_TOKEN app):
-  // gerar o token DENTRO do app no Events Manager. NÃO é o "app secret" do SDK.
-  const token = Deno.env.get("TIKTOK_APP_ACCESS_TOKEN") ?? Deno.env.get("TIKTOK_ACCESS_TOKEN");
-  if (!appId || !token) return;
+  // CANAL QUE FUNCIONA (provado 19/08 com code 0 — 5 StartTrials reais): o
+  // app foi migrado pra rede de autoatribuição (SAN) e NÃO tem token de
+  // Events API — a tela Configurações do Events Manager manda "usar o
+  // segredo do app para autorizar seu app como origem do evento". Endpoint
+  // do SDK (v1.2/app/batch) com Access-Token = SEGREDO do app (o mesmo
+  // tiktokAppSecret do key.properties). Caminhos MORTOS, não insistir:
+  // v1.3/event/track = 40001 com o token do pixel web, 40105 com o segredo.
+  const ttAppId = Deno.env.get("TIKTOK_APP_ID");
+  const segredo = Deno.env.get("TIKTOK_APP_SECRET");
+  if (!ttAppId || !segredo) return;
 
-  const { data: jaFoi } = await admin
+  // Dedup SEM filtro de user_id: os 5 StartTrials de 19/08 saíram por script
+  // one-off e o marcador deles não tem user_id — filtrar por user_id os
+  // ignoraria e reenviaria tudo.
+  const marcador = ehTrial ? "tiktok_trial_enviado" : "tiktok_capi_app_enviado";
+  const { data: jaFoi, error: erroJaFoi } = await admin
     .from("analytics_events")
     .select("id")
-    .eq("event_name", "tiktok_capi_app_enviado")
-    .eq("user_id", userId)
+    .eq("event_name", marcador)
     .contains("event_data", { tx: txId })
-    .maybeSingle();
-  if (jaFoi) return;
+    .limit(2);
+  // maybeSingle() com marcador DUPLICADO devolvia erro (PGRST116) que era
+  // ignorado -> data null -> reenvio ETERNO a cada cron (caso real 17-19/08:
+  // meta_capi_app_enviado x96/dia). Na duvida (erro OU 1+ marcador), NAO reenvia.
+  if (erroJaFoi || (jaFoi?.length ?? 0) > 0) return;
 
-  // GAID (16/08): é o que deixa o TikTok casar a compra com o CLIQUE no
-  // anúncio — e-mail só acerta quem usa o mesmo e-mail no TikTok. Vai
-  // SHA-256 (é como os conectores oficiais mandam; diferente do madid da
-  // Meta, que vai cru). Ficha por user_id; se não achar, pela sessão — a
-  // compra anônima (v48+) deixa a ficha pendurada em user_id nulo.
+  // GAID CRU (≠ Events API, que pedia SHA-256): este canal é o do SDK, e o
+  // gaid cru é o que casa o evento com o clique no anúncio. Sem gaid não
+  // envia — evento órfão não atribui e só suja o relatório.
   let gaid = "";
   const { data: devTt } = await admin
     .from("analytics_events").select("event_data")
@@ -275,49 +318,57 @@ async function mandarCompraProTikTok(
       gaid = String(((porSessaoTt as { event_data?: Record<string, unknown> } | null)?.event_data ?? {}).gaid ?? "").toLowerCase();
     }
   }
+  if (!gaid) {
+    log("tiktok sem gaid, nao envia", { tx: txId });
+    return;
+  }
 
-  const payload: Record<string, unknown> = {
-    event_source: "app",
-    event_source_id: appId,
-    data: [{
-      event: "CompletePayment",
-      event_time: Math.floor(new Date(quando ?? Date.now()).getTime() / 1000),
-      event_id: txId, // dedup: mesma chave (event_source_id, event, event_id) por 48h
-      user: {
-        external_id: await sha256(userId),
-        ...(email ? { email: await sha256(email.trim().toLowerCase()) } : {}),
-        ...(gaid ? { gaid: await sha256(gaid) } : {}),
+  const payload = {
+    app_id: "br.com.coreaplicativo.app",
+    tiktok_app_id: ttAppId,
+    batch: [{
+      type: "track",
+      event: ehTrial ? "StartTrial" : "CompletePayment",
+      timestamp: new Date(quando ?? Date.now()).toISOString(),
+      event_id: txId, // dedup do lado do TikTok (48h) além do marcador acima
+      context: {
+        app: { id: "br.com.coreaplicativo.app", name: "CORE APP: organize sua vida", namespace: "br.com.coreaplicativo.app", version: "1.0.62" },
+        device: { platform: "Android", gaid },
+        locale: "pt_BR",
+        user_agent: "tiktok-business-android-sdk/1.7.0",
+        user: {},
       },
+      // StartTrial com o VALOR DO PLANO (20/08): mesmo racional da Meta —
+      // valor de evento não é receita no painel, é sinal pra otimização por
+      // valor distinguir anual (159,90) de mensal (24,90).
       properties: { currency: "BRL", value: cents / 100 },
     }],
   };
-  const teste = Deno.env.get("TIKTOK_TEST_EVENT_CODE");
-  if (teste) payload.test_event_code = teste;
 
   try {
-    const r = await fetch("https://business-api.tiktok.com/open_api/v1.3/event/track/", {
+    const r = await fetch("https://business-api.tiktok.com/open_api/v1.2/app/batch/", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Access-Token": token },
+      headers: { "Content-Type": "application/json", "Access-Token": segredo },
       body: JSON.stringify(payload),
     });
     const corpo = await r.text();
-    log("tiktok events api", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
-    // O TikTok pode responder HTTP 200 com `code` de erro no corpo (ex.:
-    // token sem permissão) — marcador só nasce com code:0, senão a venda
-    // seria dada como entregue sem nunca ter chegado.
+    log("tiktok app batch", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 300) });
+    // O TikTok pode responder HTTP 200 com `code` de erro no corpo — o
+    // marcador só nasce com code:0, senão a venda seria dada como entregue
+    // sem nunca ter chegado.
     let codeTt = -1;
     try { codeTt = JSON.parse(corpo)?.code ?? -1; } catch { /* corpo não-JSON */ }
     if (r.ok && codeTt === 0) {
       await admin.from("analytics_events").insert({
         user_id: userId,
-        event_name: "tiktok_capi_app_enviado",
-        event_data: { tx: txId, valor: cents / 100 },
+        event_name: marcador,
+        event_data: { tx: txId, valor: cents / 100, canal: "app_batch_v12" },
       });
     } else {
       ultimoErroTikTok = `HTTP ${r.status} ${corpo.slice(0, 300)}`;
     }
   } catch (e) {
-    log("tiktok events api ERRO", { msg: String(e).slice(0, 150) });
+    log("tiktok app batch ERRO", { msg: String(e).slice(0, 150) });
     ultimoErroTikTok = String(e).slice(0, 200);
   }
 }
@@ -366,9 +417,13 @@ serve(async (req) => {
 
     const hoje = new Date();
     const iso = (d: Date) => d.toISOString().slice(0, 10);
-    // Janela do cron: 3 dias pra trás (folga confortável dentro do teto de 7
-    // dias da Meta, mesmo se o cron ficar horas fora do ar).
-    const de = cron ? iso(new Date(hoje.getTime() - 3 * 86400_000)) : String(body?.de ?? "").slice(0, 10);
+    // Janela do cron: 12 dias pra trás (23/08 — trial do anual virou 7 DIAS,
+    // oferta coretrial7). A conversão acontece +7d do created_at e a
+    // liquidação Pix/pendência do Google já mostrou +26h de atraso (safra
+    // 22/08): 7+3+margem = 12. O filtro é por created_at da LINHA; o
+    // event_time que vai pra Meta é o da conversão (recente), então o teto
+    // de 7 dias da Meta continua respeitado. Idempotente pelos marcadores.
+    const de = cron ? iso(new Date(hoje.getTime() - 12 * 86400_000)) : String(body?.de ?? "").slice(0, 10);
     const ate = cron ? iso(hoje) : String(body?.ate ?? de).slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(de)) return json({ error: "informe de/ate em YYYY-MM-DD" }, 400);
     // Janela BRT: o dia vai de 03:00Z a 03:00Z do dia seguinte.
@@ -400,13 +455,17 @@ serve(async (req) => {
        * período de teste entra na tabela com amount_cents cheio (159,90) mas
        * NENHUM dinheiro existiu — mandar Purchase agora envenenaria a
        * otimização da Meta/TikTok com receita falsa. Detector: período atual
-       * mais curto que 5 dias = trial (anual/mensal reais duram 30-365d;
-       * vitalício tem fim em 2126; o prepaid de 30d passa). Quando o Google
-       * COBRAR no dia 3, o sync reescreve a linha com período de 1 ano, o
-       * detector deixa passar e o tx (inédito) sobe como Purchase de verdade. */
+       * mais curto que 10 dias = trial. ATENÇÃO (23/08): era 5 — com o trial
+       * de 7 DIAS (coretrial7) um período de 7d passava batido e virava
+       * Purchase de R$ 159,90 SEM dinheiro existir. 10 cobre 7d + a extensão
+       * de pendência que o Google aplica (safra 22/08: +26h); nada legítimo
+       * dura <10d (prepaid 30d, mensal 30d, anual 365d, vitalício 2126).
+       * Quando o Google COBRAR no fim do teste, o sync reescreve a linha com
+       * período de 30/365d, o detector deixa passar e o tx (inédito) sobe
+       * como Purchase de verdade. */
       const ini = v.current_period_start ? Date.parse(v.current_period_start) : null;
       const fim = v.current_period_end ? Date.parse(v.current_period_end) : null;
-      if (ini && fim && fim - ini < 5 * 86400_000 && fim - ini > 0) {
+      if (ini && fim && fim - ini < 10 * 86400_000 && fim - ini > 0) {
         // Purchase NÃO (dinheiro ainda não existe) — mas StartTrial SIM
         // (18/08): folha aprovada com cartão preso é o sinal de intenção que
         // a campanha AEO otimiza enquanto a cobrança do dia 3 não chega.
@@ -415,6 +474,13 @@ serve(async (req) => {
           admin, v.user_id, v.customer_email, v.amount_cents ?? 15990,
           v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
           "trial",
+        );
+        // TikTok recebe o MESMO sinal (StartTrial, com o VALOR do plano) — marcador
+        // próprio (tiktok_trial_enviado), dormente sem os secrets.
+        await mandarCompraProTikTok(
+          admin, v.user_id, v.customer_email, v.amount_cents ?? 15990,
+          v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
+          true,
         );
         feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_starttrial" });
         continue;

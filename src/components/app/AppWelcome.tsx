@@ -136,8 +136,8 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           >
             Começar
           </button>
-          {/* v61: prima o trial ANTES do gate — menos choque na folha */}
-          <span className="apw-trial">3 dias grátis · cancela quando quiser</span>
+          {/* 23/08 (dono): welcome SEM preço — preço é papel do paywall,
+              depois do compromisso. Aqui só a promessa e o Começar. */}
           {/* v60: no funil do teste o login fica DENTRO do funil (SignupScreen
               tem a esteira de conta existente); /entrar é o fallback do uso
               antigo em Comecar/Radar. */}

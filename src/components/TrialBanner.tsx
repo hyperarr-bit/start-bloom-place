@@ -173,7 +173,10 @@ export const TrialBanner = () => {
               do funil. A web segue no PaywallFlow: lá o produto continua sendo
               o vitalício no Pix. */}
           {isNativeShell()
-            ? <div className="px-5 py-10"><PaywallAssinatura contexto="gate" /></div>
+            /* 23/08: bg-background (não white) — a barra fixa de CTA do
+               paywall fecha com degradê from-background; fundo divergente
+               criava emenda visível. pt menor: a barra cuida do rodapé. */
+            ? <div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>
             : <PaywallFlow context="app" />}
         </RouteErrorBoundary>
       </motion.div>

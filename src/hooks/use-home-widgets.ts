@@ -61,15 +61,32 @@ const KEY = "core-home-widgets-v2";
 const DEFAULT_WIDGETS: ActiveWidget[] = [];
 
 export function useHomeWidgets() {
-  const { get, set: setData } = useUserData();
+  const { get, set: setData, loaded } = useUserData();
   const [activeWidgets, setActiveWidgets] = useState<ActiveWidget[]>(() => {
     const saved = get<ActiveWidget[]>(KEY, []);
     return saved.length > 0 ? saved : DEFAULT_WIDGETS;
   });
 
+  // A GRAVAÇÃO SÓ DESTRAVA DEPOIS DA HIDRATAÇÃO (20/08, review da Monik ★4:
+  // "os widgets desaparecem quando saio e entro"). Antes de `loaded`, o get()
+  // devolve o fallback [] — e o efeito de gravação escrevia esse VAZIO por
+  // cima do valor salvo no servidor a cada boot frio. Não era só sumir da
+  // tela: destruía o dado. `pronto` é estado (não ref) de propósito — vira
+  // true num render SEPARADO, garantindo que a primeira gravação já enxerga
+  // o estado hidratado, nunca o [] da montagem.
+  const [pronto, setPronto] = useState(false);
   useEffect(() => {
+    if (!loaded || pronto) return;
+    const saved = get<ActiveWidget[]>(KEY, []);
+    if (saved.length > 0) setActiveWidgets(saved);
+    setPronto(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, pronto]);
+
+  useEffect(() => {
+    if (!pronto) return;
     setData(KEY, activeWidgets);
-  }, [activeWidgets, setData]);
+  }, [activeWidgets, setData, pronto]);
 
   const addWidget = (id: WidgetId) => {
     const def = WIDGET_CATALOG.find(w => w.id === id);

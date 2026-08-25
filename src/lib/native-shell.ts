@@ -43,6 +43,21 @@ export const APP_PRECOS = {
   // pagou. Trocar aqui SEM trocar lá é pior que não trocar.
   mensal: { id: "core_mensal", preco: "R$ 24,90" },
   anual: { id: "core_anual", preco: "R$ 159,90", porMes: "R$ 13,32", economiaAno: "R$ 138" },
+  // 23/08 (dono aprovou o desenho novo): o mensal da VITRINE vira À VISTA —
+  // base plan pré-pago de 30 dias no core_mensal, mesmo preço do recorrente
+  // (24,90), pago no Pix (ou cartão) na folha do Google, renovação manual.
+  // Motivo (dados de 19-22/08): 5/5 compradores do pré-pago 19,90 viram a
+  // folha COM trial e cancelaram de propósito — recusam RECORRÊNCIA, não
+  // preço. O recorrente core_mensal continua no catálogo pra save-offer e
+  // base antiga; a vitrine não vende mais ele.
+  mensalVista: { id: "core_mensal:coremensalvista", preco: "R$ 24,90" },
+  // 23/08 noite (pivô aprovado: "tire o trial e foca só no à vista") — o app
+  // vende SÓ pagamento à vista, na mecânica do único formato que liquidou
+  // dinheiro de verdade (pré-pago, Pix na folha): anual 159,90 na vitrine
+  // como R$ 13,32/mês, e o 97,90 é a CAIXA DE PRESENTE da escada de saída
+  // (estilo Me+) — nunca exposto na vitrine, senão vira o preço real.
+  anualVista: { id: "core_anual:coreanualvista", preco: "R$ 159,90", porMes: "R$ 13,32" },
+  anual97: { id: "core_anual:coreanual97", preco: "R$ 97,90", economia: "R$ 62" },
   // 16/08 (dono): downsell do D3 = "R$ 19,90 o mês, no Pix, renova quando
   // você quiser" — base plan PRÉ-PAGO de 30 dias no MESMO produto core_mensal
   // (Play cobra o Pix na folha e controla a expiração; renovação é manual por

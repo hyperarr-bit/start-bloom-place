@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { localDayKey } from "@/lib/utils";
 import { Droplets, Minus, Pencil, Plus } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { SerieHistorico } from "@/components/historico/SerieHistorico";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -216,6 +217,24 @@ export const HydrationTracker = () => {
 
         </div>
       </div>
+
+      {/* Histórico (23/08, review da Elaine): as duas chaves andam juntas
+          (a Rotina conta pela `water-log`) — a série une as duas pelo MAIOR
+          do dia, exatamente como o `current` faz pro hoje. Sem isso um dia
+          registrado na Rotina apareceria vazio aqui. */}
+      <SerieHistorico
+        registros={Object.fromEntries(
+          [...new Set([...Object.keys(waterLog), ...Object.keys(waterLogRotina)])].map((k) => [
+            k,
+            Math.max(Number(waterLog[k] ?? 0), Number(waterLogRotina[k] ?? 0)),
+          ]),
+        )}
+        meta={waterGoal}
+        cor="hsl(var(--saude-blue))"
+        id="agua"
+        unidade=" copos"
+        formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+      />
     </div>
   );
 };

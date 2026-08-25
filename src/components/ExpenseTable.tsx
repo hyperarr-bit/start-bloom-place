@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, ChevronDown, Check, X, CreditCard } from "lucide-react";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const [cardParcela, setCardParcela] = useState("");
 
   const nParcelas = parseInt(parcelas, 10);
-  const totalDigitado = parseFloat(newExpense.value);
+  const totalDigitado = numeroBR(newExpense.value);
   const previaParcela =
     Number.isInteger(nParcelas) && nParcelas >= 2 && Number.isFinite(totalDigitado) && totalDigitado > 0
       ? `${nParcelas}x de R$ ${brl(totalDigitado / nParcelas)}`
@@ -115,14 +116,14 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {
       // mesma tecla, dois destinos: parcelado vira dívida, à vista vira gasto
-      if (parcelando) { lancarParcelamento(parseFloat(newExpense.value)); return; }
+      if (parcelando) { lancarParcelamento(numeroBR(newExpense.value)); return; }
       setExpenses([
         ...expenses,
         {
           id: Date.now().toString(),
           description: newExpense.description,
           category: newExpense.category || "outros",
-          value: parseFloat(newExpense.value),
+          value: numeroBR(newExpense.value),
           date: newExpense.date || localDayKey(),
           paymentMethod: newExpense.paymentMethod || "pix",
           cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
@@ -167,7 +168,7 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
   };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.value);
+    const valor = numeroBR(rascunho.value);
     // valor inválido não salva: melhor o botão não responder do que gravar NaN
     if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
     setExpenses(expenses.map((e) => e.id !== editandoId ? e : {

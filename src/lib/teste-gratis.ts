@@ -170,8 +170,25 @@ export function limparGuiaSemente(): void {
  * continua visível até ele expirar, e aí some sozinha. */
 const CHAVE_TRIAL_CARTAO = "core-trial-cartao-fim";
 
-export function marcarTrialCartao(): void {
-  try { localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + 3 * 86_400_000)); } catch { /* noop */ }
+export function marcarTrialCartao(dias = 7): void {
+  // 23/08: default 7 — o trial da vitrine nova é o anual de 7 dias (oferta
+  // coretrial7). A Missão continua sendo o sprint dos 3 PRIMEIROS dias (o
+  // dia dela sai do próprio início, não deste fim); este marcador só diz
+  // "ainda está no período de teste" pra Trilha/save-offer.
+  try { localStorage.setItem(CHAVE_TRIAL_CARTAO, String(Date.now() + dias * 86_400_000)); } catch { /* noop */ }
+}
+
+/** Igual à de cima, mas com o fim REAL do período (vem do RevenueCat na
+ *  sincronização do boot — ver conferirTrialCartao). Cobre quem virou
+ *  assinante sem o app saber que era trial: compra implícita do v61, Android
+ *  matando o app na folha do Google, retomada pós-compra. O evento acorda a
+ *  MissaoDoTrial já montada (o marcador nasce depois do primeiro render). */
+export function marcarTrialCartaoAte(fimMs: number): void {
+  if (!Number.isFinite(fimMs) || fimMs <= Date.now()) return;
+  try {
+    localStorage.setItem(CHAVE_TRIAL_CARTAO, String(fimMs));
+    window.dispatchEvent(new Event("core:trial-cartao"));
+  } catch { /* noop */ }
 }
 
 export function trialCartaoAtivo(): boolean {
@@ -195,6 +212,10 @@ export type Missao = {
   d1: boolean; d2: boolean; d3: boolean;
   vista: boolean;                       // B1 (boas-vindas do pagante) já foi mostrada
   holofote: "pendente" | "feito" | "dispensado";
+  // v65 (20/08): quem saiu do holofote por ROLAGEM não fez o registro (2/2
+  // nos dados) — a instrução morria junto com o anel. O chip é a instrução
+  // que sobrevive: pill discreta no rodapé do módulo até o dia 1 sair.
+  chip?: boolean;
 };
 const CHAVE_MISSAO = "core-missao";
 

@@ -20,7 +20,10 @@ const purgeLocalUserCache = () => {
     // anônimo (compra antes do cadastro) e a pessoa loga em seguida — a
     // vassoura levava a flag e a Missão junto, no exato segundo em que elas
     // passam a importar. Pego no emulador em 19/08, mesmo caso do core-pwa.
-    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area"]);
+    // core-theme-mode/palette (20/08, reviews da Monik ★4 e Isabela ★3): o
+    // tema escuro e a paleta moram nessas chaves — a vassoura levava os dois
+    // no logout e a pessoa reconfigurava a cada volta. Mesmo caso core-pwa.
+    const KEEP = new Set(["core-welcome-done", "theme", "vite-ui-theme", "finance-keys-migrated-v2", "core-pwa", "core-gw-arm", "core-boas-vindas-visto", "core-trial-cartao-fim", "core-missao", "core-lembrete-hora", "core-funnel-area", "core-theme-mode", "core-theme-palette", "core-save-offer-visto"]);
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -89,6 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Uma consulta à loja por sessão antes de declarar "não assinante".
   const lojaConsultadaRef = useRef(false);
   const ultimaReconciliacaoRef = useRef(0);
+  const trialConferidoRef = useRef(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -196,6 +200,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           await checkSubscriptionStatus(); // relê já com o acesso gravado
           return;
         }
+      }
+      // Assinante do app da loja: confere UMA vez por sessão se a assinatura
+      // é o TRIAL de 3 dias (periodType no RevenueCat) — é o que liga a
+      // Missão/holofote pra quem comprou sem o app saber que era trial
+      // (compra implícita do v61, app morto na folha do Google).
+      if (data?.subscribed && isNativeShell() && !trialConferidoRef.current) {
+        trialConferidoRef.current = true;
+        import("@/lib/revenuecat").then((m) => m.conferirTrialCartao()).catch(() => { /* nunca quebra o boot */ });
       }
       setIsSubscribed(data?.subscribed ?? false);
       setTrialExpired(data?.trial_expired ?? false);

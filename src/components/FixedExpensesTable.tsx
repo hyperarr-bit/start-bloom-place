@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { numeroBR } from "@/lib/data-normalizers";
 import { Plus, Trash2, ChevronDown, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -69,7 +70,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
         id: Date.now().toString(),
         description: newExpense.description,
         category: newExpense.category || "outros",
-        value: parseFloat(newExpense.value),
+        value: numeroBR(newExpense.value),
         paymentMethod: newExpense.paymentMethod || "boleto",
         cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
         day: dayNum >= 1 ? dayNum : undefined,
@@ -101,7 +102,7 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
   };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.value);
+    const valor = numeroBR(rascunho.value);
     if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
     const dia = parseInt(rascunho.day, 10);
     setExpenses(expenses.map((e) => e.id !== editandoId ? e : {

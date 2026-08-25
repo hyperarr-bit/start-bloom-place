@@ -25,11 +25,9 @@ import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { ArrowRight, Bell, Check, Loader2, Moon, Sun, Sunrise } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { AREAS, DOOR_AREAS, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
-import { useUserData } from "@/hooks/use-user-data";
 // 18/08: iniciarTeste/armarGuiaSemente/agendarReguaDoTeste saíram — o teste
 // caseiro morreu pra entrada nova (trial é da folha do Google agora).
 import { estadoTeste } from "@/lib/teste-gratis";
@@ -53,8 +51,8 @@ const FUNIL = "teste";
 // (céu = pergunta, grafite = emoção), todo input devolve algo, prova
 // intercalada, CTA grafite, single-select avança sozinho.
 type Step =
-  | "welcome" | "porta" | "dor" | "mecanismo" | "horario" | "notif"
-  | "montando" | "offer" | "signup" | "confirm" | "liberando";
+  | "welcome" | "promessas" | "porta" | "dor" | "antesdepois" | "mecanismo" | "horario" | "notif"
+  | "montando" | "resultado" | "compromissos" | "contrato" | "offer" | "signup" | "confirm" | "liberando";
 
 // Mesma pele das outras telas do shell: funil sempre claro + céu suave.
 const LIGHT_VARS = {
@@ -241,7 +239,7 @@ function Progresso({ n }: { n: 1 | 2 | 3 | 4 }) {
  *  BitePal: single-select sem Next); CTA e timeline saíram — a timeline do
  *  trial mora agora na tela do gate, onde é a estrela. Cards chovem em
  *  cascata igual a grade da welcome (mesmo spring, mesma família). */
-function PortaTeste({ onPick, onEntrar }: { onPick: (a: AreaKey | "tudo") => void; onEntrar: () => void }) {
+function PortaTeste({ onPick }: { onPick: (a: AreaKey | "tudo") => void }) {
   const [sel, setSel] = useState<AreaKey | "tudo" | null>(null);
   const escolher = (k: AreaKey | "tudo") => {
     if (sel) return; // primeira escolha vale — nada de trocar no meio do voo
@@ -259,17 +257,10 @@ function PortaTeste({ onPick, onEntrar }: { onPick: (a: AreaKey | "tudo") => voi
         Qual área tá mais fora<br />de controle hoje?
       </motion.h1>
       <p className="text-muted-foreground text-[13.5px] mt-2 mb-1">
-        Seu teste começa por ela. As outras 15 vêm junto.
+        Seu CORE começa por ela. As outras 15 vêm junto.
       </p>
-      {/* Porta do LOGIN (18/08, avaliação 2★): pagante do site/conta antiga
-          cai NESTA tela — NO TOPO de propósito (no rodapé caía além da dobra
-          do h-dvh overflow-hidden: visível no DOM, inalcançável pro dedo). */}
-      <button
-        onClick={() => { trackEvent("funnel_click", { cta: "porta_ja_tenho_conta", funil: FUNIL }); onEntrar(); }}
-        className="self-start text-[12px] text-muted-foreground mb-4 py-0.5"
-      >
-        Já tenho conta — <span className="underline underline-offset-2 font-semibold text-foreground">entrar</span>
-      </button>
+      {/* 23/08 (dono): o "entrar" saiu DESTA tela — quem tem conta usa o
+          "Já tenho conta? Entrar" da welcome, um passo antes. Pergunta limpa. */}
       <div className="space-y-2.5">
         {PORTA_OPCOES.map((o, i) => (
           <motion.button
@@ -603,7 +594,10 @@ function MontandoScreen({ area, hora, onDone }: { area: AreaKey; hora: string | 
     { at: 22, texto: "Lendo suas respostas" },
     { at: 50, texto: `Armando seus lembretes de ${horaLabel}` },
     { at: 80, texto: "Preparando os 16 módulos" },
-    { at: 100, texto: "Liberando seus 3 dias grátis" },
+    // dia-agnóstico de propósito: o Nº de dias grátis vem do catálogo da Play
+    // (3→7 em 23/08) e esta tela roda ANTES do prefetch — quem promete número
+    // é o paywall, que lê da folha.
+    { at: 100, texto: "Liberando seu teste grátis" },
   ];
   const fim = useRef(false);
   useEffect(() => {
@@ -673,6 +667,293 @@ function MontandoScreen({ area, hora, onDone }: { area: AreaKey; hora: string | 
 }
 
 
+/* ---------------------------------------------- telas do funil Me+ (23/08)
+ * Pivô à vista aprovado pelo dono: o que nos faltava (dado: 74% olham o
+ * paywall e não tocam) era o INVESTIMENTO da pessoa antes do preço — o Me+
+ * resolve com promessa → antes/depois → resultado → micro-compromissos →
+ * contrato assinado. Adaptado com números REAIS (nada de "31 milhões"). */
+
+/** T0.5 — promessas automáticas (prime emocional, ~4s, toque pula). */
+function PromessasScreen({ onDone }: { onDone: () => void }) {
+  const FRAMES = [
+    { bg: "#fdeccb", emoji: "🗂️", t: "Mais organização" },
+    { bg: "#cdeeee", emoji: "🔁", t: "Mais constância" },
+    { bg: "#d9e4fb", emoji: "✨", t: "Sua vida inteira num lugar" },
+  ];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (i >= FRAMES.length) { onDone(); return; }
+    const id = window.setTimeout(() => setI((v) => v + 1), 1150);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
+  const f = FRAMES[Math.min(i, FRAMES.length - 1)];
+  return (
+    <button
+      onClick={onDone}
+      className="fixed inset-0 z-[5] w-full grid place-items-center transition-colors duration-500"
+      style={{ background: f.bg }}
+      aria-label="Pular apresentação"
+    >
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={f.t}
+          initial={{ opacity: 0, scale: 0.9, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 1.05 }}
+          transition={{ duration: 0.32 }}
+          className="text-center px-8"
+        >
+          <div className="text-[56px] leading-none mb-4">{f.emoji}</div>
+          <div className="text-[30px] font-black tracking-[-0.02em] text-[#16121c]">{f.t}</div>
+        </motion.div>
+      </AnimatePresence>
+    </button>
+  );
+}
+
+/** Interstitial antes/depois (Me+ tem ilustração; nós contamos com as dores
+ *  REAIS da área escolhida — personalização barata que ilustração não dá). */
+function AntesDepoisScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const HOJE: Record<AreaKey, string[]> = {
+    dinheiro: ["Contas na cabeça", "Gasto que some", "Culpa no fim do mês"],
+    rotina: ["Começa e larga", "Dia que não rende", "Tarefa esquecida"],
+    corpo: ["Treino sem plano", "Semana sim, mês não", "Desânimo sozinho"],
+    saude: ["Água esquecida", "Sono bagunçado", "Remédio atrasado"],
+    metas: ["Meta só na cabeça", "Zero progresso visível", "Sempre 'segunda-feira'"],
+  };
+  const DEPOIS = ["Lembrete que chega na hora", "Tudo num painel só", "Progresso que dá pra VER"];
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2">
+      <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight text-center mb-5">
+        Você conhece essa<br />sensação?
+      </h1>
+      <div className="grid grid-cols-2 gap-2.5">
+        <motion.div {...chove(0)} className="rounded-2xl bg-black/[0.05] border border-black/[0.06] p-3.5">
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-black/40 mb-2">Hoje</div>
+          {HOJE[area].map((l) => (
+            <div key={l} className="flex items-start gap-1.5 text-[12.5px] font-semibold text-black/55 py-1 leading-snug">
+              <span className="mt-[1px]">😵‍💫</span> {l}
+            </div>
+          ))}
+        </motion.div>
+        <motion.div {...chove(1)} className="rounded-2xl border p-3.5" style={{ background: "linear-gradient(180deg,#eaf5fd,#f7fbff)", borderColor: "rgba(126,198,246,.45)" }}>
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-[#1c76c8] mb-2">Com o CORE</div>
+          {DEPOIS.map((l) => (
+            <div key={l} className="flex items-start gap-1.5 text-[12.5px] font-bold text-[#16121c] py-1 leading-snug">
+              <Check className="w-3.5 h-3.5 mt-[2px] shrink-0 text-emerald-600" strokeWidth={3} /> {l}
+            </div>
+          ))}
+        </motion.div>
+      </div>
+      <div className="mt-auto pt-5 pb-1">
+        <motion.button {...chove(2)} onClick={onNext} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
+          <span className="flex items-center gap-1.5">Continuar <ArrowRight className="w-4 h-4" /></span>
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+/** Resultado do quiz (Me+: medidores) — o espelho motivacional com o único
+ *  número que é NOSSO de verdade: 2+ registros na 1ª semana = fica. */
+function ResultadoScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const [enche, setEnche] = useState(false);
+  useEffect(() => { const id = window.setTimeout(() => setEnche(true), 350); return () => window.clearTimeout(id); }, []);
+  const barras = [
+    { rot: `Organização em ${AREAS[area].nome} hoje`, pct: 26, cor: "#e0654a" },
+    { rot: "Potencial com um sistema do teu lado", pct: 91, cor: "#127a56" },
+  ];
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2">
+      <div className="text-center mb-5">
+        <div className="inline-flex px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider mb-2">
+          Seu resultado
+        </div>
+        <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight">
+          Seu ponto de partida
+        </h1>
+      </div>
+      <div className="rounded-2xl border border-border bg-white p-4 space-y-4">
+        {barras.map((b) => (
+          <div key={b.rot}>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[12.5px] font-bold">{b.rot}</span>
+              <span className="text-[13px] font-black tabular-nums" style={{ color: b.cor }}>{b.pct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-black/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-[width] duration-1000 ease-out"
+                style={{ width: enche ? `${b.pct}%` : "0%", background: b.cor }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <motion.p {...chove(2)} className="text-[12.5px] text-muted-foreground text-center leading-snug mt-4 px-2">
+        Dado real de quem usa o CORE: registrar <b className="text-foreground">2+ vezes na primeira semana</b>{" "}
+        é o que separa quem vira a chave de quem desiste.
+      </motion.p>
+      <div className="mt-auto pt-5 pb-1">
+        <motion.button {...chove(3)} onClick={onNext} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
+          <span className="flex items-center gap-1.5">Ver meu plano <ArrowRight className="w-4 h-4" /></span>
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+/** Micro-compromissos (Me+: "Você quer criar bons hábitos?" Não/Claro!) —
+ *  3 sims em sequência; consistência é o vento a favor do paywall. */
+function CompromissosScreen({ onDone }: { onDone: () => void }) {
+  const PERGUNTAS = [
+    { emoji: "🗓️", p: "Você quer organizar seu dia?" },
+    { emoji: "🔁", p: "Quer construir hábitos que ficam?" },
+    { emoji: "🚀", p: "Topa virar sua melhor versão?" },
+  ];
+  const [i, setI] = useState(0);
+  const responder = (sim: boolean) => {
+    trackEvent("funnel_quiz_answer", { step: `compromisso_${i + 1}`, answer: sim ? "claro" : "nao", funil: FUNIL });
+    if (i >= PERGUNTAS.length - 1) onDone();
+    else setI(i + 1);
+  };
+  const q = PERGUNTAS[i];
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={q.p}
+          initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.24 }}
+          className="flex-1 flex flex-col"
+        >
+          <div className="flex-1 grid place-items-center">
+            <div className="text-center px-4">
+              <div className="text-[64px] leading-none mb-5">{q.emoji}</div>
+              <h1 className="text-[26px] font-black tracking-[-0.02em] leading-tight">{q.p}</h1>
+              <div className="flex justify-center gap-1.5 mt-5">
+                {PERGUNTAS.map((_, k) => (
+                  <span key={k} className={`w-2 h-2 rounded-full ${k <= i ? "bg-accent" : "bg-black/10"}`} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="pb-1 space-y-2.5">
+            <button onClick={() => responder(true)} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
+              Claro!
+            </button>
+            <button onClick={() => responder(false)} className="w-full text-center text-[13px] text-muted-foreground py-2">
+              Não
+            </button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/** Contrato assinado com o dedo (assinatura do Me+, o pico de compromisso).
+ *  Canvas cru de pointer events — sem lib. "Pular" existe: fricção opcional. */
+function ContratoScreen({ onDone }: { onDone: () => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const desenhando = useRef(false);
+  const tracos = useRef(0);
+  const [assinou, setAssinou] = useState(false);
+  const [festa, setFesta] = useState(false);
+
+  const pos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const c = canvasRef.current!;
+    const r = c.getBoundingClientRect();
+    return { x: ((e.clientX - r.left) / r.width) * c.width, y: ((e.clientY - r.top) / r.height) * c.height };
+  };
+  const comeca = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    desenhando.current = true;
+    const ctx = canvasRef.current!.getContext("2d")!;
+    const { x, y } = pos(e);
+    ctx.beginPath(); ctx.moveTo(x, y);
+  };
+  const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!desenhando.current) return;
+    const ctx = canvasRef.current!.getContext("2d")!;
+    ctx.strokeStyle = "#16121c"; ctx.lineWidth = 4; ctx.lineCap = "round";
+    const { x, y } = pos(e);
+    ctx.lineTo(x, y); ctx.stroke();
+    tracos.current += 1;
+    if (tracos.current > 12 && !assinou) setAssinou(true);
+  };
+  const limpar = () => {
+    const c = canvasRef.current!;
+    c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
+    tracos.current = 0;
+    setAssinou(false);
+  };
+  const fechar = (pulou: boolean) => {
+    trackEvent("funnel_click", { cta: pulou ? "contrato_pulou" : "contrato_assinou", funil: FUNIL });
+    if (pulou) { onDone(); return; }
+    setFesta(true);
+    window.setTimeout(onDone, 950);
+  };
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2 relative">
+      {festa && (
+        <div className="pointer-events-none fixed inset-0 z-[70] overflow-hidden">
+          {Array.from({ length: 26 }).map((_, k) => (
+            <motion.span
+              key={k}
+              initial={{ opacity: 1, x: `${(k * 137) % 100}vw`, y: -24, rotate: 0 }}
+              animate={{ opacity: [1, 1, 0], y: "104vh", rotate: 320 }}
+              transition={{ duration: 1.05 + (k % 5) * 0.12, ease: "easeIn" }}
+              className="absolute w-2.5 h-2.5 rounded-[2px]"
+              style={{ background: TILE_CORES[k % TILE_CORES.length] }}
+            />
+          ))}
+        </div>
+      )}
+      <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight text-center mb-2">
+        Assina esse compromisso<br />com você?
+      </h1>
+      <p className="text-[13px] text-muted-foreground text-center mb-4 px-3">
+        <b className="text-foreground">"Eu vou dar 10 minutos por dia pro que importa. Começando hoje."</b>
+      </p>
+      <div className="rounded-2xl border-2 border-dashed border-black/15 bg-white relative">
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={300}
+          className="w-full h-[150px] touch-none rounded-2xl"
+          onPointerDown={comeca}
+          onPointerMove={move}
+          onPointerUp={() => { desenhando.current = false; }}
+          onPointerLeave={() => { desenhando.current = false; }}
+        />
+        {!assinou && (
+          <span className="absolute inset-0 grid place-items-center text-[13px] text-black/25 font-semibold pointer-events-none">
+            ✍️ assina aqui com o dedo
+          </span>
+        )}
+        {assinou && (
+          <button onClick={limpar} className="absolute top-2 right-3 text-[11px] text-muted-foreground underline underline-offset-2">
+            limpar
+          </button>
+        )}
+      </div>
+      <div className="mt-auto pt-5 pb-1">
+        <button
+          onClick={() => fechar(false)}
+          disabled={!assinou}
+          className={`${CTA_GRAFITE} disabled:opacity-40`}
+          style={{ background: GRAFITE }}
+        >
+          <span className="flex items-center gap-1.5">Assinei — abrir meu plano <ArrowRight className="w-4 h-4" /></span>
+        </button>
+        <button onClick={() => fechar(true)} className="w-full text-center text-[12.5px] text-muted-foreground mt-3 py-1">
+          Agora não
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------- orquestra */
 
 export default function ComecarTeste() {
@@ -701,10 +982,6 @@ export default function ComecarTeste() {
     try { return localStorage.getItem("core-lembrete-hora"); } catch { return null; }
   });
   const [posCompra, setPosCompra] = useState(false);
-  // Veio do quiz (D0) → paywall em modo TRIAL (3 dias grátis no anual).
-  // D3/expirado do teste caseiro antigo chega com trialGate=false e vê a
-  // oferta normal ("seu teste terminou").
-  const [trialGate, setTrialGate] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState("");
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -712,7 +989,7 @@ export default function ComecarTeste() {
   userRef.current = user;
 
   useEffect(() => {
-    trackEvent("funnel_view", { step: step === "offer" ? (trialGate ? "offer_trial" : "offer_d3") : step, funil: FUNIL });
+    trackEvent("funnel_view", { step, funil: FUNIL });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
@@ -763,9 +1040,13 @@ export default function ComecarTeste() {
       if (!escondidoDesde || Date.now() - escondidoDesde < 30 * 60_000) return;
       escondidoDesde = 0;
       const s = stepRef.current;
-      if (userRef.current || s === "offer" || s === "signup" || s === "confirm" || s === "liberando") return;
+      // Varredura 23/08: resultado/compromissos/contrato entraram na lista —
+      // quem ASSINOU o contrato e voltou 31min depois recomeçava 11 telas.
+      if (userRef.current || s === "resultado" || s === "compromissos" || s === "contrato" || s === "offer" || s === "signup" || s === "confirm" || s === "liberando") return;
       trackEvent("app_welcome_reset", { de: s, funil: FUNIL });
-      setStep("porta");
+      // welcome, não porta: a porta perdeu o link de login (23/08) — resetar
+      // pra ela escondia o único "Entrar" do funil.
+      setStep("welcome");
     };
     document.addEventListener("visibilitychange", aoMudarVisibilidade);
     return () => document.removeEventListener("visibilitychange", aoMudarVisibilidade);
@@ -779,16 +1060,14 @@ export default function ComecarTeste() {
     return <Navigate to="/home" replace />;
   }
 
-  /** Fim do quiz (v60): sininho → MONTANDO (loading teatral) → gate do
-   *  trial. O trial nasce NA FOLHA do Google (coretrial/coretrialmensal,
-   *  3 dias grátis, cobrança automática no dia 3). Quem estava NO MEIO do
-   *  teste caseiro antigo continua respeitado pelos guards de estadoTeste. */
+  /** Fim do quiz (pivô 23/08, funil Me+): sininho → MONTANDO (loading
+   *  teatral) → RESULTADO → compromissos ("Claro!" ×3) → CONTRATO assinado
+   *  com o dedo → paywall À VISTA. O trial morreu: compromisso vem antes do
+   *  preço, e o preço é pagamento único (Pix na folha do Google). */
   const abrirApp = (_pediuNotif: boolean) => setStep("montando");
   const montou = () => {
-    const a = area ?? "dinheiro";
-    trackEvent("funnel_click", { cta: "teste_gate_cartao", area: a, funil: FUNIL });
-    setTrialGate(true);
-    setStep("offer");
+    trackEvent("funnel_click", { cta: "pos_montando", area: area ?? "dinheiro", funil: FUNIL });
+    setStep("resultado");
   };
 
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
@@ -826,13 +1105,20 @@ export default function ComecarTeste() {
         {step === "welcome" && (
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
             <AppWelcome
-              onComecar={() => setStep("porta")}
-              onEntrar={() => setStep("signup")}
+              onComecar={() => setStep("promessas")}
+              onEntrar={() => { /* "Já tenho conta" = LOGIN, não cadastro (bug 20/08: caía na tela de criar conta) */ navigate("/auth"); }}
             />
           </motion.div>
         )}
       </AnimatePresence>
-      <div className={`relative z-[1] flex-1 flex flex-col ${telaCheia ? "items-center justify-center px-5 py-10" : "px-5 pt-4 pb-6"}`}>
+      {/* Promessas FORA do slide (varredura): é overlay fixed — dentro do
+          motion.div com transform o fixed ancorava no container e a tela
+          pastel deslizava com moldura em volta. Mesmo desenho da welcome. */}
+      {step === "promessas" && <PromessasScreen onDone={() => setStep("porta")} />}
+      {/* offer (23/08): CENTRADO de propósito (estilo Me+, tela preenchida) —
+          a barra de CTA fixa segura o rodapé em qualquer altura
+ */}
+      <div className={`relative z-[1] flex-1 flex flex-col ${step === "offer" ? "items-center justify-center px-5 pt-4 pb-0" : telaCheia ? "items-center justify-center px-5 py-10" : "px-5 pt-4 pb-6"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...slide} className={telaCheia ? "w-full" : "w-full flex-1 flex flex-col"}>
             {step === "porta" && (
@@ -843,7 +1129,6 @@ export default function ComecarTeste() {
                   try { localStorage.setItem(FUNNEL_AREA_KEY, a); } catch { /* noop */ }
                   setStep("dor");
                 }}
-                onEntrar={() => setStep("signup")}
               />
             )}
             {step === "dor" && (
@@ -851,10 +1136,11 @@ export default function ComecarTeste() {
                 area={area ?? "dinheiro"}
                 onPick={(id) => {
                   try { localStorage.setItem("core-teste-dor", id); } catch { /* noop */ }
-                  setStep("mecanismo");
+                  setStep("antesdepois");
                 }}
               />
             )}
+            {step === "antesdepois" && <AntesDepoisScreen area={area ?? "dinheiro"} onNext={() => setStep("mecanismo")} />}
             {step === "mecanismo" && <MecanismoScreen onNext={() => setStep("horario")} />}
             {step === "horario" && (
               <HorarioScreen
@@ -868,14 +1154,15 @@ export default function ComecarTeste() {
             )}
             {step === "notif" && <NotifScreen area={area ?? "dinheiro"} hora={hora} onDone={abrirApp} />}
             {step === "montando" && <MontandoScreen area={area ?? "dinheiro"} hora={hora} onDone={montou} />}
+            {step === "resultado" && <ResultadoScreen area={area ?? "dinheiro"} onNext={() => setStep("compromissos")} />}
+            {step === "compromissos" && <CompromissosScreen onDone={() => setStep("contrato")} />}
+            {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}
             {step === "offer" && (
               <PaywallAssinatura
                 contexto="funil"
                 area={area}
                 d3={d3}
-                trial={trialGate}
                 onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
-                onEntrar={() => setStep("signup")}
               />
             )}
             {step === "signup" && (

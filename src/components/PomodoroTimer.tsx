@@ -13,13 +13,30 @@ export const PomodoroTimer = () => {
   const [sessions, setSessions] = usePersistedState<number>("pomodoro-sessions-today", 0);
   const [totalFocusMin, setTotalFocusMin] = usePersistedState<number>("pomodoro-total-focus", 0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Fim da contagem no RELÓGIO DE PAREDE (20/08, review ★4: "o Pomodoro
+  // pausa quando a tela é bloqueada"). Com a tela travada o WebView congela
+  // os setInterval — contar por tick fazia o timer parar junto. O restante
+  // agora deriva SEMPRE de fimEm - agora; o tick só re-renderiza, e ao
+  // voltar do bloqueio o visibilitychange recalcula e o timer "alcança" o
+  // tempo real (inclusive completando a sessão se o prazo venceu no escuro).
+  const fimEm = useRef(0);
 
   const durations = { focus: 25 * 60, break: 5 * 60, longBreak: 15 * 60 };
 
   useEffect(() => {
+    if (!isRunning) fimEm.current = 0; // pausa/troca: a retomada re-ancora
     if (isRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => setTimeLeft(t => t - 1), 1000);
+      if (!fimEm.current) fimEm.current = Date.now() + timeLeft * 1000;
+      const tick = () => setTimeLeft(Math.max(0, Math.round((fimEm.current - Date.now()) / 1000)));
+      intervalRef.current = setInterval(tick, 1000);
+      const aoVoltar = () => { if (document.visibilityState === "visible") tick(); };
+      document.addEventListener("visibilitychange", aoVoltar);
+      return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        document.removeEventListener("visibilitychange", aoVoltar);
+      };
     } else if (timeLeft === 0) {
+      fimEm.current = 0;
       setIsRunning(false);
       if (mode === "focus") {
         setSessions(s => s + 1);

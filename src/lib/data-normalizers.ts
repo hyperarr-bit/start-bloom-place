@@ -150,6 +150,34 @@ const normalizeMonthlyBudgets = (v: any) => {
 
 // ----------------------------- registry -----------------------------------
 
+/**
+ * Dinheiro digitado como gente digita (review ★3 de 20/08: "os valores ficam
+ * errados, o total... altera o valor depois que salva"). Duas fontes do mesmo
+ * estrago: value salvo como STRING em versões antigas vira CONCATENAÇÃO no
+ * reduce do total; e vírgula decimal no parseFloat trunca ("12,50" → 12,
+ * "1.250,50" → 1.25). Regra: tem vírgula → pontos são milhar; senão, ponto é
+ * decimal. Devolve NaN quando não há número (pros guards dos forms segurarem).
+ */
+export const numeroBR = (v: any): number => {
+  if (typeof v === "number") return v;
+  const t = String(v ?? "").replace(/[^\d.,-]/g, "");
+  if (!t) return NaN;
+  const norm = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
+  const n = parseFloat(norm);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
+};
+
+// Cura na LEITURA as listas de dinheiro (expenses/incomes/fixed): coage cada
+// `value` pra número — dado antigo corrompido sara sozinho no próximo boot.
+const normalizeMoneyList = (v: any) => {
+  if (!Array.isArray(v)) return [];
+  return v.map((item) => {
+    if (!isPlainObject(item)) return item;
+    const n = numeroBR(item.value);
+    return { ...item, value: Number.isFinite(n) ? n : 0 };
+  });
+};
+
 const NORMALIZERS: Record<string, (value: any) => any> = {
   "dp-gratitude": normalizeGratitude,
   "core-mood-log": normalizeMoodLog,
@@ -158,6 +186,9 @@ const NORMALIZERS: Record<string, (value: any) => any> = {
   "hiperfoco-strategies": normalizeStrategies,
   "goals-board-v2": normalizeGoalsBoard,
   "finance-monthly-budgets": normalizeMonthlyBudgets,
+  "finance-expenses": normalizeMoneyList,
+  "finance-incomes": normalizeMoneyList,
+  "finance-fixed-expenses": normalizeMoneyList,
 };
 
 export const normalizeForKey = <T,>(key: string, value: T): T => {

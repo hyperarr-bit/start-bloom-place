@@ -35,7 +35,7 @@ import {
   trialCartaoAtivo, missaoAtual, iniciarMissao, salvarMissao, diaDaMissao,
   guiaSemente, type Missao,
 } from "@/lib/teste-gratis";
-import { agendarReguaDaMissao } from "@/lib/notificacoes";
+import { agendarReguaDaMissao, pedirPermissao } from "@/lib/notificacoes";
 
 const GRAFITE = "#16121c";
 
@@ -52,10 +52,41 @@ const ALVO: Record<string, { rota: string; passos: Array<{ seletor: string; dica
       { seletor: '[data-spotlight="financeiro"]', dica: "Toca em 💰 MEU FINANCEIRO pra abrir seu painel." },
     ],
   },
-  rotina: { rota: "/rotina", passos: [{ seletor: '[data-spotlight="add-todo"]', dica: "Escreve 1 tarefa de hoje — leva 10 segundos." }] },
-  corpo: { rota: "/treino", passos: [{ seletor: '[data-spotlight="add-exercise"]', dica: "Monta teu primeiro exercício — leva 10 segundos." }] },
-  saude: { rota: "/saude", passos: [{ seletor: '[data-spotlight="add-water"]', dica: "Marca 1 copo d'água — leva 2 segundos." }] },
-  metas: { rota: "/desenvolvimento", passos: [{ seletor: '[data-spotlight="add-goal"]', dica: "Escreve 1 meta pequena — leva 10 segundos." }] },
+  rotina: {
+    rota: "/rotina",
+    // 20/08: 3/3 sem_ancora da rotina — add-todo mora na aba FOCO e a rotina
+    // ABRE na SEMANA. O 1º registro certo é o hábito, que vive na aba de
+    // entrada; a aba é o fallback (mesmo desenho do financeiro).
+    passos: [
+      { seletor: '[data-spotlight="add-habit"]', dica: "Cria teu 1º hábito — ex.: beber água. Leva 10 segundos." },
+      { seletor: '[data-spotlight="tab-semana"]', dica: "Toca em 📅 MINHA SEMANA pra montar tua rotina." },
+    ],
+  },
+  corpo: {
+    rota: "/treino",
+    // add-exercise só existe com músculos configurados — conta nova cai no
+    // CONFIG primeiro.
+    passos: [
+      { seletor: '[data-spotlight="add-exercise"]', dica: "Monta teu primeiro exercício — leva 10 segundos." },
+      { seletor: '[data-spotlight="tab-config"]', dica: "Toca em ⚙️ CONFIG e escolhe teus grupos musculares." },
+    ],
+  },
+  saude: {
+    rota: "/saude",
+    passos: [
+      { seletor: '[data-spotlight="add-water"]', dica: "Marca 1 copo d'água — leva 2 segundos." },
+      { seletor: '[data-spotlight="tab-hoje"]', dica: "Toca em 💊 HOJE pra registrar teu dia." },
+    ],
+  },
+  metas: {
+    rota: "/desenvolvimento",
+    // add-goal mora na aba METAS; a default é SOBRE MIM — sem o fallback a
+    // conta nova ficava sem tutorial (mesma classe da rotina).
+    passos: [
+      { seletor: '[data-spotlight="add-goal"]', dica: "Escreve 1 meta pequena — leva 10 segundos." },
+      { seletor: '[data-spotlight="tab-metas"]', dica: "Toca em METAS pra criar tua primeira." },
+    ],
+  },
 };
 
 const FORA = ["/app", "/entrar", "/auth", "/planos", "/comecar", "/inicio", "/lp", "/admin", "/preview", "/retrospectiva", "/update-password"];
@@ -79,11 +110,20 @@ function Holofote({ area, aoSair }: { area: string; aoSair: (motivo: string) => 
     if (!cfg) { sair("sem_config"); return; }
     let vivo = true;
     const timers: number[] = [];
-    // 600ms pro módulo montar; não achou NENHUM da cadeia → fail-open.
-    timers.push(window.setTimeout(() => {
+    // RETRY (20/08): 600ms e UMA tentativa não bastavam — módulo pesado
+    // (Rotina, 1.300 linhas) monta depois disso e o holofote falhava aberto
+    // por CORRIDA, não por falta de âncora. Procura a cadeia a cada 300ms
+    // por até ~4,5s; só então desiste. As 7 saídas continuam valendo o
+    // tempo todo (o timeout de 12s inclusive).
+    let tentativas = 0;
+    const procurar = () => {
       if (!vivo) return;
       const passo = cfg.passos.map((p) => ({ ...p, el: document.querySelector(p.seletor) })).find((p) => p.el);
-      if (!passo?.el) { sair("sem_ancora"); return; }
+      if (!passo?.el) {
+        if (++tentativas >= 13) { sair("sem_ancora"); return; }
+        timers.push(window.setTimeout(procurar, 300));
+        return;
+      }
       const el = passo.el;
       setDica(passo.dica);
       alvoRef.current = el;
@@ -94,8 +134,25 @@ function Holofote({ area, aoSair }: { area: string; aoSair: (motivo: string) => 
         if (r.width < 8 || r.height < 8) { sair("ancora_invisivel"); return; }
         setRect(r);
         trackEvent("holofote_montou", { area });
+        // Rolagem arma quando o scroll ASSENTAR (2 leituras estáveis), não em
+        // tempo fixo: o smooth-scroll de distância longa passa de 800ms e o
+        // próprio scrollIntoView matava o anel como "rolagem" (provado no
+        // emulador 20/08, rotina).
+        let ultimoY = -1, estaveis = 0;
+        const armarQuandoParar = () => {
+          if (!vivo) return;
+          const y = window.scrollY;
+          if (y === ultimoY && ++estaveis >= 2) {
+            window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
+            return;
+          }
+          if (y !== ultimoY) { estaveis = 0; ultimoY = y; }
+          timers.push(window.setTimeout(armarQuandoParar, 250));
+        };
+        timers.push(window.setTimeout(armarQuandoParar, 400));
       }, 520));
-    }, 600));
+    };
+    timers.push(window.setTimeout(procurar, 600));
     // Morte por tempo: 12s e ele se despede sozinho.
     timers.push(window.setTimeout(() => sair("timeout"), 12_000));
 
@@ -113,10 +170,6 @@ function Holofote({ area, aoSair }: { area: string; aoSair: (motivo: string) => 
       sair("toque_fora");
     };
     const aoEsconder = () => { if (document.visibilityState === "hidden") sair("segundo_plano"); };
-    // rolagem só derruba depois do scrollIntoView assentar
-    timers.push(window.setTimeout(() => {
-      window.addEventListener("scroll", aoRolar, { passive: true, capture: true });
-    }, 1400));
     document.addEventListener("pointerdown", aoTocar, { passive: true, capture: true });
     document.addEventListener("visibilitychange", aoEsconder);
     window.addEventListener("resize", aoRolar);
@@ -225,6 +278,18 @@ export function MissaoDoTrial() {
   const [celebrando, setCelebrando] = useState<0 | 1 | 2 | 3>(0);
   const ctaEm = useRef(0);
 
+  // O marcador do trial pode nascer DEPOIS do primeiro render: a compra na
+  // sessão marca na hora, mas quem vem da sincronização com o RevenueCat
+  // (conferirTrialCartao, boot) só marca quando a resposta chega. O evento
+  // força o recálculo de `elegivel` — senão o B1 só apareceria na próxima
+  // troca de rota.
+  const [, recalcular] = useState(0);
+  useEffect(() => {
+    const f = () => recalcular((x) => x + 1);
+    window.addEventListener("core:trial-cartao", f);
+    return () => window.removeEventListener("core:trial-cartao", f);
+  }, []);
+
   const elegivel = isNativeShell() && trialCartaoAtivo() && !!user && isSubscribed && !fora(pathname);
 
   // Nasce a missão na primeira entrada elegível (a área vem do guia/funil).
@@ -238,14 +303,22 @@ export function MissaoDoTrial() {
   }, [elegivel]);
 
   // B3 — cada dia vencido: escuta a MESMA fonte de verdade da trilha.
+  // Escrita de NAVEGAÇÃO (*-last-seen-*) não é ação da pessoa — filtrada por
+  // nome. A guarda de tempo (2,5s) que existia aqui foi REMOVIDA na revisão
+  // de 22/08: ela engolia a ação de 1 toque ("marca 1 copo — leva 2
+  // segundos") e não protegia de verdade (os culpados do dia-1-em-0s já
+  // morreram na fonte: quickstart suprimido pra missão, virada de mês é
+  // escrita {system} sem ativação, last-seen filtrado).
   useEffect(() => {
     if (!missao) return;
-    const aoAgir = () => {
+    const aoAgir = (ev: Event) => {
+      const chave = (ev as CustomEvent).detail?.key as string | undefined;
+      if (chave && /last-seen/.test(chave)) return;
       const m = missaoAtual();
       if (!m || !trialCartaoAtivo()) return;
       const dia = diaDaMissao(m);
       if (dia === 1 && !m.d1) {
-        salvarMissao({ ...m, d1: true, holofote: m.holofote === "pendente" ? "feito" : m.holofote });
+        salvarMissao({ ...m, d1: true, chip: false, holofote: m.holofote === "pendente" ? "feito" : m.holofote });
         setMissao(missaoAtual());
         trackEvent("missao_dia_feito", { dia: 1, segundos: ctaEm.current ? Math.round((Date.now() - ctaEm.current) / 1000) : null });
         setCelebrando(1);
@@ -323,11 +396,17 @@ export function MissaoDoTrial() {
           <div className="mt-auto pt-6">
             <motion.button
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.05 }}
-              onClick={() => {
+              onClick={async () => {
                 ctaEm.current = Date.now();
                 trackEvent("missao_cta", { area: missao.area });
                 salvarMissao({ ...missao, vista: true });
                 setMissao(missaoAtual());
+                // Permissão ANTES do navigate (revisão 22/08): o diálogo do
+                // sistema pausa a Activity → visibilitychange:hidden → o
+                // holofote recém-montado morria como "segundo_plano" antes
+                // do anel aparecer. Pedindo AQUI, o diálogo abre sobre o B1;
+                // a régua (abaixo) encontra a permissão já decidida.
+                try { await pedirPermissao(); } catch { /* nunca trava o CTA */ }
                 void agendarReguaDaMissao(missao.area, AREAS[missao.area as AreaKey]?.nome ?? "seu módulo", localStorage.getItem("core-lembrete-hora"));
                 navigate(cfg.rota);
               }}
@@ -358,14 +437,46 @@ export function MissaoDoTrial() {
               trackEvent("holofote_saida", { motivo, area: missao.area });
               // "feito" só quando a ação aconteceu (o listener de activation
               // marca antes); qualquer outra saída dispensa sem insistir.
+              // Rolagem/timeout = a pessoa estava EXPLORANDO e a instrução
+              // morreria junto — deixa o chip no lugar (2/2 que rolaram não
+              // fizeram o registro; quem toca fora fez 3/3).
               const m = missaoAtual();
-              if (m && m.holofote === "pendente") { salvarMissao({ ...m, holofote: "dispensado" }); setMissao(missaoAtual()); }
+              if (m && m.holofote === "pendente") {
+                const deixaChip = motivo === "rolagem" || motivo === "timeout";
+                salvarMissao({ ...m, holofote: "dispensado", ...(deixaChip ? { chip: true } : {}) });
+                setMissao(missaoAtual());
+              }
             }}
           />
         )}
       </AnimatePresence>
       <AnimatePresence>
         {celebrando !== 0 && <Celebracao key={`cel-${celebrando}`} dia={celebrando} aoFim={() => setCelebrando(0)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {missao.chip && !missao.d1 && noModulo && celebrando === 0 && missao.holofote !== "pendente" && (
+          <motion.div
+            key="chip-missao"
+            initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 24 }}
+            transition={{ type: "spring", stiffness: 320, damping: 26 }}
+            className="fixed bottom-20 inset-x-0 z-[60] flex justify-center px-6"
+          >
+            <div className="flex items-center gap-2.5 rounded-full bg-[#16121c] text-white shadow-[0_14px_30px_-8px_rgba(22,18,28,.55)] pl-4 pr-2 py-2 max-w-[360px]">
+              <span className="text-[12.5px] font-semibold leading-snug">✨ {(ALVO[missao.area] ?? ALVO.dinheiro).passos[0].dica}</span>
+              <button
+                aria-label="Fechar dica"
+                onClick={() => {
+                  trackEvent("missao_chip", { acao: "fechou", area: missao.area });
+                  const m = missaoAtual();
+                  if (m) { salvarMissao({ ...m, chip: false }); setMissao(missaoAtual()); }
+                }}
+                className="w-7 h-7 rounded-full grid place-items-center bg-white/10 text-white/70 shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </>
   );

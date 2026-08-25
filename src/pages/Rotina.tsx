@@ -459,8 +459,17 @@ const Rituals = () => {
 
 
 // ============= HABIT HEATMAP (GitHub Style) =============
-const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[] }) => {
+// v67 (pedido da review ★4 da Monik, 19/08): "a consistência não mostra os
+// dados separados por hábito". O DESIGN NÃO MUDA (ordem do dono): o card abre
+// idêntico, agregado; a única adição é a linha de chips no rodapé — tocar num
+// hábito re-pinta o MESMO heatmap e o 🔥 vira o streak daquele hábito. A
+// fonte por hábito é o rotina-habit-log {data: [nomes]}, alimentado no toggle
+// do ✓ (NUNCA no mount — lição do bug destrutivo dos widgets de 20/08).
+const HabitHeatmap = ({ habitsChecked, habits, days: dayNames, habitLog }: { habitsChecked: Record<string, boolean[]>; habits: string[]; days: string[]; habitLog: Record<string, string[]> }) => {
   const [streakLog, setStreakLog] = usePersistedState<Record<string, boolean | number>>("heatmap-log", {});
+  const [foco, setFoco] = useState<string | null>(null);
+  // hábito apagado/renomeado some dos chips — o filtro não pode apontar pro nada
+  useEffect(() => { if (foco && !habits.includes(foco)) setFoco(null); }, [habits, foco]);
   
   // Calculate if today has any habits done
   const today = new Date();
@@ -485,6 +494,10 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
     return 0;
   };
 
+  // Com foco num hábito, o nível vem do log POR HÁBITO; sem foco, tudo igual.
+  const nivelDoDia = (key: string): number =>
+    foco ? ((habitLog[key] ?? []).includes(foco) ? 2 : 0) : getLevel(streakLog[key]);
+
   let currentWeek: typeof weeks[0] = [];
   for (let i = 0; i < 112; i++) {
     const d = new Date(startDate);
@@ -494,7 +507,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
       weeks.push(currentWeek);
       currentWeek = [];
     }
-    currentWeek.push({ date: d, key, level: getLevel(streakLog[key]) });
+    currentWeek.push({ date: d, key, level: nivelDoDia(key) });
   }
   if (currentWeek.length > 0) weeks.push(currentWeek);
 
@@ -503,7 +516,7 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
   const checkDate = new Date();
   while (true) {
     const key = getDateKey(checkDate);
-    if (getLevel(streakLog[key]) > 0) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
+    if (nivelDoDia(key) > 0) { streak++; checkDate.setDate(checkDate.getDate() - 1); }
     else break;
   }
 
@@ -551,6 +564,25 @@ const HabitHeatmap = ({ habitsChecked, habits, days: dayNames }: { habitsChecked
           </div>
           <div className="text-xs text-muted-foreground">Últimas 16 semanas</div>
         </div>
+        {habits.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto mt-3 pb-0.5">
+            <button
+              onClick={() => setFoco(null)}
+              className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${foco === null ? "bg-[hsl(var(--rt-heat-3))] text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+            >
+              Todos
+            </button>
+            {habits.map((h) => (
+              <button
+                key={h}
+                onClick={() => setFoco(foco === h ? null : h)}
+                className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors ${foco === h ? "bg-[hsl(var(--rt-heat-3))] text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+              >
+                {h}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -994,6 +1026,10 @@ const Rotina = () => {
   const [semanaChecks, setSemanaChecks] = usePersistedState<string>("rotina-habits-week", "");
   const semanaValida = semanaChecks === semanaAtualId();
   const checkedAtual: Record<string, boolean[]> = semanaValida ? habitsChecked : {};
+  // Histórico POR HÁBITO por data real {"2026-08-21": ["Beber água"]} — a
+  // fonte do filtro do heatmap (review da Monik). Alimentado SÓ no toggle
+  // (nunca no mount): a grade semanal zera toda segunda, este log não.
+  const [habitLog, setHabitLog] = usePersistedState<Record<string, string[]>>("rotina-habit-log", {});
 
   // Schedule state
   const [schedule, setSchedule] = usePersistedState<Record<string, Record<string, string>>>("rotina-schedule", defaultSchedule);
@@ -1013,6 +1049,17 @@ const Rotina = () => {
     newChecked[day] = [...newChecked[day]];
     newChecked[day][habitIndex] = !newChecked[day][habitIndex];
     setHabitsChecked(newChecked);
+    // Espelha o DIA INTEIRO no log por data real (a coluna tocada pode ser
+    // qualquer dia da semana corrente). Reescrever a entrada toda a partir da
+    // grade é auto-curativo: check e uncheck ficam sempre consistentes.
+    const idx = days.indexOf(day);
+    const hoje = new Date();
+    const dow = hoje.getDay() === 0 ? 6 : hoje.getDay() - 1;
+    const dataReal = new Date(hoje);
+    dataReal.setDate(hoje.getDate() - dow + idx);
+    const chave = getDateKey(dataReal);
+    const feitos = habitNames.filter((_, i) => newChecked[day][i]);
+    setHabitLog(prev => ({ ...prev, [chave]: feitos }));
   };
 
   const addHabit = () => {
@@ -1114,7 +1161,7 @@ const Rotina = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={tab.id === "mes" ? "tab-mes" : undefined}
+              data-spotlight={`tab-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
@@ -1197,7 +1244,7 @@ const Rotina = () => {
             </div>
 
             {/* Heatmap */}
-            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} />
 
             {/* Grid: Schedule + Side */}
             <div className="grid lg:grid-cols-[1fr_320px] gap-4">
@@ -1323,7 +1370,7 @@ const Rotina = () => {
         {activeTab === "revisao" && (
           <div className="space-y-5">
             <WeeklyReview />
-            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} />
+            <HabitHeatmap habitsChecked={checkedAtual} habits={habitNames} days={days} habitLog={habitLog} />
           </div>
         )}
       </main>

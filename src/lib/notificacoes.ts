@@ -1,4 +1,5 @@
 import { isNativeShell } from "./native-shell";
+import { trackEvent } from "./analytics";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -543,7 +544,7 @@ export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<v
       id: BASE_RESGATE + 2,
       at: new Date(Date.now() + 24 * 3600_000),
       title: "Ainda dá tempo de começar hoje",
-      body: `Seu plano${daArea} te espera do jeito que você deixou. Cancele quando quiser.`,
+      body: `Seu plano${daArea} te espera do jeito que você deixou.`,
     },
   ];
   try {
@@ -642,7 +643,7 @@ export async function agendarReguaDoTeste(area: string | null, inicioMs: number,
   const avisos = [
     { id: BASE_TESTE + 1, at: new Date(d1), title: c.d1t, body: c.d1b, rota: rotaModulo },
     { id: BASE_TESTE + 2, at: new Date(d2), title: "Amanhã seu teste fecha", body: "Olha o que você já montou no CORE. Se fizer sentido, a partir de R$ 13,32/mês no anual. Se não, sem drama.", rota: rotaModulo },
-    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com a assinatura. A partir de R$ 13,32/mês — cancele quando quiser.", rota: "/app?step=offer&d3=1" },
+    { id: BASE_TESTE + 3, at: new Date(inicioMs + 68 * 3600_000), title: "Hoje é o dia de decidir", body: "Tudo que você construiu nos 3 dias fica salvo com a assinatura. A partir de R$ 13,32/mês.", rota: "/app?step=offer&d3=1" },
   ];
   try {
     await LN.schedule({
@@ -666,13 +667,20 @@ export async function cancelarReguaDoTeste(): Promise<void> {
  * são a ponte do retorno: PROGRESSO + missão, nunca "seu trial acaba"
  * seco (RCD: progress email; Duolingo: cobrar quando há algo a proteger).
  * D1 abre o MÓDULO (não paywall — receita da avaliação 1★, ver
- * ROTA_DA_AREA); a véspera é honesta: endowment + como cancelar. */
+ * ROTA_DA_AREA). Push nosso = USO; aviso de cobrança é do Google. */
 const BASE_MISSAO = 900000;
 
 export async function agendarReguaDaMissao(area: string | null, nomeArea: string, preferencia?: string | null): Promise<void> {
+  // INSTRUMENTADA (20/08): a régua morria MUDA sem permissão — 9 de 13
+  // trials sem rastro de lembrete e ninguém sabia se a régua existia. Agora
+  // cada desfecho vira evento, e sem permissão ela PEDE na hora (o B1 é o
+  // momento de máxima boa vontade: a pessoa acabou de assinar). A volta do
+  // D1 é o jogo inteiro: 0/8 cancelados voltaram.
   const p = await plugin();
-  if (!p) return;
-  if (!(await temPermissao())) return;
+  if (!p) { trackEvent("regua_missao_armada", { ok: false, motivo: "sem_plugin", area }); return; }
+  let permitido = await temPermissao();
+  if (!permitido) permitido = await pedirPermissao();
+  if (!permitido) { trackEvent("regua_missao_armada", { ok: false, motivo: "sem_permissao", area }); return; }
   await garantirCanal();
   await limparFaixa(BASE_MISSAO);
   const { LN } = p;
@@ -684,9 +692,6 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
   const alvo = new Date(inicioMs + 14 * 3600_000);
   alvo.setHours(Math.floor(hora), Math.round((hora % 1) * 60), 0, 0);
   while (alvo.getTime() < inicioMs + 14 * 3600_000) alvo.setDate(alvo.getDate() + 1);
-  const vespera = new Date(inicioMs + 52 * 3600_000);
-  vespera.setHours(8, 30, 0, 0);
-  if (vespera.getTime() < inicioMs + 44 * 3600_000) vespera.setTime(inicioMs + 52 * 3600_000);
   const avisos = [
     {
       id: BASE_MISSAO + 1, at: alvo,
@@ -694,12 +699,10 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
       body: `Ontem você começou ${nomeArea}. Fechar o dia de hoje leva 1 minuto.`,
       rota: rotaModulo,
     },
-    {
-      id: BASE_MISSAO + 2, at: vespera,
-      title: "Amanhã seu teste vira assinatura",
-      body: "Tudo que você registrou fica com você. Continua de onde parou — ou cancela na Play sem custo.",
-      rota: rotaModulo,
-    },
+    // A VÉSPERA FOI REMOVIDA (22/08, ordem do dono após a raquel cancelar 4h
+    // antes da cobrança guiada pelo aviso): nenhum concorrente (BitePal, Cal
+    // AI) manda lembrete de cobrança — o Google já manda o e-mail obrigatório
+    // dele. Nosso push é pra USO, não pra decisão de cobrança.
   ];
   try {
     await LN.schedule({
@@ -710,7 +713,11 @@ export async function agendarReguaDaMissao(area: string | null, nomeArea: string
         extra: { rota: a.rota },
       })),
     });
-  } catch { /* régua nunca derruba o app */ }
+    trackEvent("regua_missao_armada", { ok: true, area, preferencia: preferencia ?? "sem" });
+  } catch (e) {
+    // régua nunca derruba o app — mas o fracasso vira evento, não silêncio
+    trackEvent("regua_missao_armada", { ok: false, motivo: "erro_agendar", area });
+  }
 }
 
 export async function cancelarReguaDaMissao(): Promise<void> {

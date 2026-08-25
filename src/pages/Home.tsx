@@ -20,6 +20,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useHomeWidgets, WidgetId, ActiveWidget } from "@/hooks/use-home-widgets";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useAuth } from "@/hooks/use-auth";
+import { trialCartaoAtivo } from "@/lib/teste-gratis";
 
 // One-time reset key — bump version to replay onboarding for everyone
 const ONBOARDING_RESET_KEY = "core-onboarding-reset-v2";
@@ -125,8 +126,14 @@ const HomePage = () => {
     const lsFlag = typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true";
     const dbFlag = !!get<string>("force-new-user-tutorial", "");
     const contaNova = !!user.created_at && Date.now() - new Date(user.created_at).getTime() < 48 * 3600e3;
-    const forceNewUser = contaNova && (dbFlag || lsFlag);
-    if ((dbFlag || lsFlag) && !contaNova) {
+    // Pagante nos 3 dias do trial tem a MISSÃO como tutorial (B1 → holofote
+    // → celebração). Os dois sistemas juntos brigam: o cadastro pós-compra
+    // arma esta flag pra todo mundo, o quickstart montava por cima do B1 e
+    // uma ação DELE creditava o dia 1 da missão (19/08, trial real: dia 1
+    // "feito" em 0s e o holofote nunca montou). Missão ativa = missão manda.
+    const missaoManda = trialCartaoAtivo();
+    const forceNewUser = contaNova && (dbFlag || lsFlag) && !missaoManda;
+    if ((dbFlag || lsFlag) && (!contaNova || missaoManda)) {
       try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* ignore */ }
       if (dbFlag) setData("force-new-user-tutorial", "");
     }
@@ -169,6 +176,20 @@ const HomePage = () => {
     setShowOnboarding(shouldShow);
     setOnboardingResolved(true);
   }, [loaded, isGuest, get, setData, user]);
+
+  // A flag do trial pode chegar DEPOIS da decisão acima (sincronização com o
+  // RevenueCat no boot é assíncrona): se a missão assumir com o quickstart já
+  // em pé, derruba ele e limpa a flag de usuário-novo. Só dispara quando um
+  // TRIAL foi detectado — exatamente o caso em que a missão manda.
+  useEffect(() => {
+    const missaoAssumiu = () => {
+      try { localStorage.removeItem("force-new-user-tutorial"); } catch { /* ignore */ }
+      setData("force-new-user-tutorial", "");
+      setShowOnboarding(false);
+    };
+    window.addEventListener("core:trial-cartao", missaoAssumiu);
+    return () => window.removeEventListener("core:trial-cartao", missaoAssumiu);
+  }, [setData]);
 
   // Auto check-in on app open (only after data loaded)
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
 import { Plus, Trash2, Check, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -37,7 +38,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
         {
           id: Date.now().toString(),
           description: newIncome.description,
-          value: parseFloat(newIncome.value),
+          value: numeroBR(newIncome.value),
           date: newIncome.date || localDayKey(),
         },
       ]);
@@ -59,7 +60,7 @@ export const IncomeTable = ({ incomes, setIncomes, prefillExample = false }: Inc
   };
 
   const salvarEdicao = () => {
-    const valor = parseFloat(rascunho.value);
+    const valor = numeroBR(rascunho.value);
     if (!rascunho.description.trim() || !Number.isFinite(valor)) return;
     setIncomes(incomes.map((i) => i.id !== editandoId ? i : {
       ...i,

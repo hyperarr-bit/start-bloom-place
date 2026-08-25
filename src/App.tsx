@@ -27,6 +27,7 @@ import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/test
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
 // pagante, B2 holofote fail-open, B3 celebração por dia vencido.
 import { MissaoDoTrial } from "@/components/missao/MissaoDoTrial";
+import { SaveOfferDowngrade } from "@/components/missao/SaveOfferDowngrade";
 import { useLembretes } from "@/hooks/use-lembretes";
 import { useViradaDoMes } from "@/hooks/use-virada-do-mes";
 
@@ -61,6 +62,18 @@ const ehPwa = () => {
   } catch { /* noop */ }
   return window.matchMedia?.("(display-mode: standalone)").matches === true
     || (window.navigator as { standalone?: boolean }).standalone === true;
+};
+
+/** Chegou pela raiz MAS carregando marca de campanha (encurtador, redirect do
+ *  anúncio, link com utm colado à mão)? Então é tráfego pago e vai pro FUNIL,
+ *  não pra home institucional — a home é pra quem digita o domínio. Sem esta
+ *  peneira, a home de 24/08 roubaria venda de quem clicou no anúncio. */
+const PARAMS_DE_ANUNCIO = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid", "gclid", "ttclid", "gbraid", "wbraid", "ref"];
+const temMarcaDeAnuncio = () => {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    return PARAMS_DE_ANUNCIO.some((k) => !!p.get(k));
+  } catch { return false; }
 };
 
 /**
@@ -126,15 +139,31 @@ const RootGate = () => {
         return <Navigate to={`${isNativeShell() ? ENTRADA_APP : "/inicio"}?step=analise`} replace />;
     } catch { /* noop */ }
   }
-  /* Visitante deslogado na raiz vai pro funil VITRINE, não pro de finanças.
+  /* A RAIZ DA WEB, deslogado. Duas viradas na história desta linha:
    *
-   * Até 10/08 esta linha mandava pra "/comecar" — resquício de quando ele era
-   * a entrada. Quem digitava coreaplicativo.com.br sem caminho caía no funil
-   * ANTIGO (só finanças, "O que mais te atrapalha hoje?") enquanto 86% do
-   * tráfego pago já entrava pelo /inicio com a porta das 5 áreas. Dois funis
-   * diferentes vendendo o mesmo produto, e o pior deles atendendo quem chega
-   * pela marca (tráfego mais quente: veio pelo nome, não pelo anúncio). */
-  if (!user) return <Navigate to={ehPwa() ? "/entrar" : "/inicio"} replace />;
+   * 10/08 — mandava pra "/comecar", resquício de quando ele era a entrada.
+   * Quem digitava coreaplicativo.com.br caía no funil ANTIGO (só finanças)
+   * enquanto 86% do tráfego pago já entrava pelo /inicio com a porta das 5
+   * áreas. Dois funis vendendo o mesmo produto, e o pior deles atendendo
+   * quem chega pela marca — tráfego mais quente, veio pelo nome.
+   *
+   * 24/08 — a raiz deixou de ser um redirect e virou SITE INSTITUCIONAL.
+   *
+   * Motivo: a inscrição da empresa no Apple Developer Program foi recusada
+   * porque a URL enviada (o funil) parecia "em fase de construção, com
+   * conteúdo limitado e não relacionado à empresa da inscrição". Sem uma home
+   * de verdade — com menu, preço, contato e a pessoa jurídica no rodapé — não
+   * existe App Store.
+   *
+   * A venda não é sacrificada: o funil segue em /inicio, o tráfego pago segue
+   * indo pra lá (peneira de temMarcaDeAnuncio) e todo CTA da home despeja no
+   * mesmo funil. Quem cai aqui é o visitante de MARCA — digitou o domínio,
+   * tráfego mais quente — e o revisor de loja, que antes via um quiz. */
+  if (!user) {
+    if (ehPwa()) return <Navigate to="/entrar" replace />;
+    if (temMarcaDeAnuncio()) return <Navigate to={`/inicio${window.location.search}`} replace />;
+    return <SiteHome />;
+  }
 
   const area = getFunnelArea();
   let landed = true;
@@ -227,6 +256,11 @@ const PlanosApp = lazyPage(() => import("./pages/PlanosApp"));
 const Privacidade = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.Privacidade })));
 const Termos = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.Termos })));
 const ExcluirConta = lazyPage(() => import("./pages/Legal").then((m) => ({ default: m.ExcluirConta })));
+// Site institucional da WEB (24/08) — home na raiz e página de suporte.
+// Exigência da Apple pra inscrição da empresa: site completo, público, com
+// contato. Ver src/pages/site/SiteHome.tsx e src/lib/empresa.ts.
+const SiteHome = lazyPage(() => import("./pages/site/SiteHome"));
+const Suporte = lazyPage(() => import("./pages/site/Suporte"));
 const Index = lazyPage(() => import("./pages/Index"));
 const Home = lazyPage(() => import("./pages/Home"));
 const Rotina = lazyPage(() => import("./pages/Rotina"));
@@ -410,6 +444,13 @@ const AnimatedRoutes = () => {
         <Route path="/privacidade" element={<PageTransition><Privacidade /></PageTransition>} />
         <Route path="/termos" element={<PageTransition><Termos /></PageTransition>} />
         <Route path="/excluir-conta" element={<PageTransition><ExcluirConta /></PageTransition>} />
+        {/* URL de suporte pública — a Apple exige uma pra aprovar a inscrição
+            da empresa, e o revisor abre sem conta (igual às legais acima).
+            SoNaWeb porque a página fala de compra no site ("o Pix costuma
+            liberar em segundos"): dentro do binário da loja isso é pagamento
+            externo, a mesma trava dos funis. O revisor da Apple abre pelo
+            NAVEGADOR, então a exigência dela continua atendida. */}
+        <Route path="/suporte" element={<SoNaWeb><PageTransition><Suporte /></PageTransition></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
@@ -517,6 +558,7 @@ const App = () => {
                 <TrilhaDoTeste />
                 <RetomadaPosCompra />
                 <MissaoDoTrial />
+            <SaveOfferDowngrade />
                 {/* Os 10 segundos depois de assinar: celebração antes do
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}
                 <PortaoBoasVindas />

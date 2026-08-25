@@ -2,6 +2,8 @@ import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { EMPRESA } from "@/lib/empresa";
+import { RodapeSite } from "@/components/site/RodapeSite";
 
 /**
  * PÁGINAS LEGAIS (24/07) — nasceram por exigência de loja, não por enfeite:
@@ -17,7 +19,7 @@ import { trackEvent } from "@/lib/analytics";
  */
 
 const ATUALIZADO = "24 de julho de 2026";
-const CONTATO = "suporte@coreaplicativo.com.br";
+const CONTATO = EMPRESA.email;
 
 function LegalShell({ titulo, children }: { titulo: string; children: ReactNode }) {
   const navigate = useNavigate();
@@ -35,10 +37,25 @@ function LegalShell({ titulo, children }: { titulo: string; children: ReactNode 
           <h1 className="text-lg font-bold">{titulo}</h1>
         </div>
       </header>
-      <main className="max-w-3xl mx-auto px-5 py-8 pb-20">
-        <p className="text-xs text-muted-foreground mb-6">Atualizado em {ATUALIZADO}</p>
+      <main className="max-w-3xl mx-auto px-5 py-8 pb-16">
+        <p className="text-xs text-muted-foreground mb-4">Atualizado em {ATUALIZADO}</p>
+        {/* Identificação da operadora (24/08): a Apple recusou a inscrição da
+            empresa por não conseguir ligar o domínio à pessoa jurídica. Os
+            textos legais são justamente onde isso tem que estar explícito. */}
+        <div className="mb-7 rounded-lg border border-border bg-muted/40 px-4 py-3 text-[13px] leading-relaxed text-muted-foreground">
+          <p>
+            O CORE é operado por <span className="font-semibold text-foreground">{EMPRESA.razaoSocial}</span>
+            {EMPRESA.cnpj && <>, inscrita no CNPJ sob o nº {EMPRESA.cnpj}</>}
+            {EMPRESA.endereco && <>, com sede em {EMPRESA.endereco}</>}.
+          </p>
+          <p className="mt-1">
+            Contato:{" "}
+            <a href={`mailto:${CONTATO}`} className="font-semibold text-accent hover:underline">{CONTATO}</a>
+          </p>
+        </div>
         <div className="space-y-6 text-[15px] leading-relaxed text-foreground/90">{children}</div>
       </main>
+      <RodapeSite />
     </div>
   );
 }

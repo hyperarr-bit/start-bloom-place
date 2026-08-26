@@ -52,21 +52,25 @@ const maisUm = (d) => new Date(Date.parse(d + "T00:00:00Z") + 86400_000).toISOSt
 const INICIO = `${de}T03:00:00Z`;
 const FIM = `${maisUm(ate)}T03:00:00Z`;
 
-/* mesma decifragem do metricas-app (AES-256-GCM, tag nos últimos 16 bytes) */
-const abrirReferrer = (raw = "") => {
+/* Decifragem do blob da Meta (AES-256-GCM, tag nos últimos 16 bytes).
+ * `fonte` é o objeto {data, nonce} que vem dentro de utm_content. */
+const abrirFonte = (fonte) => {
   try {
-    const texto = decodeURIComponent(String(raw));
-    const m = /utm_content=(\{.*\})/.exec(texto);
-    if (!m) return null;
-    const fonte = JSON.parse(m[1])?.source;
     if (!fonte?.data || !fonte?.nonce) return null;
     const bruto = Buffer.from(fonte.data, "hex");
-    const corpo = bruto.subarray(0, -16);
-    const tag = bruto.subarray(-16);
     const d = createDecipheriv("aes-256-gcm", Buffer.from(env.META_INSTALL_REFERRER_KEY.trim(), "hex"), Buffer.from(fonte.nonce, "hex"));
-    d.setAuthTag(tag);
-    return JSON.parse(Buffer.concat([d.update(corpo), d.final()]).toString());
+    d.setAuthTag(bruto.subarray(-16));
+    return JSON.parse(Buffer.concat([d.update(bruto.subarray(0, -16)), d.final()]).toString());
   } catch { return null; }
+};
+/* referrer bruto da Play ("utm_source=...&utm_content={...}") */
+const abrirReferrer = (raw = "") => {
+  const m = /utm_content=(\{.*\})/.exec(decodeURIComponent(String(raw)));
+  try { return m ? abrirFonte(JSON.parse(m[1])?.source) : null; } catch { return null; }
+};
+/* utm_content de QUALQUER evento — aqui já chega como JSON, sem query string */
+const abrirUtmContent = (uc) => {
+  try { return abrirFonte((typeof uc === "string" ? JSON.parse(uc) : uc)?.source); } catch { return null; }
 };
 
 /* ------------------------------------------------------- lado do BANCO */
@@ -126,30 +130,69 @@ const doApp = vendas.filter((v) => v.payment_method === "play_store");
  */
 const chaveCampanha = (id) => (id ? String(id).slice(0, -2) : "");
 
+const daBlob = (a) => ({
+  chave: chaveCampanha(a.campaign_group_id) || `nome:${a.campaign_group_name}`,
+  nome: a.campaign_group_name ?? "(campanha sem nome)",
+  conjunto: a.campaign_name ?? null,
+  anuncio: a.adgroup_name ?? null,
+});
+
+/*
+ * DE ONDE VEM A ATRIBUIÇÃO (26/08 — o conserto do "orgânico" inflado).
+ *
+ * A versão anterior caçava o evento `install_referrer` nas SESSÕES do
+ * comprador. Isso perdia todo mundo que comprou ANÔNIMO e só criou conta
+ * depois: o referrer é emitido UMA vez por instalação (flag
+ * core_install_referrer_done), fica preso na primeira sessão, e a sessão da
+ * compra é outra — sem vínculo. Essas vendas caíam em "orgânico/sem
+ * referrer" e a gente lia como tráfego grátis que não era.
+ *
+ * Só que o dado nunca esteve perdido: o `trackEvent` carimba utm_source,
+ * utm_campaign e utm_content em TODO evento, lendo do localStorage. O
+ * utm_content carrega o mesmo blob cifrado com campanha, conjunto e anúncio.
+ * Então basta ler QUALQUER evento do usuário.
+ *
+ * Caso real: espacomarasantos60 (anual 97,90 de 26/08) aparecia como
+ * orgânica; 12 dos 15 eventos dela tinham o blob, e ele abre em
+ * "venus — Cópia". O install_referrer segue como plano B.
+ */
 const campanhaDaVenda = async (v) => {
   const nada = (rot) => ({ chave: `?${rot}`, nome: rot, conjunto: null, anuncio: null });
-  if (!v.user_id) return nada("sem referrer");
-  const sess = await buscar("analytics_events", {
-    select: "session_id", user_id: `eq.${v.user_id}`, limit: "50",
+  if (!v.user_id) return nada("sem user_id");
+
+  const evs = await buscar("analytics_events", {
+    select: "event_data,session_id", user_id: `eq.${v.user_id}`, limit: "80",
   }, token);
-  const ids = [...new Set(sess.map((x) => x.session_id).filter(Boolean))];
-  if (!ids.length) return nada("sem referrer");
-  const refs = await buscar("analytics_events", {
-    select: "event_data", event_name: "eq.install_referrer",
-    session_id: `in.(${ids.join(",")})`, limit: "3",
-  }, token);
-  for (const r of refs) {
-    const a = abrirReferrer(r.event_data?.referrer ?? "");
-    if (a?.campaign_group_id || a?.campaign_group_name) {
-      return {
-        chave: chaveCampanha(a.campaign_group_id) || `nome:${a.campaign_group_name}`,
-        nome: a.campaign_group_name ?? "(campanha sem nome)",
-        conjunto: a.campaign_name ?? null,
-        anuncio: a.adgroup_name ?? null,
-      };
+  if (!evs.length) return nada("sem telemetria");
+
+  // 1) blob cifrado no utm_content de qualquer evento — o caminho que pega
+  //    inclusive quem comprou anônimo e só depois se cadastrou
+  for (const e of evs) {
+    const a = abrirUtmContent(e.event_data?.utm_content);
+    if (a?.campaign_group_id || a?.campaign_group_name) return daBlob(a);
+  }
+
+  // 2) plano B: install_referrer nas sessões (instalações antigas / sem blob)
+  const ids = [...new Set(evs.map((x) => x.session_id).filter(Boolean))];
+  if (ids.length) {
+    const refs = await buscar("analytics_events", {
+      select: "event_data", event_name: "eq.install_referrer",
+      session_id: `in.(${ids.join(",")})`, limit: "3",
+    }, token);
+    for (const r of refs) {
+      const a = abrirReferrer(r.event_data?.referrer ?? "");
+      if (a?.campaign_group_id || a?.campaign_group_name) return daBlob(a);
     }
   }
-  return nada(refs.length ? "referrer sem campanha" : "orgânico/sem referrer");
+
+  // 3) sem blob: a fonte crua ainda separa loja de anúncio. "google-play"
+  //    é descoberta orgânica na Play — receita grátis, e vale saber quanto é.
+  const fonte = evs.map((e) => e.event_data?.utm_source).find(Boolean);
+  if (fonte) {
+    const rotulo = fonte === "google-play" ? "ORGÂNICO — busca na Play Store" : `${fonte} (sem campanha no blob)`;
+    return nada(rotulo);
+  }
+  return nada("sem origem registrada");
 };
 
 const porCampanha = new Map(); // chave(id) → {nome, pagoR, pagoN, trialR, trialN, emails[], anuncios}

@@ -47,6 +47,8 @@ async function mandarCompraProMeta(
   // próprio: o MESMO tx manda StartTrial hoje e Purchase quando o Google
   // cobrar (dedup da Meta é por (event_name, event_id), não colide).
   tipo: "purchase" | "trial" = "purchase",
+  // família do produto ("monthly_prepaid" etc) — preço sozinho não basta
+  billing: string | null = null,
 ) {
   const dataset = Deno.env.get("META_APP_DATASET_ID");
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
@@ -222,13 +224,19 @@ async function mandarCompraProMeta(
     // nosso caso: o presente de 97,90 converte mais fácil, então a campanha
     // aprenderia a caçar quem compra o BARATO. Agora cada preço tem nome
     // próprio e o conjunto escolhe o que quer maximizar.
-    const PRECOS: Record<number, { evento: string; sufixo: string }> = {
-      1990:  { evento: "compra_mensal_pix", sufixo: "mp"  },  // coremensalpix (downsell)
-      2490:  { evento: "compra_mensal",     sufixo: "m"   },  // coremensalvista
-      9790:  { evento: "compra_anual_97",   sufixo: "a97" },  // coreanual97 (presente)
-      15990: { evento: "compra_anual",      sufixo: "a"   },  // coreanualvista (cheio)
+    //
+    // PREÇO SOZINHO NÃO IDENTIFICA O PRODUTO (26/08). O vitalício R$ 19,90 dos
+    // APKs antigos tem o MESMO valor do coremensalpix — sem checar o tipo, uma
+    // venda vitalícia entrava como `compra_mensal_pix` e envenenava justamente
+    // o sinal que a gente está construindo. Por isso o par (cents + billing).
+    const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[] }> = {
+      1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"] },
+      2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"] },
+      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
+      15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
-    const porPlano = PRECOS[cents];
+    const achado = PRECOS[cents];
+    const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });
   }
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
@@ -444,7 +452,7 @@ serve(async (req) => {
 
     const { data: vendas } = await admin
       .from("subscriptions")
-      .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,current_period_end,created_at")
+      .select("user_id,customer_email,amount_cents,revenuecat_subscription_id,current_period_start,current_period_end,created_at,billing_period")
       .eq("payment_method", "play_store")
       .not("revenuecat_subscription_id", "is", null)
       .gte("created_at", inicio)
@@ -515,6 +523,7 @@ serve(async (req) => {
       await mandarCompraProMeta(
         admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
         v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
+        "purchase", v.billing_period,
       );
       const depois = await admin
         .from("analytics_events").select("id")

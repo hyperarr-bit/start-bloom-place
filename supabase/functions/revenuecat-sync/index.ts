@@ -121,6 +121,8 @@ async function mandarCompraProMeta(
   cents: number,
   txId: string,
   quando: string | null,
+  // família do produto ("monthly_prepaid" etc) — preço sozinho não basta
+  billing: string | null = null,
 ) {
   const dataset = Deno.env.get("META_APP_DATASET_ID");
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
@@ -291,13 +293,19 @@ async function mandarCompraProMeta(
     // nosso caso: o presente de 97,90 converte mais fácil, então a campanha
     // aprenderia a caçar quem compra o BARATO. Agora cada preço tem nome
     // próprio e o conjunto escolhe o que quer maximizar.
-    const PRECOS: Record<number, { evento: string; sufixo: string }> = {
-      1990:  { evento: "compra_mensal_pix", sufixo: "mp"  },  // coremensalpix (downsell)
-      2490:  { evento: "compra_mensal",     sufixo: "m"   },  // coremensalvista
-      9790:  { evento: "compra_anual_97",   sufixo: "a97" },  // coreanual97 (presente)
-      15990: { evento: "compra_anual",      sufixo: "a"   },  // coreanualvista (cheio)
+    //
+    // PREÇO SOZINHO NÃO IDENTIFICA O PRODUTO (26/08). O vitalício R$ 19,90 dos
+    // APKs antigos tem o MESMO valor do coremensalpix — sem checar o tipo, uma
+    // venda vitalícia entrava como `compra_mensal_pix` e envenenava justamente
+    // o sinal que a gente está construindo. Por isso o par (cents + billing).
+    const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[] }> = {
+      1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"] },
+      2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"] },
+      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
+      15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
-    const porPlano = PRECOS[cents];
+    const achado = PRECOS[cents];
+    const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });
   }
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
@@ -578,7 +586,7 @@ async function reconciliarRevenueCat(
     // ReferenceError, a function devolvia 500 DEPOIS do upsert e o CAPI do
     // caminho anônimo (exatamente o que este sync cobre) nunca rodava.
     const centsDaCompra = infoProduto(v.storeId).cents ?? 2790;
-    await mandarCompraProMeta(admin, userId, email, centsDaCompra, v.id, v.inicio);
+    await mandarCompraProMeta(admin, userId, email, centsDaCompra, v.id, v.inicio, infoProduto(v.storeId).billing);
     await mandarCompraProTikTok(admin, userId, email, centsDaCompra, v.id, v.inicio);
   }
 

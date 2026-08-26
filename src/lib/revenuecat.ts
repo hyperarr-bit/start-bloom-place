@@ -455,6 +455,17 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
       trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: id });
       return false;
     }
+    /* TELEMETRIA DA FOLHA (26/08). `app_compra_opcao` só existia no caminho de
+     * ASSINATURA — o prepago vai por purchaseStoreProduct e não passava por
+     * lá. Resultado: dos 102 toques em comprar da safra à vista, a gente via
+     * as desistências mas não sabia o que a loja tinha servido no aparelho.
+     * Sem isso não dá pra separar "achou caro" de "a loja nem ofereceu". */
+    trackEvent("app_compra_opcao", {
+      produto: id,
+      escolhida: produto?.identifier ?? id,
+      preco: produto?.priceString ?? null,
+      prepago: true,
+    });
     await Purchases.purchaseStoreProduct({ product: produto });
     await sincronizarAssinatura();
     return true;

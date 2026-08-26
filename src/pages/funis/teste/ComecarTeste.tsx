@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/use-auth";
 // caseiro morreu pra entrada nova (trial é da folha do Google agora).
 import { estadoTeste } from "@/lib/teste-gratis";
 import { pedirPermissao } from "@/lib/notificacoes";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { barraClaraEnquantoMontado } from "@/lib/status-bar";
 import {
   SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY,
@@ -1074,6 +1075,24 @@ export default function ComecarTeste() {
   // Cor é código de modo (lei BitePal): céu = pergunta, grafite = emoção,
   // branco = venda/conta.
   const escura = step === "mecanismo" || step === "notif";
+  /* AVALIAÇÃO NO PICO — RELIGADA 26/08.
+   *
+   * Este gatilho existia desde 14/08, mas morava no ComecarRadar. Quando o
+   * funil do app virou este arquivo, o Radar ficou só na WEB — e
+   * pedirAvaliacaoSePuder recusa fora do shell nativo. Resultado medido: 244
+   * pedidos até 14/08 e ZERO desde então. O app passou doze dias sem nunca
+   * pedir nota a ninguém, com 288 pessoas ativas na última semana.
+   *
+   * "resultado" é o equivalente do diagnóstico do Radar: o segundo de maior
+   * empolgação, ANTES de qualquer atrito de preço — é assim que BitePal e
+   * Brainrot acumulam milhares de avaliações. As travas (1×/90 dias, 3 na
+   * vida, só no shell) moram em pedirAvaliacaoSePuder. */
+  useEffect(() => {
+    if (step !== "resultado") return;
+    const t = window.setTimeout(() => { void pedirAvaliacaoSePuder("plano_pronto", { forte: true }); }, 2600);
+    return () => window.clearTimeout(t);
+  }, [step]);
+
   return (
     <LayoutGroup>
     <div

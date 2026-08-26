@@ -6,6 +6,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { sequenciaAtual } from "@/lib/reagendar";
 import { 
   ArrowLeft, Plus, X, Trash2, AlertTriangle, Play, Pause, RotateCcw, 
@@ -1187,6 +1188,7 @@ const Rotina = () => {
             Fica na aba "Minha Semana" porque é onde os hábitos são marcados:
             é o lugar em que a sequência acabou de ficar visível pra pessoa. */}
         {activeTab === "semana" && <PedirLembreteRotina sequencia={sequenciaViva} />}
+        <AvaliarNaSequencia sequencia={sequenciaViva} />
 
         {/* ============= MINHA SEMANA ============= */}
         {activeTab === "semana" && (
@@ -1379,3 +1381,26 @@ const Rotina = () => {
 };
 
 export default Rotina;
+
+/* PEDIR NOTA A QUEM JÁ USA (26/08).
+ *
+ * O único gatilho vivo até hoje era o pico do funil — ele pega quem ACABOU de
+ * chegar, não quem ficou. E são 79 pessoas com 3+ dias ativos na semana que
+ * nunca foram convidadas a avaliar, justamente as que têm o que dizer.
+ *
+ * Três dias seguidos marcando hábito é a conquista mais comum do app e não
+ * depende de comprar nada. Sem UI própria de propósito: é a caixa do Google
+ * por cima, e as travas (1×/90 dias, 3 na vida, só no shell) já vivem em
+ * pedirAvaliacaoSePuder. */
+function AvaliarNaSequencia({ sequencia }: { sequencia: number }) {
+  const pedido = useRef(false);
+  useEffect(() => {
+    if (pedido.current || sequencia < 3) return;
+    pedido.current = true;
+    const t = window.setTimeout(() => {
+      void pedirAvaliacaoSePuder("sequencia_habito", { vezes: sequencia });
+    }, 1800);
+    return () => window.clearTimeout(t);
+  }, [sequencia]);
+  return null;
+}

@@ -13,7 +13,7 @@
  *  - mini-demo/telas fictícias: a semente é plantada DENTRO do módulo de
  *    verdade (GuiaSemente), mesma identidade, mesmo componente do pagante.
  *
- * Produto: assinatura — anual R$ 159,90 (herói, = R$ 13,32/mês) + mensal
+ * Produto: assinatura — anual R$ 97,90 (herói, = R$ 8,16/mês) + mensal
  * R$ 24,90. Downsell pós-cancelamento da folha: R$ 19,90/mês no Pix,
  * pré-pago de 30 dias, renovação manual (decisão do dono 16/08).
  *

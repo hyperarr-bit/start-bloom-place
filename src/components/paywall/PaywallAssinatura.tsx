@@ -13,7 +13,8 @@
  * nunca — as ofertas de trial seguem vivas no catálogo SÓ pros APKs antigos.
  *
  * A ESCADA (cada degrau só aparece depois de recusa real):
- *   vitrine: Mensal 24,90 | 12 meses 159,90 (herói, R$ 13,32/mês)
+ *   vitrine: Mensal 24,90 | 12 meses 97,90 (herói, R$ 8,16/mês) — 26/08 o
+ *   anual de 159,90 saiu: 95 dos 102 toques em comprar iam nele e vendeu ZERO
  *   cancelou a folha do ANUAL → 🎁 ANUAL 97,90 (R$ 62 off — nunca na vitrine)
  *   cancelou o 97,90 ou o MENSAL → resgate: 1 mês 19,90 (Pix)
  *

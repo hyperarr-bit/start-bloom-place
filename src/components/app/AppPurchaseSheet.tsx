@@ -8,7 +8,7 @@ import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
  *
  * HISTÓRIA: nasceu em 06/08 vendendo o VITALÍCIO R$ 27,90 ("Quero pra sempre",
  * "PAGAMENTO ÚNICO", "sem mensalidade"). Em 16/08 o app virou ASSINATURA
- * (anual 159,90 / mensal 24,90) e o catálogo da Play foi trocado — mas esta
+ * (anual 97,90 / mensal 24,90) e o catálogo da Play foi trocado — mas esta
  * tela continuou oferecendo o produto antigo. Quem estava no teste de 3 dias
  * e abria "Meu acesso" via uma oferta que não é mais a nossa, com um preço
  * que não bate com o catálogo: confusão pra quem paga e divergência que

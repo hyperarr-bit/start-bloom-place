@@ -234,15 +234,25 @@ async function mandarCompraProMeta(
     // APKs antigos tem o MESMO valor do coremensalpix — sem checar o tipo, uma
     // venda vitalícia entrava como `compra_mensal_pix` e envenenava justamente
     // o sinal que a gente está construindo. Por isso o par (cents + billing).
-    const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[] }> = {
-      1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"] },
-      2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"] },
+    //
+    // E UM COMBINADO POR FAMÍLIA (26/08). Separar por preço deixa cada evento
+    // com sinal curto demais: mensal ficou 24 (24,90) e 5 (19,90). O
+    // `compra_mensal_geral` dispara nos DOIS e junta os 29 — é ele que um
+    // conjunto de anúncios usa pra otimizar "vendeu um mês", sem se importar
+    // se foi cheio ou resgate. Os por preço continuam existindo pra leitura.
+    const MENSAL_GERAL = { evento: "compra_mensal_geral", sufixo: "mg" };
+    const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
+      1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"], junto: MENSAL_GERAL },
+      2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"], junto: MENSAL_GERAL },
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
     const achado = PRECOS[cents];
     const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
-    if (porPlano) eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });
+    if (porPlano) {
+      eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });
+      if (porPlano.junto) eventos.push({ ...base, event_name: porPlano.junto.evento, event_id: `${txId}_${porPlano.junto.sufixo}` });
+    }
   }
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
   if (teste) payload.test_event_code = teste;

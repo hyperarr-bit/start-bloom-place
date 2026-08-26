@@ -83,15 +83,15 @@ export function PaywallAssinatura({
   const recap = useRecap(area);
   const teste = estadoTeste();
   const [plano, setPlano] = useState<"anual" | "mensal">("anual");
-  // Degraus da escada. "gift" = anual 97,90 (caixa de presente do Me+);
-  // "downsell" = 1 mês 19,90 no Pix (o resgate que já vendia).
-  const [oferta, setOferta] = useState<"cheia" | "gift" | "downsell">("cheia");
+  // Degraus da escada. "resgate" = 1 mês 19,90 no Pix, na caixa de presente
+  // do Me+ (o desenho que segurava atenção; 26/08 o 97,90 virou o anual).
+  const [oferta, setOferta] = useState<"cheia" | "resgate">("cheia");
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [conferindo, setConferindo] = useState(false);
   // Disponibilidade REAL no catálogo da loja.
-  const [loja, setLoja] = useState({ mensalVista: false, anualVista: false, anual97: false });
+  const [loja, setLoja] = useState({ mensalVista: false, anualVista: false, anual97: false, mensalPix: false });
   const cancelamentos = useRef(0);
   const giftTimer = useRef<number | null>(null);
   const vivoRef = useRef(true);
@@ -108,7 +108,7 @@ export function PaywallAssinatura({
       await rc.initRevenueCat();
       await rc.prefetchAssinaturas();
       if (!vivoRef.current) return;
-      const ler = () => setLoja({ mensalVista: rc.temMensalVista(), anualVista: rc.temAnualVista(), anual97: rc.temAnual97() });
+      const ler = () => setLoja({ mensalVista: rc.temMensalVista(), anualVista: rc.temAnualVista(), anual97: rc.temAnual97(), mensalPix: rc.temMensalPix() });
       ler();
       // Base plans criados por API demoram a propagar (varredura: o herói
       // ficava botão morto no dia do lançamento). Uma re-tentativa curta
@@ -124,8 +124,8 @@ export function PaywallAssinatura({
       // — só visual, a compra continua dependendo da loja de verdade.
       try {
         if (localStorage.getItem("core-debug-gift") === "1") {
-          setLoja({ mensalVista: true, anualVista: true, anual97: true });
-          window.setTimeout(() => setOferta("gift"), 600);
+          setLoja({ mensalVista: true, anualVista: true, anual97: true, mensalPix: true });
+          window.setTimeout(() => setOferta("resgate"), 600);
         }
       } catch { /* noop */ }
     })();
@@ -145,14 +145,14 @@ export function PaywallAssinatura({
   /** Agenda a caixa de presente (pop do Me+, 450ms depois da recusa).
    *  Segura o CTA travado até o modal abrir — a varredura pegou a corrida:
    *  re-toque na janela reabria a folha e queimava o degrau sem ninguém ver. */
-  const abrirGift = (origem: string): boolean => {
-    if (giftJaFoi() || !loja.anual97) return false;
+  const abrirResgate = (origem: string): boolean => {
+    if (giftJaFoi() || !loja.mensalPix) return false;
     giftTimer.current = window.setTimeout(() => {
       if (!vivoRef.current) return;
       try { sessionStorage.setItem(GIFT_VISTO_SESSAO, "1"); } catch { /* noop */ }
-      setOferta("gift");
+      setOferta("resgate");
       setComprando(false);
-      trackEvent("app_gift_view", { de: "anual_159", para: "anual_97", origem, contexto });
+      trackEvent("app_downsell_view", { plano: "mensal_pix", de: "anual_97", origem, contexto });
     }, 450);
     return true;
   };
@@ -218,13 +218,13 @@ export function PaywallAssinatura({
       setPendente(true);
     } else if (motivo === "cancelou") {
       cancelamentos.current += 1;
-      // ESCADA: recusa do anual cheio → presente 97,90; recusa do presente ou
-      // do mensal → resgate 19,90. Cada degrau uma vez, sempre por recusa REAL.
-      if (oferta === "cheia" && produto.startsWith("core_anual") && abrirGift("cancelou_folha")) {
+      /* ESCADA (redesenhada 26/08). Era: recusou anual 159,90 → presente 97,90
+       * → resgate 19,90. Agora o 97,90 É o anual, então o degrau do meio some e
+       * a recusa cai direto no 19,90 — com o mesmo desenho de caixa de presente,
+       * que é o que segurava a atenção. Cada degrau uma vez, sempre por recusa
+       * REAL na folha do Google. */
+      if (oferta === "cheia" && abrirResgate("cancelou_folha")) {
         return; // CTA fica travado até o modal abrir (o timer solta)
-      } else if (oferta !== "downsell" && rc.temMensalPix()) {
-        setOferta("downsell");
-        trackEvent("app_downsell_view", { plano: "mensal_pix", origem: "cancelou_folha", contexto });
       } else if (cancelamentos.current >= 2) {
         trackEvent("app_resgate_view", { contexto });
       }
@@ -248,10 +248,8 @@ export function PaywallAssinatura({
   })();
   const titulo = contexto === "funil" ? "Seu plano tá pronto" : "Sua vida inteira organizada";
 
-  const compraAtual = oferta === "downsell"
-    ? { fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarMensalPix(), id: APP_PRECOS.mensalPix.id, cta: <>Pagar 1 mês no Pix <ArrowRight className="w-4 h-4" /></>, legal: "À vista pelo Google Play · 30 dias de acesso · renova só se você quiser" }
-    : plano === "anual"
-    ? { fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnualVista(), id: APP_PRECOS.anualVista.id, cta: <>Continuar <ArrowRight className="w-4 h-4" /></>, legal: `${APP_PRECOS.anualVista.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática` }
+  const compraAtual = plano === "anual"
+    ? { fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnual97(), id: APP_PRECOS.anual97.id, cta: <>Continuar <ArrowRight className="w-4 h-4" /></>, legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática` }
     : { fn: (rc: typeof import("@/lib/revenuecat")) => (loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true })), id: loja.mensalVista ? APP_PRECOS.mensalVista.id : APP_PRECOS.mensal.id, cta: <>Continuar <ArrowRight className="w-4 h-4" /></>, legal: `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}` };
 
   const barraFixa = contexto !== "planos";
@@ -315,7 +313,7 @@ export function PaywallAssinatura({
           aria-label="Fechar"
           onClick={() => {
             // 1º X da sessão = caixa de presente (Me+); depois disso, fecha.
-            if (oferta === "cheia" && abrirGift("x_planos")) return;
+            if (oferta === "cheia" && abrirResgate("x_planos")) return;
             trackEvent("app_sheet_close", { via: "x", contexto });
             onFechar();
           }}
@@ -332,29 +330,6 @@ export function PaywallAssinatura({
         <h2 className="text-[25px] [@media(max-height:700px)]:text-[22px] font-bold tracking-tight leading-[1.15]">{titulo}</h2>
       </div>
 
-      {oferta === "downsell" ? (
-        <>
-          <div className="rounded-2xl border-2 border-accent bg-accent/5 p-4 mb-2">
-            <div className="text-[11px] font-extrabold uppercase tracking-wider text-accent mb-1">Última oferta</div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-[15px] font-bold">1 mês de CORE</span>
-              <span className="text-[20px] font-extrabold">{APP_PRECOS.mensalPix.preco}</span>
-            </div>
-            <p className="text-[12.5px] text-muted-foreground leading-snug mt-1.5">
-              Paga no <b className="text-foreground">Pix, dentro do Google</b> — vale 30 dias e renova
-              <b className="text-foreground"> só se você quiser</b>. Sem assinatura presa no cartão.
-            </p>
-          </div>
-          {/* Varredura: o downsell substituía a vitrine SEM volta — 1 folha
-              cancelada por curiosidade escondia o preço cheio pra sempre. */}
-          <button
-            onClick={() => setOferta("cheia")}
-            className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 py-1 mb-1"
-          >
-            Ver os planos
-          </button>
-        </>
-      ) : (
         <>
           {/* Recap (endowment) — só fora do funil: no funil o compromisso
               acabou de acontecer (resultado → "Claro!" ×3 → contrato). */}
@@ -409,15 +384,14 @@ export function PaywallAssinatura({
               </span>
               <span className="text-[34px] font-black leading-none mt-1">12</span>
               <span className="text-[13px] font-bold text-black/45">meses</span>
-              <span className="text-[15px] font-extrabold mt-2">{APP_PRECOS.anualVista.porMes}<small className="text-[10px] font-bold text-black/45">/mês</small></span>
+              <span className="text-[15px] font-extrabold mt-2">{APP_PRECOS.anual97.porMes}<small className="text-[10px] font-bold text-black/45">/mês</small></span>
               <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
               <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-                {APP_PRECOS.anualVista.preco} por 1 ano<br />economiza R$ 139
+                {APP_PRECOS.anual97.preco} por 1 ano<br />economiza {APP_PRECOS.anual97.economia}
               </span>
             </button>
           </div>
         </>
-      )}
 
       {teste.fase === "ativo" && !d3 && contexto !== "planos" && (
         <button
@@ -471,7 +445,7 @@ export function PaywallAssinatura({
       {/* ══ CAIXA DE PRESENTE (modal do Me+, f092/f108): bottom sheet POR CIMA
           do paywall, preço riscado → card de moldura amarela "Melhor oferta",
           CTA preto. Números honestos: R$ 62 OFF (não "50%"). ══ */}
-      {oferta === "gift" && (
+      {oferta === "resgate" && (
         <div className="fixed inset-0 z-[70]">
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -501,31 +475,31 @@ export function PaywallAssinatura({
                   OFERTA ESPECIAL
                 </motion.div>
                 <p className="text-[12.5px] font-semibold text-white/85 mt-2">
-                  Só nesta tela · {APP_PRECOS.anual97.economia} de desconto de verdade
+                  Só nesta tela · comece por 30 dias, sem assinatura
                 </p>
               </div>
 
               <div className="flex items-center justify-center gap-2 mt-4">
                 <div className="rounded-2xl bg-white/95 text-[#16121c] px-3 py-3 text-center w-[118px]">
-                  <div className="text-[21px] font-black leading-none">12</div>
-                  <div className="text-[10.5px] font-bold text-black/45">meses</div>
-                  <div className="text-[13.5px] font-extrabold mt-1 line-through decoration-[#e0654a] decoration-2">{APP_PRECOS.anualVista.preco}</div>
-                  <div className="text-[10px] font-semibold text-black/40">por ano</div>
+                  <div className="text-[21px] font-black leading-none">1</div>
+                  <div className="text-[10.5px] font-bold text-black/45">mês</div>
+                  <div className="text-[13.5px] font-extrabold mt-1 line-through decoration-[#e0654a] decoration-2">{APP_PRECOS.mensal.preco}</div>
+                  <div className="text-[10px] font-semibold text-black/40">por mês</div>
                 </div>
                 <ArrowRight className="w-6 h-6 text-[#ffd84d] shrink-0" strokeWidth={3} />
                 <div className="rounded-2xl bg-[#ffd84d] p-1.5 w-[132px] shadow-[0_14px_30px_-10px_rgba(0,0,0,.35)]">
                   <div className="text-center text-[11px] font-black text-[#16121c] pb-1">Melhor oferta</div>
                   <div className="rounded-xl bg-white text-[#16121c] px-3 py-2.5 text-center">
-                    <div className="text-[21px] font-black leading-none">12</div>
-                    <div className="text-[10.5px] font-bold text-black/45">meses</div>
-                    <div className="text-[15px] font-extrabold mt-1">{APP_PRECOS.anual97.preco}</div>
-                    <div className="text-[10px] font-semibold text-black/40">por ano</div>
+                    <div className="text-[21px] font-black leading-none">1</div>
+                    <div className="text-[10.5px] font-bold text-black/45">mês</div>
+                    <div className="text-[15px] font-extrabold mt-1">{APP_PRECOS.mensalPix.preco}</div>
+                    <div className="text-[10px] font-semibold text-black/40">à vista</div>
                   </div>
                 </div>
               </div>
 
               <p className="text-center text-[13px] font-bold mt-4 leading-snug">
-                Total de {APP_PRECOS.anual97.preco} por 1 ano — pagamento único, sem renovação.
+                Total de {APP_PRECOS.mensalPix.preco} por 30 dias — pagamento único, sem renovação.
               </p>
 
               {/* Varredura: pendente/erro tinham que existir DENTRO do modal —
@@ -550,13 +524,13 @@ export function PaywallAssinatura({
                 disabled={comprando}
                 onClick={async () => {
                   const rc = await import("@/lib/revenuecat");
-                  void pagou(() => rc.comprarAnual97(), APP_PRECOS.anual97.id);
+                  void pagou(() => rc.comprarMensalPix(), APP_PRECOS.mensalPix.id);
                 }}
               >
                 {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continuar <ArrowRight className="w-4 h-4" /></>}
               </Button>
               <p className="text-[10px] text-white/70 text-center mt-1.5">
-                Pagamento único pelo Google Play · 12 meses de acesso · Pix ou cartão
+                Pagamento único pelo Google Play · 30 dias de acesso · Pix ou cartão
               </p>
               <button
                 onClick={() => { setOferta("cheia"); trackEvent("app_gift_recusado", { via: "agora_nao", contexto }); }}

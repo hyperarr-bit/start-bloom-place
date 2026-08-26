@@ -51,7 +51,7 @@ const FUNIL = "teste";
 // (céu = pergunta, grafite = emoção), todo input devolve algo, prova
 // intercalada, CTA grafite, single-select avança sozinho.
 type Step =
-  | "welcome" | "promessas" | "porta" | "dor" | "mecanismo" | "horario" | "notif"
+  | "welcome" | "promessas" | "porta" | "dor" | "antesdepois" | "mecanismo" | "horario" | "notif"
   | "montando" | "resultado" | "compromissos" | "contrato" | "offer" | "signup" | "confirm" | "liberando";
 
 // Mesma pele das outras telas do shell: funil sempre claro + céu suave.
@@ -714,69 +714,90 @@ function PromessasScreen({ onDone }: { onDone: () => void }) {
 
 /** Interstitial antes/depois (Me+ tem ilustração; nós contamos com as dores
  *  REAIS da área escolhida — personalização barata que ilustração não dá). */
-/*
- * A TELA DO PAYOFF (reescrita 26/08). A versão anterior mostrava duas barras
- * genéricas — "26% hoje" contra "91% de potencial" — números que não eram de
- * ninguém. Resultado medido: 4 SEGUNDOS de mediana, o menor tempo entre as
- * telas de conteúdo do funil. Tela de recompensa que ninguém olha não é
- * recompensa, é transição.
- *
- * Agora ela devolve o que a PESSOA acabou de responder: a área que escolheu,
- * o horário que marcou, o primeiro passo com hora e dia. Conclusão que a
- * pessoa reconhece como sua segura o olho; percentual inventado não segura.
- */
-function ResultadoScreen({ area, hora, onNext }: { area: AreaKey; hora: string | null; onNext: () => void }) {
-  const [mostra, setMostra] = useState(false);
-  useEffect(() => { const id = window.setTimeout(() => setMostra(true), 300); return () => window.clearTimeout(id); }, []);
-  const horaLabel = HORARIOS.find((h) => h.id === hora)?.hora ?? "19:30";
-  const quando = HORARIOS.find((h) => h.id === hora)?.label ?? "À noite, fechando o dia";
-  const nomeArea = AREAS[area].nome;
-  const linhas = [
-    { rot: "Onde você começa", val: nomeArea },
-    { rot: "Seu horário", val: `${horaLabel} — ${quando.toLowerCase()}` },
-    { rot: "Primeiro registro", val: `hoje, às ${horaLabel}` },
+function AntesDepoisScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const HOJE: Record<AreaKey, string[]> = {
+    dinheiro: ["Contas na cabeça", "Gasto que some", "Culpa no fim do mês"],
+    rotina: ["Começa e larga", "Dia que não rende", "Tarefa esquecida"],
+    corpo: ["Treino sem plano", "Semana sim, mês não", "Desânimo sozinho"],
+    saude: ["Água esquecida", "Sono bagunçado", "Remédio atrasado"],
+    metas: ["Meta só na cabeça", "Zero progresso visível", "Sempre 'segunda-feira'"],
+  };
+  const DEPOIS = ["Lembrete que chega na hora", "Tudo num painel só", "Progresso que dá pra VER"];
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2">
+      <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight text-center mb-5">
+        Você conhece essa<br />sensação?
+      </h1>
+      <div className="grid grid-cols-2 gap-2.5">
+        <motion.div {...chove(0)} className="rounded-2xl bg-black/[0.05] border border-black/[0.06] p-3.5">
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-black/40 mb-2">Hoje</div>
+          {HOJE[area].map((l) => (
+            <div key={l} className="flex items-start gap-1.5 text-[12.5px] font-semibold text-black/55 py-1 leading-snug">
+              <span className="mt-[1px]">😵‍💫</span> {l}
+            </div>
+          ))}
+        </motion.div>
+        <motion.div {...chove(1)} className="rounded-2xl border p-3.5" style={{ background: "linear-gradient(180deg,#eaf5fd,#f7fbff)", borderColor: "rgba(126,198,246,.45)" }}>
+          <div className="text-[10.5px] font-extrabold uppercase tracking-widest text-[#1c76c8] mb-2">Com o CORE</div>
+          {DEPOIS.map((l) => (
+            <div key={l} className="flex items-start gap-1.5 text-[12.5px] font-bold text-[#16121c] py-1 leading-snug">
+              <Check className="w-3.5 h-3.5 mt-[2px] shrink-0 text-emerald-600" strokeWidth={3} /> {l}
+            </div>
+          ))}
+        </motion.div>
+      </div>
+      <div className="mt-auto pt-5 pb-1">
+        <motion.button {...chove(2)} onClick={onNext} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
+          <span className="flex items-center gap-1.5">Continuar <ArrowRight className="w-4 h-4" /></span>
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+/** Resultado do quiz (Me+: medidores) — o espelho motivacional com o único
+ *  número que é NOSSO de verdade: 2+ registros na 1ª semana = fica. */
+function ResultadoScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const [enche, setEnche] = useState(false);
+  useEffect(() => { const id = window.setTimeout(() => setEnche(true), 350); return () => window.clearTimeout(id); }, []);
+  const barras = [
+    { rot: `Organização em ${AREAS[area].nome} hoje`, pct: 26, cor: "#e0654a" },
+    { rot: "Potencial com um sistema do teu lado", pct: 91, cor: "#127a56" },
   ];
   return (
     <div className="w-full flex-1 flex flex-col pt-2">
       <div className="text-center mb-5">
         <div className="inline-flex px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider mb-2">
-          Pronto
+          Seu resultado
         </div>
         <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight">
-          Seu CORE está montado
+          Seu ponto de partida
         </h1>
       </div>
-
-      <div className="rounded-2xl border border-border bg-white overflow-hidden">
-        {linhas.map((l, i) => (
-          <motion.div
-            key={l.rot}
-            initial={{ opacity: 0, x: -8 }}
-            animate={mostra ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.32, delay: 0.1 * i }}
-            className={`flex items-center justify-between gap-3 px-4 py-3.5 ${i ? "border-t border-border" : ""}`}
-          >
-            <span className="text-[12.5px] text-muted-foreground shrink-0">{l.rot}</span>
-            <span className="text-[13.5px] font-bold text-right">{l.val}</span>
-          </motion.div>
+      <div className="rounded-2xl border border-border bg-white p-4 space-y-4">
+        {barras.map((b) => (
+          <div key={b.rot}>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[12.5px] font-bold">{b.rot}</span>
+              <span className="text-[13px] font-black tabular-nums" style={{ color: b.cor }}>{b.pct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-black/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-[width] duration-1000 ease-out"
+                style={{ width: enche ? `${b.pct}%` : "0%", background: b.cor }}
+              />
+            </div>
+          </div>
         ))}
       </div>
-
-      <motion.div
-        {...chove(3)}
-        className="mt-4 rounded-2xl bg-[#127a56]/[0.07] border border-[#127a56]/20 px-4 py-3.5"
-      >
-        <p className="text-[12.5px] leading-snug text-foreground/85">
-          Quem registra <b>2+ vezes na primeira semana</b> é quem vira a chave.
-          Seu lembrete das <b>{horaLabel}</b> existe pra isso.
-        </p>
-      </motion.div>
-
+      <motion.p {...chove(2)} className="text-[12.5px] text-muted-foreground text-center leading-snug mt-4 px-2">
+        Dado real de quem usa o CORE: registrar <b className="text-foreground">2+ vezes na primeira semana</b>{" "}
+        é o que separa quem vira a chave de quem desiste.
+      </motion.p>
       <div className="mt-auto pt-5 pb-1">
-        <motion.button {...chove(4)} onClick={onNext} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
-          <span className="flex items-center gap-1.5">Continuar <ArrowRight className="w-4 h-4" /></span>
+        <motion.button {...chove(3)} onClick={onNext} className={CTA_GRAFITE} style={{ background: GRAFITE }}>
+          <span className="flex items-center gap-1.5">Ver meu plano <ArrowRight className="w-4 h-4" /></span>
         </motion.button>
-
       </div>
     </div>
   );
@@ -1115,13 +1136,11 @@ export default function ComecarTeste() {
                 area={area ?? "dinheiro"}
                 onPick={(id) => {
                   try { localStorage.setItem("core-teste-dor", id); } catch { /* noop */ }
-                  // 26/08: pulava por "antesdepois". Era a tela com a MAIOR queda
-                  // do funil (-22 sessões, 92%) e o segundo menor tempo de leitura
-                  // (4s de mediana) — ninguém lia e 8% saíam ali. Sai do caminho.
-                  setStep("mecanismo");
+                  setStep("antesdepois");
                 }}
               />
             )}
+            {step === "antesdepois" && <AntesDepoisScreen area={area ?? "dinheiro"} onNext={() => setStep("mecanismo")} />}
             {step === "mecanismo" && <MecanismoScreen onNext={() => setStep("horario")} />}
             {step === "horario" && (
               <HorarioScreen
@@ -1135,7 +1154,7 @@ export default function ComecarTeste() {
             )}
             {step === "notif" && <NotifScreen area={area ?? "dinheiro"} hora={hora} onDone={abrirApp} />}
             {step === "montando" && <MontandoScreen area={area ?? "dinheiro"} hora={hora} onDone={montou} />}
-            {step === "resultado" && <ResultadoScreen area={area ?? "dinheiro"} hora={hora} onNext={() => setStep("compromissos")} />}
+            {step === "resultado" && <ResultadoScreen area={area ?? "dinheiro"} onNext={() => setStep("compromissos")} />}
             {step === "compromissos" && <CompromissosScreen onDone={() => setStep("contrato")} />}
             {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}
             {step === "offer" && (

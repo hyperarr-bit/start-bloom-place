@@ -57,7 +57,10 @@ export const APP_PRECOS = {
   // como R$ 13,32/mês, e o 97,90 é a CAIXA DE PRESENTE da escada de saída
   // (estilo Me+) — nunca exposto na vitrine, senão vira o preço real.
   anualVista: { id: "core_anual:coreanualvista", preco: "R$ 159,90", porMes: "R$ 13,32" },
-  anual97: { id: "core_anual:coreanual97", preco: "R$ 97,90", economia: "R$ 62" },
+  /** 26/08: o 97,90 DEIXOU de ser resgate e virou O anual. O de 159,90 levou
+ *  95 dos 102 toques em comprar e vendeu ZERO — a folha do Google nunca
+ *  fechou nesse preço. A âncora agora é o mensal: 24,90 × 12 = 298,80. */
+  anual97: { id: "core_anual:coreanual97", preco: "R$ 97,90", porMes: "R$ 8,16", economia: "R$ 200" },
   // 16/08 (dono): downsell do D3 = "R$ 19,90 o mês, no Pix, renova quando
   // você quiser" — base plan PRÉ-PAGO de 30 dias no MESMO produto core_mensal
   // (Play cobra o Pix na folha e controla a expiração; renovação é manual por

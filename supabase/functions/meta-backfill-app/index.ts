@@ -49,6 +49,11 @@ async function mandarCompraProMeta(
   tipo: "purchase" | "trial" = "purchase",
   // família do produto ("monthly_prepaid" etc) — preço sozinho não basta
   billing: string | null = null,
+  // MODO FORÇADO (26/08): ignora o marcador e reenvia. Só o caminho ADMIN com
+  // lista explícita de tx chega aqui — o cron nunca força. Serve pra estrear
+  // evento novo em venda que já saiu (o dedup da Meta é por (nome, event_id),
+  // então Purchase e compra_avista são descartados e só o nome inédito entra).
+  forcar = false,
 ) {
   const dataset = Deno.env.get("META_APP_DATASET_ID");
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
@@ -68,7 +73,7 @@ async function mandarCompraProMeta(
   // maybeSingle() com marcador DUPLICADO devolvia erro (PGRST116) que era
   // ignorado -> data null -> reenvio ETERNO a cada cron (caso real 17-19/08:
   // meta_capi_app_enviado x96/dia). Na duvida (erro OU 1+ marcador), NAO reenvia.
-  if (erroJaFoi || (jaFoi?.length ?? 0) > 0) return;
+  if (!forcar && (erroJaFoi || (jaFoi?.length ?? 0) > 0)) return;
 
   // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
   const { data: dev } = await admin
@@ -435,6 +440,13 @@ serve(async (req) => {
     const cron = !ehAdmin;
     if (cron && String(body?.modo ?? "") !== "cron") return json({ error: "forbidden" }, 403);
 
+    /* REENVIO FORÇADO — lista EXPLÍCITA de tx, só pra admin logado. Nunca uma
+     * flag "força tudo": o estrago de reenviar a base inteira seria o mesmo
+     * bug de 17-22/08 (1.292 Purchase fantasma), e ninguém quer repetir. */
+    const forcarTx: string[] = (!cron && Array.isArray(body?.forcarTx))
+      ? (body.forcarTx as unknown[]).map(String).slice(0, 50)
+      : [];
+
     const hoje = new Date();
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     // Janela do cron: 12 dias pra trás (23/08 — trial do anual virou 7 DIAS,
@@ -513,29 +525,36 @@ serve(async (req) => {
         admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
         v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
       );
-      const antes = await admin
-        .from("analytics_events").select("id")
-        .eq("event_name", "meta_capi_app_enviado")
-        .eq("user_id", v.user_id)
-        .contains("event_data", { tx: v.revenuecat_subscription_id })
-        .maybeSingle();
-      if (antes.data) { feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" }); continue; }
+      const forcarEsta = forcarTx.includes(String(v.revenuecat_subscription_id));
+      if (!forcarEsta) {
+        const antes = await admin
+          .from("analytics_events").select("id")
+          .eq("event_name", "meta_capi_app_enviado")
+          .eq("user_id", v.user_id)
+          .contains("event_data", { tx: v.revenuecat_subscription_id })
+          .maybeSingle();
+        if (antes.data) { feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" }); continue; }
+      }
       await mandarCompraProMeta(
         admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,
         v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
-        "purchase", v.billing_period,
+        "purchase", v.billing_period, forcarEsta,
       );
+      // .limit(1), NÃO .maybeSingle(): no reenvio forçado existem 2+ marcadores
+      // pro mesmo tx, e maybeSingle() devolve erro PGRST116 nessa situação —
+      // o envio dava certo e o relatório dizia "falhou". Mesma armadilha que já
+      // tinha derrubado a checagem de idempotência lá em cima.
       const depois = await admin
         .from("analytics_events").select("id")
         .eq("event_name", "meta_capi_app_enviado")
         .eq("user_id", v.user_id)
         .contains("event_data", { tx: v.revenuecat_subscription_id })
-        .maybeSingle();
+        .limit(1);
       feitos.push({
         tx: v.revenuecat_subscription_id,
         email: v.customer_email,
-        resultado: depois.data ? "enviado" : "falhou",
-        ...(depois.data ? {} : { recusa: ultimoErroMeta }),
+        resultado: depois.data?.length ? "enviado" : "falhou",
+        ...(depois.data?.length ? {} : { recusa: ultimoErroMeta }),
       });
     }
     log("fim", { de, ate, total: feitos.length, cron });

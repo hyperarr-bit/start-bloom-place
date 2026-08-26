@@ -284,9 +284,21 @@ async function mandarCompraProMeta(
     // separar por valor. Classificação pelo PREÇO do catálogo à vista
     // (mensal 19,90/24,90 · anual 97,90/159,90); valor fora do catálogo
     // (vitalício legado dos APKs antigos) fica só nos eventos de cima.
-    const porPlano = cents === 1990 || cents === 2490 ? "compra_mensal"
-      : cents === 9790 || cents === 15990 ? "compra_anual" : null;
-    if (porPlano) eventos.push({ ...base, event_name: porPlano, event_id: `${txId}_${porPlano === "compra_mensal" ? "m" : "a"}` });
+    //
+    // UM EVENTO POR PREÇO (26/08). Antes `compra_anual` somava 97,90 E 159,90,
+    // e `compra_mensal` somava 19,90 E 24,90 — a Meta via os dois como a mesma
+    // conversão e não tinha como lançar mais por um ticket 64% maior. Pior no
+    // nosso caso: o presente de 97,90 converte mais fácil, então a campanha
+    // aprenderia a caçar quem compra o BARATO. Agora cada preço tem nome
+    // próprio e o conjunto escolhe o que quer maximizar.
+    const PRECOS: Record<number, { evento: string; sufixo: string }> = {
+      1990:  { evento: "compra_mensal_pix", sufixo: "mp"  },  // coremensalpix (downsell)
+      2490:  { evento: "compra_mensal",     sufixo: "m"   },  // coremensalvista
+      9790:  { evento: "compra_anual_97",   sufixo: "a97" },  // coreanual97 (presente)
+      15990: { evento: "compra_anual",      sufixo: "a"   },  // coreanualvista (cheio)
+    };
+    const porPlano = PRECOS[cents];
+    if (porPlano) eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });
   }
   const teste = Deno.env.get("META_APP_TEST_EVENT_CODE");
   if (teste) payload.test_event_code = teste;

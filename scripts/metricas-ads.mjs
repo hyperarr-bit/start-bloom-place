@@ -102,28 +102,59 @@ const vendas = await buscar("subscriptions", {
 }, token);
 const doApp = vendas.filter((v) => v.payment_method === "play_store");
 
-/* campanha de cada venda: install_referrer nas sessões do comprador */
+/*
+ * CAMPANHA DE CADA VENDA — pelo install_referrer das sessões do comprador.
+ *
+ * ARMADILHA DE NOMENCLATURA (25/08, o bug que este bloco corrige). O blob que
+ * a Meta cifra dentro do referrer usa os nomes ANTIGOS da API, que estão um
+ * nível deslocados do que o Gerenciador mostra:
+ *
+ *    campaign_group_*  → CAMPANHA   (o que o Gerenciador chama de campanha)
+ *    campaign_*        → CONJUNTO de anúncios
+ *    adgroup_*         → ANÚNCIO
+ *
+ * O código lia `campaign_name` achando que era campanha — era o CONJUNTO. E
+ * como a Meta batiza todo conjunto novo de "Novo Promoção do app Conjunto de
+ * anúncios", SETE campanhas diferentes caíam no mesmo balde e o lado do
+ * Gerenciador dizia "nenhuma venda atribuída" pra todas elas.
+ *
+ * E o casamento é por ID, nunca por nome: existem duas campanhas ativas com
+ * o nome idêntico "Novo Promoção do app Campanha — Cópia". Só que o ID do
+ * blob e o ID da Marketing API diferem nos DOIS ÚLTIMOS dígitos (…0050 no
+ * referrer × …0041 na API) — quirk da Meta. Daí o `chaveCampanha`, que
+ * compara o prefixo.
+ */
+const chaveCampanha = (id) => (id ? String(id).slice(0, -2) : "");
+
 const campanhaDaVenda = async (v) => {
-  if (!v.user_id) return "sem referrer";
+  const nada = (rot) => ({ chave: `?${rot}`, nome: rot, conjunto: null, anuncio: null });
+  if (!v.user_id) return nada("sem referrer");
   const sess = await buscar("analytics_events", {
     select: "session_id", user_id: `eq.${v.user_id}`, limit: "50",
   }, token);
   const ids = [...new Set(sess.map((x) => x.session_id).filter(Boolean))];
-  if (!ids.length) return "sem referrer";
+  if (!ids.length) return nada("sem referrer");
   const refs = await buscar("analytics_events", {
     select: "event_data", event_name: "eq.install_referrer",
     session_id: `in.(${ids.join(",")})`, limit: "3",
   }, token);
   for (const r of refs) {
-    const aberto = abrirReferrer(r.event_data?.referrer ?? "");
-    if (aberto?.campaign_name) return aberto.campaign_name;
+    const a = abrirReferrer(r.event_data?.referrer ?? "");
+    if (a?.campaign_group_id || a?.campaign_group_name) {
+      return {
+        chave: chaveCampanha(a.campaign_group_id) || `nome:${a.campaign_group_name}`,
+        nome: a.campaign_group_name ?? "(campanha sem nome)",
+        conjunto: a.campaign_name ?? null,
+        anuncio: a.adgroup_name ?? null,
+      };
+    }
   }
-  return refs.length ? "referrer sem campanha" : "orgânico/sem referrer";
+  return nada(refs.length ? "referrer sem campanha" : "orgânico/sem referrer");
 };
 
-const porCampanha = new Map(); // nome → {pagoR, pagoN, trialR, trialN, emails[]}
+const porCampanha = new Map(); // chave(id) → {nome, pagoR, pagoN, trialR, trialN, emails[], anuncios}
 for (const v of doApp) {
-  const nome = await campanhaDaVenda(v);
+  const camp = await campanhaDaVenda(v);
   const dias = (Date.parse(v.current_period_end) - Date.parse(v.current_period_start)) / 86400e3;
   // <10 dias = TRIAL (23/08). Era <5 e passou a MENTIR no dia em que o trial
   // do anual virou 7 dias (oferta coretrial7): um teste grátis de 7d entrava
@@ -131,26 +162,31 @@ for (const v of doApp) {
   // Mesmo detector do meta-backfill-app; nada legítimo dura <10d (prepaid 30,
   // mensal 30, anual 365, vitalício 2126).
   const trial = dias > 0 && dias < 10;
-  if (!porCampanha.has(nome)) porCampanha.set(nome, { pagoR: 0, pagoN: 0, trialR: 0, trialN: 0, emails: [] });
-  const c = porCampanha.get(nome);
+  if (!porCampanha.has(camp.chave)) {
+    porCampanha.set(camp.chave, { nome: camp.nome, pagoR: 0, pagoN: 0, trialR: 0, trialN: 0, emails: [], anuncios: new Map() });
+  }
+  const c = porCampanha.get(camp.chave);
   if (trial) { c.trialN++; c.trialR += v.amount_cents / 100; } else { c.pagoN++; c.pagoR += v.amount_cents / 100; }
   c.emails.push(`${v.customer_email?.split("@")[0]}${trial ? " (trial)" : ""}`);
+  // guarda o anúncio de quem PAGOU: é o dado que diz qual criativo vende
+  if (!trial && camp.anuncio) c.anuncios.set(camp.anuncio, (c.anuncios.get(camp.anuncio) ?? 0) + 1);
 }
 
 /* --------------------------------------------------- lado do GERENCIADOR */
 const insights = await (await fetch(
-  `${GRAPH}/${env.META_AD_ACCOUNT}/insights?level=campaign&time_range={"since":"${de}","until":"${ate}"}&fields=campaign_name,spend,impressions,cpm,actions&access_token=${env.META_ADS_TOKEN}`,
+  `${GRAPH}/${env.META_AD_ACCOUNT}/insights?level=campaign&time_range={"since":"${de}","until":"${ate}"}&fields=campaign_id,campaign_name,spend,impressions,cpm,actions&access_token=${env.META_ADS_TOKEN}`,
 )).json();
 if (insights.error) { console.error("✗ Marketing API:", insights.error.message); process.exit(1); }
 
 console.log(`\n━━━ GERENCIADOR × BANCO · ${de}${ate !== de ? " a " + ate : ""} (BRT) ━━━\n`);
-const nomesBanco = new Set(porCampanha.keys());
+const sobrando = new Set(porCampanha.keys());
 for (const c of (insights.data ?? []).sort((a, b) => b.spend - a.spend)) {
   if (Number(c.spend) === 0) continue;
   const inst = Number(c.actions?.find((a) => a.action_type === "mobile_app_install")?.value ?? 0);
-  const banco = porCampanha.get(c.campaign_name);
-  nomesBanco.delete(c.campaign_name);
-  console.log(`▸ ${c.campaign_name}`);
+  const chave = chaveCampanha(c.campaign_id);
+  const banco = porCampanha.get(chave);
+  sobrando.delete(chave);
+  console.log(`▸ ${c.campaign_name}  ·  id ${c.campaign_id}`);
   console.log(`  gasto R$ ${Number(c.spend).toFixed(2)} · ${c.impressions} impr · CPM R$ ${Number(c.cpm).toFixed(2)} · ${inst} installs${inst ? ` (CPI R$ ${(c.spend / inst).toFixed(2)})` : ""}`);
   if (banco) {
     const linhas = [];
@@ -158,13 +194,17 @@ for (const c of (insights.data ?? []).sort((a, b) => b.spend - a.spend)) {
     if (banco.trialN) linhas.push(`${banco.trialN} trial(s) = R$ ${banco.trialR.toFixed(2)} agendado (custo/trial R$ ${(c.spend / banco.trialN).toFixed(2)})`);
     console.log(`  BANCO: ${linhas.join(" · ")}`);
     console.log(`         ${banco.emails.join(", ")}`);
+    if (banco.anuncios.size) {
+      const top = [...banco.anuncios].sort((a, b) => b[1] - a[1]).map(([n, q]) => `${n} (${q})`);
+      console.log(`         anúncio que vendeu: ${top.join(" · ")}`);
+    }
   } else {
     console.log("  BANCO: nenhuma venda atribuída no período");
   }
   console.log();
 }
-for (const nome of nomesBanco) {
-  const b = porCampanha.get(nome);
-  console.log(`▸ ${nome} (sem gasto no gerenciador nesta janela)`);
+for (const chave of sobrando) {
+  const b = porCampanha.get(chave);
+  console.log(`▸ ${b.nome} (sem gasto no gerenciador nesta janela)`);
   console.log(`  BANCO: ${b.pagoN} pago(s) R$ ${b.pagoR.toFixed(2)} · ${b.trialN} trial(s) R$ ${b.trialR.toFixed(2)} — ${b.emails.join(", ")}\n`);
 }

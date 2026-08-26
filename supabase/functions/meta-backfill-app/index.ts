@@ -28,6 +28,10 @@ const log = (p: string, d?: unknown) =>
 
 /** Última recusa da Meta, pra devolver no modo admin (diagnóstico). */
 let ultimoErroMeta: string | null = null;
+// DIAGNÓSTICO (26/08): quais eventos foram de fato empacotados e o que a Meta
+// respondeu. Sem isso, "enviado" só diz que houve HTTP 200 — não diz se o
+// compra_anual_97 entrou no pacote nem quantos eventos a Meta contou.
+let ultimoPacote: { nomes: string[]; resposta: string } | null = null;
 let ultimoErroTikTok: string | null = null;
 
 const sha256 = async (txt: string): Promise<string> => {
@@ -264,6 +268,10 @@ async function mandarCompraProMeta(
       body: JSON.stringify(payload),
     });
     const corpo = await r.text();
+    ultimoPacote = {
+      nomes: (payload.data as Array<{ event_name?: string }>).map((e) => String(e.event_name)),
+      resposta: corpo.slice(0, 200),
+    };
     log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
     // Guarda a recusa: sem isso "falhou" é um número sem causa, e já custou
     // meio dia de hipótese errada sobre duplicação de evento.
@@ -565,6 +573,7 @@ serve(async (req) => {
         email: v.customer_email,
         resultado: depois.data?.length ? "enviado" : "falhou",
         ...(depois.data?.length ? {} : { recusa: ultimoErroMeta }),
+        ...(forcarEsta && ultimoPacote ? { pacote: ultimoPacote } : {}),
       });
     }
     log("fim", { de, ate, total: feitos.length, cron });

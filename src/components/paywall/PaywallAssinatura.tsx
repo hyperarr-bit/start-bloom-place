@@ -12,10 +12,13 @@
  *    (0/224). O downsell 19,90 fez 0/168 — e quando vendia, perdia dinheiro
  *    (R$ 16,90 líquido a CPA de R$ 70+). A objeção nunca foi preço.
  *
- * O DESENHO v81 (blueprint 64f93f75):
- *  - OFERTA ÚNICA: core_vitalicio_97 — R$ 97,90 UMA vez, seu pra sempre.
- *    Maior ticket = menor milagre (breakeven D0 pede só 2,7% install→pago).
- *    Âncora honesta: assinar por mês sairia 24,90×12 = R$ 298/ano.
+ * O DESENHO v82 (27/08, decisão do dono em cima do blueprint 64f93f75):
+ *  - DUAS COLUNAS: mensal 24,90 como ÂNCORA VIVA (frame de aluguel: "todo
+ *    mês, pra sempre") × VITALÍCIO 97,90 como herói ("4 meses de mensal =
+ *    CORE pra sempre"). O mensal vendia todo dia (5 em 26/08) — âncora morta
+ *    jogava esse chão de receita fora; âncora viva ancora E fatura.
+ *    Régua de mix definida ANTES: vitalício < 40% das vendas = frame fraco.
+ *  - Maior ticket = menor milagre (breakeven D0 pede só 2,7% install→pago).
  *  - Anti-assinatura como argumento: "paga uma vez, sem renovação" — produto
  *    AVULSO deixa a folha sem o bloco de assinatura e o Pix é nativo.
  *  - A ESPERA tratada de frente (é ela que come 79% dos leads):
@@ -83,6 +86,8 @@ export function PaywallAssinatura({
   const { user } = useAuth();
   const recap = useRecap(area);
   const teste = estadoTeste();
+  // v82: coluna escolhida — vitalício nasce selecionado (é o herói).
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">("vitalicio");
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
   // Resgate PIX (1ª recusa rápida): a folha aceita Pix mas 79% fecham no
@@ -98,7 +103,7 @@ export function PaywallAssinatura({
   // rebaixa pra "12 meses" com resposta NEGATIVA da loja — nunca rebaixar a
   // promessa antes da resposta (varredura v81: o primeiro paint mostrava o
   // fallback por 1-3s pra TODO mundo).
-  const [loja, setLoja] = useState<{ vitalicio97: boolean | null; anual97: boolean }>({ vitalicio97: null, anual97: false });
+  const [loja, setLoja] = useState<{ vitalicio97: boolean | null; anual97: boolean; mensalVista: boolean }>({ vitalicio97: null, anual97: false, mensalVista: false });
   const cancelamentos = useRef(0);
   const pixVencendoJaFoi = useRef(false);
   const vivoRef = useRef(true);
@@ -123,6 +128,7 @@ export function PaywallAssinatura({
       const ler = () => setLoja({
         vitalicio97: rc.temVitalicio97() ? true : (rc.estadoRevenueCat() === "pronto" ? false : null),
         anual97: rc.temAnual97(),
+        mensalVista: rc.temMensalVista(),
       });
       ler();
       // Produto criado por API demora a propagar (varredura: o herói ficava
@@ -148,14 +154,14 @@ export function PaywallAssinatura({
       // aparência; a compra continua dependendo da loja de verdade.
       try {
         if (localStorage.getItem("core-debug-loja") === "1") {
-          setLoja({ vitalicio97: true, anual97: true });
+          setLoja({ vitalicio97: true, anual97: true, mensalVista: true });
         }
         if (localStorage.getItem("core-debug-resgate-pix") === "1") {
-          setLoja({ vitalicio97: true, anual97: true });
+          setLoja({ vitalicio97: true, anual97: true, mensalVista: true });
           setResgatePix(true);
         }
         if (localStorage.getItem("core-debug-pix-vence") === "1") {
-          setLoja({ vitalicio97: true, anual97: true });
+          setLoja({ vitalicio97: true, anual97: true, mensalVista: true });
           setPixVencendo(true);
         }
       } catch { /* noop */ }
@@ -249,11 +255,11 @@ export function PaywallAssinatura({
        * Recusa após 30s+ = trabalhou na folha, provável código Pix gerado —
        * que VENCE EM 5 MINUTOS → o aviso corre atrás. Cada caixa uma vez
        * (a do Pix vencendo com guarda própria, senão re-arma a cada recusa). */
-      if (segundosNaFolha >= 30 && !pixVencendoJaFoi.current) {
+      if (segundosNaFolha >= 30 && !pixVencendoJaFoi.current && folhaPrepaga) {
         pixVencendoJaFoi.current = true;
         setPixVencendo(true);
         trackEvent("app_pix_vencendo_view", { contexto, produto, seg: Math.round(segundosNaFolha) });
-      } else if (segundosNaFolha < 30 && cancelamentos.current === 1) {
+      } else if (segundosNaFolha < 30 && cancelamentos.current === 1 && folhaPrepaga) {
         setResgatePix(true);
         trackEvent("app_resgate_pix_view", { contexto, produto });
       }
@@ -281,7 +287,7 @@ export function PaywallAssinatura({
    * pro anual97 com resposta NEGATIVA do catálogo — provado, mesma folha,
    * mesmo preço. A promessa muda JUNTO com o produto (regra de ouro). */
   const vitalicio = loja.vitalicio97 !== false;
-  const compraAtual = vitalicio
+  const colunaDireita = vitalicio
     ? {
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarVitalicio("core_vitalicio_97"),
         id: APP_PRECOS.vitalicio97.id,
@@ -294,6 +300,18 @@ export function PaywallAssinatura({
         cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
         legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática`,
       };
+  /* Âncora VIVA (v82): o mensal 24,90 vende de verdade (5 em 26/08) — pré-pago
+   * quando a loja carregou; fallback recorrente com a promessa mudando junto. */
+  const colunaMensal = {
+    fn: (rc: typeof import("@/lib/revenuecat")) =>
+      loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true }),
+    id: loja.mensalVista ? APP_PRECOS.mensalVista.id : APP_PRECOS.mensal.id,
+    cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
+    legal: `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}`,
+  };
+  const compraAtual = plano === "vitalicio" ? colunaDireita : colunaMensal;
+  // Folha pré-paga = Pix garantido nela (selo e resgate só prometem o real).
+  const folhaPrepaga = plano === "vitalicio" || loja.mensalVista;
 
   const barraFixa = contexto !== "planos";
 
@@ -371,7 +389,7 @@ export function PaywallAssinatura({
 
       {/* PIX gritado ANTES da folha (79% fecham no carregamento achando que é
           cartão-only — a letrinha legal de 10px ninguém lê). */}
-      {!resgatePix && !pixVencendo && (
+      {!resgatePix && !pixVencendo && folhaPrepaga && (
         <p className="flex items-center justify-center gap-1.5 mb-2 text-[12px] font-semibold text-muted-foreground">
           <span className="inline-flex items-center gap-1 rounded-md bg-[#e5f6f3] text-[#0e8577] px-1.5 py-[2px] text-[11px] font-black tracking-wide">
             <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden /> PIX
@@ -460,31 +478,44 @@ export function PaywallAssinatura({
         <span className="w-8 h-8 rounded-[10px] grid place-items-center text-[10px] font-black bg-black/[0.06] text-black/50 dark:bg-white/10 dark:text-white/60">+9</span>
       </div>
 
-      {/* ÂNCORA honesta acima do herói: o custo real de assinar pra sempre.
-          Não é botão — é régua. (0/224 trocaram de plano; escolha era teatro.) */}
-      <p className="text-center text-[12px] text-muted-foreground mb-2">
-        assinar por mês sairia <span className="line-through decoration-[#e0654a] decoration-2 font-semibold">R$ 298/ano, pra sempre</span>
-      </p>
-
-      {/* HERÓI ÚNICO (bg-white PROPOSITAL nos dois temas → cor de texto
-          explícita; varredura: dark mode virava branco no branco). */}
-      <div className="rounded-2xl border-2 border-accent overflow-hidden text-center bg-white text-[#16121c] shadow-[0_14px_30px_-14px_rgba(0,0,0,.4)] mb-1">
-        <div className="bg-accent text-white text-[10px] font-extrabold tracking-wide py-1">
-          {vitalicio ? "ACESSO VITALÍCIO — PAGA UMA VEZ" : "MELHOR PREÇO — 12 MESES"}
-        </div>
-        <div className="text-[27px] font-black leading-none mt-3 tracking-tight">
-          {vitalicio ? "Seu pra sempre" : "1 ano de CORE"}
-        </div>
-        <div className="text-[19px] font-extrabold mt-2">
-          {(vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
-          <small className="text-[11px] font-bold text-black/45"> · {vitalicio ? "uma única vez" : "R$ 8,16/mês"}</small>
-        </div>
-        <div className="mx-6 my-2.5 border-t border-black/10" aria-hidden />
-        <div className="text-[11.5px] font-semibold text-black/55 pb-3.5 px-5 leading-snug">
-          {vitalicio
-            ? <>Os 16 módulos e tudo que a gente lançar depois. <b>Sem assinatura, sem renovação, sem mensalidade.</b></>
-            : <>Acesso completo aos 16 módulos por 12 meses — sem renovação automática.</>}
-        </div>
+      {/* DUAS COLUNAS (v82): mensal = âncora VIVA com frame de aluguel; o
+          vitalício é o herói com a conta pronta. bg-white PROPOSITAL nos dois
+          temas → cor de texto explícita (varredura: dark virava branco no
+          branco). Seleção fala UMA cor: rosa. */}
+      <div className="grid grid-cols-2 gap-2.5 mb-1 items-stretch">
+        <button
+          onClick={() => setPlano("mensal")}
+          className={`rounded-2xl border-2 overflow-hidden transition-all flex flex-col text-center ${plano === "mensal" ? "border-accent shadow-[0_12px_28px_-14px_rgba(0,0,0,.35)]" : "border-border"} bg-white text-[#16121c]`}
+        >
+          <span className="h-[22px]" aria-hidden />
+          <span className="text-[30px] font-black leading-none">1</span>
+          <span className="text-[12.5px] font-bold text-black/45">mês</span>
+          <span className="text-[16px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">por mês</span>
+          <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
+          <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
+            todo mês, pra sempre
+          </span>
+        </button>
+        <button
+          onClick={() => setPlano("vitalicio")}
+          className={`rounded-2xl border-2 overflow-hidden transition-all flex flex-col text-center ${plano === "vitalicio" ? "border-accent shadow-[0_14px_30px_-14px_rgba(0,0,0,.4)]" : "border-border"} bg-white text-[#16121c]`}
+        >
+          <span className={`text-[10px] font-extrabold tracking-wide py-1 ${plano === "vitalicio" ? "bg-accent text-white" : "bg-accent/10 text-accent"}`}>
+            {vitalicio ? "MELHOR ESCOLHA" : "MELHOR PREÇO"}
+          </span>
+          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">
+            {vitalicio ? "Pra sempre" : "12 meses"}
+          </span>
+          <span className="text-[16px] font-extrabold mt-1.5">
+            {(vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
+          </span>
+          <span className="text-[10px] font-semibold text-black/40">{vitalicio ? "uma única vez" : "R$ 8,16/mês"}</span>
+          <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
+          <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
+            {vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
+          </span>
+        </button>
       </div>
 
       {teste.fase === "ativo" && !d3 && contexto !== "planos" && (

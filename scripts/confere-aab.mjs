@@ -40,7 +40,9 @@ try {
   // 3. versionName esperado no manifesto (upload errado de arquivo velho).
   if (versaoEsperada) ok(`versionName ${versaoEsperada} no manifesto`, manifesto.includes(versaoEsperada));
   // 4. Superfície de venda atual presente (embarcou o dist certo).
-  ok("gate do trial no bundle", bundle.includes("Destrave seus 3 dias"));
+  //    v80: o marcador é o selo PIX do paywall (o gate do trial morreu no v77).
+  ok("selo PIX do paywall no bundle", bundle.includes("dá pra pagar no Pix"));
+  ok("resgate Pix no bundle", bundle.includes("Prefere pagar no Pix"));
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }

@@ -15,8 +15,11 @@
  * A ESCADA (cada degrau só aparece depois de recusa real):
  *   vitrine: Mensal 24,90 | 12 meses 97,90 (herói, R$ 8,16/mês) — 26/08 o
  *   anual de 159,90 saiu: 95 dos 102 toques em comprar iam nele e vendeu ZERO
- *   cancelou a folha do ANUAL → 🎁 ANUAL 97,90 (R$ 62 off — nunca na vitrine)
- *   cancelou o 97,90 ou o MENSAL → resgate: 1 mês 19,90 (Pix)
+ *   1ª recusa → resgate PIX: reabre a MESMA folha ensinando a escolher Pix.
+ *     (raio-x 26/08, 170 recusas cronometradas: mediana 4,7s dentro da folha,
+ *     ZERO troca de produto, downsell 19,90 fez 0/168 — a objeção não é preço,
+ *     é achar que a folha é cartão-only. Pagante fica 63s; desistente, 4,7s.)
+ *   2ª recusa → resgate preço: 1 mês 19,90 na caixa de presente (Me+).
  *
  * Regras herdadas (aprendidas com dinheiro) + varredura 23/08 (37 achados):
  *  - CTA abre a folha DIRETO (tela intermediária matou 57% na v50);
@@ -89,6 +92,8 @@ export function PaywallAssinatura({
   const [oferta, setOferta] = useState<"cheia" | "resgate">("cheia");
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
+  // Resgate PIX (1ª recusa): a folha aceita Pix mas 95% fecham em ~5s sem ver.
+  const [resgatePix, setResgatePix] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [conferindo, setConferindo] = useState(false);
   // Disponibilidade REAL no catálogo da loja.
@@ -127,6 +132,11 @@ export function PaywallAssinatura({
         if (localStorage.getItem("core-debug-gift") === "1") {
           setLoja({ mensalVista: true, anualVista: true, anual97: true, mensalPix: true });
           window.setTimeout(() => setOferta("resgate"), 600);
+        }
+        // QA visual do resgate PIX (mesmo espírito do core-debug-gift).
+        if (localStorage.getItem("core-debug-resgate-pix") === "1") {
+          setLoja({ mensalVista: true, anualVista: true, anual97: true, mensalPix: true });
+          setResgatePix(true);
         }
       } catch { /* noop */ }
     })();
@@ -201,6 +211,7 @@ export function PaywallAssinatura({
     setComprando(true);
     setErro(null);
     setPendente(false);
+    setResgatePix(false);
     trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto, oferta });
     const rc = await import("@/lib/revenuecat");
     const ok = await fn();
@@ -219,12 +230,17 @@ export function PaywallAssinatura({
       setPendente(true);
     } else if (motivo === "cancelou") {
       cancelamentos.current += 1;
-      /* ESCADA (redesenhada 26/08). Era: recusou anual 159,90 → presente 97,90
-       * → resgate 19,90. Agora o 97,90 É o anual, então o degrau do meio some e
-       * a recusa cai direto no 19,90 — com o mesmo desenho de caixa de presente,
-       * que é o que segurava a atenção. Cada degrau uma vez, sempre por recusa
-       * REAL na folha do Google. */
-      if (oferta === "cheia" && abrirResgate("cancelou_folha")) {
+      /* ESCADA v80 (raio-x 26/08). A 1ª recusa NÃO é objeção de preço — é a
+       * folha pedindo cartão pra quem paga com Pix (mediana 4,7s pra fechar,
+       * zero troca de plano, 19,90 fez 0/168). Então o 1º degrau vira o
+       * resgate PIX: ensina que a MESMA folha aceita Pix e reabre. O degrau
+       * de preço (19,90 na caixa de presente) desce pra 2ª recusa. Cada
+       * degrau uma vez, sempre por recusa REAL na folha do Google. */
+      const folhaPrepaga = plano === "anual" || loja.mensalVista;
+      if (cancelamentos.current === 1 && oferta === "cheia" && folhaPrepaga) {
+        setResgatePix(true);
+        trackEvent("app_resgate_pix_view", { contexto, produto });
+      } else if (oferta === "cheia" && abrirResgate("cancelou_folha")) {
         return; // CTA fica travado até o modal abrir (o timer solta)
       } else if (cancelamentos.current >= 2) {
         trackEvent("app_resgate_view", { contexto });
@@ -269,8 +285,35 @@ export function PaywallAssinatura({
     </div>
   );
 
+  /* Resgate PIX (1ª recusa da folha). A pessoa acabou de fechar a folha
+   * achando que era cartão-only — a caixa aparece SOZINHA onde o dedo dela
+   * está (regra: prêmio persegue a pessoa, zero fricção) e reabre a MESMA
+   * folha, agora sabendo o que procurar. */
+  const caixaResgatePix = (
+    <div className="rounded-xl bg-[#e5f6f3] border border-[#b9e6df] text-[#0b6d62] text-[12.5px] leading-snug p-3 mb-2.5">
+      <b className="flex items-center gap-1.5 mb-0.5">
+        <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden />
+        Prefere pagar no Pix?
+      </b>
+      A tela do Google aceita Pix: toca de novo, escolhe <b>Pix</b> na lista e copia o código.
+      Pagou, o acesso libera sozinho.
+      <button
+        className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
+        disabled={comprando}
+        onClick={async () => {
+          trackEvent("app_resgate_pix_toque", { contexto, produto: compraAtual.id });
+          const rc = await import("@/lib/revenuecat");
+          void pagou(() => compraAtual.fn(rc), compraAtual.id);
+        }}
+      >
+        Abrir de novo e pagar no Pix
+      </button>
+    </div>
+  );
+
   const blocoAcao = (
     <>
+      {resgatePix && !pendente && caixaResgatePix}
       {pendente && caixaPendente}
       {erro && <p className="text-[12.5px] text-destructive text-center mb-2">{erro}</p>}
 
@@ -281,6 +324,18 @@ export function PaywallAssinatura({
           <Check className="w-3.5 h-3.5 inline" strokeWidth={3} /> acesso na hora
         </span>
       </p>
+
+      {/* PIX gritado ANTES da folha (raio-x 26/08: 95% fecham a folha em ~5s
+          achando que é cartão-only — a letrinha legal de 10px ninguém lê). Só
+          aparece quando a compra atual é pré-paga (folha com Pix de verdade). */}
+      {!resgatePix && (plano === "anual" || loja.mensalVista) && (
+        <p className="flex items-center justify-center gap-1.5 mb-2 text-[12px] font-semibold text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-md bg-[#e5f6f3] text-[#0e8577] px-1.5 py-[2px] text-[11px] font-black tracking-wide">
+            <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden /> PIX
+          </span>
+          dá pra pagar no Pix — escolhe na tela do Google
+        </p>
+      )}
 
       <Button
         size="lg"
@@ -414,7 +469,7 @@ export function PaywallAssinatura({
 
       {barraFixa ? (
         <>
-          <div className={pendente || erro ? "h-[252px]" : "h-[148px]"} aria-hidden />
+          <div className={pendente || erro || resgatePix ? "h-[276px]" : "h-[172px]"} aria-hidden />
           <div className="fixed bottom-0 inset-x-0 z-[60] pointer-events-none">
             <div className="max-w-sm mx-auto px-5 pb-3 pt-9 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-auto">
               {blocoAcao}

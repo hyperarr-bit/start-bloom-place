@@ -80,4 +80,13 @@ export const APP_PRECOS = {
   // (`core_vitalicio_19`, ACTIVE via API, schema espelho do core_vitalicio),
   // porque a folha não aceita desconto dinâmico em compra única.
   vitalicio19: { id: "core_vitalicio_19", preco: "R$ 19,90" },
+  /** 27/08 (v81, dono aprovou o desenho): o VITALÍCIO volta a ser a oferta —
+   *  agora única, a R$ 97,90. Raio-x de 26-27/08: quem VÊ a folha converte a
+   *  7-9%, ninguém troca de plano após recusar (0/224), e o 19,90 de resgate
+   *  fez 0/168 — então uma oferta só, no maior ticket que a folha já provou
+   *  fechar (97,90), com o mensal virando só âncora riscada (24,90×12=298,80).
+   *  Produto `core_vitalicio_97` ACTIVE no Play (schema espelho do
+   *  core_vitalicio que vendeu, diff = só preço) e registrado no RC
+   *  (entitlement CORE APP Pro) — tudo por API, conferido na resposta. */
+  vitalicio97: { id: "core_vitalicio_97", preco: "R$ 97,90" },
 } as const;

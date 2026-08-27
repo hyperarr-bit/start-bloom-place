@@ -6,6 +6,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  * anexa ao entitlement, pra compra única aparecer em /customers/{id}/purchases
  * com produto reconhecido e o Restaurar compras devolver acesso no cliente.
  * Idempotente (409/conflito = já existe, segue). Só admin invoca.
+ *
+ * 27/08 (v81): generalizada — aceita `store_identifier` no body (tem que ser
+ * da família core_vitalicio*) pra registrar irmãos novos, caso do
+ * core_vitalicio_97 (vitalício vira a oferta única do paywall).
  */
 const RC = "https://api.revenuecat.com/v2";
 const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
@@ -27,24 +31,36 @@ serve(async (req) => {
   const h = { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
   const passo: Record<string, unknown> = {};
 
+  // qual irmão da família registrar (default preserva o one-off original)
+  let alvo = "core_vitalicio";
+  try {
+    const body = await req.json();
+    if (typeof body?.store_identifier === "string") alvo = body.store_identifier;
+  } catch { /* sem body = default */ }
+  if (!alvo.startsWith("core_vitalicio")) {
+    return Response.json({ error: "só produtos da família core_vitalicio*" }, { status: 400 });
+  }
+  passo.alvo = alvo;
+
   // 1) app Android do projeto
   const apps = await (await fetch(`${RC}/projects/${PROJETO}/apps`, { headers: h })).json();
   const appPlay = (apps?.items ?? []).find((a: any) => a?.type === "play_store");
   if (!appPlay) return Response.json({ error: "app play_store não achado", apps }, { status: 500 });
   passo.app = appPlay.id;
 
-  // 2) produto core_vitalicio (cria se não existir)
+  // 2) produto (cria se não existir)
   const prods = await (await fetch(`${RC}/projects/${PROJETO}/products?limit=100`, { headers: h })).json();
-  let prod = (prods?.items ?? []).find((p: any) => p?.store_identifier === "core_vitalicio");
+  let prod = (prods?.items ?? []).find((p: any) => p?.store_identifier === alvo);
   if (!prod) {
     const r = await fetch(`${RC}/projects/${PROJETO}/products`, {
       method: "POST",
       headers: h,
       body: JSON.stringify({
-        store_identifier: "core_vitalicio",
+        store_identifier: alvo,
         app_id: appPlay.id,
         type: "one_time",
-        display_name: "CORE vitalício",
+        // display_name é ÚNICO por app no RC — irmãos ganham o sufixo do SKU
+        display_name: alvo === "core_vitalicio" ? "CORE vitalício" : `CORE vitalício ${alvo.replace("core_vitalicio_", "")}`,
       }),
     });
     prod = await r.json();

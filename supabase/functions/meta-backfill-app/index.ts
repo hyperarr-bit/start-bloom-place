@@ -251,7 +251,13 @@ async function mandarCompraProMeta(
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
-    const achado = PRECOS[cents];
+    // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par
+    // (9790, "lifetime") NÃO pode cair no compra_anual_97 (produto diferente
+    // com a mesma etiqueta de preço) nem sair só como Purchase genérico.
+    const VITALICIOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
+      9790: { evento: "compra_vitalicio_97", sufixo: "v97", aceita: ["lifetime"] },
+    };
+    const achado = billing === "lifetime" ? VITALICIOS[cents] : PRECOS[cents];
     const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) {
       eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });

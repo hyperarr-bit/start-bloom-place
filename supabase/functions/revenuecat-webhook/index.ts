@@ -129,6 +129,11 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   // Continuam no mapa pra base que comprou vitalício (renovação de acesso,
   // restore, reembolso). 09/08: downsell 19,90 ANTES do cheio (startsWith).
   core_vitalicio_19: { billing: "lifetime", cents: 1990 },
+  // 27/08 v81 (varredura pegou): o _97 tem que vir ANTES do genérico — o
+  // match é startsWith e "core_vitalicio_97".startsWith("core_vitalicio") é
+  // true; na ordem errada TODA venda de 97,90 entraria como 27,90 (a MESMA
+  // armadilha documentada duas vezes acima, e quase cometida de novo).
+  core_vitalicio_97: { billing: "lifetime", cents: 9790 }, // v81: vitalício é a oferta única
   core_vitalicio: { billing: "lifetime", cents: 2790 }, // 07/08: 27,90, espelho da web
 };
 
@@ -353,7 +358,13 @@ async function mandarCompraProMeta(
       9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
-    const achado = PRECOS[cents];
+    // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par
+    // (9790, "lifetime") NÃO pode cair no compra_anual_97 (produto diferente
+    // com a mesma etiqueta de preço) nem sair só como Purchase genérico.
+    const VITALICIOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
+      9790: { evento: "compra_vitalicio_97", sufixo: "v97", aceita: ["lifetime"] },
+    };
+    const achado = billing === "lifetime" ? VITALICIOS[cents] : PRECOS[cents];
     const porPlano = achado && billing && achado.aceita.includes(billing) ? achado : null;
     if (porPlano) {
       eventos.push({ ...base, event_name: porPlano.evento, event_id: `${txId}_${porPlano.sufixo}` });

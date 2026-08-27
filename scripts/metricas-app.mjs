@@ -170,6 +170,8 @@ const MARCAS_DE_APP = [
   "app_sheet_view", "app_compra_falhou", "app_compra_pendente", "app_paywall_close",
   "app_sheet_success", "install_referrer", "webview_info", "app_device_info",
   "app_prefolha_view", "app_downsell_view",
+  // Escada v81 (27/08): resgate PIX e aviso do código vencendo.
+  "app_resgate_pix_view", "app_resgate_pix_toque", "app_pix_vencendo_view",
 ];
 
 /**
@@ -473,6 +475,10 @@ L(`   fecharam a pré-folha        ${contar("app_prefolha_fechou")}`);
 L(`   cancelaram a folha Google   ${cancelou}`);
 L(`   downsell R$19,90 exibido    ${contar("app_downsell_view")}`);
 L(`   Pix pendente                ${contar("app_compra_pendente")}`);
+// Escada v81 (27/08): resgate de MÉTODO em vez de preço.
+L(`   resgate PIX exibido         ${contar("app_resgate_pix_view")}`);
+L(`   resgate PIX reabriu folha   ${contar("app_resgate_pix_toque")}`);
+L(`   aviso "código vencendo"     ${contar("app_pix_vencendo_view")}`);
 L();
 
 L("▸ DINHEIRO (tabela subscriptions — a verdade)");

@@ -247,8 +247,10 @@ const PlanosApp = () => {
               >
                 {teste.fase === "ativo" ? "Garantir meu CORE" : "Ver planos"}
               </Button>
+              {/* v81: a vitrine virou compra ÚNICA — "cancele quando quiser"
+                  prometia gestão de assinatura que não existe no vitalício. */}
               <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                <ShieldCheck className="w-3.5 h-3.5" /> Cancele quando quiser, direto na Play Store
+                <ShieldCheck className="w-3.5 h-3.5" /> Pagamento único pelo Google Play · Pix ou cartão
               </p>
             </div>
           </>

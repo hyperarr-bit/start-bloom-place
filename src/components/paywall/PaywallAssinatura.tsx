@@ -1,39 +1,40 @@
 /**
- * A ÚNICA VENDA DO APP — À VISTA (pivô 23/08, aprovado pelo dono).
+ * A ÚNICA VENDA DO APP — VITALÍCIO (v81, 27/08, desenho aprovado pelo dono).
  *
- * História: v53 vendia assinatura com trial no cartão. Dados de 19-23/08
- * mataram o modelo: 48 trials iniciados = R$ 0,00 liquidado; 83% cancelam a
- * folha; TODO dinheiro real do catálogo novo veio de pagamento à vista
- * (pré-pago com Pix na folha do Google — 5× 19,90 + 2× 24,90). O funil novo
- * é o do Me+ (10M+ downloads) adaptado: compromisso antes do preço, paywall
- * em colunas com âncora por mês, e escada de saída com caixa de presente.
+ * História curta de como chegamos aqui, com dinheiro de verdade:
+ *  - v48-52: vitalício 27,90 → folha do Google fechava 21%, melhor dia da
+ *    história (14/08). Único modelo que JÁ provou neste público.
+ *  - v53-75: trial no cartão → 48 trials = R$ 0,00 liquidado. Morto.
+ *  - v78-80: anual 97,90 + escada de preço → raio-x de 26-27/08 (170 recusas
+ *    cronometradas): 79% fecham a folha em <8s — DENTRO do "Processando"/tela
+ *    branca de 15-25s do Google (vídeo do dono num moto g). Quem chega a VER
+ *    a folha converte 7-9%. ZERO pessoas trocaram de plano após recusar
+ *    (0/224). O downsell 19,90 fez 0/168 — e quando vendia, perdia dinheiro
+ *    (R$ 16,90 líquido a CPA de R$ 70+). A objeção nunca foi preço.
  *
- * TUDO aqui compra pelo botão do pré-pago (purchaseStoreProduct): folha do
- * Google aceita Pix, liquida na hora, renovação manual. Sem fase grátis,
- * nunca — as ofertas de trial seguem vivas no catálogo SÓ pros APKs antigos.
+ * O DESENHO v81 (blueprint 64f93f75):
+ *  - OFERTA ÚNICA: core_vitalicio_97 — R$ 97,90 UMA vez, seu pra sempre.
+ *    Maior ticket = menor milagre (breakeven D0 pede só 2,7% install→pago).
+ *    Âncora honesta: assinar por mês sairia 24,90×12 = R$ 298/ano.
+ *  - Anti-assinatura como argumento: "paga uma vez, sem renovação" — produto
+ *    AVULSO deixa a folha sem o bloco de assinatura e o Pix é nativo.
+ *  - A ESPERA tratada de frente (é ela que come 79% dos leads):
+ *      antes do toque  → aviso "a tela do Google leva uns segundos";
+ *      1ª recusa rápida → resgate PIX reabre a MESMA folha (2ª abre na hora);
+ *      recusa após 30s+ → aviso "teu código Pix vence em 5 min" + Já paguei.
+ *  - SEM degrau de preço. 2ª recusa = nada; a notificação D+1 (já agendada
+ *    no mount) faz o trabalho de amanhã.
  *
- * A ESCADA (cada degrau só aparece depois de recusa real):
- *   vitrine: Mensal 24,90 | 12 meses 97,90 (herói, R$ 8,16/mês) — 26/08 o
- *   anual de 159,90 saiu: 95 dos 102 toques em comprar iam nele e vendeu ZERO
- *   1ª recusa → resgate PIX: reabre a MESMA folha ensinando a escolher Pix.
- *     (raio-x 26/08, 170 recusas cronometradas: mediana 4,7s dentro da folha,
- *     ZERO troca de produto, downsell 19,90 fez 0/168 — a objeção não é preço,
- *     é achar que a folha é cartão-only. Pagante fica 63s; desistente, 4,7s.)
- *   2ª recusa → resgate preço: 1 mês 19,90 na caixa de presente (Me+).
- *
- * Regras herdadas (aprendidas com dinheiro) + varredura 23/08 (37 achados):
+ * Regras herdadas (aprendidas com dinheiro):
  *  - CTA abre a folha DIRETO (tela intermediária matou 57% na v50);
- *  - Pix na folha = compra PENDENTE, não erro: caminho pendente tem que ter
- *    AÇÃO em toda superfície (barra E modal do gift) e funcionar pra
- *    comprador ANÔNIMO (o fluxo padrão: conta nasce DEPOIS do pagamento);
- *  - superfície de dinheiro nunca promete o que a folha não dá (o fallback
- *    do mensal é recorrente → a promessa muda junto);
- *  - Restaurar compras + legais sempre presentes (exigência de loja) — no
- *    gate o AppLegalFooter completo (tem o Excluir conta, exigência Play).
+ *  - Pix na folha = compra PENDENTE, não erro: caminho pendente tem AÇÃO e
+ *    funciona pra comprador ANÔNIMO (conta nasce DEPOIS do pagamento);
+ *  - superfície de dinheiro nunca promete o que a loja não carregou
+ *    (vitalício ausente do catálogo → fallback no anual97, já provado);
+ *  - Restaurar compras + legais sempre presentes (exigência de loja).
  */
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { ArrowRight, Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
@@ -46,10 +47,6 @@ import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } f
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
-
-// Gift 1× por SESSÃO DO APP de verdade (varredura: useRef zera a cada mount e
-// o sheet do /planos remonta a cada abertura — a caixa rearmava toda vez).
-const GIFT_VISTO_SESSAO = "core-gift-visto-sessao";
 
 /** Recap REAL do que a pessoa construiu (guest storage no teste, conta depois).
  *  Se não fez nada, degrada pra promessa da área — sempre há algo a perder. */
@@ -86,57 +83,80 @@ export function PaywallAssinatura({
   const { user } = useAuth();
   const recap = useRecap(area);
   const teste = estadoTeste();
-  const [plano, setPlano] = useState<"anual" | "mensal">("anual");
-  // Degraus da escada. "resgate" = 1 mês 19,90 no Pix, na caixa de presente
-  // do Me+ (o desenho que segurava atenção; 26/08 o 97,90 virou o anual).
-  const [oferta, setOferta] = useState<"cheia" | "resgate">("cheia");
   const [comprando, setComprando] = useState(false);
   const [pendente, setPendente] = useState(false);
-  // Resgate PIX (1ª recusa): a folha aceita Pix mas 95% fecham em ~5s sem ver.
+  // Resgate PIX (1ª recusa rápida): a folha aceita Pix mas 79% fecham no
+  // "Processando" sem ver — a caixa reabre a folha, que na 2ª vez abre logo.
   const [resgatePix, setResgatePix] = useState(false);
+  // Recusa DEPOIS de trabalhar na folha (30s+): provável código Pix gerado —
+  // ele vence em 5 minutos, o aviso corre atrás da pessoa.
+  const [pixVencendo, setPixVencendo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [conferindo, setConferindo] = useState(false);
-  // Disponibilidade REAL no catálogo da loja.
-  const [loja, setLoja] = useState({ mensalVista: false, anualVista: false, anual97: false, mensalPix: false });
+  // Disponibilidade REAL no catálogo da loja (botão nunca morto).
+  // vitalicio97 começa NULL (não "false"): o herói nasce vitalício e só
+  // rebaixa pra "12 meses" com resposta NEGATIVA da loja — nunca rebaixar a
+  // promessa antes da resposta (varredura v81: o primeiro paint mostrava o
+  // fallback por 1-3s pra TODO mundo).
+  const [loja, setLoja] = useState<{ vitalicio97: boolean | null; anual97: boolean }>({ vitalicio97: null, anual97: false });
   const cancelamentos = useRef(0);
-  const giftTimer = useRef<number | null>(null);
+  const pixVencendoJaFoi = useRef(false);
   const vivoRef = useRef(true);
 
   useEffect(() => {
     vivoRef.current = true;
     trackEvent("app_paywall_view", {
-      contexto, modo: "avista", d3,
+      contexto, modo: "vitalicio", d3,
       dia: teste.fase === "ativo" ? teste.dia : teste.fase,
     });
     let retry: number | null = null;
     void (async () => {
       const rc = await import("@/lib/revenuecat");
       await rc.initRevenueCat();
-      await rc.prefetchAssinaturas();
+      // As duas pré-buscas: vitalício (herói) e assinaturas (fallback anual97
+      // enquanto o SKU novo propaga na Play).
+      await Promise.all([rc.prefetchVitalicio(), rc.prefetchAssinaturas()]);
       if (!vivoRef.current) return;
-      const ler = () => setLoja({ mensalVista: rc.temMensalVista(), anualVista: rc.temAnualVista(), anual97: rc.temAnual97(), mensalPix: rc.temMensalPix() });
+      // Só rebaixa a promessa (vitalicio97=false) com resposta NEGATIVA de
+      // verdade do catálogo (estado "pronto" e o produto não veio). Init com
+      // erro de rede mantém o otimista null — o toque re-tenta sozinho.
+      const ler = () => setLoja({
+        vitalicio97: rc.temVitalicio97() ? true : (rc.estadoRevenueCat() === "pronto" ? false : null),
+        anual97: rc.temAnual97(),
+      });
       ler();
-      // Base plans criados por API demoram a propagar (varredura: o herói
-      // ficava botão morto no dia do lançamento). Uma re-tentativa curta
-      // cobre a folga; a terceira chance é o re-prefetch do próprio toque.
-      if (!rc.temAnualVista() || !rc.temMensalVista()) {
+      // Produto criado por API demora a propagar (varredura: o herói ficava
+      // botão morto no dia do lançamento). Re-tentativa curta cobre a folga;
+      // a terceira chance é o re-prefetch do próprio toque.
+      const flagQA = () => {
+        try {
+          return ["core-debug-loja", "core-debug-resgate-pix", "core-debug-pix-vence"]
+            .some((k) => localStorage.getItem(k) === "1");
+        } catch { return false; }
+      };
+      if (!rc.temVitalicio97()) {
         retry = window.setTimeout(async () => {
-          await rc.prefetchAssinaturas();
-          if (vivoRef.current) ler();
+          // Varredura v81: se o init falhou por rede, os prefetches fazem
+          // early-return — o retry tem que re-tentar o INIT primeiro.
+          await rc.initRevenueCat();
+          await Promise.all([rc.prefetchVitalicio(), rc.prefetchAssinaturas()]);
+          // o re-ler NÃO pode atropelar a loja forçada dos flags de QA
+          if (vivoRef.current && !flagQA()) ler();
         }, 2500);
       }
-      // QA do presente (23/08): emulador não abre folha real. Flag MANUAL de
-      // devtools (ninguém liga sem CDP/adb): força catálogo ok + abre o modal
-      // — só visual, a compra continua dependendo da loja de verdade.
+      // QA visual por flag de devtools (ninguém liga sem CDP/adb) — só
+      // aparência; a compra continua dependendo da loja de verdade.
       try {
-        if (localStorage.getItem("core-debug-gift") === "1") {
-          setLoja({ mensalVista: true, anualVista: true, anual97: true, mensalPix: true });
-          window.setTimeout(() => setOferta("resgate"), 600);
+        if (localStorage.getItem("core-debug-loja") === "1") {
+          setLoja({ vitalicio97: true, anual97: true });
         }
-        // QA visual do resgate PIX (mesmo espírito do core-debug-gift).
         if (localStorage.getItem("core-debug-resgate-pix") === "1") {
-          setLoja({ mensalVista: true, anualVista: true, anual97: true, mensalPix: true });
+          setLoja({ vitalicio97: true, anual97: true });
           setResgatePix(true);
+        }
+        if (localStorage.getItem("core-debug-pix-vence") === "1") {
+          setLoja({ vitalicio97: true, anual97: true });
+          setPixVencendo(true);
         }
       } catch { /* noop */ }
     })();
@@ -144,31 +164,11 @@ export function PaywallAssinatura({
     return () => {
       vivoRef.current = false;
       if (retry) window.clearTimeout(retry);
-      if (giftTimer.current) window.clearTimeout(giftTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const giftJaFoi = (): boolean => {
-    try { return sessionStorage.getItem(GIFT_VISTO_SESSAO) === "1"; } catch { return false; }
-  };
-
-  /** Agenda a caixa de presente (pop do Me+, 450ms depois da recusa).
-   *  Segura o CTA travado até o modal abrir — a varredura pegou a corrida:
-   *  re-toque na janela reabria a folha e queimava o degrau sem ninguém ver. */
-  const abrirResgate = (origem: string): boolean => {
-    if (giftJaFoi() || !loja.mensalPix) return false;
-    giftTimer.current = window.setTimeout(() => {
-      if (!vivoRef.current) return;
-      try { sessionStorage.setItem(GIFT_VISTO_SESSAO, "1"); } catch { /* noop */ }
-      setOferta("resgate");
-      setComprando(false);
-      trackEvent("app_downsell_view", { plano: "mensal_pix", de: "anual_97", origem, contexto });
-    }, 450);
-    return true;
-  };
-
-  /** "Já paguei — atualizar" (barra E modal). Varredura, invariantes 3+4: o
+  /** "Já paguei — atualizar" (barra e avisos). Varredura, invariantes 3+4: o
    *  comprador ANÔNIMO (fluxo padrão — conta nasce depois) caía num botão
    *  morto: sincronizarAssinatura exige sessão e devolvia false sempre. Sem
    *  conta, a prova de pagamento é a PRÓPRIA loja (restaurar/compra local). */
@@ -180,7 +180,13 @@ export function PaywallAssinatura({
       const rc = await import("@/lib/revenuecat");
       const restaurou = await rc.restaurar();
       if (!user) {
-        const pagouLocal = restaurou || (await rc.compraAssinaturaLocal());
+        // Varredura v81: o herói agora é compra ÚNICA (INAPP) — ela mora em
+        // nonSubscriptionTransactions (compraVitaliciaLocal), NUNCA em
+        // activeSubscriptions (compraAssinaturaLocal). As duas provas locais,
+        // senão o "Já paguei" fica cego pra quem acabou de pagar o vitalício.
+        const pagouLocal = restaurou
+          || (await rc.compraVitaliciaLocal())
+          || (await rc.compraAssinaturaLocal());
         if (pagouLocal) {
           void cancelarResgateDoPlano();
           void cancelarReguaDoTeste();
@@ -212,7 +218,9 @@ export function PaywallAssinatura({
     setErro(null);
     setPendente(false);
     setResgatePix(false);
-    trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto, oferta });
+    setPixVencendo(false);
+    trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto });
+    const t0 = Date.now();
     const rc = await import("@/lib/revenuecat");
     const ok = await fn();
     if (ok) {
@@ -230,25 +238,29 @@ export function PaywallAssinatura({
       setPendente(true);
     } else if (motivo === "cancelou") {
       cancelamentos.current += 1;
-      /* ESCADA v80 (raio-x 26/08). A 1ª recusa NÃO é objeção de preço — é a
-       * folha pedindo cartão pra quem paga com Pix (mediana 4,7s pra fechar,
-       * zero troca de plano, 19,90 fez 0/168). Então o 1º degrau vira o
-       * resgate PIX: ensina que a MESMA folha aceita Pix e reabre. O degrau
-       * de preço (19,90 na caixa de presente) desce pra 2ª recusa. Cada
-       * degrau uma vez, sempre por recusa REAL na folha do Google. */
-      const folhaPrepaga = plano === "anual" || loja.mensalVista;
-      if (cancelamentos.current === 1 && oferta === "cheia" && folhaPrepaga) {
+      /* Tempo DENTRO da folha, não desde o toque (varredura v81): o t0 do
+       * toque ainda paga import + garantirPronto + prefetch; o carimbo do
+       * revenuecat.ts nasce imediatamente antes do purchase*. */
+      const abriu = rc.inicioUltimaFolha() ?? t0;
+      const segundosNaFolha = (Date.now() - abriu) / 1000;
+      /* ESCADA v81 — só de MÉTODO, nunca de preço (0/224 trocaram de plano;
+       * 19,90 fez 0/168). Recusa rápida = fechou no "Processando"/tela branca
+       * → resgate PIX reabre (a 2ª folha abre na hora, serviço quente).
+       * Recusa após 30s+ = trabalhou na folha, provável código Pix gerado —
+       * que VENCE EM 5 MINUTOS → o aviso corre atrás. Cada caixa uma vez
+       * (a do Pix vencendo com guarda própria, senão re-arma a cada recusa). */
+      if (segundosNaFolha >= 30 && !pixVencendoJaFoi.current) {
+        pixVencendoJaFoi.current = true;
+        setPixVencendo(true);
+        trackEvent("app_pix_vencendo_view", { contexto, produto, seg: Math.round(segundosNaFolha) });
+      } else if (segundosNaFolha < 30 && cancelamentos.current === 1) {
         setResgatePix(true);
         trackEvent("app_resgate_pix_view", { contexto, produto });
-      } else if (oferta === "cheia" && abrirResgate("cancelou_folha")) {
-        return; // CTA fica travado até o modal abrir (o timer solta)
-      } else if (cancelamentos.current >= 2) {
-        trackEvent("app_resgate_view", { contexto });
       }
     } else if (motivo === "produto_ausente") {
       // Varredura: a mensagem antiga mandava ATUALIZAR o app — falso no dia
-      // do lançamento (o v76 É a versão nova; o que falta é o catálogo
-      // propagar). O toque seguinte re-prefetcha sozinho.
+      // do lançamento (o que falta é o catálogo propagar). O toque seguinte
+      // re-prefetcha sozinho.
       setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
     } else if (motivo === "catalogo") {
       setErro("Atualize o CORE na Play Store pra continuar — esta versão ficou sem o catálogo.");
@@ -259,15 +271,29 @@ export function PaywallAssinatura({
   };
 
   const selo = (() => {
-    if (contexto === "planos") return "Escolha seu plano";
+    if (contexto === "planos") return "Seu acesso";
     if (d3 || teste.fase === "expirado") return "Seu teste terminou";
     return "Último passo";
   })();
   const titulo = contexto === "funil" ? "Seu plano tá pronto" : "Sua vida inteira organizada";
 
-  const compraAtual = plano === "anual"
-    ? { fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnual97(), id: APP_PRECOS.anual97.id, cta: <>Continuar <ArrowRight className="w-4 h-4" /></>, legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática` }
-    : { fn: (rc: typeof import("@/lib/revenuecat")) => (loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true })), id: loja.mensalVista ? APP_PRECOS.mensalVista.id : APP_PRECOS.mensal.id, cta: <>Continuar <ArrowRight className="w-4 h-4" /></>, legal: `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}` };
+  /* Herói vitalício por padrão (null = loja ainda não respondeu); só rebaixa
+   * pro anual97 com resposta NEGATIVA do catálogo — provado, mesma folha,
+   * mesmo preço. A promessa muda JUNTO com o produto (regra de ouro). */
+  const vitalicio = loja.vitalicio97 !== false;
+  const compraAtual = vitalicio
+    ? {
+        fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarVitalicio("core_vitalicio_97"),
+        id: APP_PRECOS.vitalicio97.id,
+        cta: <>Quero pra sempre <ArrowRight className="w-4 h-4" /></>,
+        legal: `${APP_PRECOS.vitalicio97.preco} · pagamento único pelo Google Play · Pix ou cartão · sem renovação`,
+      }
+    : {
+        fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnual97(),
+        id: APP_PRECOS.anual97.id,
+        cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
+        legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática`,
+      };
 
   const barraFixa = contexto !== "planos";
 
@@ -285,17 +311,17 @@ export function PaywallAssinatura({
     </div>
   );
 
-  /* Resgate PIX (1ª recusa da folha). A pessoa acabou de fechar a folha
-   * achando que era cartão-only — a caixa aparece SOZINHA onde o dedo dela
-   * está (regra: prêmio persegue a pessoa, zero fricção) e reabre a MESMA
-   * folha, agora sabendo o que procurar. */
+  /* Resgate PIX (1ª recusa rápida). A pessoa fechou a folha no carregamento
+   * achando que travou (ou que era só cartão) — a caixa aparece SOZINHA onde
+   * o dedo está (prêmio persegue a pessoa, zero fricção) e reabre a MESMA
+   * folha, que na segunda vez abre na hora. */
   const caixaResgatePix = (
     <div className="rounded-xl bg-[#e5f6f3] border border-[#b9e6df] text-[#0b6d62] text-[12.5px] leading-snug p-3 mb-2.5">
       <b className="flex items-center gap-1.5 mb-0.5">
         <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden />
         Prefere pagar no Pix?
       </b>
-      A tela do Google aceita Pix: toca de novo, escolhe <b>Pix</b> na lista e copia o código.
+      Toca de novo — <b>agora a tela abre na hora</b> — e escolhe <b>Pix</b> na lista.
       Pagou, o acesso libera sozinho.
       <button
         className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
@@ -311,9 +337,27 @@ export function PaywallAssinatura({
     </div>
   );
 
+  /* Recusa depois de 30s+ DENTRO da folha: provável código Pix gerado — e o
+   * código do Google vence em 5 minutos. Quem foi pro app do banco e voltou
+   * encontra o caminho de conclusão, não um paywall mudo. */
+  const caixaPixVencendo = (
+    <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12.5px] leading-snug p-3 mb-2.5">
+      <b>Gerou o código Pix?</b> Ele vence em 5 minutos — paga agora no app do teu banco
+      que o acesso libera sozinho aqui.
+      <button
+        className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
+        disabled={conferindo}
+        onClick={() => void confirmarPagamento()}
+      >
+        {conferindo ? "Conferindo…" : "Já paguei — atualizar"}
+      </button>
+    </div>
+  );
+
   const blocoAcao = (
     <>
-      {resgatePix && !pendente && caixaResgatePix}
+      {pixVencendo && !pendente && caixaPixVencendo}
+      {resgatePix && !pendente && !pixVencendo && caixaResgatePix}
       {pendente && caixaPendente}
       {erro && <p className="text-[12.5px] text-destructive text-center mb-2">{erro}</p>}
 
@@ -321,14 +365,13 @@ export function PaywallAssinatura({
         <span className="text-[#f0a500]">★★★★★</span> <b className="text-foreground">+1000 pessoas</b>
         {" · "}
         <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
-          <Check className="w-3.5 h-3.5 inline" strokeWidth={3} /> acesso na hora
+          <Check className="w-3.5 h-3.5 inline" strokeWidth={3} /> {pendente ? "libera após o pagamento" : "acesso na hora"}
         </span>
       </p>
 
-      {/* PIX gritado ANTES da folha (raio-x 26/08: 95% fecham a folha em ~5s
-          achando que é cartão-only — a letrinha legal de 10px ninguém lê). Só
-          aparece quando a compra atual é pré-paga (folha com Pix de verdade). */}
-      {!resgatePix && (plano === "anual" || loja.mensalVista) && (
+      {/* PIX gritado ANTES da folha (79% fecham no carregamento achando que é
+          cartão-only — a letrinha legal de 10px ninguém lê). */}
+      {!resgatePix && !pixVencendo && (
         <p className="flex items-center justify-center gap-1.5 mb-2 text-[12px] font-semibold text-muted-foreground">
           <span className="inline-flex items-center gap-1 rounded-md bg-[#e5f6f3] text-[#0e8577] px-1.5 py-[2px] text-[11px] font-black tracking-wide">
             <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden /> PIX
@@ -339,7 +382,7 @@ export function PaywallAssinatura({
 
       <Button
         size="lg"
-        className="w-full min-h-[54px] rounded-full text-base font-extrabold bg-[#16121c] hover:bg-[#16121c]/90 text-white shadow-[0_18px_38px_-10px_rgba(22,18,28,.5)]"
+        className="w-full min-h-[54px] rounded-full text-base font-extrabold bg-[#16121c] hover:bg-[#16121c]/90 text-white shadow-[0_18px_38px_-10px_rgba(22,18,28,.5)] dark:ring-1 dark:ring-white/25"
         disabled={comprando}
         onClick={async () => {
           const rc = await import("@/lib/revenuecat");
@@ -348,7 +391,13 @@ export function PaywallAssinatura({
       >
         {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : compraAtual.cta}
       </Button>
-      <p className="text-[10.5px] text-muted-foreground text-center mt-1.5">{compraAtual.legal}</p>
+      {/* A ESPERA, armada antes do toque: a folha do Google leva 15-25s num
+          aparelho popular e 79% desistiam achando que travou. Quem sabe o que
+          vem, espera. */}
+      <p className="text-[10.5px] text-muted-foreground text-center mt-1.5">
+        a tela de pagamento do Google leva uns segundos pra abrir — <b>não fecha o app</b>
+      </p>
+      <p className="text-[10.5px] text-muted-foreground/80 text-center mt-0.5">{compraAtual.legal}</p>
     </>
   );
 
@@ -368,8 +417,6 @@ export function PaywallAssinatura({
         <button
           aria-label="Fechar"
           onClick={() => {
-            // 1º X da sessão = caixa de presente (Me+); depois disso, fecha.
-            if (oferta === "cheia" && abrirResgate("x_planos")) return;
             trackEvent("app_sheet_close", { via: "x", contexto });
             onFechar();
           }}
@@ -386,68 +433,59 @@ export function PaywallAssinatura({
         <h2 className="text-[25px] [@media(max-height:700px)]:text-[22px] font-bold tracking-tight leading-[1.15]">{titulo}</h2>
       </div>
 
-        <>
-          {/* Recap (endowment) — só fora do funil: no funil o compromisso
-              acabou de acontecer (resultado → "Claro!" ×3 → contrato). */}
-          {contexto !== "funil" && !(contexto === "planos" && teste.fase === "nunca") && (
-            <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5 mb-3">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-black/45 mb-2">
-                O que você construiu
-              </div>
-              {recap.map((r) => (
-                <div key={r} className="flex items-center gap-2.5 text-[13px] font-semibold py-0.5">
-                  <span className="min-w-[18px] min-h-[18px] rounded-full bg-emerald-500 text-white grid place-items-center shrink-0">
-                    <Check className="w-3 h-3" strokeWidth={3.5} />
-                  </span>
-                  {r}
-                </div>
-              ))}
+      {/* Recap (endowment) — só fora do funil: no funil o compromisso
+          acabou de acontecer (resultado → "Claro!" ×3 → contrato). */}
+      {contexto !== "funil" && !(contexto === "planos" && teste.fase === "nunca") && (
+        <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5 mb-3">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-black/45 mb-2">
+            O que você construiu
+          </div>
+          {recap.map((r) => (
+            <div key={r} className="flex items-center gap-2.5 text-[13px] font-semibold py-0.5">
+              <span className="min-w-[18px] min-h-[18px] rounded-full bg-emerald-500 text-white grid place-items-center shrink-0">
+                <Check className="w-3 h-3" strokeWidth={3.5} />
+              </span>
+              {r}
             </div>
-          )}
+          ))}
+        </div>
+      )}
 
-          {/* O que entra: eco da grade viva da welcome — os 16 módulos na
-              hora do preço, sem gastar altura (uma fileira só). */}
-          <div className="flex justify-center gap-1.5 mb-3">
-            {([["💰", "#fdeccb"], ["📅", "#cdeeee"], ["💪", "#d9e4fb"], ["🥗", "#d7f0dd"], ["🎯", "#e6def8"], ["❤️", "#fbd8e8"], ["🧠", "#dcf3d2"]] as Array<[string, string]>).map(([e, c]) => (
-              <span key={e} className="w-8 h-8 rounded-[10px] grid place-items-center text-[15px]" style={{ background: c }}>{e}</span>
-            ))}
-            <span className="w-8 h-8 rounded-[10px] grid place-items-center text-[10px] font-black bg-black/[0.06] text-black/50 dark:bg-white/10 dark:text-white/60">+9</span>
-          </div>
+      {/* O que entra: eco da grade viva da welcome — os 16 módulos na
+          hora do preço, sem gastar altura (uma fileira só). */}
+      <div className="flex justify-center gap-1.5 mb-3">
+        {([["💰", "#fdeccb"], ["📅", "#cdeeee"], ["💪", "#d9e4fb"], ["🥗", "#d7f0dd"], ["🎯", "#e6def8"], ["❤️", "#fbd8e8"], ["🧠", "#dcf3d2"]] as Array<[string, string]>).map(([e, c]) => (
+          <span key={e} className="w-8 h-8 rounded-[10px] grid place-items-center text-[15px]" style={{ background: c }}>{e}</span>
+        ))}
+        <span className="w-8 h-8 rounded-[10px] grid place-items-center text-[10px] font-black bg-black/[0.06] text-black/50 dark:bg-white/10 dark:text-white/60">+9</span>
+      </div>
 
-          {/* CARDS-COLUNA (anatomia do Me+). bg-white é PROPOSITAL nos dois
-              temas → cor de texto explícita (varredura: dark mode virava
-              branco no branco). Seleção fala UMA cor: rosa (dono, 23/08). */}
-          <div className="grid grid-cols-2 gap-2.5 mb-1 items-stretch">
-            <button
-              onClick={() => setPlano("mensal")}
-              className={`rounded-2xl border-2 overflow-hidden transition-all flex flex-col text-center ${plano === "mensal" ? "border-accent shadow-[0_12px_28px_-14px_rgba(0,0,0,.35)]" : "border-border"} bg-white text-[#16121c]`}
-            >
-              <span className="h-[26px]" aria-hidden />
-              <span className="text-[34px] font-black leading-none">1</span>
-              <span className="text-[13px] font-bold text-black/45">mês</span>
-              <span className="text-[15px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
-              <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
-              <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-                {loja.mensalVista ? "renova só se você quiser" : "cancele quando quiser"}
-              </span>
-            </button>
-            <button
-              onClick={() => setPlano("anual")}
-              className={`rounded-2xl border-2 overflow-hidden transition-all flex flex-col text-center ${plano === "anual" ? "border-accent shadow-[0_14px_30px_-14px_rgba(0,0,0,.4)]" : "border-border"} bg-white text-[#16121c]`}
-            >
-              <span className={`text-[10px] font-extrabold tracking-wide py-1 ${plano === "anual" ? "bg-accent text-white" : "bg-accent/10 text-accent"}`}>
-                MELHOR PREÇO
-              </span>
-              <span className="text-[34px] font-black leading-none mt-1">12</span>
-              <span className="text-[13px] font-bold text-black/45">meses</span>
-              <span className="text-[15px] font-extrabold mt-2">{APP_PRECOS.anual97.porMes}<small className="text-[10px] font-bold text-black/45">/mês</small></span>
-              <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
-              <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-                {APP_PRECOS.anual97.preco} por 1 ano<br />economiza {APP_PRECOS.anual97.economia}
-              </span>
-            </button>
-          </div>
-        </>
+      {/* ÂNCORA honesta acima do herói: o custo real de assinar pra sempre.
+          Não é botão — é régua. (0/224 trocaram de plano; escolha era teatro.) */}
+      <p className="text-center text-[12px] text-muted-foreground mb-2">
+        assinar por mês sairia <span className="line-through decoration-[#e0654a] decoration-2 font-semibold">R$ 298/ano, pra sempre</span>
+      </p>
+
+      {/* HERÓI ÚNICO (bg-white PROPOSITAL nos dois temas → cor de texto
+          explícita; varredura: dark mode virava branco no branco). */}
+      <div className="rounded-2xl border-2 border-accent overflow-hidden text-center bg-white text-[#16121c] shadow-[0_14px_30px_-14px_rgba(0,0,0,.4)] mb-1">
+        <div className="bg-accent text-white text-[10px] font-extrabold tracking-wide py-1">
+          {vitalicio ? "ACESSO VITALÍCIO — PAGA UMA VEZ" : "MELHOR PREÇO — 12 MESES"}
+        </div>
+        <div className="text-[27px] font-black leading-none mt-3 tracking-tight">
+          {vitalicio ? "Seu pra sempre" : "1 ano de CORE"}
+        </div>
+        <div className="text-[19px] font-extrabold mt-2">
+          {(vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
+          <small className="text-[11px] font-bold text-black/45"> · {vitalicio ? "uma única vez" : "R$ 8,16/mês"}</small>
+        </div>
+        <div className="mx-6 my-2.5 border-t border-black/10" aria-hidden />
+        <div className="text-[11.5px] font-semibold text-black/55 pb-3.5 px-5 leading-snug">
+          {vitalicio
+            ? <>Os 16 módulos e tudo que a gente lançar depois. <b>Sem assinatura, sem renovação, sem mensalidade.</b></>
+            : <>Acesso completo aos 16 módulos por 12 meses — sem renovação automática.</>}
+        </div>
+      </div>
 
       {teste.fase === "ativo" && !d3 && contexto !== "planos" && (
         <button
@@ -469,7 +507,10 @@ export function PaywallAssinatura({
 
       {barraFixa ? (
         <>
-          <div className={pendente || erro || resgatePix ? "h-[276px]" : "h-[172px]"} aria-hidden />
+          {/* Varredura v81: a barra real mede ~250-270px no estado base (as
+              linhas de espera+legal quebram em 2 em tela de 360px) — spacer
+              menor deixava a barra COBRINDO o fim do conteúdo. */}
+          <div className={pendente || erro || resgatePix || pixVencendo ? "h-[376px]" : "h-[272px]"} aria-hidden />
           <div className="fixed bottom-0 inset-x-0 z-[60] pointer-events-none">
             <div className="max-w-sm mx-auto px-5 pb-3 pt-9 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-auto">
               {blocoAcao}
@@ -496,107 +537,6 @@ export function PaywallAssinatura({
         </>
       ) : (
         blocoAcao
-      )}
-
-      {/* ══ CAIXA DE PRESENTE (modal do Me+, f092/f108): bottom sheet POR CIMA
-          do paywall, preço riscado → card de moldura amarela "Melhor oferta",
-          CTA preto. Números honestos: R$ 62 OFF (não "50%"). ══ */}
-      {oferta === "resgate" && (
-        <div className="fixed inset-0 z-[70]">
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="absolute inset-0 bg-black/55"
-            onClick={() => { setOferta("cheia"); trackEvent("app_gift_recusado", { via: "fundo", contexto }); }}
-          />
-          <motion.div
-            initial={{ y: "100%" }} animate={{ y: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="absolute inset-x-0 bottom-0 rounded-t-[28px] overflow-hidden"
-            style={{ background: "linear-gradient(178deg, hsl(330 65% 46%) 0%, hsl(330 62% 36%) 100%)" }}
-          >
-            <div className="max-w-sm mx-auto px-5 pt-7 pb-4 relative text-white">
-              <button
-                aria-label="Fechar oferta"
-                onClick={() => { setOferta("cheia"); trackEvent("app_gift_recusado", { via: "x", contexto }); }}
-                className="absolute right-4 top-4 w-8 h-8 rounded-full bg-white/15 grid place-items-center"
-              >
-                <X className="w-4 h-4" strokeWidth={2.5} />
-              </button>
-              <div className="text-center">
-                <motion.div
-                  initial={{ scale: 0.7, rotate: -6, opacity: 0 }} animate={{ scale: 1, rotate: -2, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 15, delay: 0.1 }}
-                  className="inline-block bg-white text-[#16121c] font-black italic text-[21px] tracking-tight px-4 py-1 rounded-lg shadow-[0_8px_20px_rgba(0,0,0,.25)]"
-                >
-                  OFERTA ESPECIAL
-                </motion.div>
-                <p className="text-[12.5px] font-semibold text-white/85 mt-2">
-                  Só nesta tela · comece por 30 dias, sem assinatura
-                </p>
-              </div>
-
-              <div className="flex items-center justify-center gap-2 mt-4">
-                <div className="rounded-2xl bg-white/95 text-[#16121c] px-3 py-3 text-center w-[118px]">
-                  <div className="text-[21px] font-black leading-none">1</div>
-                  <div className="text-[10.5px] font-bold text-black/45">mês</div>
-                  <div className="text-[13.5px] font-extrabold mt-1 line-through decoration-[#e0654a] decoration-2">{APP_PRECOS.mensal.preco}</div>
-                  <div className="text-[10px] font-semibold text-black/40">por mês</div>
-                </div>
-                <ArrowRight className="w-6 h-6 text-[#ffd84d] shrink-0" strokeWidth={3} />
-                <div className="rounded-2xl bg-[#ffd84d] p-1.5 w-[132px] shadow-[0_14px_30px_-10px_rgba(0,0,0,.35)]">
-                  <div className="text-center text-[11px] font-black text-[#16121c] pb-1">Melhor oferta</div>
-                  <div className="rounded-xl bg-white text-[#16121c] px-3 py-2.5 text-center">
-                    <div className="text-[21px] font-black leading-none">1</div>
-                    <div className="text-[10.5px] font-bold text-black/45">mês</div>
-                    <div className="text-[15px] font-extrabold mt-1">{APP_PRECOS.mensalPix.preco}</div>
-                    <div className="text-[10px] font-semibold text-black/40">à vista</div>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-center text-[13px] font-bold mt-4 leading-snug">
-                Total de {APP_PRECOS.mensalPix.preco} por 30 dias — pagamento único, sem renovação.
-              </p>
-
-              {/* Varredura: pendente/erro tinham que existir DENTRO do modal —
-                  a barra (z-60) fica soterrada pelo backdrop (z-70). */}
-              {pendente && (
-                <div className="rounded-xl bg-white/15 text-[12px] leading-snug p-2.5 mt-2.5 text-center">
-                  <b>Pagamento em processamento.</b> Gerou um Pix? Paga no app do banco.
-                  <button
-                    className="block w-full text-center font-bold underline underline-offset-2 mt-1 disabled:opacity-50"
-                    disabled={conferindo}
-                    onClick={() => void confirmarPagamento()}
-                  >
-                    {conferindo ? "Conferindo…" : "Já paguei — atualizar"}
-                  </button>
-                </div>
-              )}
-              {erro && <p className="text-[12px] text-[#ffd84d] text-center mt-2">{erro}</p>}
-
-              <Button
-                size="lg"
-                className="w-full min-h-[52px] rounded-full text-[15.5px] font-extrabold bg-[#16121c] hover:bg-[#16121c]/90 text-white mt-3.5"
-                disabled={comprando}
-                onClick={async () => {
-                  const rc = await import("@/lib/revenuecat");
-                  void pagou(() => rc.comprarMensalPix(), APP_PRECOS.mensalPix.id);
-                }}
-              >
-                {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Continuar <ArrowRight className="w-4 h-4" /></>}
-              </Button>
-              <p className="text-[10px] text-white/70 text-center mt-1.5">
-                Pagamento único pelo Google Play · 30 dias de acesso · Pix ou cartão
-              </p>
-              <button
-                onClick={() => { setOferta("cheia"); trackEvent("app_gift_recusado", { via: "agora_nao", contexto }); }}
-                className="w-full text-center text-[12px] text-white/70 mt-1 py-1.5"
-              >
-                Agora não
-              </button>
-            </div>
-          </motion.div>
-        </div>
       )}
     </div>
   );

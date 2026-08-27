@@ -238,6 +238,14 @@ export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "se
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 
+/** Quando a FOLHA do Google foi aberta de verdade (varredura v81): medir "tempo
+ *  na folha" a partir do toque no CTA mentia — o toque ainda paga import,
+ *  garantirPronto (que pode re-rodar o init na rede) e prefetch. O carimbo
+ *  nasce imediatamente antes do purchase*; a escada do paywall usa ele pra
+ *  separar "fechou no Processando" de "trabalhou na folha". */
+let folhaAbertaEm: number | null = null;
+export const inicioUltimaFolha = (): number | null => folhaAbertaEm;
+
 /** Corrida do boot (raio-x de 26/08): toques em comprar morriam com
  *  "rc_sem_chave" porque o init ainda não tinha terminado (ou falhou por rede)
  *  quando o dedo chegou no botão. O toque é o momento de MAIOR intenção do
@@ -307,6 +315,7 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
     }
     const escolhida = comTrial ?? baseSemTrial;
     if (escolhida) {
+      folhaAbertaEm = Date.now();
       await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({
         subscriptionOption: escolhida as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
       });
@@ -476,6 +485,7 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
       preco: produto?.priceString ?? null,
       prepago: true,
     });
+    folhaAbertaEm = Date.now();
     await Purchases.purchaseStoreProduct({ product: produto });
     await sincronizarAssinatura();
     return true;
@@ -540,11 +550,13 @@ export async function compraAssinaturaLocal(): Promise<boolean> {
 type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct;
 // 09/08: virou dois produtos (27,90 cheio + 19,90 downsell) — o cache é por
 // id e a pré-busca traz os dois numa ida só à Play.
-const IDS_VITALICIOS = ["core_vitalicio", "core_vitalicio_19"] as const;
+// 27/08 (v81): terceiro irmão, core_vitalicio_97 — o vitalício vira a oferta
+// única do paywall. Mesma família = herda todas as guardas startsWith.
+const IDS_VITALICIOS = ["core_vitalicio", "core_vitalicio_19", "core_vitalicio_97"] as const;
 export type IdVitalicio = (typeof IDS_VITALICIOS)[number];
 const produtosVitalicios: Partial<Record<IdVitalicio, ProdutoRC>> = {};
 export async function prefetchVitalicio(): Promise<void> {
-  if (produtosVitalicios.core_vitalicio && produtosVitalicios.core_vitalicio_19) return;
+  if (IDS_VITALICIOS.every((i) => produtosVitalicios[i])) return;
   if (estado !== "pronto" || !Purchases) return;
   try {
     const mod = await import("@revenuecat/purchases-capacitor");
@@ -561,6 +573,10 @@ export async function prefetchVitalicio(): Promise<void> {
   }
 }
 
+/** Vitalício 97,90 no catálogo? (regra do botão-nunca-morto: a vitrine só
+ *  promete o que a loja carregou; enquanto propaga, fallback no anual97.) */
+export const temVitalicio97 = (): boolean => !!produtosVitalicios.core_vitalicio_97;
+
 export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"): Promise<boolean> {
   ultimoMotivo = null;
   if (!(await garantirPronto())) {
@@ -576,6 +592,7 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
       trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: produtoId });
       return false;
     }
+    folhaAbertaEm = Date.now();
     await Purchases.purchaseStoreProduct({ product: produto });
     // Dinheiro saiu. Sincroniza já pra pessoa entrar na hora; se o sync
     // atrasar, webhook e reconciliarSePreciso completam.

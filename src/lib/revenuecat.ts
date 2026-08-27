@@ -238,11 +238,21 @@ export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "se
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
 
+/** Corrida do boot (raio-x de 26/08): toques em comprar morriam com
+ *  "rc_sem_chave" porque o init ainda não tinha terminado (ou falhou por rede)
+ *  quando o dedo chegou no botão. O toque é o momento de MAIOR intenção do
+ *  funil — aqui se tenta inicializar DE NOVO em vez de desistir. */
+async function garantirPronto(): Promise<boolean> {
+  if (estado === "pronto" && Purchases) return true;
+  try { await initRevenueCat(); } catch { /* estado fica como estiver */ }
+  return estado === "pronto" && !!Purchases;
+}
+
 export async function comprar(productId: string, opts?: { semTrial?: boolean }): Promise<boolean> {
   ultimoMotivo = null;
-  if (estado !== "pronto" || !Purchases) {
+  if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: productId });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: productId, retentou: true });
     return false;
   }
   try {
@@ -442,9 +452,9 @@ export const temAnual97 = (): boolean => !!produtosPrepagos[ID_ANUAL_97];
 
 async function comprarPrepago(id: IdPrepago): Promise<boolean> {
   ultimoMotivo = null;
-  if (estado !== "pronto" || !Purchases) {
+  if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: id });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: id, retentou: true });
     return false;
   }
   try {
@@ -553,9 +563,9 @@ export async function prefetchVitalicio(): Promise<void> {
 
 export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"): Promise<boolean> {
   ultimoMotivo = null;
-  if (estado !== "pronto" || !Purchases) {
+  if (!(await garantirPronto())) {
     ultimoMotivo = "catalogo";
-    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: produtoId });
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: produtoId, retentou: true });
     return false;
   }
   try {

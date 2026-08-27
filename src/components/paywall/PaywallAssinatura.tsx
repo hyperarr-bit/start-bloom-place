@@ -292,7 +292,7 @@ export function PaywallAssinatura({
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarVitalicio("core_vitalicio_97"),
         id: APP_PRECOS.vitalicio97.id,
         cta: <>Quero pra sempre <ArrowRight className="w-4 h-4" /></>,
-        legal: `${APP_PRECOS.vitalicio97.preco} · pagamento único pelo Google Play · Pix ou cartão · sem renovação`,
+        legal: `${APP_PRECOS.vitalicio97.preco} · acesso vitalício · pagamento único pelo Google Play · Pix ou cartão`,
       }
     : {
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnual97(),
@@ -510,7 +510,7 @@ export function PaywallAssinatura({
           <span className="text-[16px] font-extrabold mt-1.5">
             {(vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
           </span>
-          <span className="text-[10px] font-semibold text-black/40">{vitalicio ? "uma única vez" : "R$ 8,16/mês"}</span>
+          <span className="text-[10px] font-semibold text-black/40">{vitalicio ? "vitalício · uma única vez" : "R$ 8,16/mês"}</span>
           <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
             {vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}

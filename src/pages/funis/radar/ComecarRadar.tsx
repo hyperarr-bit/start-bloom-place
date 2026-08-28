@@ -1149,6 +1149,46 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
         )}
       </form>
       <div className="mt-5"><TrustRow posCompra={posCompra} /></div>
+      {posCompra && <ComoPagou />}
+    </div>
+  );
+}
+
+/* COMO VOCÊ PAGOU? (28/08) — o Google não expõe o meio de pagamento em
+ * NENHUMA API (o vendedor legal é ele; o instrumento é dado financeiro do
+ * comprador com o Google — não vem no CSV do Console, nem na Developer API,
+ * nem no RevenueCat). O único caminho direto é perguntar. 1 toque, opcional,
+ * e SÓ pós-compra: a decisão de dinheiro já acabou, ninguém desiste aqui.
+ * O evento app_pagou_como é a única fonte DIRETA de mix Pix×cartão que
+ * existe — a outra é inferência por tempo de folha. */
+function ComoPagou() {
+  const [estado, setEstado] = useState<"pergunta" | "obrigado" | "oculto">(() => {
+    try { return localStorage.getItem("core-como-pagou") ? "oculto" : "pergunta"; } catch { return "pergunta"; }
+  });
+  if (estado === "oculto") return null;
+  if (estado === "obrigado") {
+    return <p className="mt-4 text-center text-[12.5px] font-semibold text-emerald-700">Valeu! 🙌</p>;
+  }
+  const marcar = (metodo: string) => () => {
+    trackEvent("app_pagou_como", { metodo });
+    try { localStorage.setItem("core-como-pagou", metodo); } catch { /* noop */ }
+    setEstado("obrigado");
+  };
+  return (
+    <div className="mt-4 rounded-xl border border-border p-3 text-center">
+      <p className="text-[12px] text-muted-foreground mb-2">Rapidinho: como você pagou?</p>
+      <div className="flex justify-center gap-2">
+        {([["pix", "Pix"], ["cartao", "Cartão"], ["saldo", "Saldo Google"]] as Array<[string, string]>).map(([v, r]) => (
+          <button
+            key={v}
+            type="button"
+            onClick={marcar(v)}
+            className="px-3.5 py-1.5 rounded-full border border-border text-[12.5px] font-semibold active:scale-95 transition-transform"
+          >
+            {r}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -64,11 +64,14 @@ export const DOOR_AREAS: AreaKey[] = ["dinheiro", "rotina", "corpo", "metas"];
 
 /** Os módulos da demo curada (os 5 do criativo + Metas). */
 export const DEMO_MODULES: Array<{ key: string; emoji: string; label: string }> = [
-  { key: "rotina", emoji: "📅", label: "Rotina" },
+  /* Ordem = USO REAL (module_analytics, 30d, 28/08): finanças é o nº 1
+     disparado — 910 usuários · 19,0 mil visitas · 1.060h, vs 673 · 7,2 mil ·
+     662h da rotina. Os 6 da barra são exatamente o top 6 de uso. */
   /* 💰 e não 💸 (05/08): a arte do money-with-wings na fonte de emoji do
      Android 10 é dominada pelas ASAS BRANCAS — na pill pequena vira uma
      mancha branca ("parece uma flor", dono, olhando a barra do tour). */
   { key: "financas", emoji: "💰", label: "Finanças" },
+  { key: "rotina", emoji: "📅", label: "Rotina" },
   { key: "treino", emoji: "💪", label: "Treino" },
   { key: "dieta", emoji: "🥗", label: "Dieta" },
   { key: "saude", emoji: "❤️", label: "Saúde" },

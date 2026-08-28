@@ -598,22 +598,19 @@ export function PaywallAssinatura({
           leitura — prova REAL (feedbacks do Instagram, curadoria do dono,
           os mesmos do funil web) + segurança da compra. Só no funil, onde
           o recap sozinho não bastava. ══ */}
+      {/* v83.1 (dono: "muita informação"): UM depoimento só — o mais forte,
+          cobre finanças+rotina, os dois perfis que mais convertem. */}
       {contexto === "funil" && (
         <div className="mt-3 space-y-2">
-          {([
-            ["“Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”", "João P. — 24 anos · Campinas, SP", "JP", "#d9e4fb"],
-            ["“A tela inicial personalizada foi o que mais me conquistou. Não preciso abrir cinco aplicativos diferentes durante o dia.”", "Amanda L. — 21 anos · Fortaleza, CE", "AL", "#fbd8e8"],
-          ] as Array<[string, string, string, string]>).map(([txt, quem, ini, cor]) => (
-            <div key={ini} className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5">
-              <p className="text-[12.5px] leading-relaxed">{txt}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: cor }}>{ini}</span>
-                <p className="text-[11px] text-black/50 font-semibold">{quem} <span className="text-[#f0a500]">★★★★★</span></p>
-              </div>
+          <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5">
+            <p className="text-[12.5px] leading-relaxed">“Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”</p>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: "#d9e4fb" }}>JP</span>
+              <p className="text-[11px] text-black/50 font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
             </div>
-          ))}
+          </div>
           <p className="text-center text-[11px] text-muted-foreground pt-0.5">
-            🔒 Compra única processada pelo Google Play · sem assinatura, sem surpresa na fatura
+            🔒 Compra única processada pelo Google Play
           </p>
         </div>
       )}

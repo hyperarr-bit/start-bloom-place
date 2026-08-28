@@ -35,6 +35,9 @@ export const PedirLembretes = ({ dueDays }: { dueDays: { day?: number; bills?: {
 
   useEffect(() => {
     if (!isNativeShell() || !loaded) return;
+    // v83.1 (dono): na DEMO do funil não se pede notificação — o funil já tem
+    // a tela própria de sininho antes; aqui viraria pedido duplicado.
+    try { if (window.location.pathname.startsWith("/preview")) return; } catch { /* noop */ }
     if (contasAbertas === 0) return;                          // nada a lembrar ainda
     if (get<string>(CHAVE_JA_PERGUNTOU, "") === "true") return;
     let vivo = true;

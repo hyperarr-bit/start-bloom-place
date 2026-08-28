@@ -235,7 +235,8 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
           onClick={() => trackEvent("funnel_click", { cta: "demo_nudge_signup", modules: count })}
           className="shrink-0 inline-flex items-center gap-1 rounded-lg bg-primary text-primary-foreground font-semibold text-[13px] px-3 py-2 hover:bg-primary/90 transition"
         >
-          Criar conta <ArrowRight className="w-3.5 h-3.5" />
+          {/* v83.1: no shell o cadastro vem DEPOIS da compra — "Criar conta" mentia */}
+          {isNativeShell() ? "Quero o meu" : "Criar conta"} <ArrowRight className="w-3.5 h-3.5" />
         </Link>
         <button onClick={dismiss} aria-label="Dispensar" className="shrink-0 -mr-1 p-1 text-muted-foreground/60 hover:text-foreground">
           <X className="w-4 h-4" />

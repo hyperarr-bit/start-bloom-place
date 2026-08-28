@@ -40,6 +40,10 @@ export const PedirLembreteRotina = ({ sequencia }: { sequencia: number }) => {
 
   useEffect(() => {
     if (!isNativeShell() || !loaded) return;
+    // v83.4 (print do dono): na DEMO do funil (/preview) a sequência de 41
+    // dias é DADO DE EXEMPLO — pedir notificação ali é queimar a única
+    // chance do Android 13+ com um turista. Mesma regra do PedirLembretes.
+    try { if (window.location.pathname.startsWith("/preview")) return; } catch { /* noop */ }
     if (sequencia < SEQUENCIA_MINIMA) return;
     if (get<string>(CHAVE_JA_PERGUNTOU, "") === "true") return;
     // já ligou o lembrete de rotina por conta própria? não tem o que oferecer

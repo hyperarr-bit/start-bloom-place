@@ -303,6 +303,24 @@ const Preview = () => {
     try { sessionStorage.setItem("core-demo-tour", String(Date.now())); } catch { /* noop */ }
   }, [tour]);
 
+  // CERCA DO SHELL (28/08): arma a guarda que devolve pro funil quem sai da
+  // demo pela seta ← dos módulos (navigate("/home") → parecia "outro funil").
+  // Quem consome é o GuardaDemoShell no App. Só no app da loja + funil.
+  useEffect(() => {
+    if (!funnel || !isNativeShell()) return;
+    try { sessionStorage.setItem("core-demo-guarda", "1"); } catch { /* noop */ }
+  }, [funnel]);
+
+  // FAIXA DA STATUS BAR (28/08, foto do dono): o guard global pinta a área do
+  // notch de BRANCO — em cima do banner roxo da demo virava um "cabeçalho"
+  // branco morto (real no celular, não artefato de emulador). Enquanto a demo
+  // está montada, a faixa veste o roxo do banner; desmontou, volta o padrão.
+  useEffect(() => {
+    if (embed) return;
+    try { document.documentElement.style.setProperty("--safe-top-cor", "#7c3aed"); } catch { /* noop */ }
+    return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
+  }, [embed]);
+
   // Nudge de fechamento: nº de módulos DISTINTOS abertos no tour (sessionStorage).
   const [nudgeCount, setNudgeCount] = useState(0);
   const nudgeFiredRef = useRef(false);

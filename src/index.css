@@ -699,7 +699,11 @@ body {
 }
 
 /* Guard fixo no topo cobre exatamente a área da status bar/notch.
-   Headers sticky ficam logo abaixo dele (top: var(--app-safe-top)). */
+   Headers sticky ficam logo abaixo dele (top: var(--app-safe-top)).
+   v83.4: a cor virou variável — tela que tem topo COLORIDO (demo roxa,
+   passos céu/grafite do funil) pinta a faixa com a própria cor via
+   --safe-top-cor; sem a variável, branco de sempre. Era a "faixa branca
+   como um cabeçalho" da foto do dono (28/08): real, não artefato. */
 .app-safe-top-guard {
   position: fixed;
   z-index: 2147483647;
@@ -708,7 +712,7 @@ body {
   right: 0;
   height: var(--app-safe-top);
   pointer-events: none;
-  background-color: hsl(var(--background));
+  background: var(--safe-top-cor, hsl(var(--background)));
 }
 
 @supports (padding: env(safe-area-inset-bottom)) {

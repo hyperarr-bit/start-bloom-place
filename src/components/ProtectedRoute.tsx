@@ -28,6 +28,16 @@ export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteP
      * conta nasce DEPOIS do pagamento, como desde a v48.
      */
     if (isNativeShell()) {
+      /* CERCA DA DEMO (28/08, provado por CDP): a seta ← dos módulos faz
+       * navigate("/home") — na demo do funil isso caía aqui e o /auth vencia
+       * a corrida contra o redirect do GuardaDemoShell (o Navigate desta
+       * árvore dispara depois e atropela). Decidindo AQUI, não há corrida:
+       * visitante da demo volta pra continuação do funil, nunca pro /auth. */
+      try {
+        if (sessionStorage.getItem("core-demo-guarda") === "1") {
+          return <Navigate to="/app?step=compromissos" replace />;
+        }
+      } catch { /* noop */ }
       const t = estadoTeste();
       if (t.fase === "ativo") return <>{children}</>;
       if (t.fase === "expirado") return <Navigate to="/app?step=offer&d3=1" replace />;

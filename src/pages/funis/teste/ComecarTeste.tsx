@@ -1084,6 +1084,14 @@ export default function ComecarTeste() {
   // Cor é código de modo (lei BitePal): céu = pergunta, grafite = emoção,
   // branco = venda/conta.
   const escura = step === "mecanismo" || step === "notif";
+  /* FAIXA DA STATUS BAR (v83.4, foto do dono): o guard global pintava a área
+   * do notch de BRANCO fixo — nos passos céu/grafite virava uma listra acesa
+   * no topo do funil inteiro. A faixa agora veste a cor do passo. */
+  useEffect(() => {
+    const cor = escura ? GRAFITE : telaCheia ? "#ffffff" : "#eaf5fd";
+    try { document.documentElement.style.setProperty("--safe-top-cor", cor); } catch { /* noop */ }
+    return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
+  }, [escura, telaCheia]);
   /* AVALIAÇÃO NO PICO — MORTA EM 28/08, desta vez com número: 985 pedidos em
    * 48h (691 só em 28/08), TODOS pra quem nunca tinha usado o app, e ~1
    * avaliação nova na Play. A aposta BitePal não segurou aqui — o nosso
@@ -1103,6 +1111,8 @@ export default function ComecarTeste() {
         // BRANCO pra fugir da status bar — nas telas escuras virava uma faixa
         // acesa no topo. Puxa o fundo pra debaixo da status bar e devolve o
         // respiro como padding interno, agora pintado com a NOSSA cor.
+        // (v83.4: o guard fixo por cima também veste a cor do passo — ver o
+        // efeito --safe-top-cor logo abaixo; sem ele a faixa seguia branca.)
         marginTop: "calc(var(--app-safe-top, 0px) * -1)",
         paddingTop: "var(--app-safe-top, 0px)",
       }}

@@ -113,6 +113,39 @@ const ENTRADA_APP = "/app";
 const SoNaWeb = ({ children }: { children: ReactNode }) =>
   isNativeShell() ? <Navigate to={ENTRADA_APP} replace /> : <>{children}</>;
 
+/**
+ * CERCA DA DEMO NO SHELL (28/08, foto do dono): a demo do funil renderiza os
+ * módulos REAIS, e a seta ← de todo módulo faz navigate("/home") — pro
+ * visitante anônimo isso cai no redirect de auth e parece "outro funil"
+ * (mesma família do incidente /inicio). A cerca da web (RootGate, 24/07) só
+ * cobre "/". Aqui: enquanto a demo do funil está armada, QUALQUER saída de
+ * /preview que não seja pro próprio funil (/app) volta pra continuação do
+ * funil, e a flag morre no primeiro pouso legítimo.
+ */
+function GuardaDemoShell() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    try {
+      if (pathname.startsWith("/preview")) return;             // dentro da demo
+      if (sessionStorage.getItem("core-demo-guarda") !== "1") return;
+      // A flag SÓ morre no pouso em /app: o redirect de auth do /home dispara
+      // no render (mais fundo na árvore) e ganha a corrida do primeiro
+      // navigate — consumir a flag cedo deixava a pessoa em /auth (provado
+      // por CDP 28/08). Mantendo a flag, cada parada errada re-redireciona
+      // até convergir no funil.
+      if (pathname.startsWith("/app")) {
+        sessionStorage.removeItem("core-demo-guarda");
+        return;
+      }
+      trackEvent("demo_fuga_redirecionada", { para: pathname });
+      navigate("/app?step=compromissos", { replace: true });
+    } catch { /* cerca nunca derruba navegação */ }
+  }, [pathname, navigate]);
+  return null;
+}
+
 const RootGate = () => {
   const { loading, user } = useAuth();
   if (loading) return null;
@@ -532,6 +565,7 @@ const App = () => {
               <BrowserRouter>
                 <ScrollToTop />
                 <DeepLinks />
+                <GuardaDemoShell />
                 <TelemetriaWebView />
                 <GracePeriodBanner />
                 <Routes>

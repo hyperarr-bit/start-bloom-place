@@ -22,7 +22,10 @@
  *  - Anti-assinatura como argumento: "paga uma vez, sem renovação" — produto
  *    AVULSO deixa a folha sem o bloco de assinatura e o Pix é nativo.
  *  - A ESPERA tratada de frente (é ela que come 79% dos leads):
- *      antes do toque  → aviso "a tela do Google leva uns segundos";
+ *      no toque         → overlay "leva uns segundos — não fecha o app"
+ *                         (v83.3, dono: a linha estática sob o CTA "ninguém
+ *                         lê" — o overlay entrega a MESMA info na hora do
+ *                         toque, quando 100% estão olhando);
  *      1ª recusa rápida → resgate PIX reabre a MESMA folha (2ª abre na hora);
  *      recusa após 30s+ → aviso "teu código Pix vence em 5 min" + Já paguei.
  *  - SEM degrau de preço. 2ª recusa = nada; a notificação D+1 (já agendada
@@ -75,6 +78,71 @@ export function useRecap(area: AreaKey | null): string[] {
     linhas.push(area ? `Seu painel de ${AREAS[area].nome} te esperando` : "Seu painel te esperando do jeito que você deixou");
   }
   return linhas.slice(0, 3);
+}
+
+/* 5 feedbacks REAIS girando num slot só (v83.3, pedido do dono: "botar 5 mas
+ * ocupar só um espaço" — Cal AI roda reviews no paywall do mesmo jeito).
+ * Curadoria: cobre as 4 portas do funil (dinheiro ×2 — é a porta que mais
+ * vende —, vida inteira, rotina, corpo). Textos = versão curta dos feedbacks
+ * do Instagram já usados no funil web (PaywallDia14). Fotos vêm no bundle
+ * (preparar-loja NÃO poda /depoimentos); se faltar, cai na inicial colorida. */
+const DEPOS = [
+  { nome: "João P.", meta: "24 anos · Campinas, SP", ini: "JP", cor: "#d9e4fb", foto: "/depoimentos/joaop.jpg",
+    texto: "Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa." },
+  { nome: "Gabriel A.", meta: "20 anos · Curitiba, PR", ini: "GA", cor: "#dcf3d2", foto: "/depoimentos/gabriel.jpg",
+    texto: "Gastava descontroladamente e nunca sabia pra onde o dinheiro ia. Hoje sei exatamente quanto posso gastar por dia e finalmente comecei a guardar." },
+  { nome: "Mariana S.", meta: "22 anos · São Paulo, SP", ini: "MS", cor: "#fbd8e8", foto: "/depoimentos/mariana.jpg",
+    texto: "Ameiii o app! As retrospectivas de todo mês são muito boas — hoje organizo praticamente toda a minha vida por aqui." },
+  { nome: "Lucas M.", meta: "26 anos · Belo Horizonte, MG", ini: "LM", cor: "#d7f0dd", foto: "/depoimentos/lucas.jpg",
+    texto: "Consegui dividir cada parte do meu dia por horário e criar uma rotina que realmente consigo seguir. Ficou muito mais fácil manter constância." },
+  { nome: "Fernanda R.", meta: "29 anos · Recife, PE", ini: "FR", cor: "#fdeccb", foto: "/depoimentos/fernandar.jpg",
+    texto: "Perdi 5 quilos em um mês. Treinos e dieta organizados no mesmo lugar, com progresso registrado e até a lista de compras da dieta gerada sozinha." },
+];
+
+function CarrosselDepoimentos() {
+  const [i, setI] = useState(0);
+  const [semFoto, setSemFoto] = useState<Record<number, boolean>>({});
+  // Toque num ponto = controle manual — o giro automático para pra sempre
+  // (autonomia vence animação; regra das superfícies de venda).
+  const manual = useRef(false);
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      if (!manual.current) setI((v) => (v + 1) % DEPOS.length);
+    }, 4500);
+    return () => window.clearInterval(t);
+  }, []);
+  const d = DEPOS[i];
+  return (
+    <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5">
+      {/* key troca → fade do tailwindcss-animate; min-h segura o slot parado
+          (o texto mais longo dá 4 linhas em tela de 360px). */}
+      <div key={i} className="animate-in fade-in duration-500">
+        <p className="text-[12.5px] leading-relaxed min-h-[80px]">“{d.texto}”</p>
+        <div className="flex items-center gap-2 mt-2">
+          {!semFoto[i] ? (
+            <img
+              src={d.foto} alt="" loading="lazy"
+              className="w-6 h-6 rounded-full object-cover"
+              onError={() => setSemFoto((s) => ({ ...s, [i]: true }))}
+            />
+          ) : (
+            <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: d.cor }}>{d.ini}</span>
+          )}
+          <p className="text-[11px] text-black/50 font-semibold">{d.nome} — {d.meta} <span className="text-[#f0a500]">★★★★★</span></p>
+        </div>
+      </div>
+      <div className="flex justify-center gap-1.5 mt-2.5">
+        {DEPOS.map((dep, j) => (
+          <button
+            key={dep.nome}
+            aria-label={`Depoimento ${j + 1}`}
+            className={`w-[6px] h-[6px] rounded-full transition-colors ${j === i ? "bg-accent" : "bg-black/15"}`}
+            onClick={() => { manual.current = true; setI(j); }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function PaywallAssinatura({
@@ -477,24 +545,19 @@ export function PaywallAssinatura({
       >
         {comprando ? <Loader2 className="w-4 h-4 animate-spin" /> : compraAtual.cta}
       </Button>
-      {/* A ESPERA, armada antes do toque: a folha do Google leva 15-25s num
-          aparelho popular e 79% desistiam achando que travou. Quem sabe o que
-          vem, espera. */}
-      <p className="text-[10.5px] text-muted-foreground text-center mt-1.5">
-        a tela de pagamento do Google leva uns segundos pra abrir — <b>não fecha o app</b>
-      </p>
-      <p className="text-[10.5px] text-muted-foreground/80 text-center mt-0.5">{compraAtual.legal}</p>
+      <p className="text-[10.5px] text-muted-foreground/80 text-center mt-1.5">{compraAtual.legal}</p>
     </>
   );
 
   return (
     <div className={`w-full max-w-sm mx-auto relative ${barraFixa ? "" : "pb-6"}`}>
       {/* Overlay anti-abandono (Me+ "não feche a página"): a folha do Google
-          demora a abrir em aparelho fraco e a pessoa acha que travou. */}
+          leva 15-25s num aparelho popular e 79% desistiam achando que travou.
+          v83.3: é SÓ AQUI que a espera é avisada — no momento do toque. */}
       {comprando && (
         <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">
-          <div className="mx-auto rounded-full bg-[#16121c] text-white text-[12.5px] font-bold px-4 py-2 shadow-lg flex items-center gap-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Abrindo o pagamento — não feche o app
+          <div className="mx-auto max-w-[92%] rounded-2xl bg-[#16121c] text-white text-[12.5px] font-bold px-4 py-2.5 shadow-lg flex items-center gap-2">
+            <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> Abrindo o pagamento — leva uns segundos, não fecha o app
           </div>
         </div>
       )}
@@ -596,22 +659,13 @@ export function PaywallAssinatura({
       {/* ══ DELIBERAÇÃO (v83, autópsia 28/08): 66-73% de quem chega no offer
           não toca em NADA; quem lê 60s+ converte 44%. Isto é o material de
           leitura — prova REAL (feedbacks do Instagram, curadoria do dono,
-          os mesmos do funil web) + segurança da compra. Só no funil, onde
-          o recap sozinho não bastava. ══ */}
-      {/* v83.1 (dono: "muita informação"): UM depoimento só — o mais forte,
-          cobre finanças+rotina, os dois perfis que mais convertem. */}
+          os mesmos do funil web). Só no funil, onde o recap sozinho não
+          bastava. v83.3 (dono): 5 depoimentos GIRANDO num slot só (Cal AI
+          roda reviews no paywall assim); a linha "🔒 Compra única" morreu —
+          o legal sob o CTA já diz "pagamento único pelo Google Play". ══ */}
       {contexto === "funil" && (
-        <div className="mt-3 space-y-2">
-          <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5">
-            <p className="text-[12.5px] leading-relaxed">“Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”</p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: "#d9e4fb" }}>JP</span>
-              <p className="text-[11px] text-black/50 font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
-            </div>
-          </div>
-          <p className="text-center text-[11px] text-muted-foreground pt-0.5">
-            🔒 Compra única processada pelo Google Play
-          </p>
+        <div className="mt-3">
+          <CarrosselDepoimentos />
         </div>
       )}
 
@@ -635,10 +689,11 @@ export function PaywallAssinatura({
 
       {barraFixa ? (
         <>
-          {/* Varredura v81: a barra real mede ~250-270px no estado base (as
-              linhas de espera+legal quebram em 2 em tela de 360px) — spacer
-              menor deixava a barra COBRINDO o fim do conteúdo. */}
-          <div className={pendente || erro || resgatePix || pixVencendo ? "h-[376px]" : "h-[272px]"} aria-hidden />
+          {/* Varredura v81: a barra real mede ~250-270px no estado base (a
+              linha legal quebra em 2 em tela de 360px) — spacer menor deixava
+              a barra COBRINDO o fim do conteúdo. v83.3: −34px (linha da
+              espera saiu da barra; a info mora no overlay do toque). */}
+          <div className={pendente || erro || resgatePix || pixVencendo ? "h-[344px]" : "h-[240px]"} aria-hidden />
           <div className="fixed bottom-0 inset-x-0 z-[60] pointer-events-none">
             <div className="max-w-sm mx-auto px-5 pb-3 pt-9 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-auto">
               {blocoAcao}

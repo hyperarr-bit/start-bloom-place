@@ -703,8 +703,16 @@ export function PaywallAssinatura({
                     className="underline underline-offset-2"
                     onClick={async () => {
                       trackEvent("app_restore_paywall", {});
+                      /* Varredura v83.4: restaurar é ação de RESOLUÇÃO — desarma a
+                         reabertura automática (senão a folha abria em cima do restore
+                         em voo — pagante reinstalado cancela a folha e corre pra cá) e
+                         recolhe a caixa. Restore falho ganha voz: silêncio = botão morto. */
+                      setReabrindoEm(null);
+                      if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
+                      setResgatePix(false);
                       const rc = await import("@/lib/revenuecat");
-                      if (await rc.restaurar()) window.location.href = "/";
+                      if (await rc.restaurar()) { window.location.href = "/"; return; }
+                      setErro("Nenhuma compra encontrada nesta conta Google. Se pagou agora há pouco, espera 1 minuto e tenta de novo.");
                     }}
                   >
                     Restaurar compras

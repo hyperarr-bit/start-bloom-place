@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { UserDataContext, type UserDataContextType } from "@/hooks/use-user-data";
 import { getSeedsForModule } from "@/lib/preview-seeds";
+import { isNativeShell } from "@/lib/native-shell";
 
 /**
  * Provider de modo preview: substitui o contexto de useUserData por uma
@@ -36,11 +37,36 @@ export const PreviewUserDataProvider = ({
     return (key in store ? store[key] : fallback) as T;
   }, [store]);
 
+  /* ENDOWMENT DO FUNIL (varredura v83.4): a demo é in-memory de propósito,
+   * mas o que o USUÁRIO cria precisa alcançar o recap do paywall ("O que
+   * você construiu" — a chave core-demo-conta perdeu o escritor quando a
+   * demo de chips morreu na v83.1 e o bloco subiu 100% inerte). O espelho é
+   * SÓ a chave dedicada, nunca dados de módulo: copiar finance-dueDays pro
+   * guest storage injetaria conta de EXEMPLO no app pós-compra. */
+  const contasDaSeed = useMemo(() => {
+    try {
+      return new Set<string>(
+        ((getSeedsForModule(moduleKey)["finance-dueDays"] as Array<{ bills?: Array<{ name?: string }> }>) ?? [])
+          .flatMap((d) => (Array.isArray(d?.bills) ? d.bills.map((b) => String(b?.name ?? "")) : [])),
+      );
+    } catch { return new Set<string>(); }
+  }, [moduleKey]);
+
   // Sem toast aqui: o banner do topo já sinaliza que é demo — deixa a pessoa
   // mexer à vontade sem interrupção.
   const set = useCallback((key: string, value: any) => {
+    try {
+      if (key === "finance-dueDays" && isNativeShell()) {
+        const nova = ((Array.isArray(value) ? value : []) as Array<{ bills?: Array<{ name?: string }> }>)
+          .flatMap((d) => (Array.isArray(d?.bills) ? d.bills.map((b) => String(b?.name ?? "")) : []))
+          .find((n) => n.trim() && !contasDaSeed.has(n));
+        // mesmo formato do useUserData guest (guest:<chave> + JSON) — é de lá
+        // que o useRecap lê no paywall.
+        if (nova) localStorage.setItem("guest:core-demo-conta", JSON.stringify(nova));
+      }
+    } catch { /* endowment nunca derruba a demo */ }
     setStore((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  }, [contasDaSeed]);
 
   const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
     return (key in store ? store[key] : null) as T | null;

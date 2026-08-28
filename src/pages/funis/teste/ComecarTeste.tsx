@@ -688,6 +688,15 @@ function PromessasScreen({ onDone }: { onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [i]);
   const f = FRAMES[Math.min(i, FRAMES.length - 1)];
+  /* Varredura v83.4: esta tela é fixed inset-0 com cor POR FRAME — a faixa da
+   * status bar acompanha cada frame; ao desmontar devolve o céu (o passo
+   * seguinte, porta, é céu). */
+  useEffect(() => {
+    try { document.documentElement.style.setProperty("--safe-top-cor", f.bg); } catch { /* noop */ }
+  }, [f.bg]);
+  useEffect(() => () => {
+    try { document.documentElement.style.setProperty("--safe-top-cor", "#eaf5fd"); } catch { /* noop */ }
+  }, []);
   return (
     <button
       onClick={onDone}
@@ -1086,12 +1095,14 @@ export default function ComecarTeste() {
   const escura = step === "mecanismo" || step === "notif";
   /* FAIXA DA STATUS BAR (v83.4, foto do dono): o guard global pintava a área
    * do notch de BRANCO fixo — nos passos céu/grafite virava uma listra acesa
-   * no topo do funil inteiro. A faixa agora veste a cor do passo. */
+   * no topo do funil inteiro. A faixa agora veste a cor do passo (welcome =
+   * topo do gradiente azul da grade viva; promessas pinta por frame, dentro
+   * da própria PromessasScreen). */
   useEffect(() => {
-    const cor = escura ? GRAFITE : telaCheia ? "#ffffff" : "#eaf5fd";
+    const cor = escura ? GRAFITE : telaCheia ? "#ffffff" : step === "welcome" ? "#7ec6f6" : "#eaf5fd";
     try { document.documentElement.style.setProperty("--safe-top-cor", cor); } catch { /* noop */ }
     return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
-  }, [escura, telaCheia]);
+  }, [escura, telaCheia, step]);
   /* AVALIAÇÃO NO PICO — MORTA EM 28/08, desta vez com número: 985 pedidos em
    * 48h (691 só em 28/08), TODOS pra quem nunca tinha usado o app, e ~1
    * avaliação nova na Play. A aposta BitePal não segurou aqui — o nosso

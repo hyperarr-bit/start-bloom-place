@@ -123,26 +123,32 @@ const SoNaWeb = ({ children }: { children: ReactNode }) =>
  * funil, e a flag morre no primeiro pouso legítimo.
  */
 function GuardaDemoShell() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   useEffect(() => {
     if (!isNativeShell()) return;
     try {
       if (pathname.startsWith("/preview")) return;             // dentro da demo
       if (sessionStorage.getItem("core-demo-guarda") !== "1") return;
-      // A flag SÓ morre no pouso em /app: o redirect de auth do /home dispara
-      // no render (mais fundo na árvore) e ganha a corrida do primeiro
-      // navigate — consumir a flag cedo deixava a pessoa em /auth (provado
-      // por CDP 28/08). Mantendo a flag, cada parada errada re-redireciona
-      // até convergir no funil.
+      // A flag SÓ morre no pouso em /app COM ?step: o redirect de auth do
+      // /home dispara no render (mais fundo na árvore) e ganha a corrida do
+      // primeiro navigate — consumir a flag cedo deixava a pessoa em /auth
+      // (provado por CDP 28/08). E o Voltar do ANDROID cai em /app SEM step
+      // (a welcome) — zerava ~10 telas de progresso (varredura v83.4): sem
+      // step também é fuga, converge no mesmo ponto da seta.
       if (pathname.startsWith("/app")) {
-        sessionStorage.removeItem("core-demo-guarda");
+        if (new URLSearchParams(search).has("step")) {
+          sessionStorage.removeItem("core-demo-guarda");
+          return;
+        }
+        trackEvent("demo_fuga_redirecionada", { para: `${pathname} (sem step)` });
+        navigate("/app?step=compromissos", { replace: true });
         return;
       }
       trackEvent("demo_fuga_redirecionada", { para: pathname });
       navigate("/app?step=compromissos", { replace: true });
     } catch { /* cerca nunca derruba navegação */ }
-  }, [pathname, navigate]);
+  }, [pathname, search, navigate]);
   return null;
 }
 

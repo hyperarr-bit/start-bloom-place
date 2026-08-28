@@ -195,7 +195,12 @@ export const MonthCalendar = ({
      * tela, vem o convite. Travas (cota, 90 dias, 3 na vida, só no shell)
      * moram em pedirAvaliacaoSePuder; quem não pagou só é convidado da 2ª
      * conta em diante (vezes). */
-    if (estavaPaga === false) {
+    /* Varredura v83.4: na DEMO (/preview) nem agenda nem conta — o setTimeout
+     * de 1,2s sobrevivia à navegação SPA e a folha de avaliação abria já
+     * DENTRO do funil (o guard central só roda na hora do disparo), e o
+     * contador persistente somava conta de EXEMPLO como se fosse uso real. */
+    const emDemo = (() => { try { return window.location.pathname.startsWith("/preview"); } catch { return false; } })();
+    if (estavaPaga === false && !emDemo) {
       const total = Number(localStorage.getItem("core-contas-pagas") ?? 0) + 1;
       try { localStorage.setItem("core-contas-pagas", String(total)); } catch { /* modo privado */ }
       setTimeout(() => { void pedirAvaliacaoSePuder("conta_paga", { pagante: isSubscribed, vezes: total }); }, 1200);

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { semanaAtualId } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -1393,14 +1394,17 @@ export default Rotina;
  * por cima, e as travas (1×/90 dias, 3 na vida, só no shell) já vivem em
  * pedirAvaliacaoSePuder. */
 function AvaliarNaSequencia({ sequencia }: { sequencia: number }) {
+  // v83.3: pagante entra na chamada — quem comprou pula a régua de "2 momentos
+  // de valor" (o funil não pede mais nota; o fã é convidado AQUI).
+  const { isSubscribed } = useAuth();
   const pedido = useRef(false);
   useEffect(() => {
     if (pedido.current || sequencia < 3) return;
     pedido.current = true;
     const t = window.setTimeout(() => {
-      void pedirAvaliacaoSePuder("sequencia_habito", { vezes: sequencia });
+      void pedirAvaliacaoSePuder("sequencia_habito", { pagante: isSubscribed, vezes: sequencia });
     }, 1800);
     return () => window.clearTimeout(t);
-  }, [sequencia]);
+  }, [sequencia, isSubscribed]);
   return null;
 }

@@ -39,10 +39,17 @@ export type MotivoAvaliacao =
   | "sequencia_habito"
   | "extrato_importado"
   | "meta_batida"
-  // Pico do funil: a tela "seu mapa da vida está pronto". BitePal e Brainrot
-  // disparam a caixinha EXATAMENTE aí (dá pra ver no vídeo dos funis deles,
-  // 14/08) — é o segundo de maior empolgação e vem ANTES de qualquer atrito
-  // de preço. É como esses apps acumulam milhares de avaliações.
+  // Conta marcada como paga no calendário de finanças — o módulo onde os
+  // pagantes passam 3× mais tempo que em qualquer outro (301 min/14d).
+  | "conta_paga"
+  // Retrospectiva do mês aberta e assistida — função citada nominalmente
+  // na avaliação 5★ do Rafael C. ("sensação muito boa").
+  | "retrospectiva"
+  // MORTO NO FUNIL EM 28/08 (medido): a aposta BitePal de pedir no pico do
+  // funil disparou 985 pedidos em 48h pra quem nunca tinha usado o app e
+  // rendeu ~1 avaliação — e pior, queimava a janela de 90 dias do aparelho
+  // ANTES da pessoa virar pagante apaixonado. A cota agora é gasta só com
+  // quem provou valor. (O tipo fica: o ComecarRadar web ainda referencia.)
   | "plano_pronto";
 
 const lerNumero = (chave: string): number => {
@@ -74,6 +81,10 @@ export async function pedirAvaliacaoSePuder(
 ): Promise<boolean> {
   // Só no app da loja: na web a caixa não existe (e o plugin rejeita).
   if (!isNativeShell()) return false;
+  // Na DEMO do funil os módulos são os REAIS (/preview) — sem este guard, o
+  // turista de 30s marcando a conta de exemplo seria convidado a avaliar: o
+  // exato erro do pedido-no-funil que morreu em 28/08 (985 pedidos → ~1 nota).
+  try { if (window.location.pathname.startsWith("/preview")) return false; } catch { /* noop */ }
   if (!pagante && !forte && vezes < 2) return false;
 
   const total = lerNumero(CHAVE_TOTAL);

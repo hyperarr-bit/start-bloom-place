@@ -3,6 +3,8 @@ import { Check, Pencil, Plus, Shield, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
+import { useAuth } from "@/hooks/use-auth";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 
 /**
  * MEU MÊS — calendário financeiro que se preenche sozinho.
@@ -88,6 +90,7 @@ export const MonthCalendar = ({
   incomes, expenses, fixedExpenses, dueDays, setDueDays, installments,
   totalIncome, monthlyOutflow, reserva, onAbrirReserva,
 }: Props) => {
+  const { isSubscribed } = useAuth();
   const now = new Date();
   const today = now.getDate();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -183,8 +186,21 @@ export const MonthCalendar = ({
     setNewBill("");
     setNewBillValue("");
   };
-  const toggleBill = (day: number, billId: string) =>
+  const toggleBill = (day: number, billId: string) => {
+    const estavaPaga = (dueDays ?? []).find((d) => d.day === day)?.bills?.find((b) => b.id === billId)?.paid;
     setBillsForDay(day, (bills) => bills.map((b) => (b.id === billId ? { ...b, paid: !b.paid } : b)));
+    /* MOMENTO DE VALOR (28/08): marcar conta como paga é a ação mais repetida
+     * do módulo onde os pagantes mais vivem (301 min/14d). O ✓ verde é o
+     * micro-alívio de "resolvi uma pendência" — 1,2s depois, com o alívio na
+     * tela, vem o convite. Travas (cota, 90 dias, 3 na vida, só no shell)
+     * moram em pedirAvaliacaoSePuder; quem não pagou só é convidado da 2ª
+     * conta em diante (vezes). */
+    if (estavaPaga === false) {
+      const total = Number(localStorage.getItem("core-contas-pagas") ?? 0) + 1;
+      try { localStorage.setItem("core-contas-pagas", String(total)); } catch { /* modo privado */ }
+      setTimeout(() => { void pedirAvaliacaoSePuder("conta_paga", { pagante: isSubscribed, vezes: total }); }, 1200);
+    }
+  };
   const removeBill = (day: number, billId: string) =>
     setBillsForDay(day, (bills) => bills.filter((b) => b.id !== billId));
 

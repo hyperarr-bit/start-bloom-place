@@ -4,6 +4,7 @@ import { X, Share2, Loader2 } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
 import { computeSavingsRate } from "@/lib/finance-totals";
 import { trackEvent } from "@/lib/analytics";
+import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { useTheme } from "@/hooks/use-theme";
 import { barraClaraEnquantoMontado } from "@/lib/status-bar";
 import { toast } from "sonner";
@@ -214,6 +215,17 @@ export const MonthlyWrapped = ({ retro, onClose }: Props) => {
   // quem está no tema claro ficaria com relógio e bateria escuros por cima do
   // roxo — invisíveis. Restaura ao sair.
   useEffect(() => barraClaraEnquantoMontado(mode === "dark" ? "dark" : "light"), [mode]);
+
+  /* MOMENTO DE VALOR (28/08): a retrospectiva é a função citada nominalmente
+   * na avaliação 5★ do Rafael C. ("parece aqueles resumos de fim de ano, só
+   * que da minha própria vida"). 12s = a pessoa passou dos primeiros slides e
+   * está DENTRO da emoção — `forte` porque esse pico só existe 1× por mês e
+   * só quem construiu um mês de dados chega aqui. Travas em
+   * pedirAvaliacaoSePuder. */
+  useEffect(() => {
+    const t = window.setTimeout(() => { void pedirAvaliacaoSePuder("retrospectiva", { forte: true }); }, 12000);
+    return () => window.clearTimeout(t);
+  }, []);
 
   const slides = useMemo<SlideDef[]>(() => {
     const s: SlideDef[] = [];

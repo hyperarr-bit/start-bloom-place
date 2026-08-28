@@ -253,7 +253,14 @@ export const inicioUltimaFolha = (): number | null => folhaAbertaEm;
 async function garantirPronto(): Promise<boolean> {
   if (estado === "pronto" && Purchases) return true;
   try { await initRevenueCat(); } catch { /* estado fica como estiver */ }
-  return estado === "pronto" && !!Purchases;
+  if (estado === "pronto" && Purchases) return true;
+  /* v83 (rajada de 28/08: 96 toques em comprar recusados em 17min, 1 aparelho
+   * orgânico, 0 vendas): "pronto" exige OFFERINGS de assinatura — que a compra
+   * à vista NEM USA (vai por getProducts/purchaseStoreProduct). Se o plugin
+   * está CONFIGURADO, a compra pode tentar: quem decide é a loja, com erro
+   * próprio e legível, não um guard que barra venda possível por causa de um
+   * fetch de offerings que falhou por rede. */
+  return configurado && !!Purchases;
 }
 
 export async function comprar(productId: string, opts?: { semTrial?: boolean }): Promise<boolean> {
@@ -402,7 +409,9 @@ const diasDaFase = (fase: unknown): number | null => {
 };
 
 export async function prefetchAssinaturas(): Promise<void> {
-  if (estado !== "pronto" || !Purchases) return;
+  // v83: basta o plugin CONFIGURADO — "pronto" exigia offerings saudáveis e
+  // barrava o prefetch exatamente quando a rede tinha falhado uma vez.
+  if (!configurado || !Purchases) return;
   try {
     const offerings = await Purchases.getOfferings();
     for (const p of offerings?.current?.availablePackages ?? []) {
@@ -557,7 +566,8 @@ export type IdVitalicio = (typeof IDS_VITALICIOS)[number];
 const produtosVitalicios: Partial<Record<IdVitalicio, ProdutoRC>> = {};
 export async function prefetchVitalicio(): Promise<void> {
   if (IDS_VITALICIOS.every((i) => produtosVitalicios[i])) return;
-  if (estado !== "pronto" || !Purchases) return;
+  // v83: mesmo racional do prefetchAssinaturas — configurado basta.
+  if (!configurado || !Purchases) return;
   try {
     const mod = await import("@revenuecat/purchases-capacitor");
     const { products } = await Purchases.getProducts({
@@ -592,6 +602,15 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
       trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: produtoId });
       return false;
     }
+    /* v83: o vitalício era CEGO na telemetria de abertura — 35% das vendas só
+     * apareciam na subscriptions e a folha dele tinha que ser reconstruída por
+     * cancelamento. Mesmo evento do caminho pré-pago. */
+    trackEvent("app_compra_opcao", {
+      produto: produtoId,
+      escolhida: produto?.identifier ?? produtoId,
+      preco: produto?.priceString ?? null,
+      vitalicio: true,
+    });
     folhaAbertaEm = Date.now();
     await Purchases.purchaseStoreProduct({ product: produto });
     // Dinheiro saiu. Sincroniza já pra pessoa entrar na hora; se o sync
@@ -649,7 +668,8 @@ export async function compraVitaliciaLocal(): Promise<boolean> {
 
 /** Restaurar compras (obrigatório de loja — botão no paywall). */
 export async function restaurar(): Promise<boolean> {
-  if (estado !== "pronto" || !Purchases) return false;
+  // v83: restaurar é exigência de loja — não pode depender de offerings.
+  if (!configurado || !Purchases) return false;
   try {
     const { customerInfo } = await (Purchases as NonNullable<typeof Purchases>).restorePurchases();
     if (!temEntitlement(customerInfo)) return false;

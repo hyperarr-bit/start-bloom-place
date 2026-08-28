@@ -66,6 +66,10 @@ export function useRecap(area: AreaKey | null): string[] {
     if (metas.length > 0) linhas.push(`${metas.length} meta${metas.length > 1 ? "s" : ""} saindo do papel`);
     const treinos = get<unknown[]>("saude-workouts-v2", []) ?? [];
     if (Array.isArray(treinos) && treinos.length > 0) linhas.push("Plano de treino montado");
+    // v83: a conta armada na DEMO GUIADA (chave própria pra não poluir o
+    // módulo finanças) também conta como construção — endowment do funil.
+    const demoConta = get<string | null>("core-demo-conta", null);
+    if (demoConta && contas === 0) linhas.push(`Lembrete da conta "${demoConta}" armado`);
   } catch { /* recap nunca derruba o paywall */ }
   if (linhas.length === 0) {
     linhas.push(area ? `Seu painel de ${AREAS[area].nome} te esperando` : "Seu painel te esperando do jeito que você deixou");
@@ -93,6 +97,13 @@ export function PaywallAssinatura({
   // Resgate PIX (1ª recusa rápida): a folha aceita Pix mas 79% fecham no
   // "Processando" sem ver — a caixa reabre a folha, que na 2ª vez abre logo.
   const [resgatePix, setResgatePix] = useState(false);
+  /* v83 (autópsia 28/08): 140 sessões VIRAM o resgate e só 6 tocaram no botão
+   * — mas 54% reabriram a folha depois de ver. O botão está morto; a caixa
+   * funciona como lembrete. Então a folha REABRE SOZINHA com contagem visível
+   * (prêmio persegue a pessoa, zero ação exigida) e "Agora não" cancela. */
+  const [reabrindoEm, setReabrindoEm] = useState<number | null>(null);
+  const contagemRef = useRef<number | null>(null);
+  const compraAtualRef = useRef<{ fn: (rc: typeof import("@/lib/revenuecat")) => Promise<boolean>; id: string }>({ fn: async () => false, id: "" });
   // Recusa DEPOIS de trabalhar na folha (30s+): provável código Pix gerado —
   // ele vence em 5 minutos, o aviso corre atrás da pessoa.
   const [pixVencendo, setPixVencendo] = useState(false);
@@ -170,6 +181,7 @@ export function PaywallAssinatura({
     return () => {
       vivoRef.current = false;
       if (retry) window.clearTimeout(retry);
+      if (contagemRef.current) window.clearInterval(contagemRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -225,6 +237,9 @@ export function PaywallAssinatura({
     setPendente(false);
     setResgatePix(false);
     setPixVencendo(false);
+    // qualquer ação de compra desarma a contagem de reabertura
+    setReabrindoEm(null);
+    if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
     trackEvent("funnel_click", { cta: "app_paywall_cta", contexto, produto });
     const t0 = Date.now();
     const rc = await import("@/lib/revenuecat");
@@ -255,13 +270,32 @@ export function PaywallAssinatura({
        * Recusa após 30s+ = trabalhou na folha, provável código Pix gerado —
        * que VENCE EM 5 MINUTOS → o aviso corre atrás. Cada caixa uma vez
        * (a do Pix vencendo com guarda própria, senão re-arma a cada recusa). */
-      if (segundosNaFolha >= 30 && !pixVencendoJaFoi.current && folhaPrepaga) {
+      /* v83: gatilho do "código vencendo" ampliado 30s→20s (7 exposições em
+       * 1,5 dia era pouco; 1 das 7 virou venda). */
+      if (segundosNaFolha >= 20 && !pixVencendoJaFoi.current && folhaPrepaga) {
         pixVencendoJaFoi.current = true;
         setPixVencendo(true);
         trackEvent("app_pix_vencendo_view", { contexto, produto, seg: Math.round(segundosNaFolha) });
-      } else if (segundosNaFolha < 30 && cancelamentos.current === 1 && folhaPrepaga) {
+      } else if (segundosNaFolha < 20 && cancelamentos.current === 1 && folhaPrepaga) {
         setResgatePix(true);
-        trackEvent("app_resgate_pix_view", { contexto, produto });
+        trackEvent("app_resgate_pix_view", { contexto, produto, auto: true });
+        // contagem de 4s e a folha reabre sozinha (o cancelador rápido nunca
+        // viu o Pix; a 2ª folha abre na hora, serviço quente)
+        setReabrindoEm(4);
+        contagemRef.current = window.setInterval(() => {
+          setReabrindoEm((n) => {
+            if (n === null) return null;
+            if (n <= 1) {
+              if (contagemRef.current) window.clearInterval(contagemRef.current);
+              contagemRef.current = null;
+              trackEvent("app_resgate_pix_auto", { contexto, produto });
+              const rcMod = import("@/lib/revenuecat");
+              void rcMod.then((m) => pagou(() => compraAtualRef.current.fn(m), compraAtualRef.current.id));
+              return null;
+            }
+            return n - 1;
+          });
+        }, 1000);
       }
     } else if (motivo === "produto_ausente") {
       // Varredura: a mensagem antiga mandava ATUALIZAR o app — falso no dia
@@ -310,6 +344,8 @@ export function PaywallAssinatura({
     legal: `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}`,
   };
   const compraAtual = plano === "vitalicio" ? colunaDireita : colunaMensal;
+  // O interval da contagem captura closure velha — o ref entrega sempre a atual.
+  compraAtualRef.current = compraAtual;
   // Folha pré-paga = Pix garantido nela (selo e resgate só prometem o real).
   const folhaPrepaga = plano === "vitalicio" || loja.mensalVista;
 
@@ -339,19 +375,51 @@ export function PaywallAssinatura({
         <span className="w-[7px] h-[7px] rotate-45 bg-current rounded-[1.5px]" aria-hidden />
         Prefere pagar no Pix?
       </b>
-      Toca de novo — <b>agora a tela abre na hora</b> — e escolhe <b>Pix</b> na lista.
-      Pagou, o acesso libera sozinho.
-      <button
-        className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
-        disabled={comprando}
-        onClick={async () => {
-          trackEvent("app_resgate_pix_toque", { contexto, produto: compraAtual.id });
-          const rc = await import("@/lib/revenuecat");
-          void pagou(() => compraAtual.fn(rc), compraAtual.id);
-        }}
-      >
-        Abrir de novo e pagar no Pix
-      </button>
+      A tela do Google aceita <b>Pix</b> — abre de novo <b>na hora</b> (sem a espera),
+      escolhe Pix na lista e copia o código.
+      {reabrindoEm !== null ? (
+        <span className="flex items-center justify-between mt-1.5">
+          <b>Reabrindo em {reabrindoEm}s…</b>
+          <button
+            className="font-bold underline underline-offset-2"
+            onClick={() => {
+              setReabrindoEm(null);
+              if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
+              trackEvent("app_resgate_pix_cancelou_auto", { contexto });
+            }}
+          >
+            Agora não
+          </button>
+        </span>
+      ) : (
+        <button
+          className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
+          disabled={comprando}
+          onClick={async () => {
+            trackEvent("app_resgate_pix_toque", { contexto, produto: compraAtual.id });
+            const rc = await import("@/lib/revenuecat");
+            void pagou(() => compraAtual.fn(rc), compraAtual.id);
+          }}
+        >
+          Abrir de novo e pagar no Pix
+        </button>
+      )}
+      {/* Saída dupla (autópsia: 74% dos canceladores somem; a última chance da
+          sessão oferece o degrau junto, não depois). */}
+      {plano === "vitalicio" && loja.mensalVista && reabrindoEm === null && (
+        <button
+          className="block w-full text-center text-[11.5px] font-semibold mt-1 opacity-80 underline underline-offset-2 disabled:opacity-50"
+          disabled={comprando}
+          onClick={async () => {
+            trackEvent("app_resgate_mensal_toque", { contexto });
+            setPlano("mensal");
+            const rc = await import("@/lib/revenuecat");
+            void pagou(() => (loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true })), APP_PRECOS.mensalVista.id);
+          }}
+        >
+          ou começa com 1 mês — {APP_PRECOS.mensal.preco}
+        </button>
+      )}
     </div>
   );
 
@@ -451,9 +519,13 @@ export function PaywallAssinatura({
         <h2 className="text-[25px] [@media(max-height:700px)]:text-[22px] font-bold tracking-tight leading-[1.15]">{titulo}</h2>
       </div>
 
-      {/* Recap (endowment) — só fora do funil: no funil o compromisso
-          acabou de acontecer (resultado → "Claro!" ×3 → contrato). */}
-      {contexto !== "funil" && !(contexto === "planos" && teste.fase === "nunca") && (
+      {/* Recap (endowment). v83: LIGADO também no funil quando a DEMO
+          produziu construção real (hábito marcado, conta armada) — é o
+          material de deliberação de quem compra (autópsia: 108s lendo). O
+          fallback genérico continua só fora do funil. */}
+      {(contexto !== "funil"
+        ? !(contexto === "planos" && teste.fase === "nunca")
+        : !recap[0]?.startsWith("Seu painel")) && (
         <div className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5 mb-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-black/45 mb-2">
             O que você construiu
@@ -517,6 +589,31 @@ export function PaywallAssinatura({
           </span>
         </button>
       </div>
+
+      {/* ══ DELIBERAÇÃO (v83, autópsia 28/08): 66-73% de quem chega no offer
+          não toca em NADA; quem lê 60s+ converte 44%. Isto é o material de
+          leitura — prova REAL (feedbacks do Instagram, curadoria do dono,
+          os mesmos do funil web) + segurança da compra. Só no funil, onde
+          o recap sozinho não bastava. ══ */}
+      {contexto === "funil" && (
+        <div className="mt-3 space-y-2">
+          {([
+            ["“Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”", "João P. — 24 anos · Campinas, SP", "JP", "#d9e4fb"],
+            ["“A tela inicial personalizada foi o que mais me conquistou. Não preciso abrir cinco aplicativos diferentes durante o dia.”", "Amanda L. — 21 anos · Fortaleza, CE", "AL", "#fbd8e8"],
+          ] as Array<[string, string, string, string]>).map(([txt, quem, ini, cor]) => (
+            <div key={ini} className="rounded-2xl border border-border bg-white text-[#16121c] p-3.5">
+              <p className="text-[12.5px] leading-relaxed">{txt}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: cor }}>{ini}</span>
+                <p className="text-[11px] text-black/50 font-semibold">{quem} <span className="text-[#f0a500]">★★★★★</span></p>
+              </div>
+            </div>
+          ))}
+          <p className="text-center text-[11px] text-muted-foreground pt-0.5">
+            🔒 Compra única processada pelo Google Play · sem assinatura, sem surpresa na fatura
+          </p>
+        </div>
+      )}
 
       {teste.fase === "ativo" && !d3 && contexto !== "planos" && (
         <button

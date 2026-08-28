@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { AREAS, DOOR_AREAS, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { trackEvent } from "@/lib/analytics";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserData } from "@/hooks/use-user-data"; // demo guiada grava no guest storage
 // 18/08: iniciarTeste/armarGuiaSemente/agendarReguaDoTeste saíram — o teste
 // caseiro morreu pra entrada nova (trial é da folha do Google agora).
 import { estadoTeste } from "@/lib/teste-gratis";
@@ -53,7 +54,7 @@ const FUNIL = "teste";
 // intercalada, CTA grafite, single-select avança sozinho.
 type Step =
   | "welcome" | "promessas" | "porta" | "dor" | "antesdepois" | "mecanismo" | "horario" | "notif"
-  | "montando" | "resultado" | "compromissos" | "contrato" | "offer" | "signup" | "confirm" | "liberando";
+  | "montando" | "demo" | "resultado" | "compromissos" | "contrato" | "offer" | "signup" | "confirm" | "liberando";
 
 // Mesma pele das outras telas do shell: funil sempre claro + céu suave.
 const LIGHT_VARS = {
@@ -955,6 +956,146 @@ function ContratoScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+/* ------------------------------------------------------ demo guiada (v83) */
+
+/**
+ * DEMO GUIADA (v83, autópsia de 28/08 + decisão do dono): o comprador decide
+ * nos 108s do paywall e o funil não fabricava POSSE nenhuma — a pessoa nunca
+ * tocava no produto. Aqui ela executa 2 ações reais em ~60s (marca um hábito,
+ * arma um lembrete) e o painel dela "nasce" na frente. Os artefatos são
+ * gravados no guest storage e REAPARECEM no recap do paywall ("O que você
+ * construiu") — endowment com nome e sobrenome, a diferença estrutural do
+ * funil da web que fazia 1,38×.
+ *
+ * Régua kill/keep (escrita ANTES de ligar): hoje 73% chegam no offer; se a
+ * demo derrubar isso >10pp sem subir a conversão do paywall junto, morre em
+ * 48h. Eventos: demo_acao / demo_completou / demo_pulou (+ funnel_view
+ * step=demo automático).
+ */
+const DEMO_HABITOS: Record<string, string[]> = {
+  dinheiro: ["Anotar os gastos do dia", "Conferir o saldo de manhã", "Guardar R$ 10 hoje"],
+  rotina: ["Planejar o dia em 5 min", "Beber 2L de água", "Dormir antes das 23h"],
+  corpo: ["Treino de 15 min", "Beber 2L de água", "Caminhada depois do almoço"],
+  metas: ["5 min na meta principal", "Revisar a meta à noite", "1 passo pequeno hoje"],
+  tudo: ["Planejar o dia em 5 min", "Anotar os gastos do dia", "Beber 2L de água"],
+};
+const DEMO_CONTAS = ["Aluguel", "Cartão", "Internet", "Luz"];
+
+function DemoScreen({ area, onNext }: { area: AreaKey; onNext: () => void }) {
+  const { set, get } = useUserData();
+  const [habito, setHabito] = useState<string | null>(null);
+  const [conta, setConta] = useState<string | null>(null);
+  const habitos = DEMO_HABITOS[area] ?? DEMO_HABITOS.tudo;
+  const fez = (habito ? 1 : 0) + (conta ? 1 : 0);
+
+  const marcaHabito = (h: string) => {
+    if (habito) return;
+    setHabito(h);
+    try {
+      const atuais = get<string[]>("rotina-habits", []) ?? [];
+      if (!atuais.includes(h)) set("rotina-habits", [...atuais, h]);
+    } catch { /* demo nunca quebra o funil */ }
+    trackEvent("demo_acao", { tipo: "habito", qual: h, area, funil: FUNIL });
+  };
+  const armaConta = (c: string) => {
+    if (conta) return;
+    setConta(c);
+    try { set("core-demo-conta", c); } catch { /* idem */ }
+    trackEvent("demo_acao", { tipo: "conta", qual: c, area, funil: FUNIL });
+  };
+
+  return (
+    <div className="w-full flex-1 flex flex-col pt-2">
+      <div className="text-center mb-4">
+        <div className="inline-flex px-3 py-1 rounded-full bg-accent/10 text-accent text-[11px] font-bold uppercase tracking-wider mb-2">
+          Seu painel ficou pronto
+        </div>
+        <h1 className="text-[24px] font-black tracking-[-0.02em] leading-tight">
+          Testa ele agora
+        </h1>
+        <p className="text-[12.5px] text-muted-foreground mt-1">2 toques e ele começa a trabalhar por você</p>
+      </div>
+
+      {/* ação 1 — hábito */}
+      <div className="rounded-2xl border border-border bg-white p-3.5 mb-2.5">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-black/45 mb-2">1 · Marca teu primeiro hábito</p>
+        <div className="flex flex-wrap gap-1.5">
+          {habitos.map((h) => (
+            <button
+              key={h}
+              onClick={() => marcaHabito(h)}
+              className={`px-3 py-2 rounded-full text-[12.5px] font-semibold border transition-all ${habito === h ? "bg-emerald-500 text-white border-emerald-500" : habito ? "opacity-40 border-border" : "border-border active:scale-95"}`}
+            >
+              {habito === h && <Check className="w-3 h-3 inline mr-1" strokeWidth={3.5} />}{h}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ação 2 — lembrete de conta */}
+      <div className="rounded-2xl border border-border bg-white p-3.5 mb-2.5">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-black/45 mb-2">2 · Arma um lembrete de conta</p>
+        <div className="flex flex-wrap gap-1.5">
+          {DEMO_CONTAS.map((c) => (
+            <button
+              key={c}
+              onClick={() => armaConta(c)}
+              className={`px-3 py-2 rounded-full text-[12.5px] font-semibold border transition-all ${conta === c ? "bg-emerald-500 text-white border-emerald-500" : conta ? "opacity-40 border-border" : "border-border active:scale-95"}`}
+            >
+              {conta === c && <Check className="w-3 h-3 inline mr-1" strokeWidth={3.5} />}{c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* payoff — o painel nascendo */}
+      <AnimatePresence>
+        {fez > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="rounded-2xl p-3.5 text-white mb-2.5"
+            style={{ background: "linear-gradient(135deg, #16121c 0%, #2a2438 100%)" }}
+          >
+            <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1.5">Seu painel · amanhã</p>
+            {habito && (
+              <p className="text-[13px] font-semibold flex items-center gap-2 py-0.5">
+                <span className="w-4 h-4 rounded-full bg-emerald-500 grid place-items-center shrink-0"><Check className="w-2.5 h-2.5" strokeWidth={4} /></span>
+                {habito} <span className="text-white/40 text-[11px]">· lembrete ativo</span>
+              </p>
+            )}
+            {conta && (
+              <p className="text-[13px] font-semibold flex items-center gap-2 py-0.5">
+                <span className="w-4 h-4 rounded-full bg-emerald-500 grid place-items-center shrink-0"><Check className="w-2.5 h-2.5" strokeWidth={4} /></span>
+                {conta} <span className="text-white/40 text-[11px]">· aviso antes de vencer</span>
+              </p>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="mt-auto pt-3 pb-1">
+        {fez === 2 ? (
+          <motion.button
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            onClick={() => { trackEvent("demo_completou", { area, funil: FUNIL }); onNext(); }}
+            className={CTA_GRAFITE}
+            style={{ background: GRAFITE }}
+          >
+            <span className="flex items-center gap-1.5">Quero minha vida organizada assim <ArrowRight className="w-4 h-4" /></span>
+          </motion.button>
+        ) : (
+          <button
+            onClick={() => { trackEvent("demo_pulou", { fez, area, funil: FUNIL }); onNext(); }}
+            className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 py-2"
+          >
+            continuar sem testar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------- orquestra */
 
 export default function ComecarTeste() {
@@ -966,6 +1107,7 @@ export default function ComecarTeste() {
     const s = params.get("step");
     if (s === "signup" || s === "plano") return "signup";
     if (s === "offer" || s === "trial") return "offer";
+    if (s === "demo") return "demo"; // QA/prints da demo guiada (v83)
     // Sem step explícito: teste expirado cai direto na decisão do D3.
     if (estadoTeste().fase === "expirado") return "offer";
     // v60: entrada fresca começa na WELCOME azul (a grade viva dos módulos)
@@ -1068,7 +1210,8 @@ export default function ComecarTeste() {
   const abrirApp = (_pediuNotif: boolean) => setStep("montando");
   const montou = () => {
     trackEvent("funnel_click", { cta: "pos_montando", area: area ?? "dinheiro", funil: FUNIL });
-    setStep("resultado");
+    // v83: o painel recém-montado vai pra MÃO da pessoa antes do resultado.
+    setStep("demo");
   };
 
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
@@ -1173,6 +1316,7 @@ export default function ComecarTeste() {
             )}
             {step === "notif" && <NotifScreen area={area ?? "dinheiro"} hora={hora} onDone={abrirApp} />}
             {step === "montando" && <MontandoScreen area={area ?? "dinheiro"} hora={hora} onDone={montou} />}
+            {step === "demo" && <DemoScreen area={area ?? "dinheiro"} onNext={() => setStep("resultado")} />}
             {step === "resultado" && <ResultadoScreen area={area ?? "dinheiro"} onNext={() => setStep("compromissos")} />}
             {step === "compromissos" && <CompromissosScreen onDone={() => setStep("contrato")} />}
             {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}

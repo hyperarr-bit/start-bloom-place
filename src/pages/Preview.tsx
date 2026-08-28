@@ -173,10 +173,12 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
   // NUNCA entendeu "plano": caía em "start" e reiniciava o funil. Só não
   // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
   // Corrigido de passagem.
-  const to = isNativeShell()
-    // 09/08: no shell o cadastro passou pra DEPOIS da compra — a demo devolve
-    // direto pro paywall. Na web nada muda.
-    ? "/app?step=offer"
+  const shell = isNativeShell();
+  const to = shell
+    // v83.1 (dono, 28/08): a demo virou o passo do FUNIL Me+ — a volta cai no
+    // "quer organizar sua vida?" (compromissos → contrato → paywall), não
+    // direto no offer: o contrato assinado é o preditor de 3× da autópsia.
+    ? "/app?step=compromissos"
     : (from && voltaFunilTeste(from, tour))
       ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
   return (
@@ -186,14 +188,16 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
     >
       <div className="max-w-md mx-auto px-4 pt-3 flex items-center gap-3">
         <p className="text-xs text-muted-foreground leading-tight flex-1">
-          Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.
+          {shell
+            ? <>Isso tudo trabalhando com os <strong className="text-foreground">seus dados</strong>.</>
+            : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
         </p>
         <Link
           to={to}
           onClick={() => trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" })}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
         >
-          {funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
+          {shell ? "Quero o meu assim" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </div>
@@ -207,8 +211,8 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   // No shell o destino é a porta do app; na web, o funil de origem. Fallback
   // em ?step=signup (o "plano" saiu — ver DemoCta).
   const to = isNativeShell()
-    // 09/08: shell compra antes de cadastrar — nudge também cai no paywall.
-    ? "/app?step=offer"
+    // v83.1: nudge também devolve pro ritual (compromissos → contrato → offer).
+    ? "/app?step=compromissos"
     : (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
   if (!show) return null;
   const dismiss = () => {
@@ -238,6 +242,40 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
         </button>
       </div>
     </div>
+  );
+};
+
+/** v83.1 — "tutorial mostrando onde clicar" (dono): coach-mark de 1 passo no
+ *  1º mount da demo dentro do shell. Some sozinho em 6s ou no toque; 1× por
+ *  sessão. Aponta os dois controles que importam: a barra de módulos e o CTA. */
+const DICA_DEMO_KEY = "core-demo-dica";
+const DicaDemoShell = () => {
+  const [show, setShow] = useState(() => {
+    try { return sessionStorage.getItem(DICA_DEMO_KEY) !== "1"; } catch { return true; }
+  });
+  useEffect(() => {
+    if (!show) return;
+    try { sessionStorage.setItem(DICA_DEMO_KEY, "1"); } catch { /* noop */ }
+    trackEvent("demo_dica_view", {});
+    const id = window.setTimeout(() => setShow(false), 6000);
+    return () => window.clearTimeout(id);
+  }, [show]);
+  if (!show) return null;
+  return (
+    <button
+      onClick={() => setShow(false)}
+      className="fixed inset-x-0 z-[72] px-4 pointer-events-none"
+      style={{ top: "calc(var(--app-safe-top, 0px) + 96px)" }}
+      aria-label="Fechar dica"
+    >
+      <span className="max-w-md mx-auto pointer-events-auto flex items-start gap-2.5 rounded-2xl bg-[#16121c] text-white p-3.5 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-300 text-left">
+        <span className="text-[18px] leading-none pt-0.5">👆</span>
+        <span className="flex-1 text-[12.5px] leading-snug">
+          <b>Isso aqui é o app de verdade</b> — mexe à vontade. Troca de módulo na barra
+          de cima; quando terminar, o botão lá embaixo continua teu plano.
+        </span>
+      </span>
+    </button>
   );
 };
 
@@ -295,6 +333,7 @@ const Preview = () => {
     <div className={`min-h-screen bg-background pb-20 ${tour ? "demo-com-tour" : ""}`}>
       {!embed && <PreviewBanner funnel={funnel} />}
       {tour && <DemoTourNav current={key} from={from} />}
+      {tour && funnel && isNativeShell() && <DicaDemoShell />}
       <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />

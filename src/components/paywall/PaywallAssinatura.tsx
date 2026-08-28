@@ -565,8 +565,11 @@ export function PaywallAssinatura({
           <span className="text-[16px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
           <span className="text-[10px] font-semibold text-black/40">por mês</span>
           <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
+          {/* v83.1 (dono): "todo mês, pra sempre" assustava o comprador DA
+              coluna — âncora de aluguel mora na comparação do vitalício, não
+              no produto. Verdade do pré-pago: renovação manual. */}
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-            todo mês, pra sempre
+            {loja.mensalVista ? "renova só se você quiser" : "cancele quando quiser"}
           </span>
         </button>
         <button

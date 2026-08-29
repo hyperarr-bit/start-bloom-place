@@ -51,28 +51,43 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
 
 // Estático de propósito: sticky aqui brigava com o header sticky do módulo e
 // cobria títulos de cards no scroll do celular. O CTA persistente é o de baixo.
-const PreviewBanner = ({ funnel }: { funnel?: boolean }) => (
-  <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
-    <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2 min-w-0">
-        <Sparkles className="w-4 h-4 shrink-0" />
-        <span className="truncate">
-          {funnel
-            ? <><strong>Experimente à vontade</strong> — dados de exemplo.</>
-            : <><strong>Demonstração</strong> — dados fictícios, nada é salvo.</>}
-        </span>
+const PreviewBanner = ({ funnel }: { funnel?: boolean }) => {
+  /* v83.5 (dono): no APP o roxo era identidade que o app nunca teve — a demo
+     é o app real, então o aviso VESTE o app (fundo do tema + grafite, faixa
+     da status bar fica na cor padrão). O gradiente roxo segue na WEB. */
+  if (funnel && isNativeShell()) {
+    return (
+      <div className="bg-background border-b border-border text-foreground text-[12px]">
+        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-2">
+          <Sparkles className="w-4 h-4 shrink-0 text-accent" />
+          <span className="truncate"><strong>Experimente à vontade</strong> — dados de exemplo.</span>
+        </div>
       </div>
-      {!funnel && (
-        <Link
-          to="/auth"
-          className="shrink-0 bg-white text-violet-700 font-semibold px-3 py-1 rounded-md hover:bg-white/90 transition text-[11px] md:text-xs whitespace-nowrap"
-        >
-          Criar conta
-        </Link>
-      )}
+    );
+  }
+  return (
+    <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-[12px] md:text-sm">
+      <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Sparkles className="w-4 h-4 shrink-0" />
+          <span className="truncate">
+            {funnel
+              ? <><strong>Experimente à vontade</strong> — dados de exemplo.</>
+              : <><strong>Demonstração</strong> — dados fictícios, nada é salvo.</>}
+          </span>
+        </div>
+        {!funnel && (
+          <Link
+            to="/auth"
+            className="shrink-0 bg-white text-violet-700 font-semibold px-3 py-1 rounded-md hover:bg-white/90 transition text-[11px] md:text-xs whitespace-nowrap"
+          >
+            Criar conta
+          </Link>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /** Demo guiada do funil vitrine (tour=vida): navegação curada entre os 5
  *  módulos do criativo — liberdade com corrimão, não os 16 de uma vez. */
@@ -311,15 +326,9 @@ const Preview = () => {
     try { sessionStorage.setItem("core-demo-guarda", "1"); } catch { /* noop */ }
   }, [funnel]);
 
-  // FAIXA DA STATUS BAR (28/08, foto do dono): o guard global pinta a área do
-  // notch de BRANCO — em cima do banner roxo da demo virava um "cabeçalho"
-  // branco morto (real no celular, não artefato de emulador). Enquanto a demo
-  // está montada, a faixa veste o roxo do banner; desmontou, volta o padrão.
-  useEffect(() => {
-    if (embed) return;
-    try { document.documentElement.style.setProperty("--safe-top-cor", "#7c3aed"); } catch { /* noop */ }
-    return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
-  }, [embed]);
+  // FAIXA DA STATUS BAR: v83.4 pintava de roxo pra casar com o banner; o dono
+  // vetou ("nunca botamos isso") e o banner do shell virou cor do app — a
+  // faixa padrão (background) já casa sozinha. Sem override aqui.
 
   // Nudge de fechamento: nº de módulos DISTINTOS abertos no tour (sessionStorage).
   const [nudgeCount, setNudgeCount] = useState(0);

@@ -42,15 +42,42 @@ export const PreviewUserDataProvider = ({
    * você construiu" — a chave core-demo-conta perdeu o escritor quando a
    * demo de chips morreu na v83.1 e o bloco subiu 100% inerte). O espelho é
    * SÓ a chave dedicada, nunca dados de módulo: copiar finance-dueDays pro
-   * guest storage injetaria conta de EXEMPLO no app pós-compra. */
-  const contasDaSeed = useMemo(() => {
-    try {
-      return new Set<string>(
-        ((getSeedsForModule(moduleKey)["finance-dueDays"] as Array<{ bills?: Array<{ name?: string }> }>) ?? [])
-          .flatMap((d) => (Array.isArray(d?.bills) ? d.bills.map((b) => String(b?.name ?? "")) : [])),
-      );
-    } catch { return new Set<string>(); }
+   * guest storage injetaria conta de EXEMPLO no app pós-compra.
+   *
+   * v83.5 (bug pego pelo dono): a exclusão precisa cobrir TODO nome que as
+   * seeds possam materializar — o sync custo-fixo→conta criou "Plano de
+   * saúde" (finance-fixed-expenses) no mount e o recap mostrou construção
+   * FANTASMA pra quem não fez nada. Varre name+description do objeto de
+   * seeds inteiro; só nome que NÃO existe em seed alguma é do usuário. */
+  const nomesDaSeed = useMemo(() => {
+    const nomes = new Set<string>();
+    const varrer = (v: unknown) => {
+      if (Array.isArray(v)) { v.forEach(varrer); return; }
+      if (v && typeof v === "object") {
+        for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+          if ((k === "name" || k === "description") && typeof x === "string") nomes.add(x.trim().toLowerCase());
+          else varrer(x);
+        }
+      }
+    };
+    // SEMPRE as seeds de finanças (além do módulo atual): o fantasma só nasce
+    // do finance-dueDays, e a CURA precisa reconhecê-lo mesmo quando a demo
+    // remonta em outro módulo (rotina não conhece "Plano de saúde").
+    try { varrer(getSeedsForModule("financas")); } catch { /* noop */ }
+    try { if (moduleKey !== "financas") varrer(getSeedsForModule(moduleKey)); } catch { /* noop */ }
+    return nomes;
   }, [moduleKey]);
+
+  // Cura do fantasma: aparelho que rodou a versão com o diff furado pode ter
+  // nome de seed gravado como "construção" — apaga no primeiro mount.
+  useEffect(() => {
+    try {
+      const cru = localStorage.getItem("guest:core-demo-conta");
+      if (cru && nomesDaSeed.has(String(JSON.parse(cru)).trim().toLowerCase())) {
+        localStorage.removeItem("guest:core-demo-conta");
+      }
+    } catch { /* noop */ }
+  }, [nomesDaSeed]);
 
   // Sem toast aqui: o banner do topo já sinaliza que é demo — deixa a pessoa
   // mexer à vontade sem interrupção.
@@ -59,14 +86,14 @@ export const PreviewUserDataProvider = ({
       if (key === "finance-dueDays" && isNativeShell()) {
         const nova = ((Array.isArray(value) ? value : []) as Array<{ bills?: Array<{ name?: string }> }>)
           .flatMap((d) => (Array.isArray(d?.bills) ? d.bills.map((b) => String(b?.name ?? "")) : []))
-          .find((n) => n.trim() && !contasDaSeed.has(n));
+          .find((n) => n.trim() && !nomesDaSeed.has(n.trim().toLowerCase()));
         // mesmo formato do useUserData guest (guest:<chave> + JSON) — é de lá
         // que o useRecap lê no paywall.
         if (nova) localStorage.setItem("guest:core-demo-conta", JSON.stringify(nova));
       }
     } catch { /* endowment nunca derruba a demo */ }
     setStore((prev) => ({ ...prev, [key]: value }));
-  }, [contasDaSeed]);
+  }, [nomesDaSeed]);
 
   const fetchKey = useCallback(async <T,>(key: string): Promise<T | null> => {
     return (key in store ? store[key] : null) as T | null;

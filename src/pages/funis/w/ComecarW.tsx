@@ -26,8 +26,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
+import { ChevronRight } from "lucide-react";
 import {
-  VitrineStartScreen, QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen,
+  QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen,
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
 import { PromessasScreen, ContratoScreen, NotifScreen } from "@/pages/funis/teste/ComecarTeste";
@@ -96,6 +97,44 @@ const COMPROMISSOS_POR_AREA: Record<AreaKey, Array<{ emoji: string; p: string }>
     { emoji: "🚀", p: "Topa virar sua melhor versão?" },
   ],
 };
+
+/** Porta como PERGUNTA de quiz (30/08, dono): na web esta tela era a ENTRADA
+ *  do funil (headline hero, grade de 16 ícones, "5 perguntas rápidas · sem
+ *  cadastro"). Aqui ela vem DEPOIS da welcome+promessas — então veste o
+ *  uniforme das outras perguntas: título de quiz + opções, e só. */
+const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
+  { area: "dinheiro", emoji: "💰", label: "Meu dinheiro" },
+  { area: "rotina", emoji: "📅", label: "Minha rotina e hábitos" },
+  { area: "corpo", emoji: "💪", label: "Treino e alimentação" },
+  { area: "metas", emoji: "🎯", label: "Minhas metas paradas" },
+  { area: "dinheiro", emoji: "😵", label: "Tudo, sinceramente" },
+];
+
+function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
+  return (
+    <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
+      <span className="text-xs text-muted-foreground tabular-nums mb-2">1/6</span>
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
+        Qual área da sua vida tá mais fora de controle hoje?
+      </h2>
+      <div className="space-y-2.5">
+        {PORTAS_W.map((o) => (
+          <button
+            key={o.label}
+            onClick={() => onPickArea(o.area, o.label)}
+            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+          >
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{o.emoji}</span>
+            <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+            <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => void }) {
   const PERGUNTAS = COMPROMISSOS_POR_AREA[area] ?? COMPROMISSOS_POR_AREA.dinheiro;
@@ -241,7 +280,7 @@ export default function ComecarW() {
           <AnimatePresence mode="wait">
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
               {step === "porta" && (
-                <VitrineStartScreen
+                <PortaW
                   onPickArea={(a, label) => {
                     setArea(a);
                     const r = { ...answers, area: a, area_label: label };

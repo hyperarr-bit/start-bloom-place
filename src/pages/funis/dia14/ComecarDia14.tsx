@@ -471,7 +471,7 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
 
 // Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
 // após a pergunta de gasto. As trilhas das outras áreas não têm proof.
-export type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
+export type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" } | { kind: "extra" };
 export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
   questions.flatMap((q, i) => {
     const item: QuizItem[] = [{ kind: "q", qIdx: i }];
@@ -480,7 +480,7 @@ export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): Quiz
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, counterBase = 0 }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -490,6 +490,10 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   skipFirstAnswered?: boolean;
   /** Trilha de vida: renderiza o pico de área (senão, o proof de gasto). */
   proofArea?: AreaKey;
+  /** Funil W: slide próprio no meio do quiz (item {kind:"extra"}) — ex.: convite de notificação estilo Cal AI. */
+  extraSlide?: (next: () => void) => React.ReactNode;
+  /** Funil W: telas ANTES do quiz que contam no progresso (a porta = pergunta 1). */
+  counterBase?: number;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -508,7 +512,7 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
     const it = items[idx];
-    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : "quiz_proof" });
+    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : "quiz_proof" });
   }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
@@ -533,14 +537,16 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
         </button>
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <motion.div className="h-full bg-accent rounded-full" initial={false}
-            animate={{ width: `${((idx + 1) / items.length) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+            animate={{ width: `${((idx + 1 + counterBase) / (items.length + counterBase)) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1}/{items.length}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={item.kind === "q" ? q!.key : "proof"} {...slide}>
-          {item.kind === "proof" ? (
+        <motion.div key={item.kind === "q" ? q!.key : item.kind} {...slide}>
+          {item.kind === "extra" ? (
+            extraSlide?.(() => advance(answers)) ?? null
+          ) : item.kind === "proof" ? (
             proofArea && proofArea !== "dinheiro" ? (
               <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} onNext={() => advance(answers)} />
             ) : (

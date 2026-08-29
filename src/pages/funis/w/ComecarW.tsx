@@ -32,7 +32,7 @@ import {
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
-import { SignupScreen, ConfirmScreen, LiberandoScreen } from "@/pages/funis/radar/ComecarRadar";
+import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
 
 const FUNIL = "w";
@@ -113,8 +113,7 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
 function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
   return (
     <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      <span className="text-xs text-muted-foreground tabular-nums mb-2">1/6</span>
-      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7 mt-9">
         Qual área da sua vida tá mais fora de controle hoje?
       </h2>
       <div className="space-y-2.5">
@@ -122,9 +121,9 @@ function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => voi
           <button
             key={o.label}
             onClick={() => onPickArea(o.area, o.label)}
-            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
           >
-            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{o.emoji}</span>
+            <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
             <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
             <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
@@ -197,8 +196,7 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
     onDone();
   };
   return (
-    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      <span className="text-xs text-muted-foreground tabular-nums mb-2">quase lá</span>
+    <div className="w-full max-w-md mx-auto">
       <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-3">{conf.titulo}</h2>
       <p className="text-[14px] text-muted-foreground mb-6">
         Organizar sozinho falha no dia 3 — por esquecimento, não por preguiça. O lembrete certo, na hora certa, é metade do resultado.
@@ -211,7 +209,7 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
           </div>
         ))}
       </div>
-      <div className="mt-auto space-y-2.5 pb-2">
+      <div className="space-y-2.5 pb-2">
         <button
           onClick={() => void seguir(true)}
           disabled={indo}
@@ -318,6 +316,16 @@ export default function ComecarW() {
       const r = sessionStorage.getItem(CHAVES.respostas);
       if (r) setAnswers(JSON.parse(r));
     } catch { /* noop */ }
+    // Volta do OAuth de quem JÁ PAGOU (SignupScreen grava a flag antes de
+    // abrir o Google): pousa direto no liberando, nunca de volta no paywall.
+    try {
+      if (localStorage.getItem(POS_COMPRA_OAUTH_KEY) === "1") {
+        localStorage.removeItem(POS_COMPRA_OAUTH_KEY);
+        setPosCompra(true);
+        setStepCru("liberando");
+        return;
+      }
+    } catch { /* noop */ }
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
@@ -339,7 +347,15 @@ export default function ComecarW() {
   // prova de gasto embutida; outras áreas = trilha própria com o pico após a
   // pergunta de consistência.
   const perguntas = areaOuPadrao === "dinheiro" ? QUIZ : AREA_TRACKS[areaOuPadrao as Exclude<AreaKey, "dinheiro">];
-  const itensQuiz = areaOuPadrao === "dinheiro" ? buildQuizItems(QUIZ, "gasto") : buildQuizItems(perguntas, "consistencia");
+  const itensQuiz = (() => {
+    const base = areaOuPadrao === "dinheiro" ? buildQuizItems(QUIZ, "gasto") : buildQuizItems(perguntas, "consistencia");
+    // Notificação ENTRE as perguntas (30/08, dono: "igual o Cal AI, que mete
+    // um gráfico no meio do quiz") — entra logo depois da 2ª pergunta.
+    const pos = base.findIndex((it) => it.kind === "q" && it.qIdx === 1);
+    const arr = [...base];
+    arr.splice((pos < 0 ? 0 : pos) + 1, 0, { kind: "extra" });
+    return arr;
+  })();
   const prepSteps = ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[areaOuPadrao].nome}`, "Finalizando seu plano personalizado"];
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
 
@@ -354,7 +370,7 @@ export default function ComecarW() {
     // Cerca da demo (v83.4): a volta converge em /funil-w?step=compromissos.
     try {
       sessionStorage.setItem("core-demo-guarda", "1");
-      sessionStorage.setItem("core-demo-volta", "/funil-w?step=compromissos");
+      sessionStorage.setItem("core-demo-volta", `${window.location.pathname}?step=compromissos`);
     } catch { /* noop */ }
     const modulo = AREAS[areaOuPadrao].module;
     trackEvent("funnel_view", { step: "demo", funil: FUNIL, area: areaOuPadrao, module: modulo });
@@ -400,6 +416,8 @@ export default function ComecarW() {
                   questions={perguntas}
                   items={itensQuiz}
                   initialAnswers={answers}
+                  counterBase={1}
+                  extraSlide={(next) => <NotifW area={areaOuPadrao} onDone={next} />}
                   proofArea={areaOuPadrao === "dinheiro" ? undefined : areaOuPadrao}
                   onBack={() => setStep("porta")}
                   onDone={(r: Record<string, string>) => {
@@ -412,9 +430,8 @@ export default function ComecarW() {
               )}
               {step === "progress" && <ProgressScreen steps={prepSteps} onDone={() => setStep("result")} />}
               {step === "result" && (
-                <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("notif")} />
+                <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
               )}
-              {step === "notif" && <NotifW area={areaOuPadrao} onDone={() => setStep("central")} />}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
               {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}

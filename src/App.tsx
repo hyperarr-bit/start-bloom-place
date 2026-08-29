@@ -513,7 +513,11 @@ const AnimatedRoutes = () => {
             sempre — a bifurcação é pelo ELEMENTO da rota, nunca pela rota
             (lição do /inicio de 26/07: reapontar rota compartilhada quebrou
             o app junto). */}
-        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app">{isNativeShell() ? <ComecarTeste /> : <ComecarRadar />}</RouteErrorBoundary></PageTransition>} />
+        {/* v85 (30/08, decisão do dono): o funil W (web-que-dava-ROI, 97,90
+            vitalício foco único) vira A porta do shell — comparação
+            dia-contra-dia com o funil de colunas do v84. Rollback = trocar
+            ComecarW por ComecarTeste aqui. */}
+        <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app">{isNativeShell() ? <ComecarW /> : <ComecarRadar />}</RouteErrorBoundary></PageTransition>} />
         {/* Funil W em teste: só no shell (vende via RC; na web quebraria). */}
         <Route path="/funil-w" element={isNativeShell() ? <PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition> : <Navigate to="/lp" replace />} />
         <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

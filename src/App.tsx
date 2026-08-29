@@ -136,17 +136,22 @@ function GuardaDemoShell() {
       // (provado por CDP 28/08). E o Voltar do ANDROID cai em /app SEM step
       // (a welcome) — zerava ~10 telas de progresso (varredura v83.4): sem
       // step também é fuga, converge no mesmo ponto da seta.
-      if (pathname.startsWith("/app")) {
+      // Funil W (29/08): a demo pode pertencer a outro funil — quem armou a
+      // cerca deixa o endereço de volta em core-demo-volta; sem ele, /app.
+      const volta = sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos";
+      const casaDaVolta = volta.split("?")[0];
+      if (pathname.startsWith("/app") || pathname.startsWith(casaDaVolta)) {
         if (new URLSearchParams(search).has("step")) {
           sessionStorage.removeItem("core-demo-guarda");
+          sessionStorage.removeItem("core-demo-volta");
           return;
         }
         trackEvent("demo_fuga_redirecionada", { para: `${pathname} (sem step)` });
-        navigate("/app?step=compromissos", { replace: true });
+        navigate(volta, { replace: true });
         return;
       }
       trackEvent("demo_fuga_redirecionada", { para: pathname });
-      navigate("/app?step=compromissos", { replace: true });
+      navigate(volta, { replace: true });
     } catch { /* cerca nunca derruba navegação */ }
   }, [pathname, search, navigate]);
   return null;
@@ -338,6 +343,9 @@ const ComecarRadar = lazyPage(() => import("./pages/funis/radar/ComecarRadar"));
 // v53 (16/08): o funil do TESTE GRÁTIS — a porta nova do shell. A web nunca
 // o vê (a rota /app bifurca por isNativeShell); o radar segue na web como era.
 const ComecarTeste = lazyPage(() => import("./pages/funis/teste/ComecarTeste"));
+// FUNIL W (29/08, desenho do dono): o funil da web que dava ROI dentro do
+// app — em rota de teste até aprovação; depois vira o /app do shell.
+const ComecarW = lazyPage(() => import("./pages/funis/w/ComecarW"));
 const ComecarFunilV1 = lazyPage(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazyPage(() => import("./pages/BemVindo"));
@@ -506,6 +514,8 @@ const AnimatedRoutes = () => {
             (lição do /inicio de 26/07: reapontar rota compartilhada quebrou
             o app junto). */}
         <Route path="/app" element={<PageTransition><RouteErrorBoundary routeName="funil-app">{isNativeShell() ? <ComecarTeste /> : <ComecarRadar />}</RouteErrorBoundary></PageTransition>} />
+        {/* Funil W em teste: só no shell (vende via RC; na web quebraria). */}
+        <Route path="/funil-w" element={isNativeShell() ? <PageTransition><RouteErrorBoundary routeName="funil-w"><ComecarW /></RouteErrorBoundary></PageTransition> : <Navigate to="/lp" replace />} />
         <Route path="/funil-v1" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v1"><ComecarFunilV1 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/bem-vindo" element={<PageTransition><RouteErrorBoundary routeName="bem-vindo"><BemVindo /></RouteErrorBoundary></PageTransition>} />
         <Route path="/tutorial-proto" element={<PageTransition><TutorialLab /></PageTransition>} />

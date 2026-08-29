@@ -158,7 +158,7 @@ function StartScreen({ onPick }: { onPick: (firstAnswer: string) => void }) {
 
 /** Porta do criativo "vida inteira": o vídeo vendeu a casa, a porta faz a
  *  pessoa escolher um cômodo — amplitude vira especificidade em 1 toque. */
-function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
+export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey, label: string) => void }) {
   const options: Array<{ area: AreaKey; emoji: string; label: string }> = [
     ...DOOR_AREAS.map((key) => ({ area: key, emoji: AREAS[key].emoji, label: AREAS[key].label })),
     // "Tudo" não é uma trilha — é pedido de priorização. Começa pelo que
@@ -305,7 +305,7 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
   ],
 };
 
-function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
+export function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
   const a = AREAS[area];
   const items = answers.vitoria
     ? [answers.vitoria, ...AREA_RESULT_ITEMS[area].filter((r) => r !== answers.vitoria)].slice(0, 4)
@@ -342,7 +342,7 @@ function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, 
 
 /** Vislumbre da central: prova a amplitude (16 módulos) por 3 segundos de
  *  tela — trailer, não mapa. A demo continua guiada (5 módulos do vídeo). */
-function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
+export function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => void }) {
   const a = AREAS[area];
   // Só o módulo da área tem anel "começa aqui" (bate com a copy). Os outros
   // 15 são cards sólidos — NADA apagado, senão o lead acha que estão bloqueados.
@@ -471,8 +471,8 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
 
 // Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
 // após a pergunta de gasto. As trilhas das outras áreas não têm proof.
-type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
-const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
+export type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" };
+export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
   questions.flatMap((q, i) => {
     const item: QuizItem[] = [{ kind: "q", qIdx: i }];
     if (proofAfterKey && q.key === proofAfterKey) item.push({ kind: "proof" });
@@ -480,7 +480,7 @@ const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] 
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -649,7 +649,7 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
   );
 }
 
-function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
+export function ProgressScreen({ onDone, steps = PREP_STEPS }: { onDone: () => void; steps?: string[] }) {
   const [done, setDone] = useState(0);
   useEffect(() => {
     if (done >= steps.length) {

@@ -488,7 +488,7 @@ function HorarioScreen({ area, onPick }: { area: AreaKey; onPick: (id: string) =
 /** T4 — promessa ANTES do pedido: mostra exatamente o que vai chegar (da
  *  área escolhida) e só então pede a permissão. Última tela de funil: o
  *  toque seguinte abre o app DE VERDADE em modo guiado. */
-function NotifScreen({ area, hora, onDone }: { area: AreaKey; hora: string | null; onDone: (pediu: boolean) => void }) {
+export function NotifScreen({ area, hora, onDone }: { area: AreaKey; hora: string | null; onDone: (pediu: boolean) => void }) {
   const [indo, setIndo] = useState(false);
   const previews = PUSH_PREVIEW[area];
   const horaLabel = HORARIOS.find((h) => h.id === hora)?.hora ?? "19:30";
@@ -674,7 +674,7 @@ function MontandoScreen({ area, hora, onDone }: { area: AreaKey; hora: string | 
  * contrato assinado. Adaptado com números REAIS (nada de "31 milhões"). */
 
 /** T0.5 — promessas automáticas (prime emocional, ~4s, toque pula). */
-function PromessasScreen({ onDone }: { onDone: () => void }) {
+export function PromessasScreen({ onDone }: { onDone: () => void }) {
   const FRAMES = [
     { bg: "#fdeccb", emoji: "🗂️", t: "Mais organização" },
     { bg: "#cdeeee", emoji: "🔁", t: "Mais constância" },
@@ -863,7 +863,7 @@ function CompromissosScreen({ onDone }: { onDone: () => void }) {
 
 /** Contrato assinado com o dedo (assinatura do Me+, o pico de compromisso).
  *  Canvas cru de pointer events — sem lib. "Pular" existe: fricção opcional. */
-function ContratoScreen({ onDone }: { onDone: () => void }) {
+export function ContratoScreen({ onDone }: { onDone: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const desenhando = useRef(false);
   const tracos = useRef(0);

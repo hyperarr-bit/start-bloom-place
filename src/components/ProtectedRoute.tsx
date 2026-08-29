@@ -35,7 +35,7 @@ export const ProtectedRoute = ({ children, allowGuest = false }: ProtectedRouteP
        * visitante da demo volta pra continuação do funil, nunca pro /auth. */
       try {
         if (sessionStorage.getItem("core-demo-guarda") === "1") {
-          return <Navigate to="/app?step=compromissos" replace />;
+          return <Navigate to={sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos"} replace />;
         }
       } catch { /* noop */ }
       const t = estadoTeste();

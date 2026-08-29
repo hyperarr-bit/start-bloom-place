@@ -51,6 +51,12 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
 
 // Estático de propósito: sticky aqui brigava com o header sticky do módulo e
 // cobria títulos de cards no scroll do celular. O CTA persistente é o de baixo.
+/** Volta da demo no shell: o funil que armou a demo deixa o endereço em
+ *  core-demo-volta (funil W); sem ele, a porta clássica do /app. */
+const voltaDaDemoShell = () => {
+  try { return sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos"; } catch { return "/app?step=compromissos"; }
+};
+
 const PreviewBanner = ({ funnel }: { funnel?: boolean }) => {
   /* v83.5 (dono): no APP o roxo era identidade que o app nunca teve — a demo
      é o app real, então o aviso VESTE o app (fundo do tema + grafite, faixa
@@ -193,7 +199,9 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
     // v83.1 (dono, 28/08): a demo virou o passo do FUNIL Me+ — a volta cai no
     // "quer organizar sua vida?" (compromissos → contrato → paywall), não
     // direto no offer: o contrato assinado é o preditor de 3× da autópsia.
-    ? "/app?step=compromissos"
+    // Funil W (29/08): quem armou a demo pode deixar outra volta em
+    // core-demo-volta — senão, o /app de sempre.
+    ? voltaDaDemoShell()
     : (from && voltaFunilTeste(from, tour))
       ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
   return (
@@ -227,7 +235,7 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   // em ?step=signup (o "plano" saiu — ver DemoCta).
   const to = isNativeShell()
     // v83.1: nudge também devolve pro ritual (compromissos → contrato → offer).
-    ? "/app?step=compromissos"
+    ? voltaDaDemoShell()
     : (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
   if (!show) return null;
   const dismiss = () => {

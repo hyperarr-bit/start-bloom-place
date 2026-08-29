@@ -77,7 +77,7 @@ const stagger = (i: number) => ({
 
 /* ------------------------------------------------------ transformação (SVG) */
 
-const CHART_LABEL: Record<AreaKey, string> = {
+export const CHART_LABEL: Record<AreaKey, string> = {
   dinheiro: "Seu controle do dinheiro",
   rotina: "Sua consistência",
   corpo: "Sua evolução",
@@ -85,7 +85,7 @@ const CHART_LABEL: Record<AreaKey, string> = {
   metas: "Sua distância até a meta",
 };
 
-function TransformChart({ label = CHART_LABEL.dinheiro }: { label?: string }) {
+export function TransformChart({ label = CHART_LABEL.dinheiro }: { label?: string }) {
   return (
     <div className="relative rounded-2xl border border-border bg-card p-4 overflow-hidden">
       <div className="flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
@@ -185,7 +185,7 @@ const STACKS: Record<AreaKey, Array<{ Icon: typeof Wallet; tile: string; title: 
   ],
 };
 
-function ValueStack({ area }: { area: AreaKey }) {
+export function ValueStack({ area }: { area: AreaKey }) {
   const stack = STACKS[area] ?? STACKS.dinheiro;
   return (
     <div className="space-y-2.5">
@@ -234,7 +234,7 @@ function ValueStack({ area }: { area: AreaKey }) {
 /** Funil vitrine: no lugar da comparação com planilha (que é de finanças),
  *  a prova de amplitude — os 16 módulos. TODOS lêem como inclusos (check em
  *  cada): destacar só 5 fazia o lead achar que os cinza eram bloqueados. */
-function ModulesIncludedCard() {
+export function ModulesIncludedCard() {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-3">
@@ -297,7 +297,7 @@ function GuaranteeTimeline() {
 
 /** Contraste "o que some por ano" vs "o que o CORE custa" — usa a estimativa
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
-function AnchorCard({ gasto }: { gasto: string }) {
+export function AnchorCard({ gasto }: { gasto: string }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
   if (!anchor) return null;
   return (
@@ -318,7 +318,7 @@ function AnchorCard({ gasto }: { gasto: string }) {
 
 /** Âncora de custo das trilhas de vida: o custo de CONTINUAR ASSIM
  *  (recomeços/sintomas) vs o preço por mês. Espelha o AnchorCard de finanças. */
-function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
+export function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
   const anchor = AREA_ANCHOR[area];
   if (!anchor) return null;
   return (
@@ -482,7 +482,7 @@ function DepoCard({ d }: { d: Depo }) {
 /** Mural dentro do paywall, depois do preço — o "Success stories from our
  *  clients" do BitePal, com o "ver mais" fazendo o papel da tela-só-de-reviews
  *  do Cal AI sem custar uma tela a mais no funil. */
-function MuralDepoimentos({ area }: { area: AreaKey }) {
+export function MuralDepoimentos({ area }: { area: AreaKey }) {
   const [aberto, setAberto] = useState(false);
   return (
     <div className="text-left">
@@ -511,7 +511,7 @@ const TRUST_CHIPS = [
   { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
-function TrustChips() {
+export function TrustChips() {
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
       {TRUST_CHIPS.map((c) => (
@@ -531,7 +531,7 @@ const COMPARE_ROWS: Array<{ label: string; core: boolean; sheet: boolean; bank: 
   { label: "Dá vontade de abrir todo dia", core: true, sheet: false, bank: false },
 ];
 
-function CompareTable() {
+export function CompareTable() {
   const Mark = ({ on }: { on: boolean }) =>
     on ? (
       <span className="grid place-items-center w-5 h-5 rounded-full bg-accent/15 text-accent mx-auto">

@@ -200,7 +200,9 @@ export function PaywallW({
 
       <div className="space-y-4">
         <motion.div {...stagger(0)}>
-          {area === "dinheiro" ? <AnchorCard gasto={answers?.gasto ?? ""} /> : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} />}
+          {area === "dinheiro"
+            ? <AnchorCard gasto={answers?.gasto ?? ""} preco="97,90" />
+            : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco="97,90" />}
         </motion.div>
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />

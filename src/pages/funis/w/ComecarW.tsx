@@ -31,7 +31,7 @@ import {
   QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen,
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
-import { PromessasScreen, ContratoScreen, NotifScreen } from "@/pages/funis/teste/ComecarTeste";
+import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
 
@@ -112,7 +112,7 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
 
 function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
   return (
-    <div className="flex-1 flex flex-col justify-center w-full max-w-md mx-auto">
+    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
       <span className="text-xs text-muted-foreground tabular-nums mb-2">1/6</span>
       <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
         Qual área da sua vida tá mais fora de controle hoje?
@@ -131,6 +131,98 @@ function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => voi
             </span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Notificação NO ONBOARDING (30/08, dono: "não faz sentido depois do
+ *  compromisso; tem que seguir a identidade da web e falar do que ELE
+ *  escolheu"). Tela CLARA, uniforme de quiz, logo depois do diagnóstico:
+ *  o resultado acabou de dizer o que o CORE vai fazer — aqui ele diz COMO
+ *  te lembra disso. Copy por área, concreta. */
+const LEMBRETES_W: Record<AreaKey, { titulo: string; itens: Array<{ emoji: string; t: string }> }> = {
+  dinheiro: {
+    titulo: "O CORE te avisa antes da conta vencer",
+    itens: [
+      { emoji: "💸", t: "Conta chegando no vencimento — aviso na véspera" },
+      { emoji: "📊", t: "Quanto ainda dá pra gastar no mês" },
+      { emoji: "🗓️", t: "Fechamento do teu mês, todo dia 1º" },
+    ],
+  },
+  rotina: {
+    titulo: "O CORE te lembra do hábito na hora certa",
+    itens: [
+      { emoji: "🔁", t: "Hábito do dia ainda aberto — um toque às 21h" },
+      { emoji: "📅", t: "Sua agenda de amanhã, na noite anterior" },
+      { emoji: "🔥", t: "Sua sequência em risco — antes de quebrar" },
+    ],
+  },
+  corpo: {
+    titulo: "O CORE te lembra do treino de hoje",
+    itens: [
+      { emoji: "💪", t: "Treino do dia, no seu horário" },
+      { emoji: "💧", t: "Água ficando pra trás — lembrete leve" },
+      { emoji: "🔥", t: "Constância em risco — antes de quebrar" },
+    ],
+  },
+  saude: {
+    titulo: "O CORE cuida dos teus lembretes de saúde",
+    itens: [
+      { emoji: "💧", t: "Água e sono — no ritmo que você definir" },
+      { emoji: "❤️", t: "Check-in do teu dia, uma vez só" },
+      { emoji: "🔥", t: "Sequência em risco — antes de quebrar" },
+    ],
+  },
+  metas: {
+    titulo: "O CORE te cobra a meta (do jeito bom)",
+    itens: [
+      { emoji: "🎯", t: "Check-in semanal do progresso da meta" },
+      { emoji: "📈", t: "Marco batido — comemorar também importa" },
+      { emoji: "🔥", t: "Semana sem avanço — cutucada gentil" },
+    ],
+  },
+};
+
+function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
+  const [indo, setIndo] = useState(false);
+  const conf = LEMBRETES_W[area] ?? LEMBRETES_W.dinheiro;
+  const seguir = async (pedir: boolean) => {
+    if (indo) return;
+    setIndo(true);
+    trackEvent("funnel_click", { cta: pedir ? "notif_ativar" : "notif_pular", funil: FUNIL, area });
+    if (pedir) {
+      try { const { pedirPermissao } = await import("@/lib/notificacoes"); await pedirPermissao(); } catch { /* nunca trava o funil */ }
+    }
+    onDone();
+  };
+  return (
+    <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
+      <span className="text-xs text-muted-foreground tabular-nums mb-2">quase lá</span>
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-3">{conf.titulo}</h2>
+      <p className="text-[14px] text-muted-foreground mb-6">
+        Organizar sozinho falha no dia 3 — por esquecimento, não por preguiça. O lembrete certo, na hora certa, é metade do resultado.
+      </p>
+      <div className="space-y-2.5 mb-8">
+        {conf.itens.map((i) => (
+          <div key={i.t} className="flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3">
+            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{i.emoji}</span>
+            <span className="font-semibold text-[14px] leading-snug">{i.t}</span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-auto space-y-2.5 pb-2">
+        <button
+          onClick={() => void seguir(true)}
+          disabled={indo}
+          className="w-full rounded-full py-4 text-[16px] font-extrabold text-white active:scale-[0.99] transition-transform disabled:opacity-60"
+          style={{ background: "#16121c" }}
+        >
+          Quero ser lembrado
+        </button>
+        <button onClick={() => void seguir(false)} disabled={indo} className="w-full text-center text-[13px] text-muted-foreground py-2">
+          Agora não
+        </button>
       </div>
     </div>
   );
@@ -192,7 +284,16 @@ const CHAVES = {
 export default function ComecarW() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [step, setStepCru] = useState<Step>("welcome");
+  // Init preguiçoso DIRETO da URL (bug do dono 30/08: a volta da demo pintava
+  // 1 frame da welcome azul antes do efeito trocar o passo — o estado já
+  // nasce no passo certo e o azul nunca pinta).
+  const [step, setStepCru] = useState<Step>(() => {
+    try {
+      const s = new URLSearchParams(window.location.search).get("step");
+      if (s === "compromissos" || s === "offer" || s === "signup") return s as Step;
+    } catch { /* noop */ }
+    return "welcome";
+  });
   const [area, setArea] = useState<AreaKey | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [confirmEmail, setConfirmEmail] = useState("");
@@ -219,7 +320,6 @@ export default function ComecarW() {
     } catch { /* noop */ }
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
-      setStepCru(s as Step);
       trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
     } else {
       trackEvent("funnel_view", { step: "welcome", funil: FUNIL });
@@ -243,9 +343,9 @@ export default function ComecarW() {
   const prepSteps = ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[areaOuPadrao].nome}`, "Finalizando seu plano personalizado"];
   const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
 
-  // Faixa da status bar veste o funil (regra v83.4). Notif é tela escura.
+  // Faixa da status bar veste o funil (regra v83.4).
   useEffect(() => {
-    const cor = step === "welcome" ? "#7ec6f6" : step === "notif" ? "#16121c" : "#ffffff";
+    const cor = step === "welcome" ? "#7ec6f6" : "#ffffff";
     try { document.documentElement.style.setProperty("--safe-top-cor", cor); } catch { /* noop */ }
     return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
   }, [step]);
@@ -276,7 +376,11 @@ export default function ComecarW() {
       {step === "promessas" && <PromessasScreen onDone={() => setStep("porta")} />}
 
       {step !== "welcome" && step !== "promessas" && (
-        <div className={`flex-1 flex flex-col ${telaCheia ? "px-5 pt-4 pb-7" : "items-center justify-center px-5 py-10"}`}>
+        /* UNIFORME (30/08, dono: "as telas não conversavam — uma em cima,
+           outra embaixo, e dava pra rolar tela que não precisa"): todo passo
+           curto vive num viewport travado (h-dvh, sem scroll) com o MESMO
+           topo; só resultado/central/paywall — compridos de verdade — rolam. */
+        <div className={`flex flex-col px-5 ${telaCheia ? "min-h-dvh pt-4 pb-7" : step === "result" || step === "central" ? "min-h-dvh pt-6 pb-8" : "h-dvh overflow-hidden pt-6 pb-4"}`}>
           <AnimatePresence mode="wait">
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
               {step === "porta" && (
@@ -308,18 +412,12 @@ export default function ComecarW() {
               )}
               {step === "progress" && <ProgressScreen steps={prepSteps} onDone={() => setStep("result")} />}
               {step === "result" && (
-                <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
+                <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("notif")} />
               )}
+              {step === "notif" && <NotifW area={areaOuPadrao} onDone={() => setStep("central")} />}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
-              {step === "contrato" && <ContratoScreen onDone={() => setStep("notif")} />}
-              {/* NotifScreen foi desenhada pra fundo GRAFITE (tela escura do
-                  funil do app) — aqui ela ganha o palco escuro dela. */}
-              {step === "notif" && (
-                <div className="fixed inset-0 z-[5] overflow-y-auto flex flex-col px-5 py-10" style={{ background: "#16121c" }}>
-                  <NotifScreen area={areaOuPadrao} hora={null} onDone={() => setStep("offer")} />
-                </div>
-              )}
+              {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}
               {step === "offer" && (
                 <PaywallW
                   area={areaOuPadrao}

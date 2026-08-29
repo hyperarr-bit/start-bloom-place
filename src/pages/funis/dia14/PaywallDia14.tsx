@@ -297,7 +297,7 @@ function GuaranteeTimeline() {
 
 /** Contraste "o que some por ano" vs "o que o CORE custa" — usa a estimativa
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
-export function AnchorCard({ gasto }: { gasto: string }) {
+export function AnchorCard({ gasto, preco = PRICING.lifetime.total }: { gasto: string; preco?: string }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
   if (!anchor) return null;
   return (
@@ -309,7 +309,7 @@ export function AnchorCard({ gasto }: { gasto: string }) {
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">CORE vitalício,<br />pra enxergar tudo</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {preco}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
         </div>
       </div>
     </div>
@@ -318,7 +318,7 @@ export function AnchorCard({ gasto }: { gasto: string }) {
 
 /** Âncora de custo das trilhas de vida: o custo de CONTINUAR ASSIM
  *  (recomeços/sintomas) vs o preço por mês. Espelha o AnchorCard de finanças. */
-export function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> }) {
+export function AreaAnchorCard({ area, preco = PRICING.lifetime.total }: { area: Exclude<AreaKey, "dinheiro">; preco?: string }) {
   const anchor = AREA_ANCHOR[area];
   if (!anchor) return null;
   return (
@@ -331,7 +331,7 @@ export function AreaAnchorCard({ area }: { area: Exclude<AreaKey, "dinheiro"> })
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">Com o CORE,<br />sai por</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {PRICING.lifetime.total}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {preco}<span className="block text-[10px] font-semibold text-muted-foreground">1x, pra sempre</span></p>
         </div>
       </div>
     </div>

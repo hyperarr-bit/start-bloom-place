@@ -86,7 +86,6 @@ export function PaywallW({
   const vivoRef = useRef(true);
   // Disponibilidade real: otimista até resposta NEGATIVA da loja (regra v81).
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
-  const [mensalNaLoja, setMensalNaLoja] = useState(false);
 
   useEffect(() => {
     vivoRef.current = true;
@@ -95,10 +94,7 @@ export function PaywallW({
       const rc = await import("@/lib/revenuecat");
       await rc.prefetchVitalicio();
       if (!vivoRef.current) return;
-      if (rc.estadoRevenueCat() === "pronto") {
-        setVitalicioNaLoja(rc.temVitalicio97());
-        setMensalNaLoja(rc.temMensalVista());
-      }
+      if (rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
     })();
     return () => {
       vivoRef.current = false;
@@ -131,8 +127,8 @@ export function PaywallW({
     const abriuEm = Date.now();
     try {
       const rc = await import("@/lib/revenuecat");
-      const ok = produto === "mensal" && mensalNaLoja
-        ? await rc.comprarMensalVista()
+      const ok = produto === "mensal"
+        ? await rc.comprar("core_mensal", { semTrial: true })
         : vitalicioNaLoja !== false
           ? await rc.comprarVitalicio("core_vitalicio_97")
           : await rc.comprarAnual97();
@@ -262,9 +258,9 @@ export function PaywallW({
                   Abrir de novo e pagar no Pix
                 </button>
               )}
-              {mensalNaLoja && reabrindoEm === null && (
+              {reabrindoEm === null && (
                 <button className="block w-full text-center text-[11.5px] font-semibold mt-1 opacity-80 underline underline-offset-2 disabled:opacity-50" disabled={comprando} onClick={() => void comprar("mensal")}>
-                  ou começa com 1 mês — {APP_PRECOS.mensal.preco}
+                  ou assina o mensal — {APP_PRECOS.mensal.preco}/mês · cancela quando quiser
                 </button>
               )}
             </div>

@@ -35,10 +35,32 @@ const stagger = (i: number) => ({
   transition: { duration: 0.4, delay: Math.min(i * 0.05, 0.3) },
 });
 
-/** Preço vitalício do app no formato que o LifetimeCard da web tinha. */
-function LifetimeCardW() {
+/* A/B DO PREÇO (31/08, teste do dono): braço A = vitrine de UM preço só
+ * (o desenho da web que dava ROI); braço B = vitalício herói + mensal
+ * VISÍVEL logo abaixo, ambos selecionáveis. Sorteio 50/50 estável por
+ * aparelho (localStorage) — a pessoa vê SEMPRE o mesmo braço, mesmo
+ * recarregando. Forçar no QA: localStorage core-w-braco = "a" | "b". */
+export type BracoW = "a" | "b";
+const BRACO_KEY = "core-w-braco";
+const sortearBraco = (): BracoW => {
+  try {
+    const j = localStorage.getItem(BRACO_KEY);
+    if (j === "a" || j === "b") return j;
+    const b: BracoW = Math.random() < 0.5 ? "a" : "b";
+    localStorage.setItem(BRACO_KEY, b);
+    return b;
+  } catch { return "a"; }
+};
+
+/** Preço vitalício do app no formato que o LifetimeCard da web tinha.
+ *  No braço B vira cartão SELECIONÁVEL (o mensal mora embaixo). */
+function LifetimeCardW({ selecionavel = false, ativo = true, onSelect }: { selecionavel?: boolean; ativo?: boolean; onSelect?: () => void }) {
   return (
-    <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
+    <div
+      onClick={selecionavel ? onSelect : undefined}
+      role={selecionavel ? "button" : undefined}
+      className={`relative w-full rounded-3xl p-[2px] transition-all ${selecionavel && !ativo ? "bg-black/10 shadow-none" : "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]"}`}
+    >
       <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center text-[#16121c]">
         <div
           aria-hidden
@@ -70,6 +92,27 @@ function LifetimeCardW() {
   );
 }
 
+/** Braço B: o mensal renovável visível — hierarquia menor de propósito
+ *  (o herói continua sendo o vitalício; isto é a alternativa, não a rival). */
+function MensalCardW({ ativo, onSelect }: { ativo: boolean; onSelect: () => void }) {
+  return (
+    <div
+      onClick={onSelect}
+      role="button"
+      className={`w-full rounded-2xl border-2 bg-white text-[#16121c] px-4 py-3 flex items-center gap-3 text-left transition-all ${ativo ? "border-accent shadow-[0_10px_26px_-14px_rgba(0,0,0,.4)]" : "border-black/10"}`}
+    >
+      <span className={`grid place-items-center w-5 h-5 rounded-full border-2 shrink-0 ${ativo ? "border-accent" : "border-black/20"}`}>
+        {ativo && <span className="w-2.5 h-2.5 rounded-full bg-accent" />}
+      </span>
+      <span className="flex-1">
+        <span className="block text-[15px] font-extrabold leading-tight">Ou comece com 1 mês</span>
+        <span className="block text-[11.5px] text-black/50 font-semibold">renova todo mês · cancela quando quiser</span>
+      </span>
+      <span className="text-[17px] font-extrabold shrink-0">{APP_PRECOS.mensal.preco}</span>
+    </div>
+  );
+}
+
 export function PaywallW({
   area, answers, onPagoSemConta,
 }: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void }) {
@@ -86,10 +129,13 @@ export function PaywallW({
   const vivoRef = useRef(true);
   // Disponibilidade real: otimista até resposta NEGATIVA da loja (regra v81).
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
+  // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
+  const [braco] = useState<BracoW>(() => sortearBraco());
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">("vitalicio");
 
   useEffect(() => {
     vivoRef.current = true;
-    trackEvent("funnel_view", { step: "offer", funil: "w", area });
+    trackEvent("funnel_view", { step: "offer", funil: "w", area, braco });
     void (async () => {
       const rc = await import("@/lib/revenuecat");
       await rc.prefetchVitalicio();
@@ -127,11 +173,15 @@ export function PaywallW({
     const abriuEm = Date.now();
     try {
       const rc = await import("@/lib/revenuecat");
+      const idProduto = produto === "mensal" ? "core_mensal" : vitalicioNaLoja !== false ? "core_vitalicio_97" : "core_anual:coreanual97";
       const ok = produto === "mensal"
         ? await rc.comprar("core_mensal", { semTrial: true })
         : vitalicioNaLoja !== false
           ? await rc.comprarVitalicio("core_vitalicio_97")
           : await rc.comprarAnual97();
+      // v88: o front do W não emitia sucesso — o funil marcava "pagou 0" com
+      // dinheiro no caixa (o webhook cobria a verdade, o relatório não).
+      if (ok) trackEvent("app_sheet_success", { produto: idProduto, funil: "w", braco });
       if (ok) { onPagoSemConta(); return; }
       // Recusa: a MESMA escada provada do PaywallAssinatura.
       const dentroDaFolha = (Date.now() - abriuEm) / 1000;
@@ -154,7 +204,7 @@ export function PaywallW({
             if (v === null) return null;
             if (v <= 1) {
               desarmar();
-              void comprar("vitalicio");
+              void comprar(braco === "b" ? plano : "vitalicio");
               return null;
             }
             return v - 1;
@@ -203,7 +253,19 @@ export function PaywallW({
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />
         <motion.div {...stagger(2)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(3)}><LifetimeCardW /></motion.div>
+        <motion.div {...stagger(3)} className="space-y-2.5">
+          <LifetimeCardW
+            selecionavel={braco === "b"}
+            ativo={braco === "a" || plano === "vitalicio"}
+            onSelect={() => { setPlano("vitalicio"); trackEvent("funnel_click", { cta: "w_plano", plano: "vitalicio", braco, funil: "w" }); }}
+          />
+          {braco === "b" && (
+            <MensalCardW
+              ativo={plano === "mensal"}
+              onSelect={() => { setPlano("mensal"); trackEvent("funnel_click", { cta: "w_plano", plano: "mensal", braco, funil: "w" }); }}
+            />
+          )}
+        </motion.div>
         <MuralDepoimentos area={area} />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
@@ -272,17 +334,25 @@ export function PaywallW({
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
               disabled={comprando}
-              onClick={() => { trackEvent("funnel_click", { cta: "app_paywall_cta", produto: "core_vitalicio_97", funil: "w" }); void comprar("vitalicio"); }}
+              onClick={() => {
+                const escolha = braco === "b" ? plano : "vitalicio";
+                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco });
+                void comprar(escolha);
+              }}
             >
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <>Quero pra sempre — {APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
+                : braco === "b" && plano === "mensal"
+                  ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
+                  : <>Quero pra sempre — {APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
-              Pagamento <strong className="text-foreground font-semibold">único</strong> pelo Google Play · Pix ou cartão · sem mensalidade
+              {braco === "b" && plano === "mensal"
+                ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pelo Google Play · Pix ou cartão · cancela quando quiser</>
+                : <>Pagamento <strong className="text-foreground font-semibold">único</strong> pelo Google Play · Pix ou cartão · sem mensalidade</>}
             </span>
           </p>
         </div>

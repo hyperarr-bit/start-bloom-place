@@ -191,21 +191,28 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
     setIndo(true);
     trackEvent("funnel_click", { cta: pedir ? "notif_ativar" : "notif_pular", funil: FUNIL, area });
     if (pedir) {
-      try { const { pedirPermissao } = await import("@/lib/notificacoes"); await pedirPermissao(); } catch { /* nunca trava o funil */ }
+      try {
+        const { pedirPermissao, estadoPermissao } = await import("@/lib/notificacoes");
+        const antes = await estadoPermissao();
+        const concedida = await pedirPermissao();
+        // "denied" prévio (reinstalação/recusa antiga) = o Android NÃO mostra
+        // o diálogo nunca mais — o funil segue, e a telemetria conta quantos.
+        trackEvent("notif_permissao_funil", { funil: FUNIL, area, antes, concedida });
+      } catch { /* nunca trava o funil */ }
     }
     onDone();
   };
   return (
     <div className="w-full max-w-md mx-auto">
-      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-3">{conf.titulo}</h2>
-      <p className="text-[14px] text-muted-foreground mb-6">
-        Organizar sozinho falha no dia 3 — por esquecimento, não por preguiça. O lembrete certo, na hora certa, é metade do resultado.
+      <h2 className="text-[24px] font-bold tracking-tight leading-[1.15] mb-2">{conf.titulo}</h2>
+      <p className="text-[13px] text-muted-foreground mb-4 leading-snug">
+        Organizar sozinho falha no dia 3 — por esquecimento, não por preguiça. O lembrete certo é metade do resultado.
       </p>
-      <div className="space-y-2.5 mb-8">
+      <div className="space-y-2 mb-5">
         {conf.itens.map((i) => (
-          <div key={i.t} className="flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3">
-            <span className="grid place-items-center w-10 h-10 rounded-xl bg-secondary text-xl shrink-0">{i.emoji}</span>
-            <span className="font-semibold text-[14px] leading-snug">{i.t}</span>
+          <div key={i.t} className="flex items-center gap-3 rounded-2xl border-2 border-border bg-card p-2.5">
+            <span className="grid place-items-center w-9 h-9 rounded-xl bg-secondary text-lg shrink-0">{i.emoji}</span>
+            <span className="font-semibold text-[13.5px] leading-snug">{i.t}</span>
           </div>
         ))}
       </div>
@@ -213,7 +220,7 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
         <button
           onClick={() => void seguir(true)}
           disabled={indo}
-          className="w-full rounded-full py-4 text-[16px] font-extrabold text-white active:scale-[0.99] transition-transform disabled:opacity-60"
+          className="w-full rounded-full py-3.5 text-[15px] font-extrabold text-white active:scale-[0.99] transition-transform disabled:opacity-60"
           style={{ background: "#16121c" }}
         >
           Quero ser lembrado
@@ -236,7 +243,7 @@ function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => vo
   };
   const q = PERGUNTAS[i];
   return (
-    <div className="w-full flex-1 flex flex-col pt-2 min-h-[70vh]">
+    <div className="w-full flex-1 flex flex-col pt-2">
       <AnimatePresence mode="wait">
         <motion.div
           key={q.p}
@@ -292,8 +299,12 @@ export default function ComecarW() {
     } catch { /* noop */ }
     return "welcome";
   });
-  const [area, setArea] = useState<AreaKey | null>(null);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [area, setArea] = useState<AreaKey | null>(() => {
+    try { const a = sessionStorage.getItem(CHAVES.area) as AreaKey | null; return a && a in AREAS ? a : null; } catch { return null; }
+  });
+  const [answers, setAnswers] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(sessionStorage.getItem(CHAVES.respostas) ?? "{}"); } catch { return {}; }
+  });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [posCompra, setPosCompra] = useState(false);
   const montou = useRef(false);
@@ -310,12 +321,6 @@ export default function ComecarW() {
   useEffect(() => {
     if (montou.current) return;
     montou.current = true;
-    try {
-      const a = sessionStorage.getItem(CHAVES.area) as AreaKey | null;
-      if (a && a in AREAS) setArea(a);
-      const r = sessionStorage.getItem(CHAVES.respostas);
-      if (r) setAnswers(JSON.parse(r));
-    } catch { /* noop */ }
     // Volta do OAuth de quem JÁ PAGOU (SignupScreen grava a flag antes de
     // abrir o Google): pousa direto no liberando, nunca de volta no paywall.
     try {
@@ -378,7 +383,7 @@ export default function ComecarW() {
   };
 
   return (
-    <div style={{ ...LIGHT_VARS, background: "#ffffff" }} className="min-h-dvh text-foreground flex flex-col">
+    <div style={{ ...LIGHT_VARS, background: "#ffffff" }} className="min-h-[calc(100dvh-var(--app-safe-top,0px))] text-foreground flex flex-col">
       <AnimatePresence>
         {step === "welcome" && (
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
@@ -396,7 +401,10 @@ export default function ComecarW() {
            outra embaixo, e dava pra rolar tela que não precisa"): todo passo
            curto vive num viewport travado (h-dvh, sem scroll) com o MESMO
            topo; só resultado/central/paywall — compridos de verdade — rolam. */
-        <div className={`flex flex-col px-5 ${telaCheia ? "min-h-dvh pt-4 pb-7" : step === "result" || step === "central" ? "min-h-dvh pt-6 pb-8" : "h-dvh overflow-hidden pt-6 pb-4"}`}>
+        <div
+          style={{ ["--util" as string]: "calc(100dvh - var(--app-safe-top, 0px))" }}
+          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : step === "result" || step === "central" ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
+        >
           <AnimatePresence mode="wait">
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
               {step === "porta" && (
@@ -428,7 +436,7 @@ export default function ComecarW() {
                   }}
                 />
               )}
-              {step === "progress" && <ProgressScreen steps={prepSteps} onDone={() => setStep("result")} />}
+              {step === "progress" && <div className="flex-1 grid place-items-center"><ProgressScreen steps={prepSteps} onDone={() => setStep("result")} /></div>}
               {step === "result" && (
                 <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />
               )}

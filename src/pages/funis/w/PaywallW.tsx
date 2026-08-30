@@ -53,14 +53,10 @@ const sortearBraco = (): BracoW => {
 };
 
 /** Preço vitalício do app no formato que o LifetimeCard da web tinha.
- *  No braço B vira cartão SELECIONÁVEL (o mensal mora embaixo). */
-function LifetimeCardW({ selecionavel = false, ativo = true, onSelect }: { selecionavel?: boolean; ativo?: boolean; onSelect?: () => void }) {
+ *  Só no braço A — o braço B usa as duas colunas de peso igual. */
+function LifetimeCardW() {
   return (
-    <div
-      onClick={selecionavel ? onSelect : undefined}
-      role={selecionavel ? "button" : undefined}
-      className={`relative w-full rounded-3xl p-[2px] transition-all ${selecionavel && !ativo ? "bg-black/10 shadow-none" : "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]"}`}
-    >
+    <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
       <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center text-[#16121c]">
         <div
           aria-hidden
@@ -92,23 +88,52 @@ function LifetimeCardW({ selecionavel = false, ativo = true, onSelect }: { selec
   );
 }
 
-/** Braço B: o mensal renovável visível — hierarquia menor de propósito
- *  (o herói continua sendo o vitalício; isto é a alternativa, não a rival). */
-function MensalCardW({ ativo, onSelect }: { ativo: boolean; onSelect: () => void }) {
+/** Braço B (30/08, decisão do dono: "os dois no mesmo foco"): duas colunas
+ *  de PESO IGUAL — mesma largura, mesma altura, preço no mesmo corpo. Quem
+ *  faz o trabalho de venda não é a hierarquia visual, é a CONTA: 12 meses de
+ *  mensal custam R$ 298,80 contra R$ 97,90 uma vez (= R$ 8,16/mês no 1º ano,
+ *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
+ *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
+const CENTS = (txt: string) => Number(txt.replace(/[^\d,]/g, "").replace(",", ".")) || 0;
+
+function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void }) {
+  const mensal = CENTS(APP_PRECOS.mensal.preco);          // 24.90
+  const vital = CENTS(APP_PRECOS.vitalicio97.preco);      // 97.90
+  const anoMensal = (mensal * 12).toFixed(2).replace(".", ",");
+  const mesVital = (vital / 12).toFixed(2).replace(".", ",");
+  const moldura = (ativo: boolean) =>
+    `rounded-3xl p-[2px] transition-all ${ativo
+      ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
+      : "bg-black/10"}`;
   return (
-    <div
-      onClick={onSelect}
-      role="button"
-      className={`w-full rounded-2xl border-2 bg-white text-[#16121c] px-4 py-3 flex items-center gap-3 text-left transition-all ${ativo ? "border-accent shadow-[0_10px_26px_-14px_rgba(0,0,0,.4)]" : "border-black/10"}`}
-    >
-      <span className={`grid place-items-center w-5 h-5 rounded-full border-2 shrink-0 ${ativo ? "border-accent" : "border-black/20"}`}>
-        {ativo && <span className="w-2.5 h-2.5 rounded-full bg-accent" />}
-      </span>
-      <span className="flex-1">
-        <span className="block text-[15px] font-extrabold leading-tight">Ou comece com 1 mês</span>
-        <span className="block text-[11.5px] text-black/50 font-semibold">renova todo mês · cancela quando quiser</span>
-      </span>
-      <span className="text-[17px] font-extrabold shrink-0">{APP_PRECOS.mensal.preco}</span>
+    <div className="grid grid-cols-2 gap-2.5 items-stretch">
+      <div onClick={() => onSelect("mensal")} role="button" className={moldura(plano === "mensal")}>
+        <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-2.5 pb-3.5 text-center text-[#16121c] flex flex-col">
+          <span className="h-[19px]" aria-hidden />
+          <span className="text-[10.5px] font-extrabold tracking-[0.12em] text-black/40 mt-1.5">1 MÊS</span>
+          <span className="text-[27px] font-extrabold leading-none tracking-tight mt-1.5">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[11px] font-semibold text-black/45 mt-1">por mês, renovando</span>
+          <span className="mx-3 my-2.5 border-t border-black/10" aria-hidden />
+          <span className="text-[11.5px] font-bold text-black/55 leading-snug mt-auto">
+            12 meses<br />= R$ {anoMensal}
+          </span>
+        </div>
+      </div>
+
+      <div onClick={() => onSelect("vitalicio")} role="button" className={moldura(plano === "vitalicio")}>
+        <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-0 pb-3.5 text-center text-[#16121c] flex flex-col overflow-hidden">
+          <span className={`-mx-3 text-[9.5px] font-extrabold tracking-[0.12em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
+            MELHOR VALOR
+          </span>
+          <span className="text-[10.5px] font-extrabold tracking-[0.12em] text-black/40 mt-2.5">PRA SEMPRE</span>
+          <span className="text-[27px] font-extrabold leading-none tracking-tight mt-1.5 text-accent">{APP_PRECOS.vitalicio97.preco}</span>
+          <span className="text-[11px] font-semibold text-black/45 mt-1">uma única vez</span>
+          <span className="mx-3 my-2.5 border-t border-black/10" aria-hidden />
+          <span className="text-[11.5px] font-bold text-black/55 leading-snug mt-auto">
+            = R$ {mesVital}/mês no 1º ano<br /><b className="text-black/70">depois, nada</b>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -253,17 +278,14 @@ export function PaywallW({
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />
         <motion.div {...stagger(2)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(3)} className="space-y-2.5">
-          <LifetimeCardW
-            selecionavel={braco === "b"}
-            ativo={braco === "a" || plano === "vitalicio"}
-            onSelect={() => { setPlano("vitalicio"); trackEvent("funnel_click", { cta: "w_plano", plano: "vitalicio", braco, funil: "w" }); }}
-          />
-          {braco === "b" && (
-            <MensalCardW
-              ativo={plano === "mensal"}
-              onSelect={() => { setPlano("mensal"); trackEvent("funnel_click", { cta: "w_plano", plano: "mensal", braco, funil: "w" }); }}
+        <motion.div {...stagger(3)}>
+          {braco === "b" ? (
+            <PrecosLadoALadoW
+              plano={plano}
+              onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco, funil: "w" }); }}
             />
+          ) : (
+            <LifetimeCardW />
           )}
         </motion.div>
         <MuralDepoimentos area={area} />

@@ -94,13 +94,7 @@ function LifetimeCardW() {
  *  mensal custam R$ 298,80 contra R$ 97,90 uma vez (= R$ 8,16/mês no 1º ano,
  *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
-const CENTS = (txt: string) => Number(txt.replace(/[^\d,]/g, "").replace(",", ".")) || 0;
-
 function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void }) {
-  const mensal = CENTS(APP_PRECOS.mensal.preco);          // 24.90
-  const vital = CENTS(APP_PRECOS.vitalicio97.preco);      // 97.90
-  const anoMensal = (mensal * 12).toFixed(2).replace(".", ",");
-  const mesVital = (vital / 12).toFixed(2).replace(".", ",");
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -110,27 +104,28 @@ function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; 
       <div onClick={() => onSelect("mensal")} role="button" className={moldura(plano === "mensal")}>
         <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-2.5 pb-3.5 text-center text-[#16121c] flex flex-col">
           <span className="h-[19px]" aria-hidden />
-          <span className="text-[10.5px] font-extrabold tracking-[0.12em] text-black/40 mt-1.5">1 MÊS</span>
-          <span className="text-[27px] font-extrabold leading-none tracking-tight mt-1.5">{APP_PRECOS.mensal.preco}</span>
-          <span className="text-[11px] font-semibold text-black/45 mt-1">por mês, renovando</span>
-          <span className="mx-3 my-2.5 border-t border-black/10" aria-hidden />
-          <span className="text-[11.5px] font-bold text-black/55 leading-snug mt-auto">
-            12 meses<br />= R$ {anoMensal}
+          <span className="text-[30px] font-black leading-none mt-1.5">1</span>
+          <span className="text-[12.5px] font-bold text-black/45">mês</span>
+          <span className="text-[17px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">por mês</span>
+          <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
+          <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
+            cancele quando quiser
           </span>
         </div>
       </div>
 
       <div onClick={() => onSelect("vitalicio")} role="button" className={moldura(plano === "vitalicio")}>
         <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-0 pb-3.5 text-center text-[#16121c] flex flex-col overflow-hidden">
-          <span className={`-mx-3 text-[9.5px] font-extrabold tracking-[0.12em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
-            MELHOR VALOR
+          <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
+            MELHOR ESCOLHA
           </span>
-          <span className="text-[10.5px] font-extrabold tracking-[0.12em] text-black/40 mt-2.5">PRA SEMPRE</span>
-          <span className="text-[27px] font-extrabold leading-none tracking-tight mt-1.5 text-accent">{APP_PRECOS.vitalicio97.preco}</span>
-          <span className="text-[11px] font-semibold text-black/45 mt-1">uma única vez</span>
-          <span className="mx-3 my-2.5 border-t border-black/10" aria-hidden />
-          <span className="text-[11.5px] font-bold text-black/55 leading-snug mt-auto">
-            = R$ {mesVital}/mês no 1º ano<br /><b className="text-black/70">depois, nada</b>
+          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">Pra sempre</span>
+          <span className="text-[17px] font-extrabold mt-1.5">{APP_PRECOS.vitalicio97.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">vitalício · uma única vez</span>
+          <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
+          <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
+            4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b>
           </span>
         </div>
       </div>
@@ -156,7 +151,10 @@ export function PaywallW({
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
   // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
   const [braco] = useState<BracoW>(() => sortearBraco());
-  const [plano, setPlano] = useState<"vitalicio" | "mensal">("vitalicio");
+  /* Braço B abre no MENSAL (30/08, decisão do dono: "quero que o usuário
+   * primeiro veja o mensal") — a âncora do topo e o CTA acompanham. No braço
+   * A não existe escolha: é vitalício e ponto. */
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">(() => (sortearBraco() === "b" ? "mensal" : "vitalicio"));
 
   useEffect(() => {
     vivoRef.current = true;
@@ -271,9 +269,20 @@ export function PaywallW({
 
       <div className="space-y-4">
         <motion.div {...stagger(0)}>
-          {area === "dinheiro"
-            ? <AnchorCard gasto={answers?.gasto ?? ""} preco="97,90" />
-            : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco="97,90" />}
+          {(() => {
+            // A comparação do topo mostra o plano ESCOLHIDO — no braço B ela
+            // abre no mensal (24,90/mês) e troca pro vitalício se a pessoa
+            // mudar de coluna. No braço A é sempre o vitalício.
+            const mostraMensal = braco === "b" && plano === "mensal";
+            const preco = mostraMensal ? "24,90" : "97,90";
+            const precoSub = mostraMensal ? "por mês" : "1x, pra sempre";
+            const precoTitulo = mostraMensal
+              ? <>CORE mensal,<br />pra começar hoje</>
+              : undefined;
+            return area === "dinheiro"
+              ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />
+              : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />;
+          })()}
         </motion.div>
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />

@@ -471,16 +471,23 @@ function AreaProofSlide({ area, answer, onNext }: { area: AreaKey; answer: strin
 
 // Fluxo do quiz: perguntas + (na trilha de dinheiro) a tela de impacto logo
 // após a pergunta de gasto. As trilhas das outras áreas não têm proof.
-export type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" } | { kind: "extra" };
-export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string): QuizItem[] =>
+/* "eco" (31/08, ordem do dono, referência BitePal): a tela que RESPONDE a
+ * resposta. O quiz do BitePal nunca é só pergunta atrás de pergunta — a cada
+ * escolha o app devolve algo ("Eating window: 10 hours", "Your BMI: 25"), e é
+ * isso que faz parecer que ele entendeu você em vez de preencher formulário.
+ * O nosso era só a pergunta. */
+export type QuizItem = { kind: "q"; qIdx: number } | { kind: "proof" } | { kind: "extra" } | { kind: "eco"; qIdx: number };
+export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string, comEco = false): QuizItem[] =>
   questions.flatMap((q, i) => {
     const item: QuizItem[] = [{ kind: "q", qIdx: i }];
+    // o eco vem colado na pergunta que ele comenta; o proof continua depois
+    if (comEco) item.push({ kind: "eco", qIdx: i });
     if (proofAfterKey && q.key === proofAfterKey) item.push({ kind: "proof" });
     return item;
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, counterBase = 0 }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -492,8 +499,14 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   proofArea?: AreaKey;
   /** Funil W: slide próprio no meio do quiz (item {kind:"extra"}) — ex.: convite de notificação estilo Cal AI. */
   extraSlide?: (next: () => void) => React.ReactNode;
+  /** Funil W: a tela de ECO — recebe a pergunta respondida e as respostas. */
+  ecoSlide?: (qIdx: number, answers: Record<string, string>, next: () => void) => React.ReactNode;
   /** Funil W: telas ANTES do quiz que contam no progresso (a porta = pergunta 1). */
   counterBase?: number;
+  /** 31/08 (ordem do dono, referência BitePal): só a BARRA, sem o "3/8".
+   *  Número à vista vira contrato — a pessoa calcula quanto falta e desiste
+   *  no meio. A barra sozinha dá a mesma noção de avanço sem dar o boleto. */
+  semContador?: boolean;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -512,7 +525,7 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
   const q = item.kind === "q" ? questions[item.qIdx] : null;
   useEffect(() => {
     const it = items[idx];
-    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : "quiz_proof" });
+    trackEvent("funnel_view", { step: it.kind === "q" ? `quiz_${it.qIdx + 1}` : it.kind === "extra" ? "quiz_extra" : it.kind === "eco" ? `quiz_eco_${it.qIdx + 1}` : "quiz_proof" });
   }, [idx, items]);
   const back = () => { if (idx === 0) onBack(); else setIdx((i) => i - 1); };
   const advance = (next: Record<string, string>) => {
@@ -539,13 +552,15 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
           <motion.div className="h-full bg-accent rounded-full" initial={false}
             animate={{ width: `${((idx + 1 + counterBase) / (items.length + counterBase)) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>
+        {!semContador && <span className="text-xs text-muted-foreground tabular-nums">{idx + 1 + counterBase}/{items.length + counterBase}</span>}
       </div>
 
       <AnimatePresence mode="wait">
-        <motion.div key={item.kind === "q" ? q!.key : item.kind} {...slide}>
+        <motion.div key={item.kind === "q" ? q!.key : item.kind === "eco" ? `eco${item.qIdx}` : item.kind} {...slide}>
           {item.kind === "extra" ? (
             extraSlide?.(() => advance(answers)) ?? null
+          ) : item.kind === "eco" ? (
+            ecoSlide?.(item.qIdx, answers, () => advance(answers)) ?? null
           ) : item.kind === "proof" ? (
             proofArea && proofArea !== "dinheiro" ? (
               <AreaProofSlide area={proofArea} answer={answers.consistencia ?? ""} onNext={() => advance(answers)} />

@@ -27,7 +27,7 @@ import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen,
   buildQuizItems,
@@ -113,10 +113,25 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
   { area: "dinheiro", emoji: "😵", label: "Tudo, sinceramente" },
 ];
 
-function PortaW({ onPickArea }: { onPickArea: (a: AreaKey, label: string) => void }) {
+/* A PORTA É A PERGUNTA 1 (31/08, bronca do dono: "deixa ela no mesmo design
+ * das outras com a barra em cima"). Antes ela era uma tela avulsa, sem topo:
+ * a pessoa respondia a primeira pergunta sem nenhum sinal de que o quiz tinha
+ * começado, e a barra só aparecia depois — parecia outro app. Agora nasce com
+ * o mesmo cabeçalho do QuizScreen, com a barra no primeiro degrau de 8.
+ * O botão de voltar existe mas leva pras promessas (não há pergunta antes). */
+function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number }) {
   return (
     <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7 mt-9">
+      <div className="flex items-center gap-3 mb-8">
+        <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <motion.div className="h-full bg-accent rounded-full" initial={false}
+            animate={{ width: `${(1 / totalPassos) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
+        </div>
+      </div>
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
         Qual área da sua vida tá mais fora de controle hoje?
       </h2>
       <div className="space-y-2.5">
@@ -194,13 +209,24 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
     setIndo(true);
     trackEvent("funnel_click", { cta: pedir ? "notif_ativar" : "notif_pular", funil: FUNIL, area });
     if (pedir) {
+      /* TETO DE 4s (31/08). O `catch` sozinho não bastava: ele cobre promise
+       * REJEITADA, não promise que nunca resolve. E o plugin de permissão
+       * pendura em alguns aparelhos — reproduzido no emulador, onde o diálogo
+       * do Android não volta nunca. Como `indo` já desabilitou os DOIS botões
+       * antes do await, o resultado era uma tela sem saída: a pessoa que pediu
+       * o lembrete ficava presa no funil pra sempre, sem nem poder voltar.
+       * Corre atrás do dado quando dá, mas o funil nunca espera mais que 4s. */
+      const comTeto = <T,>(p: Promise<T>, ms = 4000) =>
+        Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
       try {
         const { pedirPermissao, estadoPermissao } = await import("@/lib/notificacoes");
-        const antes = await estadoPermissao();
-        const concedida = await pedirPermissao();
+        const antes = await comTeto(estadoPermissao());
+        const concedida = await comTeto(pedirPermissao());
         // "denied" prévio (reinstalação/recusa antiga) = o Android NÃO mostra
         // o diálogo nunca mais — o funil segue, e a telemetria conta quantos.
-        trackEvent("notif_permissao_funil", { funil: FUNIL, area, antes, concedida });
+        // `concedida: null` agora significa "o aparelho não respondeu a tempo",
+        // que é exatamente o caso que travava e a gente não conseguia contar.
+        trackEvent("notif_permissao_funil", { funil: FUNIL, area, antes, concedida, expirou: concedida === null });
       } catch { /* nunca trava o funil */ }
     }
     onDone();
@@ -417,6 +443,8 @@ export default function ComecarW() {
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
               {step === "porta" && (
                 <PortaW
+                  onBack={() => setStep("promessas")}
+                  totalPassos={itensQuiz.length + 1}
                   onPickArea={(a, label) => {
                     setArea(a);
                     const r = { ...answers, area: a, area_label: label };
@@ -433,6 +461,7 @@ export default function ComecarW() {
                   items={itensQuiz}
                   initialAnswers={answers}
                   counterBase={1}
+                  semContador
                   extraSlide={(next) => <NotifW area={areaOuPadrao} onDone={next} />}
                   proofArea={areaOuPadrao === "dinheiro" ? undefined : areaOuPadrao}
                   onBack={() => setStep("porta")}

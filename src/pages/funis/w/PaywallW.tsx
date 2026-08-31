@@ -21,6 +21,8 @@ import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
+import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao } from "@/lib/loja";
+import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import {
@@ -42,7 +44,36 @@ const stagger = (i: number) => ({
  * recarregando. Forçar no QA: localStorage core-w-braco = "a" | "b". */
 export type BracoW = "a" | "b";
 const BRACO_KEY = "core-w-braco";
+
+/* 31/08, decisão do dono: o teste fica ADIADO — o dia 30/08 fechou 1,10× de
+ * ROI líquido exatamente com o vitalício sozinho (braço A) na versão viva, e
+ * esta build sobe só com o conserto do produto_ausente, comportamento
+ * idêntico ao que está no ar. Ligar o A/B de volta = trocar esta linha pra
+ * true (o sorteio, os eventos com `braco` e o QA por localStorage já estão
+ * prontos e testados). */
+const AB_LIGADO = false;
+
+/**
+ * iOS: SEM A/B, e os DOIS preços sempre (spec do dono, 30/08).
+ *
+ * Motivo de não testar: o iPhone nasce sem campanha (não há SDK da Meta nem
+ * ATT), então o volume de lançamento não sustenta um A/B — dividir ao meio um
+ * fluxo pequeno só produz dois resultados sem significância e congela um
+ * palpite por meses. Com as duas colunas, cada tipo de comprador acha a dele
+ * sem precisar de teste.
+ *
+ * Por que os dois preços, se no Android o vitalício sozinho ganhou: aquele
+ * dado veio de público Pix-first e sensível a preço. Na App Store não existe
+ * Pix, então some o atrito que empurrava pro pagamento único — assinar lá é
+ * um Face ID. A física da decisão é outra.
+ *
+ * QUAL NASCE SELECIONADO fica nesta constante de uma linha de propósito: o
+ * A/B do Android responde isso nesta semana, e a troca tem que ser de uma
+ * linha, não de tela.
+ */
+const IOS_PLANO_INICIAL: "vitalicio" | "mensal" = "vitalicio";
 const sortearBraco = (): BracoW => {
+  if (!AB_LIGADO) return "a";
   try {
     const j = localStorage.getItem(BRACO_KEY);
     if (j === "a" || j === "b") return j;
@@ -71,7 +102,7 @@ function LifetimeCardW() {
           {APP_PRECOS.vitalicio97.preco}
         </div>
         <div className="relative text-[12px] font-semibold text-black/50 mt-1.5">
-          pagamento único · Pix ou cartão na tela do Google
+          {ehApple() ? "pagamento único · uma vez, pra sempre" : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
           4 meses de mensal = CORE pra sempre
@@ -150,23 +181,55 @@ export function PaywallW({
   // Disponibilidade real: otimista até resposta NEGATIVA da loja (regra v81).
   const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
   // A/B do preço: A = só vitalício · B = vitalício + mensal visível.
-  const [braco] = useState<BracoW>(() => sortearBraco());
+  // No iPhone não há sorteio: é sempre o layout de duas colunas (ver
+  // IOS_PLANO_INICIAL). `sortearBraco()` nem chega a ser chamado lá, senão
+  // gravaria um braço no localStorage de quem não está em teste nenhum.
+  const [braco] = useState<BracoW>(() => (ehApple() ? "b" : sortearBraco()));
   /* Braço B abre no MENSAL (30/08, decisão do dono: "quero que o usuário
    * primeiro veja o mensal") — a âncora do topo e o CTA acompanham. No braço
    * A não existe escolha: é vitalício e ponto. */
-  const [plano, setPlano] = useState<"vitalicio" | "mensal">(() => (sortearBraco() === "b" ? "mensal" : "vitalicio"));
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">(() =>
+    ehApple() ? IOS_PLANO_INICIAL : sortearBraco() === "b" ? "mensal" : "vitalicio");
+
+  /* ROTULO DO BRAÇO NA TELEMETRIA — não é detalhe de relatório.
+   * O A/B do Android (`core-w-braco`, 50/50) decide NESTA SEMANA se a vitrine
+   * fica com um preço ou dois. Se o iPhone emitisse `braco: "b"`, o iOS
+   * entraria somando no braço B e a decisão sairia de uma amostra misturada —
+   * dois públicos, duas lojas, duas mecânicas de pagamento, num número só.
+   * "ios" mantém o teste do Android limpo e ainda deixa o iPhone separável. */
+  const bracoEvento = ehApple() ? "ios" : braco;
 
   useEffect(() => {
     vivoRef.current = true;
-    trackEvent("funnel_view", { step: "offer", funil: "w", area, braco });
+    trackEvent("funnel_view", { step: "offer", funil: "w", area, braco: bracoEvento });
+    /* Varredura 31/08 (5 sessões de emulador insistindo no produto_ausente
+     * expuseram a diferença): o W montava SEM initRevenueCat() — no funil de
+     * porta o comprador é anônimo e nada no boot inicializa o RC, então o
+     * prefetch fazia early-return silencioso e o PRIMEIRO toque pagava
+     * init+catálogo inteiro (segundos de folha travada em aparelho popular).
+     * Espelho do mount do PaywallAssinatura, que sempre aqueceu: init antes
+     * do prefetch + uma re-tentativa curta. Só aquecimento de cache — o
+     * caminho do toque não muda. */
+    let retry: number | null = null;
     void (async () => {
       const rc = await import("@/lib/revenuecat");
+      await rc.initRevenueCat();
       await rc.prefetchVitalicio();
       if (!vivoRef.current) return;
       if (rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
+      if (!rc.temVitalicio97()) {
+        retry = window.setTimeout(async () => {
+          // init de novo: se o primeiro falhou por rede, o prefetch sozinho
+          // faria early-return de novo (mesma lição do v81 no paywall velho).
+          await rc.initRevenueCat();
+          await rc.prefetchVitalicio();
+          if (vivoRef.current && rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
+        }, 2500);
+      }
     })();
     return () => {
       vivoRef.current = false;
+      if (retry) window.clearTimeout(retry);
       if (contagemRef.current) window.clearInterval(contagemRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,7 +246,9 @@ export function PaywallW({
       const rc = await import("@/lib/revenuecat");
       const ok = (await rc.restaurar()) || (await rc.compraVitaliciaLocal()) || (await rc.compraAssinaturaLocal());
       if (ok) { trackEvent("funnel_click", { cta: "w_ja_paguei_ok", funil: "w" }); onPagoSemConta(); return; }
-      setErro("Ainda não achei o pagamento. Se você acabou de pagar o Pix, espera uns segundos e toca de novo.");
+      setErro(ehApple()
+        ? "Ainda não achei a compra. Espera uns segundos e toca de novo."
+        : "Ainda não achei o pagamento. Se você acabou de pagar o Pix, espera uns segundos e toca de novo.");
     } catch { /* conferência nunca derruba o paywall */ }
     setConferindo(false);
   };
@@ -204,7 +269,7 @@ export function PaywallW({
           : await rc.comprarAnual97();
       // v88: o front do W não emitia sucesso — o funil marcava "pagou 0" com
       // dinheiro no caixa (o webhook cobria a verdade, o relatório não).
-      if (ok) trackEvent("app_sheet_success", { produto: idProduto, funil: "w", braco });
+      if (ok) trackEvent("app_sheet_success", { produto: idProduto, funil: "w", braco: bracoEvento });
       if (ok) { onPagoSemConta(); return; }
       // Recusa: a MESMA escada provada do PaywallAssinatura.
       const dentroDaFolha = (Date.now() - abriuEm) / 1000;
@@ -213,6 +278,11 @@ export function PaywallW({
         setPendente(true);
       } else if (motivo === "produto_ausente") {
         setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
+      } else if (!temEscadaPix()) {
+        /* iOS: a folha da Apple é instantânea e cancelar é cancelar — não há
+         * Pix pendente pra resgatar nem lentidão de renderização pra cobrir.
+         * Só conta a recusa; a pessoa continua no paywall com o botão vivo. */
+        cancelamentos.current += 1;
       } else if (dentroDaFolha >= 30 && !pixVencendoJaFoi.current) {
         pixVencendoJaFoi.current = true;
         setPixVencendo(true);
@@ -236,7 +306,7 @@ export function PaywallW({
       } else {
         cancelamentos.current += 1;
       }
-    } catch { setErro("O Google não concluiu o pagamento. Tenta de novo em instantes."); }
+    } catch { setErro(erroFolhaNaoConcluiu()); }
     setComprando(false);
   };
 
@@ -291,7 +361,7 @@ export function PaywallW({
           {braco === "b" ? (
             <PrecosLadoALadoW
               plano={plano}
-              onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco, funil: "w" }); }}
+              onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
             <LifetimeCardW />
@@ -311,6 +381,20 @@ export function PaywallW({
           </div>
         </div>
         <motion.div {...stagger(4)}><TrustChips /></motion.div>
+
+        {/*
+          RODAPÉ LEGAL — SÓ no iPhone, e não é enfeite: sem ele a Apple
+          reprova este paywall em dois pontos de uma vez.
+            · 3.1.1 exige "Restaurar compras" alcançável. Este é o paywall de
+              ENTRADA: quem reinstala o app cai aqui, e sem o botão não tem
+              como recuperar o que já pagou (o revisor testa exatamente isso).
+            · 3.1.2 exige link funcional pra Termos e Privacidade na PRÓPRIA
+              tela de compra, não escondido em outro menu.
+          Por que só no iOS: no Android esta tela é o funil que está vendendo
+          hoje, e a entrada do iPhone não é motivo pra mexer nele. Lá o
+          restaurar continua onde sempre esteve (/planos e o gate).
+        */}
+        {ehApple() && <AppLegalFooter />}
       </div>
 
       {/* CTA sticky — motor RC + escada de resgate */}
@@ -321,8 +405,16 @@ export function PaywallW({
         <div className="max-w-sm mx-auto px-5">
           {pendente && (
             <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12.5px] leading-snug p-3 mb-2.5 text-left">
-              <b>Pagamento em processamento no Google.</b> Se você gerou um Pix, paga no app do seu banco —
-              o acesso libera sozinho aqui.
+              {ehApple() ? (
+                /* "Pendente" na Apple é raro (Ask to Buy de conta de menor,
+                 * ou revisão de fraude) e não tem nada pra pessoa fazer no
+                 * banco — só esperar. Prometer Pix aqui seria inventar. */
+                <><b>Compra em processamento.</b> A App Store ainda está confirmando —
+                o acesso libera sozinho aqui.</>
+              ) : (
+                <><b>Pagamento em processamento no Google.</b> Se você gerou um Pix, paga no app do seu banco —
+                o acesso libera sozinho aqui.</>
+              )}
               <button className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50" disabled={conferindo} onClick={() => void confirmarPagamento()}>
                 {conferindo ? "Conferindo…" : "Já paguei — atualizar"}
               </button>
@@ -367,7 +459,7 @@ export function PaywallW({
               disabled={comprando}
               onClick={() => {
                 const escolha = braco === "b" ? plano : "vitalicio";
-                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco });
+                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >
@@ -381,9 +473,11 @@ export function PaywallW({
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
+              {/* O legal cita a loja da vez e, no iPhone, NENHUMA forma de
+                * pagamento: "Pix ou cartão" aqui é reprovação na 3.1.1. */}
               {braco === "b" && plano === "mensal"
-                ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pelo Google Play · Pix ou cartão · cancela quando quiser</>
-                : <>Pagamento <strong className="text-foreground font-semibold">único</strong> pelo Google Play · Pix ou cartão · sem mensalidade</>}
+                ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
+                : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}
             </span>
           </p>
         </div>

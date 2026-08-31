@@ -21,7 +21,8 @@
  *
  * Estados possíveis (o paywall trata os quatro):
  *  - "pronto": chave configurada + offerings carregadas → compra funciona
- *  - "sem_chave": VITE_REVENUECAT_ANDROID_KEY ausente. Paywall mostra os
+ *  - "sem_chave": a chave da loja da vez ausente (VITE_REVENUECAT_ANDROID_KEY
+ *    no Android, VITE_REVENUECAT_IOS_KEY no iOS). Paywall mostra os
  *    preços, botão desabilitado com aviso. NUNCA quebra o app.
  *  - "sem_produto": chave ok, mas o RevenueCat não devolveu nenhum pacote —
  *    produtos ainda não publicados na loja. Sem esse estado o configure()
@@ -32,7 +33,7 @@
  * (`rc !== "pronto"` → botão desabilitado + aviso), então adicionar um novo
  * não exige mexer em paywall nenhum.
  */
-import { isNativeShell } from "@/lib/native-shell";
+import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
@@ -57,9 +58,25 @@ const temEntitlement = (info: unknown): boolean =>
     ((info as { entitlements?: { active?: Record<string, unknown> } })?.entitlements?.active) ?? {}
   ).length > 0;
 
+/**
+ * A chave é POR LOJA (30/08, entrada do iPhone). A do RevenueCat carrega a
+ * plataforma no prefixo: `goog_` só fala com o Play, `appl_` só com a App
+ * Store. Trocar uma pela outra não dá erro no configure() — o SDK sobe, e
+ * getOfferings() volta VAZIO. Ou seja: o modo de falha é exatamente o
+ * `rc_sem_chave` que já custou um app na loja sem forma de pagamento
+ * (ver o cabeçalho do scripts/preparar-loja.mjs). Por isso a escolha é
+ * explícita por plataforma, e não uma chave só com fallback.
+ */
+const chaveDaLoja = (): string | undefined => {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return plataformaApp() === "ios"
+    ? env.VITE_REVENUECAT_IOS_KEY
+    : env.VITE_REVENUECAT_ANDROID_KEY;
+};
+
 export async function initRevenueCat(): Promise<EstadoRC> {
   if (!isNativeShell()) return "sem_chave";
-  const key = import.meta.env.VITE_REVENUECAT_ANDROID_KEY as string | undefined;
+  const key = chaveDaLoja();
   if (!key) { estado = "sem_chave"; return estado; }
   try {
     if (!Purchases) {
@@ -564,10 +581,16 @@ type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct
 const IDS_VITALICIOS = ["core_vitalicio", "core_vitalicio_19", "core_vitalicio_97"] as const;
 export type IdVitalicio = (typeof IDS_VITALICIOS)[number];
 const produtosVitalicios: Partial<Record<IdVitalicio, ProdutoRC>> = {};
+// Diagnóstico da varredura 31/08: o catch vazio daqui deixava o evento
+// produto_ausente MUDO — impossível separar "getProducts lançou" (rede) de
+// "respondeu vazio" (conta/aparelho sem o SKU, ex.: emulador ou conta Play de
+// fora do BR — o catálogo inteiro é só-BR). Guarda o último desfecho pro
+// evento contar.
+let prefetchVitalicioDesfecho: string | null = null;
 export async function prefetchVitalicio(): Promise<void> {
   if (IDS_VITALICIOS.every((i) => produtosVitalicios[i])) return;
   // v83: mesmo racional do prefetchAssinaturas — configurado basta.
-  if (!configurado || !Purchases) return;
+  if (!configurado || !Purchases) { prefetchVitalicioDesfecho = "nao_configurado"; return; }
   try {
     const mod = await import("@revenuecat/purchases-capacitor");
     const { products } = await Purchases.getProducts({
@@ -578,8 +601,10 @@ export async function prefetchVitalicio(): Promise<void> {
       const id = IDS_VITALICIOS.find((i) => p?.identifier?.startsWith(i + ":") || p?.identifier === i);
       if (id) produtosVitalicios[id] = p;
     }
-  } catch {
+    prefetchVitalicioDesfecho = `respondeu_${(products ?? []).length}`;
+  } catch (e) {
     // sem rede agora — o comprarVitalicio tenta de novo na hora do toque
+    prefetchVitalicioDesfecho = "lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 80);
   }
 }
 
@@ -596,10 +621,29 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
   }
   try {
     if (!produtosVitalicios[produtoId]) await prefetchVitalicio();
-    const produto = produtosVitalicios[produtoId];
+    let produto = produtosVitalicios[produtoId];
+    if (!produto) {
+      /* Varredura 31/08: o toque é o momento de maior intenção (lição do
+       * 8040e72) — antes de declarar ausente, UMA re-tentativa completa
+       * (init + prefetch): se o init anterior ficou capenga por rede, o
+       * prefetch sozinho faria early-return de novo. Cliente real com rede
+       * oscilando se recupera aqui; emulador/conta sem o SKU continua
+       * falhando fechado, como desenhado. */
+      await initRevenueCat();
+      await prefetchVitalicio();
+      produto = produtosVitalicios[produtoId];
+    }
     if (!produto) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: produtoId });
+      trackEvent("app_compra_falhou", {
+        motivo: "produto_ausente",
+        produto: produtoId,
+        retentou: true,
+        // o que o aparelho REALMENTE viu — separa rede × conta/país sem SKU
+        estado_rc: estado,
+        prefetch: prefetchVitalicioDesfecho,
+        cacheados: Object.keys(produtosVitalicios).slice(0, 4),
+      });
       return false;
     }
     /* v83: o vitalício era CEGO na telemetria de abertura — 35% das vendas só

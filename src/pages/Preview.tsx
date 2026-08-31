@@ -167,7 +167,10 @@ const FUNIS_TESTE: Record<string, { path: string; volta: "signup" }> = {
   // 27/07: os TRÊS voltam em ?step=signup. O radar voltava em "plano" porque
   // tinha a tela SEU PLANO entre a demo e o cadastro — ela saiu quando o funil
   // do app foi alinhado ao esqueleto do dia 14 (ver ComecarRadar).
-  dia14: { path: "/inicio", volta: "signup" },
+  // 31/08: o /inicio virou o funil W (Pix). O dia 14 continua vivo, mas agora
+  // só em /funil-dia14 — quem entra na demo por ele tem que voltar pra lá, e
+  // não cair no funil novo no meio do caminho.
+  dia14: { path: "/funil-dia14", volta: "signup" },
   radar: { path: "/funil-radar", volta: "signup" },
   v1: { path: "/funil-v1", volta: "signup" },
 };

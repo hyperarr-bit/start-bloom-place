@@ -269,7 +269,7 @@ import LandingPage from "./pages/lp/LpFinancas";
 import Comecar from "./pages/Comecar";
 // dia14 é o funil do /inicio (25/07) — import EAGER: a URL do tráfego de
 // anúncio não pode ter flash de loading (lazy quebraria fora do Suspense).
-import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
+import ComecarWEager from "./pages/funis/w/ComecarW";
 import TutorialLab from "./pages/TutorialLab";
 import NotFound from "./pages/NotFound";
 
@@ -503,15 +503,6 @@ const AnimatedRoutes = () => {
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
-        {/* 31/08 — O FUNIL W NA WEB (/w). Mesmo funil que vende no app, com o
-            pagamento por Pix em vez da folha do Google. Existe pra responder
-            uma pergunta de dinheiro, não de produto: a folha paga 13-27% dos
-            que abrem (medido 27-31/08), cobra 15% e libera o caixa em 60 dias;
-            o Pix historicamente paga ~45%, cobra ~7% e cai em 1 dia. Se a
-            conversão do pagamento dobrar, o ROI 2 sai só daí. SoNaWeb porque
-            dentro do shell a venda TEM que passar pela folha (política da
-            Play) — lá o /app segue mandando. */}
-        <Route path="/w" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-w-web"><ComecarW /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
@@ -601,12 +592,18 @@ const App = () => {
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
-                  {/* /inicio ficou de fora da trava enquanto ERA a porta do
-                      app. Agora o shell entra por ENTRADA_APP, e o /inicio é
-                      só o funil do dia 14 da web — que termina no paywall de
-                      Pix vitalício. Sem SoNaWeb aqui, um link no histórico ou
-                      um deep link recoloca pagamento externo dentro do app. */}
-                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary></SoNaWeb>} />
+                  {/* 31/08 — /inicio VIRA O FUNIL W (ordem do dono). É o mesmo
+                      funil que vende no app, cobrando por Pix (oferta w97,
+                      R$ 97,90) em vez da folha do Google. Motivo é caixa e
+                      conversão: a folha paga 13-27% de quem a abre (medido
+                      27-31/08), cobra 15% e libera o dinheiro em 60 dias; o
+                      Pix cai em 1 dia com ~7%. Import EAGER porque esta é a
+                      porta do tráfego pago — esperar chunk aqui é desistência.
+                      O funil do dia 14 continua vivo em /funil-dia14.
+                      SoNaWeb continua obrigatório: sem ele, um link no
+                      histórico ou deep link recoloca pagamento externo dentro
+                      do app, que é violação de política da Play. */}
+                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil-w-web"><ComecarWEager /></RouteErrorBoundary></SoNaWeb>} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

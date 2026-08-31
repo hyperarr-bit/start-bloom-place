@@ -44,7 +44,19 @@ import { trackEvent } from "@/lib/analytics";
 
 const KEY = "pix-purchase-pending";
 
-type PendingOffer = "lifetime" | "downsell";
+type PendingOffer = "lifetime" | "downsell" | "w97";
+
+/* O VALOR VEM DAQUI, NÃO DE UM TERNÁRIO (31/08). O cabeçalho deste arquivo
+ * conta o estrago de disparar o preço errado: R$47,80 de pixel onde entraram
+ * R$19,90. Quando a oferta w97 (funil W na web, R$97,90) entrou, o ternário
+ * antigo `lifetime ? 27,9 : 19,9` teria carimbado 19,90 em TODA venda de
+ * 97,90 — o mesmo bug, cinco vezes maior. Mapa explícito: oferta nova sem
+ * preço aqui quebra o build em vez de mentir pro pixel. */
+const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
+  lifetime: 27.9,
+  downsell: 19.9,
+  w97: 97.9,
+};
 type Pending = { offer: PendingOffer; orderId: string | null; at: number; uid?: string | null };
 
 const readPending = (): Pending[] => {
@@ -163,7 +175,7 @@ export async function firePixPurchaseOnce(source: "checkout" | "rescue"): Promis
     return false;
   }
 
-  const value = chosen.offer === "lifetime" ? 27.9 : 19.9;
+  const value = VALOR_DA_OFERTA[chosen.offer];
   fireMetaEvent(
     "Purchase",
     { value, currency: "BRL", content_name: chosen.offer },

@@ -839,10 +839,14 @@ const Treino = () => {
                 const status = getDayStatus(day);
                 const isToday = day === todayDayName;
                 return (
-                  <div key={day} className={`text-center p-2 rounded-lg border transition-all ${isToday ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}>
+                  /* 31/08: a célula tem ~39px num celular de 360 e o p-2 comia
+                   * 16 deles — "Completo"/"Pendente" vazava por cima da borda
+                   * em QUALQUER largura. Padding lateral zero + truncate: o
+                   * rótulo agora respeita a caixa em vez de transbordar. */
+                  <div key={day} className={`text-center py-2 px-0.5 rounded-lg border transition-all ${isToday ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border bg-card"}`}>
                     <p className="text-[10px] font-bold">{day.slice(0, 3)}</p>
                     <p className="text-lg my-0.5">{status.icon}</p>
-                    <p className={`text-[8px] ${status.color}`}>{status.label}</p>
+                    <p className={`text-[8px] leading-tight truncate ${status.color}`}>{status.label}</p>
                   </div>
                 );
               })}

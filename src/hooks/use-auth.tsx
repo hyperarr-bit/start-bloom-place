@@ -3,6 +3,7 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
+import { vincularOrigem } from "@/lib/analytics";
 
 // Purge cached user data on sign-out so nothing leaks across accounts on the
 // same browser. Kept inline (no import from use-user-data) to avoid a circular
@@ -106,6 +107,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         identificarNoRevenueCat(session?.user?.id ?? null);
 
         if (session?.user) {
+          // 31/08: o funil W vende ANTES do cadastro, então a origem da
+          // instalação (install_referrer) ficou numa sessão anônima lá atrás.
+          // Este é o primeiro instante em que temos as duas pontas — carimba
+          // a origem no usuário pra o relatório ligar venda→anúncio sem
+          // depender de casar sessão ou GAID.
+          void vincularOrigem(session.user.id);
           setTimeout(() => checkSubscriptionStatus(), 0);
         } else {
           setTrialExpired(false);

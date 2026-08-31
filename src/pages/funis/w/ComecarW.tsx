@@ -25,6 +25,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
+import { isNativeShell } from "@/lib/native-shell";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronRight } from "lucide-react";
 import {
@@ -34,6 +35,8 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
+import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
+import { ehApple } from "@/lib/loja";
 
 const FUNIL = "w";
 
@@ -307,6 +310,11 @@ export default function ComecarW() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [posCompra, setPosCompra] = useState(false);
+  /* MESMO FUNIL, DOIS CANOS DE PAGAMENTO (31/08). Fora do shell da loja este
+   * arquivo roda em /w e cobra por Pix; dentro do app, pela folha do Google.
+   * A meta que motivou isso é ROI 2, e a conta não fecha na folha: ela paga
+   * 13-27% (medido 27-31/08), cobra 15% e prende o caixa 60 dias. */
+  const naWeb = !isNativeShell();
   const montou = useRef(false);
 
   const setStep = (s: Step) => {
@@ -442,18 +450,42 @@ export default function ComecarW() {
               )}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
-              {step === "contrato" && <ContratoScreen onDone={() => setStep("offer")} />}
+              {/* 31/08 — ORDEM DIFERENTE NA WEB. O Pix da Cakto exige usuário
+                  autenticado pra emitir o QR, então na web o cadastro entra
+                  ANTES do paywall (mesmo desenho do funil /inicio, que já
+                  vende assim). No app continua vendendo primeiro e cadastrando
+                  depois: lá quem cobra é a folha do Google, que não precisa de
+                  conta nossa. */}
+              {step === "contrato" && <ContratoScreen onDone={() => setStep(naWeb ? "signup" : "offer")} />}
+              {/* A BIFURCAÇÃO DAS DUAS LOJAS (31/08, decisão do dono).
+                  Não é um `if` de comportamento — é a escolha de QUAL ARQUIVO
+                  renderizar. A partir daqui o paywall do Android e o do iPhone
+                  são produtos separados: mexer num não alcança o outro, e não
+                  depende de ninguém lembrar de uma condicional. */}
               {step === "offer" && (
-                <PaywallW
-                  area={areaOuPadrao}
-                  answers={answers}
-                  onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
-                />
+                ehApple() ? (
+                  <PaywallIOS
+                    area={areaOuPadrao}
+                    answers={answers}
+                    onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
+                  />
+                ) : (
+                  <PaywallW
+                    area={areaOuPadrao}
+                    answers={answers}
+                    naWeb={naWeb}
+                    onPagoSemConta={() => {
+                      // web: a conta já existe (cadastro veio antes do paywall)
+                      if (naWeb) { setStep("liberando"); return; }
+                      setPosCompra(true); setStep("signup");
+                    }}
+                  />
+                )
               )}
               {step === "signup" && (
                 <SignupScreen
                   posCompra={posCompra}
-                  onSession={() => setStep(posCompra ? "liberando" : "offer")}
+                  onSession={() => setStep(posCompra && !naWeb ? "liberando" : "offer")}
                   onConfirm={(e: string) => { setConfirmEmail(e); setStep("confirm"); }}
                 />
               )}

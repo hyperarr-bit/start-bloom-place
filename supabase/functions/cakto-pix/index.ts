@@ -84,6 +84,8 @@ serve(async (req) => {
     const OFFER_IDS: Record<string, string> = {
       lifetime: Deno.env.get("CAKTO_OFFER_LIFETIME") ?? "",
       downsell: Deno.env.get("CAKTO_OFFER_DOWNSELL") ?? "",
+      // 31/08: oferta do funil W na web (R$ 97,90, o mesmo preço do app).
+      w97: Deno.env.get("CAKTO_OFFER_W97") ?? "",
     };
 
     if (!clientId || !clientSecret) {
@@ -106,7 +108,7 @@ serve(async (req) => {
     logStep("Authenticated", { userId: user.id });
 
     const RequestSchema = z.object({
-      offer: z.enum(["lifetime", "downsell"]),
+      offer: z.enum(["lifetime", "downsell", "w97"]),
       customer: z
         .object({
           name: z.string().max(120).optional(),

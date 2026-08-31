@@ -21,7 +21,11 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
  * → polling do check-subscription a cada 3s → celebração vitalícia.
  */
 
-export type PixOffer = "lifetime" | "downsell";
+/* 31/08 — funil W na WEB. A oferta "w97" existe porque a meta virou ROI 2 e a
+ * conta só fecha saindo da folha do Google: ela paga 13-27% (medido 27-31/08)
+ * contra ~45% do Pix, cobra 15% e segura o dinheiro 60 dias. Mesmo funil,
+ * mesmo preço do app (97,90), cano de pagamento diferente. */
+export type PixOffer = "lifetime" | "downsell" | "w97";
 
 /* 05/08 (ordem do dono): volta a estrutura de DOIS preços — 27,90 cheio e
  * 19,90 no downsell da roleta. Estes valores são DISPLAY; quem cobra é a
@@ -31,6 +35,7 @@ export type PixOffer = "lifetime" | "downsell";
 export const PIX_PRICES: Record<PixOffer, string> = {
   lifetime: "27,90",
   downsell: "19,90",
+  w97: "97,90",
 };
 
 interface Props {

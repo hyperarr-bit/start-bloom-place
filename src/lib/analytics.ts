@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { plataformaApp } from "@/lib/native-shell";
 
 // Persistent session id for the tab
 const SESSION_KEY = "core_session_id";
@@ -60,15 +61,82 @@ export const captureLandingMeta = () => {
  * fonte gravada. Só roda no shell; na web o plugin rejeita e fica o silêncio.
  */
 const REFERRER_FLAG = "core_install_referrer_done";
+/** O referrer BRUTO guardado (contém o payload cifrado da Meta com o ad_id). */
+const REFERRER_RAW = "core_install_referrer_raw";
+/** Já carimbamos a origem neste usuário? (guarda o id pra não repetir) */
+const ORIGEM_FLAG = "core_origem_vinculada";
+
+/**
+ * CARIMBA A ORIGEM NO USUÁRIO (31/08).
+ *
+ * O funil W vende ANTES do cadastro: na hora da compra não existe user_id, e
+ * o referrer ficou lá atrás numa sessão anônima. Quando a pessoa finalmente
+ * cria a conta, temos as duas pontas na mão pela primeira vez — é o momento
+ * de emitir um evento que já nasce COM user_id carregando o referrer.
+ *
+ * Com isso o relatório passa a ligar venda→anúncio por user_id (junção
+ * direta), em vez de depender de casar sessão ou GAID. Uma vez por usuário:
+ * a flag guarda o id, então trocar de conta no mesmo aparelho recarimba.
+ */
+export const vincularOrigem = async (userId: string) => {
+  try {
+    if (!userId) return;
+    if (localStorage.getItem(ORIGEM_FLAG) === userId) return;
+    let bruto = localStorage.getItem(REFERRER_RAW) || "";
+    // última chance: a Play guarda o referrer por 90 dias, então se o
+    // localStorage foi limpo (ou é aparelho antigo), relê agora — é aqui que
+    // a origem vale mais, porque é o único instante com user_id na mão.
+    if (!bruto) {
+      try {
+        bruto = await lerReferrerDaPlay();
+        if (bruto) localStorage.setItem(REFERRER_RAW, bruto.slice(0, 2000));
+      } catch { /* sem Play Services */ }
+    }
+    localStorage.setItem(ORIGEM_FLAG, userId);
+    // sem referrer guardado ainda vale registrar: separa "não sabemos"
+    // (orgânico de verdade) de "instalou antes desta versão".
+    // o trackEvent já funde os utm guardados no payload — não repetir aqui
+    trackEvent("origem_usuario", { referrer: bruto.slice(0, 2000), tem_referrer: !!bruto });
+  } catch { /* nunca derruba o login */ }
+};
+/** Lê o referrer da Play. A API devolve o mesmo valor durante 90 DIAS (não é
+ *  "uma vez por instalação" como se pensava aqui) — então dá pra reconsultar
+ *  quando faltar, em vez de depender do que sobrou no localStorage. */
+const lerReferrerDaPlay = async (): Promise<string> => {
+  if (plataformaApp() !== "android") return "";
+  const { InstallReferrer } = await import("@capgo/capacitor-install-referrer");
+  const res = (await InstallReferrer.getReferrer()) as { referrer?: string };
+  return String(res?.referrer || "");
+};
+
 export const captureInstallReferrer = async () => {
   try {
-    if (localStorage.getItem(REFERRER_FLAG)) return;
-    const { InstallReferrer } = await import("@capgo/capacitor-install-referrer");
-    const res = (await InstallReferrer.getReferrer()) as { referrer?: string };
+    if (localStorage.getItem(REFERRER_FLAG)) {
+      /*
+       * REMENDO DA BASE JÁ INSTALADA (31/08). A flag existe desde a v49 em
+       * todo aparelho que já rodou o app — então o `return` seco aqui deixava
+       * o REFERRER_RAW novo eternamente vazio justo pra base que dá o dinheiro
+       * de hoje. Como a Play guarda o referrer por 90 dias, dá pra reler uma
+       * vez e preencher. Sem emitir evento de novo: só preenche o que falta.
+       */
+      if (!localStorage.getItem(REFERRER_RAW)) {
+        try {
+          const antigo = await lerReferrerDaPlay();
+          if (antigo) localStorage.setItem(REFERRER_RAW, antigo.slice(0, 2000));
+        } catch { /* sem Play Services: fica como estava */ }
+      }
+      return;
+    }
+    // 30/08: Install Referrer é serviço da PLAY. No iPhone o plugin rejeita e
+    // a flag (que só é gravada DEPOIS de resolver) nunca fecha — ou seja, uma
+    // tentativa perdida a cada boot, pra sempre. Sai fora antes.
+    // Atribuição de instalação no iOS é outro assunto (SKAdNetwork/ATT), e
+    // não existe ainda — evento de app no iOS chega sem utm de campanha.
+    if (plataformaApp() !== "android") return;
+    const bruto = await lerReferrerDaPlay();
     // flag só depois de resolver: falha transitória do serviço da Play
     // (raro, mas existe) tenta de novo no próximo boot.
     localStorage.setItem(REFERRER_FLAG, "1");
-    const bruto = String(res?.referrer || "");
     /*
      * INTEIRO, sem cortar (13/08). O `slice(0, 400)` daqui cortava o referrer
      * no meio do payload criptografado: dentro de `utm_content.source.data` a
@@ -79,6 +147,18 @@ export const captureInstallReferrer = async () => {
      * 2000 é folga sobre o maior referrer real (~700) sem virar campo aberto.
      */
     trackEvent("install_referrer", { referrer: bruto.slice(0, 2000) });
+    /*
+     * GUARDA O BRUTO (31/08). Até aqui o referrer era emitido como evento e
+     * esquecido — e o evento nasce ANÔNIMO (0% dos 701 de um dia tinham
+     * user_id), porque dispara no boot, antes de existir conta. Ligar a venda
+     * ao anúncio dependia de ponte: mesma sessão, ou mesmo GAID. Quem instala,
+     * fecha o app e volta depois pra comprar perde a sessão; 3% dos aparelhos
+     * não expõem GAID; e o evento só dispara 1× por instalação. Resultado
+     * medido em 31/08: 25% da receita do dia sem origem — justo o número que
+     * decide qual campanha morre. Guardando o bruto, a origem passa a viajar
+     * com a pessoa e é carimbada no login (vincularOrigem).
+     */
+    try { localStorage.setItem(REFERRER_RAW, bruto.slice(0, 2000)); } catch { /* cota cheia: segue sem */ }
     if (!bruto.includes("utm_")) return;
     const p = new URLSearchParams(bruto);
     const existing = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
@@ -135,14 +215,29 @@ export const capturarDispositivoApp = async () => {
       gaid = r.gaid ?? "";
       anonId = r.anonId ?? "";
     } catch { /* web / build antigo sem o plugin */ }
+    // 30/08: a ficha nasceu só-Android e lia o UA com regex de Android — num
+    // iPhone `os` e `modelo` saíam VAZIOS e nada dizia qual loja era. O
+    // servidor monta o extinfo com "a2" (Android) fixo, então uma compra de
+    // iPhone iria pra Meta rotulada como Android: dado errado, não faltante.
+    // Gravar a plataforma aqui é o que permite o servidor ramificar pra "i2"
+    // quando o iOS entrar em campanha (hoje ainda não entra — sem SDK/ATT).
+    const ios = plataformaApp() === "ios";
     trackEvent("app_device_info", {
       ...(gaid ? { gaid } : {}),
       ...(anonId ? { anon_id: anonId } : {}),
+      plataforma: plataformaApp(),
       pacote,
       versao,
       build,
-      os: /Android (\d+(?:\.\d+)?)/.exec(ua)?.[1] ?? "",
-      modelo: /Android [^;]+; ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua)?.[1] ?? "",
+      os: ios
+        ? (/OS (\d+[_.]\d+(?:[_.]\d+)?)/.exec(ua)?.[1]?.replace(/_/g, ".") ?? "")
+        : (/Android (\d+(?:\.\d+)?)/.exec(ua)?.[1] ?? ""),
+      // O WebView do iOS mente o modelo de propósito: todo iPhone se diz
+      // "iPhone" (e iPad, "iPad") — não existe "iPhone 15 Pro" no UA. Isso é
+      // o máximo honesto que dá pra ler sem plugin nativo de device.
+      modelo: ios
+        ? (/\((iPhone|iPad|iPod)/.exec(ua)?.[1] ?? "iPhone")
+        : (/Android [^;]+; ([^)]+?)(?: Build\/[^)]*)?\)/.exec(ua)?.[1] ?? ""),
       locale: navigator.language || "pt-BR",
       fuso: Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo",
       tela_l: window.screen?.width ?? 0,

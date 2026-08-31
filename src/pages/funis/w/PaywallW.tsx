@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao } from "@/lib/loja";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+import { PixCheckout } from "@/components/paywall/PixCheckout";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import {
@@ -85,7 +86,7 @@ const sortearBraco = (): BracoW => {
 
 /** Preço vitalício do app no formato que o LifetimeCard da web tinha.
  *  Só no braço A — o braço B usa as duas colunas de peso igual. */
-function LifetimeCardW() {
+function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
   return (
     <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
       <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center text-[#16121c]">
@@ -102,7 +103,9 @@ function LifetimeCardW() {
           {APP_PRECOS.vitalicio97.preco}
         </div>
         <div className="relative text-[12px] font-semibold text-black/50 mt-1.5">
-          {ehApple() ? "pagamento único · uma vez, pra sempre" : "pagamento único · Pix ou cartão na tela do Google"}
+          {ehApple() ? "pagamento único · uma vez, pra sempre"
+            : naWeb ? "pagamento único · Pix, acesso na hora"
+            : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
           4 meses de mensal = CORE pra sempre
@@ -165,9 +168,17 @@ function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; 
 }
 
 export function PaywallW({
-  area, answers, onPagoSemConta,
-}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void }) {
+  area, answers, onPagoSemConta, naWeb = false,
+}: { area: AreaKey; answers: Record<string, string>; onPagoSemConta: () => void;
+  /* 31/08 — o MESMO paywall com outro cano de pagamento. Na web o dinheiro
+   * sai por Pix (oferta w97 da Cakto): a folha do Google paga 13-27% (medido
+   * 27-31/08), cobra 15% e segura o caixa 60 dias; o Pix histórico paga ~45%,
+   * cobra ~7% e cai em 1 dia. Tela idêntica de propósito — a comparação entre
+   * app e web só vale se a única variável for a forma de pagar. */
+  naWeb?: boolean }) {
   const [comprando, setComprando] = useState(false);
+  /** Overlay do Pix (só na web) — cobre o paywall inteiro, como no /inicio. */
+  const [pixAberto, setPixAberto] = useState(false);
   const [pendente, setPendente] = useState(false);
   const [conferindo, setConferindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -257,6 +268,14 @@ export function PaywallW({
     if (comprando) return;
     setErro(null);
     desarmar();
+    /* WEB: nada de loja. Abre o Pix por cima e sai — o overlay conduz até o
+     * QR e a confirmação; quem libera o acesso é o webhook da Cakto, igual
+     * ao funil que já roda em /inicio. */
+    if (naWeb) {
+      trackEvent("funnel_click", { cta: "w_web_pix", funil: "w", area, produto });
+      setPixAberto(true);
+      return;
+    }
     setComprando(true);
     const abriuEm = Date.now();
     try {
@@ -319,6 +338,23 @@ export function PaywallW({
     metas: "tirar suas metas do papel",
   };
 
+  /* O overlay do Pix cobre o paywall inteiro (mesmo padrão do /inicio): quem
+   * fecha SEM pagar volta pro paywall com o botão vivo; quem paga é levado
+   * adiante pelo onPagoSemConta, que na web já tem conta criada. */
+  if (naWeb && pixAberto) {
+    return (
+      <PixCheckout
+        offer="w97"
+        context="funnel"
+        onClose={(passo) => {
+          setPixAberto(false);
+          trackEvent("funnel_view", { step: "w_web_pix_saiu", funil: "w", passo: passo ?? "" });
+        }}
+        v2={{ onConfirmado: () => onPagoSemConta() }}
+      />
+    );
+  }
+
   return (
     <div className="relative w-full max-w-sm mx-auto text-center pb-40 pt-8">
       {/* Reveal (web) */}
@@ -364,7 +400,7 @@ export function PaywallW({
               onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
-            <LifetimeCardW />
+            <LifetimeCardW naWeb={naWeb} />
           )}
         </motion.div>
         <MuralDepoimentos area={area} />
@@ -475,7 +511,12 @@ export function PaywallW({
             <span>
               {/* O legal cita a loja da vez e, no iPhone, NENHUMA forma de
                 * pagamento: "Pix ou cartão" aqui é reprovação na 3.1.1. */}
-              {braco === "b" && plano === "mensal"
+              {/* Na WEB não existe loja: quem cobra é o Pix. Dizer "pelo Google
+                * Play" aqui seria mentira na tela que pede o dinheiro — e o
+                * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
+              {naWeb
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · sem mensalidade</>
+                : braco === "b" && plano === "mensal"
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}
             </span>

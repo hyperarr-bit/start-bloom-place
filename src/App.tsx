@@ -503,6 +503,15 @@ const AnimatedRoutes = () => {
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
         <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        {/* 31/08 — O FUNIL W NA WEB (/w). Mesmo funil que vende no app, com o
+            pagamento por Pix em vez da folha do Google. Existe pra responder
+            uma pergunta de dinheiro, não de produto: a folha paga 13-27% dos
+            que abrem (medido 27-31/08), cobra 15% e libera o caixa em 60 dias;
+            o Pix historicamente paga ~45%, cobra ~7% e cai em 1 dia. Se a
+            conversão do pagamento dobrar, o ROI 2 sai só daí. SoNaWeb porque
+            dentro do shell a venda TEM que passar pela folha (política da
+            Play) — lá o /app segue mandando. */}
+        <Route path="/w" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-w-web"><ComecarW /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/funil-dia14" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-dia14"><ComecarDia14 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

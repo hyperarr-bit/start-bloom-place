@@ -46,13 +46,29 @@ const stagger = (i: number) => ({
 export type BracoW = "a" | "b";
 const BRACO_KEY = "core-w-braco";
 
-/* 31/08, decisão do dono: o teste fica ADIADO — o dia 30/08 fechou 1,10× de
- * ROI líquido exatamente com o vitalício sozinho (braço A) na versão viva, e
- * esta build sobe só com o conserto do produto_ausente, comportamento
- * idêntico ao que está no ar. Ligar o A/B de volta = trocar esta linha pra
- * true (o sorteio, os eventos com `braco` e o QA por localStorage já estão
- * prontos e testados). */
+/* A/B DESLIGADO — a vitrine do Android virou DECISÃO, não sorteio (31/08).
+ * Ligar de volta = true (sorteio, eventos com `braco` e QA por localStorage
+ * seguem prontos e testados). */
 const AB_LIGADO = false;
+
+/* VITRINE DO ANDROID (31/08, ordem do dono): os DOIS preços, com o MENSAL em
+ * foco. É o oposto do que o dado de tíquete sozinho pediria — o vitalício
+ * puro levou o tíquete de R$ 47 pra R$ 93 — e mesmo assim faz sentido no
+ * conjunto, porque agora existem DUAS lojas com físicas diferentes:
+ *
+ *   · PLAY: cobra 15% e segura o caixa 60 dias. Aqui o pagamento único não
+ *     compensa a espera — mensalidade que renova sozinha rende mais no mesmo
+ *     dinheiro preso, e o preço baixo derruba a barreira de entrada.
+ *   · WEB (/inicio): Pix cai em 1 dia com ~7%. Ali mora o vitalício de 97,90,
+ *     que é caixa imediato.
+ *
+ * Ou seja: o produto barato e recorrente onde a taxa e a espera são
+ * inevitáveis; o tíquete alto à vista onde o dinheiro entra na hora.
+ *
+ * O vitalício CONTINUA na tela, na coluna ao lado — quem quer pagar uma vez
+ * paga. O que muda é qual nasce selecionado. */
+const ANDROID_DUAS_COLUNAS = true;
+const ANDROID_PLANO_INICIAL: "vitalicio" | "mensal" = "mensal";
 
 /**
  * iOS: SEM A/B, e os DOIS preços sempre (spec do dono, 30/08).
@@ -196,11 +212,17 @@ export function PaywallW({
   // IOS_PLANO_INICIAL). `sortearBraco()` nem chega a ser chamado lá, senão
   // gravaria um braço no localStorage de quem não está em teste nenhum.
   const [braco] = useState<BracoW>(() => (ehApple() ? "b" : sortearBraco()));
-  /* Braço B abre no MENSAL (30/08, decisão do dono: "quero que o usuário
-   * primeiro veja o mensal") — a âncora do topo e o CTA acompanham. No braço
-   * A não existe escolha: é vitalício e ponto. */
+  /* DUAS COLUNAS OU UMA — quem decide não é mais o sorteio. iPhone: sempre
+   * duas (spec do dono). Android: a constante acima. O braço do A/B só volta
+   * a mandar se AB_LIGADO virar true. */
+  const duasColunas = ehApple() ? true : (ANDROID_DUAS_COLUNAS || braco === "b");
+  /* Qual nasce SELECIONADO. A âncora do topo e o CTA acompanham a escolha —
+   * é o que resolve o medo de "a pessoa se assusta com 97,90 antes de ver que
+   * existe mensal". */
   const [plano, setPlano] = useState<"vitalicio" | "mensal">(() =>
-    ehApple() ? IOS_PLANO_INICIAL : sortearBraco() === "b" ? "mensal" : "vitalicio");
+    ehApple() ? IOS_PLANO_INICIAL
+      : ANDROID_DUAS_COLUNAS ? ANDROID_PLANO_INICIAL
+      : sortearBraco() === "b" ? "mensal" : "vitalicio");
 
   /* ROTULO DO BRAÇO NA TELEMETRIA — não é detalhe de relatório.
    * O A/B do Android (`core-w-braco`, 50/50) decide NESTA SEMANA se a vitrine
@@ -208,7 +230,7 @@ export function PaywallW({
    * entraria somando no braço B e a decisão sairia de uma amostra misturada —
    * dois públicos, duas lojas, duas mecânicas de pagamento, num número só.
    * "ios" mantém o teste do Android limpo e ainda deixa o iPhone separável. */
-  const bracoEvento = ehApple() ? "ios" : braco;
+  const bracoEvento = ehApple() ? "ios" : (ANDROID_DUAS_COLUNAS ? "b-mensal" : braco);
 
   useEffect(() => {
     vivoRef.current = true;
@@ -316,7 +338,7 @@ export function PaywallW({
             if (v === null) return null;
             if (v <= 1) {
               desarmar();
-              void comprar(braco === "b" ? plano : "vitalicio");
+              void comprar(duasColunas ? plano : "vitalicio");
               return null;
             }
             return v - 1;
@@ -379,7 +401,7 @@ export function PaywallW({
             // A comparação do topo mostra o plano ESCOLHIDO — no braço B ela
             // abre no mensal (24,90/mês) e troca pro vitalício se a pessoa
             // mudar de coluna. No braço A é sempre o vitalício.
-            const mostraMensal = braco === "b" && plano === "mensal";
+            const mostraMensal = duasColunas && plano === "mensal";
             const preco = mostraMensal ? "24,90" : "97,90";
             const precoSub = mostraMensal ? "por mês" : "1x, pra sempre";
             const precoTitulo = mostraMensal
@@ -394,7 +416,7 @@ export function PaywallW({
         <ValueStack area={area} />
         <motion.div {...stagger(2)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
         <motion.div {...stagger(3)}>
-          {braco === "b" ? (
+          {duasColunas ? (
             <PrecosLadoALadoW
               plano={plano}
               onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
@@ -494,14 +516,14 @@ export function PaywallW({
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
               disabled={comprando}
               onClick={() => {
-                const escolha = braco === "b" ? plano : "vitalicio";
+                const escolha = duasColunas ? plano : "vitalicio";
                 trackEvent("funnel_click", { cta: "app_paywall_cta", produto: escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
-                : braco === "b" && plano === "mensal"
+                : duasColunas && plano === "mensal"
                   ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
                   : <>Quero pra sempre — {APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
@@ -516,7 +538,7 @@ export function PaywallW({
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
               {naWeb
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · sem mensalidade</>
-                : braco === "b" && plano === "mensal"
+                : duasColunas && plano === "mensal"
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}
             </span>

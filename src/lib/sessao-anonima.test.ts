@@ -11,8 +11,12 @@
  * O que fica travado:
  *   · rede fora / resposta estranha / chave desligada → `anonimoLigado()` = false;
  *   · `signInAnonymously` recusado → "indisponivel", nunca exceção solta;
- *   · e-mail já usado no batismo → "email_em_uso" (quem chama PRECISA
- *     distinguir: trocar de conta aí deixaria a compra paga órfã).
+ *   · o e-mail entra ANTES do QR (26,1% dos pagantes fecham a aba e nunca
+ *     voltariam pra dar o endereço depois);
+ *   · a pendência do batismo é MARCADA, não deduzida de `is_anonymous` — que
+ *     vira false assim que o e-mail entra;
+ *   · `batizarConta` não reenvia o e-mail já gravado: isso cairia no fluxo de
+ *     TROCA de endereço, que exige confirmação e prenderia quem acabou de pagar.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -20,6 +24,7 @@ const mockAuth = {
   getSession: vi.fn(),
   getUser: vi.fn(),
   signInAnonymously: vi.fn(),
+  signInWithPassword: vi.fn(),
   updateUser: vi.fn(),
 };
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { auth: mockAuth } }));
@@ -36,6 +41,8 @@ beforeEach(() => {
   mockAuth.getSession.mockReset();
   mockAuth.getUser.mockReset();
   mockAuth.signInAnonymously.mockReset();
+  mockAuth.signInWithPassword.mockReset();
+  localStorage.clear();
   mockAuth.updateUser.mockReset();
 });
 
@@ -116,52 +123,123 @@ describe("garantirSessao", () => {
   });
 });
 
-describe("ehSessaoAnonima — decide entre updateUser e signUp", () => {
-  it("usuário anônimo é reconhecido pela claim", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", is_anonymous: true, email: null } } });
-    const { ehSessaoAnonima } = await carregar();
-    expect(await ehSessaoAnonima()).toBe(true);
+describe("definirEmailDaCompra — o e-mail entra ANTES do QR", () => {
+  it("abre a sessão anônima e grava o endereço nela", async () => {
+    mockAuth.getSession.mockResolvedValue({ data: { session: null } });
+    mockAuth.signInAnonymously.mockResolvedValue({ data: { session: { access_token: "y" } }, error: null });
+    mockAuth.getUser
+      .mockResolvedValueOnce({ data: { user: { id: "u1", email: null } } })   // emailDaSessao: ainda não tem
+      .mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } }); // depois do update
+    mockAuth.updateUser.mockResolvedValue({ error: null });
+    const { definirEmailDaCompra } = await carregar();
+    expect(await definirEmailDaCompra(" A@B.com ")).toEqual({ erro: null });
+    expect(mockAuth.updateUser).toHaveBeenCalledWith({ email: "a@b.com" });
+    expect(localStorage.getItem("core-batismo-pendente")).toBe("u1");
   });
 
-  it("conta de verdade NÃO é anônima (senão o batismo trocaria a senha dela)", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u2", is_anonymous: false, email: "a@b.com" } } });
-    const { ehSessaoAnonima } = await carregar();
-    expect(await ehSessaoAnonima()).toBe(false);
+  it("e-mail torto nem chega no servidor", async () => {
+    const { definirEmailDaCompra } = await carregar();
+    expect((await definirEmailDaCompra("joao@")).erro).toBe("invalido");
+    expect(mockAuth.updateUser).not.toHaveBeenCalled();
   });
 
-  it("sem usuário: não é sessão anônima (é ausência de sessão)", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: null } });
-    const { ehSessaoAnonima } = await carregar();
-    expect(await ehSessaoAnonima()).toBe(false);
+  it("colisão vira 'email_em_uso' — e como nada foi pago, dá pra entrar", async () => {
+    mockAuth.getSession.mockResolvedValue({ data: { session: { access_token: "x" } } });
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: null } } });
+    mockAuth.updateUser.mockResolvedValue({ error: { message: "A user with this email address has already been registered" } });
+    const { definirEmailDaCompra } = await carregar();
+    expect((await definirEmailDaCompra("a@b.com")).erro).toBe("email_em_uso");
   });
 
-  it("lib sem a claim: cai no fallback do e-mail vazio", async () => {
-    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u3", email: null } } });
-    const { ehSessaoAnonima } = await carregar();
-    expect(await ehSessaoAnonima()).toBe(true);
+  it("chave de anônimo desligada: não finge que deu certo", async () => {
+    mockAuth.getSession.mockResolvedValue({ data: { session: null } });
+    mockAuth.signInAnonymously.mockResolvedValue({ data: null, error: { message: "disabled" } });
+    const { definirEmailDaCompra } = await carregar();
+    expect((await definirEmailDaCompra("a@b.com")).erro).toBe("falhou");
+  });
+
+  it("mesmo e-mail de novo é no-op — não cai no fluxo de TROCA (que exige confirmação)", async () => {
+    mockAuth.getSession.mockResolvedValue({ data: { session: { access_token: "x" } } });
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    const { definirEmailDaCompra } = await carregar();
+    expect(await definirEmailDaCompra("a@b.com")).toEqual({ erro: null });
+    expect(mockAuth.updateUser).not.toHaveBeenCalled();
   });
 });
 
-describe("batizarSessaoAnonima", () => {
-  it("põe e-mail, senha e nome na MESMA conta (nunca cria outra)", async () => {
+describe("precisaBatizar — não confia em is_anonymous", () => {
+  /* Ao ganhar e-mail, `is_anonymous` vira false. Se a tela de cadastro
+   * deduzisse a pendência daquela flag, chamaria signUp, criaria um segundo
+   * usuário e órfanaria a compra paga. Por isso a marca é explícita. */
+  it("true quando a marca bate com o usuário atual, MESMO com is_anonymous false", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", is_anonymous: false, email: "a@b.com" } } });
+    const { precisaBatizar } = await carregar();
+    expect(await precisaBatizar()).toBe(true);
+  });
+
+  it("false quando a marca é de OUTRO usuário (trocou de conta)", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u2", email: "c@d.com" } } });
+    const { precisaBatizar } = await carregar();
+    expect(await precisaBatizar()).toBe(false);
+  });
+
+  it("false sem marca nenhuma — conta normal segue pelo signUp", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    const { precisaBatizar } = await carregar();
+    expect(await precisaBatizar()).toBe(false);
+  });
+});
+
+describe("batizarConta — só senha e nome", () => {
+  it("NÃO reenvia o e-mail que já está na conta (evitaria confirmação pendente)", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
     mockAuth.updateUser.mockResolvedValue({ error: null });
-    const { batizarSessaoAnonima } = await carregar();
-    expect(await batizarSessaoAnonima("a@b.com", "segredo123", "Ana")).toEqual({ erro: null });
+    const { batizarConta } = await carregar();
+    expect(await batizarConta("segredo123", "Ana", "a@b.com")).toEqual({ erro: null });
     expect(mockAuth.updateUser).toHaveBeenCalledWith({
-      email: "a@b.com", password: "segredo123",
-      data: { full_name: "Ana", display_name: "Ana" },
+      password: "segredo123", data: { full_name: "Ana", display_name: "Ana" },
+    });
+    expect(localStorage.getItem("core-batismo-pendente")).toBeNull();
+  });
+
+  it("conta sem e-mail (borda): aí sim manda o endereço junto", async () => {
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: null } } });
+    mockAuth.updateUser.mockResolvedValue({ error: null });
+    const { batizarConta } = await carregar();
+    await batizarConta("segredo123", "Ana", "a@b.com");
+    expect(mockAuth.updateUser).toHaveBeenCalledWith({
+      password: "segredo123", data: { full_name: "Ana", display_name: "Ana" }, email: "a@b.com",
     });
   });
 
-  it("e-mail já usado vira 'email_em_uso' — quem chama tem que pedir outro", async () => {
-    mockAuth.updateUser.mockResolvedValue({ error: { message: "A user with this email address has already been registered" } });
-    const { batizarSessaoAnonima } = await carregar();
-    expect((await batizarSessaoAnonima("a@b.com", "x123456", "Ana")).erro).toBe("email_em_uso");
+  it("falha não apaga a marca — a pessoa pode tentar de novo", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    mockAuth.updateUser.mockResolvedValue({ error: { message: "network unreachable" } });
+    const { batizarConta } = await carregar();
+    expect((await batizarConta("x123456", "Ana")).erro).toBe("falhou");
+    expect(localStorage.getItem("core-batismo-pendente")).toBe("u1");
+  });
+});
+
+describe("entrarNaContaExistente — seguro porque é ANTES do dinheiro", () => {
+  it("logar limpa a marca de batismo (conta de verdade não deve nada)", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.signInWithPassword.mockResolvedValue({ error: null });
+    const { entrarNaContaExistente } = await carregar();
+    expect(await entrarNaContaExistente("A@B.com", "senha123")).toEqual({ erro: null });
+    expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({ email: "a@b.com", password: "senha123" });
+    expect(localStorage.getItem("core-batismo-pendente")).toBeNull();
   });
 
-  it("qualquer outro erro vira 'falhou', não é confundido com colisão", async () => {
-    mockAuth.updateUser.mockResolvedValue({ error: { message: "network unreachable" } });
-    const { batizarSessaoAnonima } = await carregar();
-    expect((await batizarSessaoAnonima("a@b.com", "x123456", "Ana")).erro).toBe("falhou");
+  it("senha errada devolve erro e mantém a sessão de compra", async () => {
+    localStorage.setItem("core-batismo-pendente", "u1");
+    mockAuth.signInWithPassword.mockResolvedValue({ error: { message: "Invalid login credentials" } });
+    const { entrarNaContaExistente } = await carregar();
+    expect((await entrarNaContaExistente("a@b.com", "errada")).erro).toBeTruthy();
+    expect(localStorage.getItem("core-batismo-pendente")).toBe("u1");
   });
 });

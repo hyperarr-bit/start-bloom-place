@@ -26,7 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { anonimoLigado, ehSessaoAnonima } from "@/lib/sessao-anonima";
+import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -537,7 +537,7 @@ export default function ComecarW() {
                      * cadastro de novo seria absurdo: vai direto liberar. */
                     onPagoSemConta={() => {
                       if (!naWeb) { setPosCompra(true); setStep("signup"); return; }
-                      void ehSessaoAnonima().then((anon) => {
+                      void precisaBatizar().then((anon) => {
                         if (anon) { setPosCompra(true); setStep("signup"); }
                         else setStep("liberando");
                       });

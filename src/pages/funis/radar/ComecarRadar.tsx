@@ -21,7 +21,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
-import { ehSessaoAnonima, batizarSessaoAnonima } from "@/lib/sessao-anonima";
+import { precisaBatizar, batizarConta, emailDaSessao } from "@/lib/sessao-anonima";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
@@ -971,6 +971,17 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
   }, [inApp]);
 
+  /* Quem comprou sem conta na web JÁ digitou o e-mail antes do QR — ele está na
+   * sessão. Pedir de novo seria atrito bobo logo depois do pagamento, e ainda
+   * abriria a chance de a pessoa digitar outro e cair no ramo de troca de
+   * e-mail (que exige confirmação e prenderia o acesso). Preenche e segue. */
+  useEffect(() => {
+    void (async () => {
+      const e = await emailDaSessao();
+      if (e) setEmail((atual) => atual || e);
+    })();
+  }, []);
+
   /*
    * DESTRAVA O BOTÃO QUANDO A PESSOA VOLTA SEM LOGAR (31/08).
    *
@@ -1116,25 +1127,25 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
      */
     let error: { message?: string } | null = null;
     let session: unknown = null;
-    if (await ehSessaoAnonima()) {
-      const r = await batizarSessaoAnonima(email.trim().toLowerCase(), password, name.trim());
+    if (await precisaBatizar()) {
+      /* O e-mail JÁ entrou nesta conta antes do QR — aqui só falta senha e nome.
+       * `batizarConta` não reenvia o endereço de propósito: mandar o mesmo
+       * e-mail de novo cairia no fluxo de TROCA, que exige confirmação e
+       * prenderia o acesso de quem acabou de pagar. */
+      const r = await batizarConta(password, name.trim(), email.trim().toLowerCase());
       if (r.erro === "email_em_uso") {
-        /* E-mail já pertence a outra conta. NÃO logamos na conta antiga: a
-         * compra está NESTA sessão, e trocar de usuário aqui deixaria o
-         * pagamento órfão — exatamente o que este bloco existe pra evitar.
-         * Pedir outro e-mail preserva o acesso; o custo é o endereço preferido. */
         trackEvent("funnel_error", { where: "batismo_email_em_uso", inapp: inApp });
-        setErr("Esse e-mail já tem uma conta. Use outro aqui — sua compra está garantida nesta sessão e vai pra conta nova.");
+        setErr("Esse e-mail já tem uma conta. Use outro aqui — sua compra está garantida nesta conta.");
         setLoading(false);
         return;
       }
       if (r.erro) {
-        trackEvent("funnel_error", { where: "batismo_anonimo", inapp: inApp, message: (r.mensagem || "").slice(0, 200) });
-        setErr("Não consegui salvar seus dados. Tenta de novo — sua compra não se perde.");
+        trackEvent("funnel_error", { where: "batismo", inapp: inApp, message: (r.mensagem || "").slice(0, 200) });
+        setErr("Não consegui salvar sua senha. Tenta de novo — sua compra não se perde.");
         setLoading(false);
         return;
       }
-      trackEvent("funnel_click", { cta: "batismo_anonimo_ok" });
+      trackEvent("funnel_click", { cta: "batismo_ok" });
       const { data: s } = await supabase.auth.getSession();
       session = s?.session ?? null;
     } else {

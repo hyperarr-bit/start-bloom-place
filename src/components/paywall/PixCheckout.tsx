@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
-import { garantirSessao } from "@/lib/sessao-anonima";
+import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente } from "@/lib/sessao-anonima";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 
@@ -125,7 +125,7 @@ const PREPARO_LINHAS = [
   "Reservando sua condição de hoje",
 ];
 
-export type Step = "form" | "generating" | "qr" | "confirmed" | "expired" | "error";
+export type Step = "form" | "email" | "generating" | "qr" | "confirmed" | "expired" | "error";
 
 // A API da Cakto exige phone, mas o dono mandou NÃO pedir (fricção — mesmo
 // padrão do outro SaaS dele): vai um coringa fixo. O que importa pra nota é
@@ -190,9 +190,17 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [semSessao, setSemSessao] = useState(false);
-  // Comprando sem conta (sessão anônima): muda a promessa da tela de espera —
-  // não existe e-mail pra onde mandar o acesso enquanto a conta não é batizada.
+  /* Comprando SEM CONTA (funil web). O e-mail é pedido antes do QR e vira a
+   * identidade que sobrevive à aba fechada; nome e senha ficam pro pós-compra. */
   const [anonima, setAnonima] = useState(false);
+  const [emailCompra, setEmailCompra] = useState("");
+  const [emailErr, setEmailErr] = useState<string | null>(null);
+  const [emailIndo, setEmailIndo] = useState(false);
+  /* Colisão: o e-mail já tem conta. Como NADA foi pago ainda, entrar na conta
+   * existente é seguro (depois do pagamento, trocar de sessão órfanaria a
+   * compra). Mostra o campo de senha, com "usar outro e-mail" ao lado. */
+  const [contaExiste, setContaExiste] = useState(false);
+  const [senhaExistente, setSenhaExistente] = useState("");
   const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   /* RELIGADO 13/08 (rodou 30-31/07, os 2 dias recorde; caiu no revert de
@@ -223,7 +231,19 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       supabase.functions.invoke("cakto-pix", { body: { warm: true } }).catch(() => { /* noop */ });
     }
     if (SEM_FORM) {
-      generate("", "");
+      /* Quem chega aqui sem e-mail está comprando SEM CONTA (funil web, sessão
+       * anônima). Pede o endereço ANTES do QR — medido: 26,1% dos pagantes do
+       * Pix (202 de 774) fecham a aba sem voltar, e 59% dos checkouts rodam em
+       * webview do Instagram, onde o armazenamento é volátil. Sem e-mail, essa
+       * fatia paga e fica sem nenhuma forma de recuperar o acesso. */
+      void (async () => {
+        const jaTem = await emailDaSessao();
+        if (jaTem) { generate("", ""); return; }
+        const podeAnonimo = await anonimoLigado();
+        if (!podeAnonimo) { generate("", ""); return; } // caminho antigo: já tem conta
+        trackEvent("funnel_view", { step: "pix_email", offer, context });
+        setStep("email");
+      })();
       return;
     }
     (async () => {
@@ -239,6 +259,47 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* Do campo de e-mail pro QR. Grava o endereço na conta que vai pagar (abrindo
+   * a sessão anônima se preciso) e só então gera o Pix — assim `asaas-pix` já
+   * enxerga `user.email`, o welcome do webhook tem destinatário, e quem fechar a
+   * aba depois de pagar ainda consegue recuperar o acesso. */
+  const seguirDoEmail = async () => {
+    setEmailIndo(true);
+    setEmailErr(null);
+    try {
+      if (contaExiste) {
+        const { erro } = await entrarNaContaExistente(emailCompra, senhaExistente);
+        if (erro) {
+          setEmailErr("Senha incorreta. Tenta de novo ou usa outro e-mail.");
+          trackEvent("funnel_error", { where: "pix_email_login", offer });
+          return;
+        }
+        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer });
+        await generate("", "");
+        return;
+      }
+      const r = await definirEmailDaCompra(emailCompra);
+      if (r.erro === "invalido") { setEmailErr("Esse e-mail não parece certo. Confere?"); return; }
+      if (r.erro === "email_em_uso") {
+        // Antes do dinheiro: dá pra simplesmente entrar. Nada fica órfão.
+        setContaExiste(true);
+        setEmailErr("Esse e-mail já tem conta no CORE. Põe sua senha que eu sigo daqui.");
+        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer });
+        return;
+      }
+      if (r.erro) {
+        setEmailErr("Não consegui seguir agora. Tenta de novo?");
+        trackEvent("funnel_error", { where: "pix_email", offer, message: (r.mensagem || "").slice(0, 120) });
+        return;
+      }
+      setAnonima(true);
+      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context });
+      await generate("", "");
+    } finally {
+      setEmailIndo(false);
+    }
+  };
 
   const generate = async (nm: string, doc: string) => {
     setStep("generating");
@@ -526,6 +587,75 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         )}
 
         <AnimatePresence mode="wait">
+          {step === "email" && (
+            <motion.div key="email" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
+              <div className="text-center mb-5">
+                <h2 className="text-[24px] font-bold tracking-tight leading-tight">Pra onde mandamos<br />seu acesso?</h2>
+                <p className="text-sm text-muted-foreground mt-1.5">
+                  Só o e-mail. Sem senha, sem cadastro — isso fica pra depois de pagar.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-border bg-card p-4 mb-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 text-left">
+                    <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent text-accent-foreground shrink-0">
+                      <Zap className="w-5 h-5" />
+                    </span>
+                    <div>
+                      <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                    </div>
+                  </div>
+                  <div className="text-xl font-extrabold text-accent leading-none shrink-0">R$ {price}</div>
+                </div>
+              </div>
+
+              <input
+                type="email" inputMode="email" autoComplete="email" autoFocus
+                value={emailCompra}
+                onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) setContaExiste(false); }}
+                placeholder="seu@email.com"
+                className="w-full h-12 rounded-xl border-2 border-border bg-background px-4 text-[16px] outline-none focus:border-accent transition-colors"
+              />
+
+              {/* Já tem conta: entra agora, ANTES de pagar — é seguro justamente
+                  porque nenhum dinheiro se moveu ainda. */}
+              {contaExiste && (
+                <input
+                  type="password" autoComplete="current-password"
+                  value={senhaExistente}
+                  onChange={(e) => { setSenhaExistente(e.target.value); setEmailErr(null); }}
+                  placeholder="sua senha"
+                  className="w-full h-12 rounded-xl border-2 border-border bg-background px-4 text-[16px] outline-none focus:border-accent transition-colors mt-2.5"
+                />
+              )}
+
+              {emailErr && <p className="text-[12.5px] text-destructive mt-2 leading-snug">{emailErr}</p>}
+
+              <Button
+                size="lg" className="w-full h-12 text-base mt-3.5"
+                disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
+                onClick={() => void seguirDoEmail()}
+              >
+                {emailIndo ? "Só um instante…" : contaExiste ? "Entrar e gerar o Pix" : "Gerar meu Pix"}
+              </Button>
+
+              {contaExiste && (
+                <button
+                  className="w-full text-center text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 mt-2.5"
+                  onClick={() => { setContaExiste(false); setSenhaExistente(""); setEmailCompra(""); setEmailErr(null); }}
+                >
+                  Usar outro e-mail
+                </button>
+              )}
+
+              <p className="text-[11px] text-muted-foreground text-center mt-3 leading-snug px-2">
+                É pra onde vai seu acesso e seu recibo. Confere se tá certo.
+              </p>
+            </motion.div>
+          )}
+
           {step === "form" && (
             <motion.div key="form" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }} className="w-full max-w-sm">
               <div className="text-center mb-5">
@@ -786,9 +916,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   texto vira o contrário: fica aqui, que é rapidinho. */}
               {anonima ? (
                 <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
-                  🔒 Assim que o pagamento cair, a gente cria seu acesso na hora —
-                  <strong className="text-foreground"> deixa esta tela aberta</strong>,
-                  leva menos de um minuto.
+                  📩 Pagou? Seu acesso vai pra <strong className="text-foreground">{emailCompra}</strong> —
+                  pode fechar esta tela sem medo.
                 </p>
               ) : (
                 <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">

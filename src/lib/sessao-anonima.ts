@@ -1,83 +1,88 @@
 /**
- * SESSÃO ANÔNIMA — pra vender ANTES de pedir cadastro na web (01/09).
+ * COMPRAR SEM CADASTRO NA WEB — sessão anônima + e-mail antes do QR (01/09).
  *
- * O PROBLEMA QUE ISSO RESOLVE
+ * O PROBLEMA
  * No funil web a pessoa era obrigada a criar conta antes de ver o preço,
  * porque `asaas-pix` exige usuário autenticado pra emitir o QR (o QR é
  * estático e não carrega customer nosso; o único elo entre o pagamento e a
  * conta é o registro `pix_order_created`, chaveado no user_id). Medido em
  * 01/09: de 54 pessoas que assinaram o contrato, 11 criaram conta — o cadastro
- * come 80% num tráfego 100% pago. No app não existe esse degrau: lá quem cobra
- * é a folha do Google, que não precisa de conta nossa.
+ * comia 80% de um tráfego 100% pago.
  *
- * A SAÍDA MAIS BARATA
- * Em vez de reescrever a cadeia do dinheiro pra aceitar compra sem dono
- * (asaas-pix + asaas-webhook + pix-reconcile + uma tabela nova de pendentes),
- * a gente cria um usuário ANÔNIMO do Supabase antes do QR. Aí existe um
- * `user.id` de verdade, e `asaas-pix`, `asaas-webhook` e `pix-reconcile`
- * continuam byte a byte como estão — nenhuma função que move dinheiro muda.
- * Depois de pagar, a pessoa BATIZA essa conta com e-mail e senha
- * (`updateUser`), e a assinatura já está lá dentro.
+ * A SOLUÇÃO, EM DOIS TEMPOS
+ *   1. antes do QR: abre uma sessão ANÔNIMA e grava só o E-MAIL nela;
+ *   2. depois de pagar: a pessoa põe nome e senha na MESMA conta.
+ * Assim `asaas-pix`, `asaas-webhook` e `pix-reconcile` não mudam uma linha —
+ * sempre existe um `user.id` real, e agora também um `user.email` real.
  *
- * POR QUE `updateUser` NÃO TRAVA O ACESSO
- * `GET /auth/v1/settings` deste projeto devolve `mailer_autoconfirm: true`:
- * confirmação de e-mail está DESLIGADA. Então batizar aplica na hora, sem
- * mandar a pessoa pro e-mail no meio da compra. Se um dia alguém ligar a
- * confirmação, este caminho passa a prender o acesso — está anotado aqui de
- * propósito.
+ * POR QUE O E-MAIL VEM ANTES, E NÃO SÓ DEPOIS
+ * Medido na base: 202 de 774 pagantes do Pix — 26,1% — nunca emitiram
+ * `pix_confirmed`. Pagam e fecham a aba. E 59% dos checkouts rodam dentro do
+ * webview do Instagram/Facebook, onde o armazenamento é volátil. Se o e-mail
+ * só fosse pedido DEPOIS do pagamento, esse um em cada quatro ficaria com uma
+ * conta paga sem endereço nenhum: sem welcome, sem "esqueci minha senha", sem
+ * acesso em outro aparelho. O e-mail digitado antes é a única identidade que
+ * atravessa aba fechada, cache limpo e troca de aparelho — é o equivalente web
+ * do recibo que a conta Google guarda no app.
  *
- * O QUE ISSO CUSTA (é dívida real, não detalhe)
- * O acesso de quem paga e NÃO batiza a conta mora num token de UM navegador.
- * Não há e-mail em lugar nenhum, então não há como recuperar: nem por suporte,
- * nem pelo `pix-reconcile` (que credita pelo user_id do pedido — e esse
- * usuário anônimo É o dono, então pra ele já está tudo certo). Quem limpar os
- * dados do navegador perde a compra. Enquanto essa dívida existir, a tela do
- * QR não pode prometer que "o acesso chega no seu e-mail".
+ * Continua MUITO mais curto que o cadastro completo: um campo, sem senha, sem
+ * CPF, sem confirmação.
+ *
+ * COLISÃO DE E-MAIL RESOLVIDA ANTES DO DINHEIRO
+ * 13,9% dos compradores do Pix já tinham conta. Perguntar o e-mail antes do QR
+ * faz essa colisão aparecer enquanto NADA foi pago — aí dá pra simplesmente
+ * entrar na conta existente, sem risco de deixar pagamento órfão. Se a mesma
+ * colisão aparecesse depois do pagamento, trocar de sessão órfanaria a compra.
+ *
+ * DETALHES DE AUTH QUE FORAM MEDIDOS, NÃO SUPOSTOS
+ *  · `mailer_autoconfirm: true` neste projeto (confirmação de e-mail desligada).
+ *  · DEFINIR o e-mail de uma conta anônima aplica NA HORA — provado com sessão
+ *    real: `updateUser({email})` devolve 200 com o campo `email` preenchido,
+ *    `new_email` vazio, e o login com esse endereço funciona. É diferente de
+ *    TROCAR o e-mail de uma conta que já tem um, que passa por confirmação.
+ *  · Ao ganhar e-mail, `is_anonymous` vira **false**. Por isso a pendência do
+ *    batismo é marcada explicitamente aqui, e não deduzida daquela flag.
  *
  * DEGRADA SOZINHO
- * Sign-in anônimo é uma chave no painel do Supabase e em 01/09 estava
- * DESLIGADA (`external.anonymous_users: false`). Por isso `garantirSessao()`
- * devolve "indisponivel" em vez de explodir: com a chave desligada o funil web
- * volta a pedir cadastro antes do paywall, exatamente como era. Ligar a chave
- * ativa o caminho novo sem precisar de deploy.
+ * Sign-in anônimo é uma chave do painel. Com ela desligada, `garantirSessao()`
+ * responde "indisponivel" e o funil volta a pedir cadastro antes do paywall.
  *
- * ATENÇÃO DE SEGURANÇA: usuário anônimo entra com role `authenticated` (com a
- * claim `is_anonymous: true`), então TODA policy de RLS escrita pra
- * `authenticated` passa a valer pra quem só abriu a página.
+ * ATENÇÃO DE SEGURANÇA: usuário anônimo entra com role `authenticated`, então
+ * toda policy de RLS escrita pra `authenticated` passa a valer pra quem só
+ * abriu a página. Auditado em 01/09: 50 das 53 amarram em `auth.uid()`, as
+ * outras 3 são regras de negação.
  */
 import { supabase } from "@/integrations/supabase/client";
 
 /* Repetidos aqui de propósito: `src/integrations/supabase/client.ts` é gerado
  * e diz "não edite", então não dá pra exportar as constantes de lá. Os dois
- * valores são públicos — já viajam no bundle e no header de toda requisição —,
- * então repetir não expõe nada novo. */
+ * valores são públicos — já viajam no bundle e no header de toda requisição. */
 const SUPABASE_URL = "https://itoylenzvahbscgjgtqf.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
 
+/** Marca no aparelho que ESTE usuário comprou sem conta e ainda deve nome e
+ *  senha. Guarda o id porque `is_anonymous` deixa de servir assim que o e-mail
+ *  entra — sem isso, a tela de cadastro chamaria `signUp` e criaria um segundo
+ *  usuário, órfanando a compra. */
+const CHAVE_BATISMO = "core-batismo-pendente";
+
 export type EstadoSessao = "ja-tinha" | "anonima" | "indisponivel";
+export type ErroEmail = null | "email_em_uso" | "invalido" | "falhou";
 
-/** Cache do resultado: uma vez que a chave se provou desligada, não adianta
- *  bater de novo a cada tentativa de compra. Vive só nesta aba. */
 let anonimoIndisponivel = false;
-
-/** Resposta de `GET /auth/v1/settings`, cacheada por aba. */
 let promessaDaChave: Promise<boolean> | null = null;
 
 /**
  * A chave "Anonymous sign-ins" está LIGADA no painel do Supabase?
  *
  * Existe pra que o funil escolha a ORDEM das telas antes de chegar no
- * checkout. Sem isso a degradação não seria graciosa, seria um beco: com a
- * chave desligada, a pessoa passaria o funil inteiro, tocaria em comprar e só
- * então descobriria que precisa de conta — numa tela de erro que a manda pra
- * fora do funil. Perguntando ANTES, o funil volta a pedir cadastro antes do
- * paywall, exatamente como era até 31/08.
+ * checkout. Sem isso a degradação não seria graciosa, seria um beco: a pessoa
+ * passaria o funil inteiro, tocaria em comprar e só então descobriria que
+ * precisa de conta — numa tela de erro que a manda pra fora do funil.
  *
- * `/auth/v1/settings` é público (é o mesmo que o supabase-js usa pra saber
- * quais provedores mostrar) e a resposta é minúscula. Na dúvida — rede fora,
- * campo ausente, formato diferente — responde `false`, que é o caminho antigo
- * e comprovado. Nunca falhar para o lado novo.
+ * Na dúvida — rede fora, campo ausente, formato diferente — responde `false`,
+ * que é o caminho antigo e comprovado. Nunca falhar para o lado novo.
  */
 export function anonimoLigado(): Promise<boolean> {
   if (promessaDaChave) return promessaDaChave;
@@ -95,11 +100,11 @@ export function anonimoLigado(): Promise<boolean> {
 }
 
 /**
- * Garante que existe uma sessão pra chamar as edge functions de pagamento.
- * - "ja-tinha"     → a pessoa já estava logada; nada foi criado.
- * - "anonima"      → criamos um usuário anônimo agora; ela ainda não tem e-mail.
- * - "indisponivel" → não há sessão e não deu pra criar (chave desligada,
- *                    rede caiu). Quem chama tem que mandar a pessoa cadastrar.
+ * Garante uma sessão pra chamar as edge functions de pagamento.
+ * - "ja-tinha"     → já estava logada; nada foi criado.
+ * - "anonima"      → criamos um usuário anônimo agora.
+ * - "indisponivel" → não há sessão e não deu pra criar. Quem chama tem que
+ *                    mandar a pessoa cadastrar.
  */
 export async function garantirSessao(): Promise<EstadoSessao> {
   const { data: sess } = await supabase.auth.getSession();
@@ -108,7 +113,6 @@ export async function garantirSessao(): Promise<EstadoSessao> {
   try {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error || !data?.session) {
-      // Erro típico com a chave desligada: "Anonymous sign-ins are disabled".
       anonimoIndisponivel = true;
       return "indisponivel";
     }
@@ -119,44 +123,104 @@ export async function garantirSessao(): Promise<EstadoSessao> {
   }
 }
 
-/**
- * A sessão atual é de um usuário anônimo (pagou, ainda não batizou a conta)?
- *
- * Isso decide o caminho do cadastro: numa sessão anônima, chamar `signUp()`
- * cria um SEGUNDO usuário e deixa a assinatura paga órfã no primeiro — o
- * dinheiro entra e a pessoa fica sem acesso. Quem estiver nesse estado tem que
- * usar `updateUser()`.
- */
-export async function ehSessaoAnonima(): Promise<boolean> {
+/** O e-mail da sessão atual, ou null (sem sessão, ou sessão anônima crua). */
+export async function emailDaSessao(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
-  const u = data?.user as ({ is_anonymous?: boolean } & { email?: string | null }) | null | undefined;
-  if (!u) return false;
-  // `is_anonymous` é a fonte da verdade (claim do JWT). O fallback por e-mail
-  // vazio cobre versões da lib que ainda não expõem a claim no objeto.
-  return u.is_anonymous === true || !u.email;
+  return data?.user?.email ?? null;
+}
+
+const EMAIL_OK = /^\S+@\S+\.\S+$/;
+
+/**
+ * Grava o e-mail na conta que vai pagar — o passo que roda ANTES do QR.
+ *
+ * Abre a sessão anônima se preciso e define o endereço nela. A partir daqui
+ * `asaas-pix` enxerga `user.email`, o welcome do webhook tem destinatário, e a
+ * pessoa consegue recuperar o acesso mesmo que feche a aba no segundo seguinte.
+ */
+export async function definirEmailDaCompra(email: string): Promise<{ erro: ErroEmail; mensagem?: string }> {
+  const limpo = email.trim().toLowerCase();
+  if (!EMAIL_OK.test(limpo)) return { erro: "invalido" };
+  const estado = await garantirSessao();
+  if (estado === "indisponivel") return { erro: "falhou", mensagem: "sem_sessao" };
+
+  const jaTem = await emailDaSessao();
+  if (jaTem === limpo) return { erro: null }; // repetiu o mesmo e-mail: nada a fazer
+
+  const { error } = await supabase.auth.updateUser({ email: limpo });
+  if (error) {
+    const msg = error.message || "";
+    if (/already|registered|exists|taken/i.test(msg)) return { erro: "email_em_uso", mensagem: msg };
+    return { erro: "falhou", mensagem: msg };
+  }
+  const { data } = await supabase.auth.getUser();
+  if (data?.user?.id) marcarBatismoPendente(data.user.id);
+  return { erro: null };
 }
 
 /**
- * Batiza a sessão anônima: põe e-mail, senha e nome na conta que JÁ é dona da
- * compra. Não cria usuário novo — é isso que preserva a assinatura.
- *
- * Devolve `{ erro: "email_em_uso" }` quando o e-mail já pertence a outra conta.
- * Nesse caso NÃO logamos na conta antiga: a compra está nesta sessão, e trocar
- * de usuário aqui deixaria o pagamento órfão. Quem chama deve pedir outro
- * e-mail — a pessoa não perde o acesso, só o endereço preferido.
+ * A colisão de e-mail acontece ANTES do pagamento, então entrar na conta que já
+ * existe é seguro — não há compra nenhuma pra ficar órfã. Trocar de sessão aqui
+ * é o caminho certo; depois do pagamento seria o erro mais caro possível.
  */
-export async function batizarSessaoAnonima(
-  email: string,
-  password: string,
+export async function entrarNaContaExistente(email: string, senha: string): Promise<{ erro: string | null }> {
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: senha });
+  if (error) return { erro: error.message || "falhou" };
+  limparBatismo(); // conta de verdade: não deve nada
+  return { erro: null };
+}
+
+function marcarBatismoPendente(userId: string) {
+  try { localStorage.setItem(CHAVE_BATISMO, userId); } catch { /* noop */ }
+}
+
+export function limparBatismo() {
+  try { localStorage.removeItem(CHAVE_BATISMO); } catch { /* noop */ }
+}
+
+/**
+ * Esta sessão comprou sem conta e ainda deve nome e senha?
+ *
+ * Compara o id marcado com o usuário atual. NÃO usa `is_anonymous`, que vira
+ * `false` assim que o e-mail entra — confiar nele faria a tela de cadastro
+ * chamar `signUp`, criar um segundo usuário e órfãnar a compra paga.
+ */
+export async function precisaBatizar(): Promise<boolean> {
+  let marcado: string | null = null;
+  try { marcado = localStorage.getItem(CHAVE_BATISMO); } catch { /* noop */ }
+  if (!marcado) return false;
+  const { data } = await supabase.auth.getUser();
+  return !!data?.user && data.user.id === marcado;
+}
+
+/**
+ * Fecha a conta de quem comprou sem cadastro: põe senha e nome na MESMA conta
+ * que é dona da compra. O e-mail já entrou antes do QR, então aqui NÃO se mexe
+ * nele — mandar o mesmo endereço de novo cairia no fluxo de troca de e-mail,
+ * que exige confirmação e prenderia o acesso.
+ *
+ * `email` é opcional e só é usado no caso de borda em que a conta chegou aqui
+ * sem endereço (a chave do anônimo ligou no meio do caminho, por exemplo).
+ */
+export async function batizarConta(
+  senha: string,
   nome: string,
+  email?: string,
 ): Promise<{ erro: null | "email_em_uso" | "falhou"; mensagem?: string }> {
-  const { error } = await supabase.auth.updateUser({
-    email,
-    password,
+  const atual = await emailDaSessao();
+  const payload: { password: string; data: Record<string, string>; email?: string } = {
+    password: senha,
     data: { full_name: nome, display_name: nome },
-  });
-  if (!error) return { erro: null };
-  const msg = error.message || "";
-  if (/already|registered|exists|taken/i.test(msg)) return { erro: "email_em_uso", mensagem: msg };
-  return { erro: "falhou", mensagem: msg };
+  };
+  if (!atual && email && EMAIL_OK.test(email.trim().toLowerCase())) {
+    payload.email = email.trim().toLowerCase();
+  }
+  const { error } = await supabase.auth.updateUser(payload);
+  if (error) {
+    const msg = error.message || "";
+    if (/already|registered|exists|taken/i.test(msg)) return { erro: "email_em_uso", mensagem: msg };
+    return { erro: "falhou", mensagem: msg };
+  }
+  limparBatismo();
+  return { erro: null };
 }

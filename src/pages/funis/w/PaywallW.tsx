@@ -82,7 +82,33 @@ const ANDROID_DUAS_COLUNAS = true;
  * testes numa tela só. */
 const PRECO_WEB = "97,90";
 const OFERTA_WEB: "w97" = "w97";
-const ANDROID_PLANO_INICIAL: "vitalicio" | "mensal" = "mensal";
+/* QUEM NASCE SELECIONADO NO ANDROID — vira "vitalicio" em 01/09.
+ *
+ * Este é o 3º e último arranjo da vitrine. Os dois anteriores já rodaram com
+ * dinheiro em cima:
+ *   1. só o vitalício (até 31/08 21h)     — mensal só como resgate pós-recusa
+ *   2. duas colunas, MENSAL em foco       — 31/08 21h até agora
+ *   3. duas colunas, VITALÍCIO em foco    — este
+ *
+ * O que o arranjo 2 mediu em 01/09, até ~09:45 (janela BRT):
+ *   campanha do app gastou R$ 397,22 (R$ 452,83 com o imposto de 14% da Meta)
+ *   8 vendas: SETE de 24,90 + UMA de 97,90 = R$ 272,20 bruto, R$ 231,37 líquido
+ *   ROI 0,51×
+ * Os MESMOS 8 compradores no vitalício dariam R$ 783,20 bruto / R$ 665,72
+ * líquido = ROI 1,47×. Sem convencer uma pessoa a mais. O tíquete, e não a
+ * conversão, é o que está faltando.
+ *
+ * E o mensal REALMENTE converte melhor: a folha do Google fechou 30% (6 de 20)
+ * contra os ~13% históricos do vitalício. Só que 30% não é o bastante — pra
+ * empatar com um tíquete 3,9× maior, ele precisaria fechar ~4× melhor, não 2×.
+ *
+ * O vitalício continua ao lado e quem quiser mensalidade escolhe em um toque:
+ * a hipótese que sobrevive dos dois arranjos anteriores é que a coluna barata
+ * ancora o preço e resgata quem recusa, mas não deve ser o padrão de todo mundo.
+ *
+ * CUIDADO AO MEXER: `vitrine-android.test.tsx` trava esta escolha de propósito.
+ * Se você trocou esta linha, o teste quebra — e é pra quebrar. */
+const ANDROID_PLANO_INICIAL: "vitalicio" | "mensal" = "vitalicio";
 
 /**
  * iOS: SEM A/B, e os DOIS preços sempre (spec do dono, 30/08).

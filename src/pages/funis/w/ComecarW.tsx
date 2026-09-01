@@ -26,6 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { anonimoLigado, ehSessaoAnonima } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
@@ -36,6 +37,7 @@ import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTest
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
+import { SignupIOS, ConfirmIOS, LiberandoIOS } from "@/pages/funis/ios/CadastroIOS";
 import { ehApple } from "@/lib/loja";
 
 const FUNIL = "w";
@@ -336,6 +338,13 @@ export default function ComecarW() {
   });
   const [confirmEmail, setConfirmEmail] = useState("");
   const [posCompra, setPosCompra] = useState(false);
+  /* A chave de sign-in anônimo está ligada? Decide se a web vende antes de
+   * cadastrar (caminho novo) ou cadastra antes de vender (caminho de 31/08).
+   * Nasce `false` — o caminho antigo — e só vira `true` se o Supabase
+   * confirmar. A pergunta sai no mount, muito antes do contrato, então já
+   * chegou quando a resposta importa; e se não tiver chegado, o pior caso é
+   * pedir cadastro a mais, nunca levar alguém a um beco sem sessão. */
+  const [anonimoOk, setAnonimoOk] = useState(false);
   /* MESMO FUNIL, DOIS CANOS DE PAGAMENTO (31/08). Fora do shell da loja este
    * arquivo roda em /w e cobra por Pix; dentro do app, pela folha do Google.
    * A meta que motivou isso é ROI 2, e a conta não fecha na folha: ela paga
@@ -365,6 +374,8 @@ export default function ComecarW() {
         return;
       }
     } catch { /* noop */ }
+    // Pergunta cedo, usa tarde: a resposta só é lida no fim do contrato.
+    if (naWeb) void anonimoLigado().then(setAnonimoOk);
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
@@ -479,13 +490,27 @@ export default function ComecarW() {
               )}
               {step === "central" && <CentralScreen area={areaOuPadrao} onOpen={abrirDemo} />}
               {step === "compromissos" && <CompromissosPorRota area={areaOuPadrao} onDone={() => setStep("contrato")} />}
-              {/* 31/08 — ORDEM DIFERENTE NA WEB. O Pix da Cakto exige usuário
-                  autenticado pra emitir o QR, então na web o cadastro entra
-                  ANTES do paywall (mesmo desenho do funil /inicio, que já
-                  vende assim). No app continua vendendo primeiro e cadastrando
-                  depois: lá quem cobra é a folha do Google, que não precisa de
-                  conta nossa. */}
-              {step === "contrato" && <ContratoScreen onDone={() => setStep(naWeb ? "signup" : "offer")} />}
+              {/* MESMA ORDEM NAS DUAS PONTAS (01/09): vende primeiro, cadastra
+                  depois. Até ontem a web era obrigada a cadastrar ANTES do
+                  paywall porque a função do Pix exige usuário autenticado pra
+                  emitir o QR. Medido no dia: 54 assinaram o contrato e 11
+                  criaram conta — o cadastro comia 80% de um tráfego 100% pago.
+                  Agora o PixCheckout abre uma SESSÃO ANÔNIMA antes do QR
+                  (src/lib/sessao-anonima.ts), então existe um user_id de
+                  verdade e nenhuma função de dinheiro mudou. Se a chave de
+                  sign-in anônimo estiver desligada no painel, o PixCheckout
+                  cai no caminho antigo e pede pra entrar — por isso dá pra
+                  subir isto antes de ligar a chave.
+
+                  A PERGUNTA TEM QUE SER FEITA AQUI, não no checkout: se a
+                  chave estiver desligada e a gente mandar a pessoa direto pro
+                  paywall, ela só descobre que precisa de conta ao TOCAR EM
+                  COMPRAR — numa tela de erro que a joga pra fora do funil.
+                  Perguntando antes, a ordem antiga (cadastro → paywall) volta
+                  inteira. `anonimoLigado()` falha pro lado antigo de propósito. */}
+              {step === "contrato" && (
+                <ContratoScreen onDone={() => setStep(naWeb && !anonimoOk ? "signup" : "offer")} />
+              )}
               {/* A BIFURCAÇÃO DAS DUAS LOJAS (31/08, decisão do dono).
                   Não é um `if` de comportamento — é a escolha de QUAL ARQUIVO
                   renderizar. A partir daqui o paywall do Android e o do iPhone
@@ -503,23 +528,46 @@ export default function ComecarW() {
                     area={areaOuPadrao}
                     answers={answers}
                     naWeb={naWeb}
+                    /* Pagou. No app sempre vai pro cadastro. Na web depende de
+                     * QUEM é a sessão: anônima (comprou sem conta) vai pro
+                     * cadastro pra ser batizada — o SignupScreen põe e-mail e
+                     * senha NESSA conta, que é a dona da compra, em vez de
+                     * criar outra e órfã a assinatura. Se já for conta de
+                     * verdade (cadastrou antes, ou voltou logada), pedir
+                     * cadastro de novo seria absurdo: vai direto liberar. */
                     onPagoSemConta={() => {
-                      // web: a conta já existe (cadastro veio antes do paywall)
-                      if (naWeb) { setStep("liberando"); return; }
-                      setPosCompra(true); setStep("signup");
+                      if (!naWeb) { setPosCompra(true); setStep("signup"); return; }
+                      void ehSessaoAnonima().then((anon) => {
+                        if (anon) { setPosCompra(true); setStep("signup"); }
+                        else setStep("liberando");
+                      });
                     }}
                   />
                 )
               )}
+              {/* PÓS-COMPRA: telas próprias no iPhone (01/09). Foi AQUI que
+                  apareceram os 5 vazamentos do teste real — botão da Apple
+                  faltando, "como você pagou", garantia de 7 dias, "o Google
+                  confirma" e o botão do Google que não volta. Nenhum na tela
+                  de venda; todos no que vem depois dela. Agora são arquivos
+                  distintos: mexer num não alcança o outro. */}
               {step === "signup" && (
-                <SignupScreen
-                  posCompra={posCompra}
-                  onSession={() => setStep(posCompra && !naWeb ? "liberando" : "offer")}
-                  onConfirm={(e: string) => { setConfirmEmail(e); setStep("confirm"); }}
-                />
+                ehApple() ? (
+                  <SignupIOS
+                    posCompra={posCompra}
+                    onSession={() => setStep(posCompra ? "liberando" : "offer")}
+                    onConfirm={(e: string) => { setConfirmEmail(e); setStep("confirm"); }}
+                  />
+                ) : (
+                  <SignupScreen
+                    posCompra={posCompra}
+                    onSession={() => setStep(posCompra ? "liberando" : "offer")}
+                    onConfirm={(e: string) => { setConfirmEmail(e); setStep("confirm"); }}
+                  />
+                )
               )}
-              {step === "confirm" && <ConfirmScreen email={confirmEmail} />}
-              {step === "liberando" && <LiberandoScreen />}
+              {step === "confirm" && (ehApple() ? <ConfirmIOS email={confirmEmail} /> : <ConfirmScreen email={confirmEmail} />)}
+              {step === "liberando" && (ehApple() ? <LiberandoIOS /> : <LiberandoScreen />)}
             </motion.div>
           </AnimatePresence>
         </div>

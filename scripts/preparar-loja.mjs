@@ -24,7 +24,25 @@ import { readFileSync, writeFileSync, existsSync, rmSync, statSync, readdirSync 
 import { join } from "node:path";
 
 const teste = process.argv.includes("--teste");
-const ASSETS = "android/app/src/main/assets/public";
+
+/*
+ * DUAS LOJAS (30/08). `npm run loja` continua sendo o Android, byte por byte
+ * igual ao que já vende — a entrada do iPhone não podia mexer no caminho do
+ * dinheiro que está no ar. `npm run loja -- --ios` faz o mesmo ritual pro
+ * binário da Apple, com as três diferenças que importam:
+ *   - a pasta que o cap sync alimenta é outra (ios/App/App/public);
+ *   - a chave do RevenueCat é appl_, não goog_ (chave trocada = getOfferings
+ *     vazio = app na loja sem forma de pagamento, o mesmo desastre do topo);
+ *   - não existe SDK nativo da Meta no iOS, então a trava do client token
+ *     não se aplica (checá-la aqui abortaria um build correto).
+ * A poda de peso morto e o strip dos pixels JS valem IGUAL nos dois: o
+ * Capacitor copia a mesma pasta public pros dois lados.
+ */
+const alvoIOS = process.argv.includes("--ios");
+const LOJA = alvoIOS
+  ? { nome: "iOS", assets: "ios/App/App/public", plataforma: "ios", envKey: "VITE_REVENUECAT_IOS_KEY", prefixo: "appl_" }
+  : { nome: "Android", assets: "android/app/src/main/assets/public", plataforma: "android", envKey: "VITE_REVENUECAT_ANDROID_KEY", prefixo: "goog_" };
+const ASSETS = LOJA.assets;
 
 // Peso morto: só a web alcança essas telas (a landing page e o funil /plano,
 // que dentro do app redirecionam pro /inicio pela trava de rota do App.tsx).
@@ -58,24 +76,25 @@ const mb = (b) => (b / 1024 / 1024).toFixed(1) + " MB";
 
 // 1. a chave
 const env = existsSync(".env.local") ? readFileSync(".env.local", "utf8") : "";
-const chave = env.match(/^\s*VITE_REVENUECAT_ANDROID_KEY\s*=\s*"?([^"\n]+)"?/m)?.[1] ?? "";
+const chave = env.match(new RegExp(`^\\s*${LOJA.envKey}\\s*=\\s*"?([^"\\n]+)"?`, "m"))?.[1] ?? "";
 if (!chave) {
-  console.error("\n✗ VITE_REVENUECAT_ANDROID_KEY não está no .env.local — o app subiria sem forma de pagamento.\n");
+  console.error(`\n✗ ${LOJA.envKey} não está no .env.local — o app ${LOJA.nome} subiria sem forma de pagamento.\n`);
   process.exit(1);
 }
-if (!teste && !chave.startsWith("goog_")) {
-  console.error(`\n✗ A chave do RevenueCat é "${chave.slice(0, 12)}…", não uma chave de produção (goog_).`);
+if (!teste && !chave.startsWith(LOJA.prefixo)) {
+  console.error(`\n✗ A chave do RevenueCat é "${chave.slice(0, 12)}…", não uma chave de produção do ${LOJA.nome} (${LOJA.prefixo}).`);
   console.error("  Publicado assim, o botão de assinar nasce desabilitado pra todo mundo.");
   console.error("  Troque no .env.local, ou rode `npm run loja -- --teste` se o build é só pra testar.\n");
   process.exit(1);
 }
+console.log(`✓ loja: ${LOJA.nome}`);
 console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build de TESTE)" : "(produção)"}`);
 
 // SDK da Meta (12/08): a MainActivity só liga o SDK se o client token estiver
 // preenchido no strings.xml. Ou seja, build de produção com token vazio não
 // quebra nada visível — o app funciona e a campanha volta a ficar CEGA em
 // silêncio. Esse tipo de silêncio é o que barra aqui.
-if (!teste) {
+if (!teste && !alvoIOS) {
   // Mora no key.properties (gitignored) e não no strings.xml: o repo é
   // público, e token vazado vira evento falso no nosso dataset.
   const props = existsSync("android/key.properties")
@@ -103,7 +122,7 @@ if (!teste && process.env.RC_MOCK === "1") {
 
 // 2. build + sync
 sh(teste ? "RC_MOCK=1 npm run build" : "npm run build");
-sh("npx cap sync android");
+sh(`npx cap sync ${LOJA.plataforma}`);
 
 // 3. tira os rastreadores de anúncio do index.html do binário
 const indexApp = join(ASSETS, "index.html");
@@ -142,6 +161,14 @@ for (const alvo of MORTO) {
   rmSync(p, { recursive: true, force: true });
 }
 console.log(`\n✓ assets do app: ${mb(antes)} → ${mb(tamanho(ASSETS))}`);
-console.log(teste
-  ? "\nAgora: ./android/gradlew -p android assembleDebug"
-  : "\nAgora: ./android/gradlew -p android bundleRelease");
+if (alvoIOS) {
+  // No iOS o binário não sai da linha de comando sem certificado e perfil
+  // resolvidos — quem assina é o Xcode. Então o script para aqui, no mesmo
+  // ponto em que o Android para antes do gradle.
+  console.log("\nAgora: npx cap open ios → Product ▸ Archive (device/Any iOS Device)");
+  console.log("Simulador: npx cap run ios");
+} else {
+  console.log(teste
+    ? "\nAgora: ./android/gradlew -p android assembleDebug"
+    : "\nAgora: ./android/gradlew -p android bundleRelease");
+}

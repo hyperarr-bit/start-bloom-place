@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Check, X, Loader2 } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { APP_PRECOS } from "@/lib/native-shell";
+import { lojaParaCancelar } from "@/lib/loja";
 import { initRevenueCat, estadoRevenueCat, comprar, restaurar } from "@/lib/revenuecat";
 import { useUserData } from "@/hooks/use-user-data";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
@@ -113,7 +114,7 @@ export function SubscriptionPaywall({ onClose }: { onClose: () => void }) {
         </div>
 
         <ul className="text-[13px] text-muted-foreground space-y-1.5 mt-5">
-          {["Finanças, rotina, treino, dieta e +12 módulos", "Lembretes e plano diário", "Cancele quando quiser, direto na Play Store"].map((t) => (
+          {["Finanças, rotina, treino, dieta e +12 módulos", "Lembretes e plano diário", `Cancele quando quiser, direto na ${lojaParaCancelar()}`].map((t) => (
             <li key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-accent shrink-0 mt-0.5" /> {t}</li>
           ))}
         </ul>

@@ -8,6 +8,7 @@ import { trackEvent } from "@/lib/analytics";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { estadoTeste } from "@/lib/teste-gratis";
+import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura } from "@/lib/loja";
 
 /**
  * "MEU ACESSO" DO APP — a /planos do shell nativo (24/07).
@@ -173,7 +174,7 @@ const PlanosApp = () => {
                 app processe. O que se pode (e deve) fazer é levar até lá. */}
             {ehAssinaturaDaLoja && (
               <a
-                href={`https://play.google.com/store/account/subscriptions?package=${PACOTE_ANDROID}`}
+                href={urlGerenciarAssinatura(PACOTE_ANDROID)}
                 target="_blank"
                 rel="noreferrer"
                 onClick={() => trackEvent("app_gerenciar_assinatura", { billing: billingPeriod })}
@@ -183,7 +184,7 @@ const PlanosApp = () => {
                   <ExternalLink className="w-4 h-4 text-muted-foreground" />
                   Gerenciar ou cancelar assinatura
                 </span>
-                <span className="text-[11px] font-normal text-muted-foreground">Play Store</span>
+                <span className="text-[11px] font-normal text-muted-foreground">{lojaParaCancelar()}</span>
               </a>
             )}
           </motion.div>
@@ -250,7 +251,7 @@ const PlanosApp = () => {
               {/* v81: a vitrine virou compra ÚNICA — "cancele quando quiser"
                   prometia gestão de assinatura que não existe no vitalício. */}
               <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                <ShieldCheck className="w-3.5 h-3.5" /> Pagamento único pelo Google Play · Pix ou cartão
+                <ShieldCheck className="w-3.5 h-3.5" /> Pagamento único {pelaLoja()}{sufixoPagamento()}
               </p>
             </div>
           </>

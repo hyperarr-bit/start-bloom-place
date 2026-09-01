@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
 import { EMPRESA } from "@/lib/empresa";
+import { ehApple } from "@/lib/loja";
 import { RodapeSite } from "@/components/site/RodapeSite";
 
 /**
@@ -113,7 +114,9 @@ export function Privacidade() {
         <p>Não vendemos seus dados. Compartilhamos apenas com quem é necessário para o app existir:</p>
         <Lista itens={[
           "Supabase — hospedagem do banco de dados e autenticação.",
-          "Google Play e RevenueCat — processamento e validação de assinaturas no aplicativo Android.",
+          ehApple()
+            ? "App Store e RevenueCat — processamento e validação de assinaturas no aplicativo iOS."
+            : "Google Play e RevenueCat — processamento e validação de assinaturas no aplicativo Android.",
           "Provedores de pagamento — apenas quando a compra é feita fora da loja de aplicativos.",
           "Ferramentas de medição e publicidade (Meta, TikTok, Google) — recebem eventos de uso e identificadores para medir campanhas. Não enviamos a elas o conteúdo que você registra nos módulos.",
           "Autoridades, quando houver obrigação legal.",
@@ -201,11 +204,15 @@ export function Termos() {
 
       <Secao titulo="3. Assinatura no aplicativo">
         <Lista itens={[
-          "As assinaturas contratadas dentro do app Android são processadas pelo Google Play.",
+          ehApple()
+            ? "As assinaturas contratadas dentro do app iOS são processadas pela App Store."
+            : "As assinaturas contratadas dentro do app Android são processadas pelo Google Play.",
           "O preço total e o período aparecem na tela de compra antes de você confirmar.",
           "Quando há período grátis, a cobrança só acontece se você não cancelar antes do fim dele.",
           "A assinatura renova automaticamente até você cancelar.",
-          "O cancelamento é feito na Play Store (Assinaturas), a qualquer momento, e vale ao fim do período já pago.",
+          ehApple()
+            ? "O cancelamento é feito em Ajustes → sua conta Apple → Assinaturas, a qualquer momento, e vale ao fim do período já pago."
+            : "O cancelamento é feito na Play Store (Assinaturas), a qualquer momento, e vale ao fim do período já pago.",
         ]} />
       </Secao>
 
@@ -301,11 +308,19 @@ export function ExcluirConta() {
       </Secao>
 
       <Secao titulo="Atenção: assinatura">
-        <p>
-          Se você assina pelo Google Play, <b>cancele também na Play Store</b> (Menu →
-          Pagamentos e assinaturas → Assinaturas). Excluir a conta aqui não interrompe a
-          cobrança da loja.
-        </p>
+        {ehApple() ? (
+          <p>
+            Se você assina pela App Store, <b>cancele também na Apple</b> (Ajustes → sua
+            conta Apple → Assinaturas). Excluir a conta aqui não interrompe a
+            cobrança da loja.
+          </p>
+        ) : (
+          <p>
+            Se você assina pelo Google Play, <b>cancele também na Play Store</b> (Menu →
+            Pagamentos e assinaturas → Assinaturas). Excluir a conta aqui não interrompe a
+            cobrança da loja.
+          </p>
+        )}
       </Secao>
     </LegalShell>
   );

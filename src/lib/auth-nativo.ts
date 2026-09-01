@@ -41,6 +41,10 @@ import { getAuthRedirectUrl } from "./utils";
 /** O endereço de volta quando o login acontece dentro do app. */
 export const RETORNO_NATIVO = "core://auth";
 
+/** Callback do Supabase. O projeto tem domínio de auth PRÓPRIO — deduzir do
+ *  `SUPABASE_URL` (…supabase.co) dá um endereço que a Apple não reconhece. */
+const SUPABASE_CALLBACK = "https://registro.coreaplicativo.com.br/auth/v1/callback";
+
 /** É o link de volta do login (e não um atalho de módulo)? */
 export function ehRetornoDeLogin(url: string | null | undefined): boolean {
   if (!url) return false;
@@ -111,6 +115,95 @@ export async function entrarComGoogle(): Promise<{ error: { message: string } | 
     return { error: null };
   } catch {
     return { error: { message: "Não consegui abrir o navegador." } };
+  }
+}
+
+/**
+ * ENTRAR COM APPLE (30/08) — exigência da regra 4.8, não escolha de produto.
+ *
+ * A Apple obriga: app que oferece login social de TERCEIRO (o nosso é o
+ * Google) tem que oferecer também uma opção equivalente que limite os dados
+ * a nome+e-mail e permita esconder o e-mail. Sign in with Apple é a resposta
+ * padrão. Sem isso, reprovação na primeira revisão.
+ *
+ * Reusa o MESMO caminho do Google — signInWithOAuth + Browser.open + volta
+ * por `core://auth` — porque esse caminho já foi medido dentro do binário e
+ * as três armadilhas dele (redirect indo pro site, webview embutida barrada,
+ * token no fragmento) já estão resolvidas ali em cima. Um fluxo nativo
+ * próprio (ASAuthorization) seria uma segunda implementação de login pra
+ * manter, com os mesmos bugs pra redescobrir.
+ *
+ * PRÉ-REQUISITOS que NÃO são código — sem eles o botão abre e falha:
+ *  1. Apple Developer → Identifiers → **Services ID** pro Sign in with Apple,
+ *     + uma **chave .p8** (Keys → Sign in with Apple), guardando Key ID e
+ *     Team ID.
+ *  2. Supabase → Authentication → Providers → **Apple**: ligar e preencher
+ *     Services ID (client id) e o segredo gerado a partir da .p8.
+ *  3. Xcode → alvo App → Signing & Capabilities → **+ Sign in with Apple**.
+ *  4. `core://auth` já está nas Redirect URLs do Supabase (o Google usa).
+ */
+export async function entrarComApple(): Promise<{ error: { message: string } | null }> {
+  if (!isNativeShell()) {
+    // Web: o fluxo de navegador é o único que existe, e ali funciona.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: { redirectTo: getAuthRedirectUrl("/auth/callback") },
+    });
+    return { error: error ? { message: error.message } : null };
+  }
+
+  /*
+   * NO iPHONE, FLUXO NATIVO — e isto foi conserto de bug, não preferência.
+   *
+   * A primeira versão reusava o caminho do Google (signInWithOAuth +
+   * Browser.open + volta por core://auth). No aparelho do dono o login
+   * ABRIA e nunca voltava: o navegador ficava carregando pra sempre e o app
+   * seguia deslogado.
+   *
+   * A investigação descartou, uma a uma, todas as suspeitas de configuração:
+   *  · Services ID e Return URL — a Apple devolve a tela de login (HTTP 200);
+   *  · `core://auth` — está na lista de Redirect URLs do Supabase;
+   *  · o client secret — testado direto contra appleid.apple.com/auth/token:
+   *    a Apple respondeu `invalid_grant` (código falso), NÃO `invalid_client`,
+   *    ou seja aceitou a credencial.
+   * Sobrou o único elo não testável de fora: a volta do navegador pro app.
+   * O `Browser.open` do Capacitor usa SFSafariViewController, que no iOS
+   * bloqueia redirecionamento pra esquema próprio (`core://`). No Android o
+   * Custom Tab permite — por isso o Google sempre funcionou lá.
+   *
+   * O fluxo nativo não tem esse elo: a folha do sistema devolve o
+   * identityToken na própria chamada, e o Supabase troca por sessão com
+   * `signInWithIdToken`. Sem navegador, sem redirect, sem esquema.
+   * É também o que a Apple espera num app iOS — Face ID, sem sair do app.
+   */
+  try {
+    const { SignInWithApple } = await import("@capacitor-community/apple-sign-in");
+    /* clientId = o BUNDLE, não o Services ID. No fluxo nativo o token que a
+     * Apple assina sai com `aud` igual ao bundle do app; o Services ID só
+     * vale pro fluxo web. O Supabase valida essa audiência contra a lista de
+     * Client IDs do provedor — por isso os DOIS estão cadastrados lá
+     * (`br.com.coreaplicativo.signin,br.com.coreaplicativo.app`). Trocar um
+     * pelo outro aqui faz o Supabase recusar um token perfeitamente válido. */
+    const res = await SignInWithApple.authorize({
+      clientId: "br.com.coreaplicativo.app",
+      redirectURI: SUPABASE_CALLBACK,
+      scopes: "email name",
+      state: "core",
+    });
+    const idToken = res?.response?.identityToken;
+    if (!idToken) return { error: { message: "A Apple não devolveu o token." } };
+
+    const { error } = await supabase.auth.signInWithIdToken({
+      provider: "apple",
+      token: idToken,
+    });
+    if (error) return { error: { message: error.message } };
+    return { error: null };
+  } catch (e) {
+    const m = (e as { message?: string })?.message ?? "";
+    // Cancelar é decisão, não falha: não vira mensagem de erro na tela.
+    if (/cancel/i.test(m)) return { error: null };
+    return { error: { message: "Não consegui abrir o login da Apple." } };
   }
 }
 

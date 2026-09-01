@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, useLayoutEffect } from "react";
 import { useSearchParams, useLocation, useNavigate, Link, Navigate } from "react-router-dom";
-import { entrarComGoogle } from "@/lib/auth-nativo";
+import { entrarComGoogle, entrarComApple } from "@/lib/auth-nativo";
+import { ehApple, donoDaFolha } from "@/lib/loja";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
@@ -20,6 +21,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
+import { ehSessaoAnonima, batizarSessaoAnonima } from "@/lib/sessao-anonima";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
@@ -36,6 +38,14 @@ export const FUNNEL_OAUTH_KEY = "funnel-oauth-pending";
 // Cadastro PÓS-COMPRA via Google (09/08): o OAuth devolve o app em
 // ?step=offer — esta flag diz "já pagou, cai no liberando, não no paywall".
 export const POS_COMPRA_OAUTH_KEY = "core-pos-compra-oauth";
+
+/* Glifo oficial da Apple — as diretrizes de marca não aceitam emoji nem ícone
+ * genérico, e o botão tem que ser preto com o logo à esquerda do texto. */
+const AppleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 384 512" aria-hidden="true" fill="currentColor">
+    <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+  </svg>
+);
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
@@ -132,7 +142,14 @@ const TrustRow = ({ posCompra }: { posCompra?: boolean }) => (
             prometer vitalício pra quem pagou mensal é estorno na certa. A
             frase nova é verdadeira pros dois produtos. */}
         <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Compra protegida na sua conta</span>
-        <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Garantia de 7 dias</span>
+        {/* "Garantia de 7 dias" NÃO no iPhone (31/08): na Apple quem reembolsa
+            é a Apple, pelo formulário dela — prometer garantia nossa aqui vira
+            dívida de suporte com quem vier cobrar. Terceira vez que este selo
+            aparece num lugar diferente (TrustChips do paywall, e agora aqui):
+            ele foi espalhado por cópia entre telas. */}
+        {!ehApple() && (
+          <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" /> Garantia de 7 dias</span>
+        )}
       </>
     ) : (
       <>
@@ -931,6 +948,7 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   // "User already registered": a pessoa voltou pelo anúncio e já tem conta.
   // Em vez de beco sem saída, oferece login com o e-mail que ela já digitou.
@@ -952,6 +970,79 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
   }, [inApp]);
+
+  /*
+   * DESTRAVA O BOTÃO QUANDO A PESSOA VOLTA SEM LOGAR (31/08).
+   *
+   * Bug visto no iPhone do dono: tocou em "Continuar com a Apple", o navegador
+   * abriu, o login não completou, ele voltou pro app — e o botão ficou
+   * **girando pra sempre**. Nada no código devolvia o estado, porque o único
+   * `setLoading(false)` estava no caminho de ERRO do `entrarCom*()`, e ali não
+   * houve erro: a chamada abriu o navegador com sucesso. Quem desiste no meio
+   * do OAuth voltava pra uma tela que parece travada.
+   *
+   * O mesmo furo sempre existiu no Google — ninguém viu porque o Google
+   * completa. Vale pros dois.
+   */
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    let remover: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { App } = await import("@capacitor/app");
+        const h = await App.addListener("appStateChange", ({ isActive }) => {
+          // Voltou pro app: se a sessão tivesse entrado, o onSession já teria
+          // trocado de tela. Chegar aqui carregando = desistiu no navegador.
+          if (isActive) { setGoogleLoading(false); setAppleLoading(false); }
+        });
+        remover = () => { void h.remove(); };
+      } catch { /* sem plugin: nada a destravar */ }
+    })();
+    return () => remover?.();
+  }, []);
+
+  /* Espelho exato do handleGoogle — mesmas flags de pouso do OAuth, que são o
+   * que faz a volta cair em "liberando" pra quem já pagou em vez de jogar a
+   * pessoa de volta no paywall que ela acabou de comprar. */
+  /*
+   * O LOGIN NATIVO NÃO RECARREGA A PÁGINA — e é por isso que a primeira
+   * versão disto "funcionava" sem logar ninguém (31/08, visto no iPhone do
+   * dono: a folha da Apple abriu, ele concluiu, e a tela ficou parada).
+   *
+   * O caminho do Google volta do navegador RECARREGANDO o app, e é o
+   * recarregamento que faz o funil reparar na sessão nova. Eu escrevi este
+   * handler como espelho do Google — inclusive gravando as flags de pouso do
+   * OAuth — sem notar que aqui não existe volta nem recarregamento: o
+   * `signInWithIdToken` resolve na hora, em silêncio, e ninguém avisa a tela.
+   * A telemetria mostrou o sintoma exato: 3 cliques em `signup_apple` e ZERO
+   * `funnel_error`. Não falhou; ninguém avançou.
+   *
+   * Então aqui é `onSession()` na mão, igual faz o cadastro por e-mail — que
+   * também resolve sem sair da tela. E nada de flag de pouso: elas existem
+   * pra sobreviver a um recarregamento que não vai acontecer, e deixá-las
+   * gravadas suja o próximo boot.
+   */
+  const handleApple = async () => {
+    if (loading || googleLoading || appleLoading) return;
+    setErr(null);
+    setAppleLoading(true);
+    trackEvent("funnel_click", { cta: "signup_apple", pos_compra: !!posCompra });
+    const { error } = await entrarComApple();
+    if (error) {
+      trackEvent("funnel_error", { where: "signup_apple", message: (error.message || "").slice(0, 200) });
+      setErr(error.message || "Não consegui abrir a Apple. Tente de novo.");
+      setAppleLoading(false);
+      return;
+    }
+    // Sem erro pode significar duas coisas: logou, ou a pessoa cancelou na
+    // folha (o entrarComApple trata cancelamento como não-erro, de propósito).
+    // Só a sessão de verdade distingue as duas — e só ela pode avançar.
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) { setAppleLoading(false); return; }
+    trackEvent("funnel_click", { cta: "signup_success", via: "apple", pos_compra: !!posCompra });
+    setAppleLoading(false);
+    onSession();
+  };
 
   const handleGoogle = async () => {
     if (loading || googleLoading) return;
@@ -1008,7 +1099,47 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
     }
 
     trackEvent("funnel_click", { cta: "signup_submit" });
-    const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
+
+    /* BATISMO DA SESSÃO ANÔNIMA (01/09) — A ARESTA QUE CORTA.
+     *
+     * Na web a pessoa agora COMPRA ANTES de ter conta: o PixCheckout abre uma
+     * sessão anônima pra emitir o QR, e é ESSA sessão que vira dona da
+     * assinatura paga. Se aqui a gente chamasse `signUp()`, o Supabase criaria
+     * um SEGUNDO usuário, a sessão trocaria, e a compra ficaria órfã no
+     * primeiro — dinheiro entrou, pessoa sem acesso, e sem e-mail nenhum pra
+     * rastrear. Por isso: sessão anônima usa `updateUser`, que põe e-mail e
+     * senha NA MESMA conta que já é dona da compra.
+     *
+     * Funciona sem prender ninguém porque este projeto está com
+     * `mailer_autoconfirm: true` (confirmação de e-mail desligada) — o batismo
+     * vale na hora. Ligar a confirmação no painel quebraria este caminho.
+     */
+    let error: { message?: string } | null = null;
+    let session: unknown = null;
+    if (await ehSessaoAnonima()) {
+      const r = await batizarSessaoAnonima(email.trim().toLowerCase(), password, name.trim());
+      if (r.erro === "email_em_uso") {
+        /* E-mail já pertence a outra conta. NÃO logamos na conta antiga: a
+         * compra está NESTA sessão, e trocar de usuário aqui deixaria o
+         * pagamento órfão — exatamente o que este bloco existe pra evitar.
+         * Pedir outro e-mail preserva o acesso; o custo é o endereço preferido. */
+        trackEvent("funnel_error", { where: "batismo_email_em_uso", inapp: inApp });
+        setErr("Esse e-mail já tem uma conta. Use outro aqui — sua compra está garantida nesta sessão e vai pra conta nova.");
+        setLoading(false);
+        return;
+      }
+      if (r.erro) {
+        trackEvent("funnel_error", { where: "batismo_anonimo", inapp: inApp, message: (r.mensagem || "").slice(0, 200) });
+        setErr("Não consegui salvar seus dados. Tenta de novo — sua compra não se perde.");
+        setLoading(false);
+        return;
+      }
+      trackEvent("funnel_click", { cta: "batismo_anonimo_ok" });
+      const { data: s } = await supabase.auth.getSession();
+      session = s?.session ?? null;
+    } else {
+      ({ error, session } = await signUp(email.trim().toLowerCase(), password, name.trim()));
+    }
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
       // 09/07) fica indiagnosticável — senha? e-mail já usado? rede do webview?
@@ -1104,9 +1235,45 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
           o OAuth trava, então nem mostra — e-mail vira o único caminho. */}
       {!inApp ? (
         <>
-          <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
-            {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
-          </Button>
+          {/*
+            SIGN IN WITH APPLE — regra 4.8, e esta é a tela que importa.
+            O botão foi posto no /entrar, mas quem chega aqui é quem ACABOU de
+            pagar: no funil do app a conta nasce DEPOIS da compra, então este
+            é o cadastro de verdade. Sem ele, a única opção social no iPhone
+            seria o Google — exatamente o que a 4.8 proíbe.
+            Buraco achado no primeiro teste em aparelho real: o dono comprou,
+            chegou aqui e só viu "Continuar com Google".
+            Vem ANTES do Google porque a regra pede prominência ao menos igual.
+          */}
+          {ehApple() && (
+            <Button
+              type="button"
+              onClick={handleApple}
+              disabled={loading || googleLoading || appleLoading}
+              className="w-full h-12 gap-2 text-[15px] font-semibold bg-black text-white hover:bg-black/90 mb-2.5"
+            >
+              {appleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><AppleIcon /> Continuar com a Apple</>}
+            </Button>
+          )}
+
+          {/*
+            GOOGLE ESCONDIDO NO iPHONE (01/09) — e a razão é a mesma que matou
+            o login da Apple pelo navegador: o `Browser.open` usa
+            SFSafariViewController, que no iOS **bloqueia o retorno pra esquema
+            próprio** (`core://auth`). O da Apple foi trocado pelo fluxo nativo
+            e passou; o do Google continua dependendo desse retorno.
+            Deixar o botão aqui seria pior que não ter: esta tela aparece
+            DEPOIS do pagamento — a pessoa pagaria, tocaria no Google e ficaria
+            sem conseguir criar a conta.
+            A regra 4.8 é atendida pelo Sign in with Apple, e o e-mail continua
+            como caminho universal. Se um dia o Google for testado e funcionar
+            no iPhone, é só tirar este `!ehApple()`.
+          */}
+          {!ehApple() && (
+            <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading || appleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
+              {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
+            </Button>
+          )}
 
           <div className="flex items-center gap-3 my-4">
             <div className="flex-1 h-px bg-border" />
@@ -1165,6 +1332,16 @@ function ComoPagou() {
   const [estado, setEstado] = useState<"pergunta" | "obrigado" | "oculto">(() => {
     try { return localStorage.getItem("core-como-pagou") ? "oculto" : "pergunta"; } catch { return "pergunta"; }
   });
+  /*
+   * NÃO EXISTE NO iPHONE (31/08). Esta pergunta nasceu de uma limitação que é
+   * SÓ do Google: ele não expõe o instrumento de pagamento em API nenhuma, e
+   * perguntar era a única fonte direta do mix Pix×cartão. Na Apple a pergunta
+   * não tem uso — e as opções ("Pix", "Saldo Google") são, ao pé da letra,
+   * menção a pagamento de fora da App Store dentro do app: reprovação na
+   * regra 3.1.1, numa tela que aparece logo DEPOIS de alguém pagar.
+   * Achado no primeiro teste real em iPhone, não em revisão de código.
+   */
+  if (ehApple()) return null;
   if (estado === "oculto") return null;
   if (estado === "obrigado") {
     return <p className="mt-4 text-center text-[12.5px] font-semibold text-emerald-700">Valeu! 🙌</p>;
@@ -1236,8 +1413,11 @@ export function LiberandoScreen() {
         Guardando seu acesso…
       </h2>
       <p className="text-muted-foreground text-sm leading-relaxed">
+        {/* A loja que demora a confirmar é a da vez — citar "o Google" num
+            iPhone é errado no fato e é menção a loja concorrente na 3.1.1,
+            justo na tela que a pessoa encara logo depois de pagar. */}
         {demorou
-          ? "Quase lá — o Google leva alguns segundos pra confirmar."
+          ? `Quase lá — ${donoDaFolha()} leva alguns segundos pra confirmar.`
           : "Vinculando sua compra à sua conta nova."}
       </p>
     </div>

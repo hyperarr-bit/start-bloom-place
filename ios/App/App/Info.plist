@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+        <string>CORE</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<!--
+	  CRIPTOGRAFIA DE EXPORTAÇÃO (31/08). Sem esta chave, TODA build nova sobe e
+	  fica **bloqueada pro TestFlight** até alguém responder a pergunta no
+	  painel — e o erro que aparece não fala em criptografia, fala
+	  "Build is not in an internally testable state", que manda procurar no
+	  lugar errado. Custou uma ida e volta na primeira build.
+
+	  `false` é a resposta correta e honesta aqui: o app só usa HTTPS/TLS
+	  padrão do sistema (Supabase, RevenueCat, App Store). Não há criptografia
+	  própria nem algoritmo não-padrão, que é o que a regra dos EUA quer saber.
+	  Se um dia entrar cripto própria, isto vira `true` e passa a exigir
+	  documentação de conformidade.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!--
+	  DEEP LINK `core://auth` (30/08). Sem isto o login social não volta pro
+	  app: o Supabase manda pra `core://auth`, o iOS não sabe de quem é esse
+	  esquema, e a pessoa fica autenticada dentro do Safari enquanto o app
+	  segue deslogado. Esse bug exato já aconteceu no Android em 28/07 (ver
+	  src/lib/auth-nativo.ts) e custou o primeiro botão da tela de cadastro —
+	  quem entrava por Google não tinha senha pra tentar o outro caminho.
+	  No Android o esquema está no AndroidManifest; aqui é este bloco.
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>br.com.coreaplicativo.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>core</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>

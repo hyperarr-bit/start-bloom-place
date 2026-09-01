@@ -44,6 +44,10 @@ import { useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_PRECOS } from "@/lib/native-shell";
+import {
+  ehApple, pelaLoja, sufixoPagamento, temEscadaPix,
+  erroPagamentoNaoAchado, avisoAtualizarApp,
+} from "@/lib/loja";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
@@ -281,12 +285,12 @@ export function PaywallAssinatura({
           else navigate("/app?step=signup", { replace: true });
           return;
         }
-        setErro("Ainda não achamos seu pagamento — o Pix pode levar ~1 minuto. Tenta de novo já já.");
+        setErro(erroPagamentoNaoAchado());
         return;
       }
       const ok = restaurou || (await rc.sincronizarAssinatura(2));
       if (!ok) {
-        setErro("Ainda não achamos seu pagamento — o Pix pode levar ~1 minuto. Tenta de novo já já.");
+        setErro(erroPagamentoNaoAchado());
         return;
       }
       void cancelarResgateDoPlano();
@@ -371,7 +375,7 @@ export function PaywallAssinatura({
       // re-prefetcha sozinho.
       setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
     } else if (motivo === "catalogo") {
-      setErro("Atualize o CORE na Play Store pra continuar — esta versão ficou sem o catálogo.");
+      setErro(avisoAtualizarApp());
     } else if (motivo) {
       setErro("O Google não concluiu o pagamento. Tenta de novo em instantes.");
     }
@@ -394,13 +398,13 @@ export function PaywallAssinatura({
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarVitalicio("core_vitalicio_97"),
         id: APP_PRECOS.vitalicio97.id,
         cta: <>Quero pra sempre <ArrowRight className="w-4 h-4" /></>,
-        legal: `${APP_PRECOS.vitalicio97.preco} · acesso vitalício · pagamento único pelo Google Play · Pix ou cartão`,
+        legal: `${APP_PRECOS.vitalicio97.preco} · acesso vitalício · pagamento único ${pelaLoja()}${sufixoPagamento()}`,
       }
     : {
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnual97(),
         id: APP_PRECOS.anual97.id,
         cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
-        legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso · Pix ou cartão · sem renovação automática`,
+        legal: `${APP_PRECOS.anual97.preco} · 12 meses de acesso${sufixoPagamento()} · sem renovação automática`,
       };
   /* Âncora VIVA (v82): o mensal 24,90 vende de verdade (5 em 26/08) — pré-pago
    * quando a loja carregou; fallback recorrente com a promessa mudando junto. */
@@ -415,14 +419,23 @@ export function PaywallAssinatura({
   // O interval da contagem captura closure velha — o ref entrega sempre a atual.
   compraAtualRef.current = compraAtual;
   // Folha pré-paga = Pix garantido nela (selo e resgate só prometem o real).
-  const folhaPrepaga = plano === "vitalicio" || loja.mensalVista;
+  // 30/08: `temEscadaPix()` na frente porque este é o interruptor ÚNICO da
+  // mecânica de Pix — governa as duas ramificações da escada (resgate e
+  // "código vencendo") e o selo. Na App Store não existe Pix nem folha lenta
+  // pra resgatar, então tudo isso morre aqui, num lugar só.
+  const folhaPrepaga = temEscadaPix() && (plano === "vitalicio" || loja.mensalVista);
 
   const barraFixa = contexto !== "planos";
 
   const caixaPendente = (
     <div className="rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[12.5px] leading-snug p-3 mb-2.5">
-      <b>Pagamento em processamento no Google.</b> Se você gerou um Pix, paga no app do seu banco —
-      o acesso libera sozinho aqui.
+      {ehApple() ? (
+        <><b>Compra em processamento.</b> A App Store ainda está confirmando —
+        o acesso libera sozinho aqui.</>
+      ) : (
+        <><b>Pagamento em processamento no Google.</b> Se você gerou um Pix, paga no app do seu banco —
+        o acesso libera sozinho aqui.</>
+      )}
       <button
         className="block w-full text-center font-bold underline underline-offset-2 mt-1.5 disabled:opacity-50"
         disabled={conferindo}

@@ -12,6 +12,7 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
 import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
+import { ehApple, lojaParaCancelar, erroSemFalarComALoja, erroSemAbrirALoja } from "@/lib/loja";
 // (TrialTimeline saiu em 06/08 — o app vitalício usa a GuaranteeTimeline da web)
 import { DeleteAccountDialog } from "@/components/account/DeleteAccountDialog";
 import { restaurar, initRevenueCat, estadoRevenueCat, comprarVitalicio, prefetchVitalicio, motivoUltimaCompra } from "@/lib/revenuecat";
@@ -652,8 +653,8 @@ function OfferScreen({
       // aí: por mais que ela tente, não vai aparecer sem atualizar. Medido no
       // emulador com a loja simulada devolvendo catálogo vazio.
       setErroCompra(estadoAtual === "sem_produto"
-        ? "Esta versão do app ainda não vê a compra. Atualize o CORE na Play Store — leva 1 minuto."
-        : "Não consegui falar com o Google Play agora. Tente de novo em instantes.");
+        ? `Esta versão do app ainda não vê a compra. Atualize o CORE na ${lojaParaCancelar()} — leva 1 minuto.`
+        : erroSemFalarComALoja());
       setComprando(false);
       return;
     }
@@ -679,7 +680,7 @@ function OfferScreen({
         setErroCompra(
           motivo === "sem_entitlement"
             ? "A compra foi registrada, mas o acesso ainda não liberou. Toque em Restaurar compras aqui embaixo."
-            : "Não consegui abrir o Google Play agora. Tente de novo em instantes.",
+            : erroSemAbrirALoja(),
         );
       }
     }
@@ -943,7 +944,7 @@ function OfferScreen({
                 ? (comprando
                     // Spinner + texto (07/08): só trocar o rótulo era feedback
                     // fraco demais — no Moto o dono tocou 4x achando botão morto.
-                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Abrindo o Google Play…</>
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Abrindo {ehApple() ? "a App Store" : "o Google Play"}…</>
                     : <>Quero pra sempre — {plano.preco} <ArrowRight className="w-4 h-4" /></>)
                 : <>Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" /></>}
             </Button>
@@ -976,9 +977,14 @@ function OfferScreen({
             )}
             {nativo && pendente && (
               <div className="text-[11.5px] text-center mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-amber-900">
-                <b>Pagamento em processamento no Google.</b> Se você gerou um Pix,
-                é só pagar no app do seu banco — o acesso libera aqui <b>sozinho</b> assim
-                que confirmar.
+                {ehApple() ? (
+                  <><b>Compra em processamento.</b> A App Store ainda está confirmando —
+                  o acesso libera aqui <b>sozinho</b> assim que ela confirmar.</>
+                ) : (
+                  <><b>Pagamento em processamento no Google.</b> Se você gerou um Pix,
+                  é só pagar no app do seu banco — o acesso libera aqui <b>sozinho</b> assim
+                  que confirmar.</>
+                )}
                 <button
                   onClick={async () => { if (await restaurar()) { void cancelarResgateDoPlano(); void cancelarReguaDoTeste(); limparGuiaSemente(); setCelebrar(true); } }}
                   className="block mx-auto mt-1 underline font-semibold"
@@ -1079,8 +1085,8 @@ function PreFolhaPagamento({
                 As compras estão chegando
               </h3>
               <p className="text-[13px] text-muted-foreground text-center mt-2 mb-4 leading-relaxed">
-                Esta versão ainda não consegue falar com o Google Play.
-                Atualize o CORE na Play Store e volte aqui — leva 1 minuto.
+                Esta versão ainda não consegue falar com {ehApple() ? "a App Store" : "o Google Play"}.
+                Atualize o CORE na {lojaParaCancelar()} e volte aqui — leva 1 minuto.
               </p>
               <Button size="lg" onClick={onFechar} variant="outline" className="w-full h-[52px] rounded-full text-[15px] font-bold">
                 Entendi

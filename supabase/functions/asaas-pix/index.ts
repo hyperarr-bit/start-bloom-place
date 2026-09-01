@@ -287,7 +287,7 @@ serve(async (req) => {
       // não sabe de quem é o pagamento. fbp/fbc/source_url (22/07): sinal do
       // NAVEGADOR capturado na criação — o webhook usa no CAPI pra quem paga
       // no banco e nunca volta (metade das vendas só tinha e-mail no match).
-      await supabaseAdmin.from("analytics_events").insert({
+      const { error: pontErr } = await supabaseAdmin.from("analytics_events").insert({
         event_name: "pix_order_created",
         user_id: user.id,
         event_data: {
@@ -297,6 +297,15 @@ serve(async (req) => {
           ...(body.sourceUrl ? { source_url: String(body.sourceUrl).slice(0, 300) } : {}),
         },
       });
+      /* Sem a ponte, o QR vira um buraco: o webhook não sabe de quem é o
+       * pagamento (devolve no_user e o dinheiro cai no chão), o pix-reconcile
+       * pula (`if (!uid || !oid) continue`) e o polling agora rejeita por
+       * MISMATCH. Melhor não vender do que entregar um QR que a pessoa paga e
+       * ninguém consegue creditar — o erro aqui vira erro na tela dela. */
+      if (pontErr) {
+        logStep("Ponte pix_order_created FALHOU — abortando", { id: out.id, message: pontErr.message });
+        return jsonResponse({ error: "bridge_failed" }, 503);
+      }
       const b64 = typeof out.encodedImage === "string" && out.encodedImage.length
         ? (out.encodedImage.startsWith("data:") ? out.encodedImage : `data:image/png;base64,${out.encodedImage}`)
         : null;
@@ -333,16 +342,27 @@ serve(async (req) => {
       if (reg?.[0]) {
         donoId = reg[0].user_id as string;
         const o = (reg[0].event_data as Record<string, string>)?.offer;
-        if (o === "downsell" || o === "lifetime") offer = o;
+        // Por PRESENÇA no mapa, nunca por lista escrita à mão: a versão antiga
+        // era `o === "downsell" || o === "lifetime"`, então a oferta w97 (97,90)
+        // não era reconhecida, caía no fallback abaixo e virava "lifetime" —
+        // gravando 2790 numa venda de 9790 e mandando R$27,90 pro CAPI da Meta.
+        // O webhook irmão já usa esta forma; esta função tinha ficado pra trás.
+        if (o && o in PRECOS_CENTAVOS) offer = o;
       }
-      // trava de segurança: o QR é de OUTRA conta → não libera pra quem pergunta
-      if (donoId && donoId !== user.id) {
-        logStep("QR/user mismatch", { id, dono: donoId.slice(0, 8) });
+      /* Trava de segurança: só libera para o DONO do pedido.
+       *
+       * `donoId` nulo agora REJEITA (antes, caía no `if (donoId && …)` e liberava
+       * para quem perguntasse). Um QR pago sem registro-ponte não deveria existir
+       * — o create abaixo falha em vez de devolver QR sem ponte —, mas os ids do
+       * Asaas são quase sequenciais, então um pedido órfão viraria vitalício de
+       * graça para quem enumerasse. Sem ponte, quem credita é o pix-reconcile. */
+      if (!donoId || donoId !== user.id) {
+        logStep("QR/user mismatch", { id, dono: donoId ? donoId.slice(0, 8) : "(sem registro)" });
         return jsonResponse({ paid: false, status: "MISMATCH" });
       }
       if (!offer) {
         const declarado = String(body.offer ?? "");
-        offer = declarado === "downsell" ? "downsell" : "lifetime";
+        offer = declarado in PRECOS_CENTAVOS ? declarado : "lifetime";
         logStep("Offer via client fallback", { id, declarado });
       }
 

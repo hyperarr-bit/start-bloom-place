@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
+import { garantirSessao } from "@/lib/sessao-anonima";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 
@@ -189,6 +190,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [cpf, setCpf] = useState("");
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [semSessao, setSemSessao] = useState(false);
+  // Comprando sem conta (sessão anônima): muda a promessa da tela de espera —
+  // não existe e-mail pra onde mandar o acesso enquanto a conta não é batizada.
+  const [anonima, setAnonima] = useState(false);
   const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   /* RELIGADO 13/08 (rodou 30-31/07, os 2 dias recorde; caiu no revert de
@@ -239,17 +243,24 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const generate = async (nm: string, doc: string) => {
     setStep("generating");
     setErrMsg(null);
-    // Sem sessão as edge functions respondem 401 e o retry vira loop eterno
-    // (caso real 22/07: estado do funil restaurou o paywall pós-logout).
-    // Detecta ANTES e manda logar em vez de "tenta de novo".
-    const { data: sess } = await supabase.auth.getSession();
-    if (!sess?.session) {
+    /* Sem sessão as edge functions respondem 401 e o retry vira loop eterno
+     * (caso real 22/07: estado do funil restaurou o paywall pós-logout).
+     *
+     * 01/09 — em vez de mandar cadastrar, ABRE UMA SESSÃO ANÔNIMA. É o que
+     * permite vender antes de pedir conta na web: `asaas-pix` continua vendo um
+     * usuário autenticado de verdade e nenhuma função de dinheiro muda. Só
+     * quando nem isso dá certo (chave de anônimo desligada no painel, rede
+     * fora) é que cai no caminho antigo de "entra de novo" — por isso a
+     * mudança é segura de subir antes de a chave ser ligada. */
+    const estadoSessao = await garantirSessao();
+    if (estadoSessao === "indisponivel") {
       trackEvent("pix_error", { offer, context, message: "sem_sessao" });
       setSemSessao(true);
       setErrMsg("Sua sessão expirou. Entra de novo rapidinho e o Pix sai na hora.");
       setStep("error");
       return;
     }
+    if (estadoSessao === "anonima") { setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context }); }
     const t0 = Date.now();
     try {
       let data: any, error: any;
@@ -763,13 +774,29 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                 Aguardando seu pagamento…
               </p>
               {/* Mata o medo do pós-pagamento ("e se eu fechar essa tela?").
-                  Promessa VERDADEIRA: o cakto-webhook manda o welcome email
-                  com link de acesso em toda venda. */}
-              <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
-                📩 Pagou? Além de liberar aqui na hora, seu acesso e o passo a passo
-                também chegam <strong className="text-foreground">no seu e-mail</strong> —
-                pode fechar esta tela sem medo.
-              </p>
+                  Promessa VERDADEIRA: o webhook manda o welcome email com link
+                  de acesso em toda venda.
+
+                  MAS SÓ QUANDO EXISTE E-MAIL. Numa sessão ANÔNIMA (a pessoa
+                  ainda não criou conta — 01/09, compra antes do cadastro) não
+                  há endereço nenhum: `asaas-pix` só dispara o welcome se
+                  `user.email` existe. Prometer e-mail ali seria mentira, e
+                  "pode fechar sem medo" seria pior que mentira — o acesso mora
+                  no token DESTE navegador até a conta ser batizada. Então o
+                  texto vira o contrário: fica aqui, que é rapidinho. */}
+              {anonima ? (
+                <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
+                  🔒 Assim que o pagamento cair, a gente cria seu acesso na hora —
+                  <strong className="text-foreground"> deixa esta tela aberta</strong>,
+                  leva menos de um minuto.
+                </p>
+              ) : (
+                <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
+                  📩 Pagou? Além de liberar aqui na hora, seu acesso e o passo a passo
+                  também chegam <strong className="text-foreground">no seu e-mail</strong> —
+                  pode fechar esta tela sem medo.
+                </p>
+              )}
               {v2?.missao && (
                 <p className="text-[12px] text-muted-foreground mt-2">
                   🎯 Te esperando lá dentro: <strong className="text-foreground">{v2.missao.toLowerCase()}</strong>

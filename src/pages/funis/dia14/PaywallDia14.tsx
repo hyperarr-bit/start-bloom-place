@@ -12,6 +12,7 @@ import { fireMetaEvent } from "@/lib/meta-pixel";
 import { PixCheckout, PIX_PRICES, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
 import { WinbackWheel, SLICES_FUNIL } from "@/components/retention/WinbackWheel";
 import { isNativeShell } from "@/lib/native-shell";
+import { ehApple } from "@/lib/loja";
 import { GASTO_ANCHOR, VICTORY_PHRASE, AREAS, AREA_ANCHOR, ALL_MODULE_ICONS, type AreaKey } from "@/lib/funnel";
 import { useAuth } from "@/hooks/use-auth";
 
@@ -511,10 +512,33 @@ const TRUST_CHIPS = [
   { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
+/**
+ * OS SELOS NO iPHONE (30/08) — os dois primeiros de cima não podem ir.
+ *
+ * Este componente nasceu no paywall da WEB, onde os três são verdade (Pix da
+ * Cakto, reembolso manual nosso). O PaywallW importou o conjunto inteiro e
+ * levou os selos junto sem ninguém reparar. Na App Store:
+ *
+ *  · "Pix na hora" é reprovação na 3.1.1 — citar pagamento de fora da loja.
+ *  · "Garantia de 7 dias" é promessa que não é nossa pra fazer: na Apple quem
+ *    reembolsa é a Apple, pelo formulário dela. Prometer garantia própria
+ *    aqui vira dívida de suporte com quem cobra a promessa. (O cabeçalho do
+ *    PaywallW já dizia isso em palavras — o import silenciou a decisão.)
+ *
+ * Os substitutos são fatos verificáveis, não slogans: a compra é da App Store
+ * e o acesso libera na hora.
+ */
+const TRUST_CHIPS_IOS = [
+  { emoji: "", label: "Compra pela App Store" },
+  { emoji: "⚡", label: "Acesso na hora" },
+  { emoji: "♾️", label: "Sem mensalidade" },
+];
+
 export function TrustChips() {
+  const chips = ehApple() ? TRUST_CHIPS_IOS : TRUST_CHIPS;
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
-      {TRUST_CHIPS.map((c) => (
+      {chips.map((c) => (
         <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
           <span>{c.emoji}</span> {c.label}
         </span>

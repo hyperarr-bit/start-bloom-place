@@ -21,6 +21,32 @@ export const isNativeShell = (): boolean => {
   }
 };
 
+/**
+ * QUAL loja (30/08, entrada do iPhone). Até aqui "nativo" e "Android" eram a
+ * mesma coisa, e várias decisões foram gravadas com esse atalho — chave do
+ * RevenueCat, Install Referrer da Play, catálogo de produtos. Nenhuma delas
+ * vale no iOS, então o atalho precisa morrer no lugar onde ele nasceu.
+ *
+ * Lê o mesmo global injetado pelo runtime (getPlatform() devolve
+ * "ios" | "android" | "web"), pelo mesmo motivo do isNativeShell: nada de
+ * import do @capacitor/core, pra não colocar dependência nova no caminho
+ * quente do funil da WEB.
+ */
+export type PlataformaApp = "ios" | "android" | "web";
+
+export const plataformaApp = (): PlataformaApp => {
+  try {
+    const c = (window as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+    const p = c?.getPlatform?.();
+    return p === "ios" || p === "android" ? p : "web";
+  } catch {
+    return "web";
+  }
+};
+
+export const isIOS = (): boolean => plataformaApp() === "ios";
+export const isAndroid = (): boolean => plataformaApp() === "android";
+
 /** Preços da ASSINATURA do app (arquitetura decidida 22/07 com pesquisa):
  *  - mensal é ÂNCORA (existe pra fazer o anual parecer 67% off — proporção
  *    Cal AI), visível mas apagado no paywall.

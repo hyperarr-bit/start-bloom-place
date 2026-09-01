@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  ENTITLEMENTS (30/08). Só existe por causa do Sign in with Apple: sem esta
+  capability declarada, o botão "Continuar com a Apple" abre e a Apple recusa
+  a autorização — e a regra 4.8, que é o motivo do botão existir, continua
+  descumprida. O entitlement tem que casar com o Services ID cadastrado no
+  Apple Developer; se não casar, falha só em aparelho real, nunca no simulador.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

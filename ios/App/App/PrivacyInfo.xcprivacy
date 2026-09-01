@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  MANIFESTO DE PRIVACIDADE (30/08) — obrigatório desde 2024; sem ele o upload
+  é recusado na validação, antes mesmo de chegar num revisor.
+
+  Duas decisões registradas aqui, porque as duas são fáceis de errar pra mais:
+
+  1. NSPrivacyAccessedAPITypes vazio DE PROPÓSITO. A lista existe pra "APIs de
+     motivo obrigatório" (UserDefaults, timestamp de arquivo, espaço em disco).
+     O código nativo DESTE alvo é o AppDelegate do template do Capacitor e não
+     chama nenhuma delas — quem chama são os SDKs, e cada um embarca o próprio
+     manifesto (Capacitor e RevenueCat têm o deles). Declarar aqui uma API que
+     não usamos é declarar coisa falsa, o que é pior que não declarar.
+     Se a validação do upload apontar alguma, ela entra AQUI com o motivo real.
+
+  2. NSPrivacyTracking = false. O app iOS não tem SDK de anúncio, não pede ATT
+     e não cruza dado com terceiro pra publicidade — diferente do Android, que
+     embarca o SDK da Meta. Se um dia entrar campanha no iOS, isto vira true,
+     o ATT passa a ser obrigatório e os domínios de rastreio entram na lista
+     abaixo. Mudar um sem o outro é reprovação.
+-->
+<plist version="1.0">
+<dict>
+  <key>NSPrivacyTracking</key>
+  <false/>
+
+  <key>NSPrivacyTrackingDomains</key>
+  <array/>
+
+  <key>NSPrivacyAccessedAPITypes</key>
+  <array/>
+
+  <!--
+    O que o app coleta. Isto tem que BATER com o questionário "Privacidade do
+    App" no App Store Connect — divergência entre os dois é achada na análise.
+    "Linked to user" em tudo porque o app é logado: cada linha no Supabase tem
+    dono. Nada aqui é usado pra rastrear entre apps de terceiros.
+  -->
+  <key>NSPrivacyCollectedDataTypes</key>
+  <array>
+    <!-- Conta: e-mail e id do usuário (Supabase Auth). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeUserID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+      </array>
+    </dict>
+
+    <!-- Compra: histórico de assinatura/compra (RevenueCat + tabela subscriptions). -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+      </array>
+    </dict>
+
+    <!-- Telemetria de uso (analytics_events): que tela abriu, que botão tocou. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeProductInteraction</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+      </array>
+    </dict>
+
+    <!--
+      O CONTEÚDO dos módulos. O CORE guarda o que a pessoa escreve: gastos
+      (finanças), treino e dieta (corpo), sintomas e remédios (saúde). Isso
+      não é telemetria, é o produto — e é justamente o que a Apple quer ver
+      declarado. Omitir aqui pra "simplificar" é o tipo de coisa que derruba
+      na análise e queima a submissão.
+    -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeHealth</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeOtherFinancialInfo</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+      </array>
+    </dict>
+  </array>
+</dict>
+</plist>

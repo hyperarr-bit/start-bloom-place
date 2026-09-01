@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { lojaParaCancelar } from "@/lib/loja";
 import { toast } from "sonner";
 
 /**
@@ -61,7 +62,7 @@ export function DeleteAccountDialog({ open, onOpenChange }: {
             </span>
             {isNativeShell() && (
               <span className="block text-[12px]">
-                Se você tem assinatura ativa, cancele também na Play Store — excluir a
+                Se você tem assinatura ativa, cancele também na {lojaParaCancelar()} — excluir a
                 conta aqui não interrompe a cobrança.
               </span>
             )}

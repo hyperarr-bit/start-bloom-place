@@ -230,9 +230,22 @@ const CSS_APW = `
   box-shadow: 0 18px 38px -10px rgba(22,18,28,.5);
 }
 .apw-cta:active { transform: scale(.985); }
-.apw-link { border: 0; background: none; padding: 0; font-size: 14.5px; color: #4f5a64; font-family: inherit; cursor: pointer; }
+/* ALVO DE TOQUE DOS DOIS LINKS DE BAIXO (01/09 — caso real, com dinheiro).
+ *
+ * Estavam com padding zero: o alvo era só a altura do texto — 22px no "Entrar"
+ * e 17px no "Restaurar compras", contra os 48dp que o Android manda. Uma
+ * cliente que pagou R$24,90 por Pix na folha do Google precisava justamente do
+ * "Restaurar compras" pra confirmar a compra, e relatou que "não é clicável".
+ * Ela estava certa: 17px de alvo, cinza claro e sem sublinhado — parece
+ * legenda, não botão.
+ *
+ * Agora: padding vertical que leva os dois pra ~44px, e o restaurar ganha
+ * sublinhado e cor mais escura pra ANUNCIAR que é tocável. É a única saída de
+ * quem pagou e voltou depois. */
+.apw-link { border: 0; background: none; padding: 11px 16px; font-size: 14.5px; color: #4f5a64; font-family: inherit; cursor: pointer; }
 .apw-link b { color: #16121c; }
-.apw-restore { border: 0; background: none; padding: 0; font-size: 12px; color: #8a94a0; font-weight: 600; font-family: inherit; cursor: pointer; }
+.apw-restore { border: 0; background: none; padding: 12px 16px; font-size: 13px; color: #4f5a64; font-weight: 700;
+  font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .apw-restore:disabled { opacity: .6; }
 .apw-msg { font-size: 11.5px; color: #4f5a64; }
 .apw-termos { font-size: 11px; color: #9aa6b1; text-align: center; line-height: 1.5; }

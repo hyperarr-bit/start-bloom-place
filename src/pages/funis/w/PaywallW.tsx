@@ -68,6 +68,17 @@ const AB_LIGADO = false;
  * O vitalício CONTINUA na tela, na coluna ao lado — quem quer pagar uma vez
  * paga. O que muda é qual nasce selecionado. */
 const ANDROID_DUAS_COLUNAS = true;
+
+/* PREÇO DA WEB (31/08, decisão do dono). A web cobra por Pix na oferta
+ * `lifetime` da Cakto — a MESMA que já vendeu antes, a R$ 27,90. Não é o
+ * preço do app por escolha: com tíquete baixo a campanha gasta e testa rápido
+ * (o teste de hoje roda até meia-noite), e a Cakto repassa R$ 0,99 de taxa ao
+ * comprador, então o número que aparece aqui é o que ele paga.
+ * A VITRINE da web é a de UM PREÇO SÓ — o desenho do app quando era só o
+ * vitalício, que foi o que fechou 1,10× de ROI em 30/08. Duas colunas aqui
+ * seria misturar dois testes numa tela só. */
+const PRECO_WEB = "27,90";
+const OFERTA_WEB: "lifetime" = "lifetime";
 const ANDROID_PLANO_INICIAL: "vitalicio" | "mensal" = "mensal";
 
 /**
@@ -103,6 +114,7 @@ const sortearBraco = (): BracoW => {
 /** Preço vitalício do app no formato que o LifetimeCard da web tinha.
  *  Só no braço A — o braço B usa as duas colunas de peso igual. */
 function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
+  const preco = naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco;
   return (
     <div className="relative w-full rounded-3xl p-[2px] bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_44px_-14px_hsl(var(--accent)/0.55)]">
       <div className="relative rounded-[calc(1.5rem-2px)] bg-white px-4 pt-5 pb-4 overflow-hidden text-center text-[#16121c]">
@@ -116,7 +128,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
         </span>
         <div className="relative font-bold text-[15px] leading-tight mb-2">Pague 1x. Seu pra sempre.</div>
         <div className="relative text-[42px] leading-none font-extrabold tracking-tight text-accent">
-          {APP_PRECOS.vitalicio97.preco}
+          {preco}
         </div>
         <div className="relative text-[12px] font-semibold text-black/50 mt-1.5">
           {ehApple() ? "pagamento único · uma vez, pra sempre"
@@ -124,7 +136,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          4 meses de mensal = CORE pra sempre
+          {naWeb ? "menos que um lanche, uma vez só" : "4 meses de mensal = CORE pra sempre"}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (
@@ -215,12 +227,13 @@ export function PaywallW({
   /* DUAS COLUNAS OU UMA — quem decide não é mais o sorteio. iPhone: sempre
    * duas (spec do dono). Android: a constante acima. O braço do A/B só volta
    * a mandar se AB_LIGADO virar true. */
-  const duasColunas = ehApple() ? true : (ANDROID_DUAS_COLUNAS || braco === "b");
+  const duasColunas = naWeb ? false : ehApple() ? true : (ANDROID_DUAS_COLUNAS || braco === "b");
   /* Qual nasce SELECIONADO. A âncora do topo e o CTA acompanham a escolha —
    * é o que resolve o medo de "a pessoa se assusta com 97,90 antes de ver que
    * existe mensal". */
   const [plano, setPlano] = useState<"vitalicio" | "mensal">(() =>
-    ehApple() ? IOS_PLANO_INICIAL
+    naWeb ? "vitalicio"
+      : ehApple() ? IOS_PLANO_INICIAL
       : ANDROID_DUAS_COLUNAS ? ANDROID_PLANO_INICIAL
       : sortearBraco() === "b" ? "mensal" : "vitalicio");
 
@@ -366,7 +379,7 @@ export function PaywallW({
   if (naWeb && pixAberto) {
     return (
       <PixCheckout
-        offer="w97"
+        offer={OFERTA_WEB}
         context="funnel"
         onClose={(passo) => {
           setPixAberto(false);
@@ -402,7 +415,9 @@ export function PaywallW({
             // abre no mensal (24,90/mês) e troca pro vitalício se a pessoa
             // mudar de coluna. No braço A é sempre o vitalício.
             const mostraMensal = duasColunas && plano === "mensal";
-            const preco = mostraMensal ? "24,90" : "97,90";
+            // na web o preço é outro (27,90 no Pix) — a âncora tem que bater
+            // com o card e com o CTA, senão a tela promete três números
+            const preco = mostraMensal ? "24,90" : naWeb ? PRECO_WEB : "97,90";
             const precoSub = mostraMensal ? "por mês" : "1x, pra sempre";
             const precoTitulo = mostraMensal
               ? <>CORE mensal,<br />pra começar hoje</>
@@ -525,7 +540,7 @@ export function PaywallW({
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : duasColunas && plano === "mensal"
                   ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
-                  : <>Quero pra sempre — {APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
+                  : <>Quero pra sempre — {naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">

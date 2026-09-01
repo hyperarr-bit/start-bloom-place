@@ -53,6 +53,10 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
 // cobria títulos de cards no scroll do celular. O CTA persistente é o de baixo.
 /** Volta da demo no shell: o funil que armou a demo deixa o endereço em
  *  core-demo-volta (funil W); sem ele, a porta clássica do /app. */
+/** A volta que o funil deixou marcada, se deixou (o W grava o caminho dele). */
+const voltaMarcada = (): string | null => {
+  try { return sessionStorage.getItem("core-demo-volta"); } catch { return null; }
+};
 const voltaDaDemoShell = () => {
   try { return sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos"; } catch { return "/app?step=compromissos"; }
 };
@@ -205,7 +209,14 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
     // Funil W (29/08): quem armou a demo pode deixar outra volta em
     // core-demo-volta — senão, o /app de sempre.
     ? voltaDaDemoShell()
-    : (from && voltaFunilTeste(from, tour))
+    /* 31/08 (bronca do dono: "na demo, quando clica em voltar, vai pra um
+       funil diferente"). O W abre a demo com ?from=w, e `from` só é resolvido
+       pela lista FUNIS_TESTE — que tem dia14/radar/v1 e NÃO tem o w. Sem
+       correspondência, caía no /comecar: outro funil, outro paywall, outra
+       oferta. A marca que o próprio funil deixou (core-demo-volta) vale mais
+       que qualquer tabela, porque ela carrega o caminho REAL de origem. */
+    : voltaMarcada()
+      ?? (from && voltaFunilTeste(from, tour))
       ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
   return (
     <div
@@ -239,7 +250,7 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   const to = isNativeShell()
     // v83.1: nudge também devolve pro ritual (compromissos → contrato → offer).
     ? voltaDaDemoShell()
-    : (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
+    : voltaMarcada() ?? (from && voltaFunilTeste(from, true)) ?? "/comecar?step=signup";
   if (!show) return null;
   const dismiss = () => {
     try { sessionStorage.setItem(TOUR_NUDGE_DISMISSED_KEY, "1"); } catch { /* noop */ }

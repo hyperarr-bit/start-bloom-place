@@ -83,7 +83,15 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
 // check-subscription; rede de segurança: pix-reconcile agora fala cakto
 // (rota por UUID, status via GET /orders/?id=) e o cakto-pix grava
 // pix_order_created no create. Rollback = "asaas" (1 linha) + push.
-const FORCE_GATEWAY: Gateway | null = "cakto";
+/* 31/08 22h — VOLTA PRO ASAAS, ao vivo, com a campanha rodando. A Cakto
+ * parou de emitir Pix: a API dela responde HTTP 201 com `status:"refused"`
+ * (log da cakto-pix, 22:44) e o QR nunca nasce. Não é bug nosso — a chamada
+ * chega, autentica e a Cakto recusa a cobrança; o dono confirmou testando no
+ * celular. Efeito: TODO mundo que chegou no checkout hoje viu "deu ruim" —
+ * 0 pedidos criados com dinheiro de anúncio já gasto.
+ * O Asaas foi testado agora, ao vivo, e devolveu QR de R$27,90 na hora.
+ * Quando a Cakto voltar: 1 linha e push. */
+const FORCE_GATEWAY: Gateway | null = "asaas";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {

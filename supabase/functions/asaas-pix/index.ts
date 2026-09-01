@@ -34,7 +34,11 @@ const corsHeaders = {
 };
 
 const ASAAS_API = "https://api.asaas.com/v3";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+/* 01/09: entra o w97 — o funil W da web sobe pra R$ 97,90. Motivo medido na
+ * 1ª noite: o Pix fechou 33% dos QRs maduros contra 13% da folha do Google,
+ * então o preço aguenta mais. O mapa é a ÚNICA fonte do valor: oferta sem
+ * preço aqui devolve 503 em vez de cobrar errado. */
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490, w97: 9790 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
 const logStep = (step: string, details?: unknown) => {

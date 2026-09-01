@@ -27,7 +27,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  */
 
 const ASAAS_API = "https://api.asaas.com/v3";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+/* TEM QUE ESPELHAR o asaas-pix. Se uma oferta existe lá e não existe aqui, a
+ * linha abaixo a rebaixa pra "lifetime" e a venda entra pelo preço errado —
+ * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
+ * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490, w97: 9790 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -185,7 +189,7 @@ serve(async (req) => {
     const regData = (reg?.[0]?.event_data ?? {}) as Record<string, string>;
     if (reg?.[0]) { userId = reg[0].user_id as string; offer = String(regData.offer ?? ""); }
     if (!userId) { logStep("No user resolved for QR", { qrCodeId: qrCodeId.slice(0, 20) }); return jsonResponse({ received: true, warning: "no_user" }); }
-    if (offer !== "downsell" && offer !== "lifetime") offer = "lifetime";
+    if (!(offer in PRECOS_CENTAVOS)) offer = "lifetime";
     const amountCents = PRECOS_CENTAVOS[offer];
 
     // grant idempotente + dedup com o polling do app

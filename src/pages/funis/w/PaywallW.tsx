@@ -69,16 +69,19 @@ const AB_LIGADO = false;
  * paga. O que muda é qual nasce selecionado. */
 const ANDROID_DUAS_COLUNAS = true;
 
-/* PREÇO DA WEB (31/08, decisão do dono). A web cobra por Pix na oferta
- * `lifetime` da Cakto — a MESMA que já vendeu antes, a R$ 27,90. Não é o
- * preço do app por escolha: com tíquete baixo a campanha gasta e testa rápido
- * (o teste de hoje roda até meia-noite), e a Cakto repassa R$ 0,99 de taxa ao
- * comprador, então o número que aparece aqui é o que ele paga.
- * A VITRINE da web é a de UM PREÇO SÓ — o desenho do app quando era só o
- * vitalício, que foi o que fechou 1,10× de ROI em 30/08. Duas colunas aqui
- * seria misturar dois testes numa tela só. */
-const PRECO_WEB = "27,90";
-const OFERTA_WEB: "lifetime" = "lifetime";
+/* PREÇO DA WEB — 01/09: sobe de 27,90 pra 97,90, por medição da 1ª noite.
+ * O Pix fechou 33% dos QRs maduros contra 13% da folha do Google (2,5×), e
+ * mesmo assim o ROI da web ficou em 0,55×: a R$ 27,90 esse funil não paga o
+ * anúncio nem no melhor cenário. Entram R$ 2,60 por pessoa que vê o paywall;
+ * a 97,90, mesmo se o fechamento cair pela METADE, entram R$ 4,45.
+ * A oferta w97 tem que existir nos TRÊS lugares (asaas-pix, asaas-webhook e
+ * PIX_PRICES) — o webhook rebaixa oferta desconhecida pra `lifetime` e grava
+ * 27,90 numa venda de 97,90.
+ * A VITRINE da web é de UM PREÇO SÓ — o desenho do app quando era só o
+ * vitalício, que fechou 1,10× em 30/08. Duas colunas aqui seria misturar dois
+ * testes numa tela só. */
+const PRECO_WEB = "97,90";
+const OFERTA_WEB: "w97" = "w97";
 const ANDROID_PLANO_INICIAL: "vitalicio" | "mensal" = "mensal";
 
 /**
@@ -136,7 +139,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          {naWeb ? "menos que um lanche, uma vez só" : "4 meses de mensal = CORE pra sempre"}
+          {naWeb ? "uma vez só, sem mensalidade" : "4 meses de mensal = CORE pra sempre"}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (

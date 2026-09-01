@@ -98,6 +98,32 @@ export async function initRevenueCat(): Promise<EstadoRC> {
       appUserIdAtual = uid;
     }
 
+    /* CONFIRMA COMPRA PENDENTE AO ABRIR O APP (01/09 — caso real, com prejuízo).
+     *
+     * Quem paga com PIX na folha do Google não compra na hora: o Google cria a
+     * assinatura em estado PENDENTE e manda a pessoa "abrir o app para
+     * confirmar o plano". Quem não confirmar em 3 DIAS tem a compra
+     * CANCELADA E ESTORNADA pelo Google, sozinho.
+     *
+     * Só que abrir o app não confirmava nada: `configure()` + `getOfferings()`
+     * não sincronizam compra. Quem confirma é `syncPurchases()`, que manda os
+     * recibos do aparelho pro RevenueCat validar — e é a validação que gera o
+     * acknowledge no Google. Até aqui isso só acontecia se a pessoa achasse o
+     * botão "Restaurar compras" dentro do paywall.
+     *
+     * O estrago já estava no relatório de compras anuladas da Play: em 29 dias,
+     * uma cancelada pelo próprio Google (origem 2) exatamente 3 dias depois da
+     * compra, e uma devolvida a pedido de quem alegou "não recebi o item".
+     * Pix é o meio padrão de quem não tem cartão, então isso atinge justamente
+     * a fatia que mais compra o mensal.
+     *
+     * Roda solto de propósito: se falhar, o init não pode cair junto — o
+     * paywall precisa abrir de qualquer jeito. */
+    void (async () => {
+      try { await Purchases!.syncPurchases(); }
+      catch (e) { console.warn("[RC] syncPurchases no boot falhou:", e); }
+    })();
+
     const offerings = await Purchases.getOfferings();
     // configure() aceita qualquer chave bem formada, mesmo sem produto nenhum
     // do outro lado. Só chamo de "pronto" se existir pacote pra comprar.

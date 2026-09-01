@@ -40,8 +40,14 @@ serve(async (req) => {
     const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError) throw new Error(`Auth error: ${userError.message}`);
     const user = userData.user;
-    if (!user?.email) throw new Error("User not authenticated");
-    logStep("User authenticated", { email: user.email });
+    /* Exige USUÁRIO, não e-mail (01/09). A versão antiga exigia `user.email` —
+     * mas tudo aqui embaixo resolve por `user.id`; o e-mail só era usado nesta
+     * linha de log. Com a compra antes do cadastro na web, quem paga tem uma
+     * sessão ANÔNIMA, que não tem e-mail: a trava derrubava a função com 500 e
+     * o gate de assinatura do app (use-auth.tsx) mostrava "sem assinatura"
+     * para alguém que já tinha pago. */
+    if (!user) throw new Error("User not authenticated");
+    logStep("User authenticated", { email: user.email ?? "(anônimo)" });
 
     const { data: profile } = await supabaseClient
       .from("profiles")

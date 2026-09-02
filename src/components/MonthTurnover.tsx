@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { localDayKey } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { useAuth } from "@/hooks/use-auth";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, TrendingDown, ArrowRight, Copy, Sparkles, Calendar } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, getCurrentMonthName, getMonthKey, getCurrentYear, readMonthData, writeMonthData } from "@/components/finance/storage-keys";
+import { trackEvent } from "@/lib/analytics";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -36,8 +38,29 @@ const countItems = (userId: string | null, logicalKey: string) => {
  * `aplicar` é a porta pro estado do React do mês CORRENTE (a tela passa os
  * setters). Quando o alvo é um mês passado — que ninguém tem em memória — o
  * caminho antigo continua valendo.
+ *
+ * ═══ A PORTA NUNCA TINHA SIDO LIGADA (02/09) ═══
+ *
+ * O parágrafo acima descrevia a intenção; a fiação não existia. O `aplicar`
+ * nasceu opcional em 08/08 e NENHUMA tela jamais passou os setters — `git log
+ * -S` mostra a prop criada aqui e nunca usada no Index. Ou seja: TODA cópia
+ * desde 08/08 caiu no `writeMonthData`, que grava só localStorage. Dali vinham
+ * os dois estragos documentados — a tela não via a cópia, e o toque seguinte
+ * salvava o estado velho por cima — e um terceiro pior: como nada subia pro
+ * Supabase, a cópia nunca existiu em outro aparelho.
+ *
+ * Descoberto por relato de usuário em 01/09 ("repliquei e apagou"). Dois
+ * consertos juntos:
+ *   1. o Index agora passa `aplicar` de verdade (setters das 4 chaves vivas);
+ *   2. quando ninguém é dono da chave (ex.: limites por categoria, cuja tela
+ *      mora noutra aba), a escrita cai em `persistir` — o `set` do
+ *      useUserData, que grava local E servidor — em vez do writeMonthData.
+ *
+ * `copyToMonth` NUNCA escreve nas chaves do mês de ORIGEM — o teste em
+ * src/test/copia-do-mes.test.ts trava isso, porque foi exatamente a acusação
+ * do relato ("apagou o mês passado").
  */
-const copyToMonth = (
+export const copyToMonth = (
   userId: string | null,
   fromMonth: string,
   toMonth: string,
@@ -45,15 +68,17 @@ const copyToMonth = (
     fixed: boolean; bills: boolean; incomes: boolean; categoryBudgets: boolean; notes: boolean;
   },
   aplicar?: (logicalKey: string, value: any) => boolean,
+  persistir?: (logicalKey: string, value: any) => void,
 ) => {
   const fromKeys = getFinanceStorageKeys(fromMonth);
   const toKeys = getFinanceStorageKeys(toMonth);
   const newId = () => Date.now().toString() + Math.random();
 
-  // Tenta primeiro pelo estado do React; só cai no disco se ninguém adotou a
-  // chave (mês passado, ou tela de Finanças não montada).
+  // Tenta primeiro pelo estado do React; sem dono, grava local+servidor via
+  // `persistir`; o writeMonthData (só local) fica de último recurso.
   const gravar = (logicalKey: string, value: any) => {
     if (aplicar?.(logicalKey, value)) return;
+    if (persistir) { persistir(logicalKey, value); return; }
     writeMonthData(userId, logicalKey, value);
   };
 
@@ -127,6 +152,9 @@ interface MonthTurnoverProps {
 export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnoverProps) => {
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  // Escrita que VIAJA: local na hora + upsert no Supabase. É o destino das
+  // chaves sem dono em memória — ver o cabeçalho do copyToMonth.
+  const { set: persistirNoServidor } = useUserData();
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
   const [turnoverAck, setTurnoverAck] = usePersistedState<string>("finance-turnover-ack", "");
   const [showRecap, setShowRecap] = useState(false);
@@ -317,7 +345,11 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
       incomes: copyIncomes && podeReceitas,
       categoryBudgets: copyCategoryBudgets && hasCategoryBudgets,
       notes: copyNotes && prevNotesCount > 0,
-    }, aplicarNoMesCorrente);
+    }, aplicarNoMesCorrente, (chave, valor) => persistirNoServidor(chave, valor));
+    trackEvent("virada_copiou_mes", {
+      fixed: copyFixed && podeFixos, bills: copyBills && podeContas,
+      incomes: copyIncomes && podeReceitas, porta_ligada: !!aplicarNoMesCorrente,
+    });
     setCopied(true);
     setTimeout(() => {
       setShowRecap(false);

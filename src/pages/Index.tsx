@@ -41,7 +41,7 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
-import { usarListaDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { usarListaDoPerfil, mesclarPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
@@ -124,6 +124,28 @@ const Index = () => {
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsTodos, setInstallmentsTodos, perfilValido);
+
+  /* A PORTA DA CÓPIA DO MÊS — ligada pela primeira vez em 02/09.
+     O MonthTurnover declarou esta prop em 08/08 e ninguém nunca a passou
+     (`git log -S` confirma): toda cópia caía no localStorage e era engolida
+     pela próxima gravação da tela — o relato de 01/09 ("repliquei e sumiu").
+     A cópia entra sempre no perfil PESSOAL, independente do filtro ativo:
+     o arquivo de um mês passado é anterior aos perfis, e aplicar a mesclagem
+     do perfil da vez etiquetaria custo de casa como sendo da empresa. */
+  const aplicarNoMesCorrente = (chave: string, valor: unknown): boolean => {
+    switch (chave) {
+      case "finance-incomes":
+        setIncomesTodos(mesclarPerfil(incomesTodos, valor as any[], PERFIL_PESSOAL)); return true;
+      case "finance-fixed-expenses":
+        setFixedExpensesTodos(mesclarPerfil(fixedExpensesTodos, valor as any[], PERFIL_PESSOAL)); return true;
+      case "finance-dueDays":
+        setDueDays(valor as any[]); return true;
+      case "finance-notes":
+        setNotes(valor as any[]); return true;
+      default:
+        return false; // sem dono em memória — o MonthTurnover persiste local+servidor
+    }
+  };
 
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
@@ -396,7 +418,7 @@ const Index = () => {
                 )}
                 {!isPreview && (
                   <TrackedCard cardKey="month-turnover" tab="financeiro">
-                    <MonthTurnover onOpenMonth={abrirMes} />
+                    <MonthTurnover onOpenMonth={abrirMes} aplicarNoMesCorrente={aplicarNoMesCorrente} />
                   </TrackedCard>
                 )}
                 <TrackedCard cardKey="summary" tab="financeiro">

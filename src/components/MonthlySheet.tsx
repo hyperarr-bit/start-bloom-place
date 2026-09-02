@@ -7,16 +7,22 @@ import { InstallmentTracker } from "@/components/InstallmentTracker";
 import { Notes } from "@/components/Notes";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getFinanceStorageKeys, isCurrentMonth } from "@/components/finance/storage-keys";
+import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear } from "@/components/finance/storage-keys";
 
 interface MonthlySheetProps {
   month: string;
+  /** Ano da planilha. Ausente = ano corrente, que é como esta tela sempre
+   *  funcionou — pedido de cliente (01/09) para trazer 2024 e 2025 de um app
+   *  antigo: "ele organizou 2024 2025". As chaves já sabiam o ano
+   *  (`getFinanceStorageKeys(mes, ano)`); só a tela é que não perguntava. */
+  year?: number;
   onClose: () => void;
 }
 
-export const MonthlySheet = ({ month, onClose }: MonthlySheetProps) => {
-  const keys = getFinanceStorageKeys(month);
-  const isCurrent = isCurrentMonth(month);
+export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
+  const ano = year ?? getCurrentYear();
+  const keys = getFinanceStorageKeys(month, ano);
+  const isCurrent = isCurrentMonth(month) && ano === getCurrentYear();
 
   const [incomes, setIncomes] = usePersistedState(keys.incomes, [] as any[]);
   const [expenses, setExpenses] = usePersistedState(keys.expenses, [] as any[]);
@@ -61,7 +67,7 @@ export const MonthlySheet = ({ month, onClose }: MonthlySheetProps) => {
         <span className="text-xs text-muted-foreground font-medium">
           {isCurrent ? "MÊS ATUAL" : "PLANILHA DO MÊS"}
         </span>
-        <h2 className="text-xl font-bold tracking-tight mt-1">📅 {month.toUpperCase()}</h2>
+        <h2 className="text-xl font-bold tracking-tight mt-1">📅 {month.toUpperCase()}{ano !== getCurrentYear() ? ` / ${ano}` : ""}</h2>
         {isCurrent && (
           <p className="text-[10px] text-muted-foreground mt-1">
             Os dados aqui são os mesmos do financeiro geral

@@ -202,14 +202,64 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
     return data && Object.keys(data).length > 0;
   })();
 
-  // Janela de virada: só mostra o card/recap nos primeiros 7 dias do mês,
-  // se o usuário estava ativo no mês anterior e ainda não confirmou a virada.
+  // Janela de virada: quando o app ABRE o resumo sozinho — primeiros 7 dias do
+  // mês, usuário ativo no mês anterior, virada ainda não confirmada.
   const dayOfMonth = new Date().getDate();
   const isTurnoverWindow =
     dayOfMonth <= 7 &&
     prevHasData &&
     lastSeenMonth === prevKey &&
     turnoverAck !== currentKey;
+
+  /*
+   * A CÓPIA DEIXA DE MORRER COM A JANELA (01/09).
+   *
+   * `copyToMonth` já fazia tudo que um cliente pediu por escrito ("replicar o
+   * mês anterior para o mês atual para não precisar digitar a mesma coisa"):
+   * fixos, contas, receitas, orçamentos e notas, com caixinha pra cada um.
+   * Ele nunca viu — e não por acaso. A porta era `isTurnoverWindow`, que
+   * exige TRÊS coisas ao mesmo tempo, e cada uma sozinha apaga a função:
+   *   • dia ≤ 7        → a partir do dia 8 não existe mais jeito de copiar;
+   *   • lastSeenMonth  → quem instalou ESTE mês nunca teve um "mês anterior
+   *                      visto", então nasce sem a função;
+   *   • turnoverAck    → o resumo AUTO-ABRE; quem fecha por reflexo (é um
+   *                      modal na cara de quem só queria lançar uma despesa)
+   *                      grava o ack e perde a cópia pelo mês inteiro.
+   *
+   * Agora são duas coisas separadas: a janela decide se o app abre o resumo
+   * SOZINHO; `podeCopiar` decide se a porta EXISTE. A porta passa a existir
+   * sempre que houver mês anterior com movimento E algo de fato copiável —
+   * ver o parágrafo seguinte, que é onde estava a segunda metade do problema.
+   */
+
+  /*
+   * CAIXINHA QUE MENTIA (01/09, achado ao abrir a porta acima).
+   *
+   * Cada opção lê `finance-{ano}-{mês}-{sufixo}`, e nem todo sufixo tem quem
+   * escreva ali. `expenses`/`incomes` são arquivados pelo use-virada-do-mes e
+   * `dueDays` pelo carimbo do virada-contas — esses existem. `fixed` NÃO: o
+   * único escritor daquela chave é este próprio copyToMonth. Custo fixo mora
+   * em `finance-fixed-expenses`, chave única e sem mês, que já atravessa a
+   * virada por conta própria.
+   *
+   * Resultado: "Custos Fixos (0 itens)" vinha MARCADO por padrão, a pessoa
+   * confirmava, via a animação de sucesso e não acontecia nada — e ela não
+   * tinha como saber que não tinha acontecido. Pior que a função escondida é
+   * a função que finge.
+   *
+   * Não dá pra "consertar" caindo no balde corrente: quando o destino é o mês
+   * atual, origem e destino viram A MESMA chave, e a cópia só regeneraria os
+   * ids — quebrando o vínculo `fixedId` que liga cada conta ao seu custo fixo.
+   * Então a opção passa a aparecer só quando existe retrato arquivado pra
+   * restaurar, e no lugar dela a pessoa lê por que não precisa copiar.
+   */
+  const podeFixos = prevFixedCount > 0;
+  const podeContas = prevBillsInfo.total > 0;
+  const podeReceitas = prevIncomesCount > 0;
+  const temAlgoPraCopiar =
+    podeFixos || podeContas || podeReceitas || hasCategoryBudgets || prevNotesCount > 0;
+
+  const podeCopiar = prevHasData && (isTurnoverWindow || temAlgoPraCopiar);
 
   /*
    * O sinal só é gasto DEPOIS da decisão (02/08).
@@ -258,12 +308,15 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
   const message = getMessage();
 
   const handleCopy = () => {
+    // O `&&` com a disponibilidade não é redundante: a caixinha some da tela
+    // mas o estado dela continua `true` (nasce marcada). Sem isto, um item
+    // indisponível ainda entraria como pedido de cópia.
     copyToMonth(userId, prevMonth, currentMonth, {
-      fixed: copyFixed,
-      bills: copyBills,
-      incomes: copyIncomes,
-      categoryBudgets: copyCategoryBudgets,
-      notes: copyNotes,
+      fixed: copyFixed && podeFixos,
+      bills: copyBills && podeContas,
+      incomes: copyIncomes && podeReceitas,
+      categoryBudgets: copyCategoryBudgets && hasCategoryBudgets,
+      notes: copyNotes && prevNotesCount > 0,
     }, aplicarNoMesCorrente);
     setCopied(true);
     setTimeout(() => {
@@ -279,24 +332,37 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
     setTurnoverAck(currentKey);
   };
 
-  const triggerRecap = () => {
-    setStep("recap");
+  const abrir = (passo: "recap" | "copy") => {
+    setStep(passo);
     setShowRecap(true);
   };
 
-  const anySelected = copyFixed || copyBills || copyIncomes || copyCategoryBudgets || copyNotes;
+  const anySelected =
+    (podeFixos && copyFixed) ||
+    (podeContas && copyBills) ||
+    (podeReceitas && copyIncomes) ||
+    (hasCategoryBudgets && copyCategoryBudgets) ||
+    (prevNotesCount > 0 && copyNotes);
 
   return (
     <>
-      {isTurnoverWindow && (
+      {podeCopiar && (
 
+        /* Na janela de virada o assunto é o FECHAMENTO (quanto sobrou), então
+           a porta abre no resumo. Fora dela quem toca aqui já sabe o que quer
+           — copiar — e cair no resumo primeiro seria um passo a mais entre a
+           pessoa e a coisa. Por isso o rótulo e o destino mudam juntos. */
         <button
-          onClick={triggerRecap}
+          onClick={() => abrir(isTurnoverWindow ? "recap" : "copy")}
           className="w-full bg-card rounded-lg border border-border overflow-hidden hover:bg-muted/20 transition-colors text-left"
         >
           <div className="bg-muted/40 px-4 py-2 flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-[11px] font-bold tracking-wide uppercase">Resumo de {prevMonth}</span>
+            {isTurnoverWindow
+              ? <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+              : <Copy className="w-3.5 h-3.5 text-primary" />}
+            <span className="text-[11px] font-bold tracking-wide uppercase">
+              {isTurnoverWindow ? `Resumo de ${prevMonth}` : `Repetir ${prevMonth} em ${currentMonth}`}
+            </span>
             <ArrowRight className="w-3.5 h-3.5 text-muted-foreground ml-auto" />
           </div>
           <div className="px-4 py-3 space-y-2">
@@ -317,7 +383,9 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Toque para ver detalhes e preparar {currentMonth}
+              {isTurnoverWindow
+                ? `Toque para ver detalhes e preparar ${currentMonth}`
+                : `Traz os fixos, as contas e as receitas de ${prevMonth} sem digitar de novo`}
             </p>
           </div>
         </button>
@@ -438,41 +506,56 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                 </div>
 
                 <div className="space-y-2">
-                  {/* Custos Fixos */}
-                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
-                    <Checkbox checked={copyFixed} onCheckedChange={(v) => setCopyFixed(!!v)} />
-                    <div className="flex-1">
-                      <p className="text-xs font-bold">Custos Fixos</p>
+                  {/* Custos Fixos — só quando há retrato arquivado. Fora disso
+                      eles já atravessam a virada sozinhos (ver comentário lá em
+                      cima), e oferecer a cópia seria prometer trabalho nenhum. */}
+                  {podeFixos ? (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                      <Checkbox checked={copyFixed} onCheckedChange={(v) => setCopyFixed(!!v)} />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold">Custos Fixos</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Aluguel, contas, assinaturas ({prevFixedCount} itens)
+                        </p>
+                      </div>
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </label>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/20">
+                      <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
                       <p className="text-[10px] text-muted-foreground">
-                        Aluguel, contas, assinaturas ({prevFixedCount} itens)
+                        Seus <span className="font-bold">custos fixos</span> já seguem para {currentMonth} sozinhos — não precisa copiar.
                       </p>
                     </div>
-                    <Copy className="w-4 h-4 text-muted-foreground" />
-                  </label>
+                  )}
 
                   {/* Vencimentos */}
-                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
-                    <Checkbox checked={copyBills} onCheckedChange={(v) => setCopyBills(!!v)} />
-                    <div className="flex-1">
-                      <p className="text-xs font-bold">Vencimentos</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Contas por dia ({prevBillsInfo.total} contas, marcadas como não pagas)
-                      </p>
-                    </div>
-                    <Copy className="w-4 h-4 text-muted-foreground" />
-                  </label>
+                  {podeContas && (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                      <Checkbox checked={copyBills} onCheckedChange={(v) => setCopyBills(!!v)} />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold">Vencimentos</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Contas por dia ({prevBillsInfo.total} contas, marcadas como não pagas)
+                        </p>
+                      </div>
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </label>
+                  )}
 
                   {/* Receitas */}
-                  <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
-                    <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
-                    <div className="flex-1">
-                      <p className="text-xs font-bold">Receitas</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        Salário, freelances, etc. ({prevIncomesCount} fontes)
-                      </p>
-                    </div>
-                    <Copy className="w-4 h-4 text-muted-foreground" />
-                  </label>
+                  {podeReceitas && (
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/20 transition-colors cursor-pointer">
+                      <Checkbox checked={copyIncomes} onCheckedChange={(v) => setCopyIncomes(!!v)} />
+                      <div className="flex-1">
+                        <p className="text-xs font-bold">Receitas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Salário, freelances, etc. ({prevIncomesCount} fontes)
+                        </p>
+                      </div>
+                      <Copy className="w-4 h-4 text-muted-foreground" />
+                    </label>
+                  )}
 
                   {/* Limites por Categoria */}
                   {hasCategoryBudgets && (

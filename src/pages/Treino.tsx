@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
+import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -850,6 +851,24 @@ const Treino = () => {
                   </div>
                 );
               })}
+            </div>
+
+            {/* A série vive AQUI, na aba que 207 pessoas abrem, e não junto do
+                gráfico de 14 dias que mora no "resumo". A queixa da 2★ era
+                exatamente essa: o histórico existia longe de onde se olha, e
+                não passava de uma janela fixa. `weeklyVolume` já é
+                { "2026-08-30": 4200 } — não houve dado novo a gravar. */}
+            <div className="bg-card rounded-xl border border-border px-4 pt-4 pb-3">
+              <h3 className="text-xs font-bold flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-500" /> SUA EVOLUÇÃO DE CARGA
+              </h3>
+              <SerieHistorico
+                registros={weeklyVolume}
+                cor="hsl(142 71% 45%)"
+                id="treino-volume"
+                unidade="kg"
+                formatar={(n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(Math.round(n)))}
+              />
             </div>
 
             {/* Full workout cards */}

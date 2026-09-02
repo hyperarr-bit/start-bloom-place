@@ -22,6 +22,7 @@ import { useAuth } from "@/hooks/use-auth";
 
 import { FinancialSummary } from "@/components/FinancialSummary";
 import { InstallmentTracker } from "@/components/InstallmentTracker";
+import { DividasEntrePessoas } from "@/components/finance/DividasEntrePessoas";
 import { AnnualBudget } from "@/components/AnnualBudget";
 import { MonthlyBudget } from "@/components/MonthlyBudget";
 import { WishlistItems } from "@/components/WishlistItems";
@@ -40,6 +41,8 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
+import { usarListaDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -67,7 +70,11 @@ const Index = () => {
   );
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
-  const [openMonth, setOpenMonth] = useState<string | null>(null);
+  /* Mês aberto passa a carregar o ANO junto (01/09) — sem ele a planilha de
+     um mês de 2024 abria lendo as chaves de 2026 e mostrava tudo vazio. */
+  const [openMonth, setOpenMonth] = useState<{ month: string; year: number } | null>(null);
+  const abrirMes = (month: string, year?: number) =>
+    setOpenMonth({ month, year: year ?? new Date().getFullYear() });
   // Finanças virou a tela-raiz do app (pivot "só finanças"): o header dá acesso à
   const [askOpen, setAskOpen] = useState(false);
 
@@ -78,11 +85,11 @@ const Index = () => {
   };
 
 
-  const [incomes, setIncomes] = usePersistedState("finance-incomes", [] as any[]);
+  const [incomesTodos, setIncomesTodos] = usePersistedState("finance-incomes", [] as any[]);
 
-  const [expenses, setExpenses] = usePersistedState("finance-expenses", [] as any[]);
+  const [expensesTodos, setExpensesTodos] = usePersistedState("finance-expenses", [] as any[]);
 
-  const [fixedExpenses, setFixedExpenses] = usePersistedState("finance-fixed-expenses", [] as any[]);
+  const [fixedExpensesTodos, setFixedExpensesTodos] = usePersistedState("finance-fixed-expenses", [] as any[]);
 
   const [dueDays, setDueDays] = usePersistedState("finance-dueDays", [
     { day: 5, color: "yellow", bills: [] as any[] },
@@ -95,17 +102,41 @@ const Index = () => {
 
   const [goals] = usePersistedState("finance-goals", [] as any[]);
 
-  const [installments, setInstallments] = usePersistedState("finance-installments", [] as any[]);
+  const [installmentsTodos, setInstallmentsTodos] = usePersistedState("finance-installments", [] as any[]);
+
+  /* PERFIS PF/PJ (01/09, pedido por WhatsApp: "separar a questão da pf e pj...
+     isso aqui é da empresa x isso aqui é da empresa y").
+
+     A filtragem acontece AQUI, num lugar só. Cada lista vira [visíveis, setter
+     que mescla de volta] e mantém o NOME de antes — por isso nada abaixo desta
+     linha precisou mudar: tabelas, totais, calendário e dashboard continuam
+     recebendo `expenses`/`incomes` como sempre, só que já do perfil escolhido.
+     A regra de mesclagem (e o risco de apagar lançamento dos outros perfis)
+     mora em @/lib/finance-perfil, com teste dedicado. */
+  const [perfis, setPerfis] = usePersistedState<Perfil[]>("finance-perfis", []);
+  const [perfilAtivo, setPerfilAtivo] = usePersistedState<string>("finance-perfil-ativo", PERFIL_PESSOAL);
+  /* Perfil apagado noutro aparelho deixaria a tela filtrando por algo que não
+     existe mais — Finanças vazia sem explicação. Cai no pessoal. */
+  const perfilValido = perfilAtivo === PERFIL_PESSOAL || perfilAtivo === PERFIL_TODOS
+    || perfis.some((p) => p.id === perfilAtivo) ? perfilAtivo : PERFIL_PESSOAL;
+
+  const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
+  const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
+  const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
+  const [installments, setInstallments] = usarListaDoPerfil(installmentsTodos, setInstallmentsTodos, perfilValido);
 
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
   // O sync devolve null quando nada mudou — sem loop de render.
   useEffect(() => {
     if (!userDataLoaded) return;
-    const synced = syncFixedExpensesToBills(fixedExpenses, dueDays);
+    /* LISTA COMPLETA de propósito. O sync apaga toda conta cujo custo fixo
+       não esteja na lista (finance-sync.ts): com a lista filtrada por perfil,
+       trocar pra "Empresa X" apagaria as contas do Pessoal do calendário. */
+    const synced = syncFixedExpensesToBills(fixedExpensesTodos, dueDays);
     if (synced) setDueDays(synced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userDataLoaded, fixedExpenses, dueDays]);
+  }, [userDataLoaded, fixedExpensesTodos, dueDays]);
 
   const [annualData, setAnnualData] = usePersistedState("finance-annual", 
     months.map((m) => ({
@@ -330,7 +361,7 @@ const Index = () => {
         {activeTab === "financeiro" && (
           <>
             {openMonth ? (
-              <MonthlySheet month={openMonth} onClose={() => setOpenMonth(null)} />
+              <MonthlySheet month={openMonth.month} year={openMonth.year} onClose={() => setOpenMonth(null)} />
             ) : (
               <>
                 {getUserData<string>("spotlight-done-financas", "") !== "true" && (
@@ -352,9 +383,20 @@ const Index = () => {
                     visitante do funil abria MEU FINANCEIRO e levava "Julho
                     acabou — preparar agosto" com tudo zerado. Recap é ritual
                     de quem TEM mês anterior; a demo é vitrine. */}
+                {/* Antes de tudo porque muda o significado de todo número
+                    abaixo. Some inteiro pra quem não tem empresa — vira um
+                    link de uma linha (ver o componente). */}
+                {!isPreview && (
+                  <SeletorDePerfil
+                    perfis={perfis}
+                    setPerfis={setPerfis}
+                    ativo={perfilValido}
+                    setAtivo={setPerfilAtivo}
+                  />
+                )}
                 {!isPreview && (
                   <TrackedCard cardKey="month-turnover" tab="financeiro">
-                    <MonthTurnover onOpenMonth={setOpenMonth} />
+                    <MonthTurnover onOpenMonth={abrirMes} />
                   </TrackedCard>
                 )}
                 <TrackedCard cardKey="summary" tab="financeiro">
@@ -425,12 +467,18 @@ const Index = () => {
                 <TrackedCard cardKey="installments" tab="financeiro">
                   <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />
                 </TrackedCard>
+                {/* Logo abaixo do parcelamento porque é a dúvida que nasce ali
+                    ("e a dívida que não é do cartão?"), e longe o bastante do
+                    topo pra deixar claro que não conversa com os totais. */}
+                <TrackedCard cardKey="dividas-pessoas" tab="financeiro">
+                  <DividasEntrePessoas />
+                </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_200px] gap-4">
                   <TrackedCard cardKey="annual-budget" tab="financeiro">
                     <AnnualBudget />
                   </TrackedCard>
                   <TrackedCard cardKey="monthly-budget" tab="financeiro">
-                    <MonthlyBudget budgets={monthlyBudgets} setBudgets={setMonthlyBudgets} onOpenMonth={setOpenMonth} />
+                    <MonthlyBudget budgets={monthlyBudgets} setBudgets={setMonthlyBudgets} onOpenMonth={abrirMes} />
                   </TrackedCard>
                 </div>
               </>

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -360,6 +361,25 @@ const Dieta = () => {
     };
   }, []);
   const [diaryData, setDiaryData] = usePersistedState<Record<string, { meals: Record<string, { followed: boolean; note: string }>; extraFood: { had: boolean; description: string } }>>("dieta-diary-v2", {});
+
+  /* SÉRIE DA DIETA (01/09) — refeições SEGUIDAS por dia.
+   *
+   * O diário guarda por refeição se foi seguida ou não, mas só mostrava um
+   * dia por vez: pra comparar a semana era preciso tocar a setinha sete
+   * vezes e guardar de cabeça. Contar o que foi seguido dá um número por dia
+   * — e número por dia é o que o SerieHistorico sabe desenhar.
+   *
+   * Conta só `followed === true`. Refeição marcada como NÃO seguida é
+   * informação registrada, não é adesão: somá-la inflaria o gráfico
+   * justamente nos dias em que a pessoa saiu da linha e foi honesta. */
+  const serieDieta = useMemo(() => {
+    const fora: Record<string, number> = {};
+    for (const [dia, reg] of Object.entries(diaryData || {})) {
+      const seguidas = Object.values(reg?.meals || {}).filter((m) => m?.followed).length;
+      if (seguidas > 0) fora[dia] = seguidas;
+    }
+    return fora;
+  }, [diaryData]);
 
   // LISTA INTELIGENTE
   const [smartList, setSmartList] = usePersistedState<{ id: string; text: string; done: boolean }[]>("dieta-smart-list", []);
@@ -1178,6 +1198,21 @@ const Dieta = () => {
               <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => navigateDiaryDate(1)} disabled={diaryDate >= today}>
                 <ArrowLeft className="w-4 h-4 rotate-180" />
               </Button>
+            </div>
+
+            {/* Logo abaixo da navegação por dia de propósito: quem está aqui
+                veio olhar um dia, e a série responde "e nos outros?" sem
+                obrigar a tocar a setinha sete vezes. */}
+            <div className="bg-card rounded-xl border border-border px-4 pt-4 pb-3">
+              <h3 className="text-xs font-bold flex items-center gap-2">
+                <Check className="w-4 h-4 text-green-500" /> REFEIÇÕES QUE VOCÊ SEGUIU
+              </h3>
+              <SerieHistorico
+                registros={serieDieta}
+                cor="hsl(142 71% 45%)"
+                id="dieta-seguidas"
+                formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+              />
             </div>
 
             {/* Meal checklist from plan */}

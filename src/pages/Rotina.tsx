@@ -6,6 +6,8 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ModuleTip } from "@/components/ModuleTip";
+import { SerieHistorico } from "@/components/historico/SerieHistorico";
+import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { sequenciaAtual } from "@/lib/reagendar";
@@ -87,6 +89,14 @@ const getDateKey = (d?: Date) => {
 
 const getMonthDays = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
 
+/* Sugestões do BlocoDeFases na Rotina. São só um ponto de partida renomeável
+   — o vocabulário aqui é de vida, não de trabalho como na Carreira. */
+const FASES_ROTINA: Fase[] = [
+  { id: "r1", nome: "Copos de água", memo: "", counts: {} },
+  { id: "r2", nome: "Pausas", memo: "", counts: {} },
+  { id: "r3", nome: "Blocos de estudo", memo: "", counts: {} },
+];
+
 // ============= MOOD TRACKER =============
 const MoodTracker = () => {
   const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string }>>("mood-log", {});
@@ -104,13 +114,26 @@ const MoodTracker = () => {
     }
   };
 
-  // Last 7 days
-  const last7 = [...Array(7)].map((_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i));
-    const key = getDateKey(d);
-    const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-    return { key, dayName: dayNames[d.getDay()], mood: moodLog[key]?.mood };
-  });
+  /* A SÉRIE SUBSTITUI O GRÁFICO DE 7 DIAS FIXO (01/09).
+   *
+   * Este card guardava humor por data desde sempre e mostrava só a última
+   * semana, sem jeito de andar pra trás — a queixa literal da 2★ de 28/08
+   * ("ter o histórico para fazer comparação e ver onde pode ser melhorado")
+   * e da 2★ anterior que deu origem ao SerieHistorico. Escolhi aqui porque
+   * `rotina › semana` é a aba mais aberta do app depois da Finanças.
+   *
+   * Só a FORMA muda: nada de chave nova, nada de gravação nova. O registro
+   * continua sendo { mood, note } por dia; a série lê o `mood` e ignora o
+   * resto. Sem `mood` (dia só com nota) o valor é 0 e o SerieHistorico já
+   * trata 0 como "dia sem registro". */
+  const serieHumor = useMemo(() => {
+    const fora: Record<string, number> = {};
+    for (const [dia, reg] of Object.entries(moodLog)) {
+      const v = Number(reg?.mood);
+      if (Number.isFinite(v) && v > 0) fora[dia] = v;
+    }
+    return fora;
+  }, [moodLog]);
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -145,16 +168,12 @@ const MoodTracker = () => {
           </div>
         )}
 
-        <div className="flex items-end justify-between gap-1 h-16">
-          {last7.map(d => (
-            <div key={d.key} className="flex flex-col items-center gap-1 flex-1">
-              <div className={`w-full rounded-sm transition-all ${d.mood ? `h-${d.mood * 3}` : "h-1"}`} 
-                style={{ height: d.mood ? `${d.mood * 10}px` : "4px", backgroundColor: d.mood ? `hsl(${(d.mood - 1) * 30}, 70%, 55%)` : "hsl(var(--muted))" }} 
-              />
-              <span className="text-[9px] text-muted-foreground">{d.dayName}</span>
-            </div>
-          ))}
-        </div>
+        <SerieHistorico
+          registros={serieHumor}
+          cor="hsl(292 60% 60%)"
+          id="humor"
+          formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+        />
       </div>
     </div>
   );
@@ -826,6 +845,19 @@ const EnergyTracker = () => {
     setEnergyLog(prev => ({ ...prev, [today]: newEnergy }));
   };
 
+  /* Média do dia entre os períodos PREENCHIDOS — a mesma conta que o rodapé
+     já fazia pro dia de hoje, aplicada ao histórico inteiro. Quem marcou só
+     a manhã não vira "energia baixa" por causa de dois zeros que ninguém
+     respondeu. */
+  const serieEnergia = useMemo(() => {
+    const fora: Record<string, number> = {};
+    for (const [dia, vals] of Object.entries(energyLog)) {
+      const marcados = (Array.isArray(vals) ? vals : []).filter((v) => Number(v) > 0);
+      if (marcados.length) fora[dia] = marcados.reduce((a, b) => a + Number(b), 0) / marcados.length;
+    }
+    return fora;
+  }, [energyLog]);
+
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden">
       <div className="bg-gradient-to-r from-yellow-400 to-orange-500 dark:from-yellow-700 dark:to-orange-700 px-4 py-3 flex items-center gap-2">
@@ -860,6 +892,13 @@ const EnergyTracker = () => {
             Média: {(todayEnergy.filter(e => e > 0).reduce((a, b) => a + b, 0) / todayEnergy.filter(e => e > 0).length).toFixed(1)} ⚡
           </div>
         )}
+
+        <SerieHistorico
+          registros={serieEnergia}
+          cor="hsl(38 92% 50%)"
+          id="energia"
+          formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+        />
       </div>
     </div>
   );
@@ -1342,6 +1381,24 @@ const Rotina = () => {
 
             {/* Rituals */}
             <Rituals />
+
+            {/* Pedido literal da 5★ de 01/09: "no plano de carreira tem fases de
+                hoje / fechamentos da semana e mês, gostaria da mesma página na
+                rotina... e a quantidade de vezes que fizemos aquilo no dia".
+                É o mesmo componente da Carreira, com chaves próprias — contar
+                "Água" junto de "Follow-up" estragaria o fechamento dos dois.
+
+                Fica DEPOIS dos hábitos porque é outra pergunta: hábito é
+                sim/não no dia, fase é QUANTAS VEZES. Quem precisa das duas
+                (o caso dela) encontra as duas na mesma rolagem. */}
+            <BlocoDeFases
+              chaveFases="rotina-day-phases"
+              chaveTarefas="rotina-day-tasks"
+              fasesPadrao={FASES_ROTINA}
+              tituloFases="🔁 O QUE VOCÊ REPETE NO DIA"
+              vazioFases="Crie o que você repete no dia — cada um vira um contador."
+              placeholderTarefa="Nova tarefa de hoje..."
+            />
           </>
         )}
 

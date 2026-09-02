@@ -10,6 +10,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HydrationTracker } from "@/components/saude/HydrationTracker";
+import { CicloMenstrual } from "@/components/saude/CicloMenstrual";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
@@ -83,6 +84,11 @@ const Saude = () => {
             <PharmacyChecklist />
             <BMICalculator />
             <SleepCard />
+            {/* Depois do sono de propósito: a leitura cruzada do ciclo usa o
+                sono e o humor, então a pessoa já passou pelo dado que alimenta
+                o card. Nasce como um convite de uma linha e some inteiro pra
+                quem não ligar (ver o cabeçalho do componente). */}
+            <CicloMenstrual />
             <SOSCard />
           </motion.div>
         )}

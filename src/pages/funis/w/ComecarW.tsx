@@ -24,9 +24,9 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio } from "@/pages/funis/w/retomada";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -326,6 +326,9 @@ export default function ComecarW() {
       const s = new URLSearchParams(window.location.search).get("step");
       if (s === "compromissos" || s === "offer" || s === "signup") return s as Step;
     } catch { /* noop */ }
+    // ANÚNCIO NA WEB → PORTA (02/09): o clique pago cai na primeira pergunta,
+    // sem welcome nem promessas (ver retomada.ts — 69% morriam no splash).
+    if (comecaNaPorta(isNativeShell(), veioDeAnuncio(window.location.search, getAttributionParams()))) return "porta";
     // RETOMADA (02/09): o app morreu com a folha do Google aberta e voltou?
     // Cai onde parou (paywall, cadastro…), não na welcome. Só no shell.
     const retomar = passoDeRetomada(lerChave<string>(CHAVES.passo), isNativeShell());
@@ -382,6 +385,9 @@ export default function ComecarW() {
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
+    } else if (step === "porta") {
+      // clique pago na web caiu direto na porta — o "start" do funil
+      trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio" });
     } else if (step !== "welcome") {
       // retomada depois de reinício — medível separado da welcome
       trackEvent("funnel_view", { step, funil: FUNIL, retomada: true, motivo: "reinicio" });

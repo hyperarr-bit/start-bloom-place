@@ -52,3 +52,22 @@ const RETOMAVEIS: Record<string, string> = {
 };
 export const passoDeRetomada = (salvo: string | null, noShell: boolean): string | null =>
   noShell && salvo ? (RETOMAVEIS[salvo] ?? null) : null;
+
+/**
+ * ANÚNCIO NA WEB COMEÇA NA PORTA (02/09).
+ *
+ * Medido em 01–02/09 com 2.567 cliques pagos: 69% viam a welcome do app
+ * ("Um app pra vida inteira", grade azul, Começar) e iam embora sem tocar
+ * em nada — quem toca, toca em 3,5s, então não é o botão, é a tela. Um
+ * clique frio do Instagram não instalou nada; duas telas de splash antes da
+ * primeira pergunta é onde R$ 1.000 dos R$ 1.467 dos dois dias morreram.
+ * No app a welcome fica (a pessoa acabou de instalar, 70% seguem).
+ */
+export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>): boolean => {
+  try {
+    const p = new URLSearchParams(search);
+    if (p.get("utm_campaign") || p.get("fbclid") || p.get("ttclid") || p.get("gclid")) return true;
+  } catch { /* noop */ }
+  return !!(atribuicao?.utm_campaign || atribuicao?.fbclid || atribuicao?.ttclid || atribuicao?.gclid);
+};
+export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !noShell && deAnuncio;

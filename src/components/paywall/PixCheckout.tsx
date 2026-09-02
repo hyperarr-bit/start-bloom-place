@@ -201,6 +201,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
    * compra). Mostra o campo de senha, com "usar outro e-mail" ao lado. */
   const [contaExiste, setContaExiste] = useState(false);
   const [senhaExistente, setSenhaExistente] = useState("");
+  // QR PRIMEIRO (02/09): o e-mail é pedido na tela do QR, sem barrar o código.
+  const [pedirEmailNoQr, setPedirEmailNoQr] = useState(false);
+  const [emailSalvo, setEmailSalvo] = useState(false);
   const [pix, setPix] = useState<{ orderId: string | null; qrCode: string; qrCodeBase64: string | null; amount: string; expiresAt: string | null } | null>(null);
   const [copied, setCopied] = useState(false);
   /* RELIGADO 13/08 (rodou 30-31/07, os 2 dias recorde; caiu no revert de
@@ -241,8 +244,15 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         if (jaTem) { generate("", ""); return; }
         const podeAnonimo = await anonimoLigado();
         if (!podeAnonimo) { generate("", ""); return; } // caminho antigo: já tem conta
-        trackEvent("funnel_view", { step: "pix_email", offer, context });
-        setStep("email");
+        /* QR PRIMEIRO (02/09). Medido 01–02/09 na oferta w97: 93 viram a tela
+         * de e-mail, 30 terminaram de digitar (mediana 6,9s, p75 14,6s) — 57%
+         * de quem tocou em pagar nunca viu o QR. O servidor leva 0,9s. Então o
+         * QR sai já, e o e-mail é pedido NA TELA DO QR, enquanto a pessoa paga
+         * (`salvarEmailNoQr`). E-mail de conta existente: entra e ganha um QR
+         * novo na conta; o anônimo fica sem uso. */
+        trackEvent("funnel_view", { step: "pix_qr_primeiro", offer, context });
+        setPedirEmailNoQr(true);
+        generate("", "");
       })();
       return;
     }
@@ -296,6 +306,47 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setAnonima(true);
       trackEvent("funnel_click", { cta: "pix_email_ok", offer, context });
       await generate("", "");
+    } finally {
+      setEmailIndo(false);
+    }
+  };
+
+  /* E-MAIL NA TELA DO QR (02/09) — o código já está na tela; isto só amarra o
+   * endereço à conta que vai pagar (recuperação de acesso + welcome do
+   * webhook). Conta existente: entra e gera um QR novo NELA — antes do
+   * dinheiro é seguro, o pedido anônimo fica sem uso. */
+  const salvarEmailNoQr = async () => {
+    setEmailIndo(true);
+    setEmailErr(null);
+    try {
+      if (contaExiste) {
+        const { erro } = await entrarNaContaExistente(emailCompra, senhaExistente);
+        if (erro) {
+          setEmailErr("Senha incorreta. Tenta de novo ou usa outro e-mail.");
+          trackEvent("funnel_error", { where: "pix_email_login", offer, no_qr: true });
+          return;
+        }
+        trackEvent("funnel_click", { cta: "pix_email_login_ok", offer, no_qr: true });
+        setEmailSalvo(true);
+        await generate("", ""); // QR novo, agora na conta dela
+        return;
+      }
+      const r = await definirEmailDaCompra(emailCompra);
+      if (r.erro === "invalido") { setEmailErr("Esse e-mail não parece certo. Confere?"); return; }
+      if (r.erro === "email_em_uso") {
+        setContaExiste(true);
+        setEmailErr("Esse e-mail já tem conta no CORE. Põe sua senha que eu passo o Pix pra ela.");
+        trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer, no_qr: true });
+        return;
+      }
+      if (r.erro) {
+        setEmailErr("Não consegui salvar agora. Tenta de novo?");
+        trackEvent("funnel_error", { where: "pix_email", offer, no_qr: true, message: (r.mensagem || "").slice(0, 120) });
+        return;
+      }
+      setAnonima(true);
+      setEmailSalvo(true);
+      trackEvent("funnel_click", { cta: "pix_email_ok", offer, context, no_qr: true });
     } finally {
       setEmailIndo(false);
     }
@@ -864,6 +915,43 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               >
                 {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> {copiadoJa ? "Copiar de novo" : "Copiar código Pix"}</>}
               </Button>
+
+              {/* QR primeiro (02/09): o e-mail entra AQUI, depois do código, sem barrar nada. */}
+              {pedirEmailNoQr && !emailSalvo && (
+                <div className="text-left rounded-xl border border-border bg-card p-3 mb-3">
+                  <p className="text-[12.5px] font-bold leading-tight">Pra onde mandamos seu acesso?</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">Só o e-mail. Se fechar a aba depois de pagar, é por ele que você entra.</p>
+                  <input
+                    type="email" inputMode="email" autoComplete="email"
+                    value={emailCompra}
+                    onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) setContaExiste(false); }}
+                    placeholder="seu@email.com"
+                    className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors"
+                  />
+                  {contaExiste && (
+                    <input
+                      type="password" autoComplete="current-password"
+                      value={senhaExistente}
+                      onChange={(e) => { setSenhaExistente(e.target.value); setEmailErr(null); }}
+                      placeholder="sua senha"
+                      className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors mt-2"
+                    />
+                  )}
+                  {emailErr && <p className="text-[12px] text-destructive mt-1.5 leading-snug">{emailErr}</p>}
+                  <Button
+                    size="sm" variant="outline" className="w-full h-10 mt-2 font-semibold"
+                    disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
+                    onClick={() => void salvarEmailNoQr()}
+                  >
+                    {emailIndo ? "Salvando…" : contaExiste ? "Entrar e passar o Pix pra minha conta" : "Salvar e-mail"}
+                  </Button>
+                </div>
+              )}
+              {pedirEmailNoQr && emailSalvo && (
+                <p className="text-[12px] text-muted-foreground mb-3">
+                  Acesso vai pra <strong className="text-foreground">{emailCompra.trim().toLowerCase()}</strong>.
+                </p>
+              )}
 
               {!copiadoJa && (
                 <div className="text-left bg-muted/40 rounded-xl p-3 text-[12px] text-muted-foreground space-y-1 mb-3">

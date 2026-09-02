@@ -90,3 +90,23 @@ describe("retomada do funil W — o progresso sobrevive ao app morrer", () => {
     for (const k of Object.values(CHAVES_FUNIL_W)) expect(localStorage.getItem(k)).toBeNull();
   });
 });
+
+/* ============================================================
+ * ANÚNCIO NA WEB COMEÇA NA PORTA (02/09) — 69% dos cliques pagos morriam
+ * na welcome do app. No shell a welcome fica.
+ * ============================================================ */
+import { comecaNaPorta, veioDeAnuncio } from "@/pages/funis/w/retomada";
+describe("anúncio na web → porta", () => {
+  it("reconhece o clique pago pela URL ou pela atribuição guardada", () => {
+    expect(veioDeAnuncio("?utm_campaign=kazu&utm_source=ig", {})).toBe(true);
+    expect(veioDeAnuncio("?fbclid=abc", {})).toBe(true);
+    expect(veioDeAnuncio("", { utm_campaign: "120250123961310041" })).toBe(true);
+    expect(veioDeAnuncio("", {})).toBe(false);
+    expect(veioDeAnuncio("?step=offer", { utm_source: "ig" })).toBe(false); // fonte sem campanha não conta
+  });
+  it("só na WEB e só de anúncio: o app mantém a welcome; direto/orgânico também", () => {
+    expect(comecaNaPorta(false, true)).toBe(true);
+    expect(comecaNaPorta(true, true)).toBe(false);
+    expect(comecaNaPorta(false, false)).toBe(false);
+  });
+});

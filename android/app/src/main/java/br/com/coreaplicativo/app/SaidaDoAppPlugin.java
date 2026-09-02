@@ -17,10 +17,13 @@ import java.util.List;
 /**
  * POR QUE O APP MORREU DA ÚLTIMA VEZ (02/09).
  *
- * Autópsia de 28/08–02/09: 13–31% das tentativas de compra terminavam com o
- * app reiniciando 15–60s depois do toque, com a folha do Google na frente —
- * inclusive em Galaxy S25 e Z Flip, o que descarta "celular fraco". O banco
- * não tem como dizer POR QUÊ. O Android tem: desde o 11, ele guarda o motivo
+ * Autópsia de 28/08–02/09: 22% das sessões que tocam em comprar abrem uma
+ * sessão nova até 3 min depois — o app volta frio na welcome. A revisão
+ * cética da mesma noite mostrou que 89% desses reinícios vêm DEPOIS de a
+ * pessoa fechar a folha e seguir navegando (ela sai e volta), e que o Play
+ * Vitals não tem crash nenhum: não é o app caindo sob a folha. O que falta
+ * saber é POR QUE o processo morre nesse intervalo (memória? freezer? a
+ * pessoa encerrando?). O banco não diz. O Android diz: desde o 11 ele guarda o motivo
  * de cada saída do processo (ApplicationExitInfo — memória baixa, crash,
  * ANR, usuário, freezer…). Este plugin só lê o último e entrega pro JS, que
  * cruza com a hora do toque em comprar e manda como evento.

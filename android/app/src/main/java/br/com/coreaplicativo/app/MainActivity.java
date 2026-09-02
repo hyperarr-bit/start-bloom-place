@@ -27,21 +27,21 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SaidaDoAppPlugin.class);
         super.onCreate(savedInstanceState);
 
-        // O APP MORRIA COM A FOLHA DO GOOGLE NA FRENTE (02/09). Medido em 3
-        // dias: 13–31% das tentativas de compra terminavam com o app
-        // reiniciando 15–60s depois do toque — Galaxy S25 e Z Flip inclusos,
-        // então não é só memória fraca. O mecanismo mais provável: com a folha
-        // cobrindo o app, o WebView deixa de estar visível, o Android REBAIXA
-        // a prioridade do processo de renderização e o mata primeiro; o
-        // Capacitor não trata onRenderProcessGone (devolve false) e o
-        // framework derruba o app inteiro. Duas defesas:
-        //  1. o renderer continua IMPORTANTE mesmo sem estar visível
-        //     (waivedWhenNotVisible = false) — o sistema para de tratá-lo como
-        //     descartável enquanto a pessoa paga;
-        //  2. se ainda assim morrer, a activity é RECRIADA em vez do app cair:
-        //     o WebView novo carrega o app e a retomada (retomada.ts) devolve
-        //     a pessoa ao paywall. O ocorrido fica anotado pro SaidaDoAppPlugin
-        //     reportar no boot seguinte.
+        // DEFESAS DO RENDERER DO WEBVIEW (02/09) — e a correção da premissa.
+        // A hipótese que motivou isto ("o Android mata o renderer com a folha
+        // do Google na frente e o app cai") foi TESTADA na mesma noite e caiu:
+        // o Play Vitals mostra crashRate 0,00 em 8 de 9 dias (1 crash em 60
+        // dias, no onCreate, sem relação com compra), e sem handler um renderer
+        // morto viraria crash Java visível lá. E dos "reinícios" da telemetria,
+        // 89% acontecem DEPOIS de a pessoa já ter fechado a folha e continuado
+        // navegando — é ela saindo do app e voltando frio, não morte sob a
+        // folha (≤2,5% cabem nessa hipótese). O que segura essas pessoas é a
+        // retomada (retomada.ts), não isto aqui.
+        // As duas defesas ficam porque são inofensivas e baratas:
+        //  1. renderer continua IMPORTANTE sem estar visível
+        //     (waivedWhenNotVisible = false);
+        //  2. se um dia morrer, a activity é RECRIADA em vez de o app cair, e
+        //     o ocorrido fica anotado pro SaidaDoAppPlugin reportar no boot.
         final WebView webView = this.bridge.getWebView();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && webView != null) {
             webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);

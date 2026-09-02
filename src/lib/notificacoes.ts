@@ -489,16 +489,23 @@ export async function cancelarTudo(): Promise<void> {
 }
 
 /** Abre o módulo certo quando a pessoa toca no aviso. */
-export async function ligarToqueNaNotificacao(navegar: (rota: string) => void): Promise<void> {
+export async function ligarToqueNaNotificacao(navegar: (rota: string) => void): Promise<() => void> {
   const p = await plugin();
-  if (!p) return;
+  if (!p) return () => {};
   const { LN } = p;
   try {
-    await LN.addListener("localNotificationActionPerformed", (evento) => {
+    const ouvinte = await LN.addListener("localNotificationActionPerformed", (evento) => {
       const rota = (evento.notification?.extra as { rota?: string } | undefined)?.rota;
+      // 02/09: até aqui o toque não deixava rastro — impossível saber se
+      // alguma notificação trazia alguém de volta.
+      trackEvent("notif_toque", { id: evento.notification?.id ?? null, rota: rota ?? null });
       if (rota) navegar(rota);
     });
-  } catch { /* sem listener, o toque só abre o app */ }
+    // Revisão 02/09: quem registra tem que poder REMOVER — o App.tsx
+    // reinstalava o ouvinte a cada navegação e o toque navegava (e agora
+    // contava) N vezes.
+    return () => { void ouvinte.remove(); };
+  } catch { return () => {}; /* sem listener, o toque só abre o app */ }
 }
 
 /* ------------------------------------------------------ resgate do paywall */
@@ -531,20 +538,20 @@ export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<v
   await limparFaixa(BASE_RESGATE);
   const { LN } = p;
   const daArea = nomeArea ? ` de ${nomeArea}` : "";
-  // v53 (16/08): copy virou assinatura — o produto do app é 24,90/mês ou
-  // 159,90/ano (= R$ 13,32/mês). Preço real, zero pressão falsa.
+  // 02/09: copy do funil W — vitalício 97,90 (pagamento único) ou 24,90/mês.
+  // O "R$ 13,32/mês no anual" (v53) já não existia no paywall vivo.
   const avisos = [
     {
       id: BASE_RESGATE + 1,
       at: new Date(Date.now() + 2 * 3600_000),
       title: `Seu plano${daArea} ficou salvo`,
-      body: "Tudo que você montou continua aqui. A partir de R$ 13,32/mês no anual.",
+      body: "Tudo que você montou continua aqui. CORE completo por R$ 97,90 uma vez só, ou R$ 24,90/mês.",
     },
     {
       id: BASE_RESGATE + 2,
       at: new Date(Date.now() + 24 * 3600_000),
       title: "Ainda dá tempo de começar hoje",
-      body: `Seu plano${daArea} te espera do jeito que você deixou.`,
+      body: `Seu plano${daArea} te espera do jeito que você deixou. Pagamento único, sem mensalidade.`,
     },
   ];
   try {

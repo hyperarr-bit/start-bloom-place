@@ -24,11 +24,16 @@ import { trackEvent } from "@/lib/analytics";
  * acabou de criar a primeira conta, ou a central.
  */
 export function useLembretes() {
-  const { get, loaded } = useUserData();
+  const { get, loaded, isGuest } = useUserData();
   const ultimaAssinatura = useRef<string>("");
 
   useEffect(() => {
     if (!isNativeShell() || !loaded) return;
+    // 02/09: convidado (instalou, não fez conta) recebia "Sua retrospectiva
+    // de Agosto tá pronta" — de um app que nunca usou — e o toque caía na
+    // TELA DE LOGIN (/retrospectiva é rota protegida). Sem conta, sem
+    // lembrete de uso; o que traz o convidado de volta é o resgate do plano.
+    if (isGuest) return;
     let cancelado = false;
 
     (async () => {

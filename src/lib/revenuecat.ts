@@ -35,7 +35,7 @@
  */
 import { isNativeShell, plataformaApp } from "@/lib/native-shell";
 import { supabase } from "@/integrations/supabase/client";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { marcarTrialCartaoAte, trialCartaoAtivo } from "@/lib/teste-gratis";
 
 type EstadoRC = "pronto" | "sem_chave" | "sem_produto" | "erro";
@@ -360,6 +360,14 @@ export async function desfechoDaFalha(e: unknown, produto: string): Promise<bool
  *  separar "fechou no Processando" de "trabalhou na folha". */
 let folhaAbertaEm: number | null = null;
 export const inicioUltimaFolha = (): number | null => folhaAbertaEm;
+/** Instante do TOQUE em comprar (o paywall marca). O app_compra_opcao leva
+ *  `desde_toque_ms` medido no cliente — o created_at do servidor mentia
+ *  (evento fire-and-forget atravessando o background: "p90 de 12s" falso). */
+let toqueEm: number | null = null;
+export const marcarToqueDeCompra = (t: number = Date.now()): void => { toqueEm = t; };
+/** Lê e ZERA: um carimbo vale pra uma folha só — sem isso, um paywall que não
+ *  marca (revisão 02/09) herdava o toque de outro e media tempo de dias. */
+const consumirToque = (): number | null => { const v = toqueEm ? Date.now() - toqueEm : null; toqueEm = null; return v; };
 /** Carimbo da folha em memória E no disco: o `saida-do-app.ts` lê o de disco
  *  no boot seguinte pra saber se a morte do processo veio logo depois. */
 const marcarFolhaAberta = () => {
@@ -429,7 +437,8 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
      * (produto_ausente) — melhor não vender do que prometer "cobra hoje" e a
      * folha abrir com teste grátis (a foto do dono de 19/08, invertida). */
     const baseSemTrial = opts?.semTrial ? opcoes.find((o) => !!o?.isBasePlan) : undefined;
-    trackEvent("app_compra_opcao", {
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
       produto: productId,
       servidas: opcoes.map((o) => o?.id).filter(Boolean).slice(0, 6),
       escolhida: comTrial?.id ?? baseSemTrial?.id ?? "package_default",
@@ -593,7 +602,8 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
      * lá. Resultado: dos 102 toques em comprar da safra à vista, a gente via
      * as desistências mas não sabia o que a loja tinha servido no aparelho.
      * Sem isso não dá pra separar "achou caro" de "a loja nem ofereceu". */
-    trackEvent("app_compra_opcao", {
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
       produto: id,
       escolhida: produto?.identifier ?? id,
       preco: produto?.priceString ?? null,
@@ -723,7 +733,8 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
     /* v83: o vitalício era CEGO na telemetria de abertura — 35% das vendas só
      * apareciam na subscriptions e a folha dele tinha que ser reconstruída por
      * cancelamento. Mesmo evento do caminho pré-pago. */
-    trackEvent("app_compra_opcao", {
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
       produto: produtoId,
       escolhida: produto?.identifier ?? produtoId,
       preco: produto?.priceString ?? null,

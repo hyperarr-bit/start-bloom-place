@@ -315,6 +315,18 @@ export function PaywallW({
     if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
   };
 
+  /* Revisão 02/09: a contagem de 4s do resgate reabria a folha do Google em
+   * cima de quem apertou Voltar ou minimizou o app. Voltar físico (evento
+   * core:voltar, do ComecarW) e app escondido desarmam a reabertura. */
+  useEffect(() => {
+    const aoVoltar = () => desarmar();
+    const aoEsconder = () => { if (document.hidden) desarmar(); };
+    window.addEventListener("core:voltar", aoVoltar);
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => { window.removeEventListener("core:voltar", aoVoltar); document.removeEventListener("visibilitychange", aoEsconder); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const confirmarPagamento = async () => {
     setConferindo(true);
     try {
@@ -344,6 +356,7 @@ export function PaywallW({
     const abriuEm = Date.now();
     try {
       const rc = await import("@/lib/revenuecat");
+      rc.marcarToqueDeCompra?.(abriuEm);
       const idProduto = produto === "mensal" ? "core_mensal" : vitalicioNaLoja !== false ? "core_vitalicio_97" : "core_anual:coreanual97";
       const ok = produto === "mensal"
         ? await rc.comprar("core_mensal", { semTrial: true })
@@ -359,6 +372,10 @@ export function PaywallW({
       const motivo = rc.motivoUltimaCompra();
       if (motivo === "pendente") {
         setPendente(true);
+        // Pix gerado na folha: a pessoa vai pagar no banco. O resgate de 2h
+        // ("seu plano ficou salvo… R$ 97,90") viraria cobrança pra quem já
+        // pagou (revisão 02/09) — o webhook libera; o aviso morre aqui.
+        if (!naWeb) void import("@/lib/notificacoes").then((m) => m.cancelarResgateDoPlano()).catch(() => { /* noop */ });
       } else if (motivo === "produto_ausente") {
         setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
       } else if (motivo === "ja_ativo") {
@@ -467,10 +484,12 @@ export function PaywallW({
               : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />;
           })()}
         </motion.div>
-        <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
-        <ValueStack area={area} />
-        <motion.div {...stagger(2)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
-        <motion.div {...stagger(3)}>
+        {/* PREÇO LOGO ABAIXO DA ÂNCORA (02/09, medido em 3 dias): só 5% das
+            sessões chegavam a tocar nas colunas de preço — elas moravam abaixo
+            do gráfico, da pilha de valor e da tabela — e quem tocava comprava
+            58–78%. Metade de quem sai do paywall sai em menos de 10s, antes do
+            5º bloco. A decisão de preço sobe pra dobra; o resto vira apoio. */}
+        <motion.div {...stagger(1)}>
           {duasColunas ? (
             <PrecosLadoALadoW
               plano={plano}
@@ -480,6 +499,10 @@ export function PaywallW({
             <LifetimeCardW naWeb={naWeb} />
           )}
         </motion.div>
+        <motion.div {...stagger(2)}><TransformChart label={chartLabel} /></motion.div>
+        <ValueStack area={area} />
+        <motion.div {...stagger(3)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
+
         <MuralDepoimentos area={area} />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
@@ -544,6 +567,7 @@ export function PaywallW({
           {resgatePix && !pendente && !pixVencendo && (
             <div className="rounded-xl bg-[#e5f6f3] border border-[#b9e6df] text-[#0b6d62] text-[12.5px] leading-snug p-3 mb-2.5 text-left">
               <b>Prefere pagar no Pix?</b> A tela do Google aceita Pix — abre de novo na hora, escolhe Pix na lista e copia o código.
+              Se ela pediu seus dados, é só na primeira compra na Play.
               {reabrindoEm !== null ? (
                 <span className="flex items-center justify-between mt-1.5">
                   <b>Reabrindo em {reabrindoEm}s…</b>
@@ -598,6 +622,14 @@ export function PaywallW({
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}
             </span>
           </p>
+          {/* 02/09: 66% dos cancelamentos da folha vêm em <5s, iguais em todo
+              aparelho e produto — a pessoa vê a 1ª tela do Google (dados +
+              forma de pagamento) e sai. Avisar antes tira o susto. Só Android. */}
+          {!naWeb && !ehApple() && (
+            <p className="text-[10.5px] text-muted-foreground/80 text-center mt-1 leading-snug">
+              Primeira compra na Play? O Google pede seus dados uma vez e pronto.
+            </p>
+          )}
         </div>
       </div>
 

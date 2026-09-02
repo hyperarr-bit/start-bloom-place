@@ -330,11 +330,14 @@ export const trackEventBeacon = (eventName: string, data: Record<string, unknown
       session_id: getSessionId(),
     });
     const KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
-    const manda = (uid: string | null) => {
+    // Logado manda com o token da sessão: a policy do anon só aceita
+    // user_id NULO, então um evento logado com a chave anon era recusado em
+    // silêncio (revisão 02/09).
+    const manda = (uid: string | null, token: string | null = null) => {
       fetch("https://itoylenzvahbscgjgtqf.supabase.co/rest/v1/analytics_events", {
         method: "POST",
         keepalive: true,
-        headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: "return=minimal" },
+        headers: { "Content-Type": "application/json", apikey: KEY, Authorization: `Bearer ${token || KEY}`, Prefer: "return=minimal" },
         body: corpo(uid),
       }).catch(() => { /* despedida é melhor-esforço */ });
     };
@@ -344,7 +347,7 @@ export const trackEventBeacon = (eventName: string, data: Record<string, unknown
     supabase.auth.getSession().then(({ data }) => {
       if (mandou) return;
       mandou = true;
-      manda(data?.session?.user?.id ?? null);
+      manda(data?.session?.user?.id ?? null, data?.session?.access_token ?? null);
     }).catch(() => { if (!mandou) { mandou = true; manda(null); } });
     setTimeout(() => { if (!mandou) { mandou = true; manda(null); } }, 60);
   } catch { /* swallow */ }

@@ -472,12 +472,20 @@ const AnimatedRoutes = () => {
   // notificação não passa por Finanças — e era essa pessoa que via o mês
   // vazio. Ver use-virada-do-mes.ts pro diagnóstico completo.
   useViradaDoMes();
+  // Uma vez só, com navigate por ref (mesmo padrão do DeepLinks abaixo): com
+  // [navigate] nas deps o ouvinte era reinstalado a cada navegação e o toque
+  // na notificação navegava — e contava — N vezes (revisão 02/09).
+  const navigateNotifRef = useRef(navigate);
+  navigateNotifRef.current = navigate;
   useEffect(() => {
     if (!isNativeShell()) return;
+    let desligar = () => {};
     import("@/lib/notificacoes")
-      .then((m) => m.ligarToqueNaNotificacao((rota) => navigate(rota)))
+      .then((m) => m.ligarToqueNaNotificacao((rota) => navigateNotifRef.current(rota)))
+      .then((fn) => { desligar = fn; })
       .catch(() => {});
-  }, [navigate]);
+    return () => desligar();
+  }, []);
 
   // Deep links `core://` — hoje quem manda são os atalhos do toque longo no
   // ícone. Precisa do Router pelo mesmo motivo do bloco acima.

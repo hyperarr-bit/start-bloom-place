@@ -110,3 +110,46 @@ describe("anúncio na web → porta", () => {
     expect(comecaNaPorta(false, false)).toBe(false);
   });
 });
+
+/* ============================================================
+ * BOTÃO VOLTAR DO ANDROID (02/09) — 63% dos que não tocavam em comprar
+ * "voltavam": era o Voltar físico caindo na demo pelo history.
+ * ============================================================ */
+import { passoAnteriorDe, ficaNoVoltar, PASSOS_DE_DEEP_LINK } from "@/pages/funis/w/retomada";
+describe("Voltar do Android no funil W", () => {
+  it("volta de PASSO, nunca de history: contrato→compromissos→central→result→quiz→porta→welcome", () => {
+    expect(passoAnteriorDe("contrato")).toBe("compromissos");
+    expect(passoAnteriorDe("compromissos")).toBe("central");
+    expect(passoAnteriorDe("central")).toBe("result");
+    expect(passoAnteriorDe("result")).toBe("quiz");
+    expect(passoAnteriorDe("quiz")).toBe("porta");
+    expect(passoAnteriorDe("porta")).toBe("welcome");
+    expect(passoAnteriorDe("notif")).toBe("contrato");
+  });
+  it("na welcome não há pra onde voltar (minimiza); no paywall e no pós-compra o Voltar FICA", () => {
+    expect(passoAnteriorDe("welcome")).toBeNull();
+    for (const s of ["offer", "signup", "confirm", "liberando"]) expect(ficaNoVoltar(s)).toBe(true);
+    for (const s of ["welcome", "quiz", "contrato"]) expect(ficaNoVoltar(s)).toBe(false);
+  });
+  it("deep link (notificação) só abre passos que fazem sentido sem contexto", () => {
+    expect(PASSOS_DE_DEEP_LINK.has("offer")).toBe(true);
+    expect(PASSOS_DE_DEEP_LINK.has("compromissos")).toBe(true);
+    expect(PASSOS_DE_DEEP_LINK.has("quiz")).toBe(false);
+  });
+});
+
+import { alvoDoDeepLink } from "@/pages/funis/w/retomada";
+describe("deep link depois de montado (revisão 02/09)", () => {
+  it("quem acabou de pagar e voltou do Google vai pro liberando, nunca pro paywall", () => {
+    expect(alvoDoDeepLink("offer", "signup", true)).toBe("liberando");
+    expect(alvoDoDeepLink("offer", "signup", false)).toBeNull();
+    expect(alvoDoDeepLink("offer", "liberando", false)).toBeNull();
+  });
+  it("notificação abre o paywall pra quem estava na welcome; passo igual ou fora da lista é ignorado", () => {
+    expect(alvoDoDeepLink("offer", "welcome", false)).toBe("offer");
+    expect(alvoDoDeepLink("compromissos", "quiz", false)).toBe("compromissos");
+    expect(alvoDoDeepLink("offer", "offer", false)).toBeNull();
+    expect(alvoDoDeepLink("quiz", "welcome", false)).toBeNull();
+    expect(alvoDoDeepLink(null, "welcome", false)).toBeNull();
+  });
+});

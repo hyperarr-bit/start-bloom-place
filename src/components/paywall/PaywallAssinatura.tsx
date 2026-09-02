@@ -303,6 +303,8 @@ export function PaywallAssinatura({
   };
 
   const pagou = async (fn: () => Promise<boolean>, produto: string) => {
+    // carimbo do toque pro app_compra_opcao (desde_toque_ms) — consumido uma vez no revenuecat
+    void import("@/lib/revenuecat").then((m) => m.marcarToqueDeCompra?.()).catch(() => { /* noop */ });
     if (comprando) return;
     setComprando(true);
     setErro(null);

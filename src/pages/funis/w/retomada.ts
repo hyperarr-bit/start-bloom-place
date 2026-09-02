@@ -71,3 +71,37 @@ export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>
   return !!(atribuicao?.utm_campaign || atribuicao?.fbclid || atribuicao?.ttclid || atribuicao?.gclid);
 };
 export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !noShell && deAnuncio;
+
+/**
+ * BOTÃO VOLTAR DO ANDROID (02/09).
+ *
+ * Medido em 3 dias: das 524 sessões novas que viram o paywall e não tocaram
+ * em comprar, 328 (63%) "voltaram" — e era o Voltar físico. Sem listener, o
+ * Capacitor faz goBack() no history, e a única página no history antes do
+ * paywall é a DEMO (/preview). A pessoa caía na demo, fugia, refazia os
+ * compromissos, pulava o contrato e só 29% chegava de novo ao paywall.
+ * Os passos do funil W são ESTADO, não history: o Voltar tem que voltar de
+ * passo. No paywall e no pós-compra ele fica (1º toque) e minimiza (2º).
+ */
+const PASSO_ANTERIOR: Record<string, string> = {
+  promessas: "welcome", porta: "welcome", quiz: "porta", progress: "quiz", result: "quiz",
+  central: "result", compromissos: "central", contrato: "compromissos", notif: "contrato",
+};
+export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;
+export const ficaNoVoltar = (passo: string): boolean => passo === "offer" || passo === "signup" || passo === "confirm" || passo === "liberando";
+/** Passos que um deep link (notificação, retomada) pode abrir direto. */
+export const PASSOS_DE_DEEP_LINK = new Set(["compromissos", "offer", "signup"]);
+
+/**
+ * Para onde um ?step= que chega DEPOIS de montado deve levar (02/09, revisão).
+ * A volta do Google pós-compra (caminho quente, singleTask) chega como
+ * navigate("/app?step=offer") com a flag de OAuth pós-compra ligada — isso é
+ * "liberando", nunca paywall. E quem está no pós-compra (signup/confirm/
+ * liberando) não volta pro paywall por deep link nenhum.
+ */
+export const alvoDoDeepLink = (pedido: string | null, atual: string, oauthPosCompra: boolean): string | null => {
+  if (oauthPosCompra) return "liberando";
+  if (!pedido || !PASSOS_DE_DEEP_LINK.has(pedido) || pedido === atual) return null;
+  if (ficaNoVoltar(atual)) return null;
+  return pedido;
+};

@@ -26,7 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink } from "@/pages/funis/w/retomada";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -361,7 +361,9 @@ export default function ComecarW() {
     // "liberando" = a conta nasceu; a partir daqui o RootGate manda pro app,
     // e progresso guardado só serviria pra prender alguém no funil.
     if (s === "liberando") limparProgresso(); else guardarChave(CHAVES.passo, s);
-    trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
+    // "offer" é emitido pelo PaywallW no mount (com braço e área) — emitir
+    // aqui também contava 2 paywalls por sessão (varredura 02/09).
+    if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
     window.scrollTo(0, 0);
   };
 
@@ -384,13 +386,15 @@ export default function ComecarW() {
     if (naWeb) void anonimoLigado().then(setAnonimoOk);
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
-      trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
+      // "offer" já sai do PaywallW no mount — aqui só o registro da retomada
+      trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: s, funil: FUNIL, retomada: true });
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
       trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio" });
     } else if (step !== "welcome") {
-      // retomada depois de reinício — medível separado da welcome
-      trackEvent("funnel_view", { step, funil: FUNIL, retomada: true, motivo: "reinicio" });
+      // retomada depois de reinício — medível separado da welcome ("offer" só
+      // como funnel_retomada: o funnel_view dele sai do PaywallW)
+      trackEvent(step === "offer" ? "funnel_retomada" : "funnel_view", { step, funil: FUNIL, retomada: true, motivo: "reinicio" });
     } else {
       trackEvent("funnel_view", { step: "welcome", funil: FUNIL });
     }
@@ -408,6 +412,87 @@ export default function ComecarW() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const areaOuPadrao: AreaKey = area ?? "dinheiro";
+
+  /* ── BOTÃO VOLTAR DO ANDROID (02/09) — ver retomada.ts. Só no shell. ── */
+  const stepRef = useRef(step); stepRef.current = step;
+  const ultimoVoltarRef = useRef(0);
+  const [avisoVoltar, setAvisoVoltar] = useState(false);
+  useEffect(() => {
+    if (naWeb) return;
+    let vivo = true;
+    let handle: { remove: () => Promise<void> } | null = null;
+    void import("@capacitor/app").then(async ({ App }) => {
+      const h = await App.addListener("backButton", () => {
+        const s = stepRef.current;
+        if (ficaNoVoltar(s)) {
+          // paywall e pós-compra: o 1º Voltar fica na tela; o 2º em 3s minimiza
+          window.dispatchEvent(new CustomEvent("core:voltar")); // PaywallW desarma o resgate
+          const agora = Date.now();
+          if (agora - ultimoVoltarRef.current < 3000) {
+            trackEvent("funnel_click", { cta: "w_back_minimizou", funil: FUNIL, step: s });
+            void App.minimizeApp();
+            return;
+          }
+          ultimoVoltarRef.current = agora;
+          trackEvent("funnel_click", { cta: "w_back_ficou", funil: FUNIL, step: s });
+          setAvisoVoltar(true);
+          window.setTimeout(() => setAvisoVoltar(false), 2600);
+          return;
+        }
+        // A tela corrente tem o próprio Voltar (o quiz volta UMA pergunta,
+        // QuizScreen:548)? Ele manda — senão o Voltar físico na pergunta 5
+        // jogava pra porta e zerava as respostas (revisão 02/09).
+        const daTela = document.querySelector<HTMLButtonElement>('button[aria-label="Voltar"]');
+        if (daTela) {
+          trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: s, para: "tela" });
+          daTela.click();
+          return;
+        }
+        const anterior = passoAnteriorDe(s);
+        trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: s, para: anterior ?? "minimizar" });
+        if (!anterior) { void App.minimizeApp(); return; }
+        // volta de PASSO, sem contar como view nova do passo anterior
+        setStepCru(anterior as Step);
+        guardarChave(CHAVES.passo, anterior);
+        window.scrollTo(0, 0);
+      });
+      if (!vivo) { void h.remove(); return; }
+      handle = h;
+    }).catch(() => { /* plugin ausente: fica o comportamento padrão */ });
+    return () => { vivo = false; if (handle) void handle.remove(); };
+  }, [naWeb]);
+
+  /* ── DEEP LINK DEPOIS DE MONTADO (02/09): o toque na notificação chega como
+     navigate("/app?step=offer") DEPOIS de o RootGate já ter posto a pessoa em
+     /app — mesmo pathname, o ComecarW não remonta e o ?step era ignorado. ── */
+  useEffect(() => {
+    if (!montou.current) return;
+    // Volta do Google DEPOIS de pagar, caminho quente (o app não morreu):
+    // deep-link.ts navega pra /app?step=offer com a flag pós-compra ligada.
+    // Quem acabou de pagar vai pro "liberando", nunca pro paywall (revisão 02/09).
+    let oauthPosCompra = false;
+    try {
+      if (localStorage.getItem(POS_COMPRA_OAUTH_KEY) === "1") { localStorage.removeItem(POS_COMPRA_OAUTH_KEY); oauthPosCompra = true; }
+    } catch { /* noop */ }
+    const alvo = alvoDoDeepLink(params.get("step"), stepRef.current, oauthPosCompra);
+    if (!alvo) return;
+    if (alvo === "liberando") { setPosCompra(true); setStepCru("liberando"); limparProgresso(); return; }
+    trackEvent(alvo === "offer" ? "funnel_retomada" : "funnel_view", { step: alvo, funil: FUNIL, retomada: true, motivo: "deeplink" });
+    setStepCru(alvo as Step);
+    guardarChave(CHAVES.passo, alvo);
+    window.scrollTo(0, 0);
+  }, [params]);
+
+  /* ── RESGATE POR NOTIFICAÇÃO (02/09): quem chega ao paywall sem comprar
+     recebe dois avisos (2h e 24h) apontando pra cá. Existia desde 14/08 e o
+     paywall do W nunca armou. Só no shell; cancela ao pagar (pagoSemConta). ── */
+  useEffect(() => {
+    if (naWeb || step !== "offer") return;
+    void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome)).catch(() => { /* noop */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naWeb, step]);
+
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
     if (a) guardarChave(CHAVES.area, a);
     guardarChave(CHAVES.respostas, r);
@@ -415,9 +500,11 @@ export default function ComecarW() {
 
   /** Pagou sem conta: o cadastro vem depois — e o FATO de ter pago fica
    *  guardado no aparelho, pra um reinício cair no cadastro, não no paywall. */
-  const pagoSemConta = () => { setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep("signup"); };
+  const pagoSemConta = () => {
+    setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep("signup");
+    if (!naWeb) void import("@/lib/notificacoes").then((m) => m.cancelarResgateDoPlano()).catch(() => { /* noop */ });
+  };
 
-  const areaOuPadrao: AreaKey = area ?? "dinheiro";
   // Mesma derivação do dia14 em modo vitrine: dinheiro = QUIZ completo com a
   // prova de gasto embutida; outras áreas = trilha própria com o pico após a
   // pergunta de consistência.
@@ -464,6 +551,11 @@ export default function ComecarW() {
           </motion.div>
         )}
       </AnimatePresence>
+      {avisoVoltar && (
+        <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[60] rounded-full bg-[#1c1917] text-white text-[12.5px] font-medium px-4 py-2 shadow-lg whitespace-nowrap">
+          Sem pressa. Aperta Voltar de novo pra sair.
+        </div>
+      )}
       {step === "promessas" && <PromessasScreen onDone={() => setStep("porta")} />}
 
       {step !== "welcome" && step !== "promessas" && (

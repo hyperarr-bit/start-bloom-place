@@ -26,6 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada } from "@/pages/funis/w/retomada";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -311,11 +312,8 @@ function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => vo
   );
 }
 
-const CHAVES = {
-  area: "core-funil-w-area",
-  respostas: "core-funil-w-respostas",
-  passo: "core-funil-w-passo",
-} as const;
+// As chaves e a retomada moram em ./retomada.ts (02/09): progresso em
+// localStorage com validade, pra sobreviver ao Android matar o app na folha.
 
 export default function ComecarW() {
   const navigate = useNavigate();
@@ -328,16 +326,19 @@ export default function ComecarW() {
       const s = new URLSearchParams(window.location.search).get("step");
       if (s === "compromissos" || s === "offer" || s === "signup") return s as Step;
     } catch { /* noop */ }
+    // RETOMADA (02/09): o app morreu com a folha do Google aberta e voltou?
+    // Cai onde parou (paywall, cadastro…), não na welcome. Só no shell.
+    const retomar = passoDeRetomada(lerChave<string>(CHAVES.passo), isNativeShell());
+    if (retomar) return retomar as Step;
     return "welcome";
   });
   const [area, setArea] = useState<AreaKey | null>(() => {
-    try { const a = sessionStorage.getItem(CHAVES.area) as AreaKey | null; return a && a in AREAS ? a : null; } catch { return null; }
+    const a = lerChave<AreaKey>(CHAVES.area); return a && a in AREAS ? a : null;
   });
-  const [answers, setAnswers] = useState<Record<string, string>>(() => {
-    try { return JSON.parse(sessionStorage.getItem(CHAVES.respostas) ?? "{}"); } catch { return {}; }
-  });
+  const [answers, setAnswers] = useState<Record<string, string>>(() => lerChave<Record<string, string>>(CHAVES.respostas) ?? {});
   const [confirmEmail, setConfirmEmail] = useState("");
-  const [posCompra, setPosCompra] = useState(false);
+  // Pagou sem conta antes de o app morrer? Então a retomada é no CADASTRO.
+  const [posCompra, setPosCompra] = useState<boolean>(() => lerChave<boolean>(CHAVES.posCompra) === true);
   /* A chave de sign-in anônimo está ligada? Decide se a web vende antes de
    * cadastrar (caminho novo) ou cadastra antes de vender (caminho de 31/08).
    * Nasce `false` — o caminho antigo — e só vira `true` se o Supabase
@@ -354,7 +355,9 @@ export default function ComecarW() {
 
   const setStep = (s: Step) => {
     setStepCru(s);
-    try { sessionStorage.setItem(CHAVES.passo, s); } catch { /* noop */ }
+    // "liberando" = a conta nasceu; a partir daqui o RootGate manda pro app,
+    // e progresso guardado só serviria pra prender alguém no funil.
+    if (s === "liberando") limparProgresso(); else guardarChave(CHAVES.passo, s);
     trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
     window.scrollTo(0, 0);
   };
@@ -379,18 +382,34 @@ export default function ComecarW() {
     const s = params.get("step");
     if (s === "compromissos" || s === "offer" || s === "signup") {
       trackEvent("funnel_view", { step: s, funil: FUNIL, retomada: true });
+    } else if (step !== "welcome") {
+      // retomada depois de reinício — medível separado da welcome
+      trackEvent("funnel_view", { step, funil: FUNIL, retomada: true, motivo: "reinicio" });
     } else {
       trackEvent("funnel_view", { step: "welcome", funil: FUNIL });
+    }
+    /* COMPRA FEITA COM O APP MORTO (02/09): a Play concluiu, o app não viu.
+     * Pergunta pra loja no boot; se ela diz "tem compra", pula pro cadastro
+     * com "seu pagamento passou". Corre em paralelo — a welcome não espera. */
+    if (!naWeb && step !== "signup" && step !== "liberando") {
+      void import("@/lib/revenuecat").then(async (rc) => {
+        if (typeof rc.compraNaLojaSemConta !== "function") return;
+        if (!(await rc.compraNaLojaSemConta())) return;
+        trackEvent("app_compra_recuperada", { origem: "boot", funil: FUNIL, passo: step });
+        pagoSemConta();
+      }).catch(() => { /* loja fora do ar: segue o funil normal */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
-    try {
-      if (a) sessionStorage.setItem(CHAVES.area, a);
-      sessionStorage.setItem(CHAVES.respostas, JSON.stringify(r));
-    } catch { /* noop */ }
+    if (a) guardarChave(CHAVES.area, a);
+    guardarChave(CHAVES.respostas, r);
   };
+
+  /** Pagou sem conta: o cadastro vem depois — e o FATO de ter pago fica
+   *  guardado no aparelho, pra um reinício cair no cadastro, não no paywall. */
+  const pagoSemConta = () => { setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep("signup"); };
 
   const areaOuPadrao: AreaKey = area ?? "dinheiro";
   // Mesma derivação do dia14 em modo vitrine: dinheiro = QUIZ completo com a
@@ -521,7 +540,7 @@ export default function ComecarW() {
                   <PaywallIOS
                     area={areaOuPadrao}
                     answers={answers}
-                    onPagoSemConta={() => { setPosCompra(true); setStep("signup"); }}
+                    onPagoSemConta={pagoSemConta}
                   />
                 ) : (
                   <PaywallW
@@ -536,9 +555,9 @@ export default function ComecarW() {
                      * verdade (cadastrou antes, ou voltou logada), pedir
                      * cadastro de novo seria absurdo: vai direto liberar. */
                     onPagoSemConta={() => {
-                      if (!naWeb) { setPosCompra(true); setStep("signup"); return; }
+                      if (!naWeb) { pagoSemConta(); return; }
                       void precisaBatizar().then((anon) => {
-                        if (anon) { setPosCompra(true); setStep("signup"); }
+                        if (anon) pagoSemConta();
                         else setStep("liberando");
                       });
                     }}

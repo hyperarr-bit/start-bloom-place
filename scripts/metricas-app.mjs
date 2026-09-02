@@ -169,7 +169,7 @@ const MARCAS_DE_APP = [
   "app_welcome_view", "app_welcome_start", "app_paywall_rc", "app_sheet_rc",
   "app_sheet_view", "app_compra_falhou", "app_compra_pendente", "app_paywall_close",
   "app_sheet_success", "install_referrer", "webview_info", "app_device_info",
-  "app_prefolha_view", "app_downsell_view",
+  "app_prefolha_view", "app_downsell_view", "app_compra_recuperada", "app_compra_ja_ativa",
   // Escada v81 (27/08): resgate PIX e aviso do código vencendo.
   "app_resgate_pix_view", "app_resgate_pix_toque", "app_pix_vencendo_view",
 ];
@@ -473,6 +473,13 @@ L(`   viram a pré-folha           ${contar("app_prefolha_view")}`);
 L(`   escolheram forma            ${Object.entries(escolhas).map(([k, v]) => `${k}: ${v}`).join(" · ") || "ninguém"}`);
 L(`   fecharam a pré-folha        ${contar("app_prefolha_fechou")}`);
 L(`   cancelaram a folha Google   ${cancelou}`);
+// 02/09 — o que estava escondido dentro de "cancelou"/"billing_erro"
+const motivo = (m) => noPeriodo.filter((e) => e.event_name === "app_compra_falhou" && e.event_data?.motivo === m).length;
+L(`   conta Google sem permissão  ${motivo("nao_permitido")}   (não pode comprar na Play)`);
+L(`   "já é seu" (pagou, app morreu) ${contar("app_compra_ja_ativa")}   restaurou na hora: ${contar("app_compra_ja_ativa") - motivo("ja_ativo")}`);
+L(`   compra recuperada no boot   ${contar("app_compra_recuperada")}`);
+L(`   resgate Pix (paywall W)     ${noPeriodo.filter((e) => e.event_name === "funnel_view" && e.event_data?.step === "w_resgate_pix").length}`);
+L(`   retomadas após reinício     ${noPeriodo.filter((e) => e.event_name === "funnel_view" && e.event_data?.motivo === "reinicio").length}`);
 L(`   downsell R$19,90 exibido    ${contar("app_downsell_view")}`);
 L(`   Pix pendente                ${contar("app_compra_pendente")}`);
 // Escada v81 (27/08): resgate de MÉTODO em vez de preço.

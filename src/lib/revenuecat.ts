@@ -244,6 +244,30 @@ export async function reconciliarSePreciso(): Promise<boolean> {
   }
 }
 
+/**
+ * A LOJA JÁ TEM COMPRA DESTE APARELHO, MAS NÃO EXISTE CONTA? (02/09)
+ *
+ * Cenário medido: a pessoa paga, o Android mata o app com a folha na frente,
+ * ela reabre e cai na welcome sem acesso (9 das 25 vendas de hoje não têm
+ * evento de sucesso — o app morreu depois do pagamento). O RevenueCat guarda
+ * o id anônimo do aparelho entre processos; `syncPurchases` empurra pro
+ * servidor dele o recibo que a Play tem; e o entitlement responde "sim".
+ * Quem chama (ComecarW, no mount do shell sem usuário) pula direto pro
+ * cadastro com "seu pagamento passou". Nunca lança; sem loja = false.
+ */
+export async function compraNaLojaSemConta(): Promise<boolean> {
+  if (!isNativeShell()) return false;
+  if (!configurado) { try { await initRevenueCat(); } catch { return false; } }
+  if (!Purchases || !configurado) return false;
+  try {
+    try { await Purchases.syncPurchases(); } catch { /* segue com o que o RC já sabe */ }
+    const { customerInfo } = await Purchases.getCustomerInfo();
+    return temEntitlement(customerInfo);
+  } catch {
+    return false;
+  }
+}
+
 /** Compra o produto (core_anual/core_mensal). Devolve true se a assinatura
  *  ativou E o acesso foi gravado no nosso banco. */
 /**
@@ -277,9 +301,57 @@ export const temTrialServido = (productId: string): boolean | null => {
   return null;
 };
 
-export type MotivoCompra = "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | "pendente" | null;
+export type MotivoCompra =
+  | "cancelou" | "billing_erro" | "produto_ausente" | "sem_entitlement" | "catalogo" | "pendente"
+  // 02/09 — dois erros que viviam escondidos dentro de "billing_erro" e recebiam
+  // "tenta de novo em instantes": a Play dizendo que a compra JÁ É da pessoa
+  // (pagou, o app morreu na folha, voltou e tocou de novo) e a conta Google
+  // que NÃO PODE comprar (sem login na Play, conta de menor, Play velha).
+  | "ja_ativo" | "nao_permitido"
+  | null;
 let ultimoMotivo: MotivoCompra = null;
 export const motivoUltimaCompra = (): MotivoCompra => ultimoMotivo;
+
+/**
+ * DESFECHO COMUM das três folhas (assinatura, pré-pago, vitalício) — 02/09.
+ *
+ * Antes cada `catch` repetia a mesma triagem e só sabia dois nomes: "cancelou"
+ * e "billing_erro". A autópsia de 28/08–02/09 achou dois casos que precisam
+ * de resposta própria:
+ *  - código 6 "already active": a compra JÁ É desta pessoa. Acontece quando o
+ *    app morre com a folha aberta, a Play conclui o pagamento, e ela volta e
+ *    toca de novo (4 hoje, 1 ontem). Aqui a resposta certa é RESTAURAR na
+ *    hora — se a loja confirmar, a compra "deu certo" do ponto de vista dela.
+ *  - código 3 "not allowed": a conta Google não pode comprar. "Tenta de novo"
+ *    é mentira; a pessoa precisa arrumar a conta (ou usar outra).
+ * Devolve true só quando recuperou a compra (ja_ativo + restaurar ok).
+ */
+export async function desfechoDaFalha(e: unknown, produto: string): Promise<boolean> {
+  const msg = String((e as { message?: string })?.message ?? e);
+  const codigo = String((e as { code?: string })?.code ?? "");
+  // Pix/boleto escolhido NA FOLHA: compra fica pendente, o webhook libera.
+  if (codigo === "20" || /pending/i.test(msg)) {
+    ultimoMotivo = "pendente";
+    trackEvent("app_compra_pendente", { produto });
+    return false;
+  }
+  if (codigo === "6" || /already (active|own|purchased)/i.test(msg)) {
+    trackEvent("app_compra_ja_ativa", { produto });
+    if (await restaurar()) { ultimoMotivo = null; return true; }
+    ultimoMotivo = "ja_ativo";
+    trackEvent("app_compra_falhou", { motivo: "ja_ativo", produto, erro: msg.slice(0, 160) });
+    return false;
+  }
+  if (codigo === "3" || /not allowed to make the purchase/i.test(msg)) {
+    ultimoMotivo = "nao_permitido";
+    trackEvent("app_compra_falhou", { motivo: "nao_permitido", produto, erro: msg.slice(0, 160) });
+    return false;
+  }
+  const cancelou = /cancel/i.test(msg) || codigo === "1";
+  ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
+  trackEvent("app_compra_falhou", { motivo: ultimoMotivo, produto, erro: msg.slice(0, 160) });
+  return false;
+}
 
 /** Quando a FOLHA do Google foi aberta de verdade (varredura v81): medir "tempo
  *  na folha" a partir do toque no CTA mentia — o toque ainda paga import,
@@ -379,24 +451,8 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
     await sincronizarAssinatura();
     return true;
   } catch (e) {
-    // usuário cancelou a folha de compra ou erro de billing — não é crash
-    console.warn("[RC] compra não concluída:", e);
-    const msg = String((e as { message?: string })?.message ?? e);
-    const codigo = String((e as { code?: string })?.code ?? "");
-    // Pix/boleto escolhido NA FOLHA (pré-pago aceita): compra fica pendente.
-    if (codigo === "20" || /pending/i.test(msg)) {
-      ultimoMotivo = "pendente";
-      trackEvent("app_compra_pendente", { produto: productId });
-      return false;
-    }
-    const cancelou = /cancel/i.test(msg) || codigo === "1";
-    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
-    trackEvent("app_compra_falhou", {
-      motivo: cancelou ? "cancelou" : "billing_erro",
-      produto: productId,
-      erro: msg.slice(0, 160),
-    });
-    return false;
+    // cancelou / pendente / já é seu / conta não pode / erro da Play — triagem única
+    return desfechoDaFalha(e, productId);
   }
 }
 
@@ -542,22 +598,8 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
     await sincronizarAssinatura();
     return true;
   } catch (e) {
-    const msg = String((e as { message?: string })?.message ?? e);
-    const codigo = String((e as { code?: string })?.code ?? "");
-    if (codigo === "20" || /pending/i.test(msg)) {
-      // Pix gerado na folha: paga no banco → webhook libera sozinho.
-      ultimoMotivo = "pendente";
-      trackEvent("app_compra_pendente", { produto: id });
-      return false;
-    }
-    const cancelou = /cancel/i.test(msg) || codigo === "1";
-    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
-    trackEvent("app_compra_falhou", {
-      motivo: cancelou ? "cancelou" : "billing_erro",
-      produto: id,
-      erro: msg.slice(0, 160),
-    });
-    return false;
+    // cancelou / pendente / já é seu / conta não pode / erro da Play — triagem única
+    return desfechoDaFalha(e, id);
   }
 }
 
@@ -688,30 +730,8 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
     await sincronizarAssinatura();
     return true;
   } catch (e) {
-    const msg = String((e as { message?: string })?.message ?? e);
-    const codigo = String((e as { code?: string })?.code ?? "");
-    /*
-     * PIX/BOLETO DA FOLHA DO GOOGLE (08/08). Escolher Pix na folha cria uma
-     * compra PENDENTE: não é sucesso nem cancelamento — o plugin lança
-     * PAYMENT_PENDING_ERROR ("20"). Até ontem isso caía como "billing_erro"
-     * ou silêncio: a pessoa gerava o código, saía pra pagar e o app nunca
-     * dizia "paga que libera sozinho". O teste do dono (Pix pago, acesso em
-     * 64s via webhook) provou que o caminho pendente→pago fecha sozinho —
-     * só faltava o app EXPLICAR isso.
-     */
-    if (codigo === "20" || /pending/i.test(msg)) {
-      ultimoMotivo = "pendente";
-      trackEvent("app_compra_pendente", { produto: produtoId });
-      return false;
-    }
-    const cancelou = /cancel/i.test(msg) || codigo === "1";
-    ultimoMotivo = cancelou ? "cancelou" : "billing_erro";
-    trackEvent("app_compra_falhou", {
-      motivo: cancelou ? "cancelou" : "billing_erro",
-      produto: produtoId,
-      erro: msg.slice(0, 160),
-    });
-    return false;
+    // cancelou / pendente / já é seu / conta não pode / erro da Play — triagem única
+    return desfechoDaFalha(e, produtoId);
   }
 }
 

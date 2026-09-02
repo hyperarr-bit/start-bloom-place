@@ -361,6 +361,17 @@ export function PaywallW({
         setPendente(true);
       } else if (motivo === "produto_ausente") {
         setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
+      } else if (motivo === "ja_ativo") {
+        /* 02/09: a Play diz que a compra JÁ É desta pessoa (pagou, o app morreu
+         * na folha, voltou e tocou de novo). O motor já tentou restaurar; aqui
+         * vai o caminho do "Já paguei", que também confere a compra local. */
+        setErro("A Play diz que esta compra já é sua. Conferindo…");
+        void confirmarPagamento();
+      } else if (motivo === "nao_permitido") {
+        /* 02/09: conta Google que NÃO PODE comprar (5–13/dia). "Tenta de novo"
+         * era mentira — nada muda sem mexer na conta. Sem escada: reabrir a
+         * folha falharia igual. */
+        setErro("A Play Store recusou compras nesta conta Google. Abre a Play Store, confere se está logado e se a conta pode comprar (conta de menor precisa da aprovação dos pais) e volta aqui. Se você já pagou, toca em «Já paguei».");
       } else if (!temEscadaPix()) {
         /* iOS: a folha da Apple é instantânea e cancelar é cancelar — não há
          * Pix pendente pra resgatar nem lentidão de renderização pra cobrir.

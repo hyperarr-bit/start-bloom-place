@@ -157,6 +157,11 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
   const { set: persistirNoServidor } = useUserData();
   const [lastSeenMonth, setLastSeenMonth] = usePersistedState<string>("finance-last-seen-month", "");
   const [turnoverAck, setTurnoverAck] = usePersistedState<string>("finance-turnover-ack", "");
+  /* Decisão tomada = cartão some (02/09, pedido do dono: "aceita ou pula,
+     some aquele aviso pq não serve mais"). Só as duas saídas EXPLÍCITAS do
+     passo de cópia gravam isto — fechar o resumo por reflexo não conta, pra
+     quem dispensou o modal sem ler ainda ter o cartão como segunda chance. */
+  const [copiaAck, setCopiaAck] = usePersistedState<string>("finance-copia-ack", "");
   const [showRecap, setShowRecap] = useState(false);
   const [step, setStep] = useState<"recap" | "copy">("recap");
   const [copyFixed, setCopyFixed] = useState(true);
@@ -351,11 +356,22 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
       incomes: copyIncomes && podeReceitas, porta_ligada: !!aplicarNoMesCorrente,
     });
     setCopied(true);
+    // Copiou = decisão tomada: o cartão sai de cena e o resumo não auto-abre
+    // de novo (antes, copiar não gravava o ack da janela e o modal voltava
+    // na próxima visita).
+    setCopiaAck(currentKey);
+    setTurnoverAck(currentKey);
     setTimeout(() => {
       setShowRecap(false);
       setStep("recap");
       setCopied(false);
     }, 1500);
+  };
+
+  /* "Pular" no passo de cópia = decisão tão válida quanto copiar. */
+  const pularCopia = () => {
+    setCopiaAck(currentKey);
+    handleClose();
   };
 
   const handleClose = () => {
@@ -378,7 +394,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
 
   return (
     <>
-      {podeCopiar && (
+      {podeCopiar && copiaAck !== currentKey && (
 
         /* Na janela de virada o assunto é o FECHAMENTO (quanto sobrou), então
            a porta abre no resumo. Fora dela quem toca aqui já sabe o que quer
@@ -638,7 +654,7 @@ export const MonthTurnover = ({ onOpenMonth, aplicarNoMesCorrente }: MonthTurnov
                       variant="outline"
                       size="sm"
                       className="flex-1 text-xs"
-                      onClick={handleClose}
+                      onClick={pularCopia}
                     >
                       Pular
                     </Button>

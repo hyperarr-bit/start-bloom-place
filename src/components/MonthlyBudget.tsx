@@ -51,10 +51,17 @@ export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudge
 
   return (
     <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in">
-      <div className="bg-accent/20 border-b border-border px-4 py-2 flex items-center gap-2">
-        <span className="font-bold text-xs tracking-wide text-foreground">ORÇAMENTO MENSAL</span>
+      {/* flex-wrap de propósito (02/09, foto do dono): no desktop este cartão
+          mora numa coluna de 200px e o cabeçalho numa linha só estourava o
+          overflow-hidden do card — a seta de "próximo ano" era DECEPADA e
+          quem entrava em 2025 ficava sem volta. Com wrap, o seletor desce
+          pra segunda linha quando falta largura; em tela cheia continua tudo
+          numa linha. justify-center no seletor pra segunda linha não nascer
+          colada na borda. */}
+      <div className="bg-accent/20 border-b border-border px-4 py-2 flex items-center gap-2 flex-wrap">
+        <span className="font-bold text-xs tracking-wide text-foreground whitespace-nowrap">ORÇAMENTO MENSAL</span>
         <span>💰</span>
-        <div className="ml-auto flex items-center gap-0.5">
+        <div className="ml-auto flex items-center justify-center gap-0.5">
           <button
             onClick={() => setAno((a) => Math.max(ANO_MINIMO, a - 1))}
             disabled={ano <= ANO_MINIMO}

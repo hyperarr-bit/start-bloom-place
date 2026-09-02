@@ -44,15 +44,19 @@ const Retrospectiva = () => {
   const [params] = useSearchParams();
   const mesPedido = params.get("mes");
 
-  // Últimos 12 meses que têm alguma coisa pra contar, do mais recente pro
-  // mais antigo. 12 é o teto natural: é o que cabe numa "vida no app".
+  // Últimos 12 meses FECHADOS, do mais recente pro mais antigo. Começa em
+  // `atras = 1` de propósito (02/09, bug visto pelo dono): com 0, o mês
+  // CORRENTE entrava na lista e a capa dizia "Setembro fechou" no dia 2 —
+  // retrospectiva de mês que mal começou é mentira com dois dias de dado.
+  // O próprio rodapé da tela já prometia o contrato certo: "fica pronta no
+  // dia 1º". 12 é o teto natural: é o que cabe numa "vida no app".
   const meses = useMemo(() => {
     const hoje = new Date();
     // um snapshot só pros 12 meses: as chaves de vida são globais e algumas
     // são grandes (diário), então reler por mês seria 12× o mesmo parse.
     const dados = lerDadosDaVida(user?.id ?? null);
     const out: RetroMes[] = [];
-    for (let atras = 0; atras < 12; atras++) {
+    for (let atras = 1; atras <= 12; atras++) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() - atras, 1);
       const r = construirRetroMes(d.getFullYear(), d.getMonth(), user?.id ?? null, dados);
       if (r) out.push(r);

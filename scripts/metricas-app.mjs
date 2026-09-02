@@ -165,8 +165,13 @@ const EH_TESTE = (ua = "") =>
   /HeadlessChrome|Macintosh|sdk_gphone|Android SDK built|generic|QPWS30\.61-21-18-7/.test(ua);
 
 /** Eventos que SÓ o shell nativo dispara — é assim que se separa app de web. */
+// 02/09 (cético do workflow): app_welcome_view/app_welcome_start SAÍRAM daqui —
+// desde 02/09 o /inicio da WEB roda o mesmo ComecarW e emite os dois, e o
+// "quem já tinha o app" do relatório inflou 3-4× com clique pago da web
+// (1.469 "retornos" no dia, 1.113 sem marca nenhuma do shell). Só marcas que
+// o shell nativo dispara sozinho identificam sessão de app.
 const MARCAS_DE_APP = [
-  "app_welcome_view", "app_welcome_start", "app_paywall_rc", "app_sheet_rc",
+  "app_paywall_rc", "app_sheet_rc",
   "app_sheet_view", "app_compra_falhou", "app_compra_pendente", "app_paywall_close",
   "app_sheet_success", "install_referrer", "webview_info", "app_device_info",
   "app_prefolha_view", "app_downsell_view", "app_compra_recuperada", "app_compra_ja_ativa",

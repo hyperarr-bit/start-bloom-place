@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FileText, ChevronRight, ChevronLeft } from "lucide-react";
 import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear, readMonthData } from "@/components/finance/storage-keys";
 import { useAuth } from "@/hooks/use-auth";
@@ -46,7 +46,13 @@ export const MonthlyBudget = ({ budgets, setBudgets, onOpenMonth }: MonthlyBudge
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const anoAtual = getCurrentYear();
-  const [ano, setAno] = useState(anoAtual);
+  /* Persistido, não useState (02/09, achado no E2E): abrir um mês desmonta
+     este cartão (a planilha toma o lugar da aba inteira), e ao voltar o ano
+     escolhido caía pra 2026. Quem está lançando 2024 mês a mês clicava a
+     seta de novo a cada volta — 24 cliques a mais numa tarefa de 12. O
+     rodapé "Você está em 2024" já deixa o estado visível, então guardar não
+     engana ninguém. */
+  const [ano, setAno] = usePersistedState<number>("finance-orcamento-ano", anoAtual);
   const noAnoCorrente = ano === anoAtual;
 
   return (

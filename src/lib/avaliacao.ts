@@ -1,5 +1,6 @@
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
+import { userKeyOf } from "@/components/finance/storage-keys";
 
 /**
  * PEDIDO DE AVALIAÇÃO NA PLAY (14/08).
@@ -45,11 +46,21 @@ export type MotivoAvaliacao =
   // Retrospectiva do mês aberta e assistida — função citada nominalmente
   // na avaliação 5★ do Rafael C. ("sensação muito boa").
   | "retrospectiva"
-  // MORTO NO FUNIL EM 28/08 (medido): a aposta BitePal de pedir no pico do
-  // funil disparou 985 pedidos em 48h pra quem nunca tinha usado o app e
-  // rendeu ~1 avaliação — e pior, queimava a janela de 90 dias do aparelho
-  // ANTES da pessoa virar pagante apaixonado. A cota agora é gasta só com
-  // quem provou valor. (O tipo fica: o ComecarRadar web ainda referencia.)
+  // Primeiro gasto lançado na vida do aparelho (02/09): a primeira coisa
+  // concreta que o app entregou. Nunca dispara sozinho — vem SEMPRE depois
+  // da folha ConviteAvaliacao, e só se a pessoa tocou em "Deixar minha
+  // nota". Ver `reservarConvitePrimeiroGasto`.
+  | "primeiro_gasto"
+  // MORTO NO FUNIL EM 28/08: a aposta BitePal de pedir no pico do funil
+  // disparou 985 pedidos em 48h pra quem nunca tinha usado o app e queimava
+  // a janela de 90 dias do aparelho ANTES da pessoa virar pagante.
+  // CORREÇÃO DA PREMISSA (02/09, com o Console já atualizado): não rendeu
+  // "~1 avaliação" — rendeu 63 em 3 dias (27–29/08, média 4,9; 76% das de
+  // agosto). O Console atrasa 1–2 dias e a decisão foi tomada olhando um
+  // número que ainda não existia. O gatilho segue morto pelo motivo que
+  // continua válido (pedir antes de usar fere a diretriz do In-App Review);
+  // o volume voltou pelo `primeiro_gasto`. (O tipo fica: o ComecarRadar web
+  // ainda referencia.)
   | "plano_pronto";
 
 const lerNumero = (chave: string): number => {
@@ -59,6 +70,77 @@ const lerNumero = (chave: string): number => {
     return 0;
   }
 };
+
+/**
+ * As travas que valem pra QUALQUER pedido — sem efeito colateral nenhum.
+ *
+ * Existe separada porque a folha de convite (ConviteAvaliacao) precisa saber
+ * ANTES de aparecer se o toque no botão vai dar em alguma coisa: botão que
+ * às vezes não faz nada é exatamente a experiência quebrada que a regra 2
+ * evita. (A cota do próprio Google continua opaca — mas num aparelho que
+ * nunca foi perguntado ela está inteira.)
+ */
+export function podePedirAvaliacao(): boolean {
+  // Só no app da loja: na web a caixa não existe (e o plugin rejeita).
+  if (!isNativeShell()) return false;
+  // Na DEMO do funil os módulos são os REAIS (/preview) — sem este guard, o
+  // turista de 30s marcando a conta de exemplo seria convidado a avaliar: o
+  // exato erro do pedido-no-funil que morreu em 28/08.
+  try { if (window.location.pathname.startsWith("/preview")) return false; } catch { /* noop */ }
+  if (lerNumero(CHAVE_TOTAL) >= MAXIMO_NA_VIDA) return false;
+  const ultima = lerNumero(CHAVE_ULTIMA);
+  const dias = ultima ? (Date.now() - ultima) / 86_400_000 : Infinity;
+  return dias >= DIAS_ENTRE_PEDIDOS;
+}
+
+const CHAVE_PRIMEIRO_GASTO = "core-avaliacao-primeiro-gasto";
+
+/**
+ * Esta pessoa já lançou algum gasto — no mês corrente ou em qualquer mês
+ * arquivado (`finance-{ano}-{mes}-expenses`), variável ou fixo, em qualquer
+ * perfil (PF/PJ)? Lê o localStorage direto: é a mesma fonte que a tela lê,
+ * hidratada do servidor no login — quem já usava o CORE em outro aparelho
+ * chega aqui com o histórico e NÃO é tratado como novato.
+ *
+ * @param exceto id do gasto que acabou de ser salvo — dependendo de quando o
+ *   estado persiste, ele já pode estar no disco na hora desta leitura, e um
+ *   gasto não pode ser "anterior" a si mesmo.
+ */
+export function jaLancouGastoAntes(userId: string | null | undefined, exceto?: string): boolean {
+  const prefixo = userKeyOf(userId, "finance-");
+  if (!prefixo) return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const chave = localStorage.key(i);
+      if (!chave || !chave.startsWith(prefixo)) continue;
+      if (!/^(\d{4}-[^-]+-)?(fixed-)?expenses$/.test(chave.slice(prefixo.length))) continue;
+      const lista = JSON.parse(localStorage.getItem(chave) ?? "null");
+      if (Array.isArray(lista) && lista.some((g) => g && g.id !== exceto)) return true;
+    }
+  } catch { /* JSON estranho ou modo privado: na dúvida, não é novato */ return true; }
+  return false;
+}
+
+/**
+ * Reserva a única chance de convidar no primeiro gasto — uma por aparelho.
+ *
+ * Devolve `true` só quando vale mostrar a folha: app da loja, cota nossa
+ * livre, conta logada, nunca convidado antes neste aparelho e nenhum gasto
+ * anterior em nenhum mês. Marca a chance como usada ANTES de a folha abrir —
+ * fechar o app com ela na tela não pode fazê-la voltar na reabertura.
+ *
+ * O que NÃO faz: gastar a janela de 90 dias. Essa só é consumida se a pessoa
+ * tocar em "Deixar minha nota" (aí `pedirAvaliacaoSePuder` grava). Quem
+ * recusa continua elegível pros momentos de valor de sempre.
+ */
+export function reservarConvitePrimeiroGasto(userId: string | null | undefined, gastoId?: string): boolean {
+  if (!userId) return false;
+  if (!podePedirAvaliacao()) return false;
+  if (lerNumero(CHAVE_PRIMEIRO_GASTO)) return false;
+  if (jaLancouGastoAntes(userId, gastoId)) return false;
+  try { localStorage.setItem(CHAVE_PRIMEIRO_GASTO, "1"); } catch { /* modo privado */ }
+  return true;
+}
 
 /**
  * Pede a avaliação se — e só se — for uma boa hora.
@@ -79,20 +161,11 @@ export async function pedirAvaliacaoSePuder(
   motivo: MotivoAvaliacao,
   { pagante = false, vezes = 1, forte = false }: { pagante?: boolean; vezes?: number; forte?: boolean } = {},
 ): Promise<boolean> {
-  // Só no app da loja: na web a caixa não existe (e o plugin rejeita).
-  if (!isNativeShell()) return false;
-  // Na DEMO do funil os módulos são os REAIS (/preview) — sem este guard, o
-  // turista de 30s marcando a conta de exemplo seria convidado a avaliar: o
-  // exato erro do pedido-no-funil que morreu em 28/08 (985 pedidos → ~1 nota).
-  try { if (window.location.pathname.startsWith("/preview")) return false; } catch { /* noop */ }
   if (!pagante && !forte && vezes < 2) return false;
-
+  // shell, /preview, 3 na vida, 90 dias — as travas comuns moram numa função
+  // só, pra folha de convite conferir as mesmas antes de aparecer.
+  if (!podePedirAvaliacao()) return false;
   const total = lerNumero(CHAVE_TOTAL);
-  if (total >= MAXIMO_NA_VIDA) return false;
-
-  const ultima = lerNumero(CHAVE_ULTIMA);
-  const dias = ultima ? (Date.now() - ultima) / 86_400_000 : Infinity;
-  if (dias < DIAS_ENTRE_PEDIDOS) return false;
 
   try {
     const { InAppReview } = await import("@capacitor-community/in-app-review");

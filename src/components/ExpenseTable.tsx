@@ -21,9 +21,25 @@ interface Expense {
   cardName?: string;
 }
 
+/** O gasto recém-salvo, no vocabulário de quem vai comemorar (ConviteAvaliacao). */
+export interface GastoLancado {
+  id: string;
+  descricao: string;
+  valor: number;
+  categoria: string;
+}
+
 interface ExpenseTableProps {
   expenses: Expense[];
   setExpenses: (expenses: Expense[]) => void;
+  /**
+   * Disparado quando o gasto salvo entrou numa lista que estava VAZIA — o
+   * primeiro lançamento desta tabela. A tabela não sabe (nem deve saber) o
+   * que acontece depois: quem decide se isso é "o primeiro gasto da vida"
+   * ou só o primeiro do mês é o dono da chave (Index). A planilha de mês
+   * arquivado (MonthlySheet) não passa nada e nada acontece lá.
+   */
+  onPrimeiroGasto?: (gasto: GastoLancado) => void;
 }
 
 const paymentMethods = [
@@ -42,7 +58,7 @@ const isCardPayment = (method: string) => method === "credito" || method === "de
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
+export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
   const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
   const [newExpense, setNewExpense] = useState({
@@ -117,20 +133,21 @@ export const ExpenseTable = ({ expenses, setExpenses }: ExpenseTableProps) => {
     if (newExpense.description && newExpense.value) {
       // mesma tecla, dois destinos: parcelado vira dívida, à vista vira gasto
       if (parcelando) { lancarParcelamento(numeroBR(newExpense.value)); return; }
-      setExpenses([
-        ...expenses,
-        {
-          id: Date.now().toString(),
-          description: newExpense.description,
-          category: newExpense.category || "outros",
-          value: numeroBR(newExpense.value),
-          date: newExpense.date || localDayKey(),
-          paymentMethod: newExpense.paymentMethod || "pix",
-          cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
-        },
-      ]);
+      const eraVazia = expenses.length === 0;
+      const novo: Expense = {
+        id: Date.now().toString(),
+        description: newExpense.description,
+        category: newExpense.category || "outros",
+        value: numeroBR(newExpense.value),
+        date: newExpense.date || localDayKey(),
+        paymentMethod: newExpense.paymentMethod || "pix",
+        cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+      };
+      setExpenses([...expenses, novo]);
       limparForm();
-
+      if (eraVazia) {
+        onPrimeiroGasto?.({ id: novo.id, descricao: novo.description, valor: novo.value, categoria: getCategoryLabel(novo.category) });
+      }
     }
   };
 

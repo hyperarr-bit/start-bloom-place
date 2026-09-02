@@ -11,6 +11,8 @@ import { useUserData } from "@/hooks/use-user-data";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
+import { ConviteAvaliacao, type GastoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
+import { reservarConvitePrimeiroGasto } from "@/lib/avaliacao";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
 import { MonthCalendar } from "@/components/finance/MonthCalendar";
 import { EmergencyFund, useReservaEmergencia, metaDaReserva } from "@/components/finance/EmergencyFund";
@@ -57,8 +59,17 @@ const Index = () => {
   const location = useLocation();
   // No demo aberto (/preview/financas) o "voltar" deve sair pra LP, não pro app.
   const isPreview = location.pathname.startsWith("/preview");
-  const { user } = useAuth();
+  const { user, isSubscribed } = useAuth();
   const { get: getUserData, set: setUserData, isGuest, loaded: userDataLoaded } = useUserData();
+  /* CONVITE NO PRIMEIRO GASTO (02/09) — ver ConviteAvaliacao. A reserva (uma
+     por aparelho, só se nunca lançou nada, só se a cota permite) acontece
+     AQUI, na hora do toque; a folha entra 1,2s depois, com a linha nova já
+     visível na tabela — mesma coreografia do ✓ da conta paga. */
+  const [convite, setConvite] = useState<GastoDoConvite | null>(null);
+  const aoPrimeiroGasto = (gasto: GastoDoConvite) => {
+    if (!reservarConvitePrimeiroGasto(user?.id ?? null, gasto.id)) return;
+    window.setTimeout(() => setConvite(gasto), 1200);
+  };
   // Quem veio do funil chega com as respostas do quiz no aparelho — a 1ª
   // sessão usa isso (card de plano + copy do tutorial com o R$ da pessoa).
   const quiz = getQuizAnswers();
@@ -447,7 +458,7 @@ const Index = () => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="expenses" tab="financeiro">
-                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} />
+                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} />
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="notes" tab="financeiro">
@@ -601,6 +612,7 @@ const Index = () => {
           investments,
         }}
       />
+      <ConviteAvaliacao gasto={convite} pagante={isSubscribed} onFechar={() => setConvite(null)} />
     </div>
   );
 };

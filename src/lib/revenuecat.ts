@@ -360,6 +360,12 @@ export async function desfechoDaFalha(e: unknown, produto: string): Promise<bool
  *  separar "fechou no Processando" de "trabalhou na folha". */
 let folhaAbertaEm: number | null = null;
 export const inicioUltimaFolha = (): number | null => folhaAbertaEm;
+/** Carimbo da folha em memória E no disco: o `saida-do-app.ts` lê o de disco
+ *  no boot seguinte pra saber se a morte do processo veio logo depois. */
+const marcarFolhaAberta = () => {
+  folhaAbertaEm = Date.now();
+  try { localStorage.setItem("core-folha-aberta-em", String(folhaAbertaEm)); } catch { /* modo privado */ }
+};
 
 /** Corrida do boot (raio-x de 26/08): toques em comprar morriam com
  *  "rc_sem_chave" porque o init ainda não tinha terminado (ou falhou por rede)
@@ -437,7 +443,7 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
     }
     const escolhida = comTrial ?? baseSemTrial;
     if (escolhida) {
-      folhaAbertaEm = Date.now();
+      marcarFolhaAberta();
       await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({
         subscriptionOption: escolhida as Parameters<NonNullable<typeof Purchases>["purchaseSubscriptionOption"]>[0]["subscriptionOption"],
       });
@@ -593,7 +599,7 @@ async function comprarPrepago(id: IdPrepago): Promise<boolean> {
       preco: produto?.priceString ?? null,
       prepago: true,
     });
-    folhaAbertaEm = Date.now();
+    marcarFolhaAberta();
     await Purchases.purchaseStoreProduct({ product: produto });
     await sincronizarAssinatura();
     return true;
@@ -723,7 +729,7 @@ export async function comprarVitalicio(produtoId: IdVitalicio = "core_vitalicio"
       preco: produto?.priceString ?? null,
       vitalicio: true,
     });
-    folhaAbertaEm = Date.now();
+    marcarFolhaAberta();
     await Purchases.purchaseStoreProduct({ product: produto });
     // Dinheiro saiu. Sincroniza já pra pessoa entrar na hora; se o sync
     // atrasar, webhook e reconciliarSePreciso completam.

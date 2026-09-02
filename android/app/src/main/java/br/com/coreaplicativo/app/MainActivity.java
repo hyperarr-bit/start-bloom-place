@@ -1,6 +1,14 @@
 package br.com.coreaplicativo.app;
 
+import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
+
+import com.getcapacitor.WebViewListener;
 
 import com.facebook.FacebookSdk;
 import com.facebook.LoggingBehavior;
@@ -16,7 +24,45 @@ public class MainActivity extends BridgeActivity {
         // com "not implemented".
         registerPlugin(CalendarioPlugin.class);
         registerPlugin(MetaAdsPlugin.class);
+        registerPlugin(SaidaDoAppPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // O APP MORRIA COM A FOLHA DO GOOGLE NA FRENTE (02/09). Medido em 3
+        // dias: 13–31% das tentativas de compra terminavam com o app
+        // reiniciando 15–60s depois do toque — Galaxy S25 e Z Flip inclusos,
+        // então não é só memória fraca. O mecanismo mais provável: com a folha
+        // cobrindo o app, o WebView deixa de estar visível, o Android REBAIXA
+        // a prioridade do processo de renderização e o mata primeiro; o
+        // Capacitor não trata onRenderProcessGone (devolve false) e o
+        // framework derruba o app inteiro. Duas defesas:
+        //  1. o renderer continua IMPORTANTE mesmo sem estar visível
+        //     (waivedWhenNotVisible = false) — o sistema para de tratá-lo como
+        //     descartável enquanto a pessoa paga;
+        //  2. se ainda assim morrer, a activity é RECRIADA em vez do app cair:
+        //     o WebView novo carrega o app e a retomada (retomada.ts) devolve
+        //     a pessoa ao paywall. O ocorrido fica anotado pro SaidaDoAppPlugin
+        //     reportar no boot seguinte.
+        final WebView webView = this.bridge.getWebView();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && webView != null) {
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+        }
+        this.bridge.addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                SharedPreferences.Editor ed = getSharedPreferences(SaidaDoAppPlugin.PREFS, MODE_PRIVATE).edit();
+                ed.putBoolean("renderer_morreu", true);
+                ed.putLong("renderer_quando", System.currentTimeMillis());
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && detail != null) {
+                    ed.putBoolean("renderer_crash", detail.didCrash());
+                    ed.putInt("renderer_prioridade", detail.rendererPriorityAtExit());
+                }
+                ed.apply();
+                // Fora do callback: o WebView está morto, e recreate() destrói
+                // a activity (e ele junto) e sobe uma nova com WebView novo.
+                new Handler(Looper.getMainLooper()).post(MainActivity.this::recreate);
+                return true; // tratado — o framework NÃO derruba o app
+            }
+        });
 
         // Só no APK de teste: cospe requisição e RESPOSTA das plataformas no
         // logcat. Sem isto, "evento saiu" e "evento foi aceito" parecem

@@ -125,6 +125,13 @@ const SoNaWeb = ({ children }: { children: ReactNode }) =>
 function GuardaDemoShell() {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
+  // POR QUE O APP MORREU DA ÚLTIMA VEZ (02/09): lê o ExitInfo do Android e a
+  // anotação da morte do renderer uma vez por boot e manda como evento — é o
+  // instrumento que fecha a causa dos reinícios na folha (ver saida-do-app.ts).
+  useEffect(() => {
+    if (!isNativeShell()) return;
+    void import("@/lib/saida-do-app").then((m) => m.reportarSaidaAnterior()).catch(() => { /* nunca derruba o boot */ });
+  }, []);
   useEffect(() => {
     if (!isNativeShell()) return;
     try {

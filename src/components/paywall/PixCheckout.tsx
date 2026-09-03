@@ -96,6 +96,17 @@ const FORCE_GATEWAY: Gateway | null = "asaas";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
+  /* TESTE DE GATEWAY POR LINK (02/09): `?gw=cakto` na URL grava a escolha na
+   * sessão e vale ANTES do FORCE_GATEWAY — é como se testa outro gateway
+   * sem tocar no funil de todo mundo. A Cakto recusou 2 de 8 pedidos de
+   * teste hoje (intermitente, só na oferta antiga de 27,90); a w97 passou
+   * sempre. Só quem abre o link com o parâmetro entra nesse braço. */
+  try {
+    const url = new URLSearchParams(window.location.search).get("gw");
+    if (url === "asaas" || url === "pagarme" || url === "abacate" || url === "cakto") sessionStorage.setItem("pix-gw-teste", url);
+    const t = sessionStorage.getItem("pix-gw-teste");
+    if (t === "asaas" || t === "pagarme" || t === "abacate" || t === "cakto") return t;
+  } catch { /* noop */ }
   if (FORCE_GATEWAY) return FORCE_GATEWAY;
   try {
     const f = localStorage.getItem("pix-ab-force");
@@ -454,6 +465,29 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
             sourceUrl: window.location.href,
           },
         }));
+        /* Recusa intermitente (medido 02/09: 2 de 8 pedidos nascem "refused"
+         * e a repetição idêntica passa): uma 2ª tentativa antes de mostrar
+         * erro. Chave de idempotência é nova a cada chamada (função). */
+        if (error || !data?.qrCode) {
+          trackEvent("pix_retry", { offer, context, gateway: braco });
+          await new Promise((r) => setTimeout(r, 1200));
+          ({ data, error } = await supabase.functions.invoke("cakto-pix", {
+          body: {
+            offer,
+            customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
+            fingerprint,
+            antifraudRef,
+            attribution: getAttributionParams(),
+            fbp: cookie("_fbp"),
+            fbc: cookie("_fbc"),
+            // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
+            // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
+            // dentro de attribution (getAttributionParams).
+            ttp: cookie("_ttp"),
+            sourceUrl: window.location.href,
+          },
+        }));
+        }
       }
       if (error) throw error;
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }

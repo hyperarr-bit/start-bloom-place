@@ -26,7 +26,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  */
 
 const ABACATE_API = "https://api.abacatepay.com/v2";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 
 const logStep = (step: string, details?: unknown) => {

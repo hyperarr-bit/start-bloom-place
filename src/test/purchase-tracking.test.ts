@@ -158,7 +158,8 @@ describe("Purchase do Pix: só dispara o que dá pra provar", () => {
     const { firePixPurchaseOnce } = await carregar();
     expect(await firePixPurchaseOnce("checkout")).toBe(true);
     expect(metaEvents[0].eventID).toBe("ped-1");
-    expect(metaEvents[0].params.value).toBe(27.9);
+    // 03/09: a web virou preço único — `lifetime` passou a valer 97,90
+    expect(metaEvents[0].params.value).toBe(97.9);
     expect(googleConv[0].transactionId).toBe("ped-1");
   });
 

@@ -36,7 +36,7 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1990 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
 const logStep = (step: string, details?: unknown) => {

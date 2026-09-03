@@ -340,7 +340,7 @@ export default function LpFinancas() {
                 </Badge>
                 <div className="text-sm font-semibold mb-1">CORE Vitalício</div>
                 <div className="flex items-baseline gap-1 mb-1">
-                  <span className="text-4xl font-bold tracking-tight">R$ 27,90</span>
+                  <span className="text-4xl font-bold tracking-tight">R$ 97,90</span>
                   <span className="text-sm text-muted-foreground">uma vez</span>
                 </div>
                 <div className="text-xs text-muted-foreground mb-5">No Pix · todos os 16 módulos · sem assinatura</div>

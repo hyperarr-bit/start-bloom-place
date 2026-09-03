@@ -25,7 +25,7 @@ const corsHeaders = {
 // API V2 (chaves abc_prod_* são da geração v2 — a v1 responde
 // "API key version mismatch"). Pix in-app = "transparent checkout".
 const ABACATE_API = "https://api.abacatepay.com/v2";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
 const DUMMY_PHONE = "11999999999"; // mesmo padrão do cakto-pix: não pedimos telefone
 
 const logStep = (step: string, details?: unknown) => {

@@ -40,10 +40,18 @@ import { limparGuiaSemente } from "@/lib/teste-gratis";
 // (PixCheckout). Motivo: dias 12-13 tiveram ~25 cliques no anual e 0 vendas
 // no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
+/* 03/09 (ordem do dono, "97,90 em tudo"): esta tela — demo/preview, portão
+ * do /home (TrialBanner) e /comecar — era a última da WEB vendendo 27,90
+ * enquanto o funil W já vendia 97,90. Medido 31/08→03/09: 12 das 28 vendas
+ * da web saíram a 27,90, e o Pix converte IGUAL nos dois preços (36% × 32%)
+ * — o desconto não trazia venda, só cobrava menos pelo mesmo produto.
+ * O que cobra é `PRECOS_CENTAVOS` das functions (9790); aqui é display.
+ *
+ * A âncora riscada de 99,90 saiu junto: acima de 97,90 ela anunciava 2% de
+ * desconto, que lê como piada e não como oferta. */
 const PRICING = {
-  lifetime: { total: "27,90" },
+  lifetime: { total: "97,90" },
   downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
-  anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -73,7 +81,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 27.9 : 19.9,
+    value: offer === "lifetime" ? 97.9 : 19.9,
     currency: "BRL",
   });
   open(offer);
@@ -477,7 +485,6 @@ function LifetimeCard() {
         </span>
         <div className="relative font-bold text-[15px] leading-tight mb-2">Pague 1x. Seu pra sempre.</div>
         <div className="relative flex items-end justify-center gap-2">
-          <span className="text-[13px] text-muted-foreground line-through mb-[7px]">R$ {PRICING.anchor}</span>
           <span className="text-[42px] leading-none font-extrabold tracking-tight text-accent">
             R$ {PRICING.lifetime.total}
           </span>
@@ -1186,11 +1193,20 @@ function PreFolhaPagamento({
 
 type PropsDownsell = { context: "funnel" | "app"; onDismiss: () => void; onBuy: (o: PixOffer) => void };
 
+/* 03/09: o downsell da FUGA sai de cena junto com o preço único.
+ * Com o cheio a 27,90 ele era 46% de desconto; com o cheio a 97,90 vira 85%
+ * a um Voltar de distância — e a medição que está neste mesmo arquivo (roleta,
+ * 20→21/07) mostra o que uma saída barata faz: receita por paywall visto de
+ * R$ 11,16 pra R$ 3,08, "converteu quem pagaria 27,90 em 14,90".
+ * O funil W (o que traz o tráfego pago hoje) já vive sem downsell nenhum.
+ * Pra devolver: DOWNSELL_DA_FUGA = true. */
+const DOWNSELL_DA_FUGA = false;
+
 // Segunda trava, colada no conteúdo proibido: oferta de VITALÍCIO por R$ 14,90
 // no Pix não pode existir dentro do app da loja, venha de onde vier. Separado
 // em wrapper porque os hooks abaixo não podem rodar condicionalmente.
 function DownsellScreen(p: PropsDownsell) {
-  return isNativeShell() ? null : <DownsellWeb {...p} />;
+  return isNativeShell() || !DOWNSELL_DA_FUGA ? null : <DownsellWeb {...p} />;
 }
 
 function DownsellWeb({ context, onDismiss, onBuy }: PropsDownsell) {

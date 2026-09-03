@@ -53,7 +53,8 @@ type PendingOffer = "lifetime" | "downsell" | "w97";
  * 97,90 — o mesmo bug, cinco vezes maior. Mapa explícito: oferta nova sem
  * preço aqui quebra o build em vez de mentir pro pixel. */
 const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
-  lifetime: 27.9,
+  lifetime: 97.9, // 03/09: a web virou preço único — ver PIX_PRICES no PixCheckout
+
   downsell: 19.9,
   w97: 97.9,
 };

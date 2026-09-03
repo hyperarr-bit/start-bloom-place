@@ -30,7 +30,7 @@ const corsHeaders = {
 };
 
 const PAGARME_API = "https://api.pagar.me/core/v5";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
 // Pagar.me exige phone; não pedimos (fricção) — coringa, mesmo padrão dos
 // outros gateways da casa.
 const DUMMY_PHONE = { country_code: "55", area_code: "11", number: "999999999" };

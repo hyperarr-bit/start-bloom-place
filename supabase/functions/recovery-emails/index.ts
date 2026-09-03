@@ -49,7 +49,12 @@ const DS_STAGES: Stage[] = ["h24", "h48", "h72"]; // estágios com oferta 19,90
  * entrega/inbox — e mais volume só piora isso.
  * Pra religar: devolve "h48","h72","d7" aqui. A copy, a migration e o SQL
  * continuam intactos de propósito. */
-const ESTAGIOS_ATIVOS: Stage[] = ["h1", "h24"];
+/* 03/09 (preço único na web, ordem do dono "97,90 em tudo"): o h24 sai do ar.
+ * Ele vendia 19,90 contra um cheio de 27,90 (29% off); contra 97,90 vira 80%
+ * por e-mail, e a medição do próprio funil diz que saída barata converte quem
+ * pagaria cheio. O h1 fica — é dele que saíram todas as vendas da régua, e ele
+ * é o único que ainda alcança a janela viva. Devolver = pôr "h24" de volta. */
+const ESTAGIOS_ATIVOS: Stage[] = ["h1"];
 
 const checkoutLink = (stage: Stage) => {
   const url = new URL("https://www.coreaplicativo.com.br/planos");
@@ -62,7 +67,7 @@ const checkoutLink = (stage: Stage) => {
 
 /* ------------------------------------------------------------------ COPY */
 
-const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
+const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 97,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
 const PRECO_DS = `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 27,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 19,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`;
 
 /** Primeiro nome utilizável pro assunto. O SQL faz COALESCE pro prefixo do
@@ -94,11 +99,11 @@ const COPY: Record<Stage, {
     // esperar — foi o que custou 7 pontos de conversão cheia no paywall.
     subject: (nome) => nome ? `${nome}, seu plano ficou pronto. e você sumiu.` : "seu plano ficou pronto. e você sumiu.",
     headline: "Você parou a 1 Pix de distância",
-    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 27,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 27,90 é menos que um lanche.</b> A diferença é que o lanche acaba hoje.`,
+    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 97,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 97,90 uma vez.</b> Sem mensalidade, nunca — o que você montou fica seu.`,
     selo: "SEU ACESSO VITALÍCIO ESTÁ RESERVADO",
     preco: PRECO_CHEIO,
     cta: "Destravar meu acesso agora →",
-    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 27,90.",
+    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 97,90.",
   },
   h24: {
     subject: () => "R$ 19,90 hoje. R$ 27,90 amanhã.",

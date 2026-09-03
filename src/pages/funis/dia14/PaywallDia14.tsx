@@ -32,9 +32,12 @@ import { useAuth } from "@/hooks/use-auth";
 // (PixCheckout). Motivo: dias 12-13 tiveram ~25 cliques no anual e 0 vendas
 // no checkout hospedado da Cakto (caixa-preta). Preço mora na OFERTA da
 // Cakto (secrets CAKTO_OFFER_*); estes valores são display — manter em par.
+/* 03/09 (ordem do dono, "97,90 em tudo"): preço único na WEB. Esta tela abre
+ * a MESMA oferta `lifetime` do checkout, e o gateway passou a cobrar 9790 —
+ * display e cobrança andam juntos ou a tela vira promessa falsa.
+ * A âncora riscada de 99,90 saiu: em cima de 97,90 ela anuncia 2% de desconto. */
 const PRICING = {
-  lifetime: { total: "27,90" },
-  anchor: "99,90", // valor de referência riscado (sem rótulo de "mensal")
+  lifetime: { total: "97,90" },
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -64,7 +67,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 27.9 : 19.9,
+    value: offer === "lifetime" ? 97.9 : 19.9,
     currency: "BRL",
   });
   open(offer);
@@ -606,7 +609,6 @@ function LifetimeCard() {
         </span>
         <div className="relative font-bold text-[15px] leading-tight mb-2">Pague 1x. Seu pra sempre.</div>
         <div className="relative flex items-end justify-center gap-2">
-          <span className="text-[13px] text-muted-foreground line-through mb-[7px]">R$ {PRICING.anchor}</span>
           <span className="text-[42px] leading-none font-extrabold tracking-tight text-accent">
             R$ {PRICING.lifetime.total}
           </span>
@@ -922,11 +924,17 @@ export function PaywallDia14({
    * Play. Duas leituras, e basta UMA dizer "nativo" pra não abrir nada. */
   const nativoNoMount = useRef(isNativeShell());
 
+  const ROLETA_DA_FUGA = false;
+
   /** Porta única do resgate — três entradas caem aqui: X da oferta, botão
    *  voltar do navegador e fechar o Pix de 27,90 sem pagar. Uma vez por
    *  sessão. NUNCA dentro do binário da loja: lá o Pix não existe e oferta
    *  fora do Play Billing reprova na revisão. */
   const abrirResgate = (origem: string) => {
+    /* 03/09: desligado junto com o preço único (ver DOWNSELL_DA_FUGA no
+     * PaywallFlow). A roleta premiava com 14,90; contra um cheio de 97,90
+     * isso é 85% de desconto a um Voltar de distância. Devolver = true. */
+    if (!ROLETA_DA_FUGA) return false;
     if (resgateUsado.current) return false;
     if (nativoNoMount.current || isNativeShell()) return false;
     resgateUsado.current = true;

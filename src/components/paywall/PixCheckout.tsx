@@ -28,13 +28,17 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
  * mesmo preço do app (97,90), cano de pagamento diferente. */
 export type PixOffer = "lifetime" | "downsell" | "w97";
 
-/* 05/08 (ordem do dono): volta a estrutura de DOIS preços — 27,90 cheio e
- * 19,90 no downsell da roleta. Estes valores são DISPLAY; quem cobra é a
- * oferta da Cakto (secrets CAKTO_OFFER_LIFETIME / CAKTO_OFFER_DOWNSELL).
- * Trocar aqui sem trocar os secrets faz a tela prometer um preço e o QR
- * cobrar outro — os dois andam juntos ou nenhum anda. */
+/* 03/09 (ordem do dono, "97,90 em tudo"): a WEB passa a ter UM preço só.
+ * A oferta `lifetime` — que a demo, o portão do /home, o /comecar e o
+ * funil do dia 14 abrem — sobe de 27,90 pra 97,90 e encosta na `w97`.
+ * Motivo medido (31/08→03/09): 12 das 28 vendas da web saíam a 27,90 num
+ * funil que já vendia 97,90 do outro lado, e a taxa de pagamento do Pix é
+ * IGUAL nos dois preços (36% × 32%) — o desconto não comprava conversão,
+ * só dava desconto. Quem paga é o gateway: `PRECOS_CENTAVOS` das functions
+ * (asaas-pix/asaas-webhook/pix-reconcile) foi pra 9790 na mesma passada.
+ * Trocar um sem o outro faz a tela prometer um preço e o QR cobrar outro. */
 export const PIX_PRICES: Record<PixOffer, string> = {
-  lifetime: "27,90",
+  lifetime: "97,90",
   downsell: "19,90",
   w97: "97,90",
 };
@@ -779,9 +783,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-[11px] text-muted-foreground line-through">
-                      R$ {offer === "lifetime" ? "99,90" : PIX_PRICES.lifetime}
-                    </div>
                     <div className="text-xl font-extrabold text-accent leading-none">R$ {price}</div>
                   </div>
                 </div>
@@ -866,9 +867,6 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                       </div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-[11px] text-muted-foreground line-through">
-                        R$ {offer === "lifetime" ? "99,90" : PIX_PRICES.lifetime}
-                      </div>
                       <div className="text-xl font-extrabold text-accent leading-none">R$ {price}</div>
                     </div>
                   </div>

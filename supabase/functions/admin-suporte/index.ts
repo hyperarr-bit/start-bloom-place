@@ -143,7 +143,11 @@ serve(async (req) => {
       const uid = String(body.uid ?? "");
       const email = String(body.email ?? "").trim().toLowerCase();
       const billing = body.billing ? String(body.billing) : null;
-      const cents = Number(body.cents) === 1490 ? 1490 : 2790;
+      /* 03/09: preço único na web (97,90). O padrão do crédito manual segue o
+       * preço vigente; os valores antigos continuam aceitos porque o suporte
+       * ainda credita compra de quem pagou 27,90 ou 14,90 antes da troca. */
+      const centsPedido = Number(body.cents);
+      const cents = [1490, 2790, 9790].includes(centsPedido) ? centsPedido : 9790;
       const alvo = uid || (email ? await acharUid(email) : null);
       if (!alvo) return json({ error: "usuario_nao_encontrado" }, 404);
 
@@ -246,7 +250,7 @@ serve(async (req) => {
         cakto++;
         const eventId = String(ordem.event_data.order_id);
         const offerKind = String(ordem.event_data?.offer ?? "lifetime");
-        const amountCents = Number(ordem.event_data?.amount_cents) || Number(sub.amount_cents) || (offerKind === "downsell" ? 1490 : 2790);
+        const amountCents = Number(ordem.event_data?.amount_cents) || Number(sub.amount_cents) || (offerKind === "downsell" ? 1490 : 9790);
         const fbHit = rows.find((r) => r.event_data?.fbclid);
         const fbc = fbHit ? `fb.1.${new Date(fbHit.created_at).getTime()}.${fbHit.event_data.fbclid}` : null;
         const eventTime = Math.floor(new Date(sub.current_period_start).getTime() / 1000);

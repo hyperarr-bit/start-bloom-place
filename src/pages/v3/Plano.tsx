@@ -57,6 +57,11 @@ const MODULOS_16: Array<[string, string]> = [
  *  URLs Kiwify: lifetime pay.kiwify.com.br/MyqE4FO · downsell .../MxrG3yB
  *  (grant do kiwify-webhook por e-mail; NÃO ativar pixel Meta lá — CAPI já manda). */
 const KIWIFY: Record<PixOffer, string> | null = null;
+
+/* 03/09 (preço único na web): a roleta de fuga premiava com R$ 14,90. Com o
+ * cheio em 97,90 isso vira 85% de desconto a um Voltar de distância — a mesma
+ * decisão que desligou o DOWNSELL_DA_FUGA no PaywallFlow. Devolver = true. */
+const ROLETA_DA_FUGA = false;
 const FOI_KIWIFY_KEY = "fv3-foi-kiwify";
 
 const ESTADO_KEY = "fv3-state";
@@ -89,6 +94,9 @@ export default function PlanoV3() {
   const roletaVista = () => { try { return sessionStorage.getItem("fv3-ds-visto") === "1"; } catch { return false; } };
   const [dsJaVista, setDsJaVista] = useState(roletaVista);
   const abrirRoleta = useCallback((origem: string) => {
+    /* 03/09: desligada com o preço único (ver DOWNSELL_DA_FUGA no PaywallFlow).
+     * O prêmio era 14,90; contra 97,90 cheio vira 85% num Voltar. */
+    if (!ROLETA_DA_FUGA) return;
     if (roletaVista() || isSubscribed) return;
     try { sessionStorage.setItem("fv3-ds-visto", "1"); } catch { /* noop */ }
     setDsJaVista(true);
@@ -540,7 +548,7 @@ export default function PlanoV3() {
                 <p className="fv3-checkline">✓ Acesso liberado em minutos, no seu e-mail</p>
                 <div className="fv3-rodape" style={{ width: "100%" }}>
                   <button className="fv3-cta" onClick={() => { track("funnel_v3_softask_ok"); avancar(); }}>Continuar</button>
-                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pagamento único de R$ 27,90 · sem mensalidade, nunca</p>
+                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pagamento único de R$ 97,90 · sem mensalidade, nunca</p>
                 </div>
               </div>
             )}
@@ -557,8 +565,7 @@ export default function PlanoV3() {
                 <h2>Tudo isso é seu.<br />Pra sempre.</h2>
                 <div className="fv3-card" style={{ padding: "14px 16px" }}>
                   <div className="fv3-preco">
-                    <span className="fv3-anchor">R$ 99,90</span>
-                    <b>R$ 27,90</b>
+                    <b>R$ 97,90</b>
                     <span className="fv3-mini">pagamento único · vitalício</span>
                   </div>
                   <div className="fv3-modgrid">
@@ -572,7 +579,7 @@ export default function PlanoV3() {
                 </div>
                 {trilha === "dinheiro" && (
                   <p className="fv3-ancora-pessoal">
-                    Você disse que <b>R$ {vazamento} somem</b> da sua conta todo mês.<br />O CORE custa <b>R$ 27,90 — uma vez.</b>
+                    Você disse que <b>R$ {vazamento} somem</b> da sua conta todo mês.<br />O CORE custa <b>R$ 97,90 — uma vez.</b>
                   </p>
                 )}
                 {trilha !== "dinheiro" && (
@@ -830,7 +837,7 @@ function RoletaDownsell({ onAceitar, onFechar }: { onAceitar: () => void; onFech
             <div className="fv3-premio-sub">PRA SEMPRE — acesso vitalício</div>
           </div>
           <div className="fv3-premio-preco">
-            <span className="fv3-anchor">R$ 27,90</span>
+            <span className="fv3-anchor">R$ 97,90</span>
             <b>R$ 14,90</b>
             <span className="fv3-mini">pagamento único</span>
           </div>

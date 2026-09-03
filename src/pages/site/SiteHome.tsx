@@ -261,7 +261,7 @@ export default function SiteHome() {
         <div className="mt-8 grid md:grid-cols-[1.1fr_1fr] gap-5">
           <div className="rounded-2xl border-2 border-accent bg-card p-7">
             <p className="text-[12px] font-bold uppercase tracking-widest text-accent">Aqui no site</p>
-            <p className="mt-3 text-[40px] font-extrabold leading-none tracking-tight">R$&nbsp;27,90</p>
+            <p className="mt-3 text-[40px] font-extrabold leading-none tracking-tight">R$&nbsp;97,90</p>
             <p className="mt-2 text-[14px] text-muted-foreground">pagamento único no Pix · acesso vitalício</p>
             <ul className="mt-6 space-y-2.5">
               {["Os 16 módulos liberados", "Acesso no celular e no computador", "Sem renovação automática", "Cancelar não existe — você já é dono"].map((i) => (

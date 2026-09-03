@@ -44,7 +44,7 @@ serve(async (req) => {
     // sessões de teste do dono geram.
     const conta = async (desde?: string) => {
       let q = supabase.from("subscriptions").select("*", { count: "exact", head: true })
-        .in("amount_cents", [2790, 1490])
+        .in("amount_cents", [9790, 2790, 1490])
         .not("customer_email", "ilike", "%+qa%");
       if (desde) q = q.gte("current_period_start", desde);
       const { count } = await q;

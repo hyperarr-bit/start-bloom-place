@@ -38,7 +38,7 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * 1ª noite: o Pix fechou 33% dos QRs maduros contra 13% da folha do Google,
  * então o preço aguenta mais. O mapa é a ÚNICA fonte do valor: oferta sem
  * preço aqui devolve 503 em vez de cobrar errado. */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 2790, downsell: 1490, w97: 9790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
 const logStep = (step: string, details?: unknown) => {

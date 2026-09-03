@@ -255,6 +255,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         if (jaTem) { generate("", ""); return; }
         const podeAnonimo = await anonimoLigado();
         if (!podeAnonimo) { generate("", ""); return; } // caminho antigo: já tem conta
+        /* CAKTO exige e-mail na conta (cakto-pix devolve 401 pra sessão
+         * anônima: customer.email é o vínculo do webhook dela). Nesse braço o
+         * e-mail continua vindo ANTES do QR — só a Asaas faz QR-primeiro. */
+        if (braco === "cakto") {
+          trackEvent("funnel_view", { step: "pix_email", offer, context, gateway: braco });
+          setStep("email");
+          return;
+        }
         /* QR PRIMEIRO (02/09). Medido 01–02/09 na oferta w97: 93 viram a tela
          * de e-mail, 30 terminaram de digitar (mediana 6,9s, p75 14,6s) — 57%
          * de quem tocou em pagar nunca viu o QR. O servidor leva 0,9s. Então o

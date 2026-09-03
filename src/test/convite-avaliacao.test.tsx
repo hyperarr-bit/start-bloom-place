@@ -17,7 +17,7 @@ vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => true }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: mocks.trackEvent }));
 vi.mock("@capacitor-community/in-app-review", () => ({ InAppReview: { requestReview: mocks.requestReview } }));
 
-import { reservarConvitePrimeiroGasto, jaLancouGastoAntes, podePedirAvaliacao } from "@/lib/avaliacao";
+import { reservarConvitePrimeiroGasto, reservarConviteDoFunil, jaLancouGastoAntes, podePedirAvaliacao } from "@/lib/avaliacao";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { ConviteAvaliacao } from "@/components/avaliacao/ConviteAvaliacao";
 
@@ -190,5 +190,74 @@ describe("ConviteAvaliacao", () => {
     expect(mocks.requestReview).not.toHaveBeenCalled();
     expect(localStorage.getItem("core-avaliacao-ultima")).toBeNull();
     expect(mocks.trackEvent).toHaveBeenCalledWith("app_avaliacao_convite", expect.objectContaining({ acao: "recusou" }));
+  });
+});
+
+/* ============================================================
+ * O CONVITE DO FUNIL — reservarConviteDoFunil (03/09)
+ * O gatilho que colheu 63 avaliações em 3 dias volta, agora com a folha na
+ * frente: quem recusa não gasta a janela de 90 dias do aparelho.
+ * ============================================================ */
+describe("reservarConviteDoFunil", () => {
+  it("uma vez por aparelho — e sem conta logada também vale (o funil vem antes do cadastro)", () => {
+    expect(reservarConviteDoFunil()).toBe(true);
+    expect(reservarConviteDoFunil()).toBe(false);
+  });
+
+  it("reservar NÃO gasta a cota do Google: só o toque na folha gasta", () => {
+    expect(reservarConviteDoFunil()).toBe(true);
+    expect(localStorage.getItem("core-avaliacao-ultima")).toBeNull();
+    expect(podePedirAvaliacao()).toBe(true);
+  });
+
+  it("na DEMO (/preview) nunca — a folha não entra por rota de vitrine", () => {
+    window.history.replaceState({}, "", "/preview/financas");
+    expect(reservarConviteDoFunil()).toBe(false);
+  });
+
+  it("dois convites não se atropelam: quem viu o do funil não vê o do 1º gasto na mesma semana", () => {
+    expect(reservarConviteDoFunil()).toBe(true);
+    expect(reservarConvitePrimeiroGasto(UID, "g1")).toBe(false);
+    // passada a espera de 7 dias, o momento de valor volta a valer
+    localStorage.setItem("core-avaliacao-convite-em", String(Date.now() - 8 * 24 * 3600_000));
+    expect(reservarConvitePrimeiroGasto(UID, "g1")).toBe(true);
+  });
+
+  it("respeita as travas de sempre (90 dias entre pedidos)", () => {
+    localStorage.setItem("core-avaliacao-ultima", String(Date.now()));
+    expect(reservarConviteDoFunil()).toBe(false);
+  });
+});
+
+describe("ConviteAvaliacao — variante do plano pronto", () => {
+  const plano = { emoji: "\u{1F4B0}", nome: "Dinheiro" };
+
+  it("mostra o plano da área, respeita a diretriz e pede com o motivo plano_pronto", async () => {
+    vi.useFakeTimers();
+    try {
+      const fechar = vi.fn();
+      render(<ConviteAvaliacao plano={plano} pagante={false} onFechar={fechar} />);
+      expect(screen.getByText("Seu plano de Dinheiro")).toBeInTheDocument();
+      expect(screen.getByText("16 módulos liberados")).toBeInTheDocument();
+      // nenhuma pergunta, nenhuma previsão de nota, nenhum seletor nosso
+      expect(document.body.textContent).not.toMatch(/\?|estrelas|gostando/i);
+      expect(mocks.trackEvent).toHaveBeenCalledWith("app_avaliacao_convite", expect.objectContaining({ motivo: "plano_pronto", acao: "visto" }));
+
+      fireEvent.click(screen.getByRole("button", { name: /Deixar minha nota/ }));
+      expect(fechar).toHaveBeenCalledTimes(1);
+      expect(mocks.requestReview).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(mocks.trackEvent).toHaveBeenCalledWith("app_avaliacao_pedida", expect.objectContaining({ motivo: "plano_pronto" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("'Agora não' no funil não gasta a janela de 90 dias — era a objeção que matou o gatilho", () => {
+    const fechar = vi.fn();
+    render(<ConviteAvaliacao plano={plano} pagante={false} onFechar={fechar} />);
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
+    expect(localStorage.getItem("core-avaliacao-ultima")).toBeNull();
+    expect(podePedirAvaliacao()).toBe(true);
   });
 });

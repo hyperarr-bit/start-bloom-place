@@ -36,40 +36,51 @@ export interface GastoDoConvite {
   categoria: string;
 }
 
+/** O plano recém-montado no funil — a mesma folha, outro motivo (03/09). */
+export interface PlanoDoConvite {
+  emoji: string;
+  /** Nome curto da área escolhida ("Dinheiro", "Rotina"). */
+  nome: string;
+}
+
 interface ConviteAvaliacaoProps {
-  /** O gasto recém-lançado; `null` mantém a folha fechada. */
-  gasto: GastoDoConvite | null;
+  /** O gasto recém-lançado; `null` quando o convite não é esse. */
+  gasto?: GastoDoConvite | null;
+  /** O plano recém-montado; `null` quando o convite não é esse. */
+  plano?: PlanoDoConvite | null;
   pagante: boolean;
   onFechar: () => void;
 }
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export const ConviteAvaliacao = ({ gasto, pagante, onFechar }: ConviteAvaliacaoProps) => {
+export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar }: ConviteAvaliacaoProps) => {
   const semMovimento = useReducedMotion();
+  const motivo: "primeiro_gasto" | "plano_pronto" = gasto ? "primeiro_gasto" : "plano_pronto";
+  const aberto = !!gasto || !!plano;
   // Distingue "fechou porque aceitou" de "fechou porque deslizou/recusou" —
   // o Drawer avisa `open=false` nos dois casos.
   const decidiu = useRef(false);
 
   useEffect(() => {
-    if (!gasto) { decidiu.current = false; return; }
-    trackEvent("app_avaliacao_convite", { motivo: "primeiro_gasto", acao: "visto", pagante });
-  }, [gasto, pagante]);
+    if (!aberto) { decidiu.current = false; return; }
+    trackEvent("app_avaliacao_convite", { motivo, acao: "visto", pagante });
+  }, [aberto, motivo, pagante]);
 
   const aceitar = () => {
     decidiu.current = true;
-    trackEvent("app_avaliacao_convite", { motivo: "primeiro_gasto", acao: "aceitou", pagante });
+    trackEvent("app_avaliacao_convite", { motivo, acao: "aceitou", pagante });
     onFechar();
     // A caixa do Google só depois da folha sair da tela (≈300ms de animação):
     // a diretriz proíbe sobrepor a caixa, e a pessoa acabou de decidir — não
     // precisa de mais nada nossa na frente.
-    window.setTimeout(() => { void pedirAvaliacaoSePuder("primeiro_gasto", { pagante, forte: true }); }, 380);
+    window.setTimeout(() => { void pedirAvaliacaoSePuder(motivo, { pagante, forte: true }); }, 380);
   };
 
   const recusar = () => {
     if (decidiu.current) return;
     decidiu.current = true;
-    trackEvent("app_avaliacao_convite", { motivo: "primeiro_gasto", acao: "recusou", pagante });
+    trackEvent("app_avaliacao_convite", { motivo, acao: "recusou", pagante });
     onFechar();
   };
 
@@ -79,7 +90,7 @@ export const ConviteAvaliacao = ({ gasto, pagante, onFechar }: ConviteAvaliacaoP
       : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { delay: atraso, duration: 0.4, ease: [0.22, 1, 0.36, 1] as const } };
 
   return (
-    <Drawer open={!!gasto} onOpenChange={(aberto) => { if (!aberto) recusar(); }}>
+    <Drawer open={aberto} onOpenChange={(aberto) => { if (!aberto) recusar(); }}>
       <DrawerContent
         className="border-0 bg-transparent rounded-t-[28px] text-white [&>div:first-child]:bg-white/25"
         style={{ background: "linear-gradient(160deg, #1c1917 35%, #D22D80 190%)" }}
@@ -88,7 +99,7 @@ export const ConviteAvaliacao = ({ gasto, pagante, onFechar }: ConviteAvaliacaoP
         <div className="px-6 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-5">
           {/* O gasto que acabou de entrar — a prova de que funcionou, antes de
               qualquer pedido. */}
-          {gasto && (
+          {(gasto || plano) && (
             <motion.div
               {...entra(0)}
               className="flex items-center gap-3 rounded-2xl bg-white/10 ring-1 ring-white/10 px-4 py-3"
@@ -101,22 +112,39 @@ export const ConviteAvaliacao = ({ gasto, pagante, onFechar }: ConviteAvaliacaoP
               >
                 <Check className="w-5 h-5" strokeWidth={3} />
               </motion.span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[15px] font-semibold leading-tight truncate">{gasto.descricao}</span>
-                <span className="block text-[12px] text-white/55 mt-0.5 truncate">{gasto.categoria}</span>
-              </span>
-              <span className="text-[15px] font-bold tabular-nums shrink-0">{brl(gasto.valor)}</span>
+              {gasto ? (
+                <>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-semibold leading-tight truncate">{gasto.descricao}</span>
+                    <span className="block text-[12px] text-white/55 mt-0.5 truncate">{gasto.categoria}</span>
+                  </span>
+                  <span className="text-[15px] font-bold tabular-nums shrink-0">{brl(gasto.valor)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-semibold leading-tight truncate">
+                      Seu plano de {plano!.nome}
+                    </span>
+                    <span className="block text-[12px] text-white/55 mt-0.5 truncate">16 módulos liberados</span>
+                  </span>
+                  <span className="text-[20px] shrink-0" aria-hidden>{plano!.emoji}</span>
+                </>
+              )}
             </motion.div>
           )}
 
           <motion.div {...entra(0.1)} className="space-y-2">
-            <p className="text-[11px] font-semibold tracking-[0.18em] text-white/50">PRIMEIRO GASTO LANÇADO</p>
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-white/50">
+              {gasto ? "PRIMEIRO GASTO LANÇADO" : "SEU PLANO ESTÁ PRONTO"}
+            </p>
             <DrawerTitle className="text-[24px] font-bold leading-[1.15] tracking-tight text-white [text-wrap:balance]">
-              Agora o CORE cuida do resto.
+              {gasto ? "Agora o CORE cuida do resto." : "Montado do jeito que você respondeu."}
             </DrawerTitle>
             <DrawerDescription className="text-[14px] leading-relaxed text-white/70">
-              Cada gasto que você lançar vira gráfico, orçamento e retrospectiva no fim do mês.
-              Sem planilha, sem conta de cabeça.
+              {gasto
+                ? "Cada gasto que você lançar vira gráfico, orçamento e retrospectiva no fim do mês. Sem planilha, sem conta de cabeça."
+                : "Suas respostas viraram um plano com os 16 módulos do CORE — e ele começa pela área que você escolheu."}
             </DrawerDescription>
           </motion.div>
 

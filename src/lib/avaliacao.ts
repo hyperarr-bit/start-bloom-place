@@ -57,10 +57,13 @@ export type MotivoAvaliacao =
   // CORREÇÃO DA PREMISSA (02/09, com o Console já atualizado): não rendeu
   // "~1 avaliação" — rendeu 63 em 3 dias (27–29/08, média 4,9; 76% das de
   // agosto). O Console atrasa 1–2 dias e a decisão foi tomada olhando um
-  // número que ainda não existia. O gatilho segue morto pelo motivo que
-  // continua válido (pedir antes de usar fere a diretriz do In-App Review);
-  // o volume voltou pelo `primeiro_gasto`. (O tipo fica: o ComecarRadar web
-  // ainda referencia.)
+  // número que ainda não existia.
+  // VOLTOU EM 03/09, com a trava que faltava: o `primeiro_gasto` só alcançou
+  // 5 aparelhos em 2 dias (exige conta criada + 1º gasto no mesmo dia) e as
+  // avaliações ficaram em 1–2/dia. O funil é o único lugar com volume — mas
+  // agora quem chama a caixa do Google é a PESSOA, tocando na folha de
+  // convite. Quem recusa não gasta a janela de 90 dias, que era a única
+  // objeção legítima do commit que matou o gatilho.
   | "plano_pronto";
 
 const lerNumero = (chave: string): number => {
@@ -94,6 +97,45 @@ export function podePedirAvaliacao(): boolean {
 }
 
 const CHAVE_PRIMEIRO_GASTO = "core-avaliacao-primeiro-gasto";
+const CHAVE_CONVITE_FUNIL = "core-avaliacao-convite-funil";
+/** Carimbo do último convite MOSTRADO (qualquer motivo). A cota do Google já
+ *  é protegida por `podePedirAvaliacao`, mas ela só conta pedido REAL — duas
+ *  folhas seguidas em dias diferentes passariam pelas duas e viveriam como
+ *  insistência. Uma semana entre convites resolve sem tabela nova. */
+const CHAVE_CONVITE_EM = "core-avaliacao-convite-em";
+const ESPERA_ENTRE_CONVITES_MS = 7 * 24 * 3600_000;
+
+const conviteRecente = (): boolean => {
+  const quando = lerNumero(CHAVE_CONVITE_EM);
+  return quando > 0 && Date.now() - quando < ESPERA_ENTRE_CONVITES_MS;
+};
+
+const marcarConvite = (chave: string) => {
+  try {
+    localStorage.setItem(chave, "1");
+    localStorage.setItem(CHAVE_CONVITE_EM, String(Date.now()));
+  } catch { /* modo privado */ }
+};
+
+/**
+ * Reserva o convite do FIM DO FUNIL — uma vez por aparelho.
+ *
+ * Onde: o passo em que o plano aparece montado, antes de qualquer preço. É o
+ * pico da jornada e o único ponto do app com volume de verdade (o funil vê
+ * ~300 pessoas/dia; o primeiro gasto, 2–5).
+ *
+ * O que este portão NÃO faz, e é o ponto: não gasta a janela de 90 dias. A
+ * folha só CONVIDA; `pedirAvaliacaoSePuder` (e portanto a cota) só roda se a
+ * pessoa tocar em "Deixar minha nota". Quem toca em "Agora não" continua
+ * inteiro pros momentos de valor de quem vira usuário de verdade.
+ */
+export function reservarConviteDoFunil(): boolean {
+  if (!podePedirAvaliacao()) return false;
+  if (lerNumero(CHAVE_CONVITE_FUNIL)) return false;
+  if (conviteRecente()) return false;
+  marcarConvite(CHAVE_CONVITE_FUNIL);
+  return true;
+}
 
 /**
  * Esta pessoa já lançou algum gasto — no mês corrente ou em qualquer mês
@@ -137,8 +179,9 @@ export function reservarConvitePrimeiroGasto(userId: string | null | undefined, 
   if (!userId) return false;
   if (!podePedirAvaliacao()) return false;
   if (lerNumero(CHAVE_PRIMEIRO_GASTO)) return false;
+  if (conviteRecente()) return false;
   if (jaLancouGastoAntes(userId, gastoId)) return false;
-  try { localStorage.setItem(CHAVE_PRIMEIRO_GASTO, "1"); } catch { /* modo privado */ }
+  marcarConvite(CHAVE_PRIMEIRO_GASTO);
   return true;
 }
 

@@ -20,7 +20,7 @@
  * app a conta nasce depois do pagamento) e a prova social no meio do quiz
  * (a web que dava ROI rodava com ela desligada; a prova mora no mural).
  */
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { Suspense, lazy, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
@@ -37,6 +37,12 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
+/* Lazy de propósito: esta folha só existe dentro do app da loja, e o
+   ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
+   02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
+const ConviteAvaliacao = lazy(() =>
+  import("@/components/avaliacao/ConviteAvaliacao").then((m) => ({ default: m.ConviteAvaliacao })));
+import type { PlanoDoConvite } from "@/components/avaliacao/ConviteAvaliacao";
 import { PaywallIOS } from "@/pages/funis/ios/PaywallIOS";
 import { SignupIOS, ConfirmIOS, LiberandoIOS } from "@/pages/funis/ios/CadastroIOS";
 import { ehApple } from "@/lib/loja";
@@ -547,6 +553,38 @@ export default function ComecarW() {
     window.scrollTo(0, 0);
   }, [params]);
 
+  /* ── CONVITE DE AVALIAÇÃO NO FIM DO FUNIL (03/09) ──────────────────────
+   * Volta o gatilho que colheu 63 avaliações em 27–29/08 (média 4,9) e morreu
+   * em 28/08 por uma leitura do Console atrasado. Sem ele o app ficou em 1–2
+   * avaliações/dia; o `primeiro_gasto`, que entrou pra substituir, alcançou 5
+   * aparelhos em 2 dias — ele exige conta criada e o 1º gasto no mesmo dia.
+   *
+   * O que mudou em relação à versão que morreu: a caixa do Google não abre
+   * sozinha. Abre a NOSSA folha, e só quem toca em "Deixar minha nota" gasta
+   * a janela de 90 dias do aparelho. Era essa a objeção legítima de quem
+   * desligou o gatilho: pedir nota antes de a pessoa virar pagante queimava a
+   * cota dela. Quem recusa continua elegível pra conta paga, sequência e
+   * retrospectiva.
+   *
+   * Onde: no `central` — o plano montado com os 16 módulos, DEPOIS do
+   * diagnóstico e ANTES de qualquer preço. É o pico da jornada (o mesmo ponto
+   * que o funil antigo usava, um passo à frente) e o único lugar do app com
+   * volume: ~300 pessoas/dia passam por aqui.
+   *
+   * Os 4s são pra folha não cobrir a tela que a pessoa acabou de abrir. ── */
+  const [planoDoConvite, setPlanoDoConvite] = useState<PlanoDoConvite | null>(null);
+  useEffect(() => {
+    if (naWeb || step !== "central") return;
+    const t = window.setTimeout(() => {
+      void import("@/lib/avaliacao").then((m) => {
+        if (!m.reservarConviteDoFunil()) return;
+        setPlanoDoConvite({ emoji: AREAS[areaOuPadrao].emoji, nome: AREAS[areaOuPadrao].nome });
+      }).catch(() => { /* convite nunca pode quebrar o funil */ });
+    }, 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naWeb, step]);
+
   /* ── RESGATE POR NOTIFICAÇÃO (02/09): quem chega ao paywall sem comprar
      recebe dois avisos (2h e 24h) apontando pra cá. Existia desde 14/08 e o
      paywall do W nunca armou. Só no shell; cancela ao pagar (pagoSemConta). ── */
@@ -614,6 +652,15 @@ export default function ComecarW() {
           </motion.div>
         )}
       </AnimatePresence>
+      {planoDoConvite && (
+        <Suspense fallback={null}>
+          <ConviteAvaliacao
+            plano={planoDoConvite}
+            pagante={false}
+            onFechar={() => setPlanoDoConvite(null)}
+          />
+        </Suspense>
+      )}
       {avisoVoltar && (
         <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[60] rounded-full bg-[#1c1917] text-white text-[12.5px] font-medium px-4 py-2 shadow-lg whitespace-nowrap">
           {naWeb ? "Sem pressa. Aperta Voltar de novo pra voltar um passo." : "Sem pressa. Aperta Voltar de novo pra sair."}

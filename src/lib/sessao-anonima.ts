@@ -174,6 +174,22 @@ function marcarBatismoPendente(userId: string) {
   try { localStorage.setItem(CHAVE_BATISMO, userId); } catch { /* noop */ }
 }
 
+/**
+ * QR PRIMEIRO (02/09): o Pix passou a nascer ANTES do e-mail. Quem paga sem
+ * tocar em "Salvar e-mail" caía em /home anônimo, sem e-mail e sem senha —
+ * acesso só no token do navegador (59% dos checkouts são o WebView do
+ * Instagram, que esquece). A pendência de batismo passa a ser marcada na
+ * hora em que o Pix é gerado numa sessão sem e-mail: depois de pagar, a tela
+ * de cadastro (e-mail + senha) vem antes do "liberando".
+ */
+export async function marcarBatismoSeSemEmail(): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getUser();
+    const u = data?.user;
+    if (u?.id && !u.email) marcarBatismoPendente(u.id);
+  } catch { /* noop */ }
+}
+
 export function limparBatismo() {
   try { localStorage.removeItem(CHAVE_BATISMO); } catch { /* noop */ }
 }
@@ -222,5 +238,14 @@ export async function batizarConta(
     return { erro: "falhou", mensagem: msg };
   }
   limparBatismo();
+  // 02/09: 21 dos 24 pagantes web de 01–02/09 estavam sem utm no perfil —
+  // persistLeadSource só rodava no signUp clássico, e o batismo não é signUp.
+  try {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user?.id) {
+      const { persistLeadSource } = await import("@/lib/lead-source");
+      await persistLeadSource(supabase as unknown as Parameters<typeof persistLeadSource>[0], data.user.id);
+    }
+  } catch { /* atribuição nunca pode impedir o acesso */ }
   return { erro: null };
 }

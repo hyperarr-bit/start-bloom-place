@@ -165,7 +165,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          {naWeb ? "uma vez só, sem mensalidade" : "4 meses de mensal = CORE pra sempre"}
+          {naWeb ? "= R$ 8,16/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (
@@ -616,7 +616,7 @@ export function PaywallW({
                 * Play" aqui seria mentira na tela que pede o dinheiro — e o
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
               {naWeb
-                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · sem mensalidade</>
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · garantia de 7 dias, devolve em 1 mensagem</>
                 : duasColunas && plano === "mensal"
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>
                 : <>Pagamento <strong className="text-foreground font-semibold">único</strong> {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · sem mensalidade</>}

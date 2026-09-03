@@ -11,11 +11,10 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="preload" as="image" href="/videos/financas-poster.jpg" type="image/jpeg" fetchpriority="high" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" />
     <style>
       html, body, #root {
         margin: 0;
@@ -151,21 +150,36 @@
             primeiroErro = (r && (r.message || String(r))) || "promise rejeitada";
           }
         });
+        // 02/09 (medido em 3G: o bundle chega em 22s): apagar o body aos 8s
+        // matava o React que ainda ia montar (erro #299, 22 sessões em 01/09)
+        // e mostrava "atualize o WebView" pra quem só tinha rede ruim. Agora é
+        // um OVERLAY por cima do #root, que some sozinho quando a raiz montar;
+        // o texto de WebView velho só aparece se houve ERRO de verdade.
         setTimeout(function () {
           var raiz = document.getElementById("root");
           if (raiz && raiz.children && raiz.children.length > 0) return; // montou, tudo certo
-          document.body.innerHTML =
+          var capa = document.createElement("div");
+          capa.id = "core-vigia";
+          capa.setAttribute("style", "position:fixed;inset:0;z-index:2147483647;background:#fff;overflow:auto");
+          try {
+            new MutationObserver(function (_, obs) {
+              if (raiz && raiz.children && raiz.children.length > 0) { capa.remove(); obs.disconnect(); }
+            }).observe(raiz, { childList: true });
+          } catch (e3) {}
+          document.body.appendChild(capa);
+          capa.innerHTML =
             '<div style="font-family:sans-serif;padding:32px 24px;max-width:420px;margin:0 auto;color:#1a1a1a;background:#fff">' +
-            '<div style="font-size:40px;margin-bottom:12px">😕</div>' +
-            '<h1 style="font-size:20px;margin:0 0 8px">O app não conseguiu abrir</h1>' +
-            '<p style="font-size:14px;line-height:1.5;color:#555;margin:0 0 16px">Geralmente isso acontece quando o <b>Android System WebView</b> está desatualizado. Abra a Play Store, procure por "Android System WebView" e toque em Atualizar. Depois volte aqui.</p>' +
+            '<div style="font-size:40px;margin-bottom:12px">' + (primeiroErro ? "😕" : "⏳") + '</div>' +
+            '<h1 style="font-size:20px;margin:0 0 8px">' + (primeiroErro ? "O app não conseguiu abrir" : "Ainda carregando…") + '</h1>' +
+            (primeiroErro ? "" : '<p style="font-size:14px;line-height:1.5;color:#555;margin:0 0 16px">Sua conexão está lenta. Já já abre — ou toca em recarregar.</p>') +
+            (primeiroErro ? '<p style="font-size:14px;line-height:1.5;color:#555;margin:0 0 16px">Geralmente isso acontece quando o <b>Android System WebView</b> está desatualizado. Abra a Play Store, procure por "Android System WebView" e toque em Atualizar. Depois volte aqui.</p>' : '') +
             '<button onclick="location.reload()" style="font-size:15px;font-weight:bold;padding:12px 24px;border:0;border-radius:10px;background:#1a1a1a;color:#fff;width:100%">Tentar de novo</button>' +
             (primeiroErro
               ? '<p style="font-size:11px;color:#999;margin-top:16px;word-break:break-all">Detalhe técnico: ' +
                 String(primeiroErro).replace(/</g, "&lt;").slice(0, 200) + "</p>"
               : "") +
             "</div>";
-        }, 8000);
+        }, 10000);
       })();
     </script>
 
@@ -218,13 +232,6 @@
       })();
     </script>
 
-    <script
-      src="https://cdn.utmify.com.br/scripts/utms/latest.js"
-      data-utmify-prevent-xcod-sck
-      data-utmify-prevent-subids
-      async
-      defer
-    ></script>
 
     <!-- TikTok Pixel Code Start -->
     <script>
@@ -236,8 +243,7 @@
          então nunca deu sinal de compra pro algoritmo. Este tem o par
          completo: pixel no navegador + Events API no cakto-webhook,
          deduplicados pelo orderId da Cakto. */
-      ttq.load('DA0V2RJC77U9J4MASJ4G');
-      ttq.page();
+      /* 02/09: ttq.load/page saem daqui e rodam no carregador adiado (abaixo) */
     }(window, document, 'ttq');
     </script>
     <!-- TikTok Pixel Code End -->
@@ -248,9 +254,7 @@
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
       n.callMethod.apply(n,arguments):n.queue.push(arguments)};
       if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      n.queue=[];/* 02/09: o fbevents.js entra no carregador adiado; aqui só a fila */}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '998037194527241');
       fbq('track', 'PageView');
@@ -258,7 +262,6 @@
     <!-- End Meta Pixel Code -->
 
     <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18254888989"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
@@ -266,6 +269,34 @@
       gtag('config', 'AW-18254888989');
     </script>
     <!-- End Google tag -->
+
+    <!-- Meta Pixel / Google tag / TikTok Pixel / UTMify — carregador adiado (02/09).
+         Medido na porta do funil em 4G ruim: 1.051 KB antes da 1ª tela, 611 KB
+         eram estes quatro scripts disputando a banda com o bundle de 354 KB —
+         tela branca de 5,8s; em 3G o bundle só chegava aos 22s. As filas (fbq,
+         dataLayer, ttq) já existem acima, então nenhum evento se perde: os
+         scripts remotos entram quando o React avisa que a 1ª tela montou
+         (core:montou), com rede de segurança no load e aos 6s. -->
+    <script>
+      (function () {
+        var feito = false;
+        function carregar(src, attrs) {
+          var s = document.createElement("script"); s.async = true; s.src = src;
+          for (var k in (attrs || {})) s.setAttribute(k, attrs[k]);
+          document.head.appendChild(s);
+        }
+        function pixels() {
+          if (feito) return; feito = true;
+          carregar("https://connect.facebook.net/en_US/fbevents.js");
+          carregar("https://www.googletagmanager.com/gtag/js?id=AW-18254888989");
+          carregar("https://cdn.utmify.com.br/scripts/utms/latest.js", { "data-utmify-prevent-xcod-sck": "", "data-utmify-prevent-subids": "" });
+          try { if (window.ttq) { window.ttq.load("DA0V2RJC77U9J4MASJ4G"); window.ttq.page(); } } catch (e) {}
+        }
+        window.addEventListener("core:montou", pixels, { once: true });
+        window.addEventListener("load", function () { setTimeout(pixels, 800); }, { once: true });
+        setTimeout(pixels, 6000);
+      })();
+    </script>
 
 
 

@@ -1,7 +1,7 @@
 /* 800/900 entraram no v60: os títulos do onboarding usam font-black e o
    navegador estava SINTETIZANDO o peso (faux bold, traço borrado) — a
    welcome sempre pediu 900 sem ter o arquivo. */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* Inter vem do <link> do index.html (02/09: o @import aqui era um 2º download da mesma fonte, em cadeia atrás do CSS) */
 
 @tailwind base;
 @tailwind components;

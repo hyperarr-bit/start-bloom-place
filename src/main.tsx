@@ -126,3 +126,6 @@ initPwaInstall();
 captureLandingMeta();
 
 createRoot(document.getElementById("root")!).render(<App />);
+// 02/09: os pixels de anúncio (index.html) só carregam depois da 1ª pintura —
+// o aviso sai no frame seguinte ao mount, quando a porta já está na tela.
+requestAnimationFrame(() => { setTimeout(() => { try { window.dispatchEvent(new Event("core:montou")); } catch { /* noop */ } }, 0); });

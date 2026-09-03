@@ -273,11 +273,13 @@ import AuthCallback from "./pages/AuthCallback";
 import ResetPassword from "./pages/ResetPassword";
 import UpdatePassword from "./pages/UpdatePassword";
 import LandingPage from "./pages/lp/LpFinancas";
-import Comecar from "./pages/Comecar";
+// 02/09: fora do bundle principal — a porta do /inicio não usa (49 KB raw);
+// o Suspense das rotas já cobre o flash.
+const Comecar = lazy(() => import("./pages/Comecar"));
 // dia14 é o funil do /inicio (25/07) — import EAGER: a URL do tráfego de
 // anúncio não pode ter flash de loading (lazy quebraria fora do Suspense).
 import ComecarWEager from "./pages/funis/w/ComecarW";
-import TutorialLab from "./pages/TutorialLab";
+const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do

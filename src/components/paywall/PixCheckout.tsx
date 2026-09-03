@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
-import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente } from "@/lib/sessao-anonima";
+import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail } from "@/lib/sessao-anonima";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 
@@ -373,6 +373,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       return;
     }
     if (estadoSessao === "anonima") { setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context }); }
+    // Pix numa sessão sem e-mail → depois de pagar, cadastro antes de liberar (QR primeiro, 02/09)
+    void marcarBatismoSeSemEmail();
     const t0 = Date.now();
     try {
       let data: any, error: any;

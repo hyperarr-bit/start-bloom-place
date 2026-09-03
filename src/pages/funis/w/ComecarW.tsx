@@ -361,6 +361,10 @@ export default function ComecarW() {
     // "liberando" = a conta nasceu; a partir daqui o RootGate manda pro app,
     // e progresso guardado só serviria pra prender alguém no funil.
     if (s === "liberando") limparProgresso(); else guardarChave(CHAVES.passo, s);
+    // WEB (02/09): uma entrada de history por passo — sem isso o Voltar do
+    // navegador do Instagram SAÍA do site (o funil é estado, não rota). A URL
+    // não muda (nada de ?step=, que dispararia o efeito de deep link).
+    if (naWeb) { try { window.history.pushState({ w: s }, ""); } catch { /* noop */ } }
     // "offer" é emitido pelo PaywallW no mount (com braço e área) — emitir
     // aqui também contava 2 paywalls por sessão (varredura 02/09).
     if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
@@ -463,6 +467,49 @@ export default function ComecarW() {
     return () => { vivo = false; if (handle) void handle.remove(); };
   }, [naWeb]);
 
+  /* ── VOLTAR DO NAVEGADOR (web, 02/09). Medido: "sumiu sem nenhum evento"
+     no start 21% (app 7%) e no offer 51% (app 19%) — o Voltar do navegador do
+     Instagram saía do site, ou caía na demo (única rota no history antes do
+     paywall). Agora volta de PASSO, como o Voltar físico no app; no paywall e
+     pós-compra o 1º Voltar fica (a entrada é devolvida à pilha) e o 2º em 3s
+     volta um passo. O quiz volta uma pergunta pela própria seta. ── */
+  const avisouVoltarRef = useRef(0);
+  useEffect(() => {
+    if (!naWeb) return;
+    try { window.history.replaceState({ ...(window.history.state || {}), w: stepRef.current }, ""); } catch { /* noop */ }
+    const aoPopstate = (e: PopStateEvent) => {
+      const alvo = (e.state as { w?: string } | null)?.w;
+      const atual = stepRef.current;
+      if (!alvo || alvo === atual) return;
+      const daTela = document.querySelector<HTMLButtonElement>('button[aria-label="Voltar"]');
+      if (atual === "quiz" && daTela) {
+        try { window.history.pushState({ w: atual }, ""); } catch { /* noop */ }
+        trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: atual, para: "tela", via: "navegador" });
+        daTela.click();
+        return;
+      }
+      if (ficaNoVoltar(atual)) {
+        const agora = Date.now();
+        if (agora - avisouVoltarRef.current > 3000) {
+          avisouVoltarRef.current = agora;
+          try { window.history.pushState({ w: atual }, ""); } catch { /* noop */ }
+          window.dispatchEvent(new CustomEvent("core:voltar"));
+          setAvisoVoltar(true);
+          window.setTimeout(() => setAvisoVoltar(false), 2600);
+          trackEvent("funnel_click", { cta: "w_back_ficou", funil: FUNIL, step: atual, via: "navegador" });
+          return;
+        }
+      }
+      trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: atual, para: alvo, via: "navegador" });
+      setStepCru(alvo as Step);
+      guardarChave(CHAVES.passo, alvo);
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", aoPopstate);
+    return () => window.removeEventListener("popstate", aoPopstate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [naWeb]);
+
   /* ── DEEP LINK DEPOIS DE MONTADO (02/09): o toque na notificação chega como
      navigate("/app?step=offer") DEPOIS de o RootGate já ter posto a pessoa em
      /app — mesmo pathname, o ComecarW não remonta e o ?step era ignorado. ── */
@@ -553,7 +600,7 @@ export default function ComecarW() {
       </AnimatePresence>
       {avisoVoltar && (
         <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[60] rounded-full bg-[#1c1917] text-white text-[12.5px] font-medium px-4 py-2 shadow-lg whitespace-nowrap">
-          Sem pressa. Aperta Voltar de novo pra sair.
+          {naWeb ? "Sem pressa. Aperta Voltar de novo pra voltar um passo." : "Sem pressa. Aperta Voltar de novo pra sair."}
         </div>
       )}
       {step === "promessas" && <PromessasScreen onDone={() => setStep("porta")} />}

@@ -224,9 +224,14 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
           <span className="text-[10px] font-semibold text-black/40">{naWeb ? "30 dias" : "por mês"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            {/* Na web o Pix não renova sozinho — dizer "cancele quando quiser"
-                aqui prometeria assinatura e viraria reembolso. */}
-            {naWeb ? <>pago uma vez,<br />não renova sozinho</> : "cancele quando quiser"}
+            {/* 03/09 (ordem do dono): o card da web fica com a MESMA cara do
+                app — sem a frase defensiva "não renova sozinho", que pesava na
+                coluna barata. A duração continua na tela em dois lugares (o
+                "30 dias" acima e o legal do CTA), porque na web o Pix não tem
+                débito automático: prometer "cancele quando quiser" aqui seria
+                vender assinatura que não existe, e a conta volta como
+                reembolso 30 dias depois. */}
+            {naWeb ? "acesso na hora" : "cancele quando quiser"}
           </span>
         </div>
       </div>
@@ -642,7 +647,7 @@ export function PaywallW({
                 * Play" aqui seria mentira na tela que pede o dinheiro — e o
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
               {naWeb && duasColunas && plano === "mensal"
-                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · <strong className="text-foreground font-semibold">30 dias</strong> de acesso, não renova sozinho · garantia de 7 dias</>
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · <strong className="text-foreground font-semibold">30 dias</strong> de acesso · garantia de 7 dias, devolve em 1 mensagem</>
                 : naWeb
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · garantia de 7 dias, devolve em 1 mensagem</>
                 : duasColunas && plano === "mensal"

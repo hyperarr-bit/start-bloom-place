@@ -38,7 +38,17 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * 1ª noite: o Pix fechou 33% dos QRs maduros contra 13% da folha do Google,
  * então o preço aguenta mais. O mapa é a ÚNICA fonte do valor: oferta sem
  * preço aqui devolve 503 em vez de cobrar errado. */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
+/* 03/09 — entra a `w25`: 1 MÊS por R$ 24,90 na web, ao lado do vitalício.
+ * Por que existe: o app mede que a 2ª coluna dobra a receita por paywall
+ * visto (R$ 3,68 com uma coluna × R$ 7,35 com duas, vitalício em foco) e
+ * leva a conversão de quem vê o paywall de 4,7% pra 12% — o mensal traz
+ * gente que não compraria, não rouba do vitalício. Na web o Pix não tem
+ * débito automático, então isto é PRÉ-PAGO: 30 dias, não renova sozinho, e
+ * a tela tem que dizer isso. */
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+const DESCRICAO_PIX: Record<string, string> = {
+  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes",
+};
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 
 const logStep = (step: string, details?: unknown) => {
@@ -265,7 +275,7 @@ serve(async (req) => {
         headers: asaasHeaders(apiKey),
         body: JSON.stringify({
           addressKey: chave,
-          description: offer === "downsell" ? "CORE vitalicio (oferta)" : "CORE vitalicio",
+          description: DESCRICAO_PIX[offer] ?? "CORE vitalicio",
           value: amount / 100, // Asaas trabalha em REAIS, não centavos
           format: "ALL",
           expirationSeconds: EXPIRA_SEGUNDOS,

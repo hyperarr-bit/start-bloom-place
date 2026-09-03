@@ -31,7 +31,17 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * linha abaixo a rebaixa pra "lifetime" e a venda entra pelo preço errado —
  * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
  * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+/* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
+ * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
+ * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
+ * `dias: null` = vitalício. */
+const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+  lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
+  downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w97: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+};
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -193,20 +203,52 @@ serve(async (req) => {
     const amountCents = PRECOS_CENTAVOS[offer];
 
     // grant idempotente + dedup com o polling do app
-    const { data: existing } = await admin.from("subscriptions").select("id, status, plan").eq("user_id", userId).maybeSingle();
+    const { data: existing } = await admin.from("subscriptions")
+      .select("id, status, plan, billing_period, current_period_end").eq("user_id", userId).maybeSingle();
     const jaLiberado = existing?.status === "active" && existing?.plan === "lifetime";
     const { data: u } = await admin.auth.admin.getUserById(userId);
     const email = u?.user?.email ?? null;
     const now = new Date();
-    const periodEnd = new Date(now); periodEnd.setFullYear(periodEnd.getFullYear() + 100);
+    const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
+
+    /* TRAVA DE REBAIXAMENTO: quem já é VITALÍCIO nunca pode virar linha de 30
+     * dias. Sem isto, um vitalício que passasse pelo checkout do mês (link
+     * antigo, aba esquecida, suporte) perderia o acesso em 30 dias sem que
+     * ninguém percebesse — o erro só apareceria um mês depois, como "sumiu
+     * meu acesso". Na dúvida o acesso maior vence. */
+    const eraVitalicio = existing?.billing_period === "lifetime";
+
+    /* Vitalício que paga o MÊS: a linha dele não se toca. Sobrescrever
+     * carimbaria amount_cents 2490 numa venda de 97,90 (o relatório de caixa
+     * passaria a mentir) e não daria nada a ele, que já tem tudo. O dinheiro
+     * fica visível no Asaas e no pix_order_created pro suporte devolver. */
+    if (eraVitalicio && concessao.dias !== null) {
+      logStep("Vitalício pagou o mês — linha preservada, caso de reembolso", { userId, offer, qrCodeId: qrCodeId.slice(0, 20) });
+      return jsonResponse({ received: true, granted: true, jaVitalicio: true });
+    }
+    const vitalicio = concessao.dias === null;
+
+    /* Mês pré-pago EMPILHA: se a pessoa ainda tem período válido, os 30 dias
+     * contam do fim dele, não de hoje — senão pagar de novo antes de vencer
+     * ENCURTA o acesso. Mesmo desenho do extend30 do cakto-webhook. */
+    const periodEnd = new Date(now);
+    if (vitalicio) periodEnd.setFullYear(periodEnd.getFullYear() + 100);
+    else {
+      const atual = existing?.current_period_end ? new Date(existing.current_period_end) : null;
+      const base = atual && atual > now ? atual : now;
+      periodEnd.setTime(base.getTime());
+      periodEnd.setDate(periodEnd.getDate() + (concessao.dias ?? 30));
+    }
     const payload = {
-      user_id: userId, status: "active", plan: "lifetime", billing_period: "lifetime",
+      user_id: userId, status: "active",
+      plan: vitalicio ? "lifetime" : concessao.plano,
+      billing_period: vitalicio ? "lifetime" : concessao.periodo,
       payment_method: "pix", abacatepay_billing_id: qrCodeId, customer_email: email, amount_cents: amountCents,
       current_period_start: now.toISOString(), current_period_end: periodEnd.toISOString(),
     };
     if (existing?.id) await admin.from("subscriptions").update(payload).eq("id", existing.id);
     else await admin.from("subscriptions").insert(payload);
-    logStep("Access granted", { userId, offer, qrCodeId: qrCodeId.slice(0, 20), jaLiberado });
+    logStep("Access granted", { userId, offer, plano: payload.plan, ate: payload.current_period_end, qrCodeId: qrCodeId.slice(0, 20), jaLiberado });
 
     if (!jaLiberado) {
       const { data: p } = await admin.from("profiles").select("display_name").eq("id", userId).maybeSingle();
@@ -223,7 +265,12 @@ serve(async (req) => {
           const firstName = (displayName ?? "").split(" ")[0] || null;
           await fetch("https://api.resend.com/emails", {
             method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ from, to: [email], subject: "Seu acesso vitalício ao CORE tá ativo ✅", html: welcomeHtml(firstName, email) }),
+            body: JSON.stringify({
+              from, to: [email],
+              // o assunto tem que dizer a verdade: mês pré-pago não é vitalício
+              subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅",
+              html: welcomeHtml(firstName, email),
+            }),
           });
           logStep("Welcome email sent", { to: email.slice(0, 3) + "***" });
         }

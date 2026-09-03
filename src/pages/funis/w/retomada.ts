@@ -88,6 +88,23 @@ const PASSO_ANTERIOR: Record<string, string> = {
   central: "result", compromissos: "central", contrato: "compromissos", notif: "contrato",
 };
 export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;
+
+/**
+ * Pra onde o 2º Voltar leva quem está NO PAYWALL (03/09).
+ *
+ * Medido no 1º dia inteiro da v100: dos 112 aparelhos que viram o paywall, 69
+ * apertaram Voltar nele e 53 apertaram de novo — e o `minimizeApp()` entregou
+ * os 53 pro launcher. Antes da v100 o Voltar caía na demo e 29% voltavam ao
+ * offer; agora volta 0% na mesma sessão. E a 2ª exibição do offer é o que
+ * converte: 33 aparelhos viram o paywall duas vezes hoje e 19 tocaram em
+ * pagar (58%), contra 29% de quem viu uma vez só.
+ *
+ * O destino é o CONTRATO, não a demo e não a central: é o pico de compromisso
+ * ("eu assinei") e o caminho de volta é curto — contrato → notif → offer.
+ * Uma vez por sessão; no 2º recuo o app minimiza, porque insistir com quem
+ * quer sair vira cárcere e nota 1 na loja.
+ */
+export const RECUO_DO_PAYWALL = "contrato";
 export const ficaNoVoltar = (passo: string): boolean => passo === "offer" || passo === "signup" || passo === "confirm" || passo === "liberando";
 /** Passos que um deep link (notificação, retomada) pode abrir direto. */
 export const PASSOS_DE_DEEP_LINK = new Set(["compromissos", "offer", "signup"]);

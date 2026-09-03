@@ -26,7 +26,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, RECUO_DO_PAYWALL } from "@/pages/funis/w/retomada";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -427,6 +427,8 @@ export default function ComecarW() {
   /* ── BOTÃO VOLTAR DO ANDROID (02/09) — ver retomada.ts. Só no shell. ── */
   const stepRef = useRef(step); stepRef.current = step;
   const ultimoVoltarRef = useRef(0);
+  /** O recuo do paywall vale UMA vez por sessão: na segunda o app minimiza. */
+  const recuouRef = useRef(false);
   const [avisoVoltar, setAvisoVoltar] = useState(false);
   useEffect(() => {
     if (naWeb) return;
@@ -436,10 +438,20 @@ export default function ComecarW() {
       const h = await App.addListener("backButton", () => {
         const s = stepRef.current;
         if (ficaNoVoltar(s)) {
-          // paywall e pós-compra: o 1º Voltar fica na tela; o 2º em 3s minimiza
+          // paywall e pós-compra: o 1º Voltar fica na tela; o 2º em 3s RECUA
+          // um passo (só no paywall, só uma vez) ou minimiza — ver
+          // RECUO_DO_PAYWALL em retomada.ts pro número que motivou.
           window.dispatchEvent(new CustomEvent("core:voltar")); // PaywallW desarma o resgate
           const agora = Date.now();
           if (agora - ultimoVoltarRef.current < 3000) {
+            if (s === "offer" && !recuouRef.current) {
+              recuouRef.current = true;
+              trackEvent("funnel_click", { cta: "w_back_recuou", funil: FUNIL, step: s, para: RECUO_DO_PAYWALL });
+              setStepCru(RECUO_DO_PAYWALL as Step);
+              guardarChave(CHAVES.passo, RECUO_DO_PAYWALL);
+              window.scrollTo(0, 0);
+              return;
+            }
             trackEvent("funnel_click", { cta: "w_back_minimizou", funil: FUNIL, step: s });
             void App.minimizeApp();
             return;
@@ -663,7 +675,9 @@ export default function ComecarW() {
       )}
       {avisoVoltar && (
         <div className="fixed bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[60] rounded-full bg-[#1c1917] text-white text-[12.5px] font-medium px-4 py-2 shadow-lg whitespace-nowrap">
-          {naWeb ? "Sem pressa. Aperta Voltar de novo pra voltar um passo." : "Sem pressa. Aperta Voltar de novo pra sair."}
+          {naWeb || (stepRef.current === "offer" && !recuouRef.current)
+            ? "Sem pressa. Aperta Voltar de novo pra voltar um passo."
+            : "Sem pressa. Aperta Voltar de novo pra sair."}
         </div>
       )}
       {step === "promessas" && <PromessasScreen onDone={() => setStep("porta")} />}

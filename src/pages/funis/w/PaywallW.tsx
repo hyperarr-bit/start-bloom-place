@@ -82,6 +82,29 @@ const ANDROID_DUAS_COLUNAS = true;
  * testes numa tela só. */
 const PRECO_WEB = "97,90";
 const OFERTA_WEB: "w97" = "w97";
+/* 2ª COLUNA NA WEB — 1 mês por R$ 24,90 (03/09).
+ *
+ * Por que: o app rodou os dois arranjos com dinheiro em cima e a régua limpa
+ * (receita por paywall VISTO, que não depende de gasto nem de campanha) deu
+ *   só o vitalício ............... R$ 3,68  (4,7% de quem vê o paywall compra)
+ *   duas colunas, MENSAL em foco . R$ 5,39
+ *   duas colunas, VITALÍCIO foco . R$ 7,35  (12% compra)
+ * O mensal não roubou do vitalício: dobrou o número de compradores. E o
+ * número não está inflado por renovação — nenhum mensal do app renovou ainda
+ * (o 1º vencimento é fim de setembro), então esses R$ 7,35 já contam o mensal
+ * como pagamento único, que é exatamente o que ele é na web.
+ *
+ * A ORDEM não é gosto: com o mensal em foco a mesma tela cai pra R$ 5,39. O
+ * vitalício nasce selecionado, sempre.
+ *
+ * REGRA DE CORTE combinada com o dono: depois de 200 paywalls vistos na web,
+ * se a receita por paywall estiver abaixo dos R$ 6,53 de 03/09 (uma coluna),
+ * volta pra false. É esta linha.
+ *
+ * Na web o Pix não tem débito automático, então isto é PRÉ-PAGO: 30 dias, sem
+ * renovar sozinho. Toda copy desta tela e do checkout diz isso. */
+const WEB_DUAS_COLUNAS = true;
+const OFERTA_WEB_MES: "w25" = "w25";
 /* QUEM NASCE SELECIONADO NO ANDROID — vira "vitalicio" em 01/09.
  *
  * Este é o 3º e último arranjo da vitrine. Os dois anteriores já rodaram com
@@ -185,7 +208,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
  *  mensal custam R$ 298,80 contra R$ 97,90 uma vez (= R$ 8,16/mês no 1º ano,
  *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
-function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void }) {
+function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -198,10 +221,12 @@ function PrecosLadoALadoW({ plano, onSelect }: { plano: "vitalicio" | "mensal"; 
           <span className="text-[30px] font-black leading-none mt-1.5">1</span>
           <span className="text-[12.5px] font-bold text-black/45">mês</span>
           <span className="text-[17px] font-extrabold mt-2">{APP_PRECOS.mensal.preco}</span>
-          <span className="text-[10px] font-semibold text-black/40">por mês</span>
+          <span className="text-[10px] font-semibold text-black/40">{naWeb ? "30 dias" : "por mês"}</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            cancele quando quiser
+            {/* Na web o Pix não renova sozinho — dizer "cancele quando quiser"
+                aqui prometeria assinatura e viraria reembolso. */}
+            {naWeb ? <>pago uma vez,<br />não renova sozinho</> : "cancele quando quiser"}
           </span>
         </div>
       </div>
@@ -256,7 +281,7 @@ export function PaywallW({
   /* DUAS COLUNAS OU UMA — quem decide não é mais o sorteio. iPhone: sempre
    * duas (spec do dono). Android: a constante acima. O braço do A/B só volta
    * a mandar se AB_LIGADO virar true. */
-  const duasColunas = naWeb ? false : ehApple() ? true : (ANDROID_DUAS_COLUNAS || braco === "b");
+  const duasColunas = naWeb ? WEB_DUAS_COLUNAS : ehApple() ? true : (ANDROID_DUAS_COLUNAS || braco === "b");
   /* Qual nasce SELECIONADO. A âncora do topo e o CTA acompanham a escolha —
    * é o que resolve o medo de "a pessoa se assusta com 97,90 antes de ver que
    * existe mensal". */
@@ -436,7 +461,7 @@ export function PaywallW({
   if (naWeb && pixAberto) {
     return (
       <PixCheckout
-        offer={OFERTA_WEB}
+        offer={duasColunas && plano === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB}
         context="funnel"
         onClose={(passo) => {
           setPixAberto(false);
@@ -475,9 +500,9 @@ export function PaywallW({
             // na web o preço é outro (27,90 no Pix) — a âncora tem que bater
             // com o card e com o CTA, senão a tela promete três números
             const preco = mostraMensal ? "24,90" : naWeb ? PRECO_WEB : "97,90";
-            const precoSub = mostraMensal ? "por mês" : "1x, pra sempre";
+            const precoSub = mostraMensal ? (naWeb ? "30 dias" : "por mês") : "1x, pra sempre";
             const precoTitulo = mostraMensal
-              ? <>CORE mensal,<br />pra começar hoje</>
+              ? <>{naWeb ? <>CORE por 30 dias,<br />pra começar hoje</> : <>CORE mensal,<br />pra começar hoje</>}</>
               : undefined;
             return area === "dinheiro"
               ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />
@@ -492,6 +517,7 @@ export function PaywallW({
         <motion.div {...stagger(1)}>
           {duasColunas ? (
             <PrecosLadoALadoW
+              naWeb={naWeb}
               plano={plano}
               onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
@@ -596,14 +622,14 @@ export function PaywallW({
               disabled={comprando}
               onClick={() => {
                 const escolha = duasColunas ? plano : "vitalicio";
-                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
+                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? "w25" : "w97") : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >
               {comprando
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : duasColunas && plano === "mensal"
-                  ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
+                  ? <>Começar por {APP_PRECOS.mensal.preco}{naWeb ? "" : "/mês"} <ArrowRight className="w-4 h-4" /></>
                   : <>Quero pra sempre — {naWeb ? PRECO_WEB : APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
@@ -615,7 +641,9 @@ export function PaywallW({
               {/* Na WEB não existe loja: quem cobra é o Pix. Dizer "pelo Google
                 * Play" aqui seria mentira na tela que pede o dinheiro — e o
                 * comprador que lê "Google Play" e vê um QR de Pix desiste. */}
-              {naWeb
+              {naWeb && duasColunas && plano === "mensal"
+                ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · <strong className="text-foreground font-semibold">30 dias</strong> de acesso, não renova sozinho · garantia de 7 dias</>
+                : naWeb
                 ? <>Pagamento <strong className="text-foreground font-semibold">único</strong> no Pix · acesso na hora · garantia de 7 dias, devolve em 1 mensagem</>
                 : duasColunas && plano === "mensal"
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês {pelaLoja()}{formasDePagamento() && ` · ${formasDePagamento()}`} · {avisoRenovacao()}</>

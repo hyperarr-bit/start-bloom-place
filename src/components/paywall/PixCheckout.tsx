@@ -26,7 +26,7 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
  * conta só fecha saindo da folha do Google: ela paga 13-27% (medido 27-31/08)
  * contra ~45% do Pix, cobra 15% e segura o dinheiro 60 dias. Mesmo funil,
  * mesmo preço do app (97,90), cano de pagamento diferente. */
-export type PixOffer = "lifetime" | "downsell" | "w97";
+export type PixOffer = "lifetime" | "downsell" | "w97" | "w25";
 
 /* 03/09 (ordem do dono, "97,90 em tudo"): a WEB passa a ter UM preço só.
  * A oferta `lifetime` — que a demo, o portão do /home, o /comecar e o
@@ -41,6 +41,14 @@ export const PIX_PRICES: Record<PixOffer, string> = {
   lifetime: "97,90",
   downsell: "19,90",
   w97: "97,90",
+  /* 03/09 — a 2ª coluna da web: 1 MÊS por 24,90. PRÉ-PAGO: o Pix não tem
+   * débito automático, então são 30 dias e acabou. A tela tem que dizer isso
+   * ("não renova sozinho") — prometer assinatura aqui vira reembolso. */
+  w25: "24,90",
+};
+/** Quais ofertas são acesso VITALÍCIO — o recibo e a copy mudam por isso. */
+export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
+  lifetime: true, downsell: true, w97: true, w25: false,
 };
 
 interface Props {
@@ -703,7 +711,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     </span>
                     <div>
                       <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
                     </div>
                   </div>
                   <div className="text-xl font-extrabold text-accent leading-none shrink-0">R$ {price}</div>
@@ -779,7 +787,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     </span>
                     <div>
                       <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -863,7 +871,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                       </span>
                       <div>
                         <div className="text-[13.5px] font-bold leading-tight">CORE completo</div>
-                        <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · acesso vitalício</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">16 módulos · {OFERTA_VITALICIA[offer] ? "acesso vitalício" : "30 dias de acesso"}</div>
                       </div>
                     </div>
                     <div className="text-right shrink-0">

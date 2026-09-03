@@ -36,7 +36,13 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490 };
+/* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
+ * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
+ * produto de graça, e é justamente aqui que ninguém olharia. */
+const DIAS_DA_OFERTA: Record<string, number | null> = {
+  lifetime: null, downsell: null, w97: null, w25: 30,
+};
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
 const logStep = (step: string, details?: unknown) => {
@@ -223,14 +229,19 @@ serve(async (req) => {
     }
 
     // quem já tem assinatura ativa vitalícia sai da fila
+    // 03/09: sai também quem tem MÊS pré-pago vigente (`w25`) — antes o filtro
+    // só conhecia "lifetime" e um mês ativo cairia aqui todo ciclo do cron,
+    // sendo recreditado de novo e de novo.
     const uids = [...porUser.keys()];
     const jaTem = new Set<string>();
     for (let i = 0; i < uids.length; i += 100) {
       const lote = uids.slice(i, i + 100);
       const { data: subs } = await admin
-        .from("subscriptions").select("user_id, status, plan").in("user_id", lote);
+        .from("subscriptions").select("user_id, status, plan, billing_period, current_period_end").in("user_id", lote);
       for (const s of subs ?? []) {
-        if (s.status === "active" && s.plan === "lifetime") jaTem.add(String(s.user_id));
+        if (s.status !== "active") continue;
+        if (s.billing_period === "lifetime" || s.plan === "lifetime") { jaTem.add(String(s.user_id)); continue; }
+        if (s.current_period_end && new Date(s.current_period_end) > new Date()) jaTem.add(String(s.user_id));
       }
     }
 
@@ -260,12 +271,15 @@ serve(async (req) => {
         const { data: au } = await admin.auth.admin.getUserById(uid);
         const email = au?.user?.email ?? null;
         const inicio = new Date(o.criadoEm);
-        const fim = new Date(inicio); fim.setFullYear(fim.getFullYear() + 100);
+        const dias = DIAS_DA_OFERTA[o.offer] ?? null;
+        const fim = new Date(inicio);
+        if (dias === null) fim.setFullYear(fim.getFullYear() + 100);
+        else fim.setDate(fim.getDate() + dias);
         const payload = {
           user_id: uid,
           status: "active",
-          plan: "lifetime",
-          billing_period: "lifetime",
+          plan: dias === null ? "lifetime" : "web",
+          billing_period: dias === null ? "lifetime" : "monthly_prepaid",
           payment_method: "pix",
           abacatepay_billing_id: o.orderId,
           customer_email: email,

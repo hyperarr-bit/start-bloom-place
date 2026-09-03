@@ -364,7 +364,7 @@ export default function ComecarW() {
     // WEB (02/09): uma entrada de history por passo — sem isso o Voltar do
     // navegador do Instagram SAÍA do site (o funil é estado, não rota). A URL
     // não muda (nada de ?step=, que dispararia o efeito de deep link).
-    if (naWeb) { try { window.history.pushState({ w: s }, ""); } catch { /* noop */ } }
+    if (naWeb && !voltandoRef.current) { try { window.history.pushState({ w: s }, ""); } catch { /* noop */ } }
     // "offer" é emitido pelo PaywallW no mount (com braço e área) — emitir
     // aqui também contava 2 paywalls por sessão (varredura 02/09).
     if (s !== "offer") trackEvent("funnel_view", { step: s === "porta" ? "start" : s, funil: FUNIL, ...(area ? { area } : {}) });
@@ -474,20 +474,20 @@ export default function ComecarW() {
      pós-compra o 1º Voltar fica (a entrada é devolvida à pilha) e o 2º em 3s
      volta um passo. O quiz volta uma pergunta pela própria seta. ── */
   const avisouVoltarRef = useRef(0);
+  const voltandoRef = useRef(false);
   useEffect(() => {
     if (!naWeb) return;
-    try { window.history.replaceState({ ...(window.history.state || {}), w: stepRef.current }, ""); } catch { /* noop */ }
+    try {
+      window.history.replaceState({ ...(window.history.state || {}), w: stepRef.current }, "");
+      // Pousou DIRETO no paywall/pós-compra (deep link, retomada)? Sem entrada
+      // nossa atrás, o 1º Voltar sairia do site sem popstate. Uma cópia da
+      // entrada faz o 1º Voltar cair aqui (fica + aviso); o 2º sai de verdade.
+      if (ficaNoVoltar(stepRef.current)) window.history.pushState({ w: stepRef.current }, "");
+    } catch { /* noop */ }
     const aoPopstate = (e: PopStateEvent) => {
       const alvo = (e.state as { w?: string } | null)?.w;
       const atual = stepRef.current;
-      if (!alvo || alvo === atual) return;
-      const daTela = document.querySelector<HTMLButtonElement>('button[aria-label="Voltar"]');
-      if (atual === "quiz" && daTela) {
-        try { window.history.pushState({ w: atual }, ""); } catch { /* noop */ }
-        trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: atual, para: "tela", via: "navegador" });
-        daTela.click();
-        return;
-      }
+      if (!alvo) return;
       if (ficaNoVoltar(atual)) {
         const agora = Date.now();
         if (agora - avisouVoltarRef.current > 3000) {
@@ -499,6 +499,22 @@ export default function ComecarW() {
           trackEvent("funnel_click", { cta: "w_back_ficou", funil: FUNIL, step: atual, via: "navegador" });
           return;
         }
+        // 2º Voltar em 3s: se pousou direto aqui, deixa sair; senão volta um passo
+        if (alvo === atual) { trackEvent("funnel_click", { cta: "w_back_saiu", funil: FUNIL, step: atual, via: "navegador" }); try { window.history.back(); } catch { /* noop */ } return; }
+      }
+      if (alvo === atual) return;
+      const daTela = document.querySelector<HTMLButtonElement>('button[aria-label="Voltar"]');
+      if (atual === "quiz" && daTela) {
+        // a seta da tela manda: pergunta anterior (continua no quiz → devolve
+        // a entrada à pilha) ou porta (setStep sem empilhar, via voltandoRef)
+        trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: atual, para: "tela", via: "navegador" });
+        voltandoRef.current = true;
+        daTela.click();
+        window.setTimeout(() => {
+          if (stepRef.current === "quiz") { try { window.history.pushState({ w: "quiz" }, ""); } catch { /* noop */ } }
+          voltandoRef.current = false;
+        }, 0);
+        return;
       }
       trackEvent("funnel_click", { cta: "w_back", funil: FUNIL, step: atual, para: alvo, via: "navegador" });
       setStepCru(alvo as Step);

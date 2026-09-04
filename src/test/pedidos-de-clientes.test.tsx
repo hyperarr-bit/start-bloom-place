@@ -8,6 +8,8 @@
  * Ciclo completo (regra da casa, 19/07): onde a feature é de UI, o teste
  * abre → usa → SAI → REABRE, porque o buraco costuma estar na remontagem.
  */
+import { syncFixedExpensesToBills } from "@/lib/finance-sync";
+import { getMonthTotals } from "@/components/finance/storage-keys";
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
@@ -19,9 +21,7 @@ import {
   mediaDeCiclo, faseDoDia, diasEntre, somarDias, type RegistroCiclo,
 } from "@/components/saude/CicloMenstrual";
 import { getFinanceStorageKeys, getCurrentYear, getCurrentMonthName } from "@/components/finance/storage-keys";
-import {
-  doPerfil, mesclarPerfil, perfilDe, PERFIL_PESSOAL, PERFIL_TODOS,
-} from "@/lib/finance-perfil";
+import { doPerfil, mesclarPerfil, perfilDe, PERFIL_PESSOAL, PERFIL_TODOS, doPerfilDueDays, mesclarPerfilDueDays, perfilAtivoLocal, etiquetar } from "@/lib/finance-perfil";
 
 const criarStore = (inicial: Record<string, unknown> = {}) => {
   const dados: Record<string, unknown> = { ...inicial };
@@ -327,5 +327,85 @@ describe("Perfis PF/PJ nas Finanças", () => {
     expect(semId.find(i => (i as { desc?: string }).desc === "sem id")?.perfil).toBe("acme");
     // e os outros perfis continuam lá
     expect(semId.filter(i => i.id === "1" || i.id === "4")).toHaveLength(2);
+  });
+});
+
+/* ============================================================
+ * 03/09 — reclamação de cliente: "o custo da empresa altera o pessoal"
+ * O vazamento era nas CONTAS do mês e nos leitores fora da tela.
+ * ============================================================ */
+describe("Perfis PF/PJ — contas do mês e leitores fora da tela", () => {
+  const dias = [
+    { day: 5, color: "slate", bills: [
+      { id: "a", name: "Aluguel", paid: false, value: 1500 },                 // pessoal (legado)
+      { id: "b", name: "Escritório", paid: false, value: 900, perfil: "acme" },
+    ] },
+    { day: 20, color: "slate", bills: [
+      { id: "c", name: "Contador", paid: true, value: 300, perfil: "acme" },
+    ] },
+  ];
+
+  it("custo fixo da empresa vira conta ETIQUETADA — e acompanha se o perfil do fixo mudar", () => {
+    const fixos = [{ id: "f1", description: "Sala comercial", value: 900, day: 10, perfil: "acme" }, { id: "f2", description: "Luz", value: 200, day: 15 }];
+    const out = syncFixedExpensesToBills(fixos, [])!;
+    const sala = out.flatMap((d) => d.bills).find((b) => b.fixedId === "f1")!;
+    const luz = out.flatMap((d) => d.bills).find((b) => b.fixedId === "f2")!;
+    expect(sala.perfil).toBe("acme");
+    expect(luz.perfil).toBeUndefined();
+    // o fixo passou pra pessoal: a conta perde a etiqueta
+    const out2 = syncFixedExpensesToBills([{ ...fixos[0], perfil: undefined }, fixos[1]], out)!;
+    expect(out2.flatMap((d) => d.bills).find((b) => b.fixedId === "f1")!.perfil).toBeUndefined();
+  });
+
+  it("o calendário do PESSOAL não mostra conta da empresa (e vice-versa)", () => {
+    expect(doPerfilDueDays(dias, PERFIL_PESSOAL).flatMap((d) => d.bills).map((b) => b.id)).toEqual(["a"]);
+    expect(doPerfilDueDays(dias, "acme").flatMap((d) => d.bills).map((b) => b.id)).toEqual(["b", "c"]);
+    expect(doPerfilDueDays(dias, PERFIL_TODOS).flatMap((d) => d.bills)).toHaveLength(3);
+  });
+
+  it("um ciclo inteiro no pessoal (paga, apaga, cria) preserva as contas da empresa — o caso que apagaria dinheiro", () => {
+    const visivel = doPerfilDueDays(dias, PERFIL_PESSOAL);
+    // marca o aluguel como pago e cria uma conta nova no dia 20
+    const editado = [
+      { ...visivel[0], bills: [{ ...visivel[0].bills[0], paid: true }] },
+      { day: 20, color: "slate", bills: [{ id: "n", name: "Internet", paid: false, value: 120 }] },
+    ];
+    const fora = mesclarPerfilDueDays(dias, editado, PERFIL_PESSOAL);
+    const todas = fora.flatMap((d) => d.bills);
+    expect(todas.map((b) => b.id).sort()).toEqual(["a", "b", "c", "n"]);
+    expect(todas.find((b) => b.id === "a")!.paid).toBe(true);
+    expect(todas.find((b) => b.id === "b")!.perfil).toBe("acme");
+    expect(todas.find((b) => b.id === "c")!.paid).toBe(true);
+    expect(todas.find((b) => b.id === "n")!.perfil).toBe(PERFIL_PESSOAL);
+  });
+
+  it("apagar TODAS as contas visíveis de um dia não leva as contas dos outros perfis junto", () => {
+    const fora = mesclarPerfilDueDays(dias, [{ day: 5, color: "slate", bills: [] }], PERFIL_PESSOAL);
+    expect(fora.find((d) => d.day === 5)!.bills.map((b) => b.id)).toEqual(["b"]);
+    expect(fora.find((d) => d.day === 20)!.bills.map((b) => b.id)).toEqual(["c"]);
+  });
+
+  it("os totais do mês seguem o perfil ativo gravado — e 'todos' soma tudo", () => {
+    const uid = "cliente-pj";
+    localStorage.setItem(`u:${uid}:finance-incomes`, JSON.stringify([{ id: "1", value: 5000 }, { id: "2", value: 20000, perfil: "acme" }]));
+    localStorage.setItem(`u:${uid}:finance-expenses`, JSON.stringify([{ id: "3", value: 800 }, { id: "4", value: 7000, perfil: "acme" }]));
+    localStorage.setItem(`u:${uid}:finance-fixed-expenses`, JSON.stringify([]));
+    localStorage.setItem(`u:${uid}:finance-installments`, JSON.stringify([]));
+    const mesAtual = new Date().toLocaleDateString("pt-BR", { month: "long" });
+    const mes = mesAtual.charAt(0).toUpperCase() + mesAtual.slice(1);
+    localStorage.setItem(`u:${uid}:finance-perfil-ativo`, JSON.stringify(PERFIL_PESSOAL));
+    expect(perfilAtivoLocal(uid)).toBe(PERFIL_PESSOAL);
+    expect(getMonthTotals(mes, uid).receitas).toBe(5000);
+    expect(getMonthTotals(mes, uid).custosVariaveis).toBe(800);
+    localStorage.setItem(`u:${uid}:finance-perfil-ativo`, JSON.stringify("acme"));
+    expect(perfilAtivoLocal(uid)).toBe("acme");
+    expect(getMonthTotals(mes, uid).receitas).toBe(20000);
+    expect(getMonthTotals(mes, uid, undefined, PERFIL_TODOS).receitas).toBe(25000);
+  });
+
+  it("lançamento criado fora da tela (widget/ação rápida) nasce etiquetado quando a empresa está ativa", () => {
+    const gasto: { id: string; value: number; perfil?: string } = { id: "x", value: 10 };
+    expect(etiquetar(gasto, "acme").perfil).toBe("acme");
+    expect(etiquetar(gasto, PERFIL_PESSOAL).perfil).toBeUndefined();
   });
 });

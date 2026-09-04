@@ -21,6 +21,9 @@ interface Bill {
   paid: boolean;
   value?: number;
   fixedId?: string;
+  /** 03/09: a conta carrega o perfil (PF/PJ) do custo fixo que a gerou. Sem
+   *  isso o aluguel da empresa aparecia no calendário pessoal. */
+  perfil?: string;
 }
 
 interface DueDay {
@@ -61,11 +64,11 @@ export function syncFixedExpensesToBills(fixedExpenses: any[], dueDays: DueDay[]
       // adota conta manual homônima em vez de duplicar
       for (const d of days) {
         const b = d.bills.find((x) => !x.fixedId && norm(x.name) === norm(f.description));
-        if (b) { holder = d; bill = b; b.fixedId = f.id; changed = true; break; }
+        if (b) { holder = d; bill = b; b.fixedId = f.id; if (f.perfil) b.perfil = f.perfil; changed = true; break; }
       }
     }
     if (!bill) {
-      dayFor(f.day).bills.push({ id: `fx-${f.id}`, name: f.description, paid: false, value: f.value, fixedId: f.id });
+      dayFor(f.day).bills.push({ id: `fx-${f.id}`, name: f.description, paid: false, value: f.value, fixedId: f.id, ...(f.perfil ? { perfil: f.perfil } : {}) });
       changed = true;
       continue;
     }
@@ -76,6 +79,8 @@ export function syncFixedExpensesToBills(fixedExpenses: any[], dueDays: DueDay[]
     }
     if (bill.name !== f.description) { bill.name = f.description; changed = true; }
     if (typeof f.value === "number" && bill.value !== f.value) { bill.value = f.value; changed = true; }
+    // custo fixo mudou de perfil (ou ganhou um): a conta acompanha
+    if ((f.perfil || undefined) !== (bill.perfil || undefined)) { if (f.perfil) bill.perfil = f.perfil; else delete bill.perfil; changed = true; }
   }
 
   if (!changed) return null;

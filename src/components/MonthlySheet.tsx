@@ -1,4 +1,5 @@
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { usarListaDoPerfil, usarDueDaysDoPerfil, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 import { IncomeTable } from "@/components/IncomeTable";
 import { ExpenseTable } from "@/components/ExpenseTable";
 import { FixedExpensesTable } from "@/components/FixedExpensesTable";
@@ -24,17 +25,25 @@ export const MonthlySheet = ({ month, year, onClose }: MonthlySheetProps) => {
   const keys = getFinanceStorageKeys(month, ano);
   const isCurrent = isCurrentMonth(month) && ano === getCurrentYear();
 
-  const [incomes, setIncomes] = usePersistedState(keys.incomes, [] as any[]);
-  const [expenses, setExpenses] = usePersistedState(keys.expenses, [] as any[]);
-  const [fixedExpenses, setFixedExpenses] = usePersistedState(keys.fixed, [] as any[]);
-  const [dueDays, setDueDays] = usePersistedState(keys.dueDays, [
+  /* 03/09: a planilha do mês segue o perfil ativo (PF/PJ), com a volta
+     mesclada — nunca grava a lista filtrada por cima da completa. */
+  const [perfilAtivo] = usePersistedState<string>("finance-perfil-ativo", PERFIL_PESSOAL);
+  const [incomesTodos, setIncomesTodos] = usePersistedState(keys.incomes, [] as any[]);
+  const [expensesTodos, setExpensesTodos] = usePersistedState(keys.expenses, [] as any[]);
+  const [fixedTodos, setFixedTodos] = usePersistedState(keys.fixed, [] as any[]);
+  const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilAtivo || PERFIL_PESSOAL);
+  const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilAtivo || PERFIL_PESSOAL);
+  const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedTodos, setFixedTodos, perfilAtivo || PERFIL_PESSOAL);
+  const [dueDaysTodos, setDueDaysTodos] = usePersistedState(keys.dueDays, [
     { day: 5, color: "yellow", bills: [] as any[] },
     { day: 10, color: "slate", bills: [] as any[] },
     { day: 20, color: "indigo", bills: [] as any[] },
     { day: 30, color: "emerald", bills: [] as any[] },
   ]);
+  const [dueDays, setDueDays] = usarDueDaysDoPerfil(dueDaysTodos as any[], setDueDaysTodos, perfilAtivo || PERFIL_PESSOAL);
   const [notes, setNotes] = usePersistedState(keys.notes, [] as any[]);
-  const [installments, setInstallments] = usePersistedState(keys.installments, [] as any[]);
+  const [installmentsTodos, setInstallmentsTodos] = usePersistedState(keys.installments, [] as any[]);
+  const [installments, setInstallments] = usarListaDoPerfil(installmentsTodos, setInstallmentsTodos, perfilAtivo || PERFIL_PESSOAL);
 
   /* Campo quebrado não pode SUMIR com dinheiro da conta (16/08). Um
      parcelamento gravado com valor inválido (é o que acontece quando o

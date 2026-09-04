@@ -3,6 +3,7 @@ import { ArrowLeftRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
+import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceCategories } from "@/lib/finance-categories";
 
@@ -40,8 +41,9 @@ interface CategoryData {
 
 const getExpensesByCategory = (month: string, userId: string | null): Record<string, number> => {
   const keys = getFinanceStorageKeys(month);
-  const expenses = readMonthData(userId, keys.expenses) || [];
-  const fixed = readMonthData(userId, keys.fixed) || [];
+  const perfil = perfilAtivoLocal(userId);
+  const expenses = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
+  const fixed = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
   const grouped: Record<string, number> = {};
 
   expenses.forEach((e: any) => {

@@ -7,6 +7,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -134,15 +135,16 @@ export const QuickActions = () => {
     const amount = parseFloat(expenseValue.replace(",", "."));
     if (!amount || amount <= 0) { toast.error("Informe um valor válido"); return; }
     const expenses = get<any[]>("finance-expenses", []);
+    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
     const catMap: Record<string, string> = { "Alimentação": "alimentacao", "Transporte": "transporte", "Lazer": "lazer", "Saúde": "saude", "Educação": "educacao", "Compras": "outros", "Outros": "outros" };
-    expenses.push({
+    expenses.push(etiquetar({
       id: crypto.randomUUID(),
       description: expenseCategory,
       value: amount,
       category: catMap[expenseCategory] || "outros",
       date: todayStr(),
       paymentMethod: "pix",
-    });
+    }, perfil));
     set("finance-expenses", expenses);
     vibrate();
     showSuccess("expense");

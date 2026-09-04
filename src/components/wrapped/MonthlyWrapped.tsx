@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence, animate } from "framer-motion";
 import { X, Share2, Loader2 } from "lucide-react";
 import { getMonthTotals, getFinanceStorageKeys, readMonthData } from "@/components/finance/storage-keys";
+import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { computeSavingsRate } from "@/lib/finance-totals";
 import { trackEvent } from "@/lib/analytics";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
@@ -60,8 +61,9 @@ export interface WrappedData {
 export const buildWrappedData = (month: string, userId: string | null, ano?: number): WrappedData | null => {
   const totals = getMonthTotals(month, userId, ano);
   const keys = getFinanceStorageKeys(month, ano);
-  const expenses: any[] = readMonthData(userId, keys.expenses) || [];
-  const fixed: any[] = readMonthData(userId, keys.fixed) || [];
+  const perfil = perfilAtivoLocal(userId);
+  const expenses: any[] = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
+  const fixed: any[] = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
 
   const income = totals.receitas;
   const outflow = totals.custosFixos + totals.custosVariaveis;

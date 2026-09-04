@@ -111,3 +111,79 @@ export const usarListaDoPerfil = <T extends ItemComPerfil>(
   doPerfil(completos, perfil),
   (visiveis: T[]) => gravar(mesclarPerfil(completos, visiveis, perfil)),
 ];
+
+
+/* ── CONTAS DO MÊS (`finance-dueDays`) POR PERFIL ──────────────────────────
+ * Reclamação de cliente (03/09): "tudo que eu coloco de custo ou receita
+ * fica alterando no pessoal". As LISTAS já eram filtradas; o vazamento
+ * estava nas CONTAS: o custo fixo da empresa virava conta do mês sem
+ * etiqueta (finance-sync), e o calendário, o "a vencer", o "quanto posso
+ * gastar" e os widgets da Home somavam tudo. Aqui a etiqueta desce pra
+ * conta (bill) dentro do dia, com a mesma regra de volta segura: contas dos
+ * outros perfis passam intactas, contas do perfil ativo são substituídas
+ * pelo que a tela devolveu, conta nova nasce etiquetada.
+ */
+export interface ContaComPerfil extends ItemComPerfil { fixedId?: string }
+export interface DiaComContas { day: number; color?: string; bills: ContaComPerfil[] }
+
+/** O que o calendário mostra: cada dia só com as contas do perfil. */
+export const doPerfilDueDays = <D extends DiaComContas>(dias: D[], perfil: string): D[] => {
+  if (perfil === PERFIL_TODOS) return dias;
+  return (dias || []).map((d) => ({ ...d, bills: doPerfil(d?.bills ?? [], perfil) }));
+};
+
+/** Recompõe os dias completos a partir do que a tela devolveu (mesma
+ *  mecânica de `mesclarPerfil`, dia a dia). */
+export const mesclarPerfilDueDays = <D extends DiaComContas>(completos: D[], visiveis: D[], perfil: string): D[] => {
+  if (perfil === PERFIL_TODOS) return visiveis;
+  const porDia = new Map<number, D>();
+  for (const d of completos || []) if (d && typeof d.day === "number") porDia.set(d.day, d);
+  const saida: D[] = [];
+  const vistos = new Set<number>();
+  for (const v of visiveis || []) {
+    if (!v || typeof v.day !== "number") continue;
+    vistos.add(v.day);
+    const original = porDia.get(v.day);
+    const deOutros = (original?.bills ?? []).filter((b) => perfilDe(b) !== perfil);
+    const doAtivo = mesclarPerfil(original?.bills ?? [], v.bills ?? [], perfil).filter((b) => perfilDe(b) === perfil);
+    saida.push({ ...(original ?? v), ...v, bills: [...deOutros, ...doAtivo] });
+  }
+  // dia que a tela não devolveu: se ainda tem conta de outro perfil, fica
+  for (const d of completos || []) {
+    if (!d || typeof d.day !== "number" || vistos.has(d.day)) continue;
+    const deOutros = (d.bills ?? []).filter((b) => perfilDe(b) !== perfil);
+    if (deOutros.length) saida.push({ ...d, bills: deOutros });
+  }
+  return saida.sort((a, b) => a.day - b.day);
+};
+
+export const usarDueDaysDoPerfil = <D extends DiaComContas>(
+  completos: D[],
+  gravar: (v: D[]) => void,
+  perfil: string,
+): [D[], (v: D[]) => void] => [
+  doPerfilDueDays(completos, perfil),
+  (visiveis: D[]) => gravar(mesclarPerfilDueDays(completos, visiveis, perfil)),
+];
+
+/** Etiqueta um item novo criado fora da tela de Finanças (widget, ação
+ *  rápida). Pessoal não recebe etiqueta — é o legado. */
+export const etiquetar = <T extends ItemComPerfil>(item: T, perfil: string): T =>
+  perfil === PERFIL_PESSOAL || perfil === PERFIL_TODOS ? item : { ...item, perfil };
+
+/**
+ * Perfil ativo lido direto do armazenamento — pra quem soma finanças FORA
+ * da tela (widgets da Home, hub, comparação de meses, retrospectiva).
+ * Mesma chave que a tela persiste (`finance-perfil-ativo`, JSON).
+ */
+export const perfilAtivoLocal = (userId: string | null | undefined): string => {
+  try {
+    if (typeof window === "undefined") return PERFIL_PESSOAL;
+    const w = window as unknown as { __PREVIEW_SEEDS__?: Record<string, unknown> };
+    if (!userId && w.__PREVIEW_SEEDS__) return String(w.__PREVIEW_SEEDS__["finance-perfil-ativo"] ?? PERFIL_PESSOAL);
+    if (!userId) return PERFIL_PESSOAL;
+    const raw = localStorage.getItem(`u:${userId}:finance-perfil-ativo`);
+    if (!raw) return PERFIL_PESSOAL;
+    try { const v = JSON.parse(raw); return typeof v === "string" && v ? v : PERFIL_PESSOAL; } catch { return raw || PERFIL_PESSOAL; }
+  } catch { return PERFIL_PESSOAL; }
+};

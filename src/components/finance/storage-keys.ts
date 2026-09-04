@@ -1,3 +1,4 @@
+import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 // Shared finance storage key utilities.
 //
 // IMPORTANT: All app data is stored in localStorage under a per-user prefix
@@ -134,13 +135,20 @@ const writeJsonForUser = (userId: string | null | undefined, logicalKey: string,
  * Read month totals from localStorage for the given user.
  * Returns zeros when no user / no data.
  */
-export const getMonthTotals = (month: string, userId: string | null | undefined, year?: number) => {
+/**
+ * 03/09: os totais seguem o PERFIL ATIVO (PF/PJ) por padrão — Dashboard,
+ * comparação de meses, retrospectiva e Pergunte ao CORE somavam a empresa
+ * junto com o pessoal. `perfil` explícito (ou PERFIL_TODOS) sobrepõe.
+ * Leitores de cópia/arquivo (virada de mês) usam readMonthData, que segue cru.
+ */
+export const getMonthTotals = (month: string, userId: string | null | undefined, year?: number, perfil?: string) => {
   const keys = getFinanceStorageKeys(month, year);
+  const p = perfil ?? perfilAtivoLocal(userId);
 
-  const incomes = readJsonForUser(userId, keys.incomes) || [];
-  const expenses = readJsonForUser(userId, keys.expenses) || [];
-  const fixed = readJsonForUser(userId, keys.fixed) || [];
-  const installments = readJsonForUser(userId, keys.installments) || [];
+  const incomes = doPerfil(readJsonForUser(userId, keys.incomes) || [], p);
+  const expenses = doPerfil(readJsonForUser(userId, keys.expenses) || [], p);
+  const fixed = doPerfil(readJsonForUser(userId, keys.fixed) || [], p);
+  const installments = doPerfil(readJsonForUser(userId, keys.installments) || [], p);
 
   return {
     receitas: incomes.reduce((s: number, i: any) => s + (i.value || 0), 0),

@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useRef } from "react";
 import { useUserData } from "@/hooks/use-user-data";
 import { semanaAtualId } from "@/lib/utils";
+import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 
 export interface LifeHubData {
   dayScore: number;
@@ -94,15 +95,17 @@ export function useLifeHubData(): LifeHubData {
     const tStr = todayStr();
 
     // Finance — read from the same keys used by the Finanças module
-    const incomes = get<any[]>("finance-incomes", []);
-    const variableExpenses = get<any[]>("finance-expenses", []);
-    const fixedExpenses = get<any[]>("finance-fixed-expenses", []);
+    // 03/09: a Home soma só o perfil ativo (PF/PJ) — reclamação de cliente
+    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+    const incomes = doPerfil(get<any[]>("finance-incomes", []), perfil);
+    const variableExpenses = doPerfil(get<any[]>("finance-expenses", []), perfil);
+    const fixedExpenses = doPerfil(get<any[]>("finance-fixed-expenses", []), perfil);
     const totalIncome = incomes.reduce((s: number, i: any) => s + (Number(i.value) || Number(i.amount) || 0), 0);
     const totalVariableExpense = variableExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
     const totalFixedExpense = fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);
     const monthBalance = totalIncome - totalVariableExpense - totalFixedExpense;
 
-    const dueDays = get<any[]>("finance-dueDays", []);
+    const dueDays = doPerfilDueDays(get<any[]>("finance-dueDays", []), perfil);
     const today = new Date().getDate();
     let nextBill: any = null;
     dueDays.forEach((d: any) => {

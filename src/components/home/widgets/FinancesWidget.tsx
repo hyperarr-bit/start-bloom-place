@@ -5,6 +5,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 import { useState } from "react";
+import { doPerfil, etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 
 export const FinancesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const navigate = useNavigate();
@@ -21,23 +22,25 @@ export const FinancesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
     e.stopPropagation();
     if (!quickName || !quickAmount) return;
     const currentExpenses = get<any[]>("finance-expenses", []);
-    const newExpense = {
+    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+    const newExpense = etiquetar({
       id: Date.now().toString(),
       description: quickName,
       category: "outros",
       value: parseFloat(quickAmount),
       date: localDayKey(),
-    };
+    }, perfil);
     set("finance-expenses", [...currentExpenses, newExpense]);
     setQuickName("");
     setQuickAmount("");
     setShowQuickAdd(false);
   };
 
-  const allExpenses = [
+  const perfilAtivo = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+  const allExpenses = doPerfil([
     ...get<any[]>("finance-expenses", []),
     ...get<any[]>("finance-fixed-expenses", []),
-  ];
+  ], perfilAtivo);
   const lastExpenses = allExpenses.slice(-2).reverse();
 
   if (size === "small") {

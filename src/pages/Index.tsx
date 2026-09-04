@@ -43,7 +43,7 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
-import { usarListaDoPerfil, mesclarPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
@@ -102,7 +102,7 @@ const Index = () => {
 
   const [fixedExpensesTodos, setFixedExpensesTodos] = usePersistedState("finance-fixed-expenses", [] as any[]);
 
-  const [dueDays, setDueDays] = usePersistedState("finance-dueDays", [
+  const [dueDaysTodos, setDueDaysTodos] = usePersistedState("finance-dueDays", [
     { day: 5, color: "yellow", bills: [] as any[] },
     { day: 10, color: "slate", bills: [] as any[] },
     { day: 20, color: "indigo", bills: [] as any[] },
@@ -135,6 +135,10 @@ const Index = () => {
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
   const [installments, setInstallments] = usarListaDoPerfil(installmentsTodos, setInstallmentsTodos, perfilValido);
+  /* 03/09 (reclamação de cliente): as CONTAS do mês também são do perfil.
+     O calendário, o "a vencer" e o "quanto posso gastar" veem só as contas
+     do perfil ativo; a escrita volta mesclada (finance-perfil.ts). */
+  const [dueDays, setDueDays] = usarDueDaysDoPerfil(dueDaysTodos, setDueDaysTodos, perfilValido);
 
   /* A PORTA DA CÓPIA DO MÊS — ligada pela primeira vez em 02/09.
      O MonthTurnover declarou esta prop em 08/08 e ninguém nunca a passou
@@ -150,7 +154,7 @@ const Index = () => {
       case "finance-fixed-expenses":
         setFixedExpensesTodos(mesclarPerfil(fixedExpensesTodos, valor as any[], PERFIL_PESSOAL)); return true;
       case "finance-dueDays":
-        setDueDays(valor as any[]); return true;
+        setDueDaysTodos(mesclarPerfilDueDays(dueDaysTodos, valor as any[], PERFIL_PESSOAL)); return true;
       case "finance-notes":
         setNotes(valor as any[]); return true;
       default:
@@ -166,10 +170,10 @@ const Index = () => {
     /* LISTA COMPLETA de propósito. O sync apaga toda conta cujo custo fixo
        não esteja na lista (finance-sync.ts): com a lista filtrada por perfil,
        trocar pra "Empresa X" apagaria as contas do Pessoal do calendário. */
-    const synced = syncFixedExpensesToBills(fixedExpensesTodos, dueDays);
-    if (synced) setDueDays(synced);
+    const synced = syncFixedExpensesToBills(fixedExpensesTodos, dueDaysTodos);
+    if (synced) setDueDaysTodos(synced);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userDataLoaded, fixedExpensesTodos, dueDays]);
+  }, [userDataLoaded, fixedExpensesTodos, dueDaysTodos]);
 
   const [annualData, setAnnualData] = usePersistedState("finance-annual", 
     months.map((m) => ({
@@ -366,7 +370,7 @@ const Index = () => {
             {/* Convite dos lembretes: entra ACIMA do dashboard e só quando já
                 existe conta cadastrada — pedir permissão antes de haver o que
                 lembrar queima a única chance no Android 13+. */}
-            <PedirLembretes dueDays={dueDays as never} />
+            <PedirLembretes dueDays={dueDaysTodos as never} />
             <TrackedCard cardKey="weekly-challenge" tab="dashboard">
               <WeeklyChallenge expenses={expenses} />
             </TrackedCard>

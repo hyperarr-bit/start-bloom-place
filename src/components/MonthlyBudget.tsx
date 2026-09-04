@@ -2,6 +2,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FileText, ChevronRight, ChevronLeft } from "lucide-react";
 import { getFinanceStorageKeys, isCurrentMonth, getCurrentYear, readMonthData } from "@/components/finance/storage-keys";
 import { useAuth } from "@/hooks/use-auth";
+import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 
 interface MonthBudget {
   month: string;
@@ -36,9 +37,10 @@ const ANO_MINIMO = 2015;
 
 const hasMonthData = (userId: string | null, month: string, year: number) => {
   const keys = getFinanceStorageKeys(month, year);
-  const incomes = readMonthData(userId, keys.incomes) || [];
-  const expenses = readMonthData(userId, keys.expenses) || [];
-  const fixed = readMonthData(userId, keys.fixed) || [];
+  const perfil = perfilAtivoLocal(userId);
+  const incomes = doPerfil(readMonthData(userId, keys.incomes) || [], perfil);
+  const expenses = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
+  const fixed = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
   return incomes.length > 0 || expenses.length > 0 || fixed.length > 0;
 };
 

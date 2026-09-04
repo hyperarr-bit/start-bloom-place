@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
 import { useUserData } from "@/hooks/use-user-data";
+import { doPerfil, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 
 export const BudgetRemainingWidget = () => {
   const { get } = useUserData();
-  const incomes = get<any[]>("finance-incomes", []);
-  const variableExpenses = get<any[]>("finance-expenses", []);
-  const fixedExpenses = get<any[]>("finance-fixed-expenses", []);
+  // 03/09: só o perfil ativo (PF/PJ) — a empresa não entra no orçamento pessoal
+  const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+  const incomes = doPerfil(get<any[]>("finance-incomes", []), perfil);
+  const variableExpenses = doPerfil(get<any[]>("finance-expenses", []), perfil);
+  const fixedExpenses = doPerfil(get<any[]>("finance-fixed-expenses", []), perfil);
   const totalIncome = incomes.reduce((s: number, i: any) => s + (Number(i.value) || Number(i.amount) || 0), 0);
   const totalExpense = variableExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0)
     + fixedExpenses.reduce((s: number, e: any) => s + (Number(e.value) || Number(e.amount) || 0), 0);

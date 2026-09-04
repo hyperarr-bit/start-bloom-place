@@ -26,6 +26,7 @@ import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
+import { CHAVES_FUNIL_W, guardarChave, lerChave, ehPerfilSimples } from "@/pages/funis/w/retomada";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, TrustChips, CompareTable, CHART_LABEL,
@@ -290,11 +291,16 @@ export function PaywallW({
   /* Qual nasce SELECIONADO. A âncora do topo e o CTA acompanham a escolha —
    * é o que resolve o medo de "a pessoa se assusta com 97,90 antes de ver que
    * existe mensal". */
-  const [plano, setPlano] = useState<"vitalicio" | "mensal">(() =>
-    naWeb ? "vitalicio"
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">(() => {
+    // 04/09: quem volta (retomada, notificação) pousa com a coluna que já
+    // tinha escolhido — a 2ª exposição é onde 30% das vendas acontecem.
+    if (!naWeb) { const salvo = lerChave<"vitalicio" | "mensal">(CHAVES_FUNIL_W.plano); if (salvo === "vitalicio" || salvo === "mensal") return salvo; }
+    return naWeb ? "vitalicio"
       : ehApple() ? IOS_PLANO_INICIAL
       : ANDROID_DUAS_COLUNAS ? ANDROID_PLANO_INICIAL
-      : sortearBraco() === "b" ? "mensal" : "vitalicio");
+      : sortearBraco() === "b" ? "mensal" : "vitalicio";
+  });
+  const simples = ehPerfilSimples(answers);
 
   /* ROTULO DO BRAÇO NA TELEMETRIA — não é detalhe de relatório.
    * O A/B do Android (`core-w-braco`, 50/50) decide NESTA SEMANA se a vitrine
@@ -306,7 +312,7 @@ export function PaywallW({
 
   useEffect(() => {
     vivoRef.current = true;
-    trackEvent("funnel_view", { step: "offer", funil: "w", area, braco: bracoEvento });
+    trackEvent("funnel_view", { step: "offer", funil: "w", area, braco: bracoEvento, perfil: simples ? "simples" : "topo" });
     /* Varredura 31/08 (5 sessões de emulador insistindo no produto_ausente
      * expuseram a diferença): o W montava SEM initRevenueCat() — no funil de
      * porta o comprador é anônimo e nada no boot inicializa o RC, então o
@@ -340,6 +346,12 @@ export function PaywallW({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* 04/09: quem TOCOU e não pagou compra 10× mais na volta do que quem só
+   * viu (1,6% × 0,17%). A régua ganha a copy de "reservado" e o plano. */
+  const rearmarResgateTocou = () => {
+    if (naWeb) return;
+    void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[area].nome, { area, tocou: true, plano: duasColunas ? plano : "vitalicio" })).catch(() => { /* noop */ });
+  };
   const desarmar = () => {
     setReabrindoEm(null);
     if (contagemRef.current) { window.clearInterval(contagemRef.current); contagemRef.current = null; }
@@ -413,6 +425,7 @@ export function PaywallW({
          * na folha, voltou e tocou de novo). O motor já tentou restaurar; aqui
          * vai o caminho do "Já paguei", que também confere a compra local. */
         setErro("A Play diz que esta compra já é sua. Conferindo…");
+        if (!naWeb) void import("@/lib/notificacoes").then((m) => m.cancelarResgateDoPlano()).catch(() => { /* noop */ });
         void confirmarPagamento();
       } else if (motivo === "nao_permitido") {
         /* 02/09: conta Google que NÃO PODE comprar (5–13/dia). "Tenta de novo"
@@ -424,12 +437,15 @@ export function PaywallW({
          * Pix pendente pra resgatar nem lentidão de renderização pra cobrir.
          * Só conta a recusa; a pessoa continua no paywall com o botão vivo. */
         cancelamentos.current += 1;
+        rearmarResgateTocou();
       } else if (dentroDaFolha >= 30 && !pixVencendoJaFoi.current) {
         pixVencendoJaFoi.current = true;
         setPixVencendo(true);
+        rearmarResgateTocou();
         trackEvent("funnel_view", { step: "w_pix_vencendo", funil: "w" });
       } else if (dentroDaFolha < 20 && cancelamentos.current === 0) {
         cancelamentos.current += 1;
+        rearmarResgateTocou();
         setResgatePix(true);
         setReabrindoEm(4);
         trackEvent("funnel_view", { step: "w_resgate_pix", funil: "w" });
@@ -446,6 +462,7 @@ export function PaywallW({
         }, 1000);
       } else {
         cancelamentos.current += 1;
+        rearmarResgateTocou();
       }
     } catch { setErro(erroFolhaNaoConcluiu()); }
     setComprando(false);
@@ -491,8 +508,18 @@ export function PaywallW({
       <h1 className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
         Seu plano pra<br /><span className="text-accent">{vitoria[area]}</span><br />está pronto
       </h1>
-      <p className="text-muted-foreground text-sm leading-relaxed mb-5">
-        Você já viu como funciona. Agora é com os seus números de verdade.
+      <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+        {simples
+          ? "Do jeito simples: 5 minutos por dia, e o CORE cuida do resto."
+          : "Você já viu como funciona. Agora é com os seus números de verdade."}
+      </p>
+      {/* PROVA NA DOBRA (04/09): 84% das saídas e 75% dos toques acontecem em
+          <30s e 4 em 5 nunca chegam ao mural lá embaixo. Uma avaliação real,
+          curta, junto do preço. No iPhone a loja não é citada (3.1.1). */}
+      <p className="text-[12.5px] text-muted-foreground leading-snug mb-5 flex items-center justify-center gap-1.5 flex-wrap">
+        <span className="text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</span>
+        <span>“Tudo que eu sempre quis num planner. Vale cada centavo.”</span>
+        <span className="font-semibold text-foreground/70">Elisa D. · {ehApple() ? "avaliação de usuário" : "Google Play"}</span>
       </p>
 
       <div className="space-y-4">
@@ -524,14 +551,16 @@ export function PaywallW({
             <PrecosLadoALadoW
               naWeb={naWeb}
               plano={plano}
-              onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
+              onSelect={(p) => { setPlano(p); if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
             <LifetimeCardW naWeb={naWeb} />
           )}
         </motion.div>
         <motion.div {...stagger(2)}><TransformChart label={chartLabel} /></motion.div>
-        <ValueStack area={area} />
+        {/* quem pediu "bem simples" some em <10s diante da pilha de 16 módulos:
+            pra esse perfil ela sai (04/09); o resto da tela é o mesmo */}
+        {!simples && <ValueStack area={area} />}
         <motion.div {...stagger(3)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
 
         <MuralDepoimentos area={area} />
@@ -627,6 +656,7 @@ export function PaywallW({
               disabled={comprando}
               onClick={() => {
                 const escolha = duasColunas ? plano : "vitalicio";
+                if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, escolha);
                 trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? "w25" : "w97") : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}

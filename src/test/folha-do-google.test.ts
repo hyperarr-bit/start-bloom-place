@@ -14,7 +14,7 @@ vi.mock("@/lib/analytics", () => ({ trackEvent: mocks.trackEvent, getAttribution
 vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => mocks.shell.on }));
 
 import { desfechoDaFalha, motivoUltimaCompra } from "@/lib/revenuecat";
-import { CHAVES_FUNIL_W, VALIDADE_PROGRESSO_MS, guardarChave, lerChave, limparProgresso, passoDeRetomada } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W, VALIDADE_PROGRESSO_MS, REINICIO_ATE_MS, guardarChave, lerChave, idadeDaChave, limparProgresso, passoDeRetomada, ehPerfilSimples } from "@/pages/funis/w/retomada";
 
 beforeEach(() => { localStorage.clear(); mocks.trackEvent.mockClear(); mocks.shell.on = true; });
 
@@ -70,7 +70,10 @@ describe("retomada do funil W — o progresso sobrevive ao app morrer", () => {
   it("no shell, volta pro passo certo: paywall fica paywall, carregando vira o seguinte, pós-compra vira cadastro", () => {
     expect(passoDeRetomada("offer", true)).toBe("offer");
     expect(passoDeRetomada("contrato", true)).toBe("contrato");
-    expect(passoDeRetomada("progress", true)).toBe("result");
+    // 04/09: quem já tinha plano montado pousa na CENTRAL ("seu plano está pronto")
+    expect(passoDeRetomada("progress", true)).toBe("central");
+    expect(passoDeRetomada("prova", true)).toBe("central");
+    expect(passoDeRetomada("result", true)).toBe("central");
     expect(passoDeRetomada("liberando", true)).toBe("signup");
     expect(passoDeRetomada("confirm", true)).toBe("signup");
     expect(passoDeRetomada("signup", true)).toBe("signup");
@@ -206,5 +209,59 @@ describe("ofertas do checkout da web", () => {
   it("o 27,90 não existe mais em oferta nenhuma", async () => {
     const { PIX_PRICES } = await import("@/components/paywall/PixCheckout");
     expect(Object.values(PIX_PRICES)).not.toContain("27,90");
+  });
+});
+
+/* ============================================================
+ * 04/09 — RETOMADA LONGA, "SIMPLES" E A RÉGUA DE SEGUNDA CHANCE
+ * ============================================================ */
+describe("retomada longa (04/09)", () => {
+  it("o progresso vale dias, não horas — e o carimbo diz se foi reinício ou volta", () => {
+    expect(VALIDADE_PROGRESSO_MS).toBeGreaterThanOrEqual(7 * 24 * 3600_000);
+    expect(REINICIO_ATE_MS).toBe(6 * 3600_000);
+    localStorage.setItem(CHAVES_FUNIL_W.passo, JSON.stringify({ v: "offer", t: Date.now() - 3 * 24 * 3600_000 }));
+    expect(lerChave<string>(CHAVES_FUNIL_W.passo)).toBe("offer");            // 3 dias depois ainda retoma
+    expect(idadeDaChave(CHAVES_FUNIL_W.passo)!).toBeGreaterThan(REINICIO_ATE_MS); // e conta como "volta"
+    localStorage.setItem(CHAVES_FUNIL_W.passo, JSON.stringify({ v: "offer", t: Date.now() - 40 * 24 * 3600_000 }));
+    expect(lerChave(CHAVES_FUNIL_W.passo)).toBeNull();                         // 40 dias: aparelho de outra vida
+    expect(idadeDaChave(CHAVES_FUNIL_W.passo)).toBeNull();
+  });
+
+  it("a coluna escolhida tem chave própria e limparProgresso leva ela junto", () => {
+    guardarChave(CHAVES_FUNIL_W.plano, "mensal");
+    expect(lerChave<string>(CHAVES_FUNIL_W.plano)).toBe("mensal");
+    limparProgresso();
+    expect(localStorage.getItem(CHAVES_FUNIL_W.plano)).toBeNull();
+  });
+
+  it("perfil 'simples' vem da resposta do compromisso, e só dela", () => {
+    expect(ehPerfilSimples({ compromisso: "Topo, se for bem simples" })).toBe(true);
+    expect(ehPerfilSimples({ compromisso: "Sim, topo" })).toBe(false);
+    expect(ehPerfilSimples({})).toBe(false);
+    expect(ehPerfilSimples(null)).toBe(false);
+  });
+});
+
+import { proximaManha, copyDoResgate } from "@/lib/notificacoes";
+describe("régua de segunda chance (04/09)", () => {
+  it("a 2ª notificação cai na próxima 09:30 a pelo menos 12h de distância", () => {
+    const as14 = new Date(2026, 8, 4, 14, 0, 0);   // 14h → amanhã 09:30 (19,5h)
+    expect(proximaManha(as14).getTime()).toBe(new Date(2026, 8, 5, 9, 30, 0).getTime());
+    const as23 = new Date(2026, 8, 4, 23, 10, 0);  // 23h10 → amanhã 09:30 está a 10h20 → depois de amanhã
+    expect(proximaManha(as23).getTime()).toBe(new Date(2026, 8, 6, 9, 30, 0).getTime());
+    const as02 = new Date(2026, 8, 5, 2, 0, 0);    // 02h → hoje 09:30 está a 7h30 → amanhã 09:30
+    expect(proximaManha(as02).getTime()).toBe(new Date(2026, 8, 6, 9, 30, 0).getTime());
+  });
+
+  it("a copy nunca abre com preço, e distingue quem tocou de quem só viu", () => {
+    const viu = copyDoResgate("Dinheiro", false);
+    const tocou = copyDoResgate("Dinheiro", true, "mensal");
+    for (const c of [viu.agora, viu.manha, tocou.agora, tocou.manha]) {
+      expect(`${c.title} ${c.body}`).not.toMatch(/R\$|97|24,90|preço/i);
+    }
+    expect(viu.agora.title).toMatch(/ficou salvo/);
+    expect(tocou.agora.title).toMatch(/reservado/);
+    expect(tocou.agora.title).toMatch(/mês/);
+    expect(copyDoResgate("Rotina", true, "vitalicio").agora.title).toMatch(/vitalício/);
   });
 });

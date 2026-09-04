@@ -409,3 +409,16 @@ describe("Perfis PF/PJ — contas do mês e leitores fora da tela", () => {
     expect(etiquetar(gasto, PERFIL_PESSOAL).perfil).toBeUndefined();
   });
 });
+
+import { AnchorCard } from "@/pages/funis/dia14/PaywallDia14";
+describe("âncora do paywall pra quem 'não faz ideia' (04/09)", () => {
+  it("renderiza a dor em vez de sumir — e some só quando não há resposta", () => {
+    const { container, unmount } = render(<AnchorCard gasto="Não faço ideia" preco="97,90" />);
+    expect(container.textContent).toMatch(/Pra onde vai/);
+    expect(container.textContent).toMatch(/97,90/);
+    expect(container.textContent).not.toMatch(/R\$ ?\d.*somem/i); // nenhum número inventado
+    unmount();
+    const vazio = render(<AnchorCard gasto="" preco="97,90" />);
+    expect(vazio.container.textContent).toBe("");
+  });
+});

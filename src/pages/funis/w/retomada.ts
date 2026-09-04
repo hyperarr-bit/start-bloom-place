@@ -16,9 +16,33 @@ export const CHAVES_FUNIL_W = {
   respostas: "core-funil-w-respostas",
   passo: "core-funil-w-passo",
   posCompra: "core-funil-w-pos-compra",
+  /** Coluna de preço escolhida no paywall (04/09): quem volta pousa com ela marcada. */
+  plano: "core-funil-w-plano",
 } as const;
 
-export const VALIDADE_PROGRESSO_MS = 6 * 60 * 60 * 1000;
+/* 04/09 — RETOMADA LONGA. Nasceu com 6h porque a hipótese era "o app morreu
+ * na folha e voltou em minutos". Medido em 27/08→04/09 (6.458 aparelhos):
+ * 32% das vendas acontecem FORA da sessão de instalação e 18% em OUTRO dia;
+ * quem volta e RETOMA chega ao paywall 91–100% e compra 3–9%; quem volta e
+ * cai na welcome chega 18–35% e compra 1,5–1,8%. Com 6h, 117 de 137 retornos
+ * caíam na welcome e 36 refaziam o quiz inteiro. Trinta dias: a pessoa que
+ * instalou, montou o plano e voltou na semana seguinte encontra o plano. O
+ * limite existe pra um aparelho de segunda mão não abrir num funil alheio. */
+export const VALIDADE_PROGRESSO_MS = 30 * 24 * 60 * 60 * 1000;
+/** Acima disto a retomada é "volta" (a pessoa saiu e voltou), não "reinício". */
+export const REINICIO_ATE_MS = 6 * 60 * 60 * 1000;
+
+/** Há quanto tempo a chave foi gravada (ms), ou null se não existe/venceu. */
+export const idadeDaChave = (chave: string): number | null => {
+  try {
+    const cru = localStorage.getItem(chave);
+    if (!cru) return null;
+    const j = JSON.parse(cru) as { t?: number } | null;
+    if (!j || typeof j !== "object" || typeof j.t !== "number") return null;
+    const idade = Date.now() - j.t;
+    return idade < VALIDADE_PROGRESSO_MS ? idade : null;
+  } catch { return null; }
+};
 
 export const guardarChave = (chave: string, valor: unknown): void => {
   try { localStorage.setItem(chave, JSON.stringify({ v: valor, t: Date.now() })); } catch { /* modo privado */ }
@@ -40,13 +64,14 @@ export const limparProgresso = (): void => {
 };
 
 /**
- * Onde retomar a partir do passo salvo. Passos de "carregando" viram o passo
- * seguinte (progress → result); os pós-cadastro viram o cadastro (a conta
- * ainda não existe, senão o RootGate nem teria trazido a pessoa pra cá);
+ * Onde retomar a partir do passo salvo. Quem já tinha PLANO montado (prova,
+ * carregando, diagnóstico) pousa na CENTRAL — "seu plano está pronto" — e
+ * não no diagnóstico de novo (04/09); os pós-cadastro viram o cadastro (a
+ * conta ainda não existe, senão o RootGate nem teria trazido a pessoa pra cá);
  * welcome/promessas/porta não valem retomada — é o começo mesmo.
  */
 const RETOMAVEIS: Record<string, string> = {
-  quiz: "quiz", prova: "result", progress: "result", result: "result", central: "central",
+  quiz: "quiz", prova: "central", progress: "central", result: "central", central: "central",
   compromissos: "compromissos", contrato: "contrato", notif: "notif", offer: "offer",
   signup: "signup", confirm: "signup", liberando: "signup",
 };
@@ -105,6 +130,12 @@ export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[
  * quer sair vira cárcere e nota 1 na loja.
  */
 export const RECUO_DO_PAYWALL = "contrato";
+
+/** Quem pediu "Topo, se for bem simples" no quiz (24% de quem vê o paywall)
+ *  toca 23,5% contra 39,7% de quem pediu "Sim, topo" — e some em <10s. O
+ *  paywall fala diferente com essa pessoa (04/09). */
+export const ehPerfilSimples = (answers: Record<string, string> | null | undefined): boolean =>
+  (answers?.compromisso ?? "") === "Topo, se for bem simples";
 export const ficaNoVoltar = (passo: string): boolean => passo === "offer" || passo === "signup" || passo === "confirm" || passo === "liberando";
 /** Passos que um deep link (notificação, retomada) pode abrir direto. */
 export const PASSOS_DE_DEEP_LINK = new Set(["compromissos", "offer", "signup"]);

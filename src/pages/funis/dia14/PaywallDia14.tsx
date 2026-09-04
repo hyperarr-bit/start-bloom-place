@@ -303,13 +303,27 @@ function GuaranteeTimeline() {
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
 export function AnchorCard({ gasto, preco = PRICING.lifetime.total, precoSub = "1x, pra sempre", precoTitulo }: { gasto: string; preco?: string; precoSub?: string; precoTitulo?: React.ReactNode }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
-  if (!anchor) return null;
+  /* 04/09: "Não faço ideia" é 42% de quem escolhe dinheiro e ficava SEM
+   * âncora (return null). Sem inventar número: a coluna da esquerda vira a
+   * própria dor — não saber — que é o que o produto resolve. */
+  const semIdeia = !anchor && gasto === "Não faço ideia";
+  if (!anchor && !semIdeia) return null;
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <div className="grid grid-cols-2 divide-x divide-border">
         <div className="pr-3 text-center">
-          <p className="text-[11px] text-muted-foreground leading-tight mb-1">Somem por ano,<br />pela sua estimativa</p>
-          <p className="text-xl font-extrabold text-destructive/80 tracking-tight">{anchor.year}</p>
+          {semIdeia ? (
+            <>
+              <p className="text-[11px] text-muted-foreground leading-tight mb-1">Pra onde vai<br />seu dinheiro hoje</p>
+              <p className="text-xl font-extrabold text-destructive/80 tracking-tight">?</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">em 7 dias você sabe</p>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] text-muted-foreground leading-tight mb-1">Somem por ano,<br />pela sua estimativa</p>
+              <p className="text-xl font-extrabold text-destructive/80 tracking-tight">{anchor!.year}</p>
+            </>
+          )}
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">{precoTitulo ?? <>CORE vitalício,<br />pra enxergar tudo</>}</p>

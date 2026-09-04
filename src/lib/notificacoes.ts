@@ -498,7 +498,10 @@ export async function ligarToqueNaNotificacao(navegar: (rota: string) => void): 
       const rota = (evento.notification?.extra as { rota?: string } | undefined)?.rota;
       // 02/09: até aqui o toque não deixava rastro — impossível saber se
       // alguma notificação trazia alguém de volta.
-      trackEvent("notif_toque", { id: evento.notification?.id ?? null, rota: rota ?? null });
+      const id = evento.notification?.id ?? null;
+      trackEvent("notif_toque", { id, rota: rota ?? null });
+      // 04/09: tocou na de 2h → a da manhã seguinte não precisa mais existir
+      if (id === BASE_RESGATE + 1) { void LN.cancel({ notifications: [{ id: BASE_RESGATE + 2 }] }).catch(() => { /* noop */ }); }
       if (rota) navegar(rota);
     });
     // Revisão 02/09: quem registra tem que poder REMOVER — o App.tsx
@@ -530,30 +533,58 @@ const BASE_RESGATE = 700000;
  *    jeito mais rápido de virar spam.
  *  - Copy sem pressão falsa: preço real, garantia real, zero "última chance".
  */
-export async function agendarResgateDoPlano(nomeArea?: string | null): Promise<void> {
+/**
+ * A 2ª notificação cai na PRÓXIMA MANHÃ (09:30), não "24h depois" (04/09).
+ * Medido: 26% dos abandonos do paywall são entre 21h e 5h, então "+24h"
+ * caía de madrugada; o retorno espontâneo pica às 10h e 22 das 26 compras
+ * na volta são entre 8h e 16h. Se a próxima 09:30 estiver a menos de 12h,
+ * vai pra manhã seguinte (a de 2h já cobre o curto prazo).
+ */
+export function proximaManha(agora: Date): Date {
+  const alvo = new Date(agora);
+  alvo.setHours(9, 30, 0, 0);
+  while (alvo.getTime() - agora.getTime() < 12 * 3600_000) alvo.setDate(alvo.getDate() + 1);
+  return alvo;
+}
+
+/**
+ * Copy da régua (04/09): NUNCA abre com preço — a versão com "R$ 97,90 uma
+ * vez só" disparou pra 148 pessoas e rendeu 0 toques em pagar. E é segmentada:
+ * quem TOCOU em pagar e não fechou (compra 1,6% na volta) recebe "reservado";
+ * quem só viu (0,17%) recebe "ficou salvo".
+ */
+export function copyDoResgate(nomeArea: string | null | undefined, tocou: boolean, plano?: "vitalicio" | "mensal") {
+  const daArea = nomeArea ? ` de ${nomeArea}` : "";
+  const oPlano = plano === "mensal" ? "Seu mês de CORE" : "Seu CORE vitalício";
+  return {
+    agora: tocou
+      ? { title: `${oPlano} ficou reservado`, body: `Seu plano${daArea} está montado te esperando. É um toque pra abrir de novo.` }
+      : { title: `Seu plano${daArea} ficou salvo`, body: "Tudo que você montou continua aqui. É só abrir e continuar de onde parou." },
+    manha: tocou
+      ? { title: "Ainda dá tempo de começar hoje", body: `${oPlano} continua reservado, do jeito que você deixou.` }
+      : { title: "Ainda dá tempo de começar hoje", body: `Seu plano${daArea} te espera do jeito que você deixou.` },
+  };
+}
+
+export async function agendarResgateDoPlano(
+  nomeArea?: string | null,
+  opts: { area?: string | null; tocou?: boolean; plano?: "vitalicio" | "mensal" } = {},
+): Promise<void> {
   const p = await plugin();
   if (!p) return;
   if (!(await temPermissao())) return;
   await garantirCanal();
   await limparFaixa(BASE_RESGATE);
   const { LN } = p;
-  const daArea = nomeArea ? ` de ${nomeArea}` : "";
-  // 02/09: copy do funil W — vitalício 97,90 (pagamento único) ou 24,90/mês.
-  // O "R$ 13,32/mês no anual" (v53) já não existia no paywall vivo.
+  const tocou = opts.tocou === true;
+  const copy = copyDoResgate(nomeArea, tocou, opts.plano);
+  const agora = new Date();
   const avisos = [
-    {
-      id: BASE_RESGATE + 1,
-      at: new Date(Date.now() + 2 * 3600_000),
-      title: `Seu plano${daArea} ficou salvo`,
-      body: "Tudo que você montou continua aqui. CORE completo por R$ 97,90 uma vez só, ou R$ 24,90/mês.",
-    },
-    {
-      id: BASE_RESGATE + 2,
-      at: new Date(Date.now() + 24 * 3600_000),
-      title: "Ainda dá tempo de começar hoje",
-      body: `Seu plano${daArea} te espera do jeito que você deixou. Pagamento único, sem mensalidade.`,
-    },
+    { id: BASE_RESGATE + 1, at: new Date(agora.getTime() + 2 * 3600_000), ...copy.agora },
+    { id: BASE_RESGATE + 2, at: proximaManha(agora), ...copy.manha },
   ];
+  // 04/09: até aqui "quantas foram armadas" era estimativa — agora é evento.
+  trackEvent("notif_resgate_armada", { area: opts.area ?? null, tocou, plano: opts.plano ?? null, manha_em_h: Math.round((avisos[1].at.getTime() - agora.getTime()) / 3600e3) });
   try {
     await LN.schedule({
       notifications: avisos.map((a) => ({

@@ -26,7 +26,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AppWelcome } from "@/components/app/AppWelcome";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
-import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, RECUO_DO_PAYWALL } from "@/pages/funis/w/retomada";
+import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICIO_ATE_MS, limparProgresso, passoDeRetomada, comecaNaPorta, veioDeAnuncio, passoAnteriorDe, ficaNoVoltar, alvoDoDeepLink, RECUO_DO_PAYWALL } from "@/pages/funis/w/retomada";
+import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -402,9 +403,12 @@ export default function ComecarW() {
       // clique pago na web caiu direto na porta — o "start" do funil
       trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio" });
     } else if (step !== "welcome") {
-      // retomada depois de reinício — medível separado da welcome ("offer" só
-      // como funnel_retomada: o funnel_view dele sai do PaywallW)
-      trackEvent(step === "offer" ? "funnel_retomada" : "funnel_view", { step, funil: FUNIL, retomada: true, motivo: "reinicio" });
+      // retomada depois de reinício (<6h) ou VOLTA (dias depois, 04/09) —
+      // medível separado da welcome ("offer" só como funnel_retomada: o
+      // funnel_view dele sai do PaywallW)
+      const idade = idadeDaChave(CHAVES.passo);
+      const motivo = idade !== null && idade > REINICIO_ATE_MS ? "volta" : "reinicio";
+      trackEvent(step === "offer" ? "funnel_retomada" : "funnel_view", { step, funil: FUNIL, retomada: true, motivo, idade_h: idade === null ? null : Math.round(idade / 3600e3) });
     } else {
       trackEvent("funnel_view", { step: "welcome", funil: FUNIL });
     }
@@ -600,11 +604,16 @@ export default function ComecarW() {
   /* ── RESGATE POR NOTIFICAÇÃO (02/09): quem chega ao paywall sem comprar
      recebe dois avisos (2h e 24h) apontando pra cá. Existia desde 14/08 e o
      paywall do W nunca armou. Só no shell; cancela ao pagar (pagoSemConta). ── */
+  /* 04/09: não armar pra quem JÁ PAGOU. A tela de Planos monta este passo
+   * pra cliente logado e a régua disparava "pague R$ 97,90" pra quem tinha
+   * pago 2h antes (21% dos armados-que-compraram em 03/09). Também não arma
+   * com pagamento pendente de cadastro (posCompra). */
+  const { user: usuarioLogado, isSubscribed: jaAssina } = useAuth();
   useEffect(() => {
-    if (naWeb || step !== "offer") return;
-    void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome)).catch(() => { /* noop */ });
+    if (naWeb || step !== "offer" || posCompra || (usuarioLogado && jaAssina)) return;
+    void import("@/lib/notificacoes").then((m) => m.agendarResgateDoPlano(AREAS[areaOuPadrao].nome, { area: areaOuPadrao })).catch(() => { /* noop */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [naWeb, step]);
+  }, [naWeb, step, posCompra, usuarioLogado, jaAssina]);
 
   const guardar = (a: AreaKey | null, r: Record<string, string>) => {
     if (a) guardarChave(CHAVES.area, a);

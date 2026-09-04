@@ -90,17 +90,19 @@ export function useRecap(area: AreaKey | null): string[] {
  * vende —, vida inteira, rotina, corpo). Textos = versão curta dos feedbacks
  * do Instagram já usados no funil web (PaywallDia14). Fotos vêm no bundle
  * (preparar-loja NÃO poda /depoimentos); se faltar, cai na inicial colorida. */
-const DEPOS = [
-  { nome: "João P.", meta: "24 anos · Campinas, SP", ini: "JP", cor: "#d9e4fb", foto: "/depoimentos/joaop.jpg",
-    texto: "Achei que seria só mais um app de finanças, mas migrei minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa." },
-  { nome: "Gabriel A.", meta: "20 anos · Curitiba, PR", ini: "GA", cor: "#dcf3d2", foto: "/depoimentos/gabriel.jpg",
-    texto: "Gastava descontroladamente e nunca sabia pra onde o dinheiro ia. Hoje sei exatamente quanto posso gastar por dia e finalmente comecei a guardar." },
-  { nome: "Mariana S.", meta: "22 anos · São Paulo, SP", ini: "MS", cor: "#fbd8e8", foto: "/depoimentos/mariana.jpg",
-    texto: "Ameiii o app! As retrospectivas de todo mês são muito boas — hoje organizo praticamente toda a minha vida por aqui." },
-  { nome: "Lucas M.", meta: "26 anos · Belo Horizonte, MG", ini: "LM", cor: "#d7f0dd", foto: "/depoimentos/lucas.jpg",
-    texto: "Consegui dividir cada parte do meu dia por horário e criar uma rotina que realmente consigo seguir. Ficou muito mais fácil manter constância." },
-  { nome: "Fernanda R.", meta: "29 anos · Recife, PE", ini: "FR", cor: "#fdeccb", foto: "/depoimentos/fernandar.jpg",
-    texto: "Perdi 5 quilos em um mês. Treinos e dieta organizados no mesmo lugar, com progresso registrado e até a lista de compras da dieta gerada sozinha." },
+const DEPOS: Array<{ nome: string; meta: string; ini: string; cor: string; texto: string; foto?: string }> = [
+  /* 03/09: avaliações REAIS da Google Play, palavra por palavra, nome como
+   * a loja mostra. Sem foto (ninguém posou), sem nota nem quantidade (dono). */
+  { nome: "Elisa D.", meta: "", ini: "E", cor: "#fbd8e8",
+    texto: "Que app incrível! Tudo que eu sempre quis num planner online. É maravilhoso pra se organizar e motivar. Vale cada centavo." },
+  { nome: "Paulo P.", meta: "", ini: "P", cor: "#dcf3d2",
+    texto: "aplicativo muito bom, vale o preço, depois que baixei, organizei minha rotina, e estou ganhando mais por causa disso, e passando mais tempo com a minha família" },
+  { nome: "Natalia J.", meta: "", ini: "N", cor: "#fdeccb",
+    texto: "gostei muito do app, consegui organizar minhas finanças, vi meus gastos e pedi ajuda com a ia TMB" },
+  { nome: "Sabrina F.", meta: "", ini: "S", cor: "#d7f0dd",
+    texto: "Pontos fortes: Design ótimo, interfaces completas sem ser complexas. Agradável de usar. Assinatura de pagamento único." },
+  { nome: "Naisa E.", meta: "", ini: "N", cor: "#d9e4fb",
+    texto: "Esse app é incrível e o mais evolutivo que conheci até hoje!" },
 ];
 
 function CarrosselDepoimentos() {
@@ -123,7 +125,7 @@ function CarrosselDepoimentos() {
       <div key={i} className="animate-in fade-in duration-500">
         <p className="text-[12.5px] leading-relaxed min-h-[80px]">“{d.texto}”</p>
         <div className="flex items-center gap-2 mt-2">
-          {!semFoto[i] ? (
+          {d.foto && !semFoto[i] ? (
             <img
               src={d.foto} alt="" loading="lazy"
               className="w-6 h-6 rounded-full object-cover"
@@ -132,7 +134,7 @@ function CarrosselDepoimentos() {
           ) : (
             <span className="grid place-items-center w-6 h-6 rounded-full text-[10px] font-black text-[#16121c]" style={{ background: d.cor }}>{d.ini}</span>
           )}
-          <p className="text-[11px] text-black/50 font-semibold">{d.nome} — {d.meta} <span className="text-[#f0a500]">★★★★★</span></p>
+          <p className="text-[11px] text-black/50 font-semibold">{d.nome} — {d.meta || (ehApple() ? "avaliação de usuário" : "Google Play")} <span className="text-[#f0a500]">★★★★★</span></p>
         </div>
       </div>
       <div className="flex justify-center gap-1.5 mt-2.5">

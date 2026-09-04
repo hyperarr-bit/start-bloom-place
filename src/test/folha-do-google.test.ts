@@ -125,6 +125,9 @@ describe("Voltar do Android no funil W", () => {
     expect(passoAnteriorDe("quiz")).toBe("porta");
     expect(passoAnteriorDe("porta")).toBe("welcome");
     expect(passoAnteriorDe("notif")).toBe("contrato");
+    // 03/09: a tela de prova mora entre o quiz e o carregamento do plano
+    expect(passoAnteriorDe("prova")).toBe("quiz");
+    expect(passoAnteriorDe("progress")).toBe("prova");
   });
   it("na welcome não há pra onde voltar (minimiza); no paywall e no pós-compra o Voltar FICA", () => {
     expect(passoAnteriorDe("welcome")).toBeNull();
@@ -162,6 +165,9 @@ describe("recuo do paywall", () => {
     expect(RECUO_DO_PAYWALL).toBe("contrato");
     // e o caminho de volta ao paywall é curto: contrato → notif → offer
     expect(passoAnteriorDe("notif")).toBe("contrato");
+    // 03/09: a tela de prova mora entre o quiz e o carregamento do plano
+    expect(passoAnteriorDe("prova")).toBe("quiz");
+    expect(passoAnteriorDe("progress")).toBe("prova");
   });
 
   it("o paywall continua sendo 'fica no Voltar' — o recuo é o 2º toque, não o 1º", () => {

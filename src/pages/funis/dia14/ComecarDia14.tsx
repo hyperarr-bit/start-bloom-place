@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { PaywallDia14 as PaywallFlow } from "./PaywallDia14";
 import { Button } from "@/components/ui/button";
+import { ehApple } from "@/lib/loja";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -613,7 +614,11 @@ const PROVA_AVATARES: Array<{ foto?: string; ini?: string; cor?: string }> = [
   { foto: "/depoimentos/fernandar.jpg" },
 ];
 
-function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
+/** As avaliações são da GOOGLE PLAY. No iPhone a loja não pode ser citada
+ *  (3.1.1) e dizer "App Store" seria mentira — fica "avaliação de usuário". */
+const rotuloDaLoja = () => (ehApple() ? "avaliação de usuário" : "Google Play");
+
+export function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
   useEffect(() => { trackEvent("funnel_view", { step: "prova_social" }); }, []);
   return (
     <div className="w-full max-w-sm mx-auto text-center pt-4">
@@ -637,17 +642,19 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
       <p className="text-sm text-muted-foreground leading-relaxed mb-6">
         Gente que também cansou de app separado pra cada coisa.
       </p>
+      {/* 03/09: as duas citações viraram avaliações REAIS da Google Play,
+          palavra por palavra, com o nome que a loja mostra. Sem foto, sem
+          nota, sem quantidade (dono). No iPhone a loja não é citada (3.1.1). */}
       <motion.div
         initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
         className="rounded-2xl border border-border bg-card p-4 text-left mb-3"
       >
         <p className="text-[13px] leading-relaxed">
-          “Achei que seria só mais um app de finanças, mas acabei migrando praticamente minha
-          rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa.”
+          “Que app incrível! Tudo que eu sempre quis num planner online. É maravilhoso pra se organizar e motivar. Vale cada centavo.”
         </p>
         <div className="flex items-center gap-2 mt-2.5">
-          <img src="/depoimentos/joaop.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
-          <p className="text-[11px] text-muted-foreground font-semibold">João P. — 24 anos · Campinas, SP <span className="text-[#f0a500]">★★★★★</span></p>
+          <span className="grid place-items-center w-6 h-6 rounded-full text-[11px] font-bold text-white" style={{ background: "#D22D80" }}>E</span>
+          <p className="text-[11px] text-muted-foreground font-semibold">Elisa D. — {rotuloDaLoja()} <span className="text-[#f0a500]">★★★★★</span></p>
         </div>
       </motion.div>
       <motion.div
@@ -655,12 +662,11 @@ function ProvaSocialScreen({ onNext }: { onNext: () => void }) {
         className="rounded-2xl border border-border bg-card p-4 text-left mb-7"
       >
         <p className="text-[13px] leading-relaxed">
-          “A tela inicial personalizada foi o que mais me conquistou. Não preciso abrir cinco
-          aplicativos diferentes durante o dia.”
+          “aplicativo muito bom, vale o preço, depois que baixei, organizei minha rotina, e estou ganhando mais por causa disso, e passando mais tempo com a minha família”
         </p>
         <div className="flex items-center gap-2 mt-2.5">
-          <img src="/depoimentos/amanda.jpg" alt="" loading="lazy" className="w-6 h-6 rounded-full object-cover" />
-          <p className="text-[11px] text-muted-foreground font-semibold">Amanda L. — 21 anos · Fortaleza, CE <span className="text-[#f0a500]">★★★★★</span></p>
+          <span className="grid place-items-center w-6 h-6 rounded-full text-[11px] font-bold text-white" style={{ background: "#127A56" }}>P</span>
+          <p className="text-[11px] text-muted-foreground font-semibold">Paulo P. — {rotuloDaLoja()} <span className="text-[#f0a500]">★★★★★</span></p>
         </div>
       </motion.div>
       <Button size="lg" className="w-full h-12 text-base" onClick={onNext}>

@@ -383,11 +383,16 @@ const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
 };
 
 /**
- * Depoimentos REAIS (feedbacks do Instagram, curadoria e redação do dono,
- * 29/07). Fotos: avatares escolhidos pelo dono pros dois destaques; o resto
- * vai texto puro — o BitePal também mistura (o "Success stories" tem foto, os
- * quotes do quiz não). `chip` = resultado concreto embaixo do nome, a régua
- * do BitePal ("70 kg → 60 kg in 2,5 months"): resultado vende, elogio enfeita.
+ * AVALIAÇÕES REAIS DA GOOGLE PLAY (03/09, ordem do dono). Até aqui o mural
+ * era feedback do Instagram reescrito, com avatar gerado por IA. Agora é o
+ * texto que a pessoa escreveu na loja, palavra por palavra (só espaço depois
+ * de vírgula ajustado), com o primeiro nome e a inicial que a Play mostra em
+ * público. Sem foto: quem avaliou não posou pra nada. Nota e quantidade NÃO
+ * aparecem (dono: "são poucas ainda, assusta") — o "+1000" do laurel fica.
+ * Cada card mostra 5 estrelas porque cada uma destas É 5 estrelas na Play.
+ * `chip` = resumo nosso do resultado, em palavras nossas, marcado como tal.
+ * Fonte: CSV do Console (agosto) + Reviews API (últimos 7 dias); ids das
+ * avaliações no scratchpad (play-nomes.mjs) pra quem quiser conferir.
  */
 type Depo = {
   nome: string; meta: string; texto: string;
@@ -395,51 +400,31 @@ type Depo = {
 };
 
 const DEPO: Record<string, Depo> = {
-  mariana: { nome: "Mariana S.", meta: "22 anos · São Paulo, SP", ini: "M", cor: "#D22D80", foto: "/depoimentos/mariana.jpg", chip: "organiza a vida inteira no CORE",
-    texto: "Ameiii o app! As retrospectivas que aparecem todo mês são muito boas, o “Pergunte ao CORE” me ajuda a saber quanto posso gastar no dia sem sair do meu planejamento. Hoje organizo praticamente toda a minha vida por aqui." },
-  gabriel: { nome: "Gabriel A.", meta: "20 anos · Curitiba, PR", ini: "G", cor: "#127A56", foto: "/depoimentos/gabriel.jpg", chip: "do descontrole → guardando todo mês",
-    texto: "Gastava muito descontroladamente e nunca sabia para onde o dinheiro ia. O CORE me ajudou muito nessa questão. Hoje acompanho todos os meus gastos, sei exatamente quanto posso gastar por dia e finalmente consegui começar a guardar dinheiro." },
-  joaop: { nome: "João P.", meta: "24 anos · Campinas, SP", ini: "J", cor: "#8FB8DA", foto: "/depoimentos/joaop.jpg",
-    texto: "Achei que seria só mais um app de finanças, mas acabei migrando praticamente minha rotina inteira pra ele. Hoje já olho quanto posso gastar antes de sair de casa e isso mudou muito meus hábitos." },
-  juliana: { nome: "Juliana A.", meta: "26 anos · São Paulo, SP", ini: "J", cor: "#E4572E",
-    texto: "O “Pergunte ao CORE” é uma ideia genial. Sempre que bate dúvida de quanto ainda posso gastar no dia eu pergunto ali mesmo. Parece uma conversa e evita que eu extrapole meu orçamento." },
-  lucas: { nome: "Lucas M.", meta: "26 anos · Belo Horizonte, MG", ini: "L", cor: "#127A56", foto: "/depoimentos/lucas.jpg", chip: "rotina que finalmente consegue seguir",
-    texto: "Consegui organizar minhas metas, dividir cada parte do meu dia por horário e criar uma rotina que realmente consigo seguir. Minha produtividade melhorou bastante e ficou muito mais fácil manter constância." },
-  beatriz: { nome: "Beatriz M.", meta: "19 anos · Goiânia, GO", ini: "B", cor: "#D22D80", foto: "/depoimentos/beatriz.jpg",
-    texto: "Comecei usando só pelas finanças e hoje uso mais a parte de rotina. Os blocos de foco, as tarefas e os hábitos me ajudaram muito na faculdade. Nunca consegui manter uma organização por tanto tempo." },
-  carlos: { nome: "Carlos H.", meta: "31 anos · Florianópolis, SC", ini: "C", cor: "#8FB8DA", foto: "/depoimentos/carlos.jpg",
-    texto: "O que mais gostei foi que tudo fica conectado. Quando organizo minha rotina já lembro do treino, da dieta e até das contas que vencem naquela semana. Antes eu esquecia alguma coisa todo dia." },
-  fernandaR: { nome: "Fernanda R.", meta: "29 anos · Recife, PE", ini: "F", cor: "#E4572E", foto: "/depoimentos/fernandar.jpg", chip: "−5 kg em 1 mês",
-    texto: "Perdi no total 5 quilos em um mês. Meus treinos e minha dieta são todos organizados aqui, consigo registrar minhas cargas, acompanhar meu progresso e ainda gerar automaticamente a lista de compras da dieta." },
-  diego: { nome: "Diego R.", meta: "27 anos · Recife, PE", ini: "D", cor: "#127A56", foto: "/depoimentos/diego.jpg",
-    texto: "Treino há alguns anos e já testei vários aplicativos. O CORE foi o primeiro em que consegui registrar carga, acompanhar evolução e ainda deixar minha dieta no mesmo lugar." },
-  amanda: { nome: "Amanda L.", meta: "21 anos · Fortaleza, CE", ini: "A", cor: "#D22D80", foto: "/depoimentos/amanda.jpg",
-    texto: "A tela inicial personalizada foi o que mais me conquistou. Deixo logo de cara minhas tarefas, quanto posso gastar, minha água, treino e alimentação. Não preciso abrir cinco aplicativos diferentes durante o dia." },
-  larissa: { nome: "Larissa F.", meta: "23 anos · Salvador, BA", ini: "L", cor: "#E4572E", foto: "/depoimentos/larissa.jpg", chip: "hábito de leitura todo dia",
-    texto: "O módulo de Biblioteca é muito melhor do que eu imaginava. Finalmente consegui criar o hábito de ler todos os dias e acompanhar meu progresso. As metas anuais dão uma motivação enorme." },
-  gustavo: { nome: "Gustavo N.", meta: "20 anos · Curitiba, PR", ini: "G", cor: "#8FB8DA",
-    texto: "Organizei todas as provas, trabalhos e matérias da faculdade. O melhor é que consigo ver minhas tarefas junto com o restante da rotina, então fica bem mais difícil esquecer alguma entrega." },
-  patricia: { nome: "Patrícia S.", meta: "35 anos · Brasília, DF", ini: "P", cor: "#127A56",
-    texto: "O módulo Casa me salvou. Divido as tarefas com meu marido, controlo a despensa e nunca mais esqueci de comprar alguma coisa importante no mercado. É simples, mas resolve problemas do dia a dia." },
-  rafael: { nome: "Rafael C.", meta: "28 anos · Porto Alegre, RS", ini: "R", cor: "#127A56", foto: "/depoimentos/rafael.jpg",
-    texto: "A retrospectiva do mês virou uma das minhas funções favoritas. Dá uma sensação muito boa ver tudo o que consegui fazer, quantos hábitos mantive, como economizei e onde posso melhorar. Parece aqueles resumos de fim de ano, só que da minha própria vida." },
-  matheus: { nome: "Matheus V.", meta: "22 anos · Belo Horizonte, MG", ini: "M", cor: "#E4572E",
-    texto: "O que mais gostei é que o app não tenta fazer uma coisa só. Ele realmente organiza a vida inteira. Hoje não tenho mais aplicativo separado pra finanças, hábitos, tarefas, treino e leitura." },
-  fernandaO: { nome: "Fernanda O.", meta: "30 anos · Rio de Janeiro, RJ", ini: "F", cor: "#8FB8DA",
-    texto: "Dá pra perceber que o aplicativo foi pensado por alguém que realmente usa esse tipo de ferramenta. Tem muitos detalhes pequenos que fazem diferença no dia a dia. Quanto mais eu uso, mais funcionalidades descubro." },
+  elisa: { nome: "Elisa D.", meta: "ago/2026", ini: "E", cor: "#D22D80", chip: "vale cada centavo",
+    texto: "Que app incrível! Tudo que eu sempre quis num planner online. É maravilhoso pra se organizar e motivar. Vale cada centavo." },
+  paulo: { nome: "Paulo P.", meta: "ago/2026", ini: "P", cor: "#127A56", chip: "organizou a rotina e ganha mais",
+    texto: "aplicativo muito bom, vale o preço, depois que baixei, organizei minha rotina, e estou ganhando mais por causa disso, e passando mais tempo com a minha família" },
+  rebeca: { nome: "Rebeca G.", meta: "ago/2026", ini: "R", cor: "#8FB8DA", chip: "a vida inteira num app só",
+    texto: "Estou gostando bastante do Core! Acho muito legal reunir várias áreas da vida em um só lugar, como rotina, finanças, treino, alimentação, estudos, metas e até cuidados com os pets. A interface é bonita e fácil de usar, e ajuda bastante na organização do dia a dia. Ainda está em constante melhoria e algumas funções podem ser aprimoradas, mas já é um aplicativo muito útil e prático!" },
+  natalia: { nome: "Natalia J.", meta: "ago/2026", ini: "N", cor: "#E4572E", chip: "organizou as finanças",
+    texto: "gostei muito do app, consegui organizar minhas finanças, vi meus gastos e pedi ajuda com a ia TMB" },
+  sabrina: { nome: "Sabrina F.", meta: "set/2026", ini: "S", cor: "#127A56",
+    texto: "Pontos fortes: Design ótimo, interfaces completas sem ser complexas. Agradável de usar. Assinatura de pagamento único." },
+  naisa: { nome: "Naisa E.", meta: "set/2026", ini: "N", cor: "#8FB8DA",
+    texto: "Esse app é incrível e o mais evolutivo que conheci até hoje!" },
 };
 
-/** 3 histórias casadas com a área que a pessoa escolheu no quiz (o BitePal
- *  mostra perda de peso pra quem quer perder peso — a história certa pro
- *  problema certo). Mariana abre em todas: é a mais completa. */
+/** 3 avaliações casadas com a área do quiz (a história certa pro problema
+ *  certo). Elisa fecha todas: é a mais forte e a mais geral. */
 const MURAL_POR_AREA: Record<AreaKey, Depo[]> = {
-  dinheiro: [DEPO.gabriel, DEPO.mariana, DEPO.joaop],
-  rotina: [DEPO.lucas, DEPO.mariana, DEPO.carlos],
-  corpo: [DEPO.fernandaR, DEPO.diego, DEPO.mariana],
-  saude: [DEPO.fernandaR, DEPO.amanda, DEPO.mariana],
-  metas: [DEPO.lucas, DEPO.larissa, DEPO.mariana],
+  dinheiro: [DEPO.natalia, DEPO.paulo, DEPO.elisa],
+  rotina: [DEPO.paulo, DEPO.rebeca, DEPO.elisa],
+  corpo: [DEPO.rebeca, DEPO.sabrina, DEPO.elisa],
+  saude: [DEPO.rebeca, DEPO.sabrina, DEPO.elisa],
+  metas: [DEPO.paulo, DEPO.naisa, DEPO.elisa],
 };
-const MURAL_EXTRA: Depo[] = [DEPO.matheus, DEPO.rafael, DEPO.juliana, DEPO.beatriz, DEPO.gustavo, DEPO.patricia, DEPO.fernandaO];
+/** As que sobraram da área — sem repetir as três de cima. */
+const MURAL_EXTRA_TODAS: Depo[] = [DEPO.rebeca, DEPO.natalia, DEPO.paulo, DEPO.sabrina, DEPO.naisa];
 
 /** Laurel sob o herói — Cal AI abre o paywall com "Trusted by millions".
  *  10/08: +1000, medido no banco antes de subir (1.058 assinaturas, 920 delas
@@ -458,7 +443,7 @@ function LaurelProva() {
   );
 }
 
-function DepoCard({ d }: { d: Depo }) {
+function DepoCard({ d, neutra = false }: { d: Depo; neutra?: boolean }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4 text-left">
       <div className="flex items-center gap-2.5">
@@ -470,7 +455,9 @@ function DepoCard({ d }: { d: Depo }) {
             <span className="text-[13px] font-bold leading-tight truncate">{d.nome}</span>
             <span className="text-[11px] text-[#f0a500] tracking-tight shrink-0" aria-label="5 estrelas">★★★★★</span>
           </div>
-          <div className="text-[11px] text-muted-foreground leading-tight">{d.meta}</div>
+          {/* rótulo por plataforma: no iPhone a loja não é citada (3.1.1) e
+              "App Store" seria mentira — são avaliações da Google Play */}
+          <div className="text-[11px] text-muted-foreground leading-tight">{neutra ? "avaliação de usuário" : "Avaliação na Google Play"} · {d.meta}</div>
         </div>
       </div>
       {d.chip && (
@@ -486,23 +473,27 @@ function DepoCard({ d }: { d: Depo }) {
 /** Mural dentro do paywall, depois do preço — o "Success stories from our
  *  clients" do BitePal, com o "ver mais" fazendo o papel da tela-só-de-reviews
  *  do Cal AI sem custar uma tela a mais no funil. */
-export function MuralDepoimentos({ area }: { area: AreaKey }) {
+/** `semLoja`: o paywall do iPhone passa true — lá a loja não pode ser citada
+ *  (3.1.1) e dizer "App Store" seria mentira, as avaliações são da Play. */
+export function MuralDepoimentos({ area, semLoja = false }: { area: AreaKey; semLoja?: boolean }) {
   const [aberto, setAberto] = useState(false);
+  const neutra = semLoja || ehApple();
+  const extras = MURAL_EXTRA_TODAS.filter((d) => !MURAL_POR_AREA[area].includes(d));
   return (
     <div className="text-left">
       <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">
-        Histórias de quem já entrou
+        {neutra ? "O que dizem quem já usa" : "O que dizem na Google Play"}
       </div>
       <div className="space-y-3">
-        {MURAL_POR_AREA[area].map((d) => <DepoCard key={d.nome} d={d} />)}
-        {aberto && MURAL_EXTRA.map((d) => <DepoCard key={d.nome} d={d} />)}
+        {MURAL_POR_AREA[area].map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
+        {aberto && extras.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
       </div>
       {!aberto && (
         <button
           onClick={() => { setAberto(true); trackEvent("funnel_click", { cta: "depoimentos_ver_mais" }); }}
           className="w-full text-center text-[13px] font-semibold text-accent py-3"
         >
-          Ver mais {MURAL_EXTRA.length} avaliações ↓
+          Ver mais {extras.length} avaliações ↓
         </button>
       )}
     </div>

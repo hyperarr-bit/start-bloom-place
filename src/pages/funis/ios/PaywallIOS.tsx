@@ -277,7 +277,7 @@ export function PaywallIOS({
             onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios" }); }}
           />
         </motion.div>
-        <MuralDepoimentos area={area} />
+        <MuralDepoimentos area={area} semLoja />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
             <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>

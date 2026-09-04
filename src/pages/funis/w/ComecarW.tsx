@@ -31,7 +31,7 @@ import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen,
+  QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
   buildQuizItems,
 } from "@/pages/funis/dia14/ComecarDia14";
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
@@ -50,7 +50,7 @@ import { ehApple } from "@/lib/loja";
 const FUNIL = "w";
 
 type Step =
-  | "welcome" | "promessas" | "porta" | "quiz" | "progress" | "result"
+  | "welcome" | "promessas" | "porta" | "quiz" | "prova" | "progress" | "result"
   | "central" | "compromissos" | "contrato" | "notif" | "offer"
   | "signup" | "confirm" | "liberando";
 
@@ -721,10 +721,16 @@ export default function ComecarW() {
                     const todas = { ...answers, ...r };
                     setAnswers(todas);
                     guardar(area, todas);
-                    setStep("progress");
+                    /* 03/09: tela de prova entre o quiz e o plano (BitePal/Cal
+                     * AI). Já rodou em 30–31/07 no /inicio — os 2 melhores dias
+                     * de sessão→venda do mês (3,3%), e a passagem do quiz ficou
+                     * em ~96%. Saiu em 01/08 por queda que era custo de tráfego.
+                     * Volta com avaliações REAIS da Play dentro. */
+                    setStep("prova");
                   }}
                 />
               )}
+              {step === "prova" && <ProvaSocialScreen onNext={() => setStep("progress")} />}
               {step === "progress" && <div className="flex-1 grid place-items-center"><ProgressScreen steps={prepSteps} onDone={() => setStep("result")} /></div>}
               {step === "result" && (
                 <RadarResultScreen answers={answers} area={areaOuPadrao} onDone={() => setStep("central")} />

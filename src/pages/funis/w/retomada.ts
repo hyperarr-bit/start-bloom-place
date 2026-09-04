@@ -46,7 +46,7 @@ export const limparProgresso = (): void => {
  * welcome/promessas/porta não valem retomada — é o começo mesmo.
  */
 const RETOMAVEIS: Record<string, string> = {
-  quiz: "quiz", progress: "result", result: "result", central: "central",
+  quiz: "quiz", prova: "result", progress: "result", result: "result", central: "central",
   compromissos: "compromissos", contrato: "contrato", notif: "notif", offer: "offer",
   signup: "signup", confirm: "signup", liberando: "signup",
 };
@@ -84,7 +84,7 @@ export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => 
  * passo. No paywall e no pós-compra ele fica (1º toque) e minimiza (2º).
  */
 const PASSO_ANTERIOR: Record<string, string> = {
-  promessas: "welcome", porta: "welcome", quiz: "porta", progress: "quiz", result: "quiz",
+  promessas: "welcome", porta: "welcome", quiz: "porta", prova: "quiz", progress: "prova", result: "quiz",
   central: "result", compromissos: "central", contrato: "compromissos", notif: "contrato",
 };
 export const passoAnteriorDe = (passo: string): string | null => PASSO_ANTERIOR[passo] ?? null;

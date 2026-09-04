@@ -139,6 +139,39 @@ serve(async (req) => {
     // Liberar VITALÍCIO na mão (19/07): cliente que pagou mas o grant não caiu
     // (pagou e fechou antes do polling; sem webhook). Idempotente, mesmo shape
     // do grant do abacate-pix. offer downsell = acesso vitalício por 14,90.
+    /* 04/09: a 1ª venda do mês da web (w25, 24,90) recebeu vitalício pelo
+     * `check` do gateway. Esta ação reaplica a concessão certa numa linha
+     * existente. TRAVA: só mexe se o valor gravado na linha bate com o preço
+     * da oferta pedida — um vitalício de 97,90 nunca vira 30 dias por engano. */
+    if (action === "ajustar_concessao") {
+      const PRECOS: Record<string, number> = { lifetime: 9790, w97: 9790, w25: 2490, downsell: 1490 };
+      const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+        lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
+        w97: { plano: "lifetime", periodo: "lifetime", dias: null },
+        downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
+        w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+      };
+      const offer = String(body.offer ?? "");
+      if (!(offer in CONCESSAO)) return json({ error: "oferta_desconhecida" }, 400);
+      const uid = String(body.uid ?? "");
+      const email = String(body.email ?? "").trim().toLowerCase();
+      const alvo = uid || (email ? await acharUid(email) : null);
+      if (!alvo) return json({ error: "usuario_nao_encontrado" }, 404);
+      const { data: row } = await admin.from("subscriptions")
+        .select("id, amount_cents, current_period_start, created_at, plan, billing_period").eq("user_id", alvo).maybeSingle();
+      if (!row?.id) return json({ error: "sem_assinatura" }, 404);
+      if (Number(row.amount_cents) !== PRECOS[offer]) return json({ error: "valor_nao_bate", amount_cents: row.amount_cents, esperado: PRECOS[offer] }, 409);
+      const c = CONCESSAO[offer];
+      const ini = new Date(row.current_period_start ?? row.created_at);
+      const fim = new Date(ini);
+      if (c.dias === null) fim.setFullYear(fim.getFullYear() + 100); else fim.setDate(fim.getDate() + c.dias);
+      const { error: e } = await admin.from("subscriptions").update({
+        plan: c.plano, billing_period: c.periodo, current_period_end: fim.toISOString(),
+      }).eq("id", row.id);
+      if (e) return json({ error: e.message }, 500);
+      return json({ ok: true, de: { plan: row.plan, billing_period: row.billing_period }, para: { plan: c.plano, billing_period: c.periodo, current_period_end: fim.toISOString() } });
+    }
+
     if (action === "liberar_vitalicio") {
       const uid = String(body.uid ?? "");
       const email = String(body.email ?? "").trim().toLowerCase();

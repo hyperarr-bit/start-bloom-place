@@ -53,6 +53,21 @@ export const erroFolhaNaoConcluiu = (): string =>
     ? "A Apple não concluiu o pagamento. Tenta de novo em instantes."
     : "O Google não concluiu o pagamento. Tenta de novo em instantes.";
 
+/** A loja diz que a compra JÁ É desta pessoa (código 6 / "already active").
+ *  A resposta certa é RESTAURAR; esta frase só aparece se o restaurar não achou. */
+export const erroJaAtivo = (): string =>
+  ehApple()
+    ? "A App Store diz que esta compra já é sua. Toca em «Restaurar compras» aqui embaixo pra liberar o acesso."
+    : "A Play diz que esta compra já é sua. Toca em «Restaurar compras» aqui embaixo pra liberar o acesso.";
+
+/** A conta da loja não pode comprar (código 3 / "not allowed"). No Android o
+ *  caminho é a conta Google e a aprovação dos pais; na Apple é Ajustes →
+ *  Tempo de Uso / Compartilhamento Familiar — sem citar Google pra quem tem iPhone. */
+export const erroNaoPermitido = (): string =>
+  ehApple()
+    ? "A App Store recusou compras nesta conta Apple. Confere em Ajustes se a conta pode comprar (conta de menor precisa da aprovação da família) e volta aqui. Se já pagou, toca em «Restaurar compras»."
+    : "A Play Store recusou compras nesta conta Google. Abre a Play Store, confere se está logado e se a conta pode comprar (conta de menor precisa da aprovação dos pais) e volta aqui. Se já pagou, toca em «Restaurar compras».";
+
 /** Falha de rede/comunicação com a loja. */
 export const erroSemFalarComALoja = (): string =>
   ehApple()

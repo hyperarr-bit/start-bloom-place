@@ -47,6 +47,7 @@ import { APP_PRECOS } from "@/lib/native-shell";
 import {
   ehApple, pelaLoja, sufixoPagamento, temEscadaPix,
   erroPagamentoNaoAchado, avisoAtualizarApp,
+  erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu,
 } from "@/lib/loja";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
@@ -381,13 +382,13 @@ export function PaywallAssinatura({
     } else if (motivo === "ja_ativo") {
       // 02/09: a Play diz que a compra já é desta pessoa — restaurar, não "tentar de novo".
       if (await rc.restaurar()) { window.location.href = "/"; return; }
-      setErro("A Play diz que esta compra já é sua. Toca em «Restaurar compras» aqui embaixo pra liberar o acesso.");
+      setErro(erroJaAtivo());
     } else if (motivo === "nao_permitido") {
-      setErro("A Play Store recusou compras nesta conta Google. Abre a Play Store, confere se está logado e se a conta pode comprar (conta de menor precisa da aprovação dos pais) e volta aqui. Se já pagou, toca em «Restaurar compras».");
+      setErro(erroNaoPermitido());
     } else if (motivo === "catalogo") {
       setErro(avisoAtualizarApp());
     } else if (motivo) {
-      setErro("O Google não concluiu o pagamento. Tenta de novo em instantes.");
+      setErro(erroFolhaNaoConcluiu());
     }
     setComprando(false);
   };

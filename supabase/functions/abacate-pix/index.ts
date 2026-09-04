@@ -25,7 +25,14 @@ const corsHeaders = {
 // API V2 (chaves abc_prod_* são da geração v2 — a v1 responde
 // "API key version mismatch"). Pix in-app = "transparent checkout".
 const ABACATE_API = "https://api.abacatepay.com/v2";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+  lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
+  downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w97: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+};
+
 const DUMMY_PHONE = "11999999999"; // mesmo padrão do cakto-pix: não pedimos telefone
 
 const logStep = (step: string, details?: unknown) => {
@@ -363,18 +370,21 @@ serve(async (req) => {
       }
       if (!offer) {
         const declarado = String(body.offer ?? "");
-        offer = declarado === "downsell" ? "downsell" : "lifetime";
+        offer = declarado in PRECOS_CENTAVOS ? declarado : "lifetime";
         logStep("Offer via client fallback", { id, declarado });
       }
 
       const now = new Date();
+      const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
+      const vitalicio = concessao.dias === null;
       const periodEnd = new Date(now);
-      periodEnd.setFullYear(periodEnd.getFullYear() + 100); // convenção vitalício da base
+      if (vitalicio) periodEnd.setFullYear(periodEnd.getFullYear() + 100); // convenção vitalício da base
+      else periodEnd.setDate(periodEnd.getDate() + (concessao.dias ?? 30));  // 04/09: w25 = 30 dias
       const payload = {
         user_id: user.id,
         status: "active",
-        plan: "lifetime",
-        billing_period: "lifetime",
+        plan: vitalicio ? "lifetime" : concessao.plano,
+        billing_period: vitalicio ? "lifetime" : concessao.periodo,
         payment_method: "pix",
         abacatepay_billing_id: id,
         customer_email: user.email,
@@ -431,7 +441,7 @@ serve(async (req) => {
               body: JSON.stringify({
                 from,
                 to: [user.email],
-                subject: "Seu acesso vitalício ao CORE tá ativo ✅",
+                subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅",
                 html: welcomeHtml(firstName, user.email),
               }),
             });

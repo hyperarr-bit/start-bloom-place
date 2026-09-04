@@ -392,6 +392,37 @@ async function garantirPronto(): Promise<boolean> {
   return configurado && !!Purchases;
 }
 
+export type OpcaoAssinatura = { id?: string; freePhase?: unknown; isBasePlan?: boolean };
+
+/**
+ * QUAL OPÇÃO DA ASSINATURA COMPRAR — decisão pura, sem loja (04/09).
+ *
+ * `subscriptionOptions` (plano base × oferta com fase grátis) é um conceito
+ * do GOOGLE PLAY. Na App Store o produto não tem opções: o RevenueCat devolve
+ * a lista VAZIA e a compra é o próprio pacote. A regra "semTrial sem plano
+ * base = FALHA FECHADA" (varredura 23/08) protege o Android de vender teste
+ * grátis prometendo cobrança hoje — mas no iPhone ela só sabia dizer
+ * `sem_base_plan`, e foi exatamente isso que o revisor da Apple viu em
+ * 04/09 (sessão 1b27531a: dois toques na mensal, `servidas: []`, recusa 2.1).
+ * A mensal NUNCA foi comprável no iPhone, em nenhum paywall.
+ *
+ * No Android nada muda: mesma lista, mesma escolha, mesma falha fechada.
+ */
+export function escolherOpcaoDeCompra(
+  opcoes: OpcaoAssinatura[],
+  ctx: { semTrial: boolean; naApple: boolean },
+): { escolhida?: OpcaoAssinatura; falha?: "sem_base_plan" } {
+  const comTrial = ctx.semTrial ? undefined : opcoes.find((o) => !!o?.freePhase && !o?.isBasePlan);
+  const baseSemTrial = ctx.semTrial ? opcoes.find((o) => !!o?.isBasePlan) : undefined;
+  if (ctx.semTrial && !baseSemTrial) {
+    // Apple: não existe plano base — o pacote É o plano, e a Apple não tem
+    // trial configurado no CORE. Compra o pacote.
+    if (ctx.naApple) return {};
+    return { falha: "sem_base_plan" };
+  }
+  return { escolhida: comTrial ?? baseSemTrial };
+}
+
 export async function comprar(productId: string, opts?: { semTrial?: boolean }): Promise<boolean> {
   ultimoMotivo = null;
   if (!(await garantirPronto())) {
@@ -445,12 +476,13 @@ export async function comprar(productId: string, opts?: { semTrial?: boolean }):
       temGratis: !!comTrial,
       semTrial: !!opts?.semTrial,
     });
-    if (opts?.semTrial && !baseSemTrial) {
+    const decisao = escolherOpcaoDeCompra(opcoes, { semTrial: !!opts?.semTrial, naApple: plataformaApp() === "ios" });
+    if (decisao.falha) {
       ultimoMotivo = "produto_ausente";
-      trackEvent("app_compra_falhou", { motivo: "sem_base_plan", produto: productId });
+      trackEvent("app_compra_falhou", { motivo: decisao.falha, produto: productId });
       return false;
     }
-    const escolhida = comTrial ?? baseSemTrial;
+    const escolhida = decisao.escolhida;
     if (escolhida) {
       marcarFolhaAberta();
       await (Purchases as NonNullable<typeof Purchases>).purchaseSubscriptionOption({

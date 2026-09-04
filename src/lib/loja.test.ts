@@ -123,3 +123,24 @@ describe("iOS não dá motivo de reprovação", () => {
       .toBe("https://apps.apple.com/account/subscriptions");
   });
 });
+
+describe("mensagens de recusa da folha (04/09)", () => {
+  it("Android: as duas frases são as que já estavam no paywall, caractere por caractere", () => {
+    fingirPlataforma("android");
+    expect(loja.erroJaAtivo()).toBe(
+      "A Play diz que esta compra já é sua. Toca em «Restaurar compras» aqui embaixo pra liberar o acesso."
+    );
+    expect(loja.erroNaoPermitido()).toBe(
+      "A Play Store recusou compras nesta conta Google. Abre a Play Store, confere se está logado e se a conta pode comprar (conta de menor precisa da aprovação dos pais) e volta aqui. Se já pagou, toca em «Restaurar compras»."
+    );
+  });
+  it("iPhone: fala de App Store/Apple e nunca de Play ou Google", () => {
+    fingirPlataforma("ios");
+    for (const f of [loja.erroJaAtivo, loja.erroNaoPermitido, loja.erroFolhaNaoConcluiu]) {
+      const t = f();
+      expect(t).not.toMatch(/Play|Google/);
+      expect(t).toMatch(/App Store|Apple/);
+      expect(t).toMatch(/Restaurar compras|Tenta de novo/);
+    }
+  });
+});

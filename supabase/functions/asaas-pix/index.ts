@@ -46,6 +46,17 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * débito automático, então isto é PRÉ-PAGO: 30 dias, não renova sozinho, e
  * a tela tem que dizer isso. */
 const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+/* O que cada oferta CONCEDE (04/09). A primeira venda da w25 (07:42) recebeu
+ * VITALÍCIO por este caminho: a página faz `check` enquanto o QR está aberto,
+ * o check liberava com plan "lifetime" chumbado, e o webhook — que já sabia
+ * dar 30 dias — chegou depois, viu vitalício e preservou. Agora os dois usam
+ * a mesma tabela. `dias: null` = vitalício. */
+const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
+  lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
+  downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w97: { plano: "lifetime", periodo: "lifetime", dias: null },
+  w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+};
 const DESCRICAO_PIX: Record<string, string> = {
   lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes",
 };
@@ -377,19 +388,37 @@ serve(async (req) => {
       }
 
       const now = new Date();
-      const fim = new Date(now); fim.setFullYear(fim.getFullYear() + 100);
+      const { data: existing } = await supabaseAdmin.from("subscriptions")
+        .select("id, status, plan, billing_period, current_period_end").eq("user_id", user.id).maybeSingle();
+      const jaLiberado = existing?.status === "active" && existing?.plan === "lifetime";
+      const concessao = CONCESSAO[offer] ?? CONCESSAO.lifetime;
+      const eraVitalicio = existing?.status === "active" && existing?.billing_period === "lifetime";
+      if (eraVitalicio && concessao.dias !== null) {
+        // vitalício pagou o mês: a linha não se toca (sobrescrever gravaria 2490 numa
+        // venda de 97,90 e o acesso venceria em 30 dias). Caso de reembolso.
+        logStep("Vitalício pagou o mês — linha preservada", { userId: user.id, offer, id });
+        return jsonResponse({ paid: true, status: "CONFIRMED", jaVitalicio: true });
+      }
+      const vitalicio = concessao.dias === null;
+      const fim = new Date(now);
+      if (vitalicio) fim.setFullYear(fim.getFullYear() + 100);
+      else {
+        // mês pré-pago EMPILHA sobre período vigente — pagar de novo antes de vencer não encurta
+        const atual = existing?.current_period_end ? new Date(existing.current_period_end) : null;
+        fim.setTime((atual && atual > now ? atual : now).getTime());
+        fim.setDate(fim.getDate() + (concessao.dias ?? 30));
+      }
       const payload = {
-        user_id: user.id, status: "active", plan: "lifetime", billing_period: "lifetime",
+        user_id: user.id, status: "active",
+        plan: vitalicio ? "lifetime" : concessao.plano,
+        billing_period: vitalicio ? "lifetime" : concessao.periodo,
         payment_method: "pix", abacatepay_billing_id: id, customer_email: user.email ?? null,
         current_period_start: now.toISOString(), current_period_end: fim.toISOString(),
         amount_cents: PRECOS_CENTAVOS[offer],
       };
-      const { data: existing } = await supabaseAdmin.from("subscriptions")
-        .select("id, status, plan").eq("user_id", user.id).maybeSingle();
-      const jaLiberado = existing?.status === "active" && existing?.plan === "lifetime";
       if (existing?.id) await supabaseAdmin.from("subscriptions").update(payload).eq("id", existing.id);
       else await supabaseAdmin.from("subscriptions").insert(payload);
-      logStep("Access granted", { userId: user.id, offer, id, jaLiberado });
+      logStep("Access granted", { userId: user.id, offer, id, plano: payload.plan, ate: payload.current_period_end, jaLiberado });
 
       if (!jaLiberado) {
         const { data: p } = await supabaseAdmin.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
@@ -413,7 +442,7 @@ serve(async (req) => {
             await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ from, to: [user.email], subject: "Seu acesso vitalício ao CORE tá ativo ✅", html: welcomeHtml(firstName, user.email) }),
+              body: JSON.stringify({ from, to: [user.email], subject: vitalicio ? "Seu acesso vitalício ao CORE tá ativo ✅" : "Seu mês de CORE tá ativo ✅", html: welcomeHtml(firstName, user.email) }),
             });
           }
         } catch (e) {

@@ -46,6 +46,7 @@
  *
  * Coberto por `paywall-ios.test.tsx`.
  */
+import { erroJaAtivo, erroNaoPermitido, erroFolhaNaoConcluiu } from "@/lib/loja";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
@@ -218,6 +219,15 @@ export function PaywallIOS({
         setPendente(true);
       } else if (motivo === "produto_ausente") {
         setErro("A loja ainda tá carregando este plano. Espera uns segundos e toca de novo.");
+      } else if (motivo === "ja_ativo") {
+        setErro(erroJaAtivo());
+      } else if (motivo === "nao_permitido") {
+        setErro(erroNaoPermitido());
+      } else if (motivo && motivo !== "cancelou") {
+        /* 04/09: a StoreKit recusou ("not available for purchase") e o
+         * paywall ficava MUDO — botão voltava ao normal sem dizer nada. Foi o
+         * que o revisor viu. Cancelar continua silencioso (foi decisão dela). */
+        setErro(erroFolhaNaoConcluiu());
       }
     } catch {
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");

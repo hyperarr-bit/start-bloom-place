@@ -1234,7 +1234,7 @@ const Rotina = () => {
         {activeTab === "semana" && (
           <>
             {/* Hábitos Diários */}
-            <div className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
+            <div data-coach="habitos" className="bg-card rounded-lg border border-border overflow-hidden dark:bg-[hsl(var(--rt-card))] dark:border-[hsl(var(--rt-border))]">
               <div className="bg-green-100 dark:bg-[hsl(var(--rt-card))] border-b border-green-200 dark:border-[hsl(var(--rt-border))] px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm text-green-900 dark:text-[hsl(var(--rt-text))]">HÁBITOS DIÁRIOS</span>

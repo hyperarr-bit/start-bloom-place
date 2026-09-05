@@ -210,9 +210,12 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
  *  zero depois). É a lição do sábado — quando as colunas antigas só diziam
  *  "24,90" × "97,90" sem a matemática, o barato levava 92% do mix. */
 function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void; naWeb?: boolean }) {
+  /* v105: a coluna escolhida ganha BORDA GRAFITE sólida (Cal AI/Blinkist), em
+   * vez da moldura gradiente magenta — o magenta fica só na faixa "MELHOR
+   * ESCOLHA" e no tique. Uma cor de acento por tela, o resto é papel. */
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
-      ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
+      ? "bg-[#16121c] shadow-[0_14px_40px_-16px_rgba(22,18,28,.45)]"
       : "bg-black/10"}`;
   return (
     <div className="grid grid-cols-2 gap-2.5 items-stretch">

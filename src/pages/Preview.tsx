@@ -6,6 +6,10 @@ import { Sparkles, ArrowRight, X } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { DEMO_MODULES } from "@/lib/funnel";
+import { DemoCta } from "@/components/demo/DemoCta";
+import { DemoCoach } from "@/components/demo/DemoCoach";
+import { coachJaVisto } from "@/components/demo/coach-passos";
+import { voltaDaDemoShell, voltaMarcada, voltaFunilTeste, linkDoModuloDaDemo, abaPadraoDaDemo } from "@/components/demo/rotas";
 
 // Fechamento ativo do tour (pico-fim): quem abre o 2º módulo já está engajado —
 // é a hora de puxar pro cadastro, antes de esfriar fuçando.
@@ -51,15 +55,9 @@ const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
 
 // Estático de propósito: sticky aqui brigava com o header sticky do módulo e
 // cobria títulos de cards no scroll do celular. O CTA persistente é o de baixo.
-/** Volta da demo no shell: o funil que armou a demo deixa o endereço em
- *  core-demo-volta (funil W); sem ele, a porta clássica do /app. */
-/** A volta que o funil deixou marcada, se deixou (o W grava o caminho dele). */
-const voltaMarcada = (): string | null => {
-  try { return sessionStorage.getItem("core-demo-volta"); } catch { return null; }
-};
-const voltaDaDemoShell = () => {
-  try { return sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos"; } catch { return "/app?step=compromissos"; }
-};
+// As voltas da demo (core-demo-volta, funis de teste) moram em
+// components/demo/rotas.ts desde 05/09 — o CTA e o coach são testados sem
+// importar as 16 páginas de módulo daqui.
 
 const PreviewBanner = ({ funnel }: { funnel?: boolean }) => {
   /* v83.5 (dono): no APP o roxo era identidade que o app nunca teve — a demo
@@ -139,7 +137,9 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
         return (
           <Link
             key={m.key}
-            to={`/preview/${m.key}?funnel=1&tour=vida${from ? `&from=${from}` : ""}`}
+            // 05/09: o link já carrega a aba padrão do módulo (metas abre em METAS,
+            // como nos outros quatro funis) — ver rotas.ts.
+            to={linkDoModuloDaDemo(m.key, from)}
             onClick={() => trackEvent("funnel_click", { cta: "demo_tour_module", module: m.key })}
             // min-h-11 (44px): a auditoria de toque de 14/08 pegou estas
             // pílulas com 31px de altura — são a navegação mais tocada da
@@ -159,85 +159,6 @@ const DemoTourNav = ({ current, from }: { current: string; from?: string }) => {
       </span>
     </div>
   </div>
-  );
-};
-
-/** Funis de teste congelados (24/07): a demo é a MESMA página pros três, então
- *  eles carimbam `&from=` na URL e a volta devolve pro funil de origem. Sem
- *  isso a pessoa sai do /funil-radar e volta no /inicio, trocando de funil
- *  justo antes da tela de venda. Whitelist fechada — `from` desconhecido cai
- *  no comportamento normal. */
-const FUNIS_TESTE: Record<string, { path: string; volta: "signup" }> = {
-  // 27/07: os TRÊS voltam em ?step=signup. O radar voltava em "plano" porque
-  // tinha a tela SEU PLANO entre a demo e o cadastro — ela saiu quando o funil
-  // do app foi alinhado ao esqueleto do dia 14 (ver ComecarRadar).
-  // 31/08: o /inicio virou o funil W (Pix). O dia 14 continua vivo, mas agora
-  // só em /funil-dia14 — quem entra na demo por ele tem que voltar pra lá, e
-  // não cair no funil novo no meio do caminho.
-  dia14: { path: "/funil-dia14", volta: "signup" },
-  radar: { path: "/funil-radar", volta: "signup" },
-  v1: { path: "/funil-v1", volta: "signup" },
-};
-
-/** Volta pro funil de teste preservando a trilha: ?porta=vida é o que faz o
- *  funil rodar em modo vitrine (fora do /inicio ele não sabe disso sozinho). */
-const voltaFunilTeste = (from: string, tour?: boolean) => {
-  const f = FUNIS_TESTE[from];
-  if (!f) return null;
-  return `${f.path}?step=${f.volta}${tour ? "&porta=vida" : ""}`;
-};
-
-/** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.
- *  27/07: a demo PROVA e devolve direto pro CADASTRO, como no dia 14. (Antes
- *  devolvia pra tela SEU PLANO, que saiu do funil do app.) */
-const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; from?: string }) => {
-  // APP DA LOJA (26/07): todos os destinos abaixo são rotas da WEB, e as duas
-  // usadas na prática — /funil-radar e /inicio — entraram na trava SoNaWeb
-  // quando eu fechei o vazamento do Pix. A trava manda pra ENTRADA_APP, que
-  // abre no welcome azul: a pessoa tocava em "Criar conta" no fim da demo e
-  // era devolvida ao começo do funil. Bug que eu mesmo introduzi.
-  //
-  // O fallback do tour na web era "/inicio?step=plano" — e o /inicio (dia 14)
-  // NUNCA entendeu "plano": caía em "start" e reiniciava o funil. Só não
-  // explodia porque o dia 14 sempre carimba &from=dia14 e nunca chega aqui.
-  // Corrigido de passagem.
-  const shell = isNativeShell();
-  const to = shell
-    // v83.1 (dono, 28/08): a demo virou o passo do FUNIL Me+ — a volta cai no
-    // "quer organizar sua vida?" (compromissos → contrato → paywall), não
-    // direto no offer: o contrato assinado é o preditor de 3× da autópsia.
-    // Funil W (29/08): quem armou a demo pode deixar outra volta em
-    // core-demo-volta — senão, o /app de sempre.
-    ? voltaDaDemoShell()
-    /* 31/08 (bronca do dono: "na demo, quando clica em voltar, vai pra um
-       funil diferente"). O W abre a demo com ?from=w, e `from` só é resolvido
-       pela lista FUNIS_TESTE — que tem dia14/radar/v1 e NÃO tem o w. Sem
-       correspondência, caía no /comecar: outro funil, outro paywall, outra
-       oferta. A marca que o próprio funil deixou (core-demo-volta) vale mais
-       que qualquer tabela, porque ela carrega o caminho REAL de origem. */
-    : voltaMarcada()
-      ?? (from && voltaFunilTeste(from, tour))
-      ?? (funnel || tour ? "/comecar?step=signup" : "/comecar");
-  return (
-    <div
-      className="fixed inset-x-0 bottom-0 z-[70] border-t border-border bg-card/95 backdrop-blur"
-      style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-    >
-      <div className="max-w-md mx-auto px-4 pt-3 flex items-center gap-3">
-        <p className="text-xs text-muted-foreground leading-tight flex-1">
-          {shell
-            ? <>Isso tudo trabalhando com os <strong className="text-foreground">seus dados</strong>.</>
-            : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
-        </p>
-        <Link
-          to={to}
-          onClick={() => trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" })}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
-        >
-          {shell ? "Quero o meu assim" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-    </div>
   );
 };
 
@@ -283,39 +204,10 @@ const DemoTourNudge = ({ count, from }: { count: number; from?: string }) => {
   );
 };
 
-/** v83.1 — "tutorial mostrando onde clicar" (dono): coach-mark de 1 passo no
- *  1º mount da demo dentro do shell. Some sozinho em 6s ou no toque; 1× por
- *  sessão. Aponta os dois controles que importam: a barra de módulos e o CTA. */
-const DICA_DEMO_KEY = "core-demo-dica";
-const DicaDemoShell = () => {
-  const [show, setShow] = useState(() => {
-    try { return sessionStorage.getItem(DICA_DEMO_KEY) !== "1"; } catch { return true; }
-  });
-  useEffect(() => {
-    if (!show) return;
-    try { sessionStorage.setItem(DICA_DEMO_KEY, "1"); } catch { /* noop */ }
-    trackEvent("demo_dica_view", {});
-    const id = window.setTimeout(() => setShow(false), 6000);
-    return () => window.clearTimeout(id);
-  }, [show]);
-  if (!show) return null;
-  return (
-    <button
-      onClick={() => setShow(false)}
-      className="fixed inset-x-0 z-[72] px-4 pointer-events-none"
-      style={{ top: "calc(var(--app-safe-top, 0px) + 96px)" }}
-      aria-label="Fechar dica"
-    >
-      <span className="max-w-md mx-auto pointer-events-auto flex items-start gap-2.5 rounded-2xl bg-[#16121c] text-white p-3.5 shadow-[0_16px_40px_-10px_rgba(0,0,0,0.5)] animate-in fade-in slide-in-from-top-2 duration-300 text-left">
-        <span className="text-[18px] leading-none pt-0.5">👆</span>
-        <span className="flex-1 text-[12.5px] leading-snug">
-          <b>Isso aqui é o app de verdade</b> — mexe à vontade. Troca de módulo na barra
-          de cima; quando terminar, o botão lá embaixo continua teu plano.
-        </span>
-      </span>
-    </button>
-  );
-};
+/* v83.1 tinha aqui a DicaDemoShell: um card escuro genérico de 6s ("isso aqui
+ * é o app de verdade — mexe à vontade"), 1× por sessão. Saiu em 05/09 (v105):
+ * a DEMO GUIADA (components/demo/DemoCoach) aponta, no módulo que a pessoa
+ * escolheu, o resumo, as abas e a barra dos outros módulos, em 3 passos. */
 
 const Preview = () => {
   const { moduleKey } = useParams<{ moduleKey: string }>();
@@ -356,6 +248,16 @@ const Preview = () => {
   const [nudgeCount, setNudgeCount] = useState(0);
   const nudgeFiredRef = useRef(false);
 
+  // DEMO GUIADA (v105): coach de 3 passos no 1º módulo aberto, 1× por sessão,
+  // só no funil do shell. O Preview NÃO remonta ao trocar de módulo (mesmo
+  // elemento de rota), então o módulo do coach fica preso ao 1º aberto; um
+  // pulo de módulo com ele aberto o fecha (o coach conta os passos vistos).
+  const [coachModule, setCoachModule] = useState<string | null>(() =>
+    tour && funnel && isNativeShell() && key in MODULE_COMPONENTS && !coachJaVisto() ? key : null);
+  useEffect(() => {
+    if (coachModule && key !== coachModule) setCoachModule(null);
+  }, [key, coachModule]);
+
   // Telemetria do funil: a demo (app real) é um passo do funil.
   // No tour, cada módulo visitado conta — mede quantos cômodos a pessoa abre.
   useEffect(() => {
@@ -379,18 +281,28 @@ const Preview = () => {
     return <Navigate to="/lp" replace />;
   }
 
+  // ABA CERTA DO MÓDULO DE METAS (05/09, ver rotas.ts): o W abre a demo de
+  // metas sem ?tab=metas e a pessoa caía em SOBRE MIM. Normaliza a URL uma
+  // vez, com replace — mesma rota, o Preview não remonta e o funnel_view do
+  // mount sai só uma vez; o módulo lê a aba da URL ao montar, depois disto.
+  const buscaComAba = tour ? abaPadraoDaDemo(key, params.toString()) : null;
+  if (buscaComAba) {
+    return <Navigate to={`/preview/${key}?${buscaComAba}`} replace />;
+  }
+
   return (
     <div className={`min-h-screen bg-background pb-20 ${tour ? "demo-com-tour" : ""}`}>
       {!embed && <PreviewBanner funnel={funnel} />}
       {tour && <DemoTourNav current={key} from={from} />}
-      {tour && funnel && isNativeShell() && <DicaDemoShell />}
       <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
           <Component />
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
-      {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} />}
+      {/* o nudge espera o coach fechar — dois cards flutuando ao mesmo tempo é ruído */}
+      {tour && nudgeCount >= 2 && !coachModule && <DemoTourNudge count={nudgeCount} from={from} />}
       {!embed && <DemoCta funnel={funnel} tour={tour} from={from} />}
+      {coachModule && <DemoCoach module={coachModule} onDone={() => setCoachModule(null)} />}
     </div>
   );
 };

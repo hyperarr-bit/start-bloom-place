@@ -229,3 +229,31 @@ export async function pedirAvaliacaoSePuder(
     return false;
   }
 }
+
+const CHAVE_PLANO_PRONTO = "core-avaliacao-plano-pronto";
+
+/**
+ * O pedido DIRETO no "plano pronto" (v105, 05/09) — a caixa do Google, sem
+ * folha nossa na frente. Uma vez por aparelho.
+ *
+ * A EVIDÊNCIA (por que a folha de convite perdeu): na central, a folha
+ * ConviteAvaliacao na variante do plano teve 107 vistas, 4 aceites (3,7%) e
+ * 99 recusas em 03–04/09. O pedido direto no MESMO momento, enquanto viveu
+ * (27–29/08), colheu 63 avaliações em 3 dias. A folha protegia a janela de
+ * 90 dias de quem recusava — mas 96% recusavam, e a janela protegida não
+ * virou avaliação em lugar nenhum (o primeiro_gasto segue em 1–2/dia).
+ *
+ * As travas: `podePedirAvaliacao()` (só no shell, nunca em /preview, 3 na
+ * vida, 90 dias) e a chave do aparelho — marcada ANTES de abrir, pra fechar
+ * o app com a caixa na tela não fazê-la voltar. Quando as travas comuns
+ * barram, a chance do aparelho NÃO é gasta: o momento pode voltar a valer
+ * quando a janela abrir.
+ *
+ * Devolve `true` só quando a caixa foi realmente pedida.
+ */
+export async function pedirAvaliacaoPlanoPronto(): Promise<boolean> {
+  if (!podePedirAvaliacao()) return false;
+  if (lerNumero(CHAVE_PLANO_PRONTO)) return false;
+  try { localStorage.setItem(CHAVE_PLANO_PRONTO, "1"); } catch { /* modo privado */ }
+  return pedirAvaliacaoSePuder("plano_pronto", { forte: true });
+}

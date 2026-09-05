@@ -807,7 +807,7 @@ const Treino = () => {
               : null;
             return (
               <div className="space-y-4">
-                <div className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
+                <div data-coach="treino-hoje" className="space-y-4">{renderWorkoutDay(todayDayName)}</div>
                 {fallbackDay && (
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground px-1">

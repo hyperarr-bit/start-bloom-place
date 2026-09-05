@@ -345,7 +345,7 @@ const DesenvolvimentoPessoal = () => {
           </div>}
 
           {/* ========== METAS ========== */}
-          {activeTab === "metas" && <div className="space-y-4">
+          {activeTab === "metas" && <div data-coach="metas" className="space-y-4">
             <GoalsBoardV2 />
           </div>}
 

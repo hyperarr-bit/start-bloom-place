@@ -73,7 +73,9 @@ export const limparProgresso = (): void => {
 const RETOMAVEIS: Record<string, string> = {
   quiz: "quiz", prova: "central", progress: "central", result: "central", central: "central",
   compromissos: "compromissos", contrato: "contrato", notif: "notif", offer: "offer",
-  signup: "signup", confirm: "signup", liberando: "signup",
+  // v105: "pago" é a comemoração entre o pagamento e o cadastro — morreu ali,
+  // a compra já aconteceu: volta direto no cadastro.
+  pago: "signup", signup: "signup", confirm: "signup", liberando: "signup",
 };
 export const passoDeRetomada = (salvo: string | null, noShell: boolean): string | null =>
   noShell && salvo ? (RETOMAVEIS[salvo] ?? null) : null;
@@ -136,7 +138,7 @@ export const RECUO_DO_PAYWALL = "contrato";
  *  paywall fala diferente com essa pessoa (04/09). */
 export const ehPerfilSimples = (answers: Record<string, string> | null | undefined): boolean =>
   (answers?.compromisso ?? "") === "Topo, se for bem simples";
-export const ficaNoVoltar = (passo: string): boolean => passo === "offer" || passo === "signup" || passo === "confirm" || passo === "liberando";
+export const ficaNoVoltar = (passo: string): boolean => passo === "offer" || passo === "pago" || passo === "signup" || passo === "confirm" || passo === "liberando";
 /** Passos que um deep link (notificação, retomada) pode abrir direto. */
 export const PASSOS_DE_DEEP_LINK = new Set(["compromissos", "offer", "signup"]);
 

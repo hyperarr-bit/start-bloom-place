@@ -5,7 +5,7 @@ import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
-import { iconeDaOpcao, MODULO_VISUAL, ORDEM_CENTRAL } from "@/lib/funnel-icones";
+import { corDaOpcao, iconeDaOpcao, MODULO_VISUAL, ORDEM_CENTRAL } from "@/lib/funnel-icones";
 import { PaywallDia14 as PaywallFlow } from "./PaywallDia14";
 import { Button } from "@/components/ui/button";
 import { ehApple } from "@/lib/loja";
@@ -607,6 +607,7 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
                   /* v105: ícone em TODA opção (o mesmo vocabulário da porta e do
                      painel do app), linha branca, borda grafite ao escolher. */
                   const Icone = iconeDaOpcao(o.label);
+                  const paleta = corDaOpcao(i);
                   const sel = escolhida === o.label;
                   return (
                     <motion.button
@@ -619,7 +620,7 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
                         sel ? "border-[#16121c] bg-[#F6F5F3]" : "border-border bg-card"
                       }`}
                     >
-                      <span className="grid place-items-center w-[42px] h-[42px] rounded-xl shrink-0" style={{ background: "#F6F5F3", color: "#1C1917" }}>
+                      <span className="grid place-items-center w-[42px] h-[42px] rounded-xl shrink-0" style={{ background: paleta.cor, color: paleta.tinta }}>
                         <Icone className="w-5 h-5" strokeWidth={2} />
                       </span>
                       <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>

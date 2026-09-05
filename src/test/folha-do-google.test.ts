@@ -107,10 +107,16 @@ describe("anúncio na web → porta", () => {
     expect(veioDeAnuncio("", {})).toBe(false);
     expect(veioDeAnuncio("?step=offer", { utm_source: "ig" })).toBe(false); // fonte sem campanha não conta
   });
-  it("só na WEB e só de anúncio: o app mantém a welcome; direto/orgânico também", () => {
-    expect(comecaNaPorta(false, true)).toBe(true);
+  it("v105: a welcome vale pra TODO MUNDO — web e app rodam o mesmo funil", () => {
+    // 02/09→04/09 o clique pago na web pulava pra porta (69% morriam na
+    // welcome antiga). 05/09, decisão do dono: a welcome nova entra em teste
+    // na web também. Reverter = voltar `!noShell && deAnuncio`.
+    expect(comecaNaPorta(false, true)).toBe(false);
     expect(comecaNaPorta(true, true)).toBe(false);
     expect(comecaNaPorta(false, false)).toBe(false);
+    // veioDeAnuncio segue valendo pra telemetria de origem
+    expect(veioDeAnuncio("?utm_campaign=x", {})).toBe(true);
+    expect(veioDeAnuncio("", {})).toBe(false);
   });
 });
 

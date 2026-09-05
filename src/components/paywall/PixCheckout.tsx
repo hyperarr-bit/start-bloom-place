@@ -624,6 +624,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
           // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
           firePixPurchaseOnce("checkout");
+          /* 05/09 (v105): quando o FUNIL assume o pós-compra (v2.onConfirmado),
+           * ele mostra a comemoração — a mesma tela do app, com os recortes
+           * entrando na lente. Mostrar a confirmação aqui TAMBÉM daria duas
+           * comemorações seguidas. Sem o funil por trás (link solto, LP), a
+           * tela de confirmação daqui continua sendo a única e permanece. */
+          if (v2?.onConfirmado) { v2.onConfirmado(); return; }
           setStep("confirmed");
           return;
         }

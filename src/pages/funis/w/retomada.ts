@@ -97,7 +97,18 @@ export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>
   } catch { /* noop */ }
   return !!(atribuicao?.utm_campaign || atribuicao?.fbclid || atribuicao?.ttclid || atribuicao?.gclid);
 };
-export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !noShell && deAnuncio;
+/* 05/09 (decisão do dono, v105): a WEB PASSA A VER A WELCOME também.
+ *
+ * O pulo pra porta nasceu em 02/09, quando 69% do clique pago morria na
+ * welcome ANTIGA (grade azul, "Um app pra vida inteira"). A welcome de hoje é
+ * outra tela — céu, os 8 módulos que os pagantes mais usam, botão no primeiro
+ * quadro. E o argumento do dono é justo: perda alta na primeira tela existe em
+ * qualquer funil, e a gente nunca vai saber se a nova é melhor sem mostrá-la.
+ *
+ * Web e app passam a rodar o MESMO funil, do primeiro quadro ao cadastro.
+ * Pra reverter em uma linha: `!noShell && deAnuncio`. O sinal de alerta é a
+ * passagem welcome→porta na web (hoje o clique pago já chega na porta). */
+export const comecaNaPorta = (_noShell: boolean, _deAnuncio: boolean): boolean => false;
 
 /**
  * BOTÃO VOLTAR DO ANDROID (02/09).

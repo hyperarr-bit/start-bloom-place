@@ -97,18 +97,28 @@ export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>
   } catch { /* noop */ }
   return !!(atribuicao?.utm_campaign || atribuicao?.fbclid || atribuicao?.ttclid || atribuicao?.gclid);
 };
-/* 05/09 (decisão do dono, v105): a WEB PASSA A VER A WELCOME também.
+/* 05/09, 17h — MEDIDO E REVERTIDO EM 3h40 DE AR.
  *
- * O pulo pra porta nasceu em 02/09, quando 69% do clique pago morria na
- * welcome ANTIGA (grade azul, "Um app pra vida inteira"). A welcome de hoje é
- * outra tela — céu, os 8 módulos que os pagantes mais usam, botão no primeiro
- * quadro. E o argumento do dono é justo: perda alta na primeira tela existe em
- * qualquer funil, e a gente nunca vai saber se a nova é melhor sem mostrá-la.
+ * A welcome entrou pra todo mundo às 13:10 (pedido do dono: "independente
+ * sempre tem uma % muito alta de perda na tela inicial"). O número disse o
+ * contrário, e disse rápido, na mesma janela de horário:
  *
- * Web e app passam a rodar o MESMO funil, do primeiro quadro ao cadastro.
- * Pra reverter em uma linha: `!noShell && deAnuncio`. O sinal de alerta é a
- * passagem welcome→porta na web (hoje o clique pago já chega na porta). */
-export const comecaNaPorta = (_noShell: boolean, _deAnuncio: boolean): boolean => false;
+ *   WEB  primeira tela → 1ª pergunta:  21,5% (porta direto) → 10,7% (welcome)
+ *   WEB  entrada → paywall:            16,4%               → 8,0%
+ *   APP  entrada → paywall (controle): 21,4%               → 27,3%
+ *
+ * O app MELHOROU na mesma janela, com o mesmo tráfego e o mesmo leilão — o
+ * que descarta "a tarde é pior". A perda é da tela: a welcome derruba 86% do
+ * clique pago (224 → 31), e quem passa converte ótimo depois (porta → quiz
+ * subiu de 21,5% pra 77%). Ela filtra, não convence, e clique pago não tem
+ * paciência de filtro.
+ *
+ * O miolo do funil novo (ícones, eco, prova, demo guiada) NÃO mudou nada:
+ * quiz → paywall ficou em 75% contra 76% de antes. Fica tudo, só a porta de
+ * entrada do tráfego pago volta a ser a PERGUNTA.
+ *
+ * Orgânico continua vendo a welcome — é a marca, e ele tem paciência. */
+export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !noShell && deAnuncio;
 
 /**
  * BOTÃO VOLTAR DO ANDROID (02/09).

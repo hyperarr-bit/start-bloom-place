@@ -107,7 +107,11 @@ serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const { data: authData, error: authError } = await supabaseAnon.auth.getUser(token);
-    if (authError || !authData?.user?.email) {
+    /* 06/09: a WEB paga com sessão ANÔNIMA (sem e-mail até o batismo depois do
+     * QR). Exigir e-mail aqui derrubava 100% do checkout da web com 401. O
+     * vínculo compra→conta é o order_id gravado em pix_order_created (o
+     * webhook e o reconcile procuram por ele), não o e-mail. */
+    if (authError || !authData?.user) {
       return jsonResponse({ error: "User not authenticated" }, 401);
     }
     const user = authData.user;
@@ -179,7 +183,10 @@ serve(async (req) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    const name = (body.customer?.name || profile?.display_name || user.email.split("@")[0]).trim();
+    const name = (body.customer?.name || profile?.display_name || user.email?.split("@")[0] || "Cliente CORE").trim();
+    // Anônimo: a Cakto exige um e-mail no cliente. Vai um apelido determinístico
+    // no nosso domínio — nunca o e-mail de outra pessoa. O webhook casa pelo order_id.
+    const emailCliente = user.email || `pix-${user.id.slice(0, 8)}@coreaplicativo.com.br`;
     const bodyPhone = toE164(body.customer?.phone);
     const phone = (bodyPhone !== DUMMY_PHONE ? bodyPhone : null) ?? toE164(profile?.phone) ?? DUMMY_PHONE;
     // Form CPF removido (25/07): usa o CPF do body (Pagar.me/legado) ou o
@@ -188,7 +195,13 @@ serve(async (req) => {
     // testado; NÃO fingimos o CPF de uma pessoa real). O zerado nunca é salvo
     // no perfil (o guard abaixo já exige body.customer.docNumber).
     let docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || "";
-    if (docNumber.length !== 11) docNumber = "00000000000";
+    /* 06/09: o coringa 00000000000 passou a ser RECUSADO pela Cakto (ou fica
+     * minutos sem resposta). Sem CPF de 11 dígitos, devolve cpf_required
+     * (HTTP 200 + código, como a pagarme-pix) e o checkout reabre o form. */
+    if (docNumber.length !== 11 || /^(\d)\1{10}$/.test(docNumber)) {
+      logStep("cpf_required", { hasBody: !!body.customer?.docNumber, hasProfile: !!profile?.tax_id });
+      return jsonResponse({ error: "cpf_required" });
+    }
 
     // CPF (e telefone REAL, se algum dia voltar) vão pro profile — próxima
     // compra não pede de novo. O coringa nunca é salvo.
@@ -206,7 +219,7 @@ serve(async (req) => {
       paymentMethod: "pix",
       customer: {
         name,
-        email: user.email, // e-mail da CONTA — o vínculo do webhook
+        email: emailCliente, // e-mail da conta, ou apelido pro anônimo (vínculo real = order_id)
         phone,
         // fingerprint é OBRIGATÓRIO (confirmado no teto real 13/07) mas aceita
         // qualquer string não-vazia; antifraudProfilingAttemptReference NÃO

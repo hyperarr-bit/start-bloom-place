@@ -109,7 +109,12 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  * 0 pedidos criados com dinheiro de anúncio já gasto.
  * O Asaas foi testado agora, ao vivo, e devolveu QR de R$27,90 na hora.
  * Quando a Cakto voltar: 1 linha e push. */
-const FORCE_GATEWAY: Gateway | null = "asaas";
+/* 06/09 19h — CAKTO de volta na web (ordem do dono: "troca pra cakto a web").
+ * Ofertas w25 (24,90, psifava) e w47 (47,90, 39o6orh) testadas na API: QR em
+ * ~5s com CPF válido; com CPF zerado a Cakto recusa → o form nome+CPF volta
+ * neste braço (SEM_FORM). Compra anônima casa pelo order_id no webhook e no
+ * reconcile. Rollback = "asaas" (1 linha) + push. */
+const FORCE_GATEWAY: Gateway | null = "cakto";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
@@ -212,7 +217,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   // válido. Cakto exige CPF na API mas NÃO valida o dígito → a cakto-pix usa o
   // tax_id do perfil quando existe e "00000000000" (consumidor não
   // identificado) pros anônimos. Asaas/Abacate nem precisam de CPF.
-  const SEM_FORM = braco !== "pagarme";
+  /* 06/09: a Cakto passou a RECUSAR (ou pendurar por minutos) o CPF coringa
+   * 00000000000 — testado 4× com sessão anônima: zerado = refused/sem resposta,
+   * CPF válido = QR em 5s, nas duas ofertas. Então no braço Cakto o form
+   * nome+CPF volta, igual ao da Pagar.me. Dado de julho: pagantes/abertura
+   * ficou em ~40–47% com ou sem form. */
+  const SEM_FORM = braco !== "pagarme" && braco !== "cakto";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -272,14 +282,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
         if (jaTem) { generate("", ""); return; }
         const podeAnonimo = await anonimoLigado();
         if (!podeAnonimo) { generate("", ""); return; } // caminho antigo: já tem conta
-        /* CAKTO exige e-mail na conta (cakto-pix devolve 401 pra sessão
-         * anônima: customer.email é o vínculo do webhook dela). Nesse braço o
-         * e-mail continua vindo ANTES do QR — só a Asaas faz QR-primeiro. */
-        if (braco === "cakto") {
-          trackEvent("funnel_view", { step: "pix_email", offer, context, gateway: braco });
-          setStep("email");
-          return;
-        }
+        /* 06/09: a Cakto não passa mais por aqui — ela tem form nome+CPF
+         * (SEM_FORM=false) e a cakto-pix aceita sessão anônima (vínculo pelo
+         * order_id). O e-mail dela é pedido NA TELA DO QR, como na Asaas. */
         /* QR PRIMEIRO (02/09). Medido 01–02/09 na oferta w97: 93 viram a tela
          * de e-mail, 30 terminaram de digitar (mediana 6,9s, p75 14,6s) — 57%
          * de quem tocou em pagar nunca viu o QR. O servidor leva 0,9s. Então o
@@ -408,7 +413,12 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setStep("error");
       return;
     }
-    if (estadoSessao === "anonima") { setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context }); }
+    if (estadoSessao === "anonima") {
+      setAnonima(true); trackEvent("pix_sessao_anonima", { offer, context });
+      // 06/09: no caminho COM form (Cakto/Pagar.me) o anônimo ainda não deu
+      // e-mail — pede na tela do QR, senão paga e não tem como recuperar o acesso.
+      if (!SEM_FORM) setPedirEmailNoQr(true);
+    }
     // Pix numa sessão sem e-mail → depois de pagar, cadastro antes de liberar (QR primeiro, 02/09)
     void marcarBatismoSeSemEmail();
     const t0 = Date.now();
@@ -1057,7 +1067,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   "pode fechar sem medo" seria pior que mentira — o acesso mora
                   no token DESTE navegador até a conta ser batizada. Então o
                   texto vira o contrário: fica aqui, que é rapidinho. */}
-              {anonima ? (
+              {anonima && emailCompra ? (
                 <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
                   📩 Pagou? Seu acesso vai pra <strong className="text-foreground">{emailCompra}</strong> —
                   pode fechar esta tela sem medo.

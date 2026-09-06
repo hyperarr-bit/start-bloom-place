@@ -191,6 +191,23 @@ serve(async (req) => {
 
     // ---- Usuário: match por e-mail (paginado) ou por assinatura existente --
     async function resolveUserId(): Promise<string | null> {
+      /* 06/09: PRIMEIRO pelo order_id do create (pix_order_created grava
+       * user_id + order_id). É o único vínculo que existe pra compra ANÔNIMA
+       * da web (sem e-mail até o batismo) — e é o mesmo que o asaas-webhook
+       * usa. E-mail vira o segundo caminho. */
+      if (purchaseId) {
+        const { data: reg } = await supabaseClient
+          .from("analytics_events")
+          .select("user_id")
+          .eq("event_name", "pix_order_created")
+          .contains("event_data", { order_id: purchaseId })
+          .not("user_id", "is", null)
+          .limit(1);
+        if (reg?.[0]?.user_id) {
+          logStep("Found user by order_id (pix_order_created)", { userId: reg[0].user_id });
+          return String(reg[0].user_id);
+        }
+      }
       if (customerEmail) {
         const target = customerEmail.toLowerCase();
         for (let page = 1; page <= 20; page++) {

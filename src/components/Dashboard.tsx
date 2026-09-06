@@ -413,7 +413,7 @@ export const Dashboard = ({
           CSS) e quebrava em Android comum — Samsung é 360px. Por isso o corpo
           escala com a largura da tela (clamp) em vez de tamanho fixo, o ícone
           encolhe no celular e o texto ganha min-w-0 pra poder espremer. */}
-      <div data-coach="resumo" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">

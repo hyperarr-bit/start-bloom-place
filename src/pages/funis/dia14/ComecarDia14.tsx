@@ -5,7 +5,6 @@ import {
   ArrowRight, Check, Sparkles, ShieldCheck,
   Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
-import { iconeDaOpcao, MODULO_VISUAL, ORDEM_CENTRAL } from "@/lib/funnel-icones";
 import { PaywallDia14 as PaywallFlow } from "./PaywallDia14";
 import { Button } from "@/components/ui/button";
 import { ehApple } from "@/lib/loja";
@@ -307,8 +306,6 @@ const AREA_RESULT_ITEMS: Record<AreaKey, string[]> = {
   ],
 };
 
-const LEMBRETES_POR_AREA: Record<AreaKey, number> = { dinheiro: 3, rotina: 3, corpo: 3, saude: 3, metas: 3 };
-
 export function RadarResultScreen({ answers, area, onDone }: { answers: Record<string, string>; area: AreaKey; onDone: () => void }) {
   const a = AREAS[area];
   const items = answers.vitoria
@@ -319,17 +316,6 @@ export function RadarResultScreen({ answers, area, onDone }: { answers: Record<s
       <div className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">Análise concluída</div>
       <h2 className="text-[28px] font-bold tracking-tight leading-tight mb-1">Seu mapa da vida<br />está pronto</h2>
       <LifeRadar area={area} />
-      {/* v105: o PLANO EM NÚMEROS (Cal AI faz assim): três cartões curtos antes
-          do texto. "5 min/dia" é a promessa que a pessoa acabou de aceitar no
-          quiz; os lembretes são os do LEMBRETES_W da área; 16 é o que ela viu. */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        {[["5 min", "por dia"], [String(LEMBRETES_POR_AREA[area] ?? 3), "lembretes na hora"], ["16", "módulos abertos"]].map(([g, c]) => (
-          <div key={c} className="rounded-2xl border border-border bg-card py-3 px-2">
-            <div className="text-[20px] font-extrabold tracking-[-0.02em] leading-none text-foreground">{g}</div>
-            <div className="text-[11px] font-medium text-muted-foreground leading-tight mt-1.5">{c}</div>
-          </div>
-        ))}
-      </div>
       <Card className="p-3.5 text-left mb-4 border-destructive/30 bg-destructive/[0.04]">
         <p className="text-[13.5px] leading-snug">
           <strong>Seu ponto de partida: {a.nome}.</strong> Foi o que você disse que mais dói — é por onde seu plano começa.
@@ -361,37 +347,34 @@ export function CentralScreen({ area, onOpen }: { area: AreaKey; onOpen: () => v
   const a = AREAS[area];
   // Só o módulo da área tem anel "começa aqui" (bate com a copy). Os outros
   // 15 são cards sólidos — NADA apagado, senão o lead acha que estão bloqueados.
-  const startHere = a.module;
+  const startLabel: Record<string, string> = { financas: "Finanças", rotina: "Rotina", treino: "Treino", saude: "Saúde", desenvolvimento: "Metas" };
+  const startHere = startLabel[a.module];
   return (
     <div className="w-full max-w-sm mx-auto text-center">
       <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Sua central tá pronta</h2>
       <p className="text-muted-foreground text-sm leading-relaxed mb-5">
         Os 16 módulos já são seus. <strong className="text-foreground">Começamos por {a.nome}</strong> — o resto entra no seu ritmo.
       </p>
-      {/* v105: os 16 como o painel do app os desenha (ícone lucide + pastel),
-          na ordem de uso real dos pagantes — o emoji saiu do funil inteiro. */}
-      <div className="grid grid-cols-4 gap-2.5 mb-3">
-        {ORDEM_CENTRAL.map((id, i) => {
-          const m = MODULO_VISUAL[id];
-          const on = id === startHere;
-          const Icon = m.Icon;
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {ALL_MODULE_ICONS.map((m, i) => {
+          const on = m.label === startHere;
           return (
             <motion.div
-              key={id}
+              key={m.label}
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.05 + i * 0.03, duration: 0.35, ease: [0.22, 1.25, 0.36, 1] }}
-              className="relative flex flex-col items-center gap-1.5"
+              transition={{ delay: 0.08 + i * 0.035, duration: 0.3 }}
+              className={`relative rounded-2xl border-2 p-2.5 flex flex-col items-center gap-1 bg-card ${
+                on ? "border-accent bg-accent/[0.07]" : "border-border"
+              }`}
             >
               {on && (
-                <span className="absolute -top-2 right-0 z-10 text-[8px] font-extrabold uppercase tracking-wide bg-accent text-accent-foreground rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 text-[8px] font-bold uppercase tracking-wide bg-accent text-accent-foreground rounded-full px-1.5 py-0.5 whitespace-nowrap">
                   começa aqui
                 </span>
               )}
-              <span className={`grid place-items-center w-[52px] h-[52px] rounded-2xl ${on ? "ring-[3px] ring-accent" : ""}`} style={{ background: m.cor, color: m.tinta }}>
-                <Icon className="w-[22px] h-[22px]" strokeWidth={2} />
-              </span>
-              <span className="text-[10.5px] font-semibold leading-none text-foreground">{m.nome}</span>
+              <span className="text-xl">{m.emoji}</span>
+              <span className="text-[10px] font-semibold leading-none text-foreground">{m.label}</span>
             </motion.div>
           );
         })}
@@ -505,7 +488,7 @@ export const buildQuizItems = (questions: QuizQ[], proofAfterKey?: string, comEc
   });
 const QUIZ_ITEMS: QuizItem[] = buildQuizItems(QUIZ, PROOF_AFTER_KEY);
 
-export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false, onAnswer }: {
+export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, skipFirstAnswered, proofArea, extraSlide, ecoSlide, counterBase = 0, semContador = false }: {
   questions: QuizQ[];
   items: QuizItem[];
   onDone: (a: Record<string, string>) => void;
@@ -525,8 +508,6 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
    *  Número à vista vira contrato — a pessoa calcula quanto falta e desiste
    *  no meio. A barra sozinha dá a mesma noção de avanço sem dar o boleto. */
   semContador?: boolean;
-  /** v105: cada resposta sobe na hora (o funil W decide o ECO a partir da 1ª). */
-  onAnswer?: (key: string, label: string, all: Record<string, string>) => void;
 }) {
   const startIdx = skipFirstAnswered && initialAnswers && questions.length > 0 && initialAnswers[questions[0].key]
     ? items.findIndex((it) => it.kind === "q" && it.qIdx === 1)
@@ -554,24 +535,12 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
     if (idx < items.length - 1) setIdx((i) => Math.min(i + 1, items.length - 1));
     else onDone(next);
   };
-  /* v105: a escolha PRIMEIRO acende (borda grafite + tique magenta, 240 ms) e
-   * só então avança — é o feedback que o Cal AI dá e que a tela seca não dava.
-   * A trava continua valendo desde o toque: dois toques no mesmo quadro não
-   * avançam duas vezes. */
-  const [escolhida, setEscolhida] = useState<string | null>(null);
-  useEffect(() => { setEscolhida(null); }, [idx]);
   const pick = (label: string) => {
     if (!q || travaRef.current) return;
-    travaRef.current = true;
-    setEscolhida(label);
     const next = { ...answers, [q.key]: label };
     setAnswers(next);
     trackEvent("funnel_quiz_answer", { q: q.key, answer: label });
-    onAnswer?.(q.key, label, next);
-    window.setTimeout(() => {
-      travaRef.current = false;
-      advance(next);
-    }, 240);
+    advance(next);
   };
   return (
     <div className="w-full max-w-md mx-auto">
@@ -601,34 +570,21 @@ export function QuizScreen({ questions, items, onDone, onBack, initialAnswers, s
             )
           ) : (
             <>
-              <h2 className="text-[26px] font-extrabold tracking-[-0.02em] leading-[1.15] mb-6">{q!.q}</h2>
-              <div className="space-y-2.5">
-                {q!.opts.map((o, i) => {
-                  /* v105: ícone em TODA opção (o mesmo vocabulário da porta e do
-                     painel do app), linha branca, borda grafite ao escolher. */
-                  const Icone = iconeDaOpcao(o.label);
-                  const sel = escolhida === o.label;
-                  return (
-                    <motion.button
-                      key={o.label}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.045, duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
-                      onClick={() => pick(o.label)}
-                      className={`w-full flex items-center gap-3 rounded-2xl border-2 p-3 text-left active:scale-[0.985] transition-[transform,border-color,background-color] duration-150 ${
-                        sel ? "border-[#16121c] bg-[#F6F5F3]" : "border-border bg-card"
-                      }`}
-                    >
-                      <span className="grid place-items-center w-[42px] h-[42px] rounded-xl shrink-0" style={{ background: "#F6F5F3", color: "#1C1917" }}>
-                        <Icone className="w-5 h-5" strokeWidth={2} />
-                      </span>
-                      <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
-                      <span className={`grid place-items-center w-[22px] h-[22px] rounded-full border-2 shrink-0 transition-colors ${sel ? "border-accent bg-accent" : "border-border"}`}>
-                        <Check className={`w-3 h-3 text-white transition-transform ${sel ? "scale-100" : "scale-0"}`} strokeWidth={3.5} />
-                      </span>
-                    </motion.button>
-                  );
-                })}
+              <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">{q!.q}</h2>
+              <div className="space-y-3">
+                {q!.opts.map((o) => (
+                  <button
+                    key={o.label}
+                    onClick={() => pick(o.label)}
+                    className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+                  >
+                    <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+                    <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+                    <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+                    </span>
+                  </button>
+                ))}
               </div>
             </>
           )}

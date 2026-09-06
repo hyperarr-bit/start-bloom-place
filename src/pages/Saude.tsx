@@ -79,7 +79,7 @@ const Saude = () => {
         />
 
         {activeTab === "hoje" && (
-          <motion.div data-coach="saude-hoje" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
             <HydrationTracker />
             <PharmacyChecklist />
             <BMICalculator />

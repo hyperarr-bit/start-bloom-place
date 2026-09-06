@@ -5,7 +5,7 @@ import { ehApple, donoDaFolha } from "@/lib/loja";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
-  Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2, Clock,
+  Lock, MailCheck, Loader2, ChevronLeft, ChevronRight, Circle, CheckCircle2,
 } from "lucide-react";
 import { PaywallFlow } from "@/components/paywall/PaywallFlow";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
@@ -26,11 +26,10 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
   AREAS, AREA_TRACKS, AREA_PROOF, ALL_MODULE_ICONS, FUNNEL_AREA_KEY, DOOR_AREAS, AREA_TUTORIAL,
-  VICTORY_PHRASE, getFunnelArea,
+  VICTORY_PHRASE,
   type AreaKey, type QuizQ,
 } from "@/lib/funnel";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
-import { EMPRESA } from "@/lib/empresa";
 import { agendarResgateDoPlano, cancelarResgateDoPlano } from "@/lib/notificacoes";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
@@ -1390,54 +1389,16 @@ function ComoPagou() {
  * primeira (a Play leva uns segundos pra propagar), restaura e tenta de
  * novo — e SÓ ENTÃO celebra e solta no app. Sem esta espera, a pessoa caía
  * no gate ainda "sem assinatura" e via paywall DE NOVO depois de pagar.
- *
- * v105 (05/09), duas correções medidas em 207 vendas na Play (28/08→04/09):
- *
- *  1. `celebrar`: a comemoração migrou pra ANTES do cadastro (PagoScreen —
- *     92% criam a conta depois de pagar, mediana 22 s, e chegavam aqui sem
- *     ninguém ter dito "deu certo"). Quando o ComecarW passa
- *     `celebrar={false}`, esta tela fecha com um "Acesso guardado" curto em
- *     vez de comemorar de novo. O padrão continua `true` pra nada mudar
- *     antes de o funil ser religado na ordem nova.
- *
- *  2. `ok === false` NÃO comemora mais. Aconteceu uma vez e a tela soltou
- *     confete em cima de um acesso que não existia — a pessoa caiu no
- *     paywall de novo. Agora é honesto: "ainda não achamos sua compra", com
- *     botão pra sincronizar de novo (o Pix da folha do Google leva minutos),
- *     entrada no app mesmo assim e o canal de suporte. A web não passa por
- *     aqui: nela o webhook já gravou o acesso antes desta tela existir.
  */
-export function LiberandoScreen({ celebrar = true }: { celebrar?: boolean } = {}) {
+export function LiberandoScreen() {
   // mesmo par de chaves que o OfferScreen usa pra saudação da celebração
   const { get: getUserData } = useUserData();
   const nome = getUserData<string>("core-user-name", "") || getUserData<string>("user-name", "");
   const [demorou, setDemorou] = useState(false);
-  // "sync" conferindo · "ok" acesso gravado · "falhou" o shell não achou a compra
-  const [fase, setFase] = useState<"sync" | "ok" | "falhou">("sync");
-  const [tentativa, setTentativa] = useState(0);
-  const [tentando, setTentando] = useState(false);
-  const [areaKey] = useState(() => getFunnelArea());
-  const vivo = useRef(true);
-
-  /** initRevenueCat → sync (3×) → se não achou, restaurar (força a leitura
-   *  do recibo da Play) → sync de novo. A receita da primeira versão, agora
-   *  reaproveitada pelo botão "Já paguei — atualizar". */
-  const sincronizarCompra = async (): Promise<boolean> => {
-    const rc = await import("@/lib/revenuecat");
-    await rc.initRevenueCat();
-    let ok = await rc.sincronizarAssinatura(3);
-    if (!ok) {
-      // a folha fechou mas o RC ainda não viu a transação nesta conta:
-      // restaurar força a leitura do recibo da Play e re-sincroniza
-      await rc.restaurar();
-      ok = await rc.sincronizarAssinatura(3);
-    }
-    return ok;
-  };
-
+  const [pronto, setPronto] = useState(false);
   useEffect(() => {
-    vivo.current = true;
-    const t = setTimeout(() => { if (vivo.current) setDemorou(true); }, 9000);
+    let vivo = true;
+    const t = setTimeout(() => { if (vivo) setDemorou(true); }, 9000);
     (async () => {
       // WEB (02/09): não há loja nem RevenueCat — a compra foi confirmada no
       // Pix e o webhook já gravou o acesso. Aqui era 3× revenuecat-sync com
@@ -1445,109 +1406,25 @@ export function LiberandoScreen({ celebrar = true }: { celebrar?: boolean } = {}
       if (!isNativeShell()) {
         try { await supabase.functions.invoke("check-subscription"); } catch { /* melhor esforço */ }
         trackEvent("app_pos_compra_liberado", { ok: true, web: true });
-        if (vivo.current) setFase("ok");
+        if (vivo) setPronto(true);
         return;
       }
-      let ok = false;
-      // Antes, uma exceção aqui deixava o spinner girando pra sempre; agora
-      // cai no mesmo estado honesto de "não achei".
-      try { ok = await sincronizarCompra(); } catch { ok = false; }
+      const rc = await import("@/lib/revenuecat");
+      await rc.initRevenueCat();
+      let ok = await rc.sincronizarAssinatura(3);
+      if (!ok) {
+        // a folha fechou mas o RC ainda não viu a transação nesta conta:
+        // restaurar força a leitura do recibo da Play e re-sincroniza
+        await rc.restaurar();
+        ok = await rc.sincronizarAssinatura(3);
+      }
       trackEvent("app_pos_compra_liberado", { ok });
-      if (vivo.current) setFase(ok ? "ok" : "falhou");
+      if (vivo) setPronto(true);
     })();
-    return () => { vivo.current = false; clearTimeout(t); };
+    return () => { vivo = false; clearTimeout(t); };
   }, []);
-
-  // v105: NÃO pede avaliação aqui. O pedido direto do Google já acontece no
-  // "plano pronto" (central), e `conta_paga` é o motivo de conta marcada como
-  // paga em Finanças — misturar os dois na telemetria escondia o número de
-  // cada um. Quem virou pagante é convidado pelos momentos de valor de sempre
-  // (primeiro gasto, sequência, retrospectiva).
-
-  const tentarDeNovo = async () => {
-    if (tentando) return;
-    const n = tentativa + 1;
-    setTentativa(n);
-    setTentando(true);
-    trackEvent("app_pos_compra_retry", { tentativa: n });
-    let ok = false;
-    try { ok = await sincronizarCompra(); } catch { ok = false; }
-    trackEvent("app_pos_compra_liberado", { ok, tentativa: n });
-    if (!vivo.current) return;
-    setTentando(false);
-    if (ok) setFase("ok");
-  };
-
-  const abrirApp = () => { window.location.href = "/"; };
-  const cta = "w-full h-14 rounded-full text-base font-semibold";
-  const grafite = { background: "#16121c", color: "#fff" };
-
-  if (fase === "ok" && celebrar) {
-    return <BoasVindasPago imediato nome={nome} onComecar={abrirApp} />;
-  }
-  if (fase === "ok") {
-    const area = areaKey ? AREAS[areaKey] : null;
-    return (
-      <div className="w-full max-w-sm mx-auto text-center py-12">
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-          style={{ background: "#127A56", color: "#fff", boxShadow: "0 16px 40px -16px rgba(18,122,86,.6)" }}
-        >
-          <Check className="w-10 h-10" strokeWidth={3} />
-        </div>
-        <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Acesso guardado</h2>
-        <p className="text-muted-foreground leading-relaxed mb-7">
-          Seu CORE está na sua conta.{" "}
-          {area ? <>Vamos começar por <b className="text-foreground">{area.nome}</b>.</> : "Tudo pronto pra começar."}
-        </p>
-        <Button size="lg" className={cta} style={grafite} onClick={abrirApp}>
-          Abrir o CORE <ArrowRight className="w-5 h-5 ml-1" />
-        </Button>
-      </div>
-    );
-  }
-  if (fase === "falhou") {
-    return (
-      <div className="w-full max-w-sm mx-auto text-center py-10">
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5"
-          style={{ background: "#FDECCB", color: "#9A5B00" }}
-        >
-          <Clock className="w-10 h-10" strokeWidth={2.2} />
-        </div>
-        <h2 className="text-[26px] font-bold tracking-tight leading-tight mb-2">Ainda não achamos sua compra</h2>
-        <p className="text-muted-foreground leading-relaxed mb-7">
-          Se você pagou no Pix, o banco pode levar alguns minutos. Sua conta está criada — quando o pagamento entrar, o acesso libera sozinho.
-        </p>
-        <Button size="lg" className={cta} style={grafite} onClick={() => { void tentarDeNovo(); }} disabled={tentando}>
-          {tentando ? <><Loader2 className="w-5 h-5 animate-spin mr-2" />Conferindo…</> : "Já paguei — atualizar"}
-        </Button>
-        {tentativa > 0 && !tentando && (
-          <p className="text-xs text-muted-foreground mt-3">
-            Ainda não apareceu. Pix pode levar uns minutos — tenta de novo daqui a pouco.
-          </p>
-        )}
-        <button
-          type="button"
-          className="inline-block mt-5 text-sm font-semibold underline underline-offset-4 text-foreground"
-          onClick={() => { trackEvent("app_pos_compra_entrou_sem_acesso", { tentativas: tentativa }); abrirApp(); }}
-        >
-          Entrar no app mesmo assim
-        </button>
-        <p className="mt-5 text-xs text-muted-foreground">
-          Precisa de ajuda?{" "}
-          {/* O canal de suporte do app é o e-mail da EMPRESA (mesmo do
-              rodapé, do Legal e da página /suporte, que é só-web). */}
-          <a
-            className="underline underline-offset-4 font-semibold text-foreground"
-            href={`mailto:${EMPRESA.email}?subject=${encodeURIComponent("Paguei e o acesso não liberou")}`}
-            onClick={() => trackEvent("app_pos_compra_suporte", { tentativas: tentativa })}
-          >
-            Falar com a gente
-          </a>
-        </p>
-      </div>
-    );
+  if (pronto) {
+    return <BoasVindasPago imediato nome={nome} onComecar={() => { window.location.href = "/"; }} />;
   }
   return (
     <div className="w-full max-w-sm mx-auto text-center py-16">

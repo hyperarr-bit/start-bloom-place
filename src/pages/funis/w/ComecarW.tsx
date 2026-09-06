@@ -30,8 +30,7 @@ import { CHAVES_FUNIL_W as CHAVES, guardarChave, lerChave, idadeDaChave, REINICI
 import { useAuth } from "@/hooks/use-auth";
 import { anonimoLigado, precisaBatizar } from "@/lib/sessao-anonima";
 import { QUIZ, AREA_TRACKS, AREAS, type AreaKey } from "@/lib/funnel";
-import { ArrowRight, Bell, ChevronLeft, ChevronRight } from "lucide-react";
-import { ICONE_PORTA, ICONES_COMPROMISSO, MODULO_VISUAL } from "@/lib/funnel-icones";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   QuizScreen, ProgressScreen, RadarResultScreen, CentralScreen, ProvaSocialScreen,
   buildQuizItems,
@@ -39,7 +38,6 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
-import { PagoScreen } from "@/components/funil/PagoScreen";
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -54,7 +52,7 @@ const FUNIL = "w";
 
 type Step =
   | "welcome" | "promessas" | "porta" | "quiz" | "prova" | "progress" | "result"
-  | "central" | "compromissos" | "contrato" | "notif" | "offer" | "pago"
+  | "central" | "compromissos" | "contrato" | "notif" | "offer"
   | "signup" | "confirm" | "liberando";
 
 // Tema claro fixo (o funil da web roda claro, doa o que doer o tema do sistema).
@@ -132,14 +130,6 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
  * o mesmo cabeçalho do QuizScreen, com a barra no primeiro degrau de 8.
  * O botão de voltar existe mas leva pras promessas (não há pergunta antes). */
 function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number }) {
-  /* v105: a escolha acende (borda grafite) por 220 ms antes de avançar — o
-   * mesmo feedback das outras perguntas. A trava evita o toque duplo. */
-  const [escolhida, setEscolhida] = useState<string | null>(null);
-  const escolher = (o: (typeof PORTAS_W)[number]) => {
-    if (escolhida) return;
-    setEscolhida(o.label);
-    window.setTimeout(() => onPickArea(o.area, o.label), 220);
-  };
   return (
     <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
       <div className="flex items-center gap-3 mb-8">
@@ -151,37 +141,23 @@ function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, 
             animate={{ width: `${(1 / totalPassos) * 100}%` }} transition={{ duration: 0.35, ease: "easeOut" }} />
         </div>
       </div>
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent mb-2.5">Pra começar</div>
-      <h2 className="text-[26px] font-extrabold tracking-[-0.02em] leading-[1.15] mb-2">
+      <h2 className="text-[27px] font-bold tracking-tight leading-[1.15] mb-7">
         Qual área da sua vida tá mais fora de controle hoje?
       </h2>
-      <p className="text-[14px] text-muted-foreground leading-snug mb-5">Seu plano começa por ela. O resto entra no seu ritmo.</p>
       <div className="space-y-2.5">
-        {PORTAS_W.map((o, i) => {
-          /* v105: o tile é o MÓDULO que a área abre, com o ícone e o pastel do
-             painel do app (o emoji saiu do funil inteiro). */
-          const v = MODULO_VISUAL[ICONE_PORTA[o.label] ?? "tudo"];
-          const Icon = v.Icon;
-          const sel = escolhida === o.label;
-          return (
-            <motion.button
-              key={o.label}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.045, duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
-              onClick={() => escolher(o)}
-              className={`w-full flex items-center gap-3 rounded-2xl border-2 p-3 text-left active:scale-[0.985] transition-[transform,border-color,background-color] duration-150 ${
-                sel ? "border-[#16121c] bg-[#F6F5F3]" : "border-border bg-card"
-              }`}
-            >
-              <span className="grid place-items-center w-[42px] h-[42px] rounded-xl shrink-0" style={{ background: v.cor, color: v.tinta }}>
-                <Icon className="w-5 h-5" strokeWidth={2} />
-              </span>
-              <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
-              <ChevronRight className="w-[18px] h-[18px] text-muted-foreground shrink-0" />
-            </motion.button>
-          );
-        })}
+        {PORTAS_W.map((o) => (
+          <button
+            key={o.label}
+            onClick={() => onPickArea(o.area, o.label)}
+            className="group w-full flex items-center gap-3.5 rounded-2xl border-2 border-border bg-card p-3.5 text-left hover:border-accent hover:bg-accent/[0.04] active:scale-[0.99] transition-all"
+          >
+            <span className="grid place-items-center w-11 h-11 rounded-xl bg-secondary text-2xl shrink-0">{o.emoji}</span>
+            <span className="font-semibold text-[15px] flex-1 leading-snug">{o.label}</span>
+            <span className="grid place-items-center w-6 h-6 rounded-full border-2 border-border group-hover:border-accent transition-colors shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-accent transition-colors" />
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -235,20 +211,9 @@ const LEMBRETES_W: Record<AreaKey, { titulo: string; itens: Array<{ emoji: strin
   },
 };
 
-/** v105: a notificação de EXEMPLO que a pessoa veria — um cartão igual ao do
- *  Android, com a copy da área. Mostrar a coisa vale mais que descrevê-la. */
-const NOTIF_EXEMPLO: Record<AreaKey, [string, string]> = {
-  dinheiro: ["Conta de luz vence amanhã", "R$ 182,40 · toca pra marcar como paga"],
-  rotina: ["Hora do hábito: ler 10 páginas", "Sequência de 6 dias · não quebra hoje"],
-  corpo: ["Treino de hoje: pernas · 35 min", "3 de 5 na semana · falta pouco"],
-  saude: ["Vitamina D · agora", "e 2 copos de água pra bater a meta"],
-  metas: ["Meta: viagem em dezembro · 62%", "Próximo passo: guardar R$ 200 esta semana"],
-};
-
 function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
   const [indo, setIndo] = useState(false);
   const conf = LEMBRETES_W[area] ?? LEMBRETES_W.dinheiro;
-  const exemplo = NOTIF_EXEMPLO[area] ?? NOTIF_EXEMPLO.dinheiro;
   const seguir = async (pedir: boolean) => {
     if (indo) return;
     setIndo(true);
@@ -278,32 +243,16 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
   };
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent mb-2.5">Um detalhe importante</div>
-      <h2 className="text-[24px] font-extrabold tracking-[-0.02em] leading-[1.15] mb-3">{conf.titulo}</h2>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
-        className="flex items-start gap-3 rounded-[18px] border border-border bg-[#F6F5F3] px-3.5 py-3 mb-4"
-      >
-        <span className="grid place-items-center w-[38px] h-[38px] rounded-[10px] bg-[#16121c] text-white text-[11px] font-black shrink-0">CORE</span>
-        <span className="min-w-0">
-          <span className="block text-[11px] font-medium text-muted-foreground mb-0.5">CORE · agora</span>
-          <span className="block text-[14px] font-bold leading-tight">{exemplo[0]}</span>
-          <span className="block text-[13px] text-muted-foreground leading-snug">{exemplo[1]}</span>
-        </span>
-      </motion.div>
-      <p className="text-[13.5px] text-muted-foreground mb-4 leading-snug">
+      <h2 className="text-[24px] font-bold tracking-tight leading-[1.15] mb-2">{conf.titulo}</h2>
+      <p className="text-[13px] text-muted-foreground mb-4 leading-snug">
         Organizar sozinho falha no dia 3 — por esquecimento, não por preguiça. O lembrete certo é metade do resultado.
       </p>
-      <div className="space-y-2.5 mb-5">
-        {conf.itens.map((i, k) => (
-          <motion.div
-            key={i.t}
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 + k * 0.05, duration: 0.36, ease: [0.23, 1, 0.32, 1] }}
-            className="flex items-start gap-2.5"
-          >
-            <Bell className="w-[18px] h-[18px] text-accent shrink-0 mt-0.5" strokeWidth={2} />
-            <span className="font-medium text-[14px] leading-snug">{i.t}</span>
-          </motion.div>
+      <div className="space-y-2 mb-5">
+        {conf.itens.map((i) => (
+          <div key={i.t} className="flex items-center gap-3 rounded-2xl border-2 border-border bg-card p-2.5">
+            <span className="grid place-items-center w-9 h-9 rounded-xl bg-secondary text-lg shrink-0">{i.emoji}</span>
+            <span className="font-semibold text-[13.5px] leading-snug">{i.t}</span>
+          </div>
         ))}
       </div>
       <div className="space-y-2.5 pb-2">
@@ -325,8 +274,6 @@ function NotifW({ area, onDone }: { area: AreaKey; onDone: () => void }) {
 
 function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => void }) {
   const PERGUNTAS = COMPROMISSOS_POR_AREA[area] ?? COMPROMISSOS_POR_AREA.dinheiro;
-  const ICONES = ICONES_COMPROMISSO[area] ?? ICONES_COMPROMISSO.dinheiro;
-  const visual = MODULO_VISUAL[AREAS[area].module] ?? MODULO_VISUAL.financas;
   const [i, setI] = useState(0);
   const responder = (sim: boolean) => {
     trackEvent("funnel_quiz_answer", { step: `compromisso_${i + 1}`, answer: sim ? "claro" : "nao", area, funil: FUNIL });
@@ -345,22 +292,13 @@ function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => vo
         >
           <div className="flex-1 grid place-items-center">
             <div className="text-center px-4">
-              <div className="flex justify-center gap-1.5 mb-5">
+              <div className="text-[64px] leading-none mb-5">{q.emoji}</div>
+              <h1 className="text-[26px] font-black tracking-[-0.02em] leading-tight">{q.p}</h1>
+              <div className="flex justify-center gap-1.5 mt-5">
                 {PERGUNTAS.map((_, k) => (
-                  <span key={k} className={`w-2 h-2 rounded-full transition-colors ${k <= i ? "bg-accent" : "bg-black/10"}`} />
+                  <span key={k} className={`w-2 h-2 rounded-full ${k <= i ? "bg-accent" : "bg-black/10"}`} />
                 ))}
               </div>
-              {/* v105: o ícone do módulo da área no tile pastel do app, no lugar do emoji */}
-              {(() => { const Icon = ICONES[i] ?? visual.Icon; return (
-                <motion.span
-                  key={q.p}
-                  initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.45, ease: [0.22, 1.25, 0.36, 1] }}
-                  className="mx-auto mb-5 grid place-items-center w-[76px] h-[76px] rounded-[24px]" style={{ background: visual.cor, color: visual.tinta }}
-                >
-                  <Icon className="w-[34px] h-[34px]" strokeWidth={2} />
-                </motion.span>
-              ); })()}
-              <h1 className="text-[26px] font-extrabold tracking-[-0.02em] leading-tight">{q.p}</h1>
             </div>
           </div>
           <div className="pb-1 space-y-2.5">
@@ -377,47 +315,6 @@ function CompromissosPorRota({ area, onDone }: { area: AreaKey; onDone: () => vo
           </div>
         </motion.div>
       </AnimatePresence>
-    </div>
-  );
-}
-
-/** ECO (v105) — tela nova depois da 1ª pergunta, só pra quem respondeu
- *  "Quero organizar tudo" / "Um pouco de tudo": 46% de todas as respostas da
- *  1ª pergunta (184 de 396 em 03–04/09). Diz que a pessoa não está sozinha e
- *  POR QUE o plano começa por uma área só — o argumento contra o "tudo de uma
- *  vez" que larga no dia 3. Medir: passagem do eco e toque no paywall de quem
- *  o viu contra quem não viu. */
-const RESPOSTA_TUDO = /organizar tudo|um pouco de tudo/i;
-export const respondeuTudo = (answers: Record<string, string> | null | undefined): boolean => RESPOSTA_TUDO.test(answers?.atrapalha ?? "");
-
-function EcoW({ area, onNext }: { area: AreaKey; onNext: () => void }) {
-  const a = AREAS[area];
-  const visual = MODULO_VISUAL[a.module] ?? MODULO_VISUAL.financas;
-  const Icon = visual.Icon;
-  const item = (i: number) => ({ initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, transition: { delay: i * 0.06, duration: 0.36, ease: [0.23, 1, 0.32, 1] as const } });
-  return (
-    <div className="w-full max-w-md mx-auto">
-      <motion.div {...item(0)} className="text-[11px] font-bold uppercase tracking-[0.12em] text-accent mb-2">Você não está sozinho</motion.div>
-      <motion.div {...item(1)} className="flex items-baseline gap-2 mb-2">
-        <span className="text-[44px] font-extrabold tracking-[-0.03em] leading-none text-accent tabular-nums">46</span>
-        <span className="text-[15px] font-semibold text-muted-foreground">de cada 100 pessoas respondem isso</span>
-      </motion.div>
-      <motion.h2 {...item(2)} className="text-[24px] font-extrabold tracking-[-0.02em] leading-[1.15] mb-3">Quem tenta arrumar tudo de uma vez larga no dia 3.</motion.h2>
-      <motion.p {...item(3)} className="text-[14.5px] text-muted-foreground leading-snug mb-4">
-        Por isso o seu plano começa por <b className="text-foreground font-semibold">{a.nome.toLowerCase()}</b>: 5 minutos por dia numa área só. Os outros 15 módulos ficam abertos e entram no seu ritmo.
-      </motion.p>
-      <motion.div {...item(4)} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3 mb-5">
-        <span className="grid place-items-center w-[42px] h-[42px] rounded-xl shrink-0" style={{ background: visual.cor, color: visual.tinta }}><Icon className="w-5 h-5" strokeWidth={2} /></span>
-        <span><span className="block text-[14px] font-bold">Começa por {a.nome}</span><span className="block text-[12.5px] text-muted-foreground">o resto entra quando você quiser</span></span>
-      </motion.div>
-      <motion.button
-        {...item(5)}
-        onClick={onNext}
-        className="w-full h-14 rounded-full text-[16px] font-semibold text-white flex items-center justify-center gap-2 active:scale-[0.97] transition-transform"
-        style={{ background: "#16121c" }}
-      >
-        Faz sentido <ArrowRight className="w-[18px] h-[18px]" strokeWidth={2.2} />
-      </motion.button>
     </div>
   );
 }
@@ -449,9 +346,6 @@ export default function ComecarW() {
     const a = lerChave<AreaKey>(CHAVES.area); return a && a in AREAS ? a : null;
   });
   const [answers, setAnswers] = useState<Record<string, string>>(() => lerChave<Record<string, string>>(CHAVES.respostas) ?? {});
-  /* v105: o QuizScreen guarda as respostas dele e só entrega no fim; o ECO
-   * precisa da 1ª resposta NA HORA pra entrar (ou não) na sequência. */
-  const [parciais, setParciais] = useState<Record<string, string>>({});
   const [confirmEmail, setConfirmEmail] = useState("");
   // Pagou sem conta antes de o app morrer? Então a retomada é no CADASTRO.
   const [posCompra, setPosCompra] = useState<boolean>(() => lerChave<boolean>(CHAVES.posCompra) === true);
@@ -694,19 +588,15 @@ export default function ComecarW() {
    * volume: ~300 pessoas/dia passam por aqui.
    *
    * Os 4s são pra folha não cobrir a tela que a pessoa acabou de abrir. ── */
-  /* v105 (05/09): a FOLHA de convite na central morreu — medida em 03–04/09:
-   * 107 viram, 4 aceitaram (3,7%), 99 recusaram. O pedido DIRETO do Google no
-   * "plano pronto" rendeu 63 avaliações em 3 dias (27–29/08). Volta o direto,
-   * uma vez por aparelho; a folha fica só pra quem pagou (conta_paga). */
   const [planoDoConvite, setPlanoDoConvite] = useState<PlanoDoConvite | null>(null);
   useEffect(() => {
     if (naWeb || step !== "central") return;
     const t = window.setTimeout(() => {
       void import("@/lib/avaliacao").then((m) => {
-        const pedir = (m as { pedirAvaliacaoPlanoPronto?: () => Promise<boolean> }).pedirAvaliacaoPlanoPronto;
-        if (typeof pedir === "function") void pedir();
-      }).catch(() => { /* avaliação nunca pode quebrar o funil */ });
-    }, 2500);
+        if (!m.reservarConviteDoFunil()) return;
+        setPlanoDoConvite({ emoji: AREAS[areaOuPadrao].emoji, nome: AREAS[areaOuPadrao].nome });
+      }).catch(() => { /* convite nunca pode quebrar o funil */ });
+    }, 4000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naWeb, step]);
@@ -733,10 +623,7 @@ export default function ComecarW() {
   /** Pagou sem conta: o cadastro vem depois — e o FATO de ter pago fica
    *  guardado no aparelho, pra um reinício cair no cadastro, não no paywall. */
   const pagoSemConta = () => {
-    /* v105: no app, PRIMEIRO a comemoração (PagoScreen: os recortes entram na
-     * lente), DEPOIS o cadastro. Na web o PixCheckout já confirmou na tela —
-     * vai direto batizar a conta. */
-    setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep(naWeb ? "signup" : "pago");
+    setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep("signup");
     if (!naWeb) void import("@/lib/notificacoes").then((m) => m.cancelarResgateDoPlano()).catch(() => { /* noop */ });
   };
 
@@ -751,27 +638,19 @@ export default function ComecarW() {
     const pos = base.findIndex((it) => it.kind === "q" && it.qIdx === 1);
     const arr = [...base];
     arr.splice((pos < 0 ? 0 : pos) + 1, 0, { kind: "extra" });
-    // v105: o ECO cola na 1ª pergunta, só pra quem respondeu "tudo" (46%).
-    if (respondeuTudo({ ...answers, ...parciais })) {
-      const p1 = arr.findIndex((it) => it.kind === "q" && it.qIdx === 0);
-      if (p1 >= 0) arr.splice(p1 + 1, 0, { kind: "eco", qIdx: 0 });
-    }
     return arr;
   })();
   const prepSteps = ["Analisando suas respostas", "Montando sua central", `Preparando o módulo de ${AREAS[areaOuPadrao].nome}`, "Finalizando seu plano personalizado"];
-  const telaCheia = step === "offer" || step === "pago" || step === "signup" || step === "confirm" || step === "liberando";
+  const telaCheia = step === "offer" || step === "signup" || step === "confirm" || step === "liberando";
 
   // Faixa da status bar veste o funil (regra v83.4).
   useEffect(() => {
-    const cor = step === "welcome" ? "#2F7BD0" : "#ffffff";
+    const cor = step === "welcome" ? "#7ec6f6" : "#ffffff";
     try { document.documentElement.style.setProperty("--safe-top-cor", cor); } catch { /* noop */ }
     return () => { try { document.documentElement.style.removeProperty("--safe-top-cor"); } catch { /* noop */ } };
   }, [step]);
 
   const abrirDemo = () => {
-    // v105: o passo fica gravado ANTES de sair do funil — quem morre dentro da
-    // demo (14% saem lá) e reabre tem que cair na central, não na welcome.
-    guardarChave(CHAVES.passo, "central");
     // Cerca da demo (v83.4): a volta converge em /funil-w?step=compromissos.
     try {
       sessionStorage.setItem("core-demo-guarda", "1");
@@ -779,9 +658,7 @@ export default function ComecarW() {
     } catch { /* noop */ }
     const modulo = AREAS[areaOuPadrao].module;
     trackEvent("funnel_view", { step: "demo", funil: FUNIL, area: areaOuPadrao, module: modulo });
-    // v105: metas abre direto na aba METAS (antes caía em "Sobre mim", sem o
-    // quadro de metas que a demo guiada aponta) — mesmo parâmetro dos outros funis.
-    navigate(`/preview/${modulo}?funnel=1&tour=vida&from=w${areaOuPadrao === "metas" ? "&tab=metas" : ""}`);
+    navigate(`/preview/${modulo}?funnel=1&tour=vida&from=w`);
   };
 
   return (
@@ -790,9 +667,7 @@ export default function ComecarW() {
         {step === "welcome" && (
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
             <AppWelcome
-              /* v105: as "promessas" saíram — custavam 3,5 s por 1,5% de perda;
-                 a welcome já carrega a promessa. */
-              onComecar={() => setStep("porta")}
+              onComecar={() => setStep("promessas")}
               onEntrar={() => navigate("/auth")}
             />
           </motion.div>
@@ -829,7 +704,7 @@ export default function ComecarW() {
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
               {step === "porta" && (
                 <PortaW
-                  onBack={() => setStep("welcome")}
+                  onBack={() => setStep("promessas")}
                   totalPassos={itensQuiz.length + 1}
                   onPickArea={(a, label) => {
                     setArea(a);
@@ -849,8 +724,6 @@ export default function ComecarW() {
                   counterBase={1}
                   semContador
                   extraSlide={(next) => <NotifW area={areaOuPadrao} onDone={next} />}
-                  ecoSlide={(_qIdx, _r, next) => <EcoW area={areaOuPadrao} onNext={() => { trackEvent("funnel_click", { cta: "eco_faz_sentido", funil: FUNIL, area: areaOuPadrao }); next(); }} />}
-                  onAnswer={(k, v) => setParciais((p) => ({ ...p, [k]: v }))}
                   proofArea={areaOuPadrao === "dinheiro" ? undefined : areaOuPadrao}
                   onBack={() => setStep("porta")}
                   onDone={(r: Record<string, string>) => {
@@ -934,9 +807,6 @@ export default function ComecarW() {
                   confirma" e o botão do Google que não volta. Nenhum na tela
                   de venda; todos no que vem depois dela. Agora são arquivos
                   distintos: mexer num não alcança o outro. */}
-              {step === "pago" && (
-                <PagoScreen area={areaOuPadrao} onContinuar={() => setStep("signup")} />
-              )}
               {step === "signup" && (
                 ehApple() ? (
                   <SignupIOS
@@ -953,8 +823,7 @@ export default function ComecarW() {
                 )
               )}
               {step === "confirm" && (ehApple() ? <ConfirmIOS email={confirmEmail} /> : <ConfirmScreen email={confirmEmail} />)}
-              {/* v105: no app a comemoração já aconteceu no "pago" — aqui só "acesso guardado" */}
-              {step === "liberando" && (ehApple() ? <LiberandoIOS /> : <LiberandoScreen celebrar={naWeb} />)}
+              {step === "liberando" && (ehApple() ? <LiberandoIOS /> : <LiberandoScreen />)}
             </motion.div>
           </AnimatePresence>
         </div>

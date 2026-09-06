@@ -455,11 +455,6 @@ export default function ComecarW() {
   const [confirmEmail, setConfirmEmail] = useState("");
   // Pagou sem conta antes de o app morrer? Então a retomada é no CADASTRO.
   const [posCompra, setPosCompra] = useState<boolean>(() => lerChave<boolean>(CHAVES.posCompra) === true);
-  /* Pra onde a comemoração leva. No app é sempre o cadastro (a conta nasce
-   * depois da compra). Na web depende de QUEM pagou: sessão anônima vai ser
-   * batizada no cadastro; conta de verdade já pode liberar. Decidido ANTES de
-   * mostrar a tela, pra ela não precisar esperar promessa nenhuma. */
-  const [destinoPos, setDestinoPos] = useState<"signup" | "liberando">("signup");
   /* A chave de sign-in anônimo está ligada? Decide se a web vende antes de
    * cadastrar (caminho novo) ou cadastra antes de vender (caminho de 31/08).
    * Nasce `false` — o caminho antigo — e só vira `true` se o Supabase
@@ -738,10 +733,10 @@ export default function ComecarW() {
   /** Pagou sem conta: o cadastro vem depois — e o FATO de ter pago fica
    *  guardado no aparelho, pra um reinício cair no cadastro, não no paywall. */
   const pagoSemConta = () => {
-    /* v105: PRIMEIRO a comemoração (PagoScreen: os recortes entram na lente),
-     * DEPOIS o cadastro. 05/09: vale nos dois — na web o PixCheckout entrega a
-     * confirmação pra cá em vez de mostrar a dele, pra não comemorar 2×. */
-    setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep("pago");
+    /* v105: no app, PRIMEIRO a comemoração (PagoScreen: os recortes entram na
+     * lente), DEPOIS o cadastro. Na web o PixCheckout já confirmou na tela —
+     * vai direto batizar a conta. */
+    setPosCompra(true); guardarChave(CHAVES.posCompra, true); setStep(naWeb ? "signup" : "pago");
     if (!naWeb) void import("@/lib/notificacoes").then((m) => m.cancelarResgateDoPlano()).catch(() => { /* noop */ });
   };
 
@@ -925,10 +920,10 @@ export default function ComecarW() {
                      * cadastro de novo seria absurdo: vai direto liberar. */
                     onPagoSemConta={() => {
                       if (!naWeb) { pagoSemConta(); return; }
-                      void precisaBatizar()
-                        .then((anon) => { setDestinoPos(anon ? "signup" : "liberando"); })
-                        .catch(() => { /* falha pro lado seguro: pede cadastro */ })
-                        .finally(() => pagoSemConta());
+                      void precisaBatizar().then((anon) => {
+                        if (anon) pagoSemConta();
+                        else setStep("liberando");
+                      });
                     }}
                   />
                 )
@@ -940,7 +935,7 @@ export default function ComecarW() {
                   de venda; todos no que vem depois dela. Agora são arquivos
                   distintos: mexer num não alcança o outro. */}
               {step === "pago" && (
-                <PagoScreen area={areaOuPadrao} onContinuar={() => setStep(destinoPos)} />
+                <PagoScreen area={areaOuPadrao} onContinuar={() => setStep("signup")} />
               )}
               {step === "signup" && (
                 ehApple() ? (
@@ -958,9 +953,8 @@ export default function ComecarW() {
                 )
               )}
               {step === "confirm" && (ehApple() ? <ConfirmIOS email={confirmEmail} /> : <ConfirmScreen email={confirmEmail} />)}
-              {/* v105: a comemoração já aconteceu no "pago" (nos dois) — aqui
-                  só o "acesso guardado", ou o estado honesto se a loja não achar */}
-              {step === "liberando" && (ehApple() ? <LiberandoIOS /> : <LiberandoScreen celebrar={false} />)}
+              {/* v105: no app a comemoração já aconteceu no "pago" — aqui só "acesso guardado" */}
+              {step === "liberando" && (ehApple() ? <LiberandoIOS /> : <LiberandoScreen celebrar={naWeb} />)}
             </motion.div>
           </AnimatePresence>
         </div>

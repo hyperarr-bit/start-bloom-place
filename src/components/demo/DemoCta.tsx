@@ -46,9 +46,7 @@ export const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boole
           {/* v105 (05/09): no shell a demo é um PASSO do plano — o texto diz de
               onde a pessoa veio e o botão diz pra onde volta. "Quero o meu
               assim" soava como compra e a demo já perdia 14% pro launcher. */}
-          {/* 05/09: web e app iguais — quando a demo é passo do funil, o texto
-              diz de onde a pessoa veio; fora do funil, continua o convite. */}
-          {shell || (funnel && tour)
+          {shell
             ? <>Seu plano continua daqui.</>
             : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
         </p>
@@ -57,7 +55,7 @@ export const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boole
           onClick={() => trackEvent("funnel_click", { cta: funnel ? "demo_quase_la" : "demo_create_account" })}
           className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm px-4 py-2.5 hover:bg-primary/90 transition"
         >
-          {shell || (funnel && tour) ? "Voltar pro meu plano" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
+          {shell ? "Voltar pro meu plano" : funnel ? "Quase lá" : "Criar conta"} <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </div>

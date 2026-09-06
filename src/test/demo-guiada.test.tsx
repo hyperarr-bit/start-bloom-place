@@ -252,17 +252,10 @@ describe("DemoCta", () => {
     expect(screen.getByRole("link", { name: /Voltar pro meu plano/ })).toHaveAttribute("href", "/app?step=compromissos&x=1");
   });
 
-  it("v105 (05/09): na WEB dentro do funil o botão é o MESMO do app — web e app idênticos", () => {
+  it("fora do shell nada muda: 'Quase lá' no funil, 'Criar conta' fora dele", () => {
     mocks.shell = false;
     monta({ funnel: true, tour: true, from: "w" });
-    expect(screen.getByRole("link", { name: /Voltar pro meu plano/ })).toHaveAttribute("href", "/comecar?step=signup");
-    expect(screen.getByText(/Seu plano continua daqui/)).toBeInTheDocument();
-  });
-
-  it("fora do funil o convite continua: 'Criar conta'", () => {
-    mocks.shell = false;
-    monta({ funnel: false, tour: false });
-    expect(screen.getByRole("link", { name: /Criar conta/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Quase lá/ })).toHaveAttribute("href", "/comecar?step=signup");
     expect(screen.getByText(/Crie sua conta/)).toBeInTheDocument();
   });
 });

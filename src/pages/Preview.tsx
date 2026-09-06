@@ -248,13 +248,12 @@ const Preview = () => {
   const [nudgeCount, setNudgeCount] = useState(0);
   const nudgeFiredRef = useRef(false);
 
-  // DEMO GUIADA (v105): coach de 3 passos no 1º módulo aberto, 1× por sessão.
-  // 05/09: também na WEB (o dono quer os dois funis idênticos) — a demo é a
-  // mesma página nos dois, e é onde 14% somem no app. O Preview NÃO remonta ao trocar de módulo (mesmo
+  // DEMO GUIADA (v105): coach de 3 passos no 1º módulo aberto, 1× por sessão,
+  // só no funil do shell. O Preview NÃO remonta ao trocar de módulo (mesmo
   // elemento de rota), então o módulo do coach fica preso ao 1º aberto; um
   // pulo de módulo com ele aberto o fecha (o coach conta os passos vistos).
   const [coachModule, setCoachModule] = useState<string | null>(() =>
-    tour && funnel && key in MODULE_COMPONENTS && !coachJaVisto() ? key : null);
+    tour && funnel && isNativeShell() && key in MODULE_COMPONENTS && !coachJaVisto() ? key : null);
   useEffect(() => {
     if (coachModule && key !== coachModule) setCoachModule(null);
   }, [key, coachModule]);

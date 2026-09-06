@@ -53,27 +53,6 @@ const POR_ROTULO: Record<string, LucideIcon> = {
   "Sentir que tô evoluindo de novo": TrendingUp, "Minhas metas todas num painel": LayoutDashboard,
 };
 
-
-/** PALETA DAS OPÇÕES DO QUIZ (05/09, dono: "o primeiro emoji do quiz tá
- *  colorido e o resto em preto e branco, deixa tudo colorido").
- *
- *  A porta pinta o tile com a cor do MÓDULO que a área abre. As perguntas
- *  seguintes não são módulos, então ganham a mesma paleta pastel do painel do
- *  app, em ordem fixa por posição na lista: a mesma opção cai sempre na mesma
- *  cor, e cada pergunta abre colorida de cima a baixo. Ordem escolhida pra dar
- *  contraste entre vizinhas (quente → frio → quente). */
-const PALETA_OPCOES: Array<{ cor: string; tinta: string }> = [
-  { cor: "#FDECCB", tinta: "#9A5B00" }, // âmbar
-  { cor: "#CDEEE6", tinta: "#0B6E5E" }, // verde-água
-  { cor: "#E6DEF8", tinta: "#5B3BB5" }, // roxo
-  { cor: "#D7F0DD", tinta: "#1F7A45" }, // verde
-  { cor: "#FBD8E8", tinta: "#B12A5B" }, // rosa
-  { cor: "#D9E4FB", tinta: "#2E55B8" }, // azul
-  { cor: "#FFE4CF", tinta: "#B4560E" }, // laranja
-  { cor: "#D4EEF6", tinta: "#0E6F8C" }, // ciano
-];
-export const corDaOpcao = (i: number) => PALETA_OPCOES[i % PALETA_OPCOES.length];
-
 export const iconeDaOpcao = (label: string): LucideIcon => POR_ROTULO[label] ?? Sparkles;
 /** Só pra teste: o rótulo tem ícone escolhido de propósito (não caiu no fallback)? */
 export const temIconeProprio = (label: string): boolean => label in POR_ROTULO;

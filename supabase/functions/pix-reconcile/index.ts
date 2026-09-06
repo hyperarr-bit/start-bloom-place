@@ -36,12 +36,12 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790 };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
 const DIAS_DA_OFERTA: Record<string, number | null> = {
-  lifetime: null, downsell: null, w97: null, w25: 30,
+  lifetime: null, downsell: null, w97: null, w25: 30, w47: null,
 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 
@@ -211,7 +211,10 @@ serve(async (req) => {
       const uid = q.user_id as string | null;
       const oid = String(q.event_data?.order_id ?? "");
       if (!uid || !oid) continue;
-      const offer = q.event_data?.offer === "downsell" ? "downsell" : "lifetime";
+      // 06/09: a oferta REAL do create (w25 = 30 dias, w47/w97 = vitalício) —
+      // colapsar tudo em "lifetime" creditava pra sempre quem pagou 1 mês pela Cakto.
+      const ofertaCrua = String(q.event_data?.offer ?? "");
+      const offer = ofertaCrua in DIAS_DA_OFERTA ? ofertaCrua : ofertaCrua === "downsell" ? "downsell" : "lifetime";
       // 01/08: o VALOR REAL do pedido vem do create (amount_cents no evento).
       // A tabela chumbada virou bug no dia em que o preço mudou (27,90→19,90):
       // o reconcile creditou 2790 pra quem pagou 1990. Preço de tabela agora é

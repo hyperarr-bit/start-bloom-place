@@ -86,6 +86,12 @@ serve(async (req) => {
       downsell: Deno.env.get("CAKTO_OFFER_DOWNSELL") ?? "",
       // 31/08: oferta do funil W na web (R$ 97,90, o mesmo preço do app).
       w97: Deno.env.get("CAKTO_OFFER_W97") ?? "",
+      // 06/09 (ordem do dono, "troca pra cakto a web"): as duas colunas da web
+      // — 1 mês pré-pago a 24,90 e vitalício a 47,90. Os IDs das ofertas são
+      // criados no painel da Cakto e entram como secret; sem secret a oferta
+      // responde "não configurada" em vez de cobrar o valor errado.
+      w25: Deno.env.get("CAKTO_OFFER_W25") ?? "",
+      w47: Deno.env.get("CAKTO_OFFER_W47") ?? "",
     };
 
     if (!clientId || !clientSecret) {
@@ -108,7 +114,7 @@ serve(async (req) => {
     logStep("Authenticated", { userId: user.id });
 
     const RequestSchema = z.object({
-      offer: z.enum(["lifetime", "downsell", "w97"]),
+      offer: z.enum(["lifetime", "downsell", "w97", "w25", "w47"]),
       customer: z
         .object({
           name: z.string().max(120).optional(),

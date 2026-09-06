@@ -31,6 +31,15 @@ const LIFETIME_OFFER = Deno.env.get("CAKTO_OFFER_LIFETIME") ?? "";
 const DOWNSELL_OFFER = Deno.env.get("CAKTO_OFFER_DOWNSELL") ?? "";
 if (LIFETIME_OFFER) CAKTO_OFFERS[LIFETIME_OFFER.toLowerCase()] = { billing: "lifetime" };
 if (DOWNSELL_OFFER) CAKTO_OFFERS[DOWNSELL_OFFER.toLowerCase()] = { billing: "lifetime" };
+// 06/09: ofertas da WEB pela Cakto. A w25 é 1 MÊS PRÉ-PAGO (pagamento único de
+// 24,90): sem esta linha ela cairia na inferência "sem recorrência = vitalício"
+// e daria acesso pra sempre por 24,90. w97 e w47 são vitalícias.
+const W97_OFFER = Deno.env.get("CAKTO_OFFER_W97") ?? "";
+const W25_OFFER = Deno.env.get("CAKTO_OFFER_W25") ?? "";
+const W47_OFFER = Deno.env.get("CAKTO_OFFER_W47") ?? "";
+if (W97_OFFER) CAKTO_OFFERS[W97_OFFER.toLowerCase()] = { billing: "lifetime" };
+if (W25_OFFER) CAKTO_OFFERS[W25_OFFER.toLowerCase()] = { billing: "monthly" };
+if (W47_OFFER) CAKTO_OFFERS[W47_OFFER.toLowerCase()] = { billing: "lifetime" };
 
 const logStep = (step: string, details?: unknown) => {
   const d = details ? ` - ${JSON.stringify(details)}` : "";

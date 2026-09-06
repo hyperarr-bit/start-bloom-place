@@ -81,8 +81,12 @@ const ANDROID_DUAS_COLUNAS = true;
  * A VITRINE da web é de UM PREÇO SÓ — o desenho do app quando era só o
  * vitalício, que fechou 1,10× em 30/08. Duas colunas aqui seria misturar dois
  * testes numa tela só. */
-const PRECO_WEB = "97,90";
-const OFERTA_WEB: "w97" = "w97";
+/* 06/09 (ordem do dono): "bota 24,90 mensal e 47,90 vitalício na web". O
+ * vitalício da web cai de 97,90 pra 47,90 — oferta nova `w47` nas functions
+ * (asaas-pix, asaas-webhook, pix-reconcile) e no rastreio. O app continua
+ * em 97,90 (APP_PRECOS). */
+const PRECO_WEB = "47,90";
+const OFERTA_WEB: "w47" = "w47";
 /* 2ª COLUNA NA WEB — 1 mês por R$ 24,90 (03/09).
  *
  * Por que: o app rodou os dois arranjos com dinheiro em cima e a régua limpa
@@ -657,7 +661,7 @@ export function PaywallW({
               onClick={() => {
                 const escolha = duasColunas ? plano : "vitalicio";
                 if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, escolha);
-                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? "w25" : "w97") : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
+                trackEvent("funnel_click", { cta: "app_paywall_cta", produto: naWeb ? (escolha === "mensal" ? OFERTA_WEB_MES : OFERTA_WEB) : escolha === "mensal" ? "core_mensal" : "core_vitalicio_97", funil: "w", braco: bracoEvento });
                 void comprar(escolha);
               }}
             >

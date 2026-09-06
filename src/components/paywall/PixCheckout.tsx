@@ -26,7 +26,11 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
  * conta só fecha saindo da folha do Google: ela paga 13-27% (medido 27-31/08)
  * contra ~45% do Pix, cobra 15% e segura o dinheiro 60 dias. Mesmo funil,
  * mesmo preço do app (97,90), cano de pagamento diferente. */
-export type PixOffer = "lifetime" | "downsell" | "w97" | "w25";
+/* 06/09 (ordem do dono): a web passa a vender o VITALÍCIO a R$ 47,90 (`w47`),
+ * ao lado do mês de 24,90. A `w97` continua existindo pra quem já está com um
+ * QR de 97,90 aberto e pro app; oferta nova = chave nova, nunca trocar o
+ * valor de uma chave viva (o webhook casaria pedido antigo com preço novo). */
+export type PixOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47";
 
 /* 03/09 (ordem do dono, "97,90 em tudo"): a WEB passa a ter UM preço só.
  * A oferta `lifetime` — que a demo, o portão do /home, o /comecar e o
@@ -45,10 +49,11 @@ export const PIX_PRICES: Record<PixOffer, string> = {
    * débito automático, então são 30 dias e acabou. A tela tem que dizer isso
    * ("não renova sozinho") — prometer assinatura aqui vira reembolso. */
   w25: "24,90",
+  w47: "47,90",
 };
 /** Quais ofertas são acesso VITALÍCIO — o recibo e a copy mudam por isso. */
 export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
-  lifetime: true, downsell: true, w97: true, w25: false,
+  lifetime: true, downsell: true, w97: true, w25: false, w47: true,
 };
 
 interface Props {

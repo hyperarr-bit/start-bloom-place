@@ -45,7 +45,8 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * gente que não compraria, não rouba do vitalício. Na web o Pix não tem
  * débito automático, então isto é PRÉ-PAGO: 30 dias, não renova sozinho, e
  * a tela tem que dizer isso. */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+// 06/09: `w47` = vitalício da web a R$ 47,90 (ordem do dono). Chave nova, w97 fica pra QR antigo.
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790 };
 /* O que cada oferta CONCEDE (04/09). A primeira venda da w25 (07:42) recebeu
  * VITALÍCIO por este caminho: a página faz `check` enquanto o QR está aberto,
  * o check liberava com plan "lifetime" chumbado, e o webhook — que já sabia
@@ -56,9 +57,10 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
   w97: { plano: "lifetime", periodo: "lifetime", dias: null },
   w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+  w47: { plano: "lifetime", periodo: "lifetime", dias: null },
 };
 const DESCRICAO_PIX: Record<string, string> = {
-  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes",
+  lifetime: "CORE vitalicio", downsell: "CORE vitalicio (oferta)", w97: "CORE vitalicio", w25: "CORE 1 mes", w47: "CORE vitalicio",
 };
 const EXPIRA_SEGUNDOS = 1800; // 30 min — mesmo prazo dos outros gateways
 

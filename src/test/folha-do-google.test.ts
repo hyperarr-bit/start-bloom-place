@@ -224,6 +224,9 @@ describe("ofertas do checkout da web", () => {
     expect(OFERTA_VITALICIA.w25).toBe(false);
     // e a oferta cheia da web continua vitalícia a 97,90
     expect(PIX_PRICES.w97).toBe("97,90");
+    // 06/09: o vitalício que a web VENDE agora é a w47, 47,90, vitalícia
+    expect(PIX_PRICES.w47).toBe("47,90");
+    expect(OFERTA_VITALICIA.w47).toBe(true);
     expect(OFERTA_VITALICIA.w97).toBe(true);
   });
 

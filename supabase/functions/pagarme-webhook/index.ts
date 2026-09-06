@@ -20,7 +20,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
  */
 
 const PAGARME_API = "https://api.pagar.me/core/v5";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w47: 4790 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const basicAuth = (key: string) => `Basic ${btoa(`${key}:`)}`;
 

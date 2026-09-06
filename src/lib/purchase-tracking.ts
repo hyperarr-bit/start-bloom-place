@@ -44,7 +44,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const KEY = "pix-purchase-pending";
 
-type PendingOffer = "lifetime" | "downsell" | "w97" | "w25";
+type PendingOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47";
 
 /* O VALOR VEM DAQUI, NÃO DE UM TERNÁRIO (31/08). O cabeçalho deste arquivo
  * conta o estrago de disparar o preço errado: R$47,80 de pixel onde entraram
@@ -58,6 +58,7 @@ const VALOR_DA_OFERTA: Record<PendingOffer, number> = {
 
   downsell: 19.9,
   w97: 97.9,
+  w47: 47.9,      // 06/09: vitalício da web cai pra 47,90 (ordem do dono)
 };
 type Pending = { offer: PendingOffer; orderId: string | null; at: number; uid?: string | null };
 

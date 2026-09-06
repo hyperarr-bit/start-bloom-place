@@ -25,12 +25,13 @@ const corsHeaders = {
 // API V2 (chaves abc_prod_* são da geração v2 — a v1 responde
 // "API key version mismatch"). Pix in-app = "transparent checkout".
 const ABACATE_API = "https://api.abacatepay.com/v2";
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790 };
 const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
   lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
   downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
   w97: { plano: "lifetime", periodo: "lifetime", dias: null },
   w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+  w47: { plano: "lifetime", periodo: "lifetime", dias: null }, // 06/09: vitalício web 47,90
 };
 
 const DUMMY_PHONE = "11999999999"; // mesmo padrão do cakto-pix: não pedimos telefone

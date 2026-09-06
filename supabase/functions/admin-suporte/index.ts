@@ -144,7 +144,7 @@ serve(async (req) => {
      * existente. TRAVA: só mexe se o valor gravado na linha bate com o preço
      * da oferta pedida — um vitalício de 97,90 nunca vira 30 dias por engano. */
     if (action === "ajustar_concessao") {
-      const PRECOS: Record<string, number> = { lifetime: 9790, w97: 9790, w25: 2490, downsell: 1490 };
+      const PRECOS: Record<string, number> = { lifetime: 9790, w97: 9790, w25: 2490, downsell: 1490, w47: 4790 };
       const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number | null }> = {
         lifetime: { plano: "lifetime", periodo: "lifetime", dias: null },
         w97: { plano: "lifetime", periodo: "lifetime", dias: null },

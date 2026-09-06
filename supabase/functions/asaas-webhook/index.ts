@@ -31,7 +31,7 @@ const ASAAS_API = "https://api.asaas.com/v3";
  * linha abaixo a rebaixa pra "lifetime" e a venda entra pelo preço errado —
  * dinheiro real registrado como outro valor, e o CAPI da Meta disparando o
  * número errado junto. Foi o que quase aconteceu com o w97 (01/09). */
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1490, w97: 9790, w25: 2490, w47: 4790 };
 /* O que cada oferta CONCEDE (03/09, com a entrada da `w25`). Até aqui toda
  * venda da web era vitalícia e o grant era chumbado; a `w25` é 1 mês
  * PRÉ-PAGO (o Pix não tem débito automático), então o acesso precisa vencer.
@@ -41,6 +41,7 @@ const CONCESSAO: Record<string, { plano: string; periodo: string; dias: number |
   downsell: { plano: "lifetime", periodo: "lifetime", dias: null },
   w97: { plano: "lifetime", periodo: "lifetime", dias: null },
   w25: { plano: "web", periodo: "monthly_prepaid", dias: 30 },
+  w47: { plano: "lifetime", periodo: "lifetime", dias: null }, // 06/09: vitalício web 47,90
 };
 const APP_URL = "https://www.coreaplicativo.com.br";
 const PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);

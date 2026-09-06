@@ -101,11 +101,26 @@ describe("retomada do funil W — o progresso sobrevive ao app morrer", () => {
 import { comecaNaPorta, veioDeAnuncio } from "@/pages/funis/w/retomada";
 describe("anúncio na web → porta", () => {
   it("reconhece o clique pago pela URL ou pela atribuição guardada", () => {
-    expect(veioDeAnuncio("?utm_campaign=kazu&utm_source=ig", {})).toBe(true);
-    expect(veioDeAnuncio("?fbclid=abc", {})).toBe(true);
+    // como o anúncio da Meta chega de verdade (06/09: 192 sessões assim)
+    expect(veioDeAnuncio("?utm_source=ig&utm_medium=paid&utm_campaign=120250123961310041&fbclid=abc", {})).toBe(true);
+    expect(veioDeAnuncio("?utm_medium=paid", {})).toBe(true);
     expect(veioDeAnuncio("", { utm_campaign: "120250123961310041" })).toBe(true);
+    expect(veioDeAnuncio("?ttclid=t1", {})).toBe(true);
     expect(veioDeAnuncio("", {})).toBe(false);
     expect(veioDeAnuncio("?step=offer", { utm_source: "ig" })).toBe(false); // fonte sem campanha não conta
+  });
+  it("link da bio do Instagram NÃO é anúncio (06/09): fbclid e ig4a sozinhos caem na welcome", () => {
+    // 06/09: 157 sessões do link da bio chegaram como utm_campaign=ig4a (etiqueta
+    // do próprio Instagram) e iam parar na pergunta. fbclid o Instagram pendura
+    // em qualquer link externo, pago ou não.
+    expect(veioDeAnuncio("?utm_source=ig&utm_campaign=ig4a", {})).toBe(false);
+    expect(veioDeAnuncio("?fbclid=abc", {})).toBe(false);
+    expect(veioDeAnuncio("?utm_source=ig&utm_medium=organic&utm_campaign=ig_tipos&fbclid=abc", {})).toBe(false);
+    expect(veioDeAnuncio("", { utm_campaign: "ig4a", fbclid: "abc" })).toBe(false);
+    // atribuição paga guardada de antes não é apagada por um clique orgânico sem medium
+    expect(veioDeAnuncio("?utm_campaign=ig4a", { utm_campaign: "120250123961310041", utm_medium: "paid" })).toBe(true);
+    // ...mas o link marcado como orgânico vence a atribuição antiga
+    expect(veioDeAnuncio("?utm_medium=organic&utm_campaign=ig_tipos", { utm_campaign: "120250123961310041", utm_medium: "paid" })).toBe(false);
   });
   it("clique pago na web cai na PERGUNTA; o app e o orgânico veem a welcome", () => {
     // 02/09: a welcome antiga matava 69% do clique pago. 05/09 13:10–17:00: a
@@ -115,7 +130,7 @@ describe("anúncio na web → porta", () => {
     expect(comecaNaPorta(false, true)).toBe(true);
     expect(comecaNaPorta(true, true)).toBe(false);
     expect(comecaNaPorta(false, false)).toBe(false);
-    expect(veioDeAnuncio("?utm_campaign=x", {})).toBe(true);
+    expect(veioDeAnuncio("?utm_campaign=120250123961310041", {})).toBe(true);
     expect(veioDeAnuncio("", {})).toBe(false);
   });
 });

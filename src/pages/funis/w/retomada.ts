@@ -90,12 +90,26 @@ export const passoDeRetomada = (salvo: string | null, noShell: boolean): string 
  * primeira pergunta é onde R$ 1.000 dos R$ 1.467 dos dois dias morreram.
  * No app a welcome fica (a pessoa acabou de instalar, 70% seguem).
  */
+/* 06/09 — `fbclid` sozinho NÃO é anúncio. O Instagram pendura fbclid em
+ * qualquer link externo, inclusive o da bio: quem tocava no link da bio
+ * (orgânico, sem campanha) caía na pergunta em vez da welcome. Anúncio é
+ * utm_medium=paid, campanha com ID numérico da Meta ({{campaign.id}}) ou
+ * click-id do TikTok/Google. utm_medium=organic nunca é anúncio. */
+const CAMPANHA_DA_META = /^\d{12,}$/;
+const ehPago = (get: (k: string) => string | null | undefined): boolean => {
+  const medium = (get("utm_medium") || "").toLowerCase();
+  if (medium === "organic") return false;
+  if (medium === "paid" || medium === "cpc" || medium === "ads") return true;
+  if (CAMPANHA_DA_META.test(get("utm_campaign") || "")) return true;
+  return !!(get("ttclid") || get("gclid"));
+};
 export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>): boolean => {
   try {
     const p = new URLSearchParams(search);
-    if (p.get("utm_campaign") || p.get("fbclid") || p.get("ttclid") || p.get("gclid")) return true;
+    if (ehPago((k) => p.get(k))) return true;
+    if ((p.get("utm_medium") || "").toLowerCase() === "organic") return false;
   } catch { /* noop */ }
-  return !!(atribuicao?.utm_campaign || atribuicao?.fbclid || atribuicao?.ttclid || atribuicao?.gclid);
+  return ehPago((k) => atribuicao?.[k]);
 };
 /* 05/09, 17h — MEDIDO E REVERTIDO EM 3h40 DE AR.
  *

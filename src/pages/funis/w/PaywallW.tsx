@@ -193,7 +193,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          {naWeb ? "= R$ 8,16/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
+          {naWeb ? "= R$ 3,99/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (
@@ -247,11 +247,13 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
             MELHOR ESCOLHA
           </span>
           <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">Pra sempre</span>
-          <span className="text-[17px] font-extrabold mt-1.5">{APP_PRECOS.vitalicio97.preco}</span>
+          {/* 06/09: a web vende o vitalício a PRECO_WEB (47,90); o app segue no
+              preço da loja. A âncora "N meses de mensal" acompanha: 47,90 ÷ 24,90 ≈ 2. */}
+          <span className="text-[17px] font-extrabold mt-1.5">{naWeb ? `R$ ${PRECO_WEB}` : APP_PRECOS.vitalicio97.preco}</span>
           <span className="text-[10px] font-semibold text-black/40">vitalício · uma única vez</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b>
+            {naWeb ? "2 meses de mensal =" : "4 meses de mensal ="}<br /><b className="text-black/60">CORE pra sempre</b>
           </span>
         </div>
       </div>

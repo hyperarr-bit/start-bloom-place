@@ -588,15 +588,18 @@ export default function ComecarW() {
    * volume: ~300 pessoas/dia passam por aqui.
    *
    * Os 4s são pra folha não cobrir a tela que a pessoa acabou de abrir. ── */
+  /* v106 (05/09): a FOLHA de convite na central sai; volta o pedido DIRETO
+   * do Google no "plano pronto". Medido: 27–29/08 o pedido direto abriu
+   * 1.455 caixas e rendeu 63 avaliações (média 4,9) em 3 dias; de 02/09 a
+   * 05/09 a folha foi vista 182 vezes e 11 tocaram (6%) — 9 avaliações na
+   * semana. Uma vez por aparelho; as travas comuns (shell, /preview, 3 na
+   * vida, 90 dias) continuam valendo dentro de pedirAvaliacaoPlanoPronto. */
   const [planoDoConvite, setPlanoDoConvite] = useState<PlanoDoConvite | null>(null);
   useEffect(() => {
     if (naWeb || step !== "central") return;
     const t = window.setTimeout(() => {
-      void import("@/lib/avaliacao").then((m) => {
-        if (!m.reservarConviteDoFunil()) return;
-        setPlanoDoConvite({ emoji: AREAS[areaOuPadrao].emoji, nome: AREAS[areaOuPadrao].nome });
-      }).catch(() => { /* convite nunca pode quebrar o funil */ });
-    }, 4000);
+      void import("@/lib/avaliacao").then((m) => { void m.pedirAvaliacaoPlanoPronto(); }).catch(() => { /* avaliação nunca pode quebrar o funil */ });
+    }, 2500);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [naWeb, step]);

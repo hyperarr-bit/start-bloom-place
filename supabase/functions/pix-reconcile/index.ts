@@ -36,12 +36,12 @@ const CAKTO_API = "https://api.cakto.com.br/public_api";
 // 12/08: downsell era 1490 (preço de julho) — desde 10/08 a roleta cobra
 // 19,90 (i9o4ob8). Só fallback de evento antigo sem amount_cents, mas fallback
 // errado credita/reporta valor errado no dia em que for usado.
-const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790 };
+const PRECOS_CENTAVOS: Record<string, number> = { lifetime: 9790, downsell: 1990, w97: 9790, w25: 2490, w47: 4790, w27: 2790 };
 /* 03/09: com a `w25` (1 mês pré-pago na web) o reconcile deixou de poder
  * chumbar "lifetime" — creditar vitalício pra quem pagou 24,90 é dar o
  * produto de graça, e é justamente aqui que ninguém olharia. */
 const DIAS_DA_OFERTA: Record<string, number | null> = {
-  lifetime: null, downsell: null, w97: null, w25: 30, w47: null,
+  lifetime: null, downsell: null, w97: null, w25: 30, w47: null, w27: null,
 };
 const ASAAS_PAGOS = new Set(["RECEIVED", "CONFIRMED", "RECEIVED_IN_CASH"]);
 

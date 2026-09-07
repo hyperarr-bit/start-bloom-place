@@ -36,8 +36,13 @@ import { useAuth } from "@/hooks/use-auth";
  * a MESMA oferta `lifetime` do checkout, e o gateway passou a cobrar 9790 —
  * display e cobrança andam juntos ou a tela vira promessa falsa.
  * A âncora riscada de 99,90 saiu: em cima de 97,90 ela anuncia 2% de desconto. */
+/* 07/09 (ordem do dono, "troca pra 27,90 o vitalício na web e deixa o paywall
+ * igual o dia 14"): esta tela volta a ser o paywall da WEB, a R$ 27,90, na
+ * oferta `w27` — na Cakto é a oferta de 27,90 de sempre; PIX_PRICES.w27 é o
+ * par de display. */
+export const OFERTA_WEB: PixOffer = "w27";
 const PRICING = {
-  lifetime: { total: "97,90" },
+  lifetime: { total: PIX_PRICES[OFERTA_WEB] },
 };
 
 // Paywall sempre claro, mesmo com o app em dark (padrão dos paywalls mobile).
@@ -67,7 +72,7 @@ function openPixIntent(offer: PixOffer, cta: string, context: string, open: (o: 
   trackEvent("funnel_click", { cta, context });
   fireMetaEvent("InitiateCheckout", {
     content_name: offer,
-    value: offer === "lifetime" ? 97.9 : 19.9,
+    value: Number(PIX_PRICES[offer].replace(",", ".")),
     currency: "BRL",
   });
   open(offer);
@@ -749,7 +754,7 @@ function OfferScreen({
             <Button
               size="lg"
               className="w-full h-14 rounded-full text-base font-bold shadow-[0_10px_30px_-8px_rgba(0,0,0,0.4)]"
-              onClick={() => openPixIntent("lifetime", "paywall_lifetime", context, onBuy)}
+              onClick={() => openPixIntent(OFERTA_WEB, "paywall_lifetime", context, onBuy)}
             >
               Quero pra sempre — R$ {PRICING.lifetime.total} no Pix <ArrowRight className="w-4 h-4" />
             </Button>
@@ -894,9 +899,13 @@ function PremioScreen({
 export function PaywallDia14({
   context,
   answers,
+  onPagoSemConta,
 }: {
   context: "funnel" | "app";
   answers?: Record<string, string>;
+  /** 07/09: no funil W da web, quem paga sem conta segue pro cadastro
+   *  (batismo) e depois pro "liberando" — o mesmo caminho do PaywallW. */
+  onPagoSemConta?: () => void;
 }) {
   /**
    * DOWNSELL COM ROLETA (05/08, ordem do dono). Três fases: oferta → roleta →
@@ -951,7 +960,7 @@ export function PaywallDia14({
   const fecharPix = (step?: PixStep) => {
     const era = pixOffer;
     setPixOffer(null);
-    if (era !== "lifetime") return; // fechar o downsell volta pro prêmio, só
+    if (era !== OFERTA_WEB) return; // fechar o downsell volta pro prêmio, só
     abrirResgate(`pix_${step ?? "?"}`);
   };
 
@@ -1005,7 +1014,7 @@ export function PaywallDia14({
   return (
     <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground overflow-y-auto">
       {pixOffer && (
-        <PixCheckout offer={pixOffer} context={context} onClose={fecharPix} />
+        <PixCheckout offer={pixOffer} context={context} onClose={fecharPix} v2={onPagoSemConta ? { onConfirmado: onPagoSemConta } : undefined} />
       )}
       <div className="px-5">
         <AnimatePresence mode="wait">

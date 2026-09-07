@@ -30,7 +30,10 @@ import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
  * ao lado do mês de 24,90. A `w97` continua existindo pra quem já está com um
  * QR de 97,90 aberto e pro app; oferta nova = chave nova, nunca trocar o
  * valor de uma chave viva (o webhook casaria pedido antigo com preço novo). */
-export type PixOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47";
+/* 07/09 (ordem do dono): vitalício da web a R$ 27,90 (`w27`) no paywall do
+ * dia 14. Na Cakto é a MESMA oferta de 27,90 de sempre (CAKTO_OFFER_LIFETIME);
+ * nas outras functions, 2790. */
+export type PixOffer = "lifetime" | "downsell" | "w97" | "w25" | "w47" | "w27";
 
 /* 03/09 (ordem do dono, "97,90 em tudo"): a WEB passa a ter UM preço só.
  * A oferta `lifetime` — que a demo, o portão do /home, o /comecar e o
@@ -50,10 +53,11 @@ export const PIX_PRICES: Record<PixOffer, string> = {
    * ("não renova sozinho") — prometer assinatura aqui vira reembolso. */
   w25: "24,90",
   w47: "47,90",
+  w27: "27,90",
 };
 /** Quais ofertas são acesso VITALÍCIO — o recibo e a copy mudam por isso. */
 export const OFERTA_VITALICIA: Record<PixOffer, boolean> = {
-  lifetime: true, downsell: true, w97: true, w25: false, w47: true,
+  lifetime: true, downsell: true, w97: true, w25: false, w47: true, w27: true,
 };
 
 interface Props {

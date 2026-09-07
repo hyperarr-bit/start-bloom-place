@@ -227,12 +227,19 @@ describe("ofertas do checkout da web", () => {
     // 06/09: o vitalício que a web VENDE agora é a w47, 47,90, vitalícia
     expect(PIX_PRICES.w47).toBe("47,90");
     expect(OFERTA_VITALICIA.w47).toBe(true);
+    // 07/09: o paywall do dia 14 vende a web a 27,90 (w27), vitalícia
+    expect(PIX_PRICES.w27).toBe("27,90");
+    expect(OFERTA_VITALICIA.w27).toBe(true);
     expect(OFERTA_VITALICIA.w97).toBe(true);
   });
 
-  it("o 27,90 não existe mais em oferta nenhuma", async () => {
+  it("o 27,90 só existe na w27 (07/09, ordem do dono); a lifetime segue 97,90", async () => {
+    // 03/09 o 27,90 tinha saído de toda oferta ("97,90 em tudo"). 07/09 voltou,
+    // mas numa CHAVE PRÓPRIA (w27), pra não mudar o valor de oferta viva.
     const { PIX_PRICES } = await import("@/components/paywall/PixCheckout");
-    expect(Object.values(PIX_PRICES)).not.toContain("27,90");
+    const com2790 = Object.entries(PIX_PRICES).filter(([, p]) => p === "27,90").map(([k]) => k);
+    expect(com2790).toEqual(["w27"]);
+    expect(PIX_PRICES.lifetime).toBe("97,90");
   });
 });
 

@@ -38,6 +38,7 @@ import {
 import { PromessasScreen, ContratoScreen } from "@/pages/funis/teste/ComecarTeste";
 import { SignupScreen, ConfirmScreen, LiberandoScreen, POS_COMPRA_OAUTH_KEY } from "@/pages/funis/radar/ComecarRadar";
 import { PaywallW } from "./PaywallW";
+import { PaywallDia14 } from "@/pages/funis/dia14/PaywallDia14";
 /* Lazy de propósito: esta folha só existe dentro do app da loja, e o
    ComecarW é carregado ansiosamente na /inicio da WEB (velocidade da 1ª tela,
    02/09) — o vaul do Drawer não pode entrar no bundle de quem nunca vai vê-la. */
@@ -701,7 +702,7 @@ export default function ComecarW() {
            topo; só resultado/central/paywall — compridos de verdade — rolam. */
         <div
           style={{ ["--util" as string]: "calc(100dvh - var(--app-safe-top, 0px))" }}
-          className={`flex flex-col px-5 ${telaCheia ? "min-h-[var(--util)] pt-4 pb-7" : step === "result" || step === "central" ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
+          className={`flex flex-col ${step === "offer" && naWeb ? "px-0" : "px-5"} ${telaCheia ? (step === "offer" && naWeb ? "min-h-[var(--util)]" /* 07/09: o PaywallDia14 traz fundo e padding próprios */ : "min-h-[var(--util)] pt-4 pb-7") : step === "result" || step === "central" ? "min-h-[var(--util)] pt-6 pb-8" : "h-[var(--util)] overflow-hidden pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]"}`}
         >
           <AnimatePresence mode="wait">
             <motion.div key={step} {...fade} className="w-full flex-1 flex flex-col">
@@ -781,6 +782,21 @@ export default function ComecarW() {
                     area={areaOuPadrao}
                     answers={answers}
                     onPagoSemConta={pagoSemConta}
+                  />
+                ) : naWeb ? (
+                  /* 07/09 (ordem do dono): a WEB volta ao paywall do dia 14 —
+                   * uma oferta, vitalício a R$ 27,90 (w27), sem X, sem coluna
+                   * mensal. O pós-compra continua o do funil W (batismo →
+                   * liberando) via onPagoSemConta. */
+                  <PaywallDia14
+                    context="funnel"
+                    answers={answers}
+                    onPagoSemConta={() => {
+                      void precisaBatizar().then((anon) => {
+                        if (anon) pagoSemConta();
+                        else setStep("liberando");
+                      });
+                    }}
                   />
                 ) : (
                   <PaywallW

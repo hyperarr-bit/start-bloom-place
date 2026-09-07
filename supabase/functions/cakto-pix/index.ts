@@ -92,6 +92,8 @@ serve(async (req) => {
       // responde "não configurada" em vez de cobrar o valor errado.
       w25: Deno.env.get("CAKTO_OFFER_W25") ?? "",
       w47: Deno.env.get("CAKTO_OFFER_W47") ?? "",
+      // 07/09: w27 = a oferta de 27,90 de sempre da Cakto (mesmo ID do "lifetime").
+      w27: Deno.env.get("CAKTO_OFFER_LIFETIME") ?? "",
     };
 
     if (!clientId || !clientSecret) {
@@ -118,7 +120,7 @@ serve(async (req) => {
     logStep("Authenticated", { userId: user.id });
 
     const RequestSchema = z.object({
-      offer: z.enum(["lifetime", "downsell", "w97", "w25", "w47"]),
+      offer: z.enum(["lifetime", "downsell", "w97", "w25", "w47", "w27"]),
       customer: z
         .object({
           name: z.string().max(120).optional(),

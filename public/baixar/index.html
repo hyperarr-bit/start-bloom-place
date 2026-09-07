@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baixar o CORE</title>
+<meta name="robots" content="noindex">
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;color:#1c1917;font-family:Inter,-apple-system,system-ui,sans-serif;text-align:center;padding:24px}
+  .marca{font-weight:900;font-size:28px;letter-spacing:-.02em;margin-bottom:6px}
+  p{color:#6b6661;font-size:15px;margin:0 0 22px}
+  a{display:block;margin:10px auto;max-width:320px;padding:15px 20px;border-radius:999px;background:#16121c;color:#fff;font-weight:700;text-decoration:none;font-size:16px}
+  a.ios{background:#fff;color:#16121c;border:2px solid #e7e4df}
+</style>
+</head>
+<body>
+<div>
+  <div class="marca">CORE</div>
+  <p>Um app só pra vida inteira. Escolhe a sua loja:</p>
+  <a id="play" href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dig%26utm_medium%3Dbio%26utm_campaign%3Dig_bio">Baixar na Google Play</a>
+  <a id="ios" class="ios" href="https://apps.apple.com/br/app/id6806913181">Baixar na App Store</a>
+</div>
+<script>
+  /* Link único da bio do Instagram (07/09): iPhone vai pra App Store, Android
+     vai pra Play com install_referrer (utm_campaign=ig_bio — o app grava e o
+     relatório atribui). Desktop ou navegador desconhecido: fica nos botões. */
+  (function () {
+    var ua = navigator.userAgent || "";
+    var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var android = /Android/i.test(ua);
+    var alvo = ios ? document.getElementById("ios").href : android ? document.getElementById("play").href : null;
+    if (alvo) setTimeout(function () { window.location.replace(alvo); }, 150);
+  })();
+</script>
+</body>
+</html>

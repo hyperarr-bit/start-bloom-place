@@ -85,8 +85,11 @@ const ANDROID_DUAS_COLUNAS = true;
  * vitalício da web cai de 97,90 pra 47,90 — oferta nova `w47` nas functions
  * (asaas-pix, asaas-webhook, pix-reconcile) e no rastreio. O app continua
  * em 97,90 (APP_PRECOS). */
-const PRECO_WEB = "47,90";
-const OFERTA_WEB: "w47" = "w47";
+/* 07/09 10h40 (ordem do dono): de volta a 97,90 (w97) — o 47,90 (w47) rodou
+ * de 06/09 18h35 a 07/09 10h20. As chaves w47/w27 continuam existindo nas
+ * functions pra QR antigo. */
+const PRECO_WEB = "97,90";
+const OFERTA_WEB: "w97" = "w97";
 /* 2ª COLUNA NA WEB — 1 mês por R$ 24,90 (03/09).
  *
  * Por que: o app rodou os dois arranjos com dinheiro em cima e a régua limpa
@@ -193,7 +196,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>
         <div className="relative text-[11px] font-semibold text-black/40 mt-1">
-          {naWeb ? "= R$ 3,99/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
+          {naWeb ? "= R$ 8,16/mês no 1º ano, R$ 0 depois" : "4 meses de mensal = CORE pra sempre"}
         </div>
         <div className="relative grid grid-cols-3 gap-1.5 mt-3.5">
           {["16 módulos", "Sem mensalidade", "Acesso na hora"].map((c) => (
@@ -253,7 +256,7 @@ function PrecosLadoALadoW({ plano, onSelect, naWeb = false }: { plano: "vitalici
           <span className="text-[10px] font-semibold text-black/40">vitalício · uma única vez</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            {naWeb ? "2 meses de mensal =" : "4 meses de mensal ="}<br /><b className="text-black/60">CORE pra sempre</b>
+            4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b>
           </span>
         </div>
       </div>

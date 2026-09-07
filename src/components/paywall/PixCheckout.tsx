@@ -118,7 +118,10 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  * ~5s com CPF válido; com CPF zerado a Cakto recusa → o form nome+CPF volta
  * neste braço (SEM_FORM). Compra anônima casa pelo order_id no webhook e no
  * reconcile. Rollback = "asaas" (1 linha) + push. */
-const FORCE_GATEWAY: Gateway | null = "cakto";
+/* 07/09 10h40 — VOLTA PRO ASAAS (ordem do dono: "volta pra asaas e 97,90, vou
+ * focar no app store e play"). Medido em 13h de Cakto: a tela do CPF que ela
+ * exige derrubou QR/abertura de 100% pra 50%, sem nenhum erro de gateway. */
+const FORCE_GATEWAY: Gateway | null = "asaas";
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {

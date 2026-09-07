@@ -278,13 +278,77 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   },
   hiperfoco: {
     ...COMMON,
+    "hiperfoco-thoughts": {
+      [iso(today)]: {
+        7: [{ id: "1", text: "Acordei com a ideia de vender pra escolas", tags: ["negócio"], hour: 7 }],
+        9: [{ id: "2", text: "Reunião com a Marina: proposta até sexta", tags: ["trabalho"], hour: 9 }],
+        13: [{ id: "3", text: "Ideia: ligar o app com a planilha do cliente", tags: ["app"], hour: 13 }],
+        20: [{ id: "4", text: "Dia produtivo. Amanhã: responder o Pedro", tags: ["pessoal"], hour: 20 }],
+      },
+      [daysAgo(1)]: {
+        8: [{ id: "5", text: "Treino feito antes do trabalho", tags: ["pessoal"], hour: 8 }],
+        15: [{ id: "6", text: "Cliente novo indicado pela Dona Lúcia", tags: ["negócio"], hour: 15 }],
+      },
+    },
     "mente-dreams": [
       { id: "1", title: "Viver no exterior por 1 ano", category: "Vida" },
       { id: "2", title: "Lançar meu próprio app", category: "Carreira" },
     ],
   },
-  estudos: { ...COMMON },
-  carreira: { ...COMMON },
+  estudos: {
+    ...COMMON,
+    // 07/09: demo cheia (antes só COMMON = tela vazia nos stories e na demo guiada)
+    "estudos-schedule-name": "Minha grade",
+    "estudos-pomodoro-count": 14,
+    "estudos-cursos-andamento": [
+      { id: "1", name: "Inglês intermediário", notes: "3x por semana, 40 min" },
+      { id: "2", name: "Excel do zero ao avançado", notes: "Aula 12 de 30" },
+    ],
+    "estudos-cursos-desejo": [
+      { id: "3", name: "Oratória" },
+      { id: "4", name: "Design no Figma" },
+    ],
+    "estudos-subjects": [
+      { id: "1", name: "Present perfect", leitura: true, resumo: true },
+      { id: "2", name: "Tabela dinâmica", leitura: true, resumo: false },
+      { id: "3", name: "PROCV e XLOOKUP", leitura: false, resumo: false },
+    ],
+    "estudos-exams": [
+      { id: "1", title: "Prova de inglês", date: daysAgo(-6), time: "19:00", color: "bg-blue-500", done: false },
+      { id: "2", title: "Entrega do projeto de Excel", date: daysAgo(-13), time: "23:59", color: "bg-green-500", done: false },
+    ],
+    "estudos-notebooks": [
+      { id: "1", date: daysAgo(1), curso: "Inglês", materia: "Present perfect", resumo: "Ações que começaram no passado e continuam agora.", planoLeitura: "Unidade 5", duvidas: "Diferença pro simple past", frases: "I have lived here for 3 years." },
+    ],
+  },
+  carreira: {
+    ...COMMON,
+    "career-day-phases": [
+      { id: "f1", nome: "Prospecção", memo: "", counts: { [iso(today)]: 6, [daysAgo(1)]: 8, [daysAgo(2)]: 5 } },
+      { id: "f2", nome: "Follow-up", memo: "", counts: { [iso(today)]: 3, [daysAgo(1)]: 4 } },
+      { id: "f3", nome: "Entregas", memo: "", counts: { [iso(today)]: 2, [daysAgo(1)]: 1 } },
+    ],
+    "career-day-tasks": [
+      { id: "1", texto: "Mandar proposta pra Dona Lúcia", feito: true, dia: iso(today) },
+      { id: "2", texto: "Ligar pro fornecedor", feito: false, dia: iso(today) },
+      { id: "3", texto: "Fechar relatório da semana", feito: false, dia: iso(today) },
+    ],
+    "career-jobs": [
+      { id: "1", company: "Studio Norte", role: "Designer júnior", link: "", status: "entrevista", date: daysAgo(3), salary: "R$ 3.200", notes: "Entrevista quinta às 15h", favorite: true },
+      { id: "2", company: "Loja Vida", role: "Vendedor", link: "", status: "aplicado", date: daysAgo(6), salary: "R$ 2.400 + comissão", notes: "", favorite: false },
+    ],
+    "career-skills": [
+      { id: "1", name: "Vendas", category: "Comercial", level: 3, targetLevel: 5, notes: "" },
+      { id: "2", name: "Excel", category: "Ferramentas", level: 2, targetLevel: 4, notes: "" },
+      { id: "3", name: "Inglês", category: "Idiomas", level: 2, targetLevel: 4, notes: "" },
+    ],
+    "career-contacts": [
+      { id: "1", name: "Marina S.", company: "Studio Norte", role: "Gerente", linkedin: "", email: "", phone: "", notes: "Indicou a vaga", lastContact: daysAgo(2), category: "Rede" },
+    ],
+    "career-portfolio": [
+      { id: "1", title: "Site da padaria do bairro", description: "Landing page feita em uma semana", link: "", category: "Design", date: daysAgo(20), highlight: true },
+    ],
+  },
   biblioteca: {
     ...COMMON,
     "lib-books": [
@@ -292,22 +356,74 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       { id: "2", title: "Mindset", author: "Carol Dweck", status: "lido", progress: 100 },
     ],
   },
-  casa: { ...COMMON },
-  viagens: { ...COMMON },
+  casa: {
+    ...COMMON,
+    "casa-rooms": [
+      { id: "1", name: "Cozinha", color: "bg-yellow-200 dark:bg-yellow-900/40", tasks: [{ id: "1", text: "Limpar a geladeira", done: true }, { id: "2", text: "Trocar o filtro de água", done: false }] },
+      { id: "2", name: "Sala", color: "bg-blue-200 dark:bg-blue-900/40", tasks: [{ id: "3", text: "Aspirar o sofá", done: false }, { id: "4", text: "Regar as plantas", done: true }] },
+      { id: "3", name: "Quarto", color: "bg-purple-200 dark:bg-purple-900/40", tasks: [{ id: "5", text: "Trocar os lençóis", done: false }] },
+      { id: "4", name: "Banheiro", color: "bg-green-200 dark:bg-green-900/40", tasks: [{ id: "6", text: "Repor papel higiênico", done: false }] },
+    ],
+    "casa-shopping-list": [
+      { id: "1", name: "Arroz 5 kg", checked: false, fromPantry: true },
+      { id: "2", name: "Ovos", checked: false, fromPantry: false },
+      { id: "3", name: "Detergente", checked: true, fromPantry: false },
+      { id: "4", name: "Frango", checked: false, fromPantry: false },
+    ],
+    "casa-maint-tasks": [
+      { id: "1", task: "Limpar o ar-condicionado", frequencyMonths: 6, lastDone: daysAgo(150), icon: "❄️" },
+      { id: "2", task: "Trocar o filtro do purificador", frequencyMonths: 3, lastDone: daysAgo(80), icon: "💧" },
+    ],
+  },
+  viagens: {
+    ...COMMON,
+    "travel-bucket": [
+      { id: "1", name: "Jericoacoara", country: "Brasil", continent: "América do Sul", notes: "Julho, 7 dias", visited: false, rating: 0, photoUrl: "", priority: "próximo" },
+      { id: "2", name: "Buenos Aires", country: "Argentina", continent: "América do Sul", notes: "Feriado de novembro", visited: false, rating: 0, photoUrl: "", priority: "planejando" },
+      { id: "3", name: "Lisboa", country: "Portugal", continent: "Europa", notes: "", visited: false, rating: 0, photoUrl: "", priority: "sonho" },
+      { id: "4", name: "Chapada dos Veadeiros", country: "Brasil", continent: "América do Sul", notes: "Cachoeira Santa Bárbara", visited: true, rating: 5, photoUrl: "", priority: "próximo" },
+    ],
+  },
   relacionamentos: {
     ...COMMON,
     "rel-people": [
-      { id: "1", name: "Mãe", relation: "Família" },
-      { id: "2", name: "João", relation: "Amigo" },
+      { id: "1", name: "Mãe", relation: "Família", birthday: "1965-08-12", notes: "Gosta de orquídea" },
+      { id: "2", name: "Ana", relation: "Namorada", birthday: "1998-03-04", notes: "Ama café coado" },
+      { id: "3", name: "João", relation: "Amigo", birthday: "1997-11-21", notes: "Aniversário sempre no bar do Zé" },
+      { id: "4", name: "Pedro", relation: "Irmão", birthday: "2001-05-09", notes: "" },
+      { id: "5", name: "Dona Lúcia", relation: "Cliente", birthday: "", notes: "Sempre pergunta dos filhos" },
     ],
     "rel-dates": [
-      { id: "1", personId: "1", title: "Aniversário", date: "1965-08-12" },
+      { id: "1", title: "Aniversário da mãe", person: "Mãe", date: "2026-08-12", type: "birthday" },
+      { id: "2", title: "1 ano de namoro", person: "Ana", date: "2026-09-20", type: "anniversary" },
+      { id: "3", title: "Aniversário do João", person: "João", date: "2026-11-21", type: "birthday" },
+    ],
+    "rel-moments": [
+      { id: "1", date: daysAgo(2), person: "Ana", description: "Jantar surpresa em casa" },
+      { id: "2", date: daysAgo(9), person: "Mãe", description: "Almoço de domingo com a família toda" },
+    ],
+    "rel-events": [
+      { id: "1", name: "Churrasco do Pedro", date: daysAgo(-5), location: "Casa do Pedro", rsvp: "confirmed", tasks: [{ id: "1", text: "Levar carvão", done: false }] },
     ],
   },
   pet: {
     ...COMMON,
     "pet-list": [
-      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", age: 3 },
+      { id: "1", name: "Mel", species: "Cachorro", breed: "Golden", weight: "28 kg", birthday: "2023-04-15" },
+      { id: "2", name: "Tom", species: "Gato", breed: "SRD", weight: "4,2 kg", birthday: "2022-10-02" },
+    ],
+    "pet-health": [
+      { id: "1", petId: "1", type: "vaccine", name: "V10", date: daysAgo(40), nextDate: daysAgo(-325) },
+      { id: "2", petId: "1", type: "deworming", name: "Vermífugo", date: daysAgo(70), nextDate: daysAgo(-20) },
+      { id: "3", petId: "2", type: "visit", name: "Check-up anual", date: daysAgo(10), nextDate: daysAgo(-355) },
+    ],
+    "pet-expenses": [
+      { id: "1", petId: "1", category: "Ração", description: "Ração 15 kg", value: 189.9, date: daysAgo(3) },
+      { id: "2", petId: "1", category: "Banho", description: "Banho e tosa", value: 80, date: daysAgo(12) },
+      { id: "3", petId: "2", category: "Ração", description: "Ração de gato 3 kg", value: 95, date: daysAgo(6) },
+    ],
+    "pet-diary": [
+      { id: "1", petName: "Mel", date: daysAgo(1), text: "Passeio longo no parque, cansou gostoso.", mood: "😄" },
     ],
   },
   beleza: { ...COMMON },

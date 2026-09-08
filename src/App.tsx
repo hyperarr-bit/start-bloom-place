@@ -314,6 +314,10 @@ const ExcluirConta = lazyPage(() => import("./pages/Legal").then((m) => ({ defau
 // contato. Ver src/pages/site/SiteHome.tsx e src/lib/empresa.ts.
 const SiteHome = lazyPage(() => import("./pages/site/SiteHome"));
 const Suporte = lazyPage(() => import("./pages/site/Suporte"));
+// Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
+// /suporte do site: aquela é SoNaWeb e nunca abriu no shell — que era
+// exatamente o buraco. Esta funciona nos dois.
+const Ajuda = lazyPage(() => import("./pages/Ajuda"));
 const Index = lazyPage(() => import("./pages/Index"));
 const Home = lazyPage(() => import("./pages/Home"));
 const Rotina = lazyPage(() => import("./pages/Rotina"));
@@ -359,6 +363,7 @@ const ComecarFunilV1 = lazyPage(() => import("./pages/funis/v1/ComecarV1"));
 // Recepção do pagante (15/07): destino do e-mail de boas-vindas pós-Pix.
 const BemVindo = lazyPage(() => import("./pages/BemVindo"));
 
+const AdminSuporte = lazyPage(() => import("./pages/admin/AdminSuporte"));
 const AdminLogin = lazyPage(() => import("./pages/admin/AdminLogin"));
 const AdminLayout = lazyPage(() => import("./pages/admin/AdminLayout"));
 const AdminFunnel = lazyPage(() => import("./pages/admin/AdminFunnel"));
@@ -564,6 +569,9 @@ const AnimatedRoutes = () => {
             não é módulo, é uma tela transversal que lê todos eles. */}
         <Route path="/retrospectiva" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="retrospectiva"><Retrospectiva /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
         <Route path="/notificacoes" element={<ProtectedRoute><PageTransition><RouteErrorBoundary routeName="notificacoes"><Notificacoes /></RouteErrorBoundary></PageTransition></ProtectedRoute>} />
+        {/* allowGuest: o convidado do teste grátis também trava, e mandar
+            ele pro /auth quando ele foi pedir socorro é o pior desfecho. */}
+        <Route path="/ajuda" element={<ProtectedRoute allowGuest><PageTransition><Ajuda /></PageTransition></ProtectedRoute>} />
         <Route path="/admin" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route path="funil" element={<AdminFunnel />} />
@@ -571,6 +579,7 @@ const AnimatedRoutes = () => {
           <Route path="usuarios" element={<AdminUsuarios />} />
           {/* Assinantes removida (inútil) — rota antiga cai no funil via catch-all */}
           <Route path="pagantes" element={<AdminPagantes />} />
+          <Route path="suporte" element={<AdminSuporte />} />
           {/* Compat: qualquer rota antiga do admin cai no funil novo. */}
           <Route path="*" element={<Navigate to="/admin/funil" replace />} />
         </Route>

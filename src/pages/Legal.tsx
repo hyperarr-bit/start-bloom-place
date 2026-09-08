@@ -19,10 +19,16 @@ import { RodapeSite } from "@/components/site/RodapeSite";
  * Rotas PÚBLICAS de propósito: o revisor do Google abre sem conta.
  */
 
+/* Cada documento tem a SUA data. Antes era uma constante só pros três, então
+ * mexer num item da privacidade alegaria que os termos também mudaram — o que
+ * não é verdade e é exatamente o tipo de imprecisão que um texto legal não pode
+ * ter. 08/09: a privacidade ganhou o item de fotos e mensagens de suporte (a
+ * aba de suporte com anexo de print); termos e exclusão de conta não mudaram. */
 const ATUALIZADO = "24 de julho de 2026";
+const ATUALIZADO_PRIVACIDADE = "8 de setembro de 2026";
 const CONTATO = EMPRESA.email;
 
-function LegalShell({ titulo, children }: { titulo: string; children: ReactNode }) {
+function LegalShell({ titulo, children, atualizado = ATUALIZADO }: { titulo: string; children: ReactNode; atualizado?: string }) {
   const navigate = useNavigate();
   return (
     <div className="min-h-dvh bg-background">
@@ -39,7 +45,7 @@ function LegalShell({ titulo, children }: { titulo: string; children: ReactNode 
         </div>
       </header>
       <main className="max-w-3xl mx-auto px-5 py-8 pb-16">
-        <p className="text-xs text-muted-foreground mb-4">Atualizado em {ATUALIZADO}</p>
+        <p className="text-xs text-muted-foreground mb-4">Atualizado em {atualizado}</p>
         {/* Identificação da operadora (24/08): a Apple recusou a inscrição da
             empresa por não conseguir ligar o domínio à pessoa jurídica. Os
             textos legais são justamente onde isso tem que estar explícito. */}
@@ -79,7 +85,7 @@ const Lista = ({ itens }: { itens: string[] }) => (
 export function Privacidade() {
   useEffect(() => { trackEvent("legal_view", { pagina: "privacidade" }); }, []);
   return (
-    <LegalShell titulo="Política de Privacidade">
+    <LegalShell titulo="Política de Privacidade" atualizado={ATUALIZADO_PRIVACIDADE}>
       <p>
         O CORE é um aplicativo de organização pessoal. Esta política explica quais dados
         coletamos, por que coletamos e o que você pode fazer com eles. Escrevemos em
@@ -92,6 +98,12 @@ export function Privacidade() {
           "Conteúdo que você registra: lançamentos financeiros, hábitos, rotina, treinos, refeições, metas, anotações e demais informações dos módulos que você usa. Alguns desses dados são sensíveis (por exemplo, saúde) e por isso ficam vinculados só à sua conta.",
           "Dados de uso: telas abertas, ações no app, data e hora, tipo de aparelho, versão do app e identificadores técnicos — usados para entender o que funciona e corrigir erros.",
           "Dados de compra: status da sua assinatura ou pagamento. Nunca recebemos nem armazenamos número de cartão.",
+          // 07/09: três módulos já subiam imagem pro Storage e a política não
+          // dizia uma palavra sobre foto. Com o formulário de suporte (menu →
+          // Ajuda e suporte) entram também o texto do chamado e um diagnóstico
+          // do aparelho — dado que a pessoa não digitou e por isso precisa
+          // estar escrito aqui, não só no código.
+          "Fotos e mensagens de suporte: as imagens que você anexa dentro dos módulos (por exemplo, no quadro dos sonhos) e, quando você abre um chamado em Ajuda e suporte, o que você escreve, os prints que anexa e um diagnóstico automático do aparelho (versão do app, plataforma, modelo e a última tela aberta). Ficam em armazenamento privado, ligados à sua conta, e são usados para responder você e corrigir o problema.",
         ]} />
       </Secao>
 
@@ -100,7 +112,7 @@ export function Privacidade() {
           "Fazer o app funcionar: guardar o que você registra e sincronizar entre aparelhos.",
           "Manter sua conta e liberar o acesso que você contratou.",
           "Melhorar o produto: entender quais partes ajudam e quais atrapalham.",
-          "Falar com você sobre a sua conta, sua assinatura e novidades do app.",
+          "Falar com você sobre a sua conta, sua assinatura e novidades do app — e responder os chamados que você abre no suporte, lendo a mensagem, os prints e o diagnóstico enviados.",
           "Cumprir obrigações legais e prevenir fraude e abuso.",
         ]} />
         <p className="text-sm text-muted-foreground">

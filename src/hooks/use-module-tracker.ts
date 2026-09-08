@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, createContext, useContext } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { CHAVE_ULTIMO_MODULO } from "@/lib/diagnostico-suporte";
 
 // Context for child components to report active tab
 type TabReporter = (tabId: string) => void;
@@ -66,6 +67,21 @@ export const useModuleTracker = (moduleId: string) => {
     currentTab.current = tabId;
     enteredAt.current = new Date();
   }, [user, moduleId]);
+
+  /*
+   * ONDE A PESSOA ESTAVA (07/09, pedido de cliente por DM: "coloca um
+   * formulário pra gente por o bug e anexar o print").
+   *
+   * Chamado de suporte sem a tela do erro é adivinhação: "não está salvando"
+   * pode ser Finanças, Dieta ou Diário. Este hook é o ÚNICO lugar do app que
+   * já sabe o módulo aberto sem ninguém ter que contar — então ele deixa o
+   * bilhete, e o formulário de suporte lê. Fora do `if (!user)` de propósito:
+   * o convidado do teste grátis também abre chamado, e ele não tem conta.
+   * sessionStorage porque só vale pra ESTA sessão do app.
+   */
+  useEffect(() => {
+    try { sessionStorage.setItem(CHAVE_ULTIMO_MODULO, moduleId); } catch { /* storage bloqueado */ }
+  }, [moduleId]);
 
   useEffect(() => {
     if (!user) return;

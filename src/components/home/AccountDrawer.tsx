@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy, LifeBuoy } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -47,6 +47,7 @@ export const AccountDrawer = ({
     import("@/pages/Conquistas");
     import("@/pages/Retrospectiva");
     import("@/pages/Notificacoes");
+    import("@/pages/Ajuda");
     if (isNativeShell()) import("@/pages/PlanosApp");
     else import("@/pages/Planos");
   }, [open]);
@@ -117,6 +118,7 @@ export const AccountDrawer = ({
         // assinar no meio do teste só tinha a faixa fina do rodapé, que some
         // nas telas de funil. Quem quer pagar precisa de caminho.
         { icon: CreditCard, label: "Meu acesso", onClick: handleManageSubscription },
+        { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
       ]
     : [
         { icon: UserCircle, label: "Minha conta", onClick: handleMinhaConta, spotlight: "minha-conta" as const },
@@ -134,6 +136,12 @@ export const AccountDrawer = ({
         // site é institucional e nada dizia "entre com a mesma conta". Só
         // dentro do app da loja; na web a pessoa já está no computador.
         ...(isNativeShell() ? [{ icon: Monitor, label: "Usar no computador", onClick: () => setView("computador") }] : []),
+        // 07/09 (pedido de uma cliente pagante, por DM): "faz em algum local
+        // suporte e coloca um formulário pra gente por o bug e anexar o
+        // print". Dentro do app o único contato era um mailto: perdido na
+        // página de termos — a /suporte do site é bloqueada no shell. Este
+        // item é a porta que faltava, e vale na web também.
+        { icon: LifeBuoy, label: "Ajuda e suporte", onClick: () => go("/ajuda") },
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 

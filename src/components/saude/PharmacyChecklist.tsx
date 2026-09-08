@@ -152,7 +152,7 @@ export const PharmacyChecklist = () => {
                           value={s.time}
                           aria-label={`Horário de ${s.name}`}
                           onChange={e => changeTime(s.id, e.target.value)}
-                          className="bg-transparent text-xs text-muted-foreground w-[4.5rem] focus:outline-none focus:text-foreground"
+                          className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
                         />
                       </td>
                       <td className="px-4 py-3">

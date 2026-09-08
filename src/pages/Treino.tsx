@@ -23,6 +23,7 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { ResumoDoModulo, emDias } from "@/components/ui/resumo-do-modulo";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -465,6 +466,28 @@ const Treino = () => {
     return weekDays.find(d => activeDays.includes(d) && (workoutPlan[d]?.exercises?.length ?? 0) === 0) ?? todayDayName;
   }, [activeDays, todayDayName, workoutPlan]);
 
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // Reaproveita o plano de hoje, o log de treinos e a sequência já calculados.
+  const treinoDeHoje = workoutPlan[todayDayName];
+  const exerciciosHoje = treinoDeHoje?.exercises?.length ?? 0;
+  const feitosHoje = treinoDeHoje?.exercises?.filter(e => e.done).length ?? 0;
+  const hojeEDescanso = !diasAtivosLimpos.includes(todayDayName) && exerciciosHoje === 0;
+  const treinosNaSemana = workoutLog.filter(d => typeof d === "string" && d >= semanaAtual).length;
+  const itensDoResumo = [
+    {
+      rotulo: "Hoje",
+      valor: hojeEDescanso ? "Descanso" : (exerciciosHoje ? `${feitosHoje}/${exerciciosHoje}` : null),
+      sub: hojeEDescanso ? undefined : (treinoDeHoje?.muscles?.length ? treinoDeHoje.muscles.join(" + ") : "exercícios"),
+      tom: hojeEDescanso ? "neutro" as const : (feitosHoje >= exerciciosHoje ? "ok" as const : "atencao" as const),
+      onClick: () => { setActiveTab("hoje"); reportTab?.("hoje"); },
+    },
+    { rotulo: "Semana", valor: treinosNaSemana ? `${treinosNaSemana}/${diasAtivosLimpos.length}` : null, sub: "treinos feitos", tom: "ok" as const, onClick: () => { setActiveTab("semana"); reportTab?.("semana"); } },
+    { rotulo: "Sequência", valor: streak ? emDias(streak) : null, tom: "ok" as const, onClick: () => { setActiveTab("resumo"); reportTab?.("resumo"); } },
+  ];
+
   const renderWorkoutDay = (day: string, compact = false) => {
     const workout = workoutPlan[day];
     const isActive = activeDays.includes(day);
@@ -787,6 +810,7 @@ const Treino = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Monte seu primeiro treino na aba CONFIG" className="mb-4" />
         <ModuleTip
           moduleId="treino"
           tips={[

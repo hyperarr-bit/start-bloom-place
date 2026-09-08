@@ -3,6 +3,10 @@ import { Check, Pencil, Plus, Shield, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { computeMonthlyBalance, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
+// 07/09: a parcela do mês agora é carimbada (startMonth/parcelaDoMes) — a conta
+// antiga "pagas + 1" mostrava k+1 no calendário logo depois de marcar a do mês
+// como paga, enquanto o card mostrava k. Uma fonte só pros dois.
+import { parcelaDoMes, parcelaAtiva } from "@/lib/finance-parcelas";
 import { useAuth } from "@/hooks/use-auth";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 
@@ -128,7 +132,7 @@ export const MonthCalendar = ({
     }
     for (const p of installments ?? []) {
       // Parcela ativa: o dia vem do `date` da compra (melhor sinal disponível).
-      if (p?.paidInstallments < p?.totalInstallments && p?.date) {
+      if (p && parcelaAtiva(p) && p.date) {
         const d = Number(String(p.date).slice(8, 10));
         if (d >= 1) get(Math.min(d, daysInMonth)).installments.push(p);
       }
@@ -400,7 +404,7 @@ export const MonthCalendar = ({
             ))}
             {sel.installments.map((p: any) => (
               <div key={p.id} className="flex items-center justify-between text-[13px]">
-                <span className="truncate">💳 {p.description} ({p.paidInstallments + 1}/{p.totalInstallments})</span>
+                <span className="truncate">💳 {p.description} ({parcelaDoMes(p)}/{p.totalInstallments})</span>
                 <span className="font-semibold shrink-0">−{brl(p.installmentValue || 0)}</span>
               </div>
             ))}

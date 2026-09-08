@@ -27,6 +27,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
+import { useUserData } from "@/hooks/use-user-data";
+import { ResumoDoModulo, comoLista, emDias } from "@/components/ui/resumo-do-modulo";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 
@@ -1177,6 +1179,31 @@ const Rotina = () => {
   );
   const horasGrade = [...gradePadrao, ...extrasSalvos].sort((a, b) => offsetDaAncora(a) - offsetDaAncora(b));
 
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // Tarefas (TodoList, aba FOCO) e fases (BlocoDeFases, aba SEMANA) moram em
+  // subcomponentes — aqui só a mesma chave, lida do store, pra contar.
+  const { get: lerDado } = useUserData();
+  const hojeChave = getDateKey();
+  const diaDeHoje = days[(new Date().getDay() + 6) % 7];
+  const habitosFeitosHoje = (checkedAtual[diaDeHoje] ?? []).filter(Boolean).length;
+  const tarefasPendentes =
+    comoLista<{ done?: boolean }>(lerDado("todo-list", [])).filter(t => !t?.done).length +
+    urgencies.filter(u => !u.done).length;
+  const fasesHoje = comoLista<Fase>(lerDado("rotina-day-phases", FASES_ROTINA))
+    .map(f => ({ nome: f?.nome ?? "", n: Number(f?.counts?.[hojeChave]) || 0 }))
+    .filter(f => f.n > 0)
+    .sort((a, b) => b.n - a.n);
+  const repeticoesHoje = fasesHoje.reduce((s, f) => s + f.n, 0);
+  const itensDoResumo = [
+    { rotulo: "Hábitos hoje", valor: habitNames.length ? `${habitosFeitosHoje}/${habitNames.length}` : null, tom: habitosFeitosHoje >= habitNames.length ? "ok" as const : "atencao" as const, onClick: () => setActiveTab("semana") },
+    { rotulo: "Tarefas", valor: tarefasPendentes, sub: "pendentes", tom: "atencao" as const, onClick: () => setActiveTab("foco") },
+    { rotulo: "Repetições hoje", valor: repeticoesHoje, sub: fasesHoje[0]?.nome, tom: "ok" as const, onClick: () => setActiveTab("semana") },
+    { rotulo: "Sequência", valor: sequenciaViva ? emDias(sequenciaViva) : null, tom: "ok" as const, onClick: () => setActiveTab("revisao") },
+  ];
+
   const quote = motivationalQuotes[new Date().getDay() % motivationalQuotes.length];
 
   return (
@@ -1210,6 +1237,7 @@ const Rotina = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Comece cadastrando um hábito na sua semana" />
         <ModuleTip
           moduleId="rotina"
           tips={[

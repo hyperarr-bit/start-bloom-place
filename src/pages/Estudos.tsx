@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { ResumoDoModulo, diasAte, rotuloEmDias } from "@/components/ui/resumo-do-modulo";
 
 
 // ── Types ──
@@ -323,6 +324,28 @@ const Estudos = () => {
     reportTab?.(tabId);
   };
 
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // Tarefas da semana são por dia (sábado e domingo caem em "FINAL DE
+  // SEMANA", como a aba). Provas ficam na aba Estudos. O contador de pomodoros
+  // é acumulado — a chave não guarda por dia, então o resumo diz "no total".
+  const diaDaSemanaHoje = new Date().getDay();
+  const diaDeHojeNasTarefas = diaDaSemanaHoje === 0 || diaDaSemanaHoje === 6 ? "FINAL DE SEMANA" : weekDays[diaDaSemanaHoje - 1];
+  const tarefasPendentesHoje = (weekTasks[diaDeHojeNasTarefas] ?? []).filter(t => !t?.done).length;
+  const proximaProva = exams
+    .filter(e => !e.done)
+    .map(e => ({ titulo: e.title, dias: diasAte(e.date) }))
+    .filter(e => Number.isFinite(e.dias) && e.dias >= 0)
+    .sort((a, b) => a.dias - b.dias)[0];
+  const itensDoResumo = [
+    { rotulo: "Tarefas hoje", valor: tarefasPendentesHoje, sub: "pendentes", tom: "atencao" as const, onClick: () => handleTabChange("tarefas") },
+    { rotulo: "Próx. prova", valor: proximaProva ? rotuloEmDias(proximaProva.dias) : null, sub: proximaProva?.titulo, tom: proximaProva && proximaProva.dias <= 3 ? "atencao" as const : "neutro" as const, onClick: () => handleTabChange("estudos") },
+    { rotulo: "Cursos", valor: cursosAndamento.length, sub: "em andamento", tom: "neutro" as const, onClick: () => handleTabChange("estudos") },
+    { rotulo: "Pomodoros", valor: Number(pomodoroCount) || 0, sub: "no total", tom: "ok" as const, onClick: () => handleTabChange("pomodoro") },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <SpotlightOverlay
@@ -361,6 +384,7 @@ const Estudos = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Cadastre um curso ou a próxima prova" />
         <ModuleTip moduleId="estudos" tips={[
           "Organize cursos em andamento e sua lista de desejos",
           "Monte sua grade horária semanal editável",

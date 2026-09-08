@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { GoalsBoardV2 } from "@/components/hiperfoco/GoalsBoardV2";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { ResumoDoModulo, comoLista } from "@/components/ui/resumo-do-modulo";
 import { useUserData } from "@/hooks/use-user-data";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 
@@ -280,7 +281,7 @@ const DesenvolvimentoPessoal = () => {
   const reportTab = useTabReporter();
   const abas = useAbasOcultas("desenvolvimento", ABAS_DP);
   const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
-  const { set: setUserData, isGuest } = useUserData();
+  const { get: lerDado, set: setUserData, isGuest } = useUserData();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
   // SOBRE MIM
@@ -413,6 +414,27 @@ const DesenvolvimentoPessoal = () => {
   const saveGratitude = () => { setGratitudeEntries({ ...gratitudeEntries, [today]: todayGratitude }); };
 
 
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // As metas moram no GoalsBoardV2 (goals-board-v2): meta "em andamento" é a
+  // que ainda tem passo aberto (ou nenhum passo escrito).
+  const metasEmAndamento = comoLista<{ actionGroups?: { tasks?: { done?: boolean }[] }[] }>(lerDado("goals-board-v2", []))
+    .filter(m => {
+      const passos = comoLista<{ tasks?: { done?: boolean }[] }>(m?.actionGroups).flatMap(g => comoLista<{ done?: boolean }>(g?.tasks));
+      return passos.length === 0 || passos.some(t => !t?.done);
+    }).length;
+  const humorDeHoje = moodOptions.find(m => m.value === moodLog[today]);
+  const gratidaoHoje = (gratitudeEntries[today] ?? []).filter(g => typeof g === "string" && g.trim()).length;
+  const diarioEscritoHoje = !!journalEntries[today]?.text?.trim();
+  const itensDoResumo = [
+    { rotulo: "Humor hoje", valor: humorDeHoje ? `${humorDeHoje.emoji} ${humorDeHoje.label}` : null, tom: "neutro" as const, onClick: () => trocarAba("humor") },
+    { rotulo: "Gratidão", valor: gratidaoHoje ? `${gratidaoHoje}/3` : null, sub: "hoje", tom: gratidaoHoje >= 3 ? "ok" as const : "atencao" as const, onClick: () => trocarAba("gratidao") },
+    { rotulo: "Metas", valor: metasEmAndamento, sub: "em andamento", tom: "atencao" as const, onClick: () => trocarAba("metas") },
+    { rotulo: "Diário", valor: diarioEscritoHoje ? "Escrito ✓" : null, tom: "ok" as const, onClick: () => trocarAba("diario") },
+  ];
+
   const { onModuleComplete, CompletionDialog } = useModuleCompletionFlow("metas");
 
   return (
@@ -451,6 +473,7 @@ const DesenvolvimentoPessoal = () => {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Comece pela sua primeira meta" className="mb-4" />
         <ModuleTip
           moduleId="desenvolvimento"
           tips={[

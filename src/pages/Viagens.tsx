@@ -18,6 +18,8 @@ import { TravelBudget } from "@/components/travel/TravelBudget";
 import { BucketList } from "@/components/travel/BucketList";
 import { Outings } from "@/components/travel/Outings";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useUserData } from "@/hooks/use-user-data";
+import { ResumoDoModulo, comoLista, diasAte, rotuloEmDias } from "@/components/ui/resumo-do-modulo";
 
 // "Passeios" fica em SEGUNDO, colado em Destinos: é a aba do uso mais comum
 // (cinema no sábado, jantar fora) e a barra rola na horizontal — quem entra
@@ -47,6 +49,30 @@ const Viagens = () => {
     setActiveTab(tabId);
     reportTab?.(tabId);
   };
+
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // Próxima viagem = carteira do Budget (travel-trips-v2) ou um Timer
+  // (travel-countdowns); passeios e destinos vêm das próprias abas.
+  const { get: lerDado } = useUserData();
+  const carteira = lerDado<{ trips?: { destination?: string; startDate?: string }[] }>("travel-trips-v2", { trips: [] });
+  const proximaViagem = [
+    ...comoLista<{ destination?: string; startDate?: string }>(carteira?.trips).map(t => ({ nome: t?.destination ?? "", dias: diasAte(t?.startDate ?? "") })),
+    ...comoLista<{ tripName?: string; departureDate?: string }>(lerDado("travel-countdowns", [])).map(c => ({ nome: c?.tripName ?? "", dias: diasAte(c?.departureDate ?? "") })),
+  ].filter(v => Number.isFinite(v.dias) && v.dias >= 0).sort((a, b) => a.dias - b.dias)[0];
+  const proximosPasseios = comoLista<{ name?: string; date?: string }>(lerDado("travel-outings", []))
+    .map(p => ({ nome: p?.name ?? "", dias: diasAte(p?.date ?? "") }))
+    .filter(p => Number.isFinite(p.dias) && p.dias >= 0)
+    .sort((a, b) => a.dias - b.dias);
+  const destinosPendentes = comoLista<{ visited?: boolean; priority?: string }>(lerDado("travel-bucket", [])).filter(d => !d?.visited);
+  const destinosProximos = destinosPendentes.filter(d => d?.priority === "próximo").length;
+  const itensDoResumo = [
+    { rotulo: "Próx. viagem", valor: proximaViagem ? rotuloEmDias(proximaViagem.dias) : null, sub: proximaViagem?.nome, tom: "ok" as const, onClick: () => handleTabChange("budget") },
+    { rotulo: "Passeios", valor: proximosPasseios.length, sub: proximosPasseios[0] ? `${proximosPasseios[0].nome} · ${rotuloEmDias(proximosPasseios[0].dias)}` : undefined, tom: "neutro" as const, onClick: () => handleTabChange("passeios") },
+    { rotulo: "Destinos", valor: destinosPendentes.length, sub: destinosProximos ? `${destinosProximos} marcados como próximo` : "na lista", tom: "neutro" as const, onClick: () => handleTabChange("destinos") },
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -86,6 +112,7 @@ const Viagens = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Adicione o primeiro destino" />
         <ModuleTip
           moduleId="viagens"
           tips={[

@@ -16,6 +16,8 @@ import { PharmacyChecklist } from "@/components/saude/PharmacyChecklist";
 import { BodyEvolution } from "@/components/saude/BodyEvolution";
 import { MedicalLog } from "@/components/saude/MedicalLog";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
+import { useUserData } from "@/hooks/use-user-data";
+import { ResumoDoModulo, comoLista, diasAte, rotuloEmDias } from "@/components/ui/resumo-do-modulo";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
@@ -31,6 +33,34 @@ const Saude = () => {
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+
+  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
+     igual a de finanças, você entrar e ja ter um resumo do que tem para
+     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
+     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
+  // Água, remédios e consultas vivem nos cards (HydrationTracker,
+  // PharmacyChecklist, MedicalLog); aqui é o store lido direto — reativo, pra
+  // o "+ Copo" do card mudar o número aqui em cima na hora. A conta da água é
+  // a mesma do card: o maior entre a chave da Saúde e a da Rotina.
+  const { get: lerDado } = useUserData();
+  const hoje = todayStr();
+  const metaAgua = Math.min(20, Math.max(1, Math.round(Number(lerDado<number>("core-saude-water-goal", 8)) || 8)));
+  const coposHoje = Math.max(
+    Number(lerDado<Record<string, number>>("core-saude-water", {})?.[hoje]) || 0,
+    Number(lerDado<Record<string, number>>("water-log", {})?.[hoje]) || 0,
+  );
+  const suplementos = comoLista<{ id: string }>(lerDado("core-saude-supplements", []));
+  const tomadosHoje = comoLista<string>(lerDado<Record<string, string[]>>("core-saude-supplement-log", {})?.[hoje]).filter(id => suplementos.some(s => s?.id === id)).length;
+  const remediosPendentes = Math.max(0, suplementos.length - tomadosHoje);
+  const proximaConsulta = comoLista<{ doctor?: string; specialty?: string; date?: string }>(lerDado("core-saude-appointments", []))
+    .map(c => ({ quem: c?.specialty || c?.doctor || "", dias: diasAte(c?.date ?? "") }))
+    .filter(c => Number.isFinite(c.dias) && c.dias >= 0)
+    .sort((a, b) => a.dias - b.dias)[0];
+  const itensDoResumo = [
+    { rotulo: "Água", valor: coposHoje ? `${coposHoje}/${metaAgua}` : null, sub: "copos", tom: coposHoje >= metaAgua ? "ok" as const : "atencao" as const, onClick: () => setActiveTab("hoje") },
+    { rotulo: "Remédios", valor: suplementos.length ? (remediosPendentes ? `${remediosPendentes} pendentes` : "Todos ✓") : null, tom: remediosPendentes ? "atencao" as const : "ok" as const, onClick: () => setActiveTab("hoje") },
+    { rotulo: "Próx. consulta", valor: proximaConsulta ? rotuloEmDias(proximaConsulta.dias) : null, sub: proximaConsulta?.quem, tom: proximaConsulta && proximaConsulta.dias <= 3 ? "atencao" as const : "neutro" as const, onClick: () => setActiveTab("log") },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,6 +98,7 @@ const Saude = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
+        <ResumoDoModulo itens={itensDoResumo} vazio="Registre o primeiro copo de água de hoje" />
         <ModuleTip
           moduleId="saude"
           tips={[

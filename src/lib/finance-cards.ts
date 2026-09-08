@@ -58,6 +58,19 @@ const NEUTRO = "bg-gray-500/15 text-gray-700 dark:text-gray-300";
 export const CUSTOM_CARDS_KEY = "finance-custom-cards";
 export const MAX_CUSTOM_CARDS = 20;
 
+/**
+ * FECHAMENTO E VENCIMENTO POR CARTÃO (07/09) — avaliação 4★: "seria
+ * interessante ter como adicionar a data de vencimento do cartão de crédito".
+ * Chave PRÓPRIA (`value` do cartão → {closingDay, dueDay}), e não um campo
+ * dentro de CustomCard, porque as 11 bandeiras padrão não têm registro
+ * gravado nenhum — e é justamente Nubank/Itaú que a maioria quer configurar.
+ * Ausente = cartão sem fatura (comportamento de sempre). A regra do que
+ * muda com isso mora em lib/finance-fatura.ts.
+ */
+export const CARD_CONFIG_KEY = "finance-card-config";
+export type CardConfig = { closingDay?: number; dueDay?: number };
+const SEM_CONFIG: Record<string, CardConfig> = {};
+
 /** `value` é um id estável — o rename NÃO mexe nele, então gasto/parcela já
  *  lançados seguem resolvendo pro nome novo. `archived` = some do seletor mas
  *  continua resolvendo rótulo/cor do que já foi lançado (nada se perde). */
@@ -90,6 +103,28 @@ export function useFinanceCards() {
   const custom = get<CustomCard[]>(CUSTOM_CARDS_KEY, VAZIO);
   const list = useMemo(() => (Array.isArray(custom) ? custom : VAZIO), [custom]);
   const setCustom = (next: CustomCard[]) => setData(CUSTOM_CARDS_KEY, next);
+
+  const configBruta = get<Record<string, CardConfig>>(CARD_CONFIG_KEY, SEM_CONFIG);
+  const config = useMemo(
+    () => (configBruta && typeof configBruta === "object" && !Array.isArray(configBruta) ? configBruta : SEM_CONFIG),
+    [configBruta],
+  );
+  /** Fechamento/vencimento do cartão, ou undefined (sem fatura). */
+  const configOf = (value: string): CardConfig | undefined => {
+    const c = config[value];
+    return c && (Number.isInteger(c.closingDay) || Number.isInteger(c.dueDay)) ? c : undefined;
+  };
+  /** Grava fechamento/vencimento; dia fora de 1–31 vira "sem". Os dois
+   *  vazios apagam a entrada — cartão volta a não ter fatura. */
+  const setConfig = (value: string, cfg: CardConfig) => {
+    const dia = (d: unknown) => (Number.isInteger(d) && (d as number) >= 1 && (d as number) <= 31 ? (d as number) : undefined);
+    const limpo: CardConfig = {};
+    const fecha = dia(cfg.closingDay); if (fecha) limpo.closingDay = fecha;
+    const vence = dia(cfg.dueDay); if (vence) limpo.dueDay = vence;
+    const next = { ...config };
+    if (fecha || vence) next[value] = limpo; else delete next[value];
+    setData(CARD_CONFIG_KEY, next);
+  };
 
   // ATIVOS aparecem no seletor; ARQUIVADOS só resolvem rótulo/cor do histórico
   const ativos = useMemo(() => list.filter((c) => !c.archived).map(customToCard), [list]);
@@ -141,5 +176,5 @@ export function useFinanceCards() {
   // cor que o PRÓXIMO cartão criado vai ganhar (pré-visualização no diálogo)
   const nextPalette = CARD_PALETTE[list.length % CARD_PALETTE.length];
 
-  return { cards, custom: ativos, byValue, labelOf, styleOf, addCustom, renameCustom, removeCustom, nextPalette };
+  return { cards, custom: ativos, byValue, labelOf, styleOf, addCustom, renameCustom, removeCustom, nextPalette, configOf, setConfig };
 }

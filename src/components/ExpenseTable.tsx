@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { numeroBR } from "@/lib/data-normalizers";
 import { localDayKey } from "@/lib/utils";
-import { Plus, Trash2, ChevronDown, Check, X, CreditCard } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Check, X, CreditCard, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,10 @@ import { CardSelect } from "@/components/finance/CardSelect";
 import { useFinanceCategories } from "@/lib/finance-categories";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { NOVO_PARCELAMENTO_EVENT, type Installment, type NovoParcelamentoDetalhe } from "@/components/InstallmentTracker";
+import { NOVO_CUSTO_FIXO_EVENT, type FixedExpense, type NovoCustoFixoDetalhe } from "@/components/FixedExpensesTable";
+import { mesDoGasto } from "@/lib/finance-fatura";
+import { mesesEntre, nomeDoMes } from "@/lib/finance-parcelas";
+import { mesCorrenteId } from "@/lib/virada-contas";
 
 interface Expense {
   id: string;
@@ -40,6 +44,9 @@ interface ExpenseTableProps {
    * arquivado (MonthlySheet) não passa nada e nada acontece lá.
    */
   onPrimeiroGasto?: (gasto: GastoLancado) => void;
+  /** "YYYY-MM" da chave que esta tabela edita. Ausente = mês corrente. Serve
+   *  pro selo "fatura de out." (lib/finance-fatura). */
+  mes?: string;
 }
 
 const paymentMethods = [
@@ -58,9 +65,10 @@ const isCardPayment = (method: string) => method === "credito" || method === "de
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: ExpenseTableProps) => {
+export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: ExpenseTableProps) => {
   const { labelOf: getCategoryLabel, styleOf: getCategoryStyle } = useFinanceCategories();
-  const { labelOf: getCardLabel, styleOf: getCardStyle } = useFinanceCards();
+  const { labelOf: getCardLabel, styleOf: getCardStyle, configOf } = useFinanceCards();
+  const mesDaChave = mes ?? mesCorrenteId();
   const [newExpense, setNewExpense] = useState({
     description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
   });
@@ -91,6 +99,50 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
       : null;
 
   const limparForm = () => setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
+
+  /**
+   * "REPETE TODO MÊS" (07/09) — avaliação 4★ da Play: "as contas recorrentes.
+   * Não consegui fazer". O recurso existia (custo fixo com Dia → conta do mês
+   * com ✓ de paga), mas nenhuma tela dizia "recorrente" e quem lança um gasto
+   * pensa "isso repete", não "isso é fixo". O toggle fica ao lado do
+   * "Parcelar", visível sem abrir nada — pelo mesmo motivo dele. O que se
+   * cria é UM custo fixo comum (mesmo formato que o FixedExpensesTable grava),
+   * entregue por evento pra quem é dono da chave certa.
+   */
+  const [repetindo, setRepetindo] = useState(false);
+  const [diaRepete, setDiaRepete] = useState("");
+
+  const lancarRecorrente = (valor: number) => {
+    if (!Number.isFinite(valor) || valor <= 0) { toast.error("Informe o valor."); return; }
+    // sem Dia digitado, usa o dia da data da compra (ou de hoje): é o que faz
+    // a conta aparecer no MEU MÊS pra marcar como paga
+    const dataRef = newExpense.date || localDayKey();
+    const diaDigitado = parseInt(diaRepete, 10);
+    const dia = Number.isInteger(diaDigitado) && diaDigitado >= 1 && diaDigitado <= 31
+      ? diaDigitado
+      : Math.min(31, Math.max(1, Number(dataRef.slice(8, 10)) || 1));
+    const fixo: FixedExpense = {
+      id: Date.now().toString(),
+      description: newExpense.description.trim(),
+      category: newExpense.category || "outros",
+      value: valor,
+      paymentMethod: newExpense.paymentMethod || "boleto",
+      cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+      day: dia,
+    };
+    const detalhe: NovoCustoFixoDetalhe = { fixo, handled: false };
+    window.dispatchEvent(new CustomEvent(NOVO_CUSTO_FIXO_EVENT, { detail: detalhe }));
+    if (!detalhe.handled) {
+      toast.error("Não consegui criar a conta recorrente agora.", { description: "Use o card CUSTOS FIXOS, logo acima." });
+      return;
+    }
+    toast.success(`${fixo.description} repete todo mês, dia ${dia}`, {
+      description: "Está em CUSTOS FIXOS e aparece no MEU MÊS pra marcar como paga.",
+    });
+    limparForm();
+    setDiaRepete("");
+    setRepetindo(false);
+  };
 
   const lancarParcelamento = (total: number) => {
     if (!Number.isFinite(total) || total <= 0) { toast.error("Informe o valor TOTAL da compra."); return; }
@@ -131,8 +183,10 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
 
   const addExpense = () => {
     if (newExpense.description && newExpense.value) {
-      // mesma tecla, dois destinos: parcelado vira dívida, à vista vira gasto
+      // mesma tecla, três destinos: parcelado vira dívida, recorrente vira
+      // custo fixo, à vista vira gasto
       if (parcelando) { lancarParcelamento(numeroBR(newExpense.value)); return; }
+      if (repetindo) { lancarRecorrente(numeroBR(newExpense.value)); return; }
       const eraVazia = expenses.length === 0;
       const novo: Expense = {
         id: Date.now().toString(),
@@ -204,6 +258,13 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
 
   const total = expenses.reduce((sum, e) => sum + e.value, 0);
 
+  /* Compra no crédito depois do fechamento do cartão pertence à fatura do
+     mês seguinte (lib/finance-fatura): continua listada aqui, com selo, mas
+     sai do "despesas do mês" e entra no próximo. */
+  const mesDaFaturaDe = (e: Expense) => mesDoGasto(e, configOf, mesDaChave);
+  const adiado = (e: Expense) => mesesEntre(mesDaChave, mesDaFaturaDe(e)) > 0;
+  const totalAdiado = expenses.reduce((s, e) => s + (adiado(e) ? e.value : 0), 0);
+
   return (
     <div className="bg-card rounded-lg overflow-hidden border border-border animate-fade-in">
       <div className="bg-income py-2 px-4">
@@ -249,19 +310,59 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
             <ChevronDown className={`w-3 h-3 transition-transform ${showMore ? "rotate-180" : ""}`} />
             {showMore ? "Menos opções" : "Mais opções (categoria, data, pagamento)"}
           </button>
-          <button
-            onClick={() => setParcelando((p) => !p)}
-            aria-pressed={parcelando}
-            className={`h-9 px-3 flex-shrink-0 rounded-full text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
-              parcelando
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <CreditCard className="w-3.5 h-3.5" />
-            {parcelando ? "Parcelado" : "Parcelar"}
-          </button>
+          <div className="flex items-center gap-1.5">
+            {/* Os dois modos são excludentes: ligar um desliga o outro. */}
+            <button
+              onClick={() => { setRepetindo((r) => !r); setParcelando(false); }}
+              aria-pressed={repetindo}
+              aria-label="Repete todo mês (conta recorrente)"
+              className={`h-9 px-3 flex-shrink-0 rounded-full text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
+                repetindo
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Repeat className="w-3.5 h-3.5" />
+              {repetindo ? "Repete todo mês" : "Repetir"}
+            </button>
+            <button
+              onClick={() => { setParcelando((p) => !p); setRepetindo(false); }}
+              aria-pressed={parcelando}
+              className={`h-9 px-3 flex-shrink-0 rounded-full text-[11px] font-semibold flex items-center gap-1.5 border transition-colors ${
+                parcelando
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              {parcelando ? "Parcelado" : "Parcelar"}
+            </button>
+          </div>
         </div>
+
+        {repetindo && (
+          <div className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                Vence dia
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={31}
+                  placeholder="Ex: 10"
+                  aria-label="Dia em que a conta recorrente vence"
+                  value={diaRepete}
+                  onChange={(e) => setDiaRepete(e.target.value)}
+                  className="h-9 w-20 text-xs"
+                />
+              </label>
+              <p className="text-[10px] text-muted-foreground flex-1">
+                Conta recorrente: vai pra <strong className="text-foreground">CUSTOS FIXOS</strong>, repete todo mês e aparece no <strong className="text-foreground">MEU MÊS</strong> pra marcar como paga.
+              </p>
+            </div>
+          </div>
+        )}
 
         {parcelando && (
           <div className="rounded-lg border border-primary/30 bg-primary/[0.04] p-2.5 space-y-2">
@@ -425,6 +526,11 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
                           <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
                         </>
                       )}
+                      {adiado(expense) && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 font-semibold" title="Compra depois do fechamento: conta nas despesas do mês da fatura">
+                          fatura de {nomeDoMes(mesDaFaturaDe(expense), true)}.
+                        </span>
+                      )}
                     </div>
                   </div>
                   <span className="text-sm tabular-nums font-medium whitespace-nowrap">
@@ -445,6 +551,12 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto }: Expense
         <span className="text-xs text-muted-foreground">TOTAL</span>
         <span className="text-sm font-bold tabular-nums">R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
+      {totalAdiado > 0 && (
+        <div className="px-3 pb-2 -mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+          <span>desses, na fatura do mês que vem</span>
+          <span className="tabular-nums">R$ {brl(totalAdiado)}</span>
+        </div>
+      )}
     </div>
   );
 };

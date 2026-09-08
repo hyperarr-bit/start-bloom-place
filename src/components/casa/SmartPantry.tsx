@@ -32,7 +32,8 @@ const SmartPantry = () => {
     if (status === "acabou") {
       const item = pantry.find(p => p.id === id);
       if (item) {
-        setShopping(prev => [...prev, { id: Date.now().toString(), name: item.name, checked: false, fromPantry: true }]);
+        // guarda a categoria de origem pra devolver o item ao lugar certo
+        setShopping(prev => [...prev, { id: Date.now().toString(), name: item.name, checked: false, fromPantry: true, origemCategory: item.category }]);
       }
       setPantry(prev => prev.filter(p => p.id !== id));
     } else {
@@ -43,7 +44,12 @@ const SmartPantry = () => {
   const checkShoppingItem = (id: string) => {
     const item = shopping.find(s => s.id === id);
     if (item && !item.checked && item.fromPantry) {
-      setPantry(prev => [...prev, { id: Date.now().toString(), name: item.name, category: "armario", status: "cheio" }]);
+      /* Volta pra categoria de ONDE SAIU (07/09, avaliação: "os itens voltam
+         todos para o armário"). Leite comprado ia pro armário e a pessoa
+         tinha que apagar e recadastrar na geladeira. "armario" só como
+         fallback pra item que entrou na lista antes de existir a origem. */
+      const category: PantryItem["category"] = item.origemCategory ?? "armario";
+      setPantry(prev => [...prev, { id: Date.now().toString(), name: item.name, category, status: "cheio" }]);
     }
     setShopping(prev => prev.map(s => s.id === id ? { ...s, checked: !s.checked } : s));
   };
@@ -130,7 +136,7 @@ const SmartPantry = () => {
           <div className="bg-emerald-50 dark:bg-emerald-950/30 p-2 space-y-1.5">
             {shopping.map(item => (
               <div key={item.id} className={`flex items-center gap-2 p-2 rounded-lg border ${item.checked ? "bg-green-500/10 border-green-500/20" : "bg-background/50 border-border"}`}>
-                <button onClick={() => checkShoppingItem(item.id)}
+                <button onClick={() => checkShoppingItem(item.id)} aria-label={`${item.checked ? "Desmarcar" : "Comprei"} ${item.name}`}
                   className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${item.checked ? "bg-green-500 border-green-500" : "border-muted-foreground/30"}`}>
                   {item.checked && <Check className="w-3 h-3 text-white" />}
                 </button>

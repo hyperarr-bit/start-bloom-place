@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, BellOff, BookOpen, CalendarCheck, Dumbbell, Receipt, Salad, Sparkles } from "lucide-react";
+import { ArrowLeft, BellOff, BookOpen, CalendarCheck, Dumbbell, Pill, Receipt, Salad, Sparkles } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { isNativeShell } from "@/lib/native-shell";
 import { estadoPermissao, listarAgendados, pedirPermissao, type EstadoPermissao, type TipoDeLembrete } from "@/lib/notificacoes";
 import { CHAVE_PREFS, lerPrefs, rotuloHora, type PrefsNotificacoes } from "@/lib/prefs-notificacoes";
+import { CHAVE_REMEDIOS_LIGADO, type Leitor } from "@/lib/reagendar";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -41,8 +42,10 @@ const Notificacoes = () => {
   // estável por ambiente. Reverter quando houver push web.
   if (!isNativeShell()) return <Navigate to="/home" replace />;
   const navigate = useNavigate();
-  const { get } = useUserData();
+  const { get, set } = useUserData();
   const [prefs, setPrefs] = usePersistedState<PrefsNotificacoes>(CHAVE_PREFS, lerPrefs(undefined));
+  // remédios (07/09): chave própria, nasce ligado — ver CHAVE_REMEDIOS_LIGADO
+  const remediosLigado = get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false;
   const [permissao, setPermissao] = useState<EstadoPermissao | null>(null);
   const [agendados, setAgendados] = useState<Partial<Record<TipoDeLembrete, number>>>({});
 
@@ -102,6 +105,26 @@ const Notificacoes = () => {
       if (!ok) return; // negou: não finge que ligou
     }
     await aplicar({ [campo]: valor });
+  };
+
+  /** Remédios não passam pelo `aplicar` das prefs: a chave é outra, e o `get`
+   *  deste render ainda não enxerga a escrita — o leitor sobreposto entrega o
+   *  valor novo ao reagendador sem esperar o próximo render. */
+  const alternarRemedios = async (valor: boolean) => {
+    trackEvent("notif_pref", { campo: "remedios", valor });
+    if (valor && permissao === "prompt") {
+      const ok = await pedirPermissao();
+      setPermissao(ok ? "granted" : "denied");
+      if (!ok) return;
+    }
+    set(CHAVE_REMEDIOS_LIGADO, valor);
+    const leitor: Leitor = (k, fb) => (k === CHAVE_REMEDIOS_LIGADO ? (valor as unknown as typeof fb) : get(k, fb));
+    filaRef.current = filaRef.current.then(async () => {
+      const { reagendarTudo } = await import("@/lib/reagendar");
+      await reagendarTudo(leitor, prefsRef.current);
+      await atualizarEstado();
+    });
+    await filaRef.current;
   };
 
   const rodapeDe = (tipo: TipoDeLembrete, ligado: boolean, vazio: string) => {
@@ -164,6 +187,15 @@ const Notificacoes = () => {
           ligado={p.retrospectiva}
           onChange={(v) => void alternar("retrospectiva", v)}
           rodape={rodapeDe("retrospectiva", p.retrospectiva, "Agenda no próximo dia 1º")}
+        />
+
+        <LinhaAviso
+          icone={<Pill className="w-4 h-4" />}
+          titulo="Hora do remédio"
+          descricao="Na hora que você cadastrou em Saúde, remédio por remédio. Já marcou como tomado? O aviso de hoje não vem."
+          ligado={remediosLigado}
+          onChange={(v) => void alternarRemedios(v)}
+          rodape={rodapeDe("saude", remediosLigado, "Cadastre um remédio com horário em Saúde")}
         />
 
         <div className="pt-4 pb-1 px-1">

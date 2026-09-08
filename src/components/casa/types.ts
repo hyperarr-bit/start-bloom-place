@@ -21,6 +21,11 @@ export interface ShoppingItem {
   name: string;
   checked: boolean;
   fromPantry: boolean;
+  /** De onde o item saiu da despensa quando "acabou" (07/09, avaliação da
+   *  Play: "os itens voltam todos para o armário, poderia voltar o item
+   *  para o local onde foi colocado inicial"). Opcional: item que já estava
+   *  na lista antes disto não tem — e volta pro armário como sempre voltou. */
+  origemCategory?: PantryItem["category"];
 }
 
 export interface Recipe {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { numeroBR } from "@/lib/data-normalizers";
 import { Plus, Trash2, ChevronDown, Check, X, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
  */
 type QuemPaga = "eu" | "outro" | "ambos";
 
-interface FixedExpense {
+export interface FixedExpense {
   id: string;
   description: string;
   category: string;
@@ -43,6 +43,20 @@ interface FixedExpensesTableProps {
   expenses: FixedExpense[];
   setExpenses: (expenses: FixedExpense[]) => void;
 }
+
+/**
+ * PONTE DA CONTA RECORRENTE (07/09) — avaliação 4★ da Play: "as contas
+ * recorrentes. Não consegui fazer". Elas sempre existiram: são os CUSTOS
+ * FIXOS com "Dia", que viram conta do mês (finance-sync) com ✓ de paga no
+ * MEU MÊS. Só que a palavra "recorrente" não aparecia em lugar nenhum, e
+ * quem lança um gasto pensa "isso repete todo mês", não "isso é custo fixo".
+ * O ExpenseTable ganhou o toggle "Repete todo mês" e manda o item pra CÁ,
+ * pelo mesmo mecanismo do parcelamento (NOVO_PARCELAMENTO_EVENT): quem está
+ * montado é o dono da chave certa (`finance-fixed-expenses` ou a do mês da
+ * planilha) e o `usePersistedState` do pai só enxerga escrita feita por ele.
+ */
+export const NOVO_CUSTO_FIXO_EVENT = "core:novo-custo-fixo";
+export type NovoCustoFixoDetalhe = { fixo: FixedExpense; handled: boolean };
 
 const paymentMethods = [
   { value: "pix", label: "Pix" },
@@ -66,6 +80,18 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
     description: "", category: "", value: "", paymentMethod: "", cardName: "", day: "",
   });
   const [showMore, setShowMore] = useState(expenses.length === 0);
+
+  // Recebe a conta recorrente criada no "+ Novo gasto" (ver NOVO_CUSTO_FIXO_EVENT).
+  useEffect(() => {
+    const onNovo = (e: Event) => {
+      const detalhe = (e as CustomEvent<NovoCustoFixoDetalhe>).detail;
+      if (!detalhe?.fixo) return;
+      detalhe.handled = true;
+      setExpenses([...expenses, detalhe.fixo]);
+    };
+    window.addEventListener(NOVO_CUSTO_FIXO_EVENT, onNovo);
+    return () => window.removeEventListener(NOVO_CUSTO_FIXO_EVENT, onNovo);
+  }, [expenses, setExpenses]);
 
   const addExpense = () => {
     if (!newExpense.description && !newExpense.value) {
@@ -196,6 +222,12 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
           Dividir
         </button>
       </div>
+      {/* Dizer com todas as letras o que este card é (07/09): "as contas
+          recorrentes. Não consegui fazer" — estavam aqui o tempo todo, com
+          outro nome. */}
+      <p className="px-4 py-1.5 text-[10px] text-muted-foreground border-b border-border/60">
+        contas recorrentes · repetem todo mês · com o <strong>Dia</strong> preenchido, marque como paga em Contas do mês
+      </p>
 
       {/* Nome de quem divide. Fica aqui em cima porque é o que dá sentido a
           todo selo que aparece na lista abaixo. */}
@@ -274,7 +306,8 @@ export const FixedExpensesTable = ({ expenses, setExpenses }: FixedExpensesTable
             min={1}
             max={31}
             placeholder="Dia"
-            title="Dia do vencimento (opcional) — aparece no calendário Meu Mês"
+            aria-label="Dia do vencimento"
+            title="Dia do vencimento (opcional) — vira conta do mês, com ✓ de paga no Meu Mês"
             value={newExpense.day}
             onChange={(e) => setNewExpense({ ...newExpense, day: e.target.value })}
             className="h-9 text-xs w-14 text-right"

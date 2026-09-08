@@ -8,10 +8,19 @@ import {
   aplicarViradaDeContas,
   viradaDeContas,
   temContas,
+  mesCorrenteId,
   CHAVE_CARIMBO_CONTAS,
   CHAVE_CONTAS,
   type DiaDeContas,
 } from "@/lib/virada-contas";
+import {
+  viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, type Parcela,
+} from "@/lib/finance-parcelas";
+
+/** Balde corrente das parcelas — a mesma chave de sempre, sem renomear. */
+const CHAVE_PARCELAS = "finance-installments";
+/** Até onde olhar pra trás por parcela nascida em planilha de mês antigo. */
+const MESES_DE_PARCELAS = 24;
 
 /**
  * Aplica a separação por mês assim que os dados carregam (01/08).
@@ -102,7 +111,10 @@ export const useViradaDoMes = () => {
     // à virada — ver lib/virada-contas.ts.
     const contas = (readMonthData(uid, CHAVE_CONTAS) ??
       get<DiaDeContas[]>(CHAVE_CONTAS, [])) as DiaDeContas[];
-    if (carregados.every((itens) => itens.length === 0) && !temContas(contas)) return;
+    // As parcelas entram na mesma espera (07/09): balde vazio + contas vazias
+    // + lançamentos vazios = ainda não há o que olhar.
+    const parcelas = lerBalde(CHAVE_PARCELAS) as unknown as Parcela[];
+    if (carregados.every((itens) => itens.length === 0) && !temContas(contas) && parcelas.length === 0) return;
     feitoPara.current = quem;
 
     for (let i = 0; i < BALDES.length; i++) {
@@ -148,6 +160,45 @@ export const useViradaDoMes = () => {
         gravarContas: (zeradas) => set(CHAVE_CONTAS, zeradas, { system: true }),
       });
       if (r.zerou) trackEvent("virada_mes_zerou_contas", { arquivou: r.arquivou ? 1 : 0 });
+    }
+
+    /*
+     * PARCELAS: "k de N" avança sozinho na virada (07/09).
+     *
+     * Avaliações da Play (set/2026): "não é repetida para os próximos meses
+     * até finalizar" / "não atualiza para o próximo mês, tendo que adicionar
+     * novamente". A regra toda mora em lib/finance-parcelas: registro do
+     * balde carimbado com mês anterior deixa um RETRATO na chave daquele mês
+     * e avança no próprio balde; parcela nascida dentro da planilha de um
+     * mês antigo é trazida pro balde uma única vez (marca `levada`).
+     *
+     * Roda AQUI, e não na tela de Finanças, pelo mesmo motivo dos outros
+     * baldes: `set` de sistema não dispara ativação nem degrau do teste
+     * grátis (`/finance-installments/` é gatilho de first_installment) — uma
+     * escrita de boot pela tela contaria como gesto da pessoa. A tela ainda
+     * recalcula a projeção ao renderizar (pura), pro caso de já estar
+     * montada quando isto roda.
+     */
+    const agora = mesCorrenteId(hoje);
+    const fontes = [agora, ...mesesAnteriores(agora, MESES_DE_PARCELAS)].map((mes) => ({
+      mes,
+      chave: chaveArquivadaDeParcelas(mes),
+      itens: lerBalde(chaveArquivadaDeParcelas(mes)) as unknown as Parcela[],
+    }));
+    const vp = viradaDeParcelas(parcelas, agora, fontes);
+    if (vp) {
+      for (const [mes, retratos] of Object.entries(vp.arquivos)) {
+        const chave = chaveArquivadaDeParcelas(mes);
+        set(chave, mesclarSemDuplicar(lerBalde(chave), retratos as unknown as Lancamento[]), { system: true });
+      }
+      for (const [mes, itens] of Object.entries(vp.fontesAtualizadas)) {
+        set(chaveArquivadaDeParcelas(mes), itens, { system: true });
+      }
+      set(CHAVE_PARCELAS, vp.lista, { system: true });
+      trackEvent("virada_mes_parcelas", {
+        avancadas: vp.lista.length,
+        retratos: Object.values(vp.arquivos).reduce((s, l) => s + l.length, 0),
+      });
     }
   }, [loaded, user?.id, get, set]);
 };

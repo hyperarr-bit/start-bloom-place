@@ -49,7 +49,33 @@ export interface BlocoDeFasesProps {
   vazioFases?: string;
   /** Placeholder do campo de nova tarefa. */
   placeholderTarefa?: string;
+  /** Chave da anotação livre de cada mês (ex.: "rotina-month-notes"). Sem
+   *  ela, o fechamento do mês fica só com os números — é o que a Carreira
+   *  sempre teve. */
+  chaveNotaMes?: string;
 }
+
+/* ANOTAÇÃO DO MÊS (07/09) — a segunda metade do pedido da 5★ de 01/09:
+ * "...acompanhar a evolução diária também de ANOTAÇÕES DE COMO FOI O MÊS
+ *  baseado no que marcamos com o toque do lápis para reorganizarmos".
+ * O memorando do lápis é por fase e não tem data; o que faltava era um lugar
+ * pra escrever, olhando os totais, "esse mês foi assim". Uma nota por mês
+ * (chave YYYY-MM), com a navegação do próprio fechamento — a nota de julho
+ * continua lá quando a pessoa volta pra comparar.
+ * Componente separado pra só criar o estado persistido quando a chave vem. */
+const NotaDoMes = ({ chave, mes }: { chave: string; mes: string }) => {
+  const [notas, setNotas] = usePersistedState<Record<string, string>>(chave, {});
+  const texto = typeof notas?.[mes] === "string" ? notas[mes] : "";
+  return (
+    <Textarea
+      aria-label="Como foi o mês"
+      placeholder="Como foi o mês? O que reorganizar pro próximo..."
+      value={texto}
+      className="text-xs min-h-[64px] bg-card"
+      onChange={e => setNotas(prev => ({ ...(prev ?? {}), [mes]: e.target.value }))}
+    />
+  );
+};
 
 export const BlocoDeFases = ({
   chaveFases,
@@ -58,6 +84,7 @@ export const BlocoDeFases = ({
   tituloFases = "🔁 FASES DE HOJE",
   vazioFases = "Crie as fases do seu dia — cada uma vira um contador.",
   placeholderTarefa = "Nova tarefa...",
+  chaveNotaMes,
 }: BlocoDeFasesProps) => {
   const [phases, setPhases] = usePersistedState<Fase[]>(chaveFases, fasesPadrao);
   const [tasks, setTasks] = usePersistedState<TarefaDoDia[]>(chaveTarefas, []);
@@ -260,6 +287,7 @@ export const BlocoDeFases = ({
             <span className="text-xs text-muted-foreground">Tarefas concluídas</span>
             <span className="text-sm font-bold tabular-nums">{tarefasDoMes}</span>
           </div>
+          {chaveNotaMes && <NotaDoMes chave={chaveNotaMes} mes={prefixoMes} />}
         </div>
       </div>
     </div>

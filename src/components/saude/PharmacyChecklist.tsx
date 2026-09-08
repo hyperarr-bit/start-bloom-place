@@ -3,7 +3,13 @@ import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
+import { isNativeShell } from "@/lib/native-shell";
+import { pedirPermissao, temPermissao } from "@/lib/notificacoes";
+import { CHAVE_PREFS, lerPrefs } from "@/lib/prefs-notificacoes";
+import { reagendarTudo, type Leitor } from "@/lib/reagendar";
+import { trackEvent } from "@/lib/analytics";
 
 interface Supplement {
   id: string;
@@ -28,6 +34,7 @@ const nameColors = [
 
 export const PharmacyChecklist = () => {
   const today = todayStr();
+  const { get } = useUserData();
   const [supplements, setSupplements] = usePersistedState<Supplement[]>("core-saude-supplements", []);
   const [supplementLog, setSupplementLog] = usePersistedState<Record<string, string[]>>("core-saude-supplement-log", {});
   const [newName, setNewName] = useState("");
@@ -45,14 +52,49 @@ export const PharmacyChecklist = () => {
     }
   };
 
+  /* Notificação na hora do remédio (07/09, avaliação da Play: "adicionem
+     notificação pra tomar remédio"). A permissão do Android é pedida AQUI, no
+     cadastro — o momento em que a pessoa acabou de dizer "me lembra às 8h" —
+     e não na abertura do app: no Android 13+ a recusa é definitiva, então a
+     única chance é gasta quando faz sentido (mesma regra do PedirLembreteRotina).
+     Se já foi negada, pedirPermissao devolve false sem incomodar.
+
+     O useLembretes reagenda sozinho a cada mudança de dado, mas ele roda no
+     render seguinte — ANTES da permissão chegar no primeiro cadastro. Por isso
+     o reagendamento explícito aqui, com um leitor que já enxerga a lista nova
+     (o `get` deste render ainda tem a lista antiga). */
+  const rearmarLembretes = async (lista: Supplement[], pedir: boolean) => {
+    if (!isNativeShell()) return;
+    if (pedir) {
+      const ok = await pedirPermissao();
+      trackEvent("lembrete_remedio_permissao", { concedida: ok, total: lista.length });
+      if (!ok) return;
+    } else if (!(await temPermissao())) return;
+    const leitor: Leitor = (k, fb) => (k === "core-saude-supplements" ? (lista as unknown as typeof fb) : get(k, fb));
+    try { await reagendarTudo(leitor, lerPrefs(get<unknown>(CHAVE_PREFS, undefined))); } catch { /* sem plugin */ }
+  };
+
   const addSupplement = () => {
     if (!newName.trim()) return;
-    setSupplements(prev => [...prev, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock: 30, dosesPerDay: 1 }]);
+    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock: 30, dosesPerDay: 1 }];
+    setSupplements(lista);
     setNewName("");
+    void rearmarLembretes(lista, true);
   };
 
   const removeSupplement = (id: string) => {
-    setSupplements(prev => prev.filter(s => s.id !== id));
+    const lista = supplements.filter(s => s.id !== id);
+    setSupplements(lista);
+    void rearmarLembretes(lista, false); // cancela o aviso do que foi apagado
+  };
+
+  /** Horário editável na própria linha — antes era só texto, e mudar de 8h
+   *  pra 20h exigia apagar e recadastrar (perdendo o estoque). */
+  const changeTime = (id: string, time: string) => {
+    if (!time) return;
+    const lista = supplements.map(s => s.id === id ? { ...s, time } : s);
+    setSupplements(lista);
+    void rearmarLembretes(lista, false);
   };
 
   return (
@@ -104,7 +146,15 @@ export const PharmacyChecklist = () => {
                           {s.name}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{s.time}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        <input
+                          type="time"
+                          value={s.time}
+                          aria-label={`Horário de ${s.name}`}
+                          onChange={e => changeTime(s.id, e.target.value)}
+                          className="bg-transparent text-xs text-muted-foreground w-[4.5rem] focus:outline-none focus:text-foreground"
+                        />
+                      </td>
                       <td className="px-4 py-3">
                         {lowStock ? (
                           <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--saude-yellow))] font-semibold">

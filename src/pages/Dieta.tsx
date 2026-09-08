@@ -48,6 +48,31 @@ const defaultMealColors: Record<string, string> = {
 };
 const availableMeals = ["Café da Manhã", "Almoço", "Lanche", "Janta", "Pré-Treino", "Pós-Treino", "Ceia", "Café da Tarde"];
 
+/* =========================== CALORIAS (07/09) ===========================
+ * Avaliação da Play: "na aba dieta n tem como colocar as calorias dos pratos".
+ * As kcal vivem numa chave PARALELA à `saude-meals`, com o mesmo shape
+ * (dia → refeição → kcal), em vez de trocar o valor da refeição de string pra
+ * objeto: `saude-meals` passa por normalizador e é lida pelo QuickActions da
+ * Home, pela lista inteligente e pelo diário — mudar o formato dela era
+ * quebrar quatro leitores pra ganhar um campo. Dado antigo segue intacto.
+ * As duas somas são exportadas pra teste e pra Home e Dieta fazerem a MESMA conta. */
+export const CHAVE_KCAL = "saude-meals-kcal";
+
+/** Soma das kcal planejadas de um dia do cardápio (valor torto conta 0). */
+export const kcalDoPlano = (dia?: Record<string, unknown> | null) =>
+  Object.values(dia ?? {}).reduce<number>((s, v) => s + (Number(v) > 0 ? Number(v) : 0), 0);
+
+/** Soma do que a Home registrou no dia (`core-dieta-log`) — a mesma conta do
+ *  widget de calorias (use-life-hub-data), pra os dois números baterem. */
+export const kcalRegistradas = (log?: Record<string, { calories?: unknown }> | null) =>
+  Object.values(log ?? {}).reduce<number>((s, m) => s + (Number(m?.calories) || 0), 0);
+
+/** Aceita "350", "350,5", " 350 kcal" — e devolve 0 pra qualquer lixo. */
+export const lerKcal = (texto: string) => {
+  const n = Math.round(Number(String(texto ?? "").replace(",", ".").replace(/[^\d.]/g, "")));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
+
 /* =========================== RECEITAS: CATEGORIAS ===========================
  * FONTE ÚNICA. Antes a lista de categorias vivia em QUATRO lugares — os chips
  * de filtro, o <Select> do formulário, o mapa de cor da borda do formulário e
@@ -316,6 +341,11 @@ const Dieta = () => {
   const [mealPlan, setMealPlan] = usePersistedState("saude-meals", presetMealPlan);
   const [editingMeal, setEditingMeal] = useState<string | null>(null);
   const [editMealValue, setEditMealValue] = useState("");
+  // kcal por refeição — ver CALORIAS (07/09) no topo do arquivo
+  const [mealKcal, setMealKcal] = usePersistedState<Record<string, Record<string, number>>>(CHAVE_KCAL, {});
+  const [editMealKcal, setEditMealKcal] = useState("");
+  // o que a Home registrou hoje (widget e ação rápida): entra no total do dia
+  const [dietaLog] = usePersistedState<Record<string, Record<string, { calories?: number }>>>("core-dieta-log", {});
 
   // FASTING
   const [fastingGoal, setFastingGoal] = usePersistedState("saude-fast-goal", 16);
@@ -396,8 +426,22 @@ const Dieta = () => {
     return () => clearInterval(interval);
   }, [fastingStart]);
 
-  const startEditMeal = (day: string, meal: string) => { setEditingMeal(`${day}-${meal}`); setEditMealValue(mealPlan[day]?.[meal] || ""); };
-  const saveMeal = (day: string, meal: string) => { setMealPlan({ ...mealPlan, [day]: { ...mealPlan[day], [meal]: editMealValue } }); setEditingMeal(null); };
+  const startEditMeal = (day: string, meal: string) => {
+    setEditingMeal(`${day}-${meal}`);
+    setEditMealValue(mealPlan[day]?.[meal] || "");
+    const kcal = mealKcal[day]?.[meal];
+    setEditMealKcal(kcal && kcal > 0 ? String(kcal) : "");
+  };
+  const saveMeal = (day: string, meal: string) => {
+    setMealPlan({ ...mealPlan, [day]: { ...mealPlan[day], [meal]: editMealValue } });
+    const kcal = lerKcal(editMealKcal);
+    setMealKcal(prev => {
+      const dia = { ...(prev[day] ?? {}) };
+      if (kcal > 0) dia[meal] = kcal; else delete dia[meal];
+      return { ...prev, [day]: dia };
+    });
+    setEditingMeal(null);
+  };
 
   const formatTime = (secs: number) => { const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60; return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`; };
 
@@ -756,6 +800,7 @@ const Dieta = () => {
                                 delete updated[day];
                                 return updated;
                               });
+                              setMealKcal(prev => { const updated = { ...prev }; delete updated[day]; return updated; });
                             }}>Limpar</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -800,6 +845,12 @@ const Dieta = () => {
                             });
                             return updated;
                           });
+                          // as kcal vão junto: cardápio copiado sem caloria vira "total zero" mentiroso
+                          setMealKcal(prev => {
+                            const updated = { ...prev };
+                            copyTargetDays.forEach(targetDay => { updated[targetDay] = { ...(prev[day] || {}) }; });
+                            return updated;
+                          });
                           setCopyFromDay(null);
                           setCopyTargetDays([]);
                         }}
@@ -818,16 +869,54 @@ const Dieta = () => {
                           {isEditing ? (
                             <div className="flex gap-1">
                               <Textarea value={editMealValue} onChange={e => setEditMealValue(e.target.value)} className="text-[10px] min-h-[50px] flex-1 bg-white/50 dark:bg-background/50" />
-                              <Button size="sm" className="h-7 self-end" onClick={() => saveMeal(day, meal)}><Check className="w-3 h-3" /></Button>
+                              <div className="flex flex-col gap-1 self-end">
+                                <Input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={0}
+                                  placeholder="kcal"
+                                  aria-label={`Calorias de ${meal} de ${day}`}
+                                  value={editMealKcal}
+                                  onChange={e => setEditMealKcal(e.target.value)}
+                                  onKeyDown={e => e.key === "Enter" && saveMeal(day, meal)}
+                                  className="h-7 w-[4.5rem] text-[10px] bg-white/50 dark:bg-background/50"
+                                />
+                                <Button size="sm" className="h-7" onClick={() => saveMeal(day, meal)}><Check className="w-3 h-3" /></Button>
+                              </div>
                             </div>
                           ) : (
-                            <p className="text-[11px] leading-relaxed cursor-pointer hover:opacity-70" onClick={() => startEditMeal(day, meal)}>
-                              {mealPlan[day]?.[meal] || <span className="italic text-muted-foreground">Clique para adicionar...</span>}
-                            </p>
+                            <div className="cursor-pointer hover:opacity-70" onClick={() => startEditMeal(day, meal)}>
+                              <p className="text-[11px] leading-relaxed">
+                                {mealPlan[day]?.[meal] || <span className="italic text-muted-foreground">Clique para adicionar...</span>}
+                              </p>
+                              {(mealKcal[day]?.[meal] ?? 0) > 0 && (
+                                <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">{mealKcal[day][meal]} kcal</p>
+                              )}
+                            </div>
                           )}
                         </div>
                       );
                     })}
+                    {/* Total do dia: o plano deste dia e, se for HOJE, o que a
+                        Home já registrou — pra Dieta e widget contarem a mesma
+                        coisa. Só aparece quando há caloria em algum lugar. */}
+                    {(() => {
+                      const planejado = kcalDoPlano(mealKcal[day]);
+                      const ehHoje = day === getDiaryDayName(today);
+                      const registrado = ehHoje ? kcalRegistradas(dietaLog[today]) : 0;
+                      if (planejado <= 0 && registrado <= 0) return null;
+                      return (
+                        <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2 py-1.5" data-testid={`kcal-total-${day}`}>
+                          <span className="text-[10px] font-bold text-muted-foreground">TOTAL DO DIA</span>
+                          <span className="text-[11px] font-bold">
+                            {planejado} kcal
+                            {ehHoje && registrado > 0 && (
+                              <span className="font-normal text-muted-foreground"> · {registrado} registradas hoje</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}

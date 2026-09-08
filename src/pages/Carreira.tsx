@@ -23,7 +23,33 @@ const genId = () => crypto.randomUUID();
 
 // ============= TYPES =============
 type JobApp = { id: string; company: string; role: string; link: string; status: "aplicado" | "entrevista" | "teste" | "oferta" | "rejeitado" | "desistiu"; date: string; salary: string; notes: string; favorite: boolean };
-type PortfolioItem = { id: string; title: string; description: string; link: string; category: string; date: string; highlight: boolean };
+/* `tags`/`notas` opcionais (avaliação 4★ set/2026: "inserir na parte de
+   projetos uma parte para documentar e adicionar tags de segmentos
+   (faculdade, pessoal e etc), e também tags do ano que o projeto foi feito").
+   Item antigo sem os dois campos continua válido; o ANO vem de `date`, que
+   todo item já tem — não precisa de tag de ano gravada. */
+type PortfolioItem = { id: string; title: string; description: string; link: string; category: string; date: string; highlight: boolean; tags?: string[]; notas?: string };
+const SUGESTOES_TAGS_PORTFOLIO = ["Pessoal", "Faculdade", "Finanças", "Profissional", "Saúde"];
+const tagsDe = (i: PortfolioItem) => (Array.isArray(i.tags) ? i.tags.filter((t): t is string => typeof t === "string") : []);
+const anoDe = (i: PortfolioItem) => (i.date || "").slice(0, 4);
+
+/** Chips de etiqueta: sugestões + as já marcadas, mais um campo pra outra. */
+const EtiquetasChips = ({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) => {
+  const [nova, setNova] = useState("");
+  const alternar = (t: string) => onChange(tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t]);
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap gap-1.5">
+        {Array.from(new Set([...SUGESTOES_TAGS_PORTFOLIO, ...tags])).map(t => (
+          <button key={t} type="button" onClick={() => alternar(t)} aria-pressed={tags.includes(t)}
+            className={`text-[10px] px-2 py-1 rounded-full border ${tags.includes(t) ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{t}</button>
+        ))}
+      </div>
+      <Input value={nova} onChange={e => setNova(e.target.value)} placeholder="Outra etiqueta... (Enter)" className="h-8 text-xs"
+        onKeyDown={e => { if (e.key === "Enter" && nova.trim()) { e.preventDefault(); alternar(nova.trim()); setNova(""); } }} />
+    </div>
+  );
+};
 type Contact = { id: string; name: string; company: string; role: string; linkedin: string; email: string; phone: string; notes: string; lastContact: string; category: string };
 type Skill = { id: string; name: string; category: string; level: number; targetLevel: number; notes: string };
 /* Fase/TarefaDoDia agora moram em @/components/fases/BlocoDeFases — o mesmo
@@ -192,9 +218,21 @@ const Portfolio = () => {
     artigo: { title: "", link: "" }, link: { title: "", link: "" },
   });
 
+  // Filtro por etiqueta OU ano (string única; null = tudo) + editor de
+  // etiquetas/notas aberto numa linha.
+  const [filtro, setFiltro] = useState<string | null>(null);
+  const [editandoTags, setEditandoTags] = useState<string | null>(null);
+  const opcoesFiltro = (() => {
+    const tags = new Set<string>(); const anos = new Set<string>();
+    items.forEach(i => { tagsDe(i).forEach(t => tags.add(t)); if (anoDe(i)) anos.add(anoDe(i)); });
+    return { tags: [...tags].sort((a, b) => a.localeCompare(b)), anos: [...anos].sort((a, b) => b.localeCompare(a)) };
+  })();
+  const casaFiltro = (i: PortfolioItem) => filtro === null || tagsDe(i).includes(filtro) || anoDe(i) === filtro;
+  const atualizar = (id: string, patch: Partial<PortfolioItem>) => setItems(prev => prev.map(i => i.id === id ? { ...i, ...patch } : i));
+
   const save = () => {
     if (!form.title) return;
-    setItems(prev => [...prev, { id: genId(), title: form.title || "", description: form.description || "", link: form.link || "", category: form.category || "projeto", date: form.date || localDayKey(), highlight: form.highlight || false }]);
+    setItems(prev => [...prev, { id: genId(), title: form.title || "", description: form.description || "", link: form.link || "", category: form.category || "projeto", date: form.date || localDayKey(), highlight: form.highlight || false, ...(form.tags?.length ? { tags: form.tags } : {}), ...(form.notas ? { notas: form.notas } : {}) }]);
     setForm({ category: "projeto", highlight: false }); setShowForm(false);
   };
 
@@ -207,6 +245,15 @@ const Portfolio = () => {
 
   return (
     <div className="space-y-4">
+      {/* Porta do formulário detalhado. Ele existia desde sempre, mas nada
+          abria (`setShowForm(true)` não era chamado em lugar nenhum): o "+ Add"
+          inline só pega título e link. Achado ao pôr etiquetas/notas aqui —
+          sem esta porta, a resposta à avaliação nasceria escondida. */}
+      {!showForm && (
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowForm(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1" /> Item detalhado (descrição, etiquetas, notas)
+        </Button>
+      )}
       {showForm && (
         <div className="rounded-xl border border-border bg-card p-4 space-y-3">
           <Input placeholder="Título" value={form.title || ""} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="h-9 text-sm" />
@@ -218,6 +265,11 @@ const Portfolio = () => {
              </div>
           </div>
           <Input placeholder="Link (opcional)" value={form.link || ""} onChange={e => setForm(p => ({ ...p, link: e.target.value }))} className="h-9 text-sm" />
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Etiquetas</p>
+            <EtiquetasChips tags={form.tags || []} onChange={tags => setForm(p => ({ ...p, tags }))} />
+          </div>
+          <Textarea placeholder="Documentar: contexto, decisões, o que aprendeu..." value={form.notas || ""} onChange={e => setForm(p => ({ ...p, notas: e.target.value }))} className="text-sm min-h-[50px]" />
           <div className="flex gap-2">
             <Button size="sm" className="flex-1" onClick={save}>Salvar</Button>
             <Button size="sm" variant="ghost" onClick={() => setShowForm(false)}>Cancelar</Button>
@@ -225,8 +277,24 @@ const Portfolio = () => {
         </div>
       )}
 
+      {/* Filtro por etiqueta/ano — só aparece quando há o que filtrar */}
+      {(opcoesFiltro.tags.length > 0 || opcoesFiltro.anos.length > 1) && (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar portfolio por etiqueta">
+          <button onClick={() => setFiltro(null)} aria-pressed={filtro === null}
+            className={`text-[10px] px-2 py-1 rounded-full border ${filtro === null ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>Todos</button>
+          {opcoesFiltro.anos.map(a => (
+            <button key={`ano-${a}`} onClick={() => setFiltro(f => f === a ? null : a)} aria-pressed={filtro === a}
+              className={`text-[10px] px-2 py-1 rounded-full border ${filtro === a ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>📅 {a}</button>
+          ))}
+          {opcoesFiltro.tags.map(t => (
+            <button key={`tag-${t}`} onClick={() => setFiltro(f => f === t ? null : t)} aria-pressed={filtro === t}
+              className={`text-[10px] px-2 py-1 rounded-full border ${filtro === t ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{t}</button>
+          ))}
+        </div>
+      )}
+
       {categories.map(cat => {
-        const catItems = items.filter(i => i.category === cat);
+        const catItems = items.filter(i => i.category === cat && casaFiltro(i));
         const colors = catColors[cat];
         const inp = inlineInputs[cat];
         return (
@@ -247,16 +315,31 @@ const Portfolio = () => {
                 </div>
               )}
               {catItems.sort((a, b) => b.date.localeCompare(a.date)).map(item => (
-                <div key={item.id} className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-background/30 transition-colors group">
-                  <div className="col-span-5 min-w-0">
-                    <p className="text-xs font-medium truncate">{item.title}</p>
-                    {item.description && <p className="text-[9px] text-muted-foreground truncate">{item.description}</p>}
+                <div key={item.id}>
+                  <div className="px-3 py-2 grid grid-cols-12 gap-1 items-center hover:bg-background/30 transition-colors group">
+                    <div className="col-span-5 min-w-0">
+                      <p className="text-xs font-medium truncate">{item.title}</p>
+                      {item.description && <p className="text-[9px] text-muted-foreground truncate">{item.description}</p>}
+                      {(tagsDe(item).length > 0 || item.notas) && (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {tagsDe(item).map(t => <span key={t} className="text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t}</span>)}
+                          {item.notas && <span className="text-[8px] text-muted-foreground" title={item.notas}>📝</span>}
+                        </div>
+                      )}
+                    </div>
+                    <span className="col-span-3 text-[10px] text-muted-foreground">{item.date}</span>
+                    <div className="col-span-4 flex justify-end gap-1">
+                      {item.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(item.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
+                      <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={`Etiquetas e notas de ${item.title}`} onClick={() => setEditandoTags(editandoTags === item.id ? null : item.id)}><Edit2 className="w-3 h-3" /></Button>
+                      <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}><Trash2 className="w-3 h-3" /></Button>
+                    </div>
                   </div>
-                  <span className="col-span-3 text-[10px] text-muted-foreground">{item.date}</span>
-                  <div className="col-span-4 flex justify-end gap-1">
-                    {item.link && <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => window.open(item.link, "_blank")}><ExternalLink className="w-3 h-3" /></Button>}
-                    <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setItems(prev => prev.filter(i => i.id !== item.id))}><Trash2 className="w-3 h-3" /></Button>
-                  </div>
+                  {editandoTags === item.id && (
+                    <div className="px-3 pb-3 space-y-2 bg-background/40">
+                      <EtiquetasChips tags={tagsDe(item)} onChange={tags => atualizar(item.id, { tags })} />
+                      <Textarea placeholder="Documentar: contexto, decisões, o que aprendeu..." value={item.notas || ""} onChange={e => atualizar(item.id, { notas: e.target.value })} className="text-xs min-h-[50px]" />
+                    </div>
+                  )}
                 </div>
               ))}
               {/* Inline add */}

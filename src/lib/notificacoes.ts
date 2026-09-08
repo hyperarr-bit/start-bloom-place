@@ -29,7 +29,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "outro";
 
 const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   contas: 100000,
@@ -38,6 +38,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   treino: 400000,
   leitura: 500000,
   dieta: 600000,
+  saude: 800000, // 700000 é o resgate do paywall (BASE_RESGATE, mais abaixo)
 };
 const BASE_CONTAS = BASES.contas;
 const BASE_RETRO = BASES.retrospectiva;
@@ -298,7 +299,9 @@ const DIAS_SEMANA = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO"
 /** Índice 0=segunda, como o resto do app usa (JS conta domingo=0). */
 const indiceSemana = (d: Date) => (d.getDay() === 0 ? 6 : d.getDay() - 1);
 
-type Planejado = { quando: Date; title: string; body: string };
+/** `id` opcional: quem precisa de mais de um aviso por dia (remédios) traz o
+ *  seu; o padrão continua sendo um por dia, BASE + MMDD. */
+type Planejado = { quando: Date; title: string; body: string; id?: number };
 
 /** Agenda uma série já pronta na faixa do tipo, substituindo a anterior. */
 async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string, avisos: Planejado[]): Promise<number> {
@@ -313,7 +316,7 @@ async function agendarSerie(tipo: Exclude<TipoDeLembrete, "outro">, rota: string
   try {
     await LN.schedule({
       notifications: avisos.map((a) => ({
-        id: BASES[tipo] + Number(`${doisDigitos(a.quando.getMonth() + 1)}${doisDigitos(a.quando.getDate())}`),
+        id: a.id ?? BASES[tipo] + Number(`${doisDigitos(a.quando.getMonth() + 1)}${doisDigitos(a.quando.getDate())}`),
         title: a.title,
         body: a.body,
         schedule: { at: a.quando },
@@ -445,6 +448,72 @@ export async function agendarDieta(
       body: "Leva 20 segundos pra fechar o diário.",
     }));
   return agendarSerie("dieta", "/dieta", avisos);
+}
+
+/* ------------------------------------------------------ remédios (07/09) */
+
+export type RemedioAgendavel = { id: string; nome: string; hora: string; tomadoHoje: boolean };
+
+/** "Ômega 3", "Ômega 3 e Vitamina D", "A, B e C", "A, B, C e mais 2". */
+const listarNomes = (nomes: string[]) => {
+  const vis = nomes.slice(0, 3);
+  const resto = nomes.length - vis.length;
+  const base = vis.length <= 1 ? vis.join("") : `${vis.slice(0, -1).join(", ")} e ${vis[vis.length - 1]}`;
+  return resto > 0 ? `${base} e mais ${resto}` : base;
+};
+
+/**
+ * REMÉDIOS — na hora exata de cada um (07/09, avaliação da Play: "adicionem
+ * notificação pra tomar remédio").
+ *
+ * Diferente dos outros diários, o horário aqui é POR ITEM e é o que a pessoa
+ * digitou ao cadastrar (08:30, não uma hora cheia da central). Dois remédios
+ * às 08:00 viram UM aviso ("Hora do Ômega 3 e Vitamina D") — a regra de um
+ * aviso por horário vale aqui como em todo lugar.
+ *
+ * O aviso de hoje some pra quem já marcou o remédio como tomado. É a única
+ * coisa que sabemos com certeza, e "hora do remédio" pra quem acabou de tomar
+ * é o caminho mais curto pra pessoa desligar tudo.
+ *
+ * Ids: BASE + (índice do horário × 100) + (dia à frente). Cada horário
+ * distinto ocupa 100 ids, cada dia 1 — cabem 99 horários na faixa de 10.000.
+ * A série é limpa e refeita a cada mudança (limparFaixa), então apagar ou
+ * editar um remédio nunca deixa aviso órfão no sistema.
+ *
+ * PURA (recebe `agora`) pra ser testável sem plugin.
+ */
+export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()): Planejado[] {
+  const hoje = localDia(agora);
+  const porHorario = new Map<string, RemedioAgendavel[]>();
+  lista
+    .filter((r) => r?.nome && /^\d{1,2}:\d{2}$/.test(r?.hora ?? ""))
+    .forEach((r) => porHorario.set(r.hora, [...(porHorario.get(r.hora) ?? []), r]));
+  const horarios = [...porHorario.keys()].sort().slice(0, 99);
+  const avisos: Planejado[] = [];
+  horarios.forEach((hora, idx) => {
+    const [h, m] = hora.split(":").map(Number);
+    for (let i = 0; i <= HORIZONTE_DIAS; i++) {
+      const quando = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + i, h, m, 0, 0);
+      if (quando.getTime() <= agora.getTime()) continue;
+      const ehHoje = localDia(quando) === hoje;
+      const nomes = (porHorario.get(hora) ?? []).filter((r) => !(ehHoje && r.tomadoHoje)).map((r) => r.nome);
+      if (!nomes.length) continue;
+      avisos.push({
+        id: BASES.saude + idx * 100 + i,
+        quando,
+        title: `💊 Hora do ${listarNomes(nomes)}`,
+        body: nomes.length === 1
+          ? "Marca como tomado no CORE pra baixar o estoque."
+          : "Marca cada um no CORE pra baixar o estoque.",
+      });
+    }
+  });
+  return avisos;
+}
+
+export async function agendarRemedios(lista: RemedioAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.saude); return 0; }
+  return agendarSerie("saude", "/saude", planejarRemedios(lista));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

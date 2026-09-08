@@ -25,8 +25,21 @@ import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
+
+/* Abas da Rotina, fora do componente pra ser a MESMA referência em todo
+   render — o useAbasOcultas memoiza em cima dela. Pode ser ocultada pela
+   pessoa (avaliação: "Opção de ocultar certas abas"); nunca a última. */
+const ABAS_ROTINA = [
+  { id: "semana", label: "MINHA SEMANA", icon: "📅" },
+  { id: "mes", label: "MEU MÊS", icon: "📆" },
+  { id: "diario", label: "DIÁRIO", icon: "📝" },
+  { id: "revisao", label: "REVISÃO", icon: "⭐" },
+  { id: "foco", label: "FOCO", icon: "🧠" },
+];
 const defaultHabits: string[] = [];
 
 const hours = [
@@ -1047,6 +1060,7 @@ const Rotina = () => {
 
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("semana");
+  const abas = useAbasOcultas("rotina", ABAS_ROTINA);
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
@@ -1165,14 +1179,6 @@ const Rotina = () => {
 
   const quote = motivationalQuotes[new Date().getDay() % motivationalQuotes.length];
 
-  const tabs = [
-    { id: "semana", label: "MINHA SEMANA", icon: "📅" },
-    { id: "mes", label: "MEU MÊS", icon: "📆" },
-    { id: "diario", label: "DIÁRIO", icon: "📝" },
-    { id: "revisao", label: "REVISÃO", icon: "⭐" },
-    { id: "foco", label: "FOCO", icon: "🧠" },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       {RotinaCompletionDialog}
@@ -1198,19 +1204,9 @@ const Rotina = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id} data-active={activeTab === tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span>{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Barra de abas com "ocultar" (segurar a aba ou o ⋯ no fim) — mesma
+            aparência de antes, mesmos data-active/data-spotlight. */}
+        <AbasOcultaveis abas={abas} ativa={activeTab} onTrocar={setActiveTab} className="max-w-7xl mx-auto px-4 pb-2" />
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-5 space-y-5">
@@ -1398,6 +1394,7 @@ const Rotina = () => {
               tituloFases="🔁 O QUE VOCÊ REPETE NO DIA"
               vazioFases="Crie o que você repete no dia — cada um vira um contador."
               placeholderTarefa="Nova tarefa de hoje..."
+              chaveNotaMes="rotina-month-notes"
             />
           </>
         )}

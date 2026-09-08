@@ -1,6 +1,6 @@
 import {
-  agendarContas, agendarDieta, agendarLeitura, agendarRetrospectiva,
-  agendarRotina, agendarTreino,
+  agendarContas, agendarDieta, agendarLeitura, agendarRemedios, agendarRetrospectiva,
+  agendarRotina, agendarTreino, type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { localDayKey } from "@/lib/utils";
@@ -19,6 +19,15 @@ import { localDayKey } from "@/lib/utils";
  */
 
 export type Leitor = <T>(key: string, fallback: T) => T;
+
+/**
+ * Interruptor dos lembretes de remédio (07/09). Mora FORA do PrefsNotificacoes
+ * de propósito: lá todo diário "só liga se alguém disse true", e este nasce
+ * LIGADO — cadastrar um remédio com horário já é pedir pra ser lembrado. A
+ * permissão do Android é pedida no primeiro cadastro (PharmacyChecklist), não
+ * na abertura. Desliga na central de notificações.
+ */
+export const CHAVE_REMEDIOS_LIGADO = "notif-remedios-ligado";
 
 const ehDia = (k: unknown) => typeof k === "string" && /^\d{4}-\d{2}-\d{2}$/.test(k);
 
@@ -47,6 +56,9 @@ export interface DadosDosLembretes {
   jaTreinouHoje: boolean;
   leitura: { titulo: string; faltam: number } | null;
   jaPreencheuHoje: boolean;
+  /** remédios/suplementos do Saúde com horário, e se já foram tomados hoje */
+  remedios: RemedioAgendavel[];
+  remediosLigado: boolean;
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -79,6 +91,19 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
 
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
+  // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
+  type Suplemento = { id?: string; name?: string; time?: string };
+  const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
+  const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
+  const remedios: RemedioAgendavel[] = (Array.isArray(suplementos) ? suplementos : [])
+    .filter((s) => s?.name && s?.time)
+    .map((s) => ({
+      id: String(s.id ?? ""),
+      nome: String(s.name),
+      hora: String(s.time),
+      tomadoHoje: Array.isArray(tomadosHoje) && tomadosHoje.includes(String(s.id)),
+    }));
+
   return {
     dueDays: get("finance-dueDays", []) ?? [],
     marcados,
@@ -94,6 +119,8 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
         }
       : null,
     jaPreencheuHoje: Object.keys(diarioDieta[hoje]?.meals ?? {}).length > 0,
+    remedios,
+    remediosLigado: get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false,
   };
 }
 
@@ -113,6 +140,7 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.treino && [dados.diasAtivos, dados.musculosPorDia, [...dados.diasComPlano].sort(), dados.jaTreinouHoje],
     prefs.leitura && dados.leitura,
     prefs.dieta && dados.jaPreencheuHoje,
+    dados.remediosLigado && dados.remedios,
   ]);
 }
 
@@ -135,5 +163,6 @@ export async function reagendarTudo(
     ),
     leitura: await agendarLeitura(d.leitura, { hora: prefs.horaLeitura, ligado: prefs.leitura }),
     dieta: await agendarDieta({ jaPreencheuHoje: d.jaPreencheuHoje }, { hora: prefs.horaDieta, ligado: prefs.dieta }),
+    saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
   };
 }

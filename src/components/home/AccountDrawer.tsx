@@ -1,6 +1,6 @@
 import { useState, useEffect, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles } from "lucide-react";
+import { Trophy, Pencil, CreditCard, LogOut, UserCircle, ChevronLeft, Mail, KeyRound, RotateCcw, Trash2, Bell, Sparkles, Monitor, Copy } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,7 +33,7 @@ export const AccountDrawer = ({
   const navigate = useNavigate();
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [view, setView] = useState<"menu" | "account">("menu");
+  const [view, setView] = useState<"menu" | "account" | "computador">("menu");
 
   useEffect(() => {
     if (!open) setView("menu");
@@ -128,6 +128,12 @@ export const AccountDrawer = ({
         // Notificações são LOCAIS do app da loja — na web/PWA não existe como
         // entregar (30/07, dono: some da web pra não virar ticket de suporte).
         ...(isNativeShell() ? [{ icon: Bell, label: "Notificações", onClick: () => go("/notificacoes") }] : []),
+        // 07/09 (avaliação 4★ na Play: "instalei no computador e não consigo
+        // sincronizar os 2"): os dados JÁ sincronizam — o site é o mesmo app
+        // na mesma conta. O que faltava era alguém CONTAR isso: a raiz do
+        // site é institucional e nada dizia "entre com a mesma conta". Só
+        // dentro do app da loja; na web a pessoa já está no computador.
+        ...(isNativeShell() ? [{ icon: Monitor, label: "Usar no computador", onClick: () => setView("computador") }] : []),
         { icon: RotateCcw, label: "Rever tutorial", onClick: handleReplayTutorial },
       ];
 
@@ -180,6 +186,42 @@ export const AccountDrawer = ({
                     </button>
                   </div>
                 )}
+              </div>
+            </>
+          )}
+
+          {view === "computador" && (
+            <>
+              <SheetHeader className="px-5 pt-6 pb-4 flex-row items-center gap-2 space-y-0">
+                <button
+                  onClick={() => setView("menu")}
+                  className="p-1 -ml-1 rounded-md hover:bg-muted transition-colors"
+                  aria-label="Voltar"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <SheetTitle className="text-sm font-semibold">Usar no computador</SheetTitle>
+              </SheetHeader>
+              <div className="px-5 pb-4 space-y-3">
+                <p className="text-sm text-foreground leading-relaxed">
+                  O CORE também funciona no navegador do computador, com a mesma conta.
+                  Tudo que você lança aqui aparece lá, e vice-versa — sincroniza sozinho.
+                </p>
+                <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal pl-5">
+                  <li>No computador, abra <span className="font-medium text-foreground">coreaplicativo.com.br/entrar</span></li>
+                  <li>Entre com o <span className="font-medium text-foreground">mesmo e-mail</span> (ou o mesmo Google) que você usa aqui{user?.email ? `: ${user.email}` : ""}</li>
+                  <li>Pronto. Não crie outra conta — senão ela nasce vazia.</li>
+                </ol>
+                <button
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText("https://coreaplicativo.com.br/entrar"); toast.success("Link copiado"); }
+                    catch { toast.message("coreaplicativo.com.br/entrar"); }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copiar link do site
+                </button>
               </div>
             </>
           )}

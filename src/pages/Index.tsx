@@ -43,7 +43,12 @@ import { MonthComparison } from "@/components/finance/MonthComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
-import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses } from "@/lib/finance-parcelas";
+import { variaveisDoMes } from "@/lib/finance-fatura";
+import { useFinanceCards } from "@/lib/finance-cards";
+import { chaveArquivada } from "@/lib/virada-do-mes";
+import { mesCorrenteId } from "@/lib/virada-contas";
 import { SeletorDePerfil } from "@/components/finance/SeletorDePerfil";
 import { WrappedBanner } from "@/components/wrapped/WrappedBanner";
 import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelcome";
@@ -115,6 +120,28 @@ const Index = () => {
 
   const [installmentsTodos, setInstallmentsTodos] = usePersistedState("finance-installments", [] as any[]);
 
+  /* PARCELAS JÁ AVANÇADAS PRO MÊS DE AGORA (07/09, lib/finance-parcelas).
+     Quem GRAVA a virada é o hook do App (use-virada-do-mes, escrita de
+     sistema). Só que, se esta tela já estava montada quando ele rodou, o
+     usePersistedState acima ficou com a lista de antes (hidrata uma vez).
+     Recalcular aqui é puro e barato — e a primeira gravação da pessoa (pagar,
+     editar) já sai com a lista avançada, porque o setter recebe esta. */
+  const mesAgora = mesCorrenteId();
+  const installmentsAvancados = useMemo(() => {
+    const fontes = [mesAgora, ...mesesAnteriores(mesAgora, 24)].map((mes) => ({
+      mes, itens: getUserData<Parcela[]>(chaveArquivadaDeParcelas(mes), []) || [],
+    }));
+    return viradaDeParcelas(installmentsTodos as Parcela[], mesAgora, fontes)?.lista ?? (installmentsTodos as Parcela[]);
+  }, [installmentsTodos, mesAgora, getUserData]);
+
+  /* Gastos variáveis do MÊS ANTERIOR: compra no crédito depois do fechamento
+     do cartão cai na fatura deste mês (lib/finance-fatura). */
+  const mesAnterior = somarMeses(mesAgora, -1);
+  const expensesAnteriorTodos = getUserData<any[]>(
+    chaveArquivada(Number(mesAnterior.slice(0, 4)), Number(mesAnterior.slice(5, 7)) - 1, "expenses"), [],
+  ) || [];
+  const { configOf } = useFinanceCards();
+
   /* PERFIS PF/PJ (01/09, pedido por WhatsApp: "separar a questão da pf e pj...
      isso aqui é da empresa x isso aqui é da empresa y").
 
@@ -134,7 +161,8 @@ const Index = () => {
   const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
   const [fixedExpenses, setFixedExpenses] = usarListaDoPerfil(fixedExpensesTodos, setFixedExpensesTodos, perfilValido);
-  const [installments, setInstallments] = usarListaDoPerfil(installmentsTodos, setInstallmentsTodos, perfilValido);
+  const [installments, setInstallments] = usarListaDoPerfil(installmentsAvancados as any[], setInstallmentsTodos, perfilValido);
+  const expensesAnterior = doPerfil(expensesAnteriorTodos, perfilValido);
   /* 03/09 (reclamação de cliente): as CONTAS do mês também são do perfil.
      O calendário, o "a vencer" e o "quanto posso gastar" veem só as contas
      do perfil ativo; a escrita volta mesclada (finance-perfil.ts). */
@@ -198,12 +226,16 @@ const Index = () => {
 
   // Computed values
   const totalIncome = incomes.reduce((sum: number, i: any) => sum + i.value, 0);
-  const totalVariableExpenses = expenses.reduce((sum: number, e: any) => sum + e.value, 0);
+  // Variáveis pela regra da FATURA (07/09): crédito depois do fechamento do
+  // cartão sai deste mês e entra no seguinte; sem fechamento cadastrado a
+  // conta é a de sempre (lib/finance-fatura).
+  const totalVariableExpenses = variaveisDoMes(expenses, expensesAnterior, mesAgora, configOf).total;
   const totalFixedExpenses = fixedExpenses.reduce((sum: number, e: any) => sum + (e.value || 0), 0);
   const totalExpenses = totalVariableExpenses + totalFixedExpenses;
   const totalDebts = installments.reduce((sum: number, i: any) => sum + (i.totalInstallments - i.paidInstallments) * i.installmentValue, 0);
   const totalInvestments = investments.reduce((sum: number, i: any) => sum + i.currentValue, 0);
-  const monthlyInstallments = installments.reduce((sum: number, i: any) => i.paidInstallments < i.totalInstallments ? sum + i.installmentValue : sum, 0);
+  // Parcelas do mês pela mesma função que a planilha do mês usa (um total só).
+  const monthlyInstallments = somaParcelasDoMes(installments as Parcela[]);
   // "Despesas do mês" oficial (fixas + variáveis + parcelas) — é o número que
   // Dashboard, Relatórios, Saúde e a barra de resumo mostram. Fonte única em
   // lib/finance-totals; NÃO recalcular taxa/saldo em componente nenhum.
@@ -462,7 +494,7 @@ const Index = () => {
                 <div className="grid lg:grid-cols-[1fr_280px] gap-4 min-w-0">
                   <div className="min-w-0">
                     <TrackedCard cardKey="expenses" tab="financeiro">
-                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} />
+                      <ExpenseTable expenses={expenses} setExpenses={setExpenses} onPrimeiroGasto={aoPrimeiroGasto} mes={mesAgora} />
                     </TrackedCard>
                   </div>
                   <TrackedCard cardKey="notes" tab="financeiro">
@@ -502,7 +534,13 @@ const Index = () => {
                   </div>
                 </TrackedCard>
                 <TrackedCard cardKey="installments" tab="financeiro">
-                  <InstallmentTracker installments={installments} setInstallments={setInstallments} variableExpenses={expenses} />
+                  <InstallmentTracker
+                    installments={installments}
+                    setInstallments={setInstallments}
+                    variableExpenses={expenses}
+                    variableExpensesAnterior={expensesAnterior}
+                    mes={mesAgora}
+                  />
                 </TrackedCard>
                 {/* Logo abaixo do parcelamento porque é a dúvida que nasce ali
                     ("e a dívida que não é do cartão?"), e longe o bastante do

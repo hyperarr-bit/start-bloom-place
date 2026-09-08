@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { localDayKey } from "@/lib/utils";
+import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
+import { PhotoPicker } from "@/components/ui/PhotoPicker";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -11,7 +14,7 @@ import {
   ArrowLeft, Plus, X, Trash2, Star, Target, Heart, Shield, Brain,
   Lightbulb, BookOpen, Award, Eye, Sparkles, Edit3, Check, ChevronRight,
   Flame, TrendingUp, Users, Compass, Zap, MessageCircle, Wind, Calendar,
-  Headphones, PenTool, BarChart3, Timer, Mail
+  Headphones, PenTool, BarChart3, Timer, Mail, Tag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +55,180 @@ const moodOptions = [
   { emoji: "😕", label: "Meh", value: 2, color: "bg-orange-300" },
   { emoji: "😞", label: "Ruim", value: 1, color: "bg-red-300" },
 ];
+
+/* Abas do módulo, fora do componente (mesma referência em todo render — o
+   useAbasOcultas memoiza em cima). A pessoa pode ocultar qualquer uma, menos
+   a última (avaliação: "Opção de ocultar certas abas"). */
+const ABAS_DP = [
+  { id: "sobre", label: "SOBRE MIM" },
+  { id: "metas", label: "METAS" },
+  { id: "diario", label: "DIÁRIO" },
+  { id: "humor", label: "HUMOR & SCORE" },
+  { id: "respiracao", label: "RESPIRAÇÃO" },
+  { id: "gratidao", label: "GRATIDÃO" },
+  { id: "carta", label: "CARTA" },
+  { id: "desafios", label: "30 DIAS" },
+];
+
+/* ============================================================
+ * ETIQUETAS DAS METAS — avaliação 4★ (set/2026):
+ * "Na parte de metas também, inserir tags do ano das metas e tags de
+ *  segmentos (finanças, educação, profissional e etc)" + "uma parte para
+ *  documentar".
+ *
+ * As metas moram no GoalsBoardV2 (chave goals-board-v2), que é compartilhado
+ * com o módulo Mente. Em vez de mexer no formato da meta, as etiquetas vivem
+ * numa chave IRMÃ, `goals-etiquetas`, indexada pelo id da meta:
+ *   { [idDaMeta]: { tags: string[], ano: number, notas: string } }
+ * Meta antiga sem entrada aqui continua válida — só aparece sem etiqueta.
+ *
+ * O ANO vem de graça: o GoalsBoardV2 cria o id com Date.now(), então a data
+ * de criação está dentro do próprio id. Meta semeada da demo ("g1") cai no
+ * ano corrente. Quem quiser outro ano edita o chip.
+ * ============================================================ */
+export const SUGESTOES_ETIQUETAS = ["Pessoal", "Faculdade", "Finanças", "Profissional", "Saúde"];
+export type EtiquetaDeMeta = { tags: string[]; ano: number; notas: string };
+
+export const anoDaMeta = (id: string, salvo?: unknown): number => {
+  const n = Number(salvo);
+  if (Number.isFinite(n) && n >= 2000 && n <= 2100) return n;
+  const ms = Number(id);
+  // 2000-01-01 em ms: abaixo disso não é um Date.now(), é "g1"/"1"/etc.
+  if (Number.isFinite(ms) && ms > 946684800000) return new Date(ms).getFullYear();
+  return new Date().getFullYear();
+};
+
+const etiquetaDe = (mapa: Record<string, Partial<EtiquetaDeMeta>> | undefined, id: string): EtiquetaDeMeta => {
+  const e = mapa?.[id];
+  return {
+    tags: Array.isArray(e?.tags) ? e!.tags.filter((t): t is string => typeof t === "string") : [],
+    ano: anoDaMeta(id, e?.ano),
+    notas: typeof e?.notas === "string" ? e!.notas : "",
+  };
+};
+
+/** Filtro único: nome de etiqueta OU ano (como string). null = todas. */
+export const casaComFiltro = (e: EtiquetaDeMeta, filtro: string | null) =>
+  filtro === null || e.tags.includes(filtro) || String(e.ano) === filtro;
+
+export const EtiquetasDasMetas = () => {
+  const { get } = useUserData();
+  const brutas = get<unknown>("goals-board-v2", []);
+  const metas = useMemo(() => (Array.isArray(brutas) ? brutas : [])
+    .filter((m): m is { id: string; title: string } => !!m && typeof m === "object" && typeof (m as { id?: unknown }).id === "string")
+    .map(m => ({ id: m.id, title: typeof m.title === "string" ? m.title : "Meta" })), [brutas]);
+  const [etiquetas, setEtiquetas] = usePersistedState<Record<string, EtiquetaDeMeta>>("goals-etiquetas", {});
+  const [filtro, setFiltro] = useState<string | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
+  const [novaTag, setNovaTag] = useState("");
+
+  const salvar = (id: string, patch: Partial<EtiquetaDeMeta>) =>
+    setEtiquetas(prev => ({ ...(prev ?? {}), [id]: { ...etiquetaDe(prev, id), ...patch } }));
+  const alternarTag = (id: string, tag: string) => {
+    const atual = etiquetaDe(etiquetas, id);
+    salvar(id, { tags: atual.tags.includes(tag) ? atual.tags.filter(t => t !== tag) : [...atual.tags, tag] });
+  };
+
+  // Chips de filtro: só o que está em uso (tag ou ano) — filtro sem resultado
+  // é botão morto.
+  const opcoes = useMemo(() => {
+    const tags = new Set<string>(); const anos = new Set<string>();
+    metas.forEach(m => { const e = etiquetaDe(etiquetas, m.id); e.tags.forEach(t => tags.add(t)); anos.add(String(e.ano)); });
+    return { tags: [...tags].sort((a, b) => a.localeCompare(b)), anos: [...anos].sort((a, b) => b.localeCompare(a)) };
+  }, [metas, etiquetas]);
+
+  if (metas.length === 0) return null;
+  const visiveis = metas.filter(m => casaComFiltro(etiquetaDe(etiquetas, m.id), filtro));
+
+  return (
+    <div className="bg-card rounded-xl border border-border p-4 space-y-3">
+      <h3 className="text-xs font-bold flex items-center gap-2"><Tag className="w-4 h-4 text-purple-500" /> ETIQUETAS E NOTAS DAS METAS</h3>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar metas por etiqueta">
+        <button onClick={() => setFiltro(null)} aria-pressed={filtro === null}
+          className={`text-[10px] px-2 py-1 rounded-full border ${filtro === null ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>Todas</button>
+        {opcoes.anos.map(a => (
+          <button key={`ano-${a}`} onClick={() => setFiltro(f => f === a ? null : a)} aria-pressed={filtro === a}
+            className={`text-[10px] px-2 py-1 rounded-full border ${filtro === a ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>📅 {a}</button>
+        ))}
+        {opcoes.tags.map(t => (
+          <button key={`tag-${t}`} onClick={() => setFiltro(f => f === t ? null : t)} aria-pressed={filtro === t}
+            className={`text-[10px] px-2 py-1 rounded-full border ${filtro === t ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{t}</button>
+        ))}
+      </div>
+      <div className="space-y-1.5">
+        {visiveis.length === 0 && <p className="text-xs text-muted-foreground text-center py-2">Nenhuma meta com essa etiqueta.</p>}
+        {visiveis.map(m => {
+          const e = etiquetaDe(etiquetas, m.id);
+          const aberta = editando === m.id;
+          return (
+            <div key={m.id} className="rounded-lg border border-border bg-muted/20 px-3 py-2 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{m.title}</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-300">📅 {e.ano}</span>
+                    {e.tags.map(t => <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">{t}</span>)}
+                    {e.notas && <span className="text-[9px] text-muted-foreground">📝</span>}
+                  </div>
+                </div>
+                <button onClick={() => { setEditando(aberta ? null : m.id); setNovaTag(""); }}
+                  aria-label={`${aberta ? "Fechar" : "Editar"} etiquetas de ${m.title}`}
+                  className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10">
+                  {aberta ? <Check className="w-4 h-4" /> : <Edit3 className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+              {aberta && (
+                <div className="space-y-2 pt-1 border-t border-border/60">
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from(new Set([...SUGESTOES_ETIQUETAS, ...e.tags])).map(t => (
+                      <button key={t} onClick={() => alternarTag(m.id, t)} aria-pressed={e.tags.includes(t)}
+                        className={`text-[10px] px-2 py-1 rounded-full border ${e.tags.includes(t) ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{t}</button>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input value={novaTag} onChange={ev => setNovaTag(ev.target.value)} placeholder="Outra etiqueta..." className="text-xs h-8"
+                      onKeyDown={ev => { if (ev.key === "Enter" && novaTag.trim()) { alternarTag(m.id, novaTag.trim()); setNovaTag(""); } }} />
+                    <Input type="number" min={2000} max={2100} value={e.ano} aria-label="Ano da meta" className="text-xs h-8 w-24"
+                      onChange={ev => salvar(m.id, { ano: anoDaMeta(m.id, Number(ev.target.value)) })} />
+                  </div>
+                  <Textarea value={e.notas} onChange={ev => salvar(m.id, { notas: ev.target.value })}
+                    placeholder="Documentar: contexto, decisões, o que aprendeu..." className="text-xs min-h-[60px]" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ============================================================
+ * REFLEXÕES ANTERIORES (com foto) — avaliação 5★ (set/2026):
+ * "deveria ter um diário como o de pet, onde você pode adicionar fotos e
+ *  imagens do dia". Mesmo PhotoPicker do PetDiary (comprime pra 600px JPEG
+ * e guarda a data URL dentro da entrada). Entrada antiga sem `photoUrl`
+ * continua válida — só não mostra imagem.
+ * ============================================================ */
+export type EntradaDiario = { text: string; prompt: string; photoUrl?: string };
+
+export const ReflexoesAnteriores = ({ entradas, hoje }: { entradas: Record<string, EntradaDiario>; hoje: string }) => (
+  <div className="bg-card rounded-xl border border-border p-4">
+    <h3 className="text-xs font-bold mb-3">📅 REFLEXÕES ANTERIORES</h3>
+    <div className="space-y-2">
+      {Object.entries(entradas ?? {}).filter(([d, e]) => d !== hoje && e).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10).map(([date, entry]) => (
+        <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border">
+          <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "long" })}</p>
+          {entry.prompt && <p className="text-[10px] text-muted-foreground italic mb-1">Prompt: {entry.prompt}</p>}
+          <p className="text-xs whitespace-pre-wrap">{entry.text}</p>
+          {entry.photoUrl && (
+            <img src={entry.photoUrl} alt={`Foto do dia ${date}`} className="mt-2 rounded-lg w-full max-h-48 object-cover" />
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorClass, onAdd }: {
   items: string[]; setItems: (v: string[]) => void; newItem: string; setNewItem: (v: string) => void; placeholder: string; colorClass: string; onAdd?: () => void;
@@ -101,6 +278,8 @@ const DesenvolvimentoPessoal = () => {
   });
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
+  const abas = useAbasOcultas("desenvolvimento", ABAS_DP);
+  const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
   const { set: setUserData, isGuest } = useUserData();
   const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 
@@ -146,7 +325,19 @@ const DesenvolvimentoPessoal = () => {
   // VISÃO — movido para GoalsBoardV2
 
   // === NEW: JOURNALING ===
-  const [journalEntries, setJournalEntries] = usePersistedState<Record<string, { text: string; prompt: string }>> ("dp-journal", {});
+  const [journalEntries, setJournalEntries] = usePersistedState<Record<string, EntradaDiario>>("dp-journal", {});
+  // Foto do dia (5★: "diário como o de pet, onde você pode adicionar fotos").
+  // Mesma dança da reflexão abaixo: o valor salvo pode chegar depois do mount.
+  const [todayPhoto, setTodayPhoto] = useState<string | undefined>(() => journalEntries[today]?.photoUrl);
+  const fotoAplicada = useRef<string | undefined>(journalEntries[today]?.photoUrl);
+  useEffect(() => {
+    const salva = journalEntries[today]?.photoUrl;
+    if (salva && salva !== todayPhoto && todayPhoto === fotoAplicada.current) {
+      setTodayPhoto(salva);
+      fotoAplicada.current = salva;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [journalEntries, today]);
   const journalPrompts = [
     "O que aprendi hoje?", "O que me incomodou hoje e por quê?", "O que me fez sorrir hoje?",
     "Se eu pudesse mudar uma coisa no meu dia, o que seria?", "O que estou evitando enfrentar?",
@@ -247,27 +438,8 @@ const DesenvolvimentoPessoal = () => {
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2 flex gap-1 overflow-x-auto">
-          {[
-            { id: "sobre", label: "SOBRE MIM" },
-            { id: "metas", label: "METAS" },
-            { id: "diario", label: "DIÁRIO" },
-            { id: "humor", label: "HUMOR & SCORE" },
-            { id: "respiracao", label: "RESPIRAÇÃO" },
-            { id: "gratidao", label: "GRATIDÃO" },
-            { id: "carta", label: "CARTA" },
-            { id: "desafios", label: "30 DIAS" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              data-spotlight={`tab-${tab.id}`}
-              onClick={() => { setActiveTab(tab.id); reportTab?.(tab.id); }}
-              className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {/* Barra de abas com "ocultar" (segurar a aba ou o ⋯ no fim). */}
+        <AbasOcultaveis abas={abas} ativa={activeTab} onTrocar={trocarAba} className="max-w-5xl mx-auto px-4 pb-2" />
       </header>
 
       {/* Daily Quote Banner */}
@@ -347,6 +519,8 @@ const DesenvolvimentoPessoal = () => {
           {/* ========== METAS ========== */}
           {activeTab === "metas" && <div className="space-y-4">
             <GoalsBoardV2 />
+            {/* Etiquetas/ano/notas por meta — chave irmã, o quadro acima não muda. */}
+            <EtiquetasDasMetas />
           </div>}
 
           {/* ========== RODA DA VIDA ========== */}
@@ -359,26 +533,22 @@ const DesenvolvimentoPessoal = () => {
               </div>
               <Textarea value={todayJournal} onChange={e => setTodayJournal(e.target.value)}
                 placeholder="Escreva livremente seus pensamentos..." className="text-xs min-h-[150px] mb-3" />
+              {/* Foto do dia — mesmo PhotoPicker do diário do Pet (5★ set/2026) */}
+              <div className="mb-3">
+                <PhotoPicker value={todayPhoto} onChange={setTodayPhoto} onClear={() => setTodayPhoto(undefined)} label="Adicionar foto do dia" previewSize="md" />
+              </div>
               <Button size="sm" className="w-full" onClick={() => {
-                setJournalEntries({ ...journalEntries, [today]: { text: todayJournal, prompt: todayPrompt } });
+                // `photoUrl` só entra quando existe: entrada sem foto fica igual à de sempre
+                const entrada: EntradaDiario = { text: todayJournal, prompt: todayPrompt, ...(todayPhoto ? { photoUrl: todayPhoto } : {}) };
+                setJournalEntries({ ...journalEntries, [today]: entrada });
                 reflexaoAplicada.current = todayJournal;
+                fotoAplicada.current = todayPhoto;
                 // feedback explícito — antes salvava mudo e parecia quebrado
                 // (a lista embaixo só mostra dias ANTERIORES, hoje não aparece)
                 toast.success("Reflexão salva ✅");
               }}>Salvar reflexão 📝</Button>
             </div>
-            <div className="bg-card rounded-xl border border-border p-4">
-              <h3 className="text-xs font-bold mb-3">📅 REFLEXÕES ANTERIORES</h3>
-              <div className="space-y-2">
-                {Object.entries(journalEntries).filter(([d]) => d !== today).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 10).map(([date, entry]) => (
-                  <div key={date} className="bg-muted/30 rounded-lg p-3 border border-border">
-                    <p className="text-xs font-bold mb-1">{new Date(date + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "long" })}</p>
-                    <p className="text-[10px] text-muted-foreground italic mb-1">Prompt: {entry.prompt}</p>
-                    <p className="text-xs">{entry.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ReflexoesAnteriores entradas={journalEntries} hoje={today} />
           </div>}
 
           {/* ========== MOOD TRACKER ========== */}

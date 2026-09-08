@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -162,12 +162,33 @@ const Estudos = () => {
   const [pomodoroRunning, setPomodoroRunning] = useState(false);
   const [pomodoroCount, setPomodoroCount] = usePersistedState("estudos-pomodoro-count", 0);
 
+  /* Fim da contagem no RELÓGIO DE PAREDE (07/09, avaliação da Play: "O
+     Pomodoro também pausa quando a tela é bloqueada"). Mesma cura já aplicada
+     no PomodoroTimer da Rotina em 20/08: com a tela travada o WebView congela
+     os timers, e contar "1 tick = 1 segundo" fazia o cronômetro parar junto.
+     Agora o restante deriva SEMPRE de fimEm − agora; o tick só re-renderiza,
+     e ao voltar do bloqueio o visibilitychange recalcula na hora — inclusive
+     completando o pomodoro se o prazo venceu com a tela apagada. */
+  const pomodoroFimEm = useRef(0);
   useEffect(() => {
-    if (!pomodoroRunning || pomodoroTime <= 0) return;
-    const t = setTimeout(() => setPomodoroTime(prev => prev - 1), 1000);
-    if (pomodoroTime === 1) { setPomodoroRunning(false); setPomodoroCount(pomodoroCount + 1); setPomodoroTime(25 * 60); }
-    return () => clearTimeout(t);
-  }, [pomodoroRunning, pomodoroTime]);
+    if (!pomodoroRunning) { pomodoroFimEm.current = 0; return; } // pausa/reset: a retomada re-ancora
+    if (pomodoroTime <= 0) {
+      pomodoroFimEm.current = 0;
+      setPomodoroRunning(false);
+      setPomodoroCount(c => c + 1);
+      setPomodoroTime(25 * 60);
+      return;
+    }
+    if (!pomodoroFimEm.current) pomodoroFimEm.current = Date.now() + pomodoroTime * 1000;
+    const tick = () => setPomodoroTime(Math.max(0, Math.round((pomodoroFimEm.current - Date.now()) / 1000)));
+    const t = setInterval(tick, 1000);
+    const aoVoltar = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+  }, [pomodoroRunning, pomodoroTime, setPomodoroCount]);
 
   // ── CURSOS EM ANDAMENTO ──
   /** O link entra JUNTO com o curso: a seta da lista só existe se houver link,

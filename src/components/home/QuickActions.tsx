@@ -67,7 +67,13 @@ export const QuickActions = () => {
   const [taskText, setTaskText] = useState("");
   const [gratitudeText, setGratitudeText] = useState("");
   const [sleepHours, setSleepHours] = useState("");
-  
+  /* Refeição em dois toques (07/09): escolhe a refeição do plano, confirma as
+     kcal. Antes gravava `calories: 0` cravado — o widget de calorias da Home
+     nunca saía do zero por esse caminho (avaliação: "na aba dieta n tem como
+     colocar as calorias dos pratos"). A kcal vem pré-preenchida do cardápio
+     (saude-meals-kcal) quando a pessoa cadastrou lá. */
+  const [mealEscolhida, setMealEscolhida] = useState<{ tipo: string; comida: string } | null>(null);
+  const [mealKcal, setMealKcal] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -242,16 +248,19 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
-  const submitMealSelection = (mealType: string, food: string) => {
+  const submitMealSelection = (mealType: string, food: string, kcalTexto: string) => {
     const tStr = todayStr();
     const dietLog = get<Record<string, any>>("core-dieta-log", {});
-    const dayMeals = dietLog[tStr] || {};
+    const dayMeals = { ...(dietLog[tStr] || {}) };
     const mealId = crypto.randomUUID();
-    dayMeals[mealId] = { name: `${mealType}: ${food}`, calories: 0 };
+    const calories = Math.max(0, Math.round(Number(String(kcalTexto).replace(",", ".")) || 0));
+    dayMeals[mealId] = { name: `${mealType}: ${food}`, calories };
     set("core-dieta-log", { ...dietLog, [tStr]: dayMeals });
     vibrate();
     showSuccess("meal");
-    toast.success(`🍽️ ${mealType} registrado!`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
+    toast.success(calories > 0 ? `🍽️ ${mealType} registrado (${calories} kcal)!` : `🍽️ ${mealType} registrado!`, { action: { label: "Ver Dieta", onClick: () => navigate("/dieta") } });
+    setMealEscolhida(null);
+    setMealKcal("");
     setActiveAction(null);
   };
 
@@ -273,7 +282,7 @@ export const QuickActions = () => {
     setActiveAction(null);
   };
 
-  const close = () => setActiveAction(null);
+  const close = () => { setActiveAction(null); setMealEscolhida(null); setMealKcal(""); };
 
   const detoxHabits = get<any[]>("detox-habits", []);
 
@@ -484,6 +493,8 @@ export const QuickActions = () => {
                 const todayDay = weekDayNames[new Date().getDay()];
                 const mealPlan = get<Record<string, Record<string, string>>>("saude-meals", {});
                 const todayPlan = mealPlan[todayDay.toUpperCase()] || mealPlan[todayDay] || {};
+                const kcalPlan = get<Record<string, Record<string, number>>>("saude-meals-kcal", {});
+                const kcalHoje = kcalPlan[todayDay.toUpperCase()] || kcalPlan[todayDay] || {};
                 const mealEmojis: Record<string, string> = { "Café da Manhã": "🌅", "Almoço": "🍽️", "Lanche": "🍎", "Janta": "🌙", "Pré-Treino": "⚡", "Pós-Treino": "💪", "Ceia": "🌙", "Café da Tarde": "☕" };
                 const entries = Object.entries(todayPlan).filter(([_, food]) => food && food.trim());
                 
@@ -496,13 +507,50 @@ export const QuickActions = () => {
                   );
                 }
                 
+                if (mealEscolhida) {
+                  return (
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] text-muted-foreground">
+                        {mealEmojis[mealEscolhida.tipo] || "🍴"} <span className="font-medium text-foreground">{mealEscolhida.tipo}</span> — {mealEscolhida.comida}
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          ref={inputRef}
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder="kcal (opcional)"
+                          aria-label="Calorias da refeição"
+                          value={mealKcal}
+                          onChange={e => setMealKcal(e.target.value)}
+                          className="h-9 text-sm flex-1"
+                          onKeyDown={e => e.key === "Enter" && submitMealSelection(mealEscolhida.tipo, mealEscolhida.comida, mealKcal)}
+                        />
+                        <span className="flex items-center text-xs text-muted-foreground font-medium">kcal</span>
+                        <button
+                          onClick={() => submitMealSelection(mealEscolhida.tipo, mealEscolhida.comida, mealKcal)}
+                          aria-label="Registrar refeição"
+                          className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      <button onClick={() => setMealEscolhida(null)} className="text-[10px] text-muted-foreground underline">Outra refeição</button>
+                    </div>
+                  );
+                }
+
                 return (
                   <div className="space-y-1.5">
                     <p className="text-[10px] text-muted-foreground">Qual refeição você fez?</p>
                     {entries.map(([mealType, food]) => (
                       <motion.button
                         key={mealType}
-                        onClick={() => submitMealSelection(mealType, food)}
+                        onClick={() => {
+                          setMealEscolhida({ tipo: mealType, comida: food });
+                          const k = Number(kcalHoje[mealType]);
+                          setMealKcal(k > 0 ? String(Math.round(k)) : "");
+                        }}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/50 hover:bg-muted transition-colors text-left"
                         whileTap={{ scale: 0.97 }}
                       >

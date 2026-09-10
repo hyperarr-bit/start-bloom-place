@@ -1,17 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Droplets, DollarSign, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
+import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { etiquetar, PERFIL_PESSOAL } from "@/lib/finance-perfil";
+import { numeroBR } from "@/lib/data-normalizers";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
-type ActionId = "water" | "expense" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
+type ActionId = "water" | "expense" | "income" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
 
 interface QuickAction {
   id: ActionId;
@@ -25,6 +26,9 @@ const actions: QuickAction[] = [
   { id: "water", icon: Droplets, label: "+ 200ml Água", color: "bg-cyan-400/20", iconColor: "text-cyan-600" },
   { id: "mood", icon: SmilePlus, label: "Check de Humor", color: "bg-pink-400/20", iconColor: "text-pink-600" },
   { id: "expense", icon: DollarSign, label: "Registrar Gasto", color: "bg-amber-400/20", iconColor: "text-amber-600" },
+  // Espelho do gasto (09/09, cliente pagante: "registrar ganhos em ações
+  // rápidas"). Logo ao lado do gasto, porque é o par dele.
+  { id: "income", icon: Banknote, label: "Registrar Ganho", color: "bg-green-400/20", iconColor: "text-green-600" },
   { id: "weight", icon: Scale, label: "Pesar Agora", color: "bg-purple-400/20", iconColor: "text-purple-600" },
   { id: "workout", icon: Dumbbell, label: "Marcar Treino", color: "bg-orange-400/20", iconColor: "text-orange-600" },
   { id: "sleep", icon: Moon, label: "Registrar Sono", color: "bg-indigo-400/20", iconColor: "text-indigo-600" },
@@ -47,6 +51,11 @@ const expenseCategories = [
   "Alimentação", "Transporte", "Lazer", "Saúde", "Educação", "Compras", "Outros"
 ];
 
+// Receita não tem categoria, tem DESCRIÇÃO (é o que a tabela RECEITAS
+// mostra). Os chips são as descrições mais comuns; "Recebimento" é o
+// genérico, pra quem só quer anotar que entrou dinheiro.
+const incomeKinds = ["Recebimento", "Salário", "Freela", "Venda", "Extra"];
+
 const vibrate = () => {
   if (navigator.vibrate) navigator.vibrate(30);
 };
@@ -62,6 +71,8 @@ export const QuickActions = () => {
   // Form states
   const [expenseValue, setExpenseValue] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("Outros");
+  const [incomeValue, setIncomeValue] = useState("");
+  const [incomeKind, setIncomeKind] = useState(incomeKinds[0]);
   const [weightValue, setWeightValue] = useState("");
   const [ideaText, setIdeaText] = useState("");
   const [taskText, setTaskText] = useState("");
@@ -157,6 +168,34 @@ export const QuickActions = () => {
     toast.success(`💸 R$ ${amount.toFixed(2)} em ${expenseCategory}`);
     setExpenseValue("");
     setExpenseCategory("Outros");
+    setActiveAction(null);
+  };
+
+  /* REGISTRAR GANHO (09/09). Grava em `finance-incomes` — a chave que a
+     tabela RECEITAS de Finanças lê — no formato dela ({id, description,
+     value, date}) e etiquetado com o perfil ativo, igual ao gasto: com a
+     empresa selecionada em Finanças, o ganho cai na empresa. `numeroBR`
+     em vez de parseFloat porque "1.250,50" digitado vira 1.25 no parseFloat
+     (o bug de valores da review ★3 de 20/08). */
+  const submitIncome = () => {
+    const amount = numeroBR(incomeValue);
+    if (!Number.isFinite(amount) || amount <= 0) { toast.error("Informe um valor válido"); return; }
+    const incomes = get<any[]>("finance-incomes", []);
+    const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
+    set("finance-incomes", [
+      ...incomes,
+      etiquetar({
+        id: crypto.randomUUID(),
+        description: incomeKind,
+        value: amount,
+        date: todayStr(),
+      }, perfil),
+    ]);
+    vibrate();
+    showSuccess("income");
+    toast.success(`💰 R$ ${amount.toFixed(2)} — ${incomeKind}`, { action: { label: "Ver Finanças", onClick: () => navigate("/financas") } });
+    setIncomeValue("");
+    setIncomeKind(incomeKinds[0]);
     setActiveAction(null);
   };
 
@@ -373,6 +412,42 @@ export const QuickActions = () => {
                         }`}
                       >
                         {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Income form — mesma UI do gasto: valor + chips */}
+              {activeAction === "income" && (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="R$ 0,00"
+                      value={incomeValue}
+                      onChange={e => setIncomeValue(e.target.value)}
+                      className="h-9 text-sm flex-1"
+                      onKeyDown={e => e.key === "Enter" && submitIncome()}
+                    />
+                    <button onClick={submitIncome} aria-label="Salvar ganho" className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {incomeKinds.map(k => (
+                      <button
+                        key={k}
+                        onClick={() => setIncomeKind(k)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+                          incomeKind === k
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {k}
                       </button>
                     ))}
                   </div>

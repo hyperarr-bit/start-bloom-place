@@ -168,3 +168,41 @@ export const readMonthData = (userId: string | null | undefined, logicalKey: str
   readJsonForUser(userId, logicalKey);
 export const writeMonthData = (userId: string | null | undefined, logicalKey: string, value: any) =>
   writeJsonForUser(userId, logicalKey, value);
+
+/**
+ * Anos que têm algum lançamento ARQUIVADO (`finance-{ano}-{mes}-*`), pra quem
+ * monta uma lista de meses atravessando anos (Comparação Mensal, 09/09 —
+ * pedido de cliente: comparar dezembro de 2025 com janeiro de 2026).
+ *
+ * Varre as chaves do usuário no aparelho (e as seeds da demo quando não há
+ * usuário). Custo desprezível — algumas centenas de chaves — e de propósito
+ * SEM olhar o perfil: a lista de opções não pode encolher quando a pessoa
+ * troca de chip PF/PJ. Lista vazia `[]` não conta: mês arquivado sem nada não
+ * é motivo pra oferecer o ano inteiro.
+ */
+export const anosComLancamentos = (userId: string | null | undefined): number[] => {
+  const anos = new Set<number>();
+  const padrao = /^finance-(\d{4})-[a-z]+-(incomes|expenses|fixed|installments)$/;
+  const considerar = (logica: string, valor: unknown) => {
+    const m = logica.match(padrao);
+    if (m && Array.isArray(valor) && valor.length > 0) anos.add(Number(m[1]));
+  };
+  try {
+    if (typeof window === "undefined") return [];
+    const seeds = (window as any).__PREVIEW_SEEDS__;
+    if (!userId && seeds) {
+      for (const k of Object.keys(seeds)) considerar(k, seeds[k]);
+      return [...anos].sort((a, b) => a - b);
+    }
+    const prefixo = userKeyOf(userId, "");
+    if (!prefixo) return [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith(prefixo)) continue;
+      const logica = k.slice(prefixo.length);
+      if (!padrao.test(logica)) continue;
+      try { considerar(logica, JSON.parse(localStorage.getItem(k) || "null")); } catch { /* chave corrompida: ignora */ }
+    }
+  } catch { /* sem localStorage: sem anos */ }
+  return [...anos].sort((a, b) => a - b);
+};

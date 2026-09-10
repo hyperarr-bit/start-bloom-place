@@ -422,7 +422,7 @@ const Index = () => {
               />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
-              <MonthComparison />
+              <MonthComparison perfil={perfilValido} />
             </TrackedCard>
           </>
         )}
@@ -546,11 +546,11 @@ const Index = () => {
                     ("e a dívida que não é do cartão?"), e longe o bastante do
                     topo pra deixar claro que não conversa com os totais. */}
                 <TrackedCard cardKey="dividas-pessoas" tab="financeiro">
-                  <DividasEntrePessoas />
+                  <DividasEntrePessoas perfil={perfilValido} perfis={perfis} />
                 </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_200px] gap-4">
                   <TrackedCard cardKey="annual-budget" tab="financeiro">
-                    <AnnualBudget />
+                    <AnnualBudget perfil={perfilValido} />
                   </TrackedCard>
                   <TrackedCard cardKey="monthly-budget" tab="financeiro">
                     <MonthlyBudget budgets={monthlyBudgets} setBudgets={setMonthlyBudgets} onOpenMonth={abrirMes} />
@@ -597,7 +597,9 @@ const Index = () => {
 
         {activeTab === "limites" && (
           <TrackedCard cardKey="category-budgets" tab="limites">
-            <CategoryBudgets expenses={[...expenses, ...fixedExpenses]} />
+            {/* 09/09: o perfil vai junto — os gastos já chegam filtrados, e o
+                teto tem que ser do MESMO perfil (ver CategoryBudgets). */}
+            <CategoryBudgets expenses={[...expenses, ...fixedExpenses]} perfil={perfilValido} perfis={perfis} />
           </TrackedCard>
         )}
 

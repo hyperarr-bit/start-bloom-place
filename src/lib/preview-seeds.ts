@@ -352,8 +352,13 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
   biblioteca: {
     ...COMMON,
     "lib-books": [
-      { id: "1", title: "Hábitos Atômicos", author: "James Clear", status: "lendo", progress: 65 },
-      { id: "2", title: "Mindset", author: "Carol Dweck", status: "lido", progress: 100 },
+      // 09/09: formato, sinopse e páginas pra demo mostrar os selos novos; e o
+      // "lido" ganha data de fim — sem ela a meta do ano ficava em 0/12 na
+      // própria demonstração, o mesmo tropeço que um cliente relatou.
+      { id: "1", title: "Hábitos Atômicos", author: "James Clear", status: "lendo", progress: 65, format: "ebook", pages: 320, currentPage: 208,
+        synopsis: "Como pequenas mudanças diárias, de 1%, se acumulam em resultados grandes. O método dos 4 passos pra criar hábitos bons e largar os ruins." },
+      { id: "2", title: "Mindset", author: "Carol Dweck", status: "lido", progress: 100, format: "fisico", pages: 312, currentPage: 312, endDate: daysAgo(40),
+        notes: "A ideia central: talento é ponto de partida, não teto. Reler o capítulo sobre elogiar o esforço." },
     ],
   },
   casa: {

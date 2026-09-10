@@ -1,9 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info } from "lucide-react";
+import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
+import { localDayKey } from "@/lib/utils";
+import { uploadFromInput } from "@/lib/image-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +27,20 @@ interface BookQuote {
   tags: string[];
 }
 
+/* PEDIDO DE CLIENTE PAGANTE (09/09): "estou adicionando meus livros no
+   catálogo para ter uma meta de leitura. Vi que tem anotações. Mas abre um
+   campo abaixo das anotações para a SINOPSE, pois estou usando as anotações
+   para isso. Também um campo para separar livro FÍSICO e E-BOOK, e o que é
+   APOSTILA DE CURSO. E que tenha como adicionar FOTO do livro, se não
+   acharmos o link."
+
+   Os dois campos novos são OPCIONAIS de propósito: a chave `lib-books` já
+   está gravada em centenas de contas sem eles, e nada aqui pode exigir
+   migração. Quem lê essa chave fora daqui (ReadingWidget, badges-vida,
+   reagendar, retrospectiva) só olha status/pages/currentPage — campo a mais
+   não incomoda ninguém. */
+export type BookFormat = "fisico" | "ebook" | "audiobook" | "apostila";
+
 interface Book {
   id: string;
   title: string;
@@ -43,7 +59,29 @@ interface Book {
   lentTo: string;
   lentDate: string;
   lentReturnDate: string;
+  /** Sinopse (do que o livro trata) — separada das anotações porque a
+   *  cliente usava "Anotações" pra guardar a sinopse e ficava sem lugar pras
+   *  anotações de verdade. Preenchida sozinha pelo import por link. */
+  synopsis?: string;
+  /** Físico / e-book / audiobook / apostila de curso. Livro antigo não tem —
+   *  e aí NÃO ganha selo (nunca "undefined" na tela). */
+  format?: BookFormat;
 }
+
+export const FORMATOS_DO_LIVRO: { v: BookFormat; l: string; icon: string }[] = [
+  { v: "fisico", l: "Físico", icon: "📕" },
+  { v: "ebook", l: "E-book", icon: "📱" },
+  { v: "audiobook", l: "Audiobook", icon: "🎧" },
+  { v: "apostila", l: "Apostila de curso", icon: "📎" },
+];
+
+/** Selo do formato pra tela. Devolve null pra livro sem formato OU com valor
+ *  que a lista não conhece (dado de outra versão) — quem chama não renderiza
+ *  nada nesses casos. */
+export const rotuloDoFormato = (f: unknown): string | null => {
+  const achado = FORMATOS_DO_LIVRO.find(x => x.v === f);
+  return achado ? `${achado.icon} ${achado.l}` : null;
+};
 
 const genId = () => crypto.randomUUID();
 
@@ -67,7 +105,10 @@ const StarRating = ({ value, onChange, size = "w-4 h-4" }: { value: number; onCh
 );
 
 // ── URL Import ──
-const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author: string; cover: string }) => void }) => {
+/* A function fetch-book-metadata SEMPRE devolveu `description`, mas o app
+   jogava fora — só lia title/author/cover. Agora ela vira a sinopse do
+   formulário (pedido de 09/09), e a pessoa edita se quiser. */
+const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author: string; cover: string; synopsis: string }) => void }) => {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -77,7 +118,12 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
     try {
       const { data } = await supabase.functions.invoke('fetch-book-metadata', { body: { url: url.trim() } });
       if (data?.success && data.data) {
-        onImport({ title: data.data.title || "", author: data.data.author || "", cover: data.data.cover || "" });
+        onImport({
+          title: data.data.title || "",
+          author: data.data.author || "",
+          cover: data.data.cover || "",
+          synopsis: typeof data.data.description === "string" ? data.data.description.trim() : "",
+        });
         setUrl("");
       }
     } catch (err) { console.error('Failed to fetch metadata:', err); }
@@ -92,7 +138,7 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
       <div className="flex gap-1.5">
         <Input value={url} onChange={e => setUrl(e.target.value)} placeholder="Cole o link do livro aqui..."
           className="h-8 text-xs flex-1" onKeyDown={e => e.key === "Enter" && fetchMetadata()} />
-        <Button size="sm" className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white" onClick={fetchMetadata} disabled={loading || !url.trim()}>
+        <Button size="sm" className="h-8 px-3 bg-orange-500 hover:bg-orange-600 text-white" onClick={fetchMetadata} disabled={loading || !url.trim()} aria-label="Importar dados do link">
           {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link className="w-3 h-3" />}
         </Button>
       </div>
@@ -124,13 +170,29 @@ const Biblioteca = () => {
   // ── Search/Filter ──
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterFormat, setFilterFormat] = useState<string>("all");
   const [filterTag, setFilterTag] = useState<string>("all");
+
+  // ── Foto da capa (pedido de 09/09: "adicionar FOTO do livro, se não
+  //    acharmos o link") ──
+  // Estado fica AQUI e não dentro de BookForm: BookForm é chamado como
+  // função ({showForm && BookForm()}), então hook lá dentro seria hook
+  // condicional do componente pai.
+  const capaInputRef = useRef<HTMLInputElement>(null);
+  const [subindoCapa, setSubindoCapa] = useState(false);
+  const [erroCapa, setErroCapa] = useState("");
 
   // ── Derived Data ──
   const currentBook = books.find(b => b.status === "lendo");
   const booksRead = books.filter(b => b.status === "lido");
   const currentYear = new Date().getFullYear();
   const booksReadThisYear = booksRead.filter(b => b.endDate?.startsWith(String(currentYear))).length;
+  /* META QUE NÃO CONTAVA (09/09): a meta do ano só soma "lido" COM endDate do
+     ano, mas o campo FIM nunca se preenchia sozinho — a cliente marcava lido,
+     a meta ficava em 0/12 e ela achava que a meta não funcionava. Daqui pra
+     frente o save preenche FIM com hoje; o que já estava gravado sem data
+     aparece na aba Desafio com um toque pra contar. */
+  const lidosSemData = booksRead.filter(b => !b.endDate);
   const totalPagesRead = books.reduce((s, b) => s + (b.status === "lido" ? (b.pages || 0) : (b.currentPage || 0)), 0);
   /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
      igual a de finanças, você entrar e ja ter um resumo do que tem para
@@ -171,12 +233,39 @@ const Biblioteca = () => {
 
   const save = () => {
     if (!form.title) return;
+    // Rede de segurança da meta: "lido" sem FIM ganha o dia de HOJE (dia
+    // LOCAL — toISOString depois das 21h vira amanhã, bug real de 16/07).
+    const pronto: Partial<Book> = form.status === "lido" && !form.endDate ? { ...form, endDate: localDayKey() } : form;
     if (editId) {
-      setBooks(prev => prev.map(b => b.id === editId ? { ...b, ...form, quotes: b.quotes || [] } as Book : b));
+      setBooks(prev => prev.map(b => b.id === editId ? { ...b, ...pronto, quotes: b.quotes || [] } as Book : b));
     } else {
-      setBooks(prev => [...prev, { ...emptyForm(), ...form, id: genId(), quotes: [] } as Book]);
+      setBooks(prev => [...prev, { ...emptyForm(), ...pronto, id: genId(), quotes: [] } as Book]);
     }
     setShowForm(false); setEditId(null);
+  };
+
+  /** Aba Desafio: livros "lido" gravados antes de 09/09 sem data de fim
+   *  passam a contar no ano corrente com um toque. Data = hoje (dia local),
+   *  não 01/01 — 01/01 leria como "terminei no Ano Novo", que é mentira. */
+  const contarLidosSemDataEsteAno = () => {
+    const hoje = localDayKey();
+    setBooks(prev => prev.map(b => b.status === "lido" && !b.endDate ? { ...b, endDate: hoje } : b));
+  };
+
+  const subirCapa = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSubindoCapa(true); setErroCapa("");
+    try {
+      // Storage (WebP + URL assinada), NUNCA base64 no `cover`: base64 de uma
+      // foto de celular tem ~200KB e inflaria a chave lib-books além dos 50KB
+      // que a carga inicial pula (bug dos dados sumindo, 16/07). Mesmo bucket
+      // e helper do quadro dos sonhos (hiperfoco), subpasta própria.
+      const url = await uploadFromInput(e, "dream-board", "biblioteca");
+      if (url) setForm(p => ({ ...p, cover: url }));
+      else setErroCapa("Não deu pra subir a foto. Entre na sua conta e tente de novo, ou cole o link da capa.");
+    } catch (err) {
+      console.error("[biblioteca] capa:", err);
+      setErroCapa("Não deu pra subir a foto. Tente de novo.");
+    } finally { setSubindoCapa(false); }
   };
 
   const remove = (id: string) => setBooks(prev => prev.filter(b => b.id !== id));
@@ -230,9 +319,11 @@ const Biblioteca = () => {
 
   // ── Filtered books for Estante ──
   const filteredBooks = books.filter(b => {
-    const matchSearch = b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchSearch = (b.title || "").toLowerCase().includes(q) || (b.author || "").toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || b.status === filterStatus;
-    return matchSearch && matchStatus;
+    const matchFormat = filterFormat === "all" || b.format === filterFormat;
+    return matchSearch && matchStatus && matchFormat;
   });
 
   const statusGroups = [
@@ -250,7 +341,7 @@ const Biblioteca = () => {
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowForm(false)}><X className="w-4 h-4" /></Button>
       </div>
       <div className="bg-orange-50/80 dark:bg-orange-950/20 p-4 space-y-3">
-        <ImportFromUrl onImport={(data) => setForm(p => ({ ...p, title: data.title || p.title, author: data.author || p.author, cover: data.cover || p.cover }))} />
+        <ImportFromUrl onImport={(data) => setForm(p => ({ ...p, title: data.title || p.title, author: data.author || p.author, cover: data.cover || p.cover, synopsis: data.synopsis || p.synopsis }))} />
 
         {form.cover && (
           <div className="flex justify-center">
@@ -260,14 +351,27 @@ const Biblioteca = () => {
 
         <Input placeholder="Título" value={form.title || ""} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className="h-9 text-sm" />
         <Input placeholder="Autor" value={form.author || ""} onChange={e => setForm(p => ({ ...p, author: e.target.value }))} className="h-9 text-sm" />
-        <Input placeholder="URL da capa (opcional)" value={form.cover || ""} onChange={e => setForm(p => ({ ...p, cover: e.target.value }))} className="h-9 text-sm" />
+        {/* Capa: link OU foto do próprio livro ("se não acharmos o link").
+            O input de arquivo fica escondido; o botão de câmera abre a
+            galeria/câmera do celular (accept image/*). */}
+        <div className="flex gap-1.5">
+          <Input placeholder="URL da capa (opcional)" value={form.cover || ""} onChange={e => setForm(p => ({ ...p, cover: e.target.value }))} className="h-9 text-sm flex-1" />
+          <Button type="button" size="sm" variant="outline" className="h-9 px-2.5 text-xs whitespace-nowrap" onClick={() => capaInputRef.current?.click()} disabled={subindoCapa} aria-label="Tirar ou escolher foto da capa">
+            {subindoCapa ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+            <span className="ml-1">{subindoCapa ? "Subindo..." : "Foto"}</span>
+          </Button>
+          <input ref={capaInputRef} type="file" accept="image/*" className="hidden" onChange={subirCapa} aria-label="Escolher foto da capa" />
+        </div>
+        {erroCapa && <p className="text-[11px] text-destructive -mt-1">{erroCapa}</p>}
         <div className="grid grid-cols-2 gap-2">
           <Select value={form.genre || "Ficção"} onValueChange={v => setForm(p => ({ ...p, genre: v }))}>
-            <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 text-xs" aria-label="Gênero"><SelectValue /></SelectTrigger>
             <SelectContent>{bookGenres.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
           </Select>
-          <Select value={form.status || "quero-ler"} onValueChange={v => setForm(p => ({ ...p, status: v as Book["status"] }))}>
-            <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+          {/* Virar "lido" já preenche o FIM com hoje (a pessoa ajusta se
+              quiser): sem isso o livro não entrava na meta do ano. */}
+          <Select value={form.status || "quero-ler"} onValueChange={v => setForm(p => ({ ...p, status: v as Book["status"], endDate: v === "lido" && !p.endDate ? localDayKey() : p.endDate }))}>
+            <SelectTrigger className="h-9 text-xs" aria-label="Status"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="quero-ler">📋 Quero Ler</SelectItem>
               <SelectItem value="lendo">📖 Lendo</SelectItem>
@@ -276,7 +380,15 @@ const Biblioteca = () => {
             </SelectContent>
           </Select>
         </div>
-        <Input type="number" placeholder="Total de páginas" value={form.pages || ""} onChange={e => setForm(p => ({ ...p, pages: +e.target.value }))} className="h-9 text-sm" />
+        <div className="grid grid-cols-2 gap-2">
+          {/* Formato (pedido de 09/09: "separar livro FÍSICO e E-BOOK, e o que
+              é APOSTILA DE CURSO"). Sem valor = placeholder, nunca obriga. */}
+          <Select value={form.format || ""} onValueChange={v => setForm(p => ({ ...p, format: v as BookFormat }))}>
+            <SelectTrigger className="h-9 text-xs" aria-label="Formato"><SelectValue placeholder="Formato" /></SelectTrigger>
+            <SelectContent>{FORMATOS_DO_LIVRO.map(f => <SelectItem key={f.v} value={f.v}>{f.icon} {f.l}</SelectItem>)}</SelectContent>
+          </Select>
+          <Input type="number" placeholder="Total de páginas" value={form.pages || ""} onChange={e => setForm(p => ({ ...p, pages: +e.target.value }))} className="h-9 text-sm" />
+        </div>
 
         {/* Only show current page for lendo status */}
         {(form.status === "lendo" || form.status === "lido") && (
@@ -286,8 +398,8 @@ const Biblioteca = () => {
         {/* Only show dates for lendo/lido */}
         {(form.status === "lendo" || form.status === "lido") && (
           <div className="grid grid-cols-2 gap-2">
-            <div><label className="text-[10px] font-bold text-muted-foreground">INÍCIO</label><Input type="date" value={form.startDate || ""} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>
-             {form.status === "lido" && <div><label className="text-[10px] font-bold text-muted-foreground">FIM</label><Input type="date" value={form.endDate || ""} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>}
+            <div><label className="text-[10px] font-bold text-muted-foreground">INÍCIO</label><Input type="date" aria-label="Data de início" value={form.startDate || ""} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>
+             {form.status === "lido" && <div><label className="text-[10px] font-bold text-muted-foreground">FIM</label><Input type="date" aria-label="Data de fim" value={form.endDate || ""} onChange={e => setForm(p => ({ ...p, endDate: e.target.value }))} className="h-9 text-sm appearance-none [&::-webkit-date-and-time-value]:text-left" /></div>}
            </div>
         )}
 
@@ -303,7 +415,10 @@ const Biblioteca = () => {
           )}
         </div>
 
-        <Textarea placeholder="Anotações..." value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[60px]" />
+        <Textarea placeholder="Anotações..." aria-label="Anotações" value={form.notes || ""} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} className="text-sm min-h-[60px]" />
+        {/* "abre um campo abaixo das anotações para a SINOPSE" — é literalmente
+            aqui que a cliente pediu. O import por link já deixa preenchido. */}
+        <Textarea placeholder="Sinopse (do que o livro trata)..." aria-label="Sinopse" value={form.synopsis || ""} onChange={e => setForm(p => ({ ...p, synopsis: e.target.value }))} className="text-sm min-h-[60px]" />
 
         {/* Only show rating for lido status */}
         {form.status === "lido" && (
@@ -550,27 +665,43 @@ const Biblioteca = () => {
 
           {/* ══════ TAB: ESTANTE ══════ */}
           {tab === "estante" && <div className="space-y-4 mt-4">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-                <Input placeholder="Buscar livro..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+                  <Input placeholder="Buscar livro..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 h-9 text-sm" />
+                </div>
+                <Button size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white" onClick={openNew} aria-label="Novo livro"><Plus className="w-4 h-4" /></Button>
               </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-28 h-9 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="lendo">📖 Lendo</SelectItem>
-                  <SelectItem value="lido">✅ Lidos</SelectItem>
-                  <SelectItem value="quero-ler">📋 Quero Ler</SelectItem>
-                  <SelectItem value="abandonado">⚰️ Abandonados</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button size="sm" className="h-9 bg-orange-500 hover:bg-orange-600 text-white" onClick={openNew}><Plus className="w-4 h-4" /></Button>
+              {/* Dois filtros lado a lado, cada um com metade da linha: três
+                  controles + botão numa linha de 360px cortavam o segundo
+                  select (lição do resumo 2×2 de Finanças). */}
+              <div className="flex gap-2">
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="flex-1 h-9 text-xs" aria-label="Filtrar por status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="lendo">📖 Lendo</SelectItem>
+                    <SelectItem value="lido">✅ Lidos</SelectItem>
+                    <SelectItem value="quero-ler">📋 Quero Ler</SelectItem>
+                    <SelectItem value="abandonado">⚰️ Abandonados</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={filterFormat} onValueChange={setFilterFormat}>
+                  <SelectTrigger className="flex-1 h-9 text-xs" aria-label="Filtrar por formato"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Qualquer formato</SelectItem>
+                    {FORMATOS_DO_LIVRO.map(f => <SelectItem key={f.v} value={f.v}>{f.icon} {f.l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {showForm && BookForm()}
 
-            {filterStatus === "all" ? (
+            {/* Com filtro de formato e status "Todos" os grupos continuam; se
+                nenhum grupo sobrar, cai na mensagem em vez de tela em branco. */}
+            {filterStatus === "all" && filteredBooks.length > 0 ? (
               statusGroups.map(group => {
                 const groupBooks = filteredBooks.filter(b => b.status === group.key);
                 if (groupBooks.length === 0) return null;
@@ -739,6 +870,17 @@ const Biblioteca = () => {
                       style={{ width: `${Math.min(100, (booksReadThisYear / yearGoal) * 100)}%` }}
                     />
                   </div>
+                  {/* Livros marcados "lido" antes de 09/09 sem data de fim:
+                      a meta não os via e a pessoa achava a meta quebrada. */}
+                  {lidosSemData.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
+                      <Info className="w-3 h-3 flex-shrink-0" />
+                      <span>{lidosSemData.length} {lidosSemData.length === 1 ? "livro lido sem data não entra" : "livros lidos sem data não entram"} na meta</span>
+                      <button onClick={contarLidosSemDataEsteAno} className="font-bold text-amber-700 dark:text-amber-300 underline underline-offset-2">
+                        Contar como lidos este ano
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Visual Shelf */}
@@ -797,6 +939,7 @@ const Biblioteca = () => {
       {/* FAB */}
       <button
         onClick={() => { setTab("estante"); openNew(); }}
+        aria-label="Adicionar livro"
         className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg flex items-center justify-center z-30 transition-transform active:scale-90"
       >
         <Plus className="w-6 h-6" />
@@ -806,36 +949,83 @@ const Biblioteca = () => {
 };
 
 // ── BookRow Component ──
-const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit: () => void; onRemove: () => void; onUpdatePage: (id: string, page: number) => void }) => (
-  <div className="flex gap-3 items-start rounded-lg bg-card border border-border p-2.5">
-    {book.cover ? (
-      <img src={book.cover} alt={book.title} className="w-10 h-14 rounded object-cover flex-shrink-0" />
-    ) : (
-      <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
-        <BookOpen className="w-4 h-4 text-muted-foreground/30" />
-      </div>
-    )}
-    <div className="flex-1 min-w-0">
-      <h4 className="font-bold text-xs leading-tight truncate">{book.title}</h4>
-      <p className="text-[10px] text-muted-foreground truncate">{book.author}</p>
-      {book.status === "lendo" && book.pages > 0 && (
-        <div className="mt-1 space-y-0.5">
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${Math.min(100, (book.currentPage / book.pages) * 100)}%` }} />
+/* Sinopse e anotações eram gravadas e NUNCA mostradas em lugar nenhum — por
+   isso a cliente sentia que "anotações" era o único lugar pra guardar texto.
+   Agora a linha ganha um toque que abre/fecha o bloco, só quando existe
+   texto: lista fechada continua enxuta. Selos de formato e gênero (gênero já
+   era gravado desde sempre e nunca aparecia). */
+const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit: () => void; onRemove: () => void; onUpdatePage: (id: string, page: number) => void }) => {
+  const [aberto, setAberto] = useState(false);
+  const sinopse = (book.synopsis || "").trim();
+  const anotacoes = (book.notes || "").trim();
+  const seloFormato = rotuloDoFormato(book.format);
+  const rotuloDetalhe = sinopse && anotacoes ? "Sinopse e anotações" : sinopse ? "Sinopse" : "Anotações";
+  return (
+    <div className="rounded-lg bg-card border border-border p-2.5">
+      <div className="flex gap-3 items-start">
+        {book.cover ? (
+          <img src={book.cover} alt={book.title} className="w-10 h-14 rounded object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-10 h-14 rounded bg-muted flex items-center justify-center flex-shrink-0">
+            <BookOpen className="w-4 h-4 text-muted-foreground/30" />
           </div>
-          <p className="text-[9px] text-muted-foreground">{book.currentPage}/{book.pages} págs</p>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-bold text-xs leading-tight truncate">{book.title}</h4>
+          <p className="text-[10px] text-muted-foreground truncate">{book.author}</p>
+          {(seloFormato || book.genre) && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {seloFormato && <Badge variant="outline" className="text-[8px] h-4 px-1.5">{seloFormato}</Badge>}
+              {book.genre && <Badge variant="outline" className="text-[8px] h-4 px-1.5 text-muted-foreground">{book.genre}</Badge>}
+            </div>
+          )}
+          {book.status === "lendo" && book.pages > 0 && (
+            <div className="mt-1 space-y-0.5">
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-orange-500 rounded-full transition-all" style={{ width: `${Math.min(100, (book.currentPage / book.pages) * 100)}%` }} />
+              </div>
+              <p className="text-[9px] text-muted-foreground">{book.currentPage}/{book.pages} págs</p>
+            </div>
+          )}
+          {book.status === "abandonado" && <p className="text-[9px] italic text-muted-foreground mt-0.5">⚰️ A vida é curta demais para livros ruins.</p>}
+          {book.rating > 0 && <div className="mt-0.5"><StarRating value={book.rating} size="w-3 h-3" /></div>}
+          {book.lentTo && <Badge className="mt-1 text-[8px] h-4 bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800">📤 {book.lentTo}</Badge>}
+          {(book.quotes || []).length > 0 && <Badge variant="outline" className="mt-1 ml-1 text-[8px] h-4">💡 {book.quotes.length} citações</Badge>}
+          {(sinopse || anotacoes) && (
+            <button
+              type="button"
+              onClick={() => setAberto(a => !a)}
+              aria-expanded={aberto}
+              className="mt-1.5 flex items-center gap-0.5 text-[10px] font-bold text-orange-700 dark:text-orange-300"
+            >
+              {aberto ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              {aberto ? "Ocultar" : rotuloDetalhe}
+            </button>
+          )}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit} aria-label={`Editar ${book.title}`}><Edit2 className="w-3 h-3" /></Button>
+          <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={onRemove} aria-label={`Remover ${book.title}`}><Trash2 className="w-3 h-3" /></Button>
+        </div>
+      </div>
+      {aberto && (sinopse || anotacoes) && (
+        <div className="mt-2 pt-2 border-t border-border/60 space-y-2" data-testid={`detalhe-${book.id}`}>
+          {sinopse && (
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Sinopse</p>
+              <p className="text-xs leading-relaxed whitespace-pre-wrap">{sinopse}</p>
+            </div>
+          )}
+          {anotacoes && (
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Anotações</p>
+              <p className="text-xs leading-relaxed whitespace-pre-wrap">{anotacoes}</p>
+            </div>
+          )}
         </div>
       )}
-      {book.status === "abandonado" && <p className="text-[9px] italic text-muted-foreground mt-0.5">⚰️ A vida é curta demais para livros ruins.</p>}
-      {book.rating > 0 && <div className="mt-0.5"><StarRating value={book.rating} size="w-3 h-3" /></div>}
-      {book.lentTo && <Badge className="mt-1 text-[8px] h-4 bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800">📤 {book.lentTo}</Badge>}
-      {(book.quotes || []).length > 0 && <Badge variant="outline" className="mt-1 ml-1 text-[8px] h-4">💡 {book.quotes.length} citações</Badge>}
     </div>
-    <div className="flex flex-col gap-0.5">
-      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit}><Edit2 className="w-3 h-3" /></Button>
-      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={onRemove}><Trash2 className="w-3 h-3" /></Button>
-    </div>
-  </div>
-);
+  );
+};
 
 export default Biblioteca;

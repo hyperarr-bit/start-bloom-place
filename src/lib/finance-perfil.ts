@@ -187,3 +187,15 @@ export const perfilAtivoLocal = (userId: string | null | undefined): string => {
     try { const v = JSON.parse(raw); return typeof v === "string" && v ? v : PERFIL_PESSOAL; } catch { return raw || PERFIL_PESSOAL; }
   } catch { return PERFIL_PESSOAL; }
 };
+
+/**
+ * Nome que a tela mostra pra uma etiqueta (selo em "Tudo junto", cabeçalho
+ * dos Limites — 09/09): "Pessoal", o nome da empresa, ou a própria etiqueta
+ * quando a empresa já foi apagada — o lançamento não some, então o selo
+ * também não pode sumir.
+ */
+export const nomeDoPerfil = (perfil: string | undefined, perfis: Perfil[]): string => {
+  const p = perfilDe({ perfil });
+  if (p === PERFIL_PESSOAL) return "Pessoal";
+  return perfis.find((x) => x.id === p)?.nome ?? p;
+};

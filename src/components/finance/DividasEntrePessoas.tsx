@@ -22,6 +22,17 @@
  *
  * O `installments` do módulo continua sendo outra coisa: aquilo é parcela de
  * CARTÃO, que de fato compromete o mês e por isso entra nos totais.
+ *
+ * ── POR PERFIL (09/09) ───────────────────────────────────────────────────
+ * Cliente pagante: "a divisão de empresa e pessoal não tá tão separado, na
+ * parte de dívidas e empréstimos". Este caderno nasceu antes dos perfis PF/PJ
+ * e nunca ganhou a etiqueta: a lista era uma só, e o empréstimo que a empresa
+ * fez aparecia no Pessoal. Agora cada dívida carrega `perfil` (sem etiqueta =
+ * pessoal, como todo o resto do módulo — dado antigo continua valendo), a
+ * tela vê só as do perfil ativo e a volta é mesclada por `usarListaDoPerfil`,
+ * a mesma mecânica das despesas e pelo mesmo motivo: apagar uma dívida no
+ * Pessoal não pode levar junto a dívida da empresa. Em "Tudo junto" aparece
+ * tudo, com um selo discreto dizendo de quem é cada uma.
  */
 import { useState } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -31,6 +42,7 @@ import { Plus, Trash2, ArrowDownLeft, ArrowUpRight, HandCoins, ChevronDown, Chec
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { usarListaDoPerfil, etiquetar, nomeDoPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 
 /** Positivo aumenta a dívida; negativo abate (pagamento / devolução). */
 export interface LancamentoDivida {
@@ -47,6 +59,15 @@ export interface DividaPessoal {
   direcao: "devo" | "medevem";
   criadaEm: string;
   lancamentos: LancamentoDivida[];
+  /** Perfil PF/PJ dono da dívida. Ausente = pessoal (legado). */
+  perfil?: string;
+}
+
+interface Props {
+  /** Perfil ativo (PF/PJ). Sem a prop, comporta-se como sempre: pessoal. */
+  perfil?: string;
+  /** Só pra dar nome ao selo em "Tudo junto". */
+  perfis?: Perfil[];
 }
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -65,8 +86,12 @@ const dataCurta = (k: string) => {
   }
 };
 
-export const DividasEntrePessoas = () => {
-  const [dividas, setDividas] = usePersistedState<DividaPessoal[]>("finance-dividas-pessoas", []);
+export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Props) => {
+  const [dividasTodas, setDividasTodas] = usePersistedState<DividaPessoal[]>("finance-dividas-pessoas", []);
+  /* A tela só enxerga o perfil ativo; a escrita volta mesclada com as dívidas
+     dos outros perfis (finance-perfil.ts). */
+  const [dividas, setDividas] = usarListaDoPerfil(dividasTodas, setDividasTodas, perfil);
+  const consolidado = perfil === PERFIL_TODOS;
   const [aberta, setAberta] = useState<string | null>(null);
   const [nova, setNova] = useState({ pessoa: "", valor: "", direcao: "devo" as DividaPessoal["direcao"] });
   const [movimento, setMovimento] = useState<{ id: string; valor: string; sinal: 1 | -1 } | null>(null);
@@ -78,7 +103,9 @@ export const DividasEntrePessoas = () => {
     const hoje = localDayKey();
     setDividas([
       ...dividas,
-      {
+      // Nasce etiquetada com o perfil ativo (a mesclagem também etiquetaria;
+      // aqui é explícito pra ninguém depender do efeito colateral).
+      etiquetar({
         id: novoId(),
         pessoa: nova.pessoa.trim(),
         direcao: nova.direcao,
@@ -86,7 +113,7 @@ export const DividasEntrePessoas = () => {
         // O valor de abertura é o PRIMEIRO lançamento, não um campo à parte:
         // é o que mantém saldo e histórico sempre contando a mesma história.
         lancamentos: [{ id: novoId(), data: hoje, valor, nota: "Valor inicial" }],
-      },
+      }, perfil),
     ]);
     setNova({ pessoa: "", valor: "", direcao: nova.direcao });
   };
@@ -196,7 +223,7 @@ export const DividasEntrePessoas = () => {
                     className="flex-1 min-w-0 text-left"
                     aria-expanded={expandida}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium truncate">{d.pessoa}</span>
                       <span className={`category-badge ${devo
                         ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/25"
@@ -206,6 +233,13 @@ export const DividasEntrePessoas = () => {
                       {quitada && (
                         <span className="category-badge bg-muted text-muted-foreground border-border">
                           <Check className="w-3 h-3 inline -mt-0.5" /> quitada
+                        </span>
+                      )}
+                      {/* Só no consolidado: em Pessoal ou numa empresa o
+                          próprio chip do topo já diz de quem é. */}
+                      {consolidado && (
+                        <span className="category-badge bg-muted/60 text-muted-foreground border border-border/60 text-[10px]" data-testid="selo-perfil">
+                          {nomeDoPerfil(d.perfil, perfis)}
                         </span>
                       )}
                     </div>

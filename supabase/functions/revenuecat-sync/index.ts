@@ -133,19 +133,49 @@ async function mandarCompraProMeta(
   const token = Deno.env.get("META_APP_CAPI_TOKEN");
   if (!dataset || !token) return;
 
-  // Idempotência: uma compra = um evento, mesmo com o RevenueCat reenviando
-  // o webhook (ele reenvia em qualquer 500 nosso).
-  const { data: jaFoi, error: erroJaFoi } = await admin
+  /* Idempotência — RESERVA ANTES DE MANDAR (10/09). O desenho antigo era
+   * "lê marcador → manda → grava marcador". Só que a mesma compra chega aqui
+   * por DOIS caminhos ao mesmo tempo: o webhook do RevenueCat e o
+   * `revenuecat-sync` que o app chama logo depois de pagar (revenuecat.ts).
+   * Os dois liam "ainda não foi", os dois mandavam, e a Meta contava 2 (e o
+   * dedup dela por event_id não segurou: 434 envios pra 328 vendas em 14
+   * dias, +32% de ROAS inventado; caso do dia 09/09: 3 compras no painel, 2
+   * no banco). Agora cada caminho grava a SUA reserva primeiro e depois olha
+   * quem chegou antes: só a reserva mais antiga (created_at, id) manda; a
+   * outra se apaga e sai. Como cada um lê DEPOIS de inserir, em qualquer
+   * ordem de chegada exatamente um vence. Marcador antigo (sem `estado`)
+   * também conta como reserva, então venda já enviada nunca reenvia. */
+  const { data: reserva, error: erroReserva } = await admin
+    .from("analytics_events")
+    .insert({
+      user_id: userId,
+      event_name: "meta_capi_app_enviado",
+      event_data: { tx: txId, valor: cents / 100, estado: "enviando" },
+    })
+    .select("id")
+    .single();
+  const reservaId = (reserva as { id?: string } | null)?.id;
+  if (erroReserva || !reservaId) {
+    log("meta capi app: sem reserva, não manda", { msg: String(erroReserva?.message ?? "").slice(0, 120) });
+    return;
+  }
+  const { data: primeira, error: erroEleicao } = await admin
     .from("analytics_events")
     .select("id")
     .eq("event_name", "meta_capi_app_enviado")
-    .eq("user_id", userId)
     .contains("event_data", { tx: txId })
-    .limit(2);
-  // maybeSingle() com marcador DUPLICADO devolvia erro (PGRST116) que era
-  // ignorado -> data null -> reenvio ETERNO a cada cron (caso real 17-19/08:
-  // meta_capi_app_enviado x96/dia). Na duvida (erro OU 1+ marcador), NAO reenvia.
-  if (erroJaFoi || (jaFoi?.length ?? 0) > 0) return;
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const soltarReserva = async () => {
+    await admin.from("analytics_events").delete().eq("id", reservaId);
+  };
+  if (erroEleicao || (primeira as { id?: string } | null)?.id !== reservaId) {
+    // Outro caminho reservou antes (ou já enviou): esta cópia some sem mandar.
+    await soltarReserva();
+    return;
+  }
 
   // Ficha do aparelho que o app deixou gravada (extinfo é obrigatório).
   const { data: dev } = await admin
@@ -208,17 +238,27 @@ async function mandarCompraProMeta(
   }
   const s = (k: string) => String(d[k] ?? "");
   const n = (k: string) => Number(d[k] ?? 0) || 0;
+  /* PLATAFORMA (06/09, entrada do iPhone em campanha). O primeiro item do
+   * extinfo é o que diz à Meta de qual sistema veio o evento: "a2" Android,
+   * "i2" iOS. Enquanto o iPhone não tinha campanha isso era inofensivo — sem
+   * SDK não havia atribuição pra estragar. Agora estragaria: compra de iPhone
+   * chegando rotulada como Android é dado ERRADO, não faltante, e a Meta
+   * otimizaria em cima disso. A ficha `app_device_info` grava `plataforma`
+   * desde 30/08 justamente pra este momento.
+   *
+   * O RESTO DO ARRAY é igual nos dois — mesma ordem, mesmos 16 campos. Só os
+   * palpites de reserva mudam: num iPhone o padrão honesto não é "13"/"Android". */
+  const ehIOS = s("plataforma") === "ios";
   const extinfo = [
-    "a2",                                    // versão do extinfo (Android)
+    ehIOS ? "i2" : "a2",                     // versão do extinfo (i2 = iOS)
     s("pacote") || "br.com.coreaplicativo.app",
     s("build"),
     s("versao"),
     // A Meta RECUSA o evento inteiro se a versão do SO vier vazia (subcode
     // 2804043). Com a busca por sessão acima isso virou raro, mas quando
-    // sobrar sem nada é melhor um SO aproximado do que perder a venda: sem o
-    // evento a atribuição é ZERO, e o app é Android por construção.
-    s("os") || "13",
-    s("modelo") || "Android",
+    // sobrar sem nada é melhor um SO aproximado do que perder a venda.
+    s("os") || (ehIOS ? "18" : "13"),
+    s("modelo") || (ehIOS ? "iPhone" : "Android"),
     s("locale") || "pt-BR",
     "",                                      // fuso abreviado: não temos
     "",                                      // operadora: não temos
@@ -341,14 +381,17 @@ async function mandarCompraProMeta(
     const corpo = await r.text();
     log("meta capi app", { ok: r.ok, status: r.status, corpo: corpo.slice(0, 200) });
     if (r.ok) {
-      await admin.from("analytics_events").insert({
-        user_id: userId,
-        event_name: "meta_capi_app_enviado",
-        event_data: { tx: txId, valor: cents / 100 },
-      });
+      await admin
+        .from("analytics_events")
+        .update({ event_data: { tx: txId, valor: cents / 100, estado: "enviado" } })
+        .eq("id", reservaId);
+    } else {
+      // A Meta recusou: solta a reserva pra o próximo caminho tentar de novo.
+      await soltarReserva();
     }
   } catch (e) {
     log("meta capi app ERRO", { msg: String(e).slice(0, 150) });
+    try { await soltarReserva(); } catch { /* sem rede: a reserva fica e o sync não reenvia — melhor que duplicar */ }
   }
 }
 

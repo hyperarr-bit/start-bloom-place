@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
 import { localDayKey } from "@/lib/utils";
 import { uploadFromInput } from "@/lib/image-upload";
+import { limparLivros } from "@/lib/biblioteca-limpeza";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,6 +85,30 @@ export const rotuloDoFormato = (f: unknown): string | null => {
 
 const genId = () => crypto.randomUUID();
 
+/* TELA LARGA (pedido de cliente pagante, 10/09, print da estante num
+   monitor em modo escuro): "nesse espaço branco não dá pra colocar
+   anotações e a sinopse para aparecer? Porque toda vez ter que abrir para
+   ver é sacanagem". A partir de 768px (o mesmo corte do useIsMobile do
+   repo — a definição da casa de "celular") a linha do livro tem espaço
+   sobrando à direita do título, e sinopse/anotações ficam ali sem toque.
+   Decidido em JS e não só em classe md:, porque o que renderiza é
+   DIFERENTE (com toque × sem toque), não só escondido — e assim o jsdom
+   testa os dois com matchMedia mockado. Estado inicial lido na hora, sem
+   piscar layout de computador no celular. */
+const CONSULTA_TELA_LARGA = "(min-width: 768px)";
+const useTelaLarga = () => {
+  const [larga, setLarga] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(CONSULTA_TELA_LARGA)?.matches);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mql = window.matchMedia(CONSULTA_TELA_LARGA);
+    const aoMudar = () => setLarga(!!mql.matches);
+    mql.addEventListener?.("change", aoMudar);
+    aoMudar();
+    return () => mql.removeEventListener?.("change", aoMudar);
+  }, []);
+  return larga;
+};
+
 const TABS = [
   { v: "lendo", l: "Lendo Agora", icon: "📖" },
   { v: "estante", l: "Estante", icon: "📚" },
@@ -148,7 +173,16 @@ const ImportFromUrl = ({ onImport }: { onImport: (data: { title: string; author:
 // ── Main Component ──
 const Biblioteca = () => {
   const navigate = useNavigate();
-  const [books, setBooks] = usePersistedState<Book[]>("lib-books", []);
+  const [booksBrutos, setBooks] = usePersistedState<Book[]>("lib-books", []);
+  /* LIMPEZA NA LEITURA (10/09): quem importou por link antes da correção de
+     09/09 ficou com "Seguir" de autor, "Jo&atilde;o" e "… eBook : Prado,
+     Rafa" gravados em lib-books. Limpa AO LER, sem gravar de volta sozinho:
+     usePersistedState grava no Supabase, e escrita de mount é exatamente o
+     padrão do bug de 16/07 — chave pesada ainda não buscada chega como [] e
+     a "limpeza" apagaria a estante inteira no servidor. A versão limpa vai
+     pro banco quando a pessoa mexe no livro (openEdit recebe o livro já
+     limpo). limparLivros devolve o MESMO array se nada mudou. */
+  const books = useMemo(() => limparLivros(booksBrutos), [booksBrutos]);
   const [yearGoal, setYearGoal] = usePersistedState<number>("lib-year-goal", 12);
   const [pagesHintDismissed, setPagesHintDismissed] = usePersistedState<boolean>("lib-pages-hint-dismissed", false);
   const [tab, setTab] = useState("lendo");
@@ -934,13 +968,46 @@ const Biblioteca = () => {
    isso a cliente sentia que "anotações" era o único lugar pra guardar texto.
    Agora a linha ganha um toque que abre/fecha o bloco, só quando existe
    texto: lista fechada continua enxuta. Selos de formato e gênero (gênero já
-   era gravado desde sempre e nunca aparecia). */
+   era gravado desde sempre e nunca aparecia).
+
+   10/09, outro cliente pagante (print da estante num monitor): "nesse espaço
+   branco não dá pra colocar anotações e a sinopse para aparecer? Porque toda
+   vez ter que abrir para ver é sacanagem". Então:
+   - tela larga (≥768px): sinopse e anotações ficam AO LADO do título, no
+     espaço que sobrava, sem botão nenhum;
+   - celular: o toque continua, mas a linha já mostra 2 linhas da sinopse em
+     cinza (line-clamp-2) pra pessoa saber que tem algo ali antes de abrir;
+   - sem sinopse e sem anotações: nada, como sempre.
+   Cores só por token do tema (muted-foreground, foreground, border): o print
+   era em modo escuro e cinza fixo sumiria lá. */
 const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit: () => void; onRemove: () => void; onUpdatePage: (id: string, page: number) => void }) => {
   const [aberto, setAberto] = useState(false);
+  const telaLarga = useTelaLarga();
   const sinopse = (book.synopsis || "").trim();
   const anotacoes = (book.notes || "").trim();
+  const temDetalhe = !!(sinopse || anotacoes);
+  const aoLado = telaLarga && temDetalhe;
   const seloFormato = rotuloDoFormato(book.format);
   const rotuloDetalhe = sinopse && anotacoes ? "Sinopse e anotações" : sinopse ? "Sinopse" : "Anotações";
+  // prévia do celular: sinopse; se só tem anotações, elas (o objetivo é
+  // avisar que tem algo pra abrir)
+  const previa = sinopse || anotacoes;
+  const blocoDetalhe = (
+    <>
+      {sinopse && (
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Sinopse</p>
+          <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90">{sinopse}</p>
+        </div>
+      )}
+      {anotacoes && (
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Anotações</p>
+          <p className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90">{anotacoes}</p>
+        </div>
+      )}
+    </>
+  );
   return (
     <div className="rounded-lg bg-card border border-border p-2.5">
       <div className="flex gap-3 items-start">
@@ -951,7 +1018,10 @@ const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit:
             <BookOpen className="w-4 h-4 text-muted-foreground/30" />
           </div>
         )}
-        <div className="flex-1 min-w-0">
+        {/* Na tela larga com detalhe, o título fica com 2/5 e o texto com 3/5
+            da linha (proporcional: 736px → ~260/390; monitor → sobra dos dois
+            lados). Sem detalhe, o título ocupa tudo como antes. */}
+        <div className={`min-w-0 ${aoLado ? "flex-[2]" : "flex-1"}`}>
           <h4 className="font-bold text-xs leading-tight truncate">{book.title}</h4>
           <p className="text-[10px] text-muted-foreground truncate">{book.author}</p>
           {(seloFormato || book.genre) && (
@@ -972,7 +1042,12 @@ const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit:
           {book.rating > 0 && <div className="mt-0.5"><StarRating value={book.rating} size="w-3 h-3" /></div>}
           {book.lentTo && <Badge className="mt-1 text-[8px] h-4 bg-pink-100 dark:bg-pink-900/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800">📤 {book.lentTo}</Badge>}
           {(book.quotes || []).length > 0 && <Badge variant="outline" className="mt-1 ml-1 text-[8px] h-4">💡 {book.quotes.length} citações</Badge>}
-          {(sinopse || anotacoes) && (
+          {/* CELULAR: prévia de 2 linhas enquanto está fechado (some quando
+              abre, senão o texto aparece duas vezes) + o toque de sempre. */}
+          {temDetalhe && !aoLado && !aberto && (
+            <p className="mt-1 text-[10px] leading-snug text-muted-foreground line-clamp-2" data-testid={`previa-${book.id}`}>{previa}</p>
+          )}
+          {temDetalhe && !aoLado && (
             <button
               type="button"
               onClick={() => setAberto(a => !a)}
@@ -984,25 +1059,21 @@ const BookRow = ({ book, onEdit, onRemove, onUpdatePage }: { book: Book; onEdit:
             </button>
           )}
         </div>
+        {/* TELA LARGA: sinopse e anotações ao lado, no espaço que sobrava.
+            Com as duas, viram duas colunas a partir de lg (1024px). */}
+        {aoLado && (
+          <div className={`flex-[3] min-w-0 self-stretch border-l border-border/60 pl-3 grid gap-x-4 gap-y-2 ${sinopse && anotacoes ? "lg:grid-cols-2" : ""}`} data-testid={`detalhe-${book.id}`}>
+            {blocoDetalhe}
+          </div>
+        )}
         <div className="flex flex-col gap-0.5">
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onEdit} aria-label={`Editar ${book.title}`}><Edit2 className="w-3 h-3" /></Button>
           <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive/50 hover:text-destructive" onClick={onRemove} aria-label={`Remover ${book.title}`}><Trash2 className="w-3 h-3" /></Button>
         </div>
       </div>
-      {aberto && (sinopse || anotacoes) && (
+      {aberto && temDetalhe && !aoLado && (
         <div className="mt-2 pt-2 border-t border-border/60 space-y-2" data-testid={`detalhe-${book.id}`}>
-          {sinopse && (
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Sinopse</p>
-              <p className="text-xs leading-relaxed whitespace-pre-wrap">{sinopse}</p>
-            </div>
-          )}
-          {anotacoes && (
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Anotações</p>
-              <p className="text-xs leading-relaxed whitespace-pre-wrap">{anotacoes}</p>
-            </div>
-          )}
+          {blocoDetalhe}
         </div>
       )}
     </div>

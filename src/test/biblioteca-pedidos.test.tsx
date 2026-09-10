@@ -15,7 +15,7 @@
  * Rede, upload e Storage são mockados: aqui se testa a tela e a chave
  * lib-books, não o Supabase.
  */
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
@@ -131,16 +131,19 @@ describe("Sinopse", () => {
     expect(salvo.synopsis).toBe("Pequenas mudanças, resultados impressionantes.");
     expect(salvo.notes).toBe("Reler o cap. 3 antes da prova");
 
-    // lista FECHADA: só o toque, sem o texto poluindo a estante
+    // lista FECHADA (celular): o toque + prévia de 2 linhas da sinopse
+    // (10/09: "toda vez ter que abrir para ver é sacanagem"); as anotações
+    // continuam só atrás do toque
     expect(screen.getByText("Hábitos Atômicos")).toBeInTheDocument();
-    expect(screen.queryByText(/Pequenas mudanças/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Pequenas mudanças/)).toHaveClass("line-clamp-2");
     expect(screen.queryByText(/Reler o cap/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Sinopse e anotações" }));
-    expect(screen.getByText(/Pequenas mudanças/)).toBeInTheDocument();
+    expect(screen.getByText(/Pequenas mudanças/)).not.toHaveClass("line-clamp-2"); // texto inteiro, prévia some
     expect(screen.getByText(/Reler o cap/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Ocultar" }));
-    expect(screen.queryByText(/Pequenas mudanças/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reler o cap/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Pequenas mudanças/)).toHaveClass("line-clamp-2");
 
     // SAI e REABRE
     tela.unmount();
@@ -365,5 +368,123 @@ describe("Foto da capa", () => {
     fireEvent.change(screen.getByLabelText("Escolher foto da capa"), { target: { files: [new File(["x"], "capa.jpg", { type: "image/jpeg" })] } });
     expect(await screen.findByText(/Não deu pra subir a foto/)).toBeInTheDocument();
     expect(screen.queryByRole("img", { name: "Capa" })).not.toBeInTheDocument();
+  });
+});
+
+/* ============================================================
+ * 10/09 — OUTRO cliente pagante, print da estante num monitor (modo escuro):
+ * "nesse espaço branco não dá pra colocar anotações e a sinopse para
+ *  aparecer? Porque toda vez ter que abrir para ver é sacanagem"
+ *
+ * jsdom não aplica media query: o BookRow decide em JS por
+ * matchMedia("(min-width: 768px)"), então aqui o matchMedia é mockado
+ * (largo × celular) e o teste vê o que de fato renderiza em cada um.
+ * ============================================================ */
+const matchMediaOriginal = window.matchMedia;
+const simularTela = (larga: boolean) => {
+  window.matchMedia = ((query: string) => ({
+    matches: larga && /min-width:\s*768px/.test(query),
+    media: query, onchange: null,
+    addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+};
+
+describe("Sinopse e anotações sem toque na tela larga (10/09)", () => {
+  afterEach(() => { window.matchMedia = matchMediaOriginal; });
+
+  it("computador: sinopse e anotações aparecem AO LADO do título, sem botão; livro sem nada não mostra nada", () => {
+    simularTela(true);
+    const store = criarStore({
+      "lib-books": [
+        livro({ id: "a", title: "Hábitos Atômicos", synopsis: "Pequenas mudanças, resultados impressionantes.", notes: "Reler o cap. 3" }),
+        livro({ id: "b", title: "Só sinopse", synopsis: "Do que trata." }),
+        livro({ id: "c", title: "Nada" }),
+      ],
+    });
+    montar(store);
+    aba(/Estante/);
+    // texto na tela, sem toque nenhum e sem prévia cortada
+    expect(screen.getByText(/Pequenas mudanças/)).toBeInTheDocument();
+    expect(screen.getByText(/Reler o cap/)).toBeInTheDocument();
+    expect(screen.getByText("Do que trata.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Sinopse|Anotações|Sinopse e anotações|Ocultar)$/ })).not.toBeInTheDocument();
+    expect(document.querySelector(".line-clamp-2")).toBeNull();
+    // é a coluna ao lado (mesma linha da capa/título), não um bloco abaixo
+    const linha = screen.getByText("Hábitos Atômicos").closest(".flex.gap-3")!;
+    expect(linha.contains(screen.getByTestId("detalhe-a"))).toBe(true);
+    // rótulos dos dois blocos
+    expect(screen.getAllByText("Sinopse")).toHaveLength(2);
+    expect(screen.getAllByText("Anotações")).toHaveLength(1);
+    // livro sem sinopse nem anotações: nem coluna, nem prévia
+    expect(screen.queryByTestId("detalhe-c")).toBeNull();
+    expect(screen.queryByTestId("previa-c")).toBeNull();
+    // cor por token do tema, nunca cinza fixo (o print era em modo escuro)
+    expect(screen.getByText(/Pequenas mudanças/).className).not.toMatch(/text-gray|text-neutral|text-zinc|#/);
+  });
+
+  it("celular: prévia de 2 linhas em cinza do tema + o toque de abrir; sem sinopse nem anotações, nada", () => {
+    simularTela(false);
+    const store = criarStore({
+      "lib-books": [
+        livro({ id: "a", title: "Hábitos Atômicos", synopsis: "Pequenas mudanças, resultados impressionantes.", notes: "Reler o cap. 3" }),
+        livro({ id: "b", title: "Só anotações", notes: "Minha nota." }),
+        livro({ id: "c", title: "Nada" }),
+      ],
+    });
+    montar(store);
+    aba(/Estante/);
+    const previa = screen.getByTestId("previa-a");
+    expect(previa).toHaveTextContent("Pequenas mudanças");
+    expect(previa).toHaveClass("line-clamp-2", "text-muted-foreground");
+    expect(previa.className).not.toMatch(/text-gray|text-neutral|text-zinc/);
+    expect(screen.queryByTestId("detalhe-a")).toBeNull();
+    // só anotações: a prévia mostra as anotações (avisa que tem algo)
+    expect(screen.getByTestId("previa-b")).toHaveTextContent("Minha nota.");
+    expect(screen.queryByTestId("previa-c")).toBeNull();
+    // dois livros com detalhe = dois toques; "Nada" não ganha toque
+    expect(screen.getAllByRole("button", { name: /^(Sinopse|Anotações|Sinopse e anotações)$/ })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sinopse e anotações" }));
+    expect(screen.queryByTestId("previa-a")).toBeNull();
+    expect(screen.getByTestId("detalhe-a")).toHaveTextContent("Reler o cap. 3");
+    // o bloco aberto fica ABAIXO da linha, não ao lado
+    expect(screen.getByText("Hábitos Atômicos").closest(".flex.gap-3")!.contains(screen.getByTestId("detalhe-a"))).toBe(false);
+  });
+});
+
+/* ============================================================
+ * 10/09 — livro LEGADO sujo (importado antes da correção de 09/09)
+ * ============================================================ */
+describe("Livro legado sujo renderiza limpo", () => {
+  it("os quatro casos do print aparecem limpos; lib-books NÃO é regravado sozinho; editar o livro grava a versão limpa", () => {
+    const store = criarStore({
+      "lib-books": [
+        livro({ id: "a", title: "Marley &amp; Eu - Vida E Amor Ao Lado Do Pior Cao Do Mundo", author: "Seguir", synopsis: "Um c&atilde;o &amp; sua fam&iacute;lia." }),
+        livro({ id: "b", title: "100 graus - o ponto de ebulição do sucesso: Tudo o que você precisa aprender sobre criar dinheiro e liberdade para a sua vida eBook : Prado, Rafa", author: "Carlos Jo&atilde;o Santos Pereira" }),
+      ],
+    });
+    const gravadoAntes = JSON.stringify(store.dados["lib-books"]);
+    montar(store);
+    aba(/Estante/);
+
+    expect(screen.getByText("Marley & Eu - Vida E Amor Ao Lado Do Pior Cao Do Mundo")).toBeInTheDocument();
+    expect(screen.getByText("100 graus - o ponto de ebulição do sucesso: Tudo o que você precisa aprender sobre criar dinheiro e liberdade para a sua vida")).toBeInTheDocument();
+    expect(screen.getByText("Carlos João Santos Pereira")).toBeInTheDocument();
+    expect(screen.getByTestId("previa-a")).toHaveTextContent("Um cão & sua família.");
+    expect(document.body.textContent).not.toMatch(/Seguir|&amp;|&atilde;|eBook :/);
+
+    // leitura limpa, banco intocado (escrita de mount é o bug de 16/07)
+    expect(JSON.stringify(store.dados["lib-books"])).toBe(gravadoAntes);
+
+    // a pessoa edita o livro: o formulário já vem limpo e o save grava limpo
+    fireEvent.click(screen.getByRole("button", { name: "Editar Marley & Eu - Vida E Amor Ao Lado Do Pior Cao Do Mundo" }));
+    expect(screen.getByPlaceholderText("Autor")).toHaveValue("");
+    expect(screen.getByPlaceholderText("Título")).toHaveValue("Marley & Eu - Vida E Amor Ao Lado Do Pior Cao Do Mundo");
+    fireEvent.change(screen.getByPlaceholderText("Autor"), { target: { value: "John Grogan" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar Livro" }));
+    const livros = livrosDe(store);
+    expect(livros.find(l => l.id === "a")).toMatchObject({ title: "Marley & Eu - Vida E Amor Ao Lado Do Pior Cao Do Mundo", author: "John Grogan", synopsis: "Um cão & sua família." });
+    // o outro livro, não tocado, segue como estava no banco (limpa só na leitura)
+    expect(livros.find(l => l.id === "b")?.author).toBe("Carlos Jo&atilde;o Santos Pereira");
   });
 });

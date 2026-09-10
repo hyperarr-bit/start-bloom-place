@@ -40,6 +40,7 @@ import { MonthlySheet } from "@/components/MonthlySheet";
 import { MonthTurnover } from "@/components/MonthTurnover";
 import { CategoryBudgets } from "@/components/CategoryBudgets";
 import { MonthComparison } from "@/components/finance/MonthComparison";
+import { YearComparison } from "@/components/finance/YearComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
@@ -423,6 +424,11 @@ const Index = () => {
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
               <MonthComparison perfil={perfilValido} />
+            </TrackedCard>
+            {/* Comparação ANUAL logo abaixo da mensal (09/09, decisão do dono:
+                card separado, não só a linha "vs ano anterior" do Balanço). */}
+            <TrackedCard cardKey="year-comparison" tab="dashboard">
+              <YearComparison perfil={perfilValido} />
             </TrackedCard>
           </>
         )}

@@ -6,12 +6,15 @@ import { doPerfil, perfilAtivoLocal } from "@/lib/finance-perfil";
 import { useAuth } from "@/hooks/use-auth";
 import { useFinanceCategories } from "@/lib/finance-categories";
 
-const ALL_MONTHS = [
+/* Exportados (09/09) pra Comparação Anual (YearComparison), que soma os 12
+   meses com as MESMAS leituras e a MESMA cara — uma tabela de rótulos e uma
+   paleta só, senão "Lazer" roxo num card vira laranja no de baixo. */
+export const ALL_MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
-const categoryLabels: Record<string, string> = {
+export const categoryLabels: Record<string, string> = {
   alimentacao: "Alimentação", restaurante: "Restaurante", mercado: "Mercado",
   transporte: "Transporte", combustivel: "Combustível", lazer: "Lazer",
   entretenimento: "Entretenimento", saude: "Saúde", farmacia: "Farmácia",
@@ -26,7 +29,7 @@ const categoryLabels: Record<string, string> = {
   pensao: "Pensão", outros: "Outros",
 };
 
-const COLORS = [
+export const COLORS = [
   "bg-purple-500", "bg-amber-500", "bg-emerald-500",
   "bg-blue-500", "bg-red-500", "bg-indigo-500", "bg-teal-500", "bg-orange-500",
 ];
@@ -81,7 +84,7 @@ interface CategoryData {
   monthB: number;
 }
 
-const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string): Record<string, number> => {
+export const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string): Record<string, number> => {
   const keys = getFinanceStorageKeys(ALL_MONTHS[m.idx], m.ano);
   const expenses = doPerfil(readMonthData(userId, keys.expenses) || [], perfil);
   const fixed = doPerfil(readMonthData(userId, keys.fixed) || [], perfil);
@@ -99,7 +102,7 @@ const getExpensesByCategory = (m: MesAno, userId: string | null, perfil: string)
   return grouped;
 };
 
-const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
+export const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`;
 
 /**
  * Badge de variação. Compartilhado com o Balanço Anual (linha "vs ano
@@ -121,7 +124,8 @@ export const DiffBadge = ({ a, b, bomQuandoSobe = false }: { a: number; b: numbe
   );
 };
 
-const SaldoDiffBadge = ({ a, b }: { a: number; b: number }) => {
+/** Saldo varia em R$, não em %: -50% de um saldo negativo não diz nada. */
+export const SaldoDiffBadge = ({ a, b }: { a: number; b: number }) => {
   if (a === 0 && b === 0) return null;
   const diff = b - a;
   if (Math.abs(diff) < 1) return <span className="text-[10px] text-muted-foreground flex items-center gap-0.5"><Minus className="w-3 h-3" />igual</span>;

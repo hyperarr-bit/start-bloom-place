@@ -16,13 +16,20 @@ import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { ResumoDoModulo, diasAte, rotuloEmDias } from "@/components/ui/resumo-do-modulo";
+import { AprendizadosDoCurso } from "@/components/estudos/AprendizadosDoCurso";
+import { CadernoDeAprendizados } from "@/components/estudos/CadernoDeAprendizados";
+import { comoAprendizados, contarNaSemana, type Aprendizado, type AprendizadosPorCurso } from "@/components/estudos/aprendizados";
 
 
 // ── Types ──
 /** `link` e `notes` são OPCIONAIS de propósito: já existe curso salvo de gente
  *  de verdade sem esses campos. Campo novo nunca pode ser obrigatório aqui —
- *  quem já tinha lista continua abrindo a lista igual. */
-interface Course { id: string; name: string; link?: string; notes?: string; }
+ *  quem já tinha lista continua abrindo a lista igual.
+ *
+ *  `aulasFeitas`/`aulasTotal` (09/09, pedido do dono de melhorar o módulo):
+ *  "Aula 12 de 30" era texto livre na nota — agora é número, com barra e
+ *  "+1 aula". Opcionais pela mesma regra: curso antigo sem eles = sem barra. */
+interface Course { id: string; name: string; link?: string; notes?: string; aulasFeitas?: number; aulasTotal?: number; }
 interface ContentRow { id: string; name: string; leitura: boolean; resumo: boolean; }
 interface Exam { id: string; title: string; date: string; time: string; color: string; done: boolean; }
 interface Notebook {
@@ -113,6 +120,16 @@ const Estudos = () => {
   /** Qual curso está com o painel de link+anotações aberto (o ícone de papel). */
   const [cursoAberto, setCursoAberto] = useState<string | null>(null);
 
+  // APRENDIZADOS POR CURSO (09/09, pedido literal do dono: "Não tem como
+  // acrescentar o que aprendi no curso. Tipo: aprendi isso, esse slide é bom
+  // por causa disso."). Chave PRÓPRIA `{ [courseId]: Aprendizado[] }` — não
+  // infla o array de cursos, e curso antigo sem entrada continua igual.
+  // `comoAprendizados` blinda contra chave torta de versão antiga.
+  const [aprendizadosBrutos, setAprendizados] = usePersistedState<AprendizadosPorCurso>("estudos-aprendizados", {});
+  const aprendizados = useMemo(() => comoAprendizados(aprendizadosBrutos), [aprendizadosBrutos]);
+  /** Qual curso está com a lista de aprendizados expandida. */
+  const [aprendizadosAberto, setAprendizadosAberto] = useState<string | null>(null);
+
   // CONTEÚDO TRACKER
   const [subjects, setSubjects] = usePersistedState<ContentRow[]>("estudos-subjects", []);
   const [newSubject, setNewSubject] = useState("");
@@ -202,6 +219,50 @@ const Estudos = () => {
   };
   const atualizarCurso = (id: string, campo: "link" | "notes", valor: string) =>
     setCursosAndamento(prev => prev.map(c => c.id === id ? { ...c, [campo]: valor } : c));
+
+  // ── PROGRESSO EM AULAS ──
+  /** Campo vazio APAGA o número (volta a ser curso sem contagem) em vez de
+   *  gravar 0 ou NaN — "Aula 0 de 0" seria a barra mentindo. */
+  const atualizarAulas = (id: string, campo: "aulasFeitas" | "aulasTotal", valor: string) => {
+    const n = valor.trim() === "" ? undefined : Math.max(0, Math.floor(Number(valor)));
+    setCursosAndamento(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const next = { ...c };
+      if (n === undefined || !Number.isFinite(n)) delete next[campo]; else next[campo] = n;
+      return next;
+    }));
+  };
+  /** "+1 aula": nunca passa do total (se houver total). Sem total, só conta. */
+  const avancarAula = (id: string) =>
+    setCursosAndamento(prev => prev.map(c => {
+      if (c.id !== id) return c;
+      const feitas = (Number(c.aulasFeitas) || 0) + 1;
+      const total = Number(c.aulasTotal) || 0;
+      return { ...c, aulasFeitas: total > 0 ? Math.min(feitas, total) : feitas };
+    }));
+
+  // ── APRENDIZADOS ──
+  const salvarAprendizado = (cursoId: string, novo: Aprendizado, avancar: boolean) => {
+    setAprendizados(prev => {
+      const mapa = comoAprendizados(prev);
+      return { ...mapa, [cursoId]: [...(mapa[cursoId] ?? []), novo] };
+    });
+    if (avancar) avancarAula(cursoId);
+    setAprendizadosAberto(cursoId); // o que acabou de registrar tem que aparecer
+  };
+  const editarAprendizado = (cursoId: string, novo: Aprendizado) =>
+    setAprendizados(prev => {
+      const mapa = comoAprendizados(prev);
+      return { ...mapa, [cursoId]: (mapa[cursoId] ?? []).map(a => a.id === novo.id ? novo : a) };
+    });
+  const apagarAprendizado = (cursoId: string, id: string) =>
+    setAprendizados(prev => {
+      const mapa = comoAprendizados(prev);
+      const lista = (mapa[cursoId] ?? []).filter(a => a.id !== id);
+      const next = { ...mapa };
+      if (lista.length) next[cursoId] = lista; else delete next[cursoId];
+      return next;
+    });
 
   // ── GRADE: linhas de horário ──
   // A grade é livre agora, então a pessoa pode criar "19h30" depois do "7h30".
@@ -339,10 +400,15 @@ const Estudos = () => {
     .map(e => ({ titulo: e.title, dias: diasAte(e.date) }))
     .filter(e => Number.isFinite(e.dias) && e.dias >= 0)
     .sort((a, b) => a.dias - b.dias)[0];
+  // Aprendizados desta semana entram ANTES de Pomodoros: a barra mostra no
+  // máximo 4 tiles, e "o que aprendi esta semana" diz mais sobre o estudo
+  // do que um acumulado de pomodoros de todos os tempos. Zero some sozinho.
+  const aprendizadosNaSemana = contarNaSemana(aprendizados);
   const itensDoResumo = [
     { rotulo: "Tarefas hoje", valor: tarefasPendentesHoje, sub: "pendentes", tom: "atencao" as const, onClick: () => handleTabChange("tarefas") },
     { rotulo: "Próx. prova", valor: proximaProva ? rotuloEmDias(proximaProva.dias) : null, sub: proximaProva?.titulo, tom: proximaProva && proximaProva.dias <= 3 ? "atencao" as const : "neutro" as const, onClick: () => handleTabChange("estudos") },
     { rotulo: "Cursos", valor: cursosAndamento.length, sub: "em andamento", tom: "neutro" as const, onClick: () => handleTabChange("estudos") },
+    { rotulo: "Aprendizados", valor: aprendizadosNaSemana, sub: "esta semana", tom: "ok" as const, onClick: () => handleTabChange("caderno") },
     { rotulo: "Pomodoros", valor: Number(pomodoroCount) || 0, sub: "no total", tom: "ok" as const, onClick: () => handleTabChange("pomodoro") },
   ];
 
@@ -389,6 +455,7 @@ const Estudos = () => {
           "Organize cursos em andamento e sua lista de desejos",
           "Monte sua grade horária semanal editável",
           "Registre provas e trabalhos com datas de entrega",
+          "Depois de cada aula, toque em \"Aprendi hoje\" no curso: o Caderno reúne tudo pra reler",
           "Use o caderno para anotar resumos e dúvidas das aulas",
         ]} />
 
@@ -444,6 +511,23 @@ const Estudos = () => {
                             onChange={e => atualizarCurso(c.id, "link", e.target.value)}
                             onBlur={e => atualizarCurso(c.id, "link", normalizarLink(e.target.value) || "")}
                             placeholder="Link do curso (opcional)" className="h-9 text-xs rounded-lg" />
+                          {/* Contagem de aulas mora no mesmo painel do link e da
+                              nota: é "dado do curso", se ajusta uma vez. O dia a
+                              dia é o "+1 aula" da linha, não estes campos. */}
+                          <div className="flex items-center gap-2">
+                            <label className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Aulas feitas
+                              <Input type="number" inputMode="numeric" min={0} value={c.aulasFeitas ?? ""}
+                                onChange={e => atualizarAulas(c.id, "aulasFeitas", e.target.value)}
+                                placeholder="ex: 12" className="mt-1 h-9 text-xs rounded-lg font-normal normal-case tracking-normal" />
+                            </label>
+                            <label className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              Total de aulas
+                              <Input type="number" inputMode="numeric" min={0} value={c.aulasTotal ?? ""}
+                                onChange={e => atualizarAulas(c.id, "aulasTotal", e.target.value)}
+                                placeholder="ex: 30" className="mt-1 h-9 text-xs rounded-lg font-normal normal-case tracking-normal" />
+                            </label>
+                          </div>
                           <Textarea value={c.notes || ""}
                             onChange={e => atualizarCurso(c.id, "notes", e.target.value)}
                             placeholder="Anotações deste curso: onde parou, o que revisar, prazo do certificado..."
@@ -457,6 +541,24 @@ const Estudos = () => {
                           {c.notes}
                         </button>
                       )}
+
+                      {/* O pedido do dono (09/09) mora aqui: progresso em aulas +
+                          "O que aprendi" deste curso. Componente próprio em
+                          src/components/estudos/. */}
+                      <div className="pb-2">
+                        <AprendizadosDoCurso
+                          cursoId={c.id}
+                          nome={c.name}
+                          progresso={{ aulasFeitas: c.aulasFeitas, aulasTotal: c.aulasTotal }}
+                          entradas={aprendizados[c.id] ?? []}
+                          aberto={aprendizadosAberto === c.id}
+                          onAbrir={ab => setAprendizadosAberto(ab ? c.id : null)}
+                          onSalvar={(novo, avancar) => salvarAprendizado(c.id, novo, avancar)}
+                          onEditar={novo => editarAprendizado(c.id, novo)}
+                          onApagar={id => apagarAprendizado(c.id, id)}
+                          onAvancarAula={() => avancarAula(c.id)}
+                        />
+                      </div>
                     </div>
                   );
                 })}
@@ -961,6 +1063,18 @@ const Estudos = () => {
           </div>}
 
           {activeTab === "caderno" && <div className="space-y-4">
+            {/* Releitura do que se registrou nos cursos (busca + filtro por
+                curso). Acima das anotações longas: frase curta de muitos dias
+                se consulta mais que texto longo de um dia. Justificativa
+                completa no cabeçalho de CadernoDeAprendizados.tsx. */}
+            <CadernoDeAprendizados
+              mapa={aprendizados}
+              cursos={cursosAndamento}
+              onEditar={editarAprendizado}
+              onApagar={apagarAprendizado}
+              onIrParaCursos={() => handleTabChange("estudos")}
+            />
+
             <Button variant="outline" className="w-full rounded-xl h-9 text-xs border-dashed" onClick={addNotebook}>
               <Plus className="w-3 h-3 mr-1" /> Nova Anotação
             </Button>

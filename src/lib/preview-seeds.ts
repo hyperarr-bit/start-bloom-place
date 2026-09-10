@@ -302,8 +302,20 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
     "estudos-pomodoro-count": 14,
     "estudos-cursos-andamento": [
       { id: "1", name: "Inglês intermediário", notes: "3x por semana, 40 min" },
-      { id: "2", name: "Excel do zero ao avançado", notes: "Aula 12 de 30" },
+      // 09/09: "Aula 12 de 30" saiu da nota e virou número (barra + "+1 aula")
+      { id: "2", name: "Excel do zero ao avançado", notes: "Certificado até dezembro", aulasFeitas: 12, aulasTotal: 30 },
     ],
+    // 09/09 (pedido do dono: "aprendi isso, esse slide é bom por causa disso").
+    // Datas recentes pra o tile "Aprendizados · esta semana" acender na demo.
+    "estudos-aprendizados": {
+      "1": [
+        { id: "1001", data: daysAgo(0), referencia: "Unidade 5 · slide 8", aprendi: "Present perfect", porque: "Usar com 'since' e 'for' — 'I have lived here since 2020'." },
+        { id: "1002", data: daysAgo(1), referencia: "Unidade 4", aprendi: "'Used to' é hábito do passado que acabou", porque: "Bom pra falar da infância sem enrolar." },
+      ],
+      "2": [
+        { id: "2001", data: daysAgo(2), referencia: "Aula 12 · slide 3", aprendi: "Tabela dinâmica resume milhares de linhas em segundos", porque: "O slide mostra o antes/depois — serve pro relatório de vendas do mês." },
+      ],
+    },
     "estudos-cursos-desejo": [
       { id: "3", name: "Oratória" },
       { id: "4", name: "Design no Figma" },

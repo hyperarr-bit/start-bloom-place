@@ -61,13 +61,22 @@ const getContextualMessage = (data: LifeHubData): string => {
     if (remaining > 0) return `${remaining} hábito${remaining > 1 ? "s" : ""} pendente${remaining > 1 ? "s" : ""} para fechar o dia ✅`;
     return "Tarde produtiva! Mantenha o ritmo 🌟";
   }
+  /* "Dia completo" só quando está COMPLETO (10/09). A frase saía a partir de
+     80 — e como o score tinha teto de 95 pra quem não cadastrava suplemento
+     (cliente: "fiz tudo mas só vai até os 95%"), o app dizia "completo" pra
+     um dia que ele mesmo não deixava fechar. Agora 100 é 100; de 80 a 99
+     fica o "Dia incrível", que já existia. Vale nos dois turnos da noite,
+     senão às 19h o anel pulsa e o toast diz "100%" enquanto a saudação
+     ainda fala em "incrível". */
   if (h >= 18 && h < 21) {
+    if (data.dayScore >= 100) return "Dia completo! Descanse com orgulho 🌟";
     if (data.dayScore >= 80) return "Dia incrível! Você está arrasando 🏆";
     if (data.dayScore >= 50) return "Bom progresso hoje! Finalize o que falta 🌙";
     if (data.currentBook) return `Que tal ler um pouco de "${data.currentBook}"? 📖`;
     return isWeekend ? "Aproveite a noite de fim de semana 🌃" : "Boa noite! Hora de desacelerar 🌙";
   }
-  if (data.dayScore >= 80) return "Dia completo! Descanse com orgulho 🌟";
+  if (data.dayScore >= 100) return "Dia completo! Descanse com orgulho 🌟";
+  if (data.dayScore >= 80) return "Dia incrível! Você está arrasando 🏆";
   if (data.dayScore >= 50) return "Bom dia! Amanhã será ainda melhor 💫";
   return "Hora de descansar. Amanhã é uma nova chance ✨";
 };

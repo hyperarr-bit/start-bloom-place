@@ -144,6 +144,8 @@ export function useLifeHubData(): LifeHubData {
     const caloriesGoal = get<number>("core-dieta-calories-goal", 2000);
     const todayLog = get<any>("core-dieta-log", {});
     const todayMeals = todayLog[tStr] || {};
+    // 4 é o fallback de quem NÃO montou plano nenhum na Dieta. Quem montou
+    // um plano de 3 refeições é cobrado por 3 (ver o bloco do score, 10/09).
     const mealsTotal = dietMeals.length || 4;
     // FIX 16/07: o diário REAL da Dieta (dieta-diary-v2) também conta —
     // core-dieta-log só recebia a ação rápida do hub
@@ -203,61 +205,107 @@ export function useLifeHubData(): LifeHubData {
     const streakData = get<any>("core-hub-streak", { count: 0, lastDate: "" });
     const streak = streakData.count || 0;
 
-    // Day Score — granular, every small action counts
+    /*
+     * SCORE DO DIA — 12 blocos que somam EXATAMENTE 100:
+     *   treino 15 + hábitos 20 + água 15 + refeições 10 + leitura 5 + humor 5
+     *   + gratidão 5 + ideia 5 + peso 5 + suplementos 5 + sono 5 + gasto 5.
+     *
+     * "Fiz tudo mas só vai até os 95%" (cliente pagante, 10/09). Ela tinha
+     * razão: três blocos só EXISTIAM pra quem tinha cadastro em outro módulo
+     * (suplemento na Saúde, livro "lendo" na Biblioteca, plano de 4 refeições
+     * na Dieta). Quem não usava aquilo perdia os pontos sem ter o que fazer —
+     * o teto real era 95, 90 ou menos, e o app ainda chamava isso de "dia
+     * completo". Mesma regra que o FinancialHealth já aplica desde 27/07:
+     * quem não usa uma coisa não é penalizado por ela.
+     *
+     * A régua pra decidir bloco a bloco: a Home cobra isso da pessoa (aparece
+     * na timeline/ações rápidas) mesmo sem cadastro?
+     *  - SIM → o bloco fica cobrável sempre (água, hábitos, humor, gratidão,
+     *    ideia, peso, sono, gasto: qualquer um registra hoje sem configurar
+     *    nada antes; e sem hábito a Home mostra "Adicionar hábitos diários"
+     *    como pendência, então hábitos continua 0/20 até cadastrar).
+     *  - NÃO → sem cadastro, pontuação cheia (suplementos, leitura; treino já
+     *    era assim: dia sem treino programado = 15).
+     * "Fez tudo o que a tela mostra" tem que dar 100 — o teste
+     * src/test/score-do-dia.test.tsx prova nos dois extremos.
+     */
     let scorePoints = 0;
     const scoreMax = 100;
 
-    // Treino (15pts)
+    // Treino (15pts) — feito, ou não há treino programado hoje (descanso /
+    // sem plano): não existe o que cobrar. Já era assim.
     if (workoutDone) scorePoints += 15;
     else if (!todayGroup) scorePoints += 15; // rest day = free
 
-    // Hábitos (20pts)
+    // Hábitos (20pts) — cobrável sempre: sem hábito a Home pede pra cadastrar
+    // ("Adicionar hábitos diários" fica pendente na timeline), então é a única
+    // ausência de cadastro que NÃO vira ponto cheio. É o coração da Rotina.
     if (tasksTotal > 0) {
       scorePoints += Math.round((tasksCompleted / tasksTotal) * 20);
     }
 
-    // Água (15pts)
+    // Água (15pts) — meta sempre existe (8 copos por padrão), sempre cobrável.
     scorePoints += Math.min(15, Math.round((waterGlasses / waterGoal) * 15));
 
-    // Refeições (10pts)
+    // Refeições (10pts) — dividido pelo número REAL do plano: plano de 3
+    // refeições, 3 registradas = 10 (antes dava round(3/4*10) = 8, a cliente
+    // nunca fechava). Sem plano nenhum continua cobrando 4. O teto de 10
+    // evita que 5 registros num plano de 3 valham 17 e mascarem outro bloco.
     if (mealsTotal > 0) {
-      scorePoints += Math.round((mealsLogged / mealsTotal) * 10);
+      scorePoints += Math.min(10, Math.round((mealsLogged / mealsTotal) * 10));
     }
 
-    // Leitura ativa (5pts)
-    if (currentBook) scorePoints += 5;
+    // Leitura (5pts) — antes: +5 se existisse um livro "lendo" na Biblioteca,
+    // 0 se não. O bloco NUNCA mediu leitura de hoje (a Biblioteca não tem
+    // registro diário), só a existência do cadastro — e quem não lê pela
+    // Biblioteca ficava com teto 95 sem ter o que fazer. Sem livro não existe
+    // o que cobrar; com livro já valia cheio. Então vale 5 sempre, até o dia
+    // em que houver um "li hoje" pra medir de verdade (currentBook segue
+    // alimentando o card da Home, só não pesa mais no score).
+    scorePoints += 5;
 
-    // Humor registrado (5pts) — FIX 16/07: Rotina grava em mood-log e o
-    // Dev. Pessoal em dp-mood-log; qualquer um dos três conta
+    // Humor registrado (5pts) — registro diário, sem cadastro prévio: sempre
+    // cobrável. FIX 16/07: Rotina grava em mood-log e o Dev. Pessoal em
+    // dp-mood-log; qualquer um dos três conta
     const moodLog = get<Record<string, any>>("core-mood-log", {});
     const moodRotina = get<Record<string, any>>("mood-log", {});
     const moodDp = get<Record<string, any>>("dp-mood-log", {});
     if (moodLog[tStr] || moodRotina[tStr] || moodDp[tStr]) scorePoints += 5;
 
-    // Gratidão registrada (5pts) — FIX 16/07: dp-gratitude (módulo) também
+    // Gratidão registrada (5pts) — registro diário, sempre cobrável.
+    // FIX 16/07: dp-gratitude (módulo) também
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
     const gratDp = get<Record<string, string[]>>("dp-gratitude", {});
     if ((gratLog[tStr] || []).length > 0 || (gratDp[tStr] || []).length > 0) scorePoints += 5;
 
-    // Ideia capturada hoje (5pts)
+    // Ideia capturada hoje (5pts) — registro diário no Hiperfoco, sempre cobrável.
     const thoughtsAll = get<Record<string, any>>("hiperfoco-thoughts", {});
     const todayThoughts = thoughtsAll[tStr] || {};
     const hasThoughtToday = Object.values(todayThoughts).some((arr: any) => Array.isArray(arr) && arr.length > 0);
     if (hasThoughtToday) scorePoints += 5;
 
-    // Peso registrado (5pts)
+    // Peso registrado (5pts) — registro diário na Saúde (medidas), não exige
+    // cadastro: qualquer um pesa hoje. Sempre cobrável — a cliente dos 95
+    // tinha feito este.
     const measures = get<any[]>("core-saude-measures", []);
     if (measures.some((m: any) => m.date === tStr)) scorePoints += 5;
 
-    // Suplementos (5pts)
+    // Suplementos (5pts) — sem suplemento cadastrado na Saúde vale 5. Não é
+    // "de graça": é que não existe o que cobrar — a Home nem lista pendência
+    // de suplemento pra quem não tem nenhum. Era o `if` que travava a
+    // cliente em 95 (10/09). Com cadastro, proporção dos tomados hoje.
     if (supplements.length > 0) {
-      scorePoints += Math.round((supplementsTaken / supplements.length) * 5);
+      scorePoints += Math.min(5, Math.round((supplementsTaken / supplements.length) * 5));
+    } else {
+      scorePoints += 5;
     }
 
-    // Sono registrado (5pts)
+    // Sono registrado (5pts) — registro diário (Saúde ou ação rápida), sem
+    // cadastro prévio: sempre cobrável.
     if (sleepHours) scorePoints += 5;
 
-    // Gasto registrado hoje (5pts)
+    // Gasto registrado hoje (5pts) — registro diário em Finanças, sem cadastro
+    // prévio: sempre cobrável. (Segue o perfil ativo, como o saldo acima.)
     const todayExpenses = variableExpenses.filter((e: any) => e.date === tStr);
     if (todayExpenses.length > 0) scorePoints += 5;
 

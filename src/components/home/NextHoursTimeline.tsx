@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Clock, ChevronRight, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
+import { abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -14,6 +15,8 @@ interface PendingItem {
   emoji: string;
   priority: number;
   route?: string;
+  /** Em vez de navegar, abre a ação rápida (o mesmo formulário do botão lá em cima). */
+  action?: ActionId;
 }
 
 export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
@@ -168,6 +171,42 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
     });
   }
 
+  /*
+   * REGISTROS DO DIA QUE O SCORE COBRA (10/09). Cliente pagante zerou esta
+   * lista e o Score do Dia ficou em 95: os seis blocos de 5 pontos que são
+   * registro diário (humor, gasto, peso, sono, gratidão, ideia) não apareciam
+   * aqui — ela não tinha como saber o que faltava. Cada um vira uma linha
+   * enquanto não foi feito e a versão riscada depois, igual às de cima. As
+   * flags vêm do hook (`registrosHoje`), as MESMAS que somam os pontos — não
+   * recalcula nada, então lista vazia ⇔ score 100 (src/test/pendencias-score).
+   * Ordem = a da fileira de Ações rápidas (todas pesam 5, o peso não
+   * desempata; assim o olho casa a linha com o botão que ela abre). Suplemento
+   * e leitura NÃO entram: sem cadastro o score já dá o bloco como cumprido.
+   * O toque abre o formulário da ação rápida em vez de navegar — gasto
+   * inclusive ("Registrar Gasto", que é o que o score conta).
+   */
+  const reg = data.registrosHoje;
+  if (reg) {
+    const registros: { feito: boolean; pendente: string; concluido: string; emoji: string; action: ActionId }[] = [
+      { feito: reg.humor, pendente: "Check de humor", concluido: "Humor registrado", emoji: "🙂", action: "mood" },
+      { feito: reg.gasto, pendente: "Registrar um gasto", concluido: "Gasto registrado", emoji: "💸", action: "expense" },
+      { feito: reg.peso, pendente: "Pesar hoje", concluido: "Peso registrado", emoji: "⚖️", action: "weight" },
+      { feito: reg.sono, pendente: "Registrar sono", concluido: "Sono registrado", emoji: "🌙", action: "sleep" },
+      { feito: reg.ideia, pendente: "Anotar uma ideia", concluido: "Ideia anotada", emoji: "💡", action: "idea" },
+      { feito: reg.gratidao, pendente: "Anotar uma gratidão", concluido: "Gratidão anotada", emoji: "🙏", action: "gratitude" },
+    ];
+    registros.forEach((r, i) => {
+      items.push({
+        label: r.feito ? r.concluido : r.pendente,
+        done: r.feito,
+        emoji: r.emoji,
+        // depois de todas as linhas que já existiam (pendentes 1–7, feitas 10–14)
+        priority: (r.feito ? 30 : 20) + i,
+        action: r.action,
+      });
+    });
+  }
+
   // Sort by priority
   items.sort((a, b) => a.priority - b.priority);
 
@@ -211,7 +250,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
               {pending.map((item, i) => (
                 <motion.button
                   key={`p-${i}`}
-                  onClick={() => item.route && navigate(item.route)}
+                  onClick={() => item.action ? abrirAcaoRapida(item.action) : item.route && navigate(item.route)}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/50 bg-card hover:bg-muted/30 transition-all text-left group"
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -219,7 +258,7 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                 >
                   <span className="text-sm">{item.emoji}</span>
                   <span className="text-xs font-medium flex-1">{item.label}</span>
-                  {item.route && (
+                  {(item.route || item.action) && (
                     <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   )}
                 </motion.button>

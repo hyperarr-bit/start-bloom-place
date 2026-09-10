@@ -3,6 +3,22 @@ import { useUserData } from "@/hooks/use-user-data";
 import { semanaAtualId } from "@/lib/utils";
 import { doPerfil, doPerfilDueDays, PERFIL_PESSOAL } from "@/lib/finance-perfil";
 
+/**
+ * Os seis registros diários de 5 pontos do Score do Dia (humor, gasto, peso,
+ * sono, gratidão, ideia), "feito hoje" ou não. Existem pra que "Pendências de
+ * hoje" cobre EXATAMENTE o que o score cobra — cliente pagante (10/09) zerou
+ * a lista e o score ficou em 95 sem dizer o que faltava. É a mesma variável
+ * que soma os pontos, não um recálculo.
+ */
+export interface RegistrosHoje {
+  humor: boolean;
+  gasto: boolean;
+  peso: boolean;
+  sono: boolean;
+  gratidao: boolean;
+  ideia: boolean;
+}
+
 export interface LifeHubData {
   dayScore: number;
   streak: number;
@@ -28,7 +44,12 @@ export interface LifeHubData {
   tasksTotal: number;
   habits: { name: string; done: boolean }[];
   userName: string;
+  /** Opcional só porque fixtures montam LifeHubData na mão (score-do-dia.test);
+   *  o hook preenche SEMPRE. Sem isso a timeline não cria as linhas novas. */
+  registrosHoje?: RegistrosHoje;
 }
+
+const NADA_REGISTRADO: RegistrosHoje = { humor: false, gasto: false, peso: false, sono: false, gratidao: false, ideia: false };
 
 // Use LOCAL date (not UTC) — toISOString() shifts to UTC and breaks streak
 // counting in the evening for users in negative timezones (e.g. BR UTC-3 after 21h).
@@ -89,6 +110,7 @@ export function useLifeHubData(): LifeHubData {
         supplementsTaken: 0, supplementsTotal: 0,
         currentBook: null, readingProgress: 0, booksReadThisYear: 0,
         tasksCompleted: 0, tasksTotal: 0, habits: [], userName: "",
+        registrosHoje: NADA_REGISTRADO,
       };
     }
 
@@ -270,13 +292,17 @@ export function useLifeHubData(): LifeHubData {
     const moodLog = get<Record<string, any>>("core-mood-log", {});
     const moodRotina = get<Record<string, any>>("mood-log", {});
     const moodDp = get<Record<string, any>>("dp-mood-log", {});
-    if (moodLog[tStr] || moodRotina[tStr] || moodDp[tStr]) scorePoints += 5;
+    // As flags `*Hoje` abaixo são as MESMAS que a timeline recebe em
+    // `registrosHoje`: o score soma por elas e a pendência aparece por elas.
+    const humorHoje = !!(moodLog[tStr] || moodRotina[tStr] || moodDp[tStr]);
+    if (humorHoje) scorePoints += 5;
 
     // Gratidão registrada (5pts) — registro diário, sempre cobrável.
     // FIX 16/07: dp-gratitude (módulo) também
     const gratLog = get<Record<string, string[]>>("core-gratitude-log", {});
     const gratDp = get<Record<string, string[]>>("dp-gratitude", {});
-    if ((gratLog[tStr] || []).length > 0 || (gratDp[tStr] || []).length > 0) scorePoints += 5;
+    const gratidaoHoje = (gratLog[tStr] || []).length > 0 || (gratDp[tStr] || []).length > 0;
+    if (gratidaoHoje) scorePoints += 5;
 
     // Ideia capturada hoje (5pts) — registro diário no Hiperfoco, sempre cobrável.
     const thoughtsAll = get<Record<string, any>>("hiperfoco-thoughts", {});
@@ -288,7 +314,8 @@ export function useLifeHubData(): LifeHubData {
     // cadastro: qualquer um pesa hoje. Sempre cobrável — a cliente dos 95
     // tinha feito este.
     const measures = get<any[]>("core-saude-measures", []);
-    if (measures.some((m: any) => m.date === tStr)) scorePoints += 5;
+    const pesoHoje = measures.some((m: any) => m.date === tStr);
+    if (pesoHoje) scorePoints += 5;
 
     // Suplementos (5pts) — sem suplemento cadastrado na Saúde vale 5. Não é
     // "de graça": é que não existe o que cobrar — a Home nem lista pendência
@@ -302,12 +329,14 @@ export function useLifeHubData(): LifeHubData {
 
     // Sono registrado (5pts) — registro diário (Saúde ou ação rápida), sem
     // cadastro prévio: sempre cobrável.
-    if (sleepHours) scorePoints += 5;
+    const sonoHoje = !!sleepHours;
+    if (sonoHoje) scorePoints += 5;
 
     // Gasto registrado hoje (5pts) — registro diário em Finanças, sem cadastro
     // prévio: sempre cobrável. (Segue o perfil ativo, como o saldo acima.)
     const todayExpenses = variableExpenses.filter((e: any) => e.date === tStr);
-    if (todayExpenses.length > 0) scorePoints += 5;
+    const gastoHoje = todayExpenses.length > 0;
+    if (gastoHoje) scorePoints += 5;
 
     const dayScore = Math.min(100, scorePoints);
     const userName = get<string>("core-user-name", "");
@@ -322,6 +351,7 @@ export function useLifeHubData(): LifeHubData {
       currentBook: currentBook?.title || null, readingProgress: currentBook?.progress || 0,
       booksReadThisYear: booksRead,
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
+      registrosHoje: { humor: humorHoje, gasto: gastoHoje, peso: pesoHoje, sono: sonoHoje, gratidao: gratidaoHoje, ideia: hasThoughtToday },
     };
   }, [get, loaded]);
 }

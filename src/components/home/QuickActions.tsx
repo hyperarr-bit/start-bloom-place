@@ -12,7 +12,19 @@ import { numeroBR } from "@/lib/data-normalizers";
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
-type ActionId = "water" | "expense" | "income" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
+export type ActionId = "water" | "expense" | "income" | "weight" | "idea" | "task" | "gratitude" | "mood" | "workout" | "sleep" | "meal" | "detox";
+
+/* ABRIR UMA AÇÃO RÁPIDA DE FORA (10/09). "Pendências de hoje" fica no pé da
+   Home e precisa abrir o MESMO formulário que o botão lá de cima abre — sem
+   isso a cliente pagante zerava a lista e o score parava em 95 sem saber o
+   que faltava. O estado `activeAction` é interno e a Home renderiza os dois
+   componentes como irmãos sem nada em comum, então a ponte de menor mudança
+   é um evento na window, na mesma convenção de core:activation/core:voltar.
+   Quem escuta é o componente (abaixo); quem dispara chama `abrirAcaoRapida`. */
+export const EVENTO_ACAO_RAPIDA = "core:acao-rapida";
+export const abrirAcaoRapida = (id: ActionId) => {
+  window.dispatchEvent(new CustomEvent(EVENTO_ACAO_RAPIDA, { detail: { id } }));
+};
 
 interface QuickAction {
   id: ActionId;
@@ -87,6 +99,7 @@ export const QuickActions = () => {
   const [mealKcal, setMealKcal] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const raizRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (activeAction && inputRef.current) {
@@ -105,6 +118,24 @@ export const QuickActions = () => {
       setActiveAction(id);
     }
   };
+
+  // Escuta o EVENTO_ACAO_RAPIDA (ver o topo do arquivo). `handleAction` é
+  // recriado a cada render (fecha sobre get/set), então o listener é
+  // registrado UMA vez e lê a versão atual pelo ref. Como a pendência fica no
+  // pé da página e o formulário abre aqui em cima, rola até ele — senão o
+  // toque parece não fazer nada.
+  const handleActionRef = useRef(handleAction);
+  handleActionRef.current = handleAction;
+  useEffect(() => {
+    const aoPedir = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: ActionId }>).detail?.id;
+      if (!id || !actions.some(a => a.id === id)) return;
+      handleActionRef.current(id);
+      raizRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    };
+    window.addEventListener(EVENTO_ACAO_RAPIDA, aoPedir);
+    return () => window.removeEventListener(EVENTO_ACAO_RAPIDA, aoPedir);
+  }, []);
 
   const showSuccess = (id: ActionId) => {
     setSuccessId(id);
@@ -326,7 +357,7 @@ export const QuickActions = () => {
   const detoxHabits = get<any[]>("detox-habits", []);
 
   return (
-    <div className="space-y-2">
+    <div ref={raizRef} className="space-y-2">
       {/* Action buttons row */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
         {actions.map((a, i) => (

@@ -18,8 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { useUserData } from "@/hooks/use-user-data";
-import { ResumoDoModulo, comoLista } from "@/components/ui/resumo-do-modulo";
 
 const genId = () => crypto.randomUUID();
 
@@ -675,29 +673,6 @@ const Carreira = () => {
     reportTab?.(tabId);
   };
 
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // Tarefas e fases são do BlocoDeFases (aba Meu Dia); vagas do JobTracker.
-  const { get: lerDado } = useUserData();
-  const hoje = localDayKey();
-  const tarefasDeHoje = comoLista<{ feito?: boolean; dia?: string }>(lerDado("career-day-tasks", [])).filter(t => t?.dia === hoje);
-  const tarefasFeitasHoje = tarefasDeHoje.filter(t => t?.feito).length;
-  const fasesHoje = comoLista<Fase>(lerDado("career-day-phases", FASES_PADRAO))
-    .map(f => ({ nome: f?.nome ?? "", n: Number(f?.counts?.[hoje]) || 0 }))
-    .filter(f => f.n > 0)
-    .sort((a, b) => b.n - a.n);
-  const repeticoesHoje = fasesHoje.reduce((s, f) => s + f.n, 0);
-  const vagas = comoLista<{ status?: string }>(lerDado("career-jobs", []));
-  const vagasAtivas = vagas.filter(v => v?.status === "aplicado" || v?.status === "entrevista" || v?.status === "teste").length;
-  const entrevistas = vagas.filter(v => v?.status === "entrevista").length;
-  const itensDoResumo = [
-    { rotulo: "Tarefas hoje", valor: tarefasDeHoje.length ? `${tarefasFeitasHoje}/${tarefasDeHoje.length}` : null, tom: tarefasFeitasHoje >= tarefasDeHoje.length ? "ok" as const : "atencao" as const, onClick: () => handleTabChange("dia") },
-    { rotulo: "Fases hoje", valor: repeticoesHoje, sub: fasesHoje[0]?.nome, tom: "ok" as const, onClick: () => handleTabChange("dia") },
-    { rotulo: "Vagas ativas", valor: vagasAtivas, sub: entrevistas ? `${entrevistas} em entrevista` : undefined, tom: "neutro" as const, onClick: () => handleTabChange("jobs") },
-  ];
-
   const careerTabs = [
     { id: "dia", label: "Meu Dia", icon: "🗓️" },
     { id: "jobs", label: "Vagas", icon: "💼" },
@@ -745,7 +720,6 @@ const Carreira = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Comece pelo seu dia: crie uma tarefa do trabalho" />
         <ModuleTip
           moduleId="carreira"
           tips={[

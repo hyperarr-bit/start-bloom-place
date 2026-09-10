@@ -11,9 +11,6 @@ import { SkinDiary } from "@/components/beleza/SkinDiary";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { useUserData } from "@/hooks/use-user-data";
-import { localDayKey } from "@/lib/utils";
-import { ResumoDoModulo, comoLista } from "@/components/ui/resumo-do-modulo";
 
 const tabs = [
   { id: "routine", label: "Rotina", icon: "✨" },
@@ -32,26 +29,6 @@ const Beleza = () => {
     setActiveTab(tabId);
     reportTab?.(tabId);
   };
-
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // Passos e checks moram na SkincareRoutine; o check-in de pele, no
-  // DailyMirror. Mesmas chaves, lidas do store.
-  const { get: lerDado } = useUserData();
-  const hoje = localDayKey();
-  const passosManha = comoLista(lerDado("skincare-am-steps", [])).length;
-  const passosNoite = comoLista(lerDado("skincare-pm-steps", [])).length;
-  const feitosManha = comoLista(lerDado<Record<string, number[]>>("skincare-morning-checked", {})?.[hoje]).length;
-  const feitosNoite = comoLista(lerDado<Record<string, number[]>>("skincare-night-checked", {})?.[hoje]).length;
-  const peleHoje = lerDado<Record<string, string>>("skincare-daily-checkin", {})?.[hoje] ?? "";
-  const nomeDaPele: Record<string, string> = { seca: "Seca 🌵", oleosa: "Oleosa 🛢️", acne: "Acne 🔴", boa: "Boa ✨", sensivel: "Sensível 🍅" };
-  const itensDoResumo = [
-    { rotulo: "Manhã", valor: passosManha ? `${feitosManha}/${passosManha}` : null, sub: "passos", tom: feitosManha >= passosManha ? "ok" as const : "atencao" as const, onClick: () => handleTabChange("routine") },
-    { rotulo: "Noite", valor: passosNoite ? `${feitosNoite}/${passosNoite}` : null, sub: "passos", tom: feitosNoite >= passosNoite ? "ok" as const : "atencao" as const, onClick: () => handleTabChange("routine") },
-    { rotulo: "Pele hoje", valor: peleHoje ? (nomeDaPele[peleHoje] ?? peleHoje) : null, tom: "neutro" as const, onClick: () => handleTabChange("routine") },
-  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -91,7 +68,6 @@ const Beleza = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-4">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Monte sua rotina de skincare" />
         <ModuleTip
           moduleId="beleza"
           tips={[

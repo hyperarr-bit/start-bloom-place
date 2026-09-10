@@ -13,8 +13,6 @@ import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { localDayKey } from "@/lib/utils";
-import { ResumoDoModulo, comoLista, diasAte, rotuloEmDias } from "@/components/ui/resumo-do-modulo";
 
 const tabs = [
   { id: "pets", label: "PETS", icon: "🐾" },
@@ -29,32 +27,6 @@ const Pet = () => {
   const { get } = useUserData();
   // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
   const vazio = (get<unknown[]>("pet-list", []) ?? []).length === 0;
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // A rotina é gravada por dia (pet-routine-<dia>) e as tarefas por pet
-  // (pet-routine-tasks-<id>); sem lista própria, o PetRoutine usa as 6 de
-  // fábrica — o mesmo denominador aqui.
-  const pets = comoLista<{ id: string; name?: string }>(get("pet-list", []));
-  const hojeChave = localDayKey();
-  const rotinaDeHoje = get<Record<string, Record<string, boolean>>>(`pet-routine-${hojeChave}`, {}) ?? {};
-  const TAREFAS_DE_FABRICA = 6;
-  const tarefasDosPets = pets.reduce((s, p) => { const proprias = get<unknown>(`pet-routine-tasks-${p?.id}`, null); return s + (Array.isArray(proprias) ? proprias.length : TAREFAS_DE_FABRICA); }, 0);
-  const feitasHoje = pets.reduce((s, p) => s + Object.values(rotinaDeHoje[p?.id] ?? {}).filter(Boolean).length, 0);
-  const proximaSaude = comoLista<{ name?: string; nextDate?: string }>(get("pet-health", []))
-    .map(r => ({ nome: r?.name ?? "", dias: diasAte(r?.nextDate ?? "") }))
-    .filter(r => Number.isFinite(r.dias) && r.dias >= 0)
-    .sort((a, b) => a.dias - b.dias)[0];
-  const mesAtual = hojeChave.slice(0, 7);
-  const gastosDoMes = comoLista<{ value?: number; date?: string }>(get("pet-expenses", []))
-    .filter(g => typeof g?.date === "string" && g.date.startsWith(mesAtual))
-    .reduce((s, g) => s + (Number(g?.value) || 0), 0);
-  const itensDoResumo = [
-    { rotulo: "Rotina hoje", valor: tarefasDosPets ? `${feitasHoje}/${tarefasDosPets}` : null, tom: feitasHoje >= tarefasDosPets ? "ok" as const : "atencao" as const, onClick: () => handleTabChange("rotina") },
-    { rotulo: "Próx. saúde", valor: proximaSaude ? rotuloEmDias(proximaSaude.dias) : null, sub: proximaSaude?.nome, tom: proximaSaude && proximaSaude.dias <= 7 ? "atencao" as const : "neutro" as const, onClick: () => handleTabChange("saude") },
-    { rotulo: "Gastos do mês", valor: gastosDoMes ? `R$ ${gastosDoMes.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}` : null, tom: "neutro" as const, onClick: () => handleTabChange("gastos") },
-  ];
   const [activeTab, setActiveTab] = useState("pets");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -103,7 +75,6 @@ const Pet = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Cadastre seu primeiro pet" />
         <ModuleTip
           moduleId="pet"
           tips={[

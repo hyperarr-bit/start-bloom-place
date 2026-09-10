@@ -25,7 +25,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { ResumoDoModulo } from "@/components/ui/resumo-do-modulo";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Switch } from "@/components/ui/switch";
 
@@ -634,32 +633,6 @@ const Dieta = () => {
     setEditingRecipeId(null);
   };
 
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // A mesma conta do "TOTAL DO DIA" do cardápio (plano do dia + o que a Home
-  // registrou hoje), pra o resumo e o card nunca discordarem.
-  const diaDeHojeNoCardapio = getDiaryDayName(today);
-  const refeicoesSeguidasHoje = Object.values(diaryData[today]?.meals ?? {}).filter(m => m?.followed).length;
-  const kcalPlanejadasHoje = kcalDoPlano(mealKcal[diaDeHojeNoCardapio]);
-  const kcalRegistradasHoje = kcalRegistradas(dietaLog[today]);
-  const itensParaComprar = smartList.filter(i => !i.done).length;
-  const horasDeJejum = fastingStart ? Math.floor(fastingElapsed / 3600) : 0;
-  const trocarAba = (id: string) => { setActiveTab(id); reportTab?.(id); };
-  const itensDoResumo = [
-    { rotulo: "Hoje", valor: meals.length ? `${refeicoesSeguidasHoje}/${meals.length}` : null, sub: "refeições seguidas", tom: refeicoesSeguidasHoje >= meals.length ? "ok" as const : "atencao" as const, onClick: () => trocarAba("diario") },
-    {
-      rotulo: "Kcal hoje",
-      valor: kcalPlanejadasHoje > 0 ? `${kcalPlanejadasHoje} kcal` : (kcalRegistradasHoje > 0 ? `${kcalRegistradasHoje} kcal` : null),
-      sub: kcalPlanejadasHoje > 0 ? (kcalRegistradasHoje > 0 ? `${kcalRegistradasHoje} registradas` : "planejadas") : (kcalRegistradasHoje > 0 ? "registradas" : undefined),
-      tom: "neutro" as const,
-      onClick: () => trocarAba("cardapio"),
-    },
-    { rotulo: "Jejum", valor: fastingStart ? `${horasDeJejum}h/${fastingGoal}h` : null, tom: horasDeJejum >= fastingGoal ? "ok" as const : "atencao" as const, onClick: () => trocarAba("jejum") },
-    { rotulo: "Lista", valor: itensParaComprar, sub: "itens pra comprar", tom: "atencao" as const, onClick: () => trocarAba("lista") },
-  ];
-
   return (
     <div className="min-h-screen bg-background pb-20">
       {DietaCompletionDialog}
@@ -701,7 +674,6 @@ const Dieta = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Toque num dia do cardápio e adicione a primeira refeição" className="mb-4" />
         <ModuleTip
           moduleId="dieta"
           tips={[

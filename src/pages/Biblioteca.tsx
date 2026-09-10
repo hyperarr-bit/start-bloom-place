@@ -14,7 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { ResumoDoModulo } from "@/components/ui/resumo-do-modulo";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, addDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -194,20 +193,6 @@ const Biblioteca = () => {
      aparece na aba Desafio com um toque pra contar. */
   const lidosSemData = booksRead.filter(b => !b.endDate);
   const totalPagesRead = books.reduce((s, b) => s + (b.status === "lido" ? (b.pages || 0) : (b.currentPage || 0)), 0);
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // Os totais (Total/Lendo/Lidos/Páginas) já existem logo abaixo; o resumo
-  // é o que tem pra FAZER: continuar o livro, cumprir a meta, cobrar o
-  // emprestado.
-  const progressoDoAtual = currentBook && currentBook.pages > 0 ? Math.round(((currentBook.currentPage || 0) / currentBook.pages) * 100) : null;
-  const livrosEmprestados = books.filter(b => b.lentTo).length;
-  const itensDoResumo = [
-    { rotulo: "Lendo agora", valor: currentBook ? (progressoDoAtual != null ? `${progressoDoAtual}%` : "Em leitura") : null, sub: currentBook?.title, tom: "ok" as const, onClick: () => setTab("lendo") },
-    { rotulo: "Meta do ano", valor: books.length && yearGoal ? `${booksReadThisYear}/${yearGoal}` : null, sub: "livros lidos", tom: booksReadThisYear >= yearGoal ? "ok" as const : "atencao" as const, onClick: () => setTab("desafio") },
-    { rotulo: "Emprestados", valor: livrosEmprestados, sub: "a receber de volta", tom: "atencao" as const, onClick: () => setTab("emprestados") },
-  ];
 
   const allQuotes = useMemo(() => {
     const q: (BookQuote & { bookTitle: string; bookAuthor: string })[] = [];
@@ -467,10 +452,6 @@ const Biblioteca = () => {
       </header>
 
       <ModuleTip moduleId="biblioteca" tips={["📚 Adicione livros por link (Amazon, Goodreads) para importar capa e dados automaticamente!", "💡 Salve citações dos seus livros e filtre por tags depois!", "🏆 Defina sua meta anual de leitura na aba Desafio!"]} />
-
-      <div className="px-4 pt-3">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Adicione o primeiro livro da estante" />
-      </div>
 
       {/* Stats */}
       <div className="px-4 py-2">

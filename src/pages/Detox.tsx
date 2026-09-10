@@ -12,8 +12,6 @@ import { ProximoPasso } from "@/components/modules/ProximoPasso";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { localDayKey } from "@/lib/utils";
-import { ResumoDoModulo, comoLista, diasAte, emDias } from "@/components/ui/resumo-do-modulo";
 
 const tabs = [
   { id: "rastreador", label: "RASTREADOR", icon: "🌿" },
@@ -27,24 +25,6 @@ const Detox = () => {
   const { get } = useUserData();
   // módulo sem nenhum registro → mostra o próximo passo no lugar do branco
   const vazio = (get<unknown[]>("detox-habits", []) ?? []).length === 0;
-  /* RESUMO DO MÓDULO (07/09, avaliação 5★ da Play: "Cada aba poderia ser
-     igual a de finanças, você entrar e ja ter um resumo do que tem para
-     fazer"). Só conta o que esta página JÁ lê — nenhuma chave nova, nenhum
-     formato mudado. Ver src/components/ui/resumo-do-modulo.tsx. */
-  // "Dias limpo" = dias desde o startDate (que a recaída reinicia), como o
-  // DetoxTracker mostra; o recorde é o campo gravado no hábito.
-  const habitosDetox = comoLista<{ name?: string; startDate?: string; record?: number; checkins?: string[] }>(get("detox-habits", []));
-  const hojeChave = localDayKey();
-  const checkinsHoje = habitosDetox.filter(h => comoLista<string>(h?.checkins).includes(hojeChave)).length;
-  const maisLimpo = habitosDetox
-    .map(h => { const d = diasAte(h?.startDate ?? ""); return { nome: h?.name ?? "", dias: Number.isFinite(d) ? -d : 0 }; })
-    .sort((a, b) => b.dias - a.dias)[0];
-  const recorde = habitosDetox.reduce((m, h) => Math.max(m, Number(h?.record) || 0), 0);
-  const itensDoResumo = [
-    { rotulo: "Check-in hoje", valor: habitosDetox.length ? `${checkinsHoje}/${habitosDetox.length}` : null, tom: checkinsHoje >= habitosDetox.length ? "ok" as const : "atencao" as const, onClick: () => handleTabChange("rastreador") },
-    { rotulo: "Dias limpo", valor: maisLimpo && maisLimpo.dias > 0 ? emDias(maisLimpo.dias) : null, sub: maisLimpo?.nome, tom: "ok" as const, onClick: () => handleTabChange("stats") },
-    { rotulo: "Recorde", valor: recorde ? emDias(recorde) : null, tom: "ok" as const, onClick: () => handleTabChange("conquistas") },
-  ];
   const [activeTab, setActiveTab] = useState("rastreador");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
@@ -93,7 +73,6 @@ const Detox = () => {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-4">
-        <ResumoDoModulo itens={itensDoResumo} vazio="Escolha o que quer reduzir" />
         <ModuleTip
           moduleId="detox"
           tips={[

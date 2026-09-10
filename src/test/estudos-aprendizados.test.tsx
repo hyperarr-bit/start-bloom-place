@@ -49,7 +49,6 @@ const montar = (store: ReturnType<typeof criarStore>) =>
 
 const diasAtras = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return localDayKey(d); };
 const abrirAba = (v: string) => fireEvent.click(document.querySelector(`[data-spotlight="tab-${v}"]`)!);
-const resumo = () => screen.getByTestId("resumo-do-modulo");
 
 describe("Aprendizados por curso — ciclo completo", () => {
   it("registra 'aprendi isso, esse slide é bom por causa disso' → aparece no curso e no Caderno → sobrevive a fechar e reabrir", () => {
@@ -197,33 +196,8 @@ describe("Caderno: busca e filtro por curso", () => {
   });
 });
 
-describe("Resumo do topo", () => {
-  it("tile 'Aprendizados' conta só a semana corrente e leva pro Caderno", () => {
-    const s = criarStore({
-      "estudos-cursos-andamento": [{ id: "c1", name: "Inglês" }],
-      "estudos-aprendizados": {
-        c1: [
-          { id: "1", data: diasAtras(0), aprendi: "desta semana" },
-          { id: "2", data: diasAtras(10), aprendi: "semana passada" },
-          { id: "3", data: diasAtras(40), aprendi: "mês passado" },
-        ],
-      },
-    });
-    montar(s);
-    const tile = within(resumo()).getByRole("button", { name: /Aprendizados/ });
-    expect(tile).toHaveTextContent("1");
-    expect(tile).toHaveTextContent("esta semana");
-    fireEvent.click(tile);
-    expect(document.querySelector('[data-spotlight="tab-caderno"]')).toHaveClass("notion-tab-active");
-    expect(screen.getByTestId("caderno-aprendizados")).toBeInTheDocument();
-  });
-
-  it("sem aprendizado o tile some (regra do ResumoDoModulo)", () => {
-    montar(criarStore({ "estudos-cursos-andamento": [{ id: "c1", name: "Inglês" }] }));
-    expect(within(resumo()).queryByText("Aprendizados")).not.toBeInTheDocument();
-  });
-
-  it("/preview/estudos (seeds da demo) mostra barra de progresso, aprendizados e o tile", () => {
+describe("Demo do funil", () => {
+  it("/preview/estudos (seeds da demo) mostra barra de progresso e aprendizados", () => {
     render(
       <MemoryRouter>
         <PreviewUserDataProvider moduleKey="estudos"><Estudos /></PreviewUserDataProvider>
@@ -231,7 +205,6 @@ describe("Resumo do topo", () => {
     );
     expect(screen.getByText("Aula 12 de 30")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Aprendizados de Inglês intermediário" })).toHaveTextContent("2 aprendizados");
-    expect(within(resumo()).getByRole("button", { name: /Aprendizados/ })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/undefined|NaN/);
   });
 });

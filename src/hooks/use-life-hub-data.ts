@@ -28,6 +28,10 @@ export interface LifeHubData {
   todayWorkoutGroup: string | null;
   workoutDone: boolean;
   workoutTime: string | null;
+  /** "descanso" = hoje não é dia ativo; "vazio" = nenhum dia da semana tem
+   *  exercício ou grupo (aí sim "Configurar treino da semana" faz sentido);
+   *  "treino" = tem treino hoje. */
+  workoutStatus?: "treino" | "descanso" | "vazio";
   caloriesConsumed: number;
   caloriesGoal: number;
   mealsLogged: number;
@@ -104,7 +108,7 @@ export function useLifeHubData(): LifeHubData {
       return {
         dayScore: 0, streak: 0, monthBalance: 0,
         nextBillName: null, nextBillDate: null,
-        todayWorkoutGroup: null, workoutDone: false, workoutTime: null,
+        todayWorkoutGroup: null, workoutDone: false, workoutTime: null, workoutStatus: "vazio",
         caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 0, mealsTotal: 4,
         waterGlasses: 0, waterGoal: 8, sleepHours: null,
         supplementsTaken: 0, supplementsTotal: 0,
@@ -146,17 +150,36 @@ export function useLifeHubData(): LifeHubData {
     const todayDayName = weekDayMap[new Date().getDay()];
     const todayPlan = workoutPlan[todayDayName];
 
-    // Support both old (muscle: string) and new (muscles: string[]) format
+    /* "Configurei tudo nos treinos mas não saiu o 'Configurar treino da
+     * semana' das pendências" (cliente pagante, 11/09). Dois descompassos com
+     * o próprio módulo Treino (Treino.tsx, getDayStatus): lá um dia está
+     * configurado quando tem EXERCÍCIO, e dia fora de `treino-active-days`
+     * é "Descanso". Aqui, "configurado" exigia GRUPO MUSCULAR — quem monta
+     * os exercícios sem marcar o grupo (caminho normal do formulário) ficava
+     * pendente pra sempre; e dia de descanso caía no mesmo "Configurar", como
+     * se o plano não existisse. Agora: grupo se tiver, senão "Treino de hoje"
+     * com a contagem de exercícios; descanso é descanso; e "Configurar" só
+     * quando NENHUM dia da semana tem exercício ou grupo. */
+    const diaTemTreino = (d: any): boolean =>
+      !!d && ((Array.isArray(d.muscles) && d.muscles.length > 0)
+        || (Array.isArray(d.exercises) && d.exercises.length > 0)
+        || (typeof d.muscle === "string" && d.muscle !== "" && d.muscle !== "Descanso"));
+    const semanaVazia = !Object.values(workoutPlan || {}).some(diaTemTreino);
+    const hojeAtivo = activeDays.includes(todayDayName);
+
     let todayGroup: string | null = null;
-    if (todayPlan) {
+    if (hojeAtivo && diaTemTreino(todayPlan)) {
       if (todayPlan.muscles && todayPlan.muscles.length > 0) {
         todayGroup = todayPlan.muscles.join(" + ");
       } else if (todayPlan.muscle && todayPlan.muscle !== "Descanso") {
         todayGroup = todayPlan.muscle;
+      } else {
+        const n = todayPlan.exercises.length;
+        todayGroup = `${n} exercício${n > 1 ? "s" : ""}`;
       }
     }
-    // Only show if it's an active day
-    if (!activeDays.includes(todayDayName)) todayGroup = null;
+    const workoutStatus: "treino" | "descanso" | "vazio" =
+      todayGroup ? "treino" : semanaVazia ? "vazio" : "descanso";
 
     const workoutLog = get<string[]>("saude-workout-log", []);
     const workoutDone = workoutLog.includes(tStr);
@@ -344,7 +367,7 @@ export function useLifeHubData(): LifeHubData {
     return {
       dayScore, streak, monthBalance,
       nextBillName: nextBill?.name || null, nextBillDate: nextBill?._day ? `dia ${nextBill._day}` : null,
-      todayWorkoutGroup: todayGroup, workoutDone, workoutTime: null,
+      todayWorkoutGroup: todayGroup, workoutDone, workoutTime: null, workoutStatus,
       caloriesConsumed, caloriesGoal, mealsLogged, mealsTotal,
       waterGlasses, waterGoal, sleepHours,
       supplementsTaken, supplementsTotal: supplements.length,

@@ -68,6 +68,17 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
       priority: data.workoutDone ? 11 : 2,
       route: "/treino",
     });
+  } else if (data.workoutStatus === "descanso") {
+    // Dia de descanso NÃO é pendência: o plano existe, hoje só não treina.
+    // Antes caía em "Configurar treino da semana" e a pessoa que tinha
+    // configurado tudo via a cobrança todo dia de folga (cliente, 11/09).
+    items.push({
+      label: "Hoje é descanso",
+      done: true,
+      emoji: "😴",
+      priority: 11,
+      route: "/treino",
+    });
   } else {
     items.push({
       label: "Configurar treino da semana",

@@ -137,6 +137,40 @@ describe("Pendências de hoje espelham o Score do Dia", () => {
     }
   });
 
+  /* "Configurei tudo nos treinos mas não saiu o 'Configurar treino da
+   * semana'" (cliente, 11/09). A Home exigia GRUPO MUSCULAR; o Treino
+   * considera configurado quem tem EXERCÍCIO. E dia de descanso caía na
+   * mesma cobrança. */
+  it("treino com exercícios mas sem grupo muscular NÃO é 'Configurar treino da semana'", () => {
+    const d = tudoFeitoBasico();
+    d["saude-workouts-v2"] = { [diaDaSemana()]: { muscles: [], exercises: [{ id: "e1", name: "Supino", done: true }, { id: "e2", name: "Remada", done: true }] } };
+    renderHome(d);
+    expect(screen.queryByText("Configurar treino da semana")).not.toBeInTheDocument();
+    expect(screen.getByText(/Treino de 2 exercícios concluído/)).toBeInTheDocument();
+    expect(score()).toBe(100);
+  });
+
+  it("dia de descanso (fora dos dias ativos) vira 'Hoje é descanso', feito — não pendência", () => {
+    const d = tudoFeitoBasico();
+    const outroDia = DIAS[(new Date().getDay() + 1) % 7];
+    d["saude-workouts-v2"] = { [outroDia]: { muscles: ["Costas"], exercises: [{ id: "e1", name: "Barra", done: false }] } };
+    d["treino-active-days"] = [outroDia];
+    d["saude-workout-log"] = [];
+    renderHome(d);
+    expect(screen.queryByText("Configurar treino da semana")).not.toBeInTheDocument();
+    expect(screen.getByText("Hoje é descanso")).toBeInTheDocument();
+    expect(pendentes()).toEqual([]);
+    expect(score()).toBe(100);
+  });
+
+  it("semana realmente vazia (nenhum dia com exercício ou grupo) continua pedindo pra configurar", () => {
+    const d = tudoFeitoBasico();
+    d["saude-workouts-v2"] = { [diaDaSemana()]: { muscles: [], exercises: [] } };
+    d["saude-workout-log"] = [];
+    renderHome(d);
+    expect(pendentes()).toEqual(["🏋️Configurar treino da semana"]);
+  });
+
   it("(c) sem suplemento cadastrado → nenhuma pendência de suplemento (o score já dá o bloco como cumprido)", () => {
     renderHome(tudoFeitoBasico());
     expect(screen.queryByText(/suplemento/i)).not.toBeInTheDocument();

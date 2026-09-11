@@ -162,10 +162,12 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   if (data.currentBook) {
     if (data.readingProgress < 100) {
       items.push({
-        label: `Continuar "${data.currentBook}" (${data.readingProgress}%)`,
-        done: false,
+        label: data.leuHoje
+          ? `Leitura de hoje feita · "${data.currentBook}" (${data.readingProgress}%)`
+          : `Continuar "${data.currentBook}" (${data.readingProgress}%)`,
+        done: !!data.leuHoje,
         emoji: "📖",
-        priority: 6,
+        priority: data.leuHoje ? 12 : 6,
         route: "/biblioteca",
       });
     }

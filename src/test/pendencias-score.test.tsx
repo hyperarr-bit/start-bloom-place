@@ -171,6 +171,24 @@ describe("Pendências de hoje espelham o Score do Dia", () => {
     expect(pendentes()).toEqual(["🏋️Configurar treino da semana"]);
   });
 
+  it("leitura: porcentagem vem de currentPage/pages; mexeu na página hoje → linha feita; sem mexer → 'Continuar' pendente e score 95", () => {
+    const d = tudoFeitoBasico();
+    d["lib-books"] = [{ id: "b1", title: "Um livro", status: "lendo", pages: 200, currentPage: 50 }];
+    renderHome(d);
+    expect(pendentes()).toEqual(['📖Continuar "Um livro" (25%)']);
+    expect(score()).toBe(95);
+  });
+
+  it("leitura: com lib-read-log de hoje a linha fica riscada e o score fecha", () => {
+    const d = tudoFeitoBasico();
+    d["lib-books"] = [{ id: "b1", title: "Um livro", status: "lendo", pages: 200, currentPage: 50 }];
+    d["lib-read-log"] = [hoje()];
+    renderHome(d);
+    expect(pendentes()).toEqual([]);
+    expect(screen.getByText(/Leitura de hoje feita/)).toBeInTheDocument();
+    expect(score()).toBe(100);
+  });
+
   it("(c) sem suplemento cadastrado → nenhuma pendência de suplemento (o score já dá o bloco como cumprido)", () => {
     renderHome(tudoFeitoBasico());
     expect(screen.queryByText(/suplemento/i)).not.toBeInTheDocument();

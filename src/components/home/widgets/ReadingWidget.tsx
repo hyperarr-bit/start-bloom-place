@@ -4,6 +4,7 @@ import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { useUserData } from "@/hooks/use-user-data";
 import { ProgressBar } from "@/components/home/ProgressBar";
 import { WidgetSize } from "@/hooks/use-home-widgets";
+import { localDayKey } from "@/lib/utils";
 
 export const ReadingWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const navigate = useNavigate();
@@ -12,11 +13,23 @@ export const ReadingWidget = ({ size = "small" }: { size?: WidgetSize }) => {
 
   const updateProgress = (newProgress: number, e: React.MouseEvent | React.ChangeEvent) => {
     e.stopPropagation();
+    const pct = Math.min(100, Math.max(0, newProgress));
     const books = get<any[]>("lib-books", []);
+    // 11/09: gravava só `progress`, que a Biblioteca ignora (lá é
+    // currentPage/pages) — o widget e o módulo viviam em campos diferentes.
+    // Agora converte em página quando o livro tem total; `progress` fica só
+    // pra livro sem páginas cadastradas.
     const updated = books.map((b: any) =>
-      b.status === "lendo" ? { ...b, progress: Math.min(100, Math.max(0, newProgress)) } : b
+      b.status === "lendo"
+        ? (Number(b.pages) > 0
+            ? { ...b, currentPage: Math.round((pct / 100) * Number(b.pages)), progress: pct }
+            : { ...b, progress: pct })
+        : b
     );
     set("lib-books", updated);
+    const hoje = localDayKey();
+    const log = get<string[]>("lib-read-log", []);
+    if (!log.includes(hoje)) set("lib-read-log", [...log.slice(-60), hoje]);
   };
 
   if (size === "small") {

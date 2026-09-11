@@ -84,7 +84,8 @@ const tudoFeitoCompleto = (): Record<string, unknown> => ({
   ...tudoFeitoBasico(),
   "core-saude-supplements": [{ id: "s1", name: "Creatina" }, { id: "s2", name: "Ômega 3" }],
   "core-saude-supplement-log": { [hoje()]: ["s1", "s2"] },
-  "lib-books": [{ id: "b1", title: "Hábitos Atômicos", status: "lendo", progress: 40 }],
+  "lib-books": [{ id: "b1", title: "Hábitos Atômicos", status: "lendo", pages: 320, currentPage: 128 }],
+  "lib-read-log": [hoje()], // 11/09: com livro em leitura, "tudo feito" inclui ter lido hoje
   "core-dieta-meals": [{ name: "Café" }, { name: "Almoço" }, { name: "Jantar" }],
   "core-dieta-log": { [hoje()]: { cafe: {}, almoco: {}, jantar: {} } },
 });
@@ -110,7 +111,19 @@ describe("Score do Dia fecha em 100", () => {
     expect(scoreDe({
       ...tudoFeitoBasico(),
       "lib-books": [{ id: "b1", title: "Um livro", status: "lendo" }],
+      "lib-read-log": [hoje()],
     })).toBe(100);
+  });
+
+  /* 11/09 — "leituras no pendências não marca como lido e a porcentagem não
+   * anda". Com livro em leitura, o ponto de leitura passa a vir do
+   * lib-read-log (mexeu na página hoje); sem livro continua cheio. */
+  it("livro em leitura sem ter lido hoje = 95; sem livro nenhum = 100", () => {
+    expect(scoreDe({
+      ...tudoFeitoBasico(),
+      "lib-books": [{ id: "b1", title: "Um livro", status: "lendo", pages: 200, currentPage: 50 }],
+    })).toBe(95);
+    expect(scoreDe({ ...tudoFeitoBasico(), "lib-books": [] })).toBe(100);
   });
 
   it("suplemento cadastrado e NÃO tomado continua cobrando os 5", () => {

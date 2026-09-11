@@ -43,6 +43,8 @@ export interface LifeHubData {
   supplementsTotal: number;
   currentBook: string | null;
   readingProgress: number;
+  /** mexeu na página de algum livro hoje (lib-read-log) */
+  leuHoje?: boolean;
   booksReadThisYear: number;
   tasksCompleted: number;
   tasksTotal: number;
@@ -112,7 +114,7 @@ export function useLifeHubData(): LifeHubData {
         caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 0, mealsTotal: 4,
         waterGlasses: 0, waterGoal: 8, sleepHours: null,
         supplementsTaken: 0, supplementsTotal: 0,
-        currentBook: null, readingProgress: 0, booksReadThisYear: 0,
+        currentBook: null, readingProgress: 0, leuHoje: false, booksReadThisYear: 0,
         tasksCompleted: 0, tasksTotal: 0, habits: [], userName: "",
         registrosHoje: NADA_REGISTRADO,
       };
@@ -219,6 +221,21 @@ export function useLifeHubData(): LifeHubData {
     // Library
     const books = get<any[]>("lib-books", []);
     const currentBook = books.find((b: any) => b.status === "lendo");
+    /* "A porcentagem não anda" (cliente, 11/09): a Home lia `progress`, um
+     * campo que a Biblioteca NUNCA grava — lá o progresso é currentPage/pages
+     * (Biblioteca.tsx, barra do "Lendo agora"). Só a demo tinha `progress`
+     * semeado, por isso parecia certo. Agora: páginas quando existem, senão o
+     * `progress` (que o widget antigo da Home gravava), senão 0.
+     * "Não marca como lido": a linha "Continuar «livro»" nunca ficava feita
+     * porque não existia registro diário de leitura. `lib-read-log` guarda os
+     * dias em que a pessoa mexeu na página (Biblioteca ou widget). */
+    const readingProgress = currentBook
+      ? (Number(currentBook.pages) > 0
+          ? Math.min(100, Math.round((Number(currentBook.currentPage) || 0) / Number(currentBook.pages) * 100))
+          : Math.min(100, Math.max(0, Number(currentBook.progress) || 0)))
+      : 0;
+    const readLog = get<string[]>("lib-read-log", []);
+    const leuHoje = Array.isArray(readLog) && readLog.includes(tStr);
     const booksRead = books.filter((b: any) => b.status === "lido").length;
 
     // Tasks / Habits — FIX 16/07 ("adicionar hábito" eterno no hub): a fonte
@@ -300,14 +317,13 @@ export function useLifeHubData(): LifeHubData {
       scorePoints += Math.min(10, Math.round((mealsLogged / mealsTotal) * 10));
     }
 
-    // Leitura (5pts) — antes: +5 se existisse um livro "lendo" na Biblioteca,
-    // 0 se não. O bloco NUNCA mediu leitura de hoje (a Biblioteca não tem
-    // registro diário), só a existência do cadastro — e quem não lê pela
-    // Biblioteca ficava com teto 95 sem ter o que fazer. Sem livro não existe
-    // o que cobrar; com livro já valia cheio. Então vale 5 sempre, até o dia
-    // em que houver um "li hoje" pra medir de verdade (currentBook segue
-    // alimentando o card da Home, só não pesa mais no score).
-    scorePoints += 5;
+    // Leitura (5pts) — sem livro em leitura não existe o que cobrar: 5.
+    // Com livro "lendo", vale pelo `lib-read-log` de hoje (11/09): a linha
+    // "Continuar «livro»" das pendências nunca ficava feita e o score dava o
+    // ponto de graça — a lista e o número discordavam. Agora os dois leem a
+    // mesma coisa: mexeu na página hoje (Biblioteca ou widget) = 5.
+    // Voltar ao "vale 5 sempre" é trocar esta linha por `scorePoints += 5`.
+    if (!currentBook || leuHoje) scorePoints += 5;
 
     // Humor registrado (5pts) — registro diário, sem cadastro prévio: sempre
     // cobrável. FIX 16/07: Rotina grava em mood-log e o Dev. Pessoal em
@@ -371,7 +387,7 @@ export function useLifeHubData(): LifeHubData {
       caloriesConsumed, caloriesGoal, mealsLogged, mealsTotal,
       waterGlasses, waterGoal, sleepHours,
       supplementsTaken, supplementsTotal: supplements.length,
-      currentBook: currentBook?.title || null, readingProgress: currentBook?.progress || 0,
+      currentBook: currentBook?.title || null, readingProgress, leuHoje,
       booksReadThisYear: booksRead,
       tasksCompleted, tasksTotal, habits: mappedHabits, userName,
       registrosHoje: { humor: humorHoje, gasto: gastoHoje, peso: pesoHoje, sono: sonoHoje, gratidao: gratidaoHoje, ideia: hasThoughtToday },

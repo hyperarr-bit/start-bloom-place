@@ -289,8 +289,16 @@ const Biblioteca = () => {
 
   const remove = (id: string) => setBooks(prev => prev.filter(b => b.id !== id));
 
+  // Dias em que a pessoa mexeu na página de algum livro: é o "li hoje" que a
+  // Home usa pra riscar "Continuar «livro»" e dar o ponto de leitura (11/09).
+  const [readLog, setReadLog] = usePersistedState<string[]>("lib-read-log", []);
+  const marcarLeituraHoje = () => {
+    const hoje = localDayKey();
+    if (!readLog.includes(hoje)) setReadLog([...readLog.slice(-60), hoje]);
+  };
   const updatePage = (id: string, page: number) => {
     setBooks(prev => prev.map(b => b.id === id ? { ...b, currentPage: Math.min(b.pages, Math.max(0, page)) } : b));
+    marcarLeituraHoje();
   };
 
   const abandonBook = (id: string) => {

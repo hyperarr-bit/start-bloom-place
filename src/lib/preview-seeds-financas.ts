@@ -58,7 +58,7 @@ export const FINANCAS_SEED: Record<string, any> = {
   ],
   "finance-fixed-expenses": FIXED("jul"),
   "finance-expenses": [
-    { id: "e-1", date: diaDoMes(2), value: 235, category: "alimentacao", description: "Mercado da semana", paymentMethod: "pix" },
+    { id: "e-1", date: diaDoMes(2), value: 235, category: "alimentacao", description: "Mercado", paymentMethod: "pix" },
     { id: "e-2", date: diaDoMes(3), value: 42, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
     { id: "e-3", date: diaDoMes(4), value: 38, category: "transporte", description: "Uber", paymentMethod: "pix" },
     { id: "e-4", date: diaDoMes(5), value: 28, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },

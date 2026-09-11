@@ -510,9 +510,13 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
                   aria-label={`Editar ${expense.description}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm truncate">{expense.description}</span>
-                      <span className={`category-badge ${getCategoryStyle(expense.category)}`}>
+                    {/* 11/09: com flex-wrap a tag caía SOZINHA na linha de baixo quando o
+                        nome era longo ("Mercado da semana" + Alimentação) e parecia erro de
+                        layout — o dono apontou duas vezes em print. Agora o nome trunca
+                        com reticências e a tag fica sempre ao lado. */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-sm truncate min-w-0">{expense.description}</span>
+                      <span className={`category-badge shrink-0 ${getCategoryStyle(expense.category)}`}>
                         {getCategoryLabel(expense.category)}
                       </span>
                     </div>

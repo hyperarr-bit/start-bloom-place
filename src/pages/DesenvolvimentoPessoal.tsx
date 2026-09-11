@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
@@ -281,7 +281,7 @@ const DesenvolvimentoPessoal = () => {
   const abas = useAbasOcultas("desenvolvimento", ABAS_DP);
   const trocarAba = useCallback((id: string) => { setActiveTab(id); reportTab?.(id); }, [reportTab]);
   const { set: setUserData, isGuest } = useUserData();
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
 
   // SOBRE MIM
   const [motivations, setMotivations] = usePersistedState<string[]>("dp-motivations", defaultMotivations);
@@ -434,7 +434,7 @@ const DesenvolvimentoPessoal = () => {
           <Sparkles className="w-5 h-5 text-purple-600" />
           <h1 className="text-base font-bold tracking-tight">DESENVOLVIMENTO PESSOAL</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

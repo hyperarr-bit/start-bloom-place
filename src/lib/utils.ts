@@ -54,3 +54,12 @@ export const parseLocalDay = (key: string) => {
   const [y, m, d] = key.split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 };
+
+
+/** "Setembro de 2026" — o toLocaleDateString devolve tudo minúsculo e a classe
+ *  `capitalize` do Tailwind subia TODA palavra ("Setembro De 2026"), em todos os
+ *  17 cabeçalhos de módulo, inclusive nos prints dos posts (11/09). Só a inicial. */
+export const mesAtualExtenso = (d: Date = new Date()): string => {
+  const t = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};

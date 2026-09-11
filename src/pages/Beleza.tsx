@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { mesAtualExtenso } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -23,7 +24,7 @@ const Beleza = () => {
   const [activeTab, setActiveTab] = useState("routine");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId);
@@ -48,7 +49,7 @@ const Beleza = () => {
           <Droplets className="w-5 h-5 text-pink-600" />
           <h1 className="text-base font-bold tracking-tight">BELEZA</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

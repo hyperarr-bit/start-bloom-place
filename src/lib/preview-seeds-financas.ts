@@ -14,6 +14,14 @@
 
 // Custos fixos do mês (mesma lista replicada nos meses passados) — total R$ 3.104
 // `day` = dia do vencimento: faz o fixo aparecer no calendário MEU MÊS.
+/** Dia N do mês CORRENTE como "YYYY-MM-DD". As datas do mês vivo eram fixas
+ *  em julho, e apareciam como "2 de jul." dentro de um cabeçalho de setembro —
+ *  inclusive nos prints dos posts do Instagram (11/09). */
+const diaDoMes = (n: number): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(Math.min(n, 28)).padStart(2, "0")}`;
+};
+
 const FIXED = (prefix: string) => [
   { id: `${prefix}-f1`, value: 1850, cardName: "inter", category: "moradia", description: "Aluguel", paymentMethod: "debito", day: 5 },
   { id: `${prefix}-f2`, value: 420, category: "plano_saude", description: "Plano de saúde", paymentMethod: "boleto", day: 8 },
@@ -46,16 +54,16 @@ export const FINANCAS_SEED: Record<string, any> = {
 
   // ------------------------------------------------------- mês atual (julho)
   "finance-incomes": [
-    { id: "i-1", date: "2026-07-01", value: 6200, description: "Salário" },
+    { id: "i-1", date: diaDoMes(1), value: 6200, description: "Salário" },
   ],
   "finance-fixed-expenses": FIXED("jul"),
   "finance-expenses": [
-    { id: "e-1", date: "2026-07-02", value: 235, category: "alimentacao", description: "Mercado da semana", paymentMethod: "pix" },
-    { id: "e-2", date: "2026-07-03", value: 42, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
-    { id: "e-3", date: "2026-07-04", value: 38, category: "transporte", description: "Uber", paymentMethod: "pix" },
-    { id: "e-4", date: "2026-07-05", value: 28, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
-    { id: "e-5", date: "2026-07-05", value: 89, category: "restaurante", description: "Almoço de domingo", paymentMethod: "credito", cardName: "nubank" },
-    { id: "e-6", date: "2026-07-06", value: 32, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
+    { id: "e-1", date: diaDoMes(2), value: 235, category: "alimentacao", description: "Mercado da semana", paymentMethod: "pix" },
+    { id: "e-2", date: diaDoMes(3), value: 42, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
+    { id: "e-3", date: diaDoMes(4), value: 38, category: "transporte", description: "Uber", paymentMethod: "pix" },
+    { id: "e-4", date: diaDoMes(5), value: 28, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
+    { id: "e-5", date: diaDoMes(5), value: 89, category: "restaurante", description: "Almoço de domingo", paymentMethod: "credito", cardName: "nubank" },
+    { id: "e-6", date: diaDoMes(6), value: 32, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
   ],
   "finance-installments": INSTALLMENT(9),
 

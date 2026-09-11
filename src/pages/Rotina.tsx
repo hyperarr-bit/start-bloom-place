@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
-import { semanaAtualId } from "@/lib/utils";
+import { semanaAtualId, mesAtualExtenso } from "@/lib/utils";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
@@ -1064,7 +1064,7 @@ const Rotina = () => {
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
 
   // Habits state
   const [habits, setHabits] = usePersistedState<string[]>("rotina-habits", defaultHabits);
@@ -1200,7 +1200,7 @@ const Rotina = () => {
           <Calendar className="w-5 h-5 text-emerald-600" />
           <h1 className="text-base font-bold tracking-tight">ROTINA</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

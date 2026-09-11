@@ -3,7 +3,7 @@ import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { localDayKey, parseLocalDay } from "@/lib/utils";
+import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, Plus, X, Trash2, Check, Utensils, Clock,
@@ -316,7 +316,7 @@ const Dieta = () => {
   const { onModuleComplete: onDietaComplete, CompletionDialog: DietaCompletionDialog } = useModuleCompletionFlow("dieta");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
   // `today` é ESTADO (não const de render): o app fica vivo em memória no
   // celular e, sem isso, "hoje" congelava no dia em que a aba abriu — cliente
   // via sexta 17 no sábado (18/07). localDayKey = dia LOCAL (toISOString virava
@@ -649,7 +649,7 @@ const Dieta = () => {
           <Apple className="w-5 h-5 text-green-600" />
           <h1 className="text-base font-bold tracking-tight">DIETA</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

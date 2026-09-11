@@ -1,5 +1,5 @@
 import { FileText, Download, FileSpreadsheet, Printer, Calendar, TrendingUp, TrendingDown, PieChart } from "lucide-react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { computeMonthlyBalance, computeSavingsRate } from "@/lib/finance-totals";
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
@@ -56,7 +56,7 @@ export const Reports = ({
   setExpenses,
 }: ReportsProps) => {
   const { labelOf } = useFinanceCategories(); // resolve nome de categorias personalizadas
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
   // totalExpenses aqui já é a saída mensal completa (fixas + variáveis + parcelas),
   // calculada uma vez no Index — mesma base da Saúde Financeira e do Dashboard.
   const balance = computeMonthlyBalance(totalIncome, totalExpenses);
@@ -166,7 +166,7 @@ export const Reports = ({
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-bold">Relatório Financeiro</h2>
-            <p className="text-sm text-muted-foreground capitalize">{currentMonth}</p>
+            <p className="text-sm text-muted-foreground">{currentMonth}</p>
           </div>
           <Calendar className="w-8 h-8 text-muted-foreground" />
         </div>

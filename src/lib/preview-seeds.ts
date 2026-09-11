@@ -82,7 +82,7 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
           { name: "Leg Press 45°", sets: "4", reps: "12", carga: "120kg", done: true, obs: "" },
           { name: "Cadeira Extensora", sets: "3", reps: "12", carga: "40kg", done: true, obs: "" },
           { name: "Afundo com halteres", sets: "3", reps: "10", carga: "16kg", done: true, obs: "" },
-          { name: "Panturrilha em pé", sets: "4", reps: "15", carga: "", done: true, obs: "" },
+          { name: "Panturrilha em pé", sets: "4", reps: "15", carga: "40kg", done: true, obs: "" },
         ],
       },
       "TERÇA": {

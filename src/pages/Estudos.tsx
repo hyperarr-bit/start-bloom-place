@@ -3,7 +3,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
-import { parseLocalDay } from "@/lib/utils";
+import { parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { ModuleTip } from "@/components/ModuleTip";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -107,7 +107,7 @@ const TABS = [
 const Estudos = () => {
   const navigate = useNavigate();
   const reportTab = useTabReporter();
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
 
   // CURSOS
   const [cursosAndamento, setCursosAndamento] = usePersistedState<Course[]>("estudos-cursos-andamento", []);
@@ -402,7 +402,7 @@ const Estudos = () => {
           <GraduationCap className="w-5 h-5 text-indigo-600" />
           <h1 className="text-base font-bold tracking-tight">ESTUDOS</h1>
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

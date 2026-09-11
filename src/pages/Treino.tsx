@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -177,7 +177,7 @@ const Treino = () => {
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
   const today = localDayKey();
   const todayDayName = weekDays[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
@@ -760,7 +760,7 @@ const Treino = () => {
                 <span className="text-[10px] font-bold text-orange-700 dark:text-orange-300">{streak}🔥</span>
               </div>
             )}
-            <span className="text-muted-foreground text-xs capitalize">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs">{currentMonth}</span>
             <ThemeToggle />
           </div>
         </div>

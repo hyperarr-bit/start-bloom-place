@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { mesAtualExtenso } from "@/lib/utils";
 import { useSetTrackedTab } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -263,7 +264,7 @@ const Index = () => {
     ? goals.reduce((sum: number, g: any) => sum + Math.min((g.currentValue / g.targetValue) * 100, 100), 0) / goals.length
     : 0;
 
-  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const currentMonth = mesAtualExtenso();
   /* Versão curta pra tela estreita (05/08). Medido no motor do aparelho do
      dono (Chromium 77, 360px): "agosto de 2026" ocupa 87px e o cabeçalho
      precisa de 329px num espaço de 328 — por isso ele via "Agosto De 2..."
@@ -339,7 +340,7 @@ const Index = () => {
                 duas linhas no aperto e caía por cima do título/chips (foto do
                 dono no aparelho de tela estreita). Mês é rótulo — ou cabe numa
                 linha, ou encurta. */}
-            <span className="text-muted-foreground text-xs capitalize whitespace-nowrap truncate max-[399px]:hidden">{currentMonth}</span>
+            <span className="text-muted-foreground text-xs whitespace-nowrap truncate max-[399px]:hidden">{currentMonth}</span>
             <span className="text-muted-foreground text-xs capitalize whitespace-nowrap min-[400px]:hidden">{mesCurto}</span>
             {/* Pergunte ao CORE — disponível em qualquer aba */}
             <button

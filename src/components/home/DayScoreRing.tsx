@@ -99,7 +99,10 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          Vamos lá!
+          {/* 11/09: dizia "Vamos lá!" até com 100 pontos — ao lado do anel
+              verde e da saudação "Dia completo", virava contradição. O rótulo
+              acompanha o número; a comemoração de 100 já mora no anel. */}
+          {score >= 100 ? "Dia completo!" : score >= 70 ? "Quase lá!" : score >= 30 ? "Bom ritmo!" : "Vamos lá!"}
         </motion.p>
         <p className="text-[11px] text-muted-foreground mb-3">Score do dia baseado em suas atividades</p>
 

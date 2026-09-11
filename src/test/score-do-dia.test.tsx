@@ -15,6 +15,7 @@ import { render, screen, act } from "@testing-library/react";
 import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { DayScoreRing, CHAVE_DIA_100_VISTO, MENSAGEM_DIA_100 } from "@/components/home/DayScoreRing";
+import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { localDayKey } from "@/lib/utils";
 
@@ -206,32 +207,32 @@ describe("Comemoração dos 100", () => {
     expect(screen.getByText("100")).toHaveClass("text-success");
   });
 
-  it("toast dispara UMA vez por dia: abrir → 100 → sair → reabrir (não repete) → dia seguinte (repete)", () => {
+  it("a tela de comemoração aparece UMA vez por dia: 95 → nada; cruza 100 → abre; reabrir no dia → não; dia seguinte → abre de novo", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 8, 10, 21, 0, 0));
 
-    // abre em 95: nada
-    const a = render(<DayScoreRing score={95} streak={0} />);
-    expect(toastMock).not.toHaveBeenCalled();
+    const a = render(<CelebracaoDia100 score={95} streak={0} />);
+    expect(screen.queryByTestId("celebracao-100")).not.toBeInTheDocument();
     a.unmount();
 
-    // cruza 100 (rerender na mesma Home)
-    const b = render(<DayScoreRing score={95} streak={0} />);
-    act(() => { b.rerender(<DayScoreRing score={100} streak={0} />); });
-    expect(toastMock).toHaveBeenCalledTimes(1);
-    expect(toastMock.mock.calls[0][0]).toBe(MENSAGEM_DIA_100);
+    const b = render(<CelebracaoDia100 score={95} streak={3} />);
+    act(() => { b.rerender(<CelebracaoDia100 score={100} streak={3} />); });
+    expect(screen.getByTestId("celebracao-100")).toBeInTheDocument();
+    expect(screen.getByText("Dia completo")).toBeInTheDocument();
+    expect(screen.getByText(MENSAGEM_DIA_100)).toBeInTheDocument();
+    expect(screen.getByText("3 dias seguidos")).toBeInTheDocument();
     expect(localStorage.getItem(CHAVE_DIA_100_VISTO)).toBe("2026-09-10");
+    // "Bom descanso" fecha
+    act(() => { screen.getByRole("button", { name: "Bom descanso" }).click(); });
     b.unmount();
 
-    // reabre a Home no mesmo dia: não repete
-    const c = render(<DayScoreRing score={100} streak={0} />);
-    expect(toastMock).toHaveBeenCalledTimes(1);
+    const c = render(<CelebracaoDia100 score={100} streak={3} />);
+    expect(screen.queryByTestId("celebracao-100")).not.toBeInTheDocument();
     c.unmount();
 
-    // dia seguinte, 100 de novo: comemora de novo
     vi.setSystemTime(new Date(2026, 8, 11, 21, 0, 0));
-    render(<DayScoreRing score={100} streak={0} />);
-    expect(toastMock).toHaveBeenCalledTimes(2);
+    render(<CelebracaoDia100 score={100} streak={4} />);
+    expect(screen.getByTestId("celebracao-100")).toBeInTheDocument();
     expect(localStorage.getItem(CHAVE_DIA_100_VISTO)).toBe("2026-09-11");
   });
 });

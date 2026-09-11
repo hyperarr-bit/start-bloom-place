@@ -11,6 +11,7 @@ import { DailyNudge } from "@/components/onboarding/DailyNudge";
 
 import { GreetingHeader } from "@/components/home/GreetingHeader";
 import { DayScoreRing } from "@/components/home/DayScoreRing";
+import { CelebracaoDia100 } from "@/components/home/CelebracaoDia100";
 import { QuickActions } from "@/components/home/QuickActions";
 import { ModuleDrawer } from "@/components/home/ModuleDrawer";
 import { NextHoursTimeline } from "@/components/home/NextHoursTimeline";
@@ -310,6 +311,7 @@ const HomePage = () => {
 
             <div className="bg-card rounded-2xl p-5 border border-border/50 shadow-sm">
               <DayScoreRing score={lifeData.dayScore} streak={lifeData.streak} />
+              <CelebracaoDia100 score={lifeData.dayScore} streak={lifeData.streak} />
             </div>
 
             <PwaInstallCard variant="home" />

@@ -1,7 +1,5 @@
-import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Flame } from "lucide-react";
-import { toast } from "sonner";
 import { localDayKey } from "@/lib/utils";
 
 interface DayScoreRingProps {
@@ -18,13 +16,6 @@ interface DayScoreRingProps {
 export const CHAVE_DIA_100_VISTO = "core-dia-100-visto";
 export const MENSAGEM_DIA_100 = "Dia 100%. Fecha o app em paz. 🌟";
 
-const dia100JaVisto = () => {
-  try { return localStorage.getItem(CHAVE_DIA_100_VISTO) === localDayKey(); } catch { return false; }
-};
-const marcarDia100Visto = () => {
-  try { localStorage.setItem(CHAVE_DIA_100_VISTO, localDayKey()); } catch { /* sem storage, sem memória — no máximo repete o toast */ }
-};
-
 export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
@@ -32,14 +23,9 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
   const completo = score >= 100;
   const semMovimento = useReducedMotion();
 
-  // Toast uma vez por DIA, não por montagem: a Home remonta a cada volta de
-  // módulo, e "Dia 100%" três vezes na mesma noite vira ruído. A chave guarda
-  // a data local (localDayKey) — amanhã é outro dia e pode comemorar de novo.
-  useEffect(() => {
-    if (!completo || dia100JaVisto()) return;
-    marcarDia100Visto();
-    toast(MENSAGEM_DIA_100, { duration: 3500 });
-  }, [completo]);
+  // A comemoração de 100 (tela cheia, uma vez por dia) mora em
+  // CelebracaoDia100, montada pela Home ao lado deste anel. Aqui ficam só o
+  // pulso e o número em verde. (Até 11/09 era um toast disparado daqui.)
 
   const getScoreColor = () => {
     if (score >= 80) return "hsl(var(--success))";

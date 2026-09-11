@@ -867,7 +867,9 @@ const Treino = () => {
                 cor="hsl(142 71% 45%)"
                 id="treino-volume"
                 unidade="kg"
-                formatar={(n) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(Math.round(n)))}
+                // "4.500" e não "4,5k": a média sai como `${fmt}${unidade}` e
+                // "4,5k" + "kg" virava "4,5kkg" (visto no print de 11/09).
+                formatar={(n) => Math.round(n).toLocaleString("pt-BR")}
               />
             </div>
 

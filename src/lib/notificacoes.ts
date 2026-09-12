@@ -29,7 +29,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "outro";
 
 const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   contas: 100000,
@@ -39,6 +39,8 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   leitura: 500000,
   dieta: 600000,
   saude: 800000, // 700000 é o resgate do paywall (BASE_RESGATE, mais abaixo)
+  aniversario: 900000,
+  casa: 1000000,
 };
 const BASE_CONTAS = BASES.contas;
 const BASE_RETRO = BASES.retrospectiva;
@@ -514,6 +516,89 @@ export function planejarRemedios(lista: RemedioAgendavel[], agora = new Date()):
 export async function agendarRemedios(lista: RemedioAgendavel[], opcoes: { ligado: boolean }): Promise<number> {
   if (!opcoes.ligado) { await limparFaixa(BASES.saude); return 0; }
   return agendarSerie("saude", "/saude", planejarRemedios(lista));
+}
+
+/* ─── Aniversário chegando (11/09, pedido de cliente: "falta 1 dia pra aniversário
+   de tal pessoa") ──────────────────────────────────────────────────────────────
+   Só a opção na central; nada de aba ou card. Lê as pessoas de Relações
+   (`rel-people`, aniversário em YYYY-MM-DD) e avisa na VÉSPERA, na hora
+   escolhida, até 60 dias à frente. Um aviso por dia: quem faz aniversário no
+   mesmo dia entra junto no texto. Idade fica de fora do aviso de propósito —
+   nem todo cadastro tem o ano certo. PURA (recebe `agora`) pra ser testável. */
+export type PessoaAgendavel = { nome: string; aniversario: string };
+
+export function planejarAniversarios(pessoas: PessoaAgendavel[], hora = 10, agora = new Date()): Planejado[] {
+  const porDia = new Map<string, string[]>();
+  for (const p of pessoas) {
+    const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(p?.aniversario ?? "");
+    if (!m || !p?.nome) continue;
+    const mes = Number(m[1]) - 1, dia = Number(m[2]);
+    // o próximo aniversário: este ano, ou o que vem se já passou
+    for (const ano of [agora.getFullYear(), agora.getFullYear() + 1]) {
+      const data = new Date(ano, mes, dia, hora, 0, 0, 0);
+      if (data.getMonth() !== mes) continue; // 29/02 em ano comum: pula
+      const vespera = new Date(data.getTime() - 24 * 3600e3);
+      if (vespera.getTime() <= agora.getTime()) continue;
+      if (vespera.getTime() - agora.getTime() > 60 * 24 * 3600e3) continue;
+      const chave = vespera.toISOString();
+      porDia.set(chave, [...(porDia.get(chave) ?? []), p.nome.trim()]);
+      break;
+    }
+  }
+  return [...porDia.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([chave, nomes]) => ({
+      quando: new Date(chave),
+      title: nomes.length === 1 ? `🎂 Amanhã é aniversário de ${nomes[0]}` : `🎂 Amanhã tem ${nomes.length} aniversários`,
+      body: nomes.length === 1
+        ? "Manda uma mensagem ou marca alguma coisa. Está em Relações."
+        : `${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` e mais ${nomes.length - 3}` : ""}. Está em Relações.`,
+    }));
+}
+
+export async function agendarAniversarios(pessoas: PessoaAgendavel[], opcoes: { hora?: number; ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.aniversario); return 0; }
+  const hora = Number.isInteger(opcoes.hora) ? (opcoes.hora as number) : 10;
+  return agendarSerie("aniversario", "/relacionamentos", planejarAniversarios(pessoas, hora));
+}
+
+/* ─── Manutenção da casa (11/09, mesmo pedido: "em casa se botar alguma
+   manutenção... tá vencendo") ─────────────────────────────────────────────────
+   Lê as tarefas de Casa (`casa-maint-tasks`: última vez feita + frequência em
+   meses). Avisa NO DIA em que vence, na hora escolhida, até 60 dias à frente;
+   o que já está vencido avisa uma vez, amanhã. Tarefa nunca feita não tem
+   vencimento — fica de fora. Um aviso por dia, tarefas do mesmo dia juntas. */
+export type ManutencaoAgendavel = { tarefa: string; ultimaVez: string; frequenciaMeses: number };
+
+export function planejarManutencao(tarefas: ManutencaoAgendavel[], hora = 10, agora = new Date()): Planejado[] {
+  const porDia = new Map<string, string[]>();
+  const amanha = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1, hora, 0, 0, 0);
+  for (const t of tarefas) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t?.ultimaVez ?? "");
+    const meses = Number(t?.frequenciaMeses);
+    if (!m || !t?.tarefa || !Number.isInteger(meses) || meses < 1) continue;
+    const vence = new Date(Number(m[1]), Number(m[2]) - 1 + meses, Number(m[3]), hora, 0, 0, 0);
+    // vencida (ou vence hoje e a hora passou): um único lembrete, amanhã
+    const quando = vence.getTime() <= agora.getTime() ? amanha : vence;
+    if (quando.getTime() - agora.getTime() > 60 * 24 * 3600e3) continue;
+    const chave = quando.toISOString();
+    porDia.set(chave, [...(porDia.get(chave) ?? []), t.tarefa.trim()]);
+  }
+  return [...porDia.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([chave, nomes]) => ({
+      quando: new Date(chave),
+      title: nomes.length === 1 ? `🔧 Manutenção: ${nomes[0]}` : `🔧 ${nomes.length} manutenções da casa`,
+      body: nomes.length === 1
+        ? "Chegou a hora. Marca como feita em Casa e o próximo prazo se ajusta."
+        : `${nomes.slice(0, 3).join(", ")}${nomes.length > 3 ? ` e mais ${nomes.length - 3}` : ""}. Marca como feitas em Casa.`,
+    }));
+}
+
+export async function agendarManutencao(tarefas: ManutencaoAgendavel[], opcoes: { hora?: number; ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.casa); return 0; }
+  const hora = Number.isInteger(opcoes.hora) ? (opcoes.hora as number) : 10;
+  return agendarSerie("casa", "/casa", planejarManutencao(tarefas, hora));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

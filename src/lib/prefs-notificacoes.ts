@@ -37,6 +37,12 @@ export interface PrefsNotificacoes {
   /** fechar o diário da dieta */
   dieta: boolean;
   horaDieta: number;
+  /** véspera do aniversário de alguém de Relações (11/09) */
+  aniversario: boolean;
+  horaAniversario: number;
+  /** manutenção da casa vencendo (11/09) */
+  casa: boolean;
+  horaCasa: number;
 }
 
 /**
@@ -60,6 +66,12 @@ export const PREFS_PADRAO: PrefsNotificacoes = {
   horaLeitura: 22, // hora de deitar — o momento em que ler é realista
   dieta: false,
   horaDieta: 20,
+  // os dois de 11/09 são raros (poucas vezes por ano), mas nascem DESLIGADOS
+  // por ordem do dono: "só se o usuário aceitar ativar"
+  aniversario: false,
+  horaAniversario: 10,
+  casa: false,
+  horaCasa: 10,
 };
 
 export const CHAVE_PREFS = "notif-prefs";
@@ -86,6 +98,10 @@ export const lerPrefs = (bruto: unknown): PrefsNotificacoes => {
     horaLeitura: horaValida(p.horaLeitura, PREFS_PADRAO.horaLeitura),
     dieta: p.dieta === true,
     horaDieta: horaValida(p.horaDieta, PREFS_PADRAO.horaDieta),
+    aniversario: p.aniversario === true,
+    horaAniversario: horaValida(p.horaAniversario, PREFS_PADRAO.horaAniversario),
+    casa: p.casa === true,
+    horaCasa: horaValida(p.horaCasa, PREFS_PADRAO.horaCasa),
   };
 };
 

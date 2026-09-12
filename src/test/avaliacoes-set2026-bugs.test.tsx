@@ -188,3 +188,45 @@ describe("Saúde: lembrete na hora de cada remédio", () => {
     expect(planejarRemedios([{ id: "x", nome: "Sem hora", hora: "", tomadoHoje: false }])).toEqual([]);
   });
 });
+
+/* ─── 11/09: dois lembretes novos, só como opção na central ──────────────── */
+import { planejarAniversarios, planejarManutencao } from "@/lib/notificacoes";
+
+describe("Notificações: aniversário chegando (véspera) e manutenção da casa (no vencimento)", () => {
+  const agora = new Date(2026, 8, 11, 22, 0, 0); // sexta 11/09 22h
+
+  it("aniversário: avisa na VÉSPERA na hora escolhida, junta quem cai no mesmo dia, ignora quem já passou e quem está longe", () => {
+    const avisos = planejarAniversarios([
+      { nome: "Ana", aniversario: "1990-09-13" },        // domingo 13 → véspera sábado 12 às 10h
+      { nome: "Bruno", aniversario: "1985-09-13" },      // mesmo dia: junta
+      { nome: "Carla", aniversario: "2000-09-05" },      // já passou este ano → só em 2027, longe
+      { nome: "Dora", aniversario: "1999-12-25" },       // > 60 dias
+      { nome: "Edu", aniversario: "1993-10-02" },        // véspera 01/10
+      { nome: "", aniversario: "1990-09-20" },           // sem nome: fora
+      { nome: "Fê", aniversario: "20/09" },              // formato torto: fora
+    ], 10, agora);
+    expect(avisos.map((a) => a.quando.toLocaleString("pt-BR"))).toEqual(["12/09/2026, 10:00:00", "01/10/2026, 10:00:00"]);
+    expect(avisos[0].title).toBe("🎂 Amanhã tem 2 aniversários");
+    expect(avisos[0].body).toContain("Ana, Bruno");
+    expect(avisos[1].title).toBe("🎂 Amanhã é aniversário de Edu");
+  });
+
+  it("aniversário de hoje não avisa (a véspera já passou); 29/02 em ano comum é pulado", () => {
+    expect(planejarAniversarios([{ nome: "Gil", aniversario: "1990-09-11" }], 10, agora)).toEqual([]);
+    const emAnoComum = planejarAniversarios([{ nome: "Hal", aniversario: "1992-02-29" }], 10, new Date(2027, 1, 1, 8));
+    expect(emAnoComum).toEqual([]);
+  });
+
+  it("manutenção: vence em última vez + frequência; vencida avisa uma vez amanhã; nunca feita fica de fora", () => {
+    const avisos = planejarManutencao([
+      { tarefa: "Limpar filtro do ar", ultimaVez: "2026-03-20", frequenciaMeses: 6 },  // vence 20/09
+      { tarefa: "Trocar filtro da água", ultimaVez: "2026-01-05", frequenciaMeses: 6 }, // venceu 05/07 → amanhã 12/09
+      { tarefa: "Dedetização", ultimaVez: "2026-09-01", frequenciaMeses: 12 },          // 2027: longe
+      { tarefa: "Calha", ultimaVez: "", frequenciaMeses: 6 },                            // nunca feita
+    ], 10, agora);
+    expect(avisos.map((a) => [a.quando.toLocaleString("pt-BR"), a.title])).toEqual([
+      ["12/09/2026, 10:00:00", "🔧 Manutenção: Trocar filtro da água"],
+      ["20/09/2026, 10:00:00", "🔧 Manutenção: Limpar filtro do ar"],
+    ]);
+  });
+});

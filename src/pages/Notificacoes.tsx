@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, BellOff, BookOpen, CalendarCheck, Dumbbell, Pill, Receipt, Salad, Sparkles } from "lucide-react";
+import { ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, Dumbbell, Pill, Receipt, Salad, Sparkles, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -32,7 +32,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const HORAS = [6, 7, 8, 9, 10, 12, 18, 20, 21, 22];
 
-type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta";
+type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa";
 
 const Notificacoes = () => {
   // 30/07 (dono): na web/PWA não existe como ENTREGAR notificação local, e a
@@ -191,11 +191,33 @@ const Notificacoes = () => {
 
         <LinhaAviso
           icone={<Pill className="w-4 h-4" />}
-          titulo="Hora do remédio"
-          descricao="Na hora que você cadastrou em Saúde, remédio por remédio. Já marcou como tomado? O aviso de hoje não vem."
+          titulo="Remédios e vitaminas"
+          descricao="Na hora que você cadastrou em Saúde, item por item. Já marcou como tomado? O aviso de hoje não vem."
           ligado={remediosLigado}
           onChange={(v) => void alternarRemedios(v)}
           rodape={rodapeDe("saude", remediosLigado, "Cadastre um remédio com horário em Saúde")}
+        />
+
+        <LinhaAviso
+          icone={<Cake className="w-4 h-4" />}
+          titulo="Aniversário chegando"
+          descricao="Na véspera do aniversário de quem está em Relações, na hora que você escolher."
+          ligado={p.aniversario}
+          onChange={(v) => void alternar("aniversario", v)}
+          rodape={rodapeDe("aniversario", p.aniversario, "Cadastre alguém com data de aniversário em Relações")}
+          hora={p.aniversario ? p.horaAniversario : undefined}
+          onHora={(h) => void aplicar({ horaAniversario: h })}
+        />
+
+        <LinhaAviso
+          icone={<Wrench className="w-4 h-4" />}
+          titulo="Manutenção da casa"
+          descricao="No dia em que uma manutenção de Casa vence, pela frequência que você definiu. O que já venceu avisa uma vez."
+          ligado={p.casa}
+          onChange={(v) => void alternar("casa", v)}
+          rodape={rodapeDe("casa", p.casa, "Marque uma manutenção como feita em Casa pra ter um prazo")}
+          hora={p.casa ? p.horaCasa : undefined}
+          onHora={(h) => void aplicar({ horaCasa: h })}
         />
 
         <div className="pt-4 pb-1 px-1">

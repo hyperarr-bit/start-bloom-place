@@ -1,6 +1,7 @@
 import {
-  agendarContas, agendarDieta, agendarLeitura, agendarRemedios, agendarRetrospectiva,
-  agendarRotina, agendarTreino, type RemedioAgendavel,
+  agendarAniversarios, agendarContas, agendarDieta, agendarLeitura, agendarManutencao, agendarRemedios,
+  agendarRetrospectiva, agendarRotina, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
+  type RemedioAgendavel,
 } from "@/lib/notificacoes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
 import { localDayKey } from "@/lib/utils";
@@ -59,6 +60,10 @@ export interface DadosDosLembretes {
   /** remédios/suplementos do Saúde com horário, e se já foram tomados hoje */
   remedios: RemedioAgendavel[];
   remediosLigado: boolean;
+  /** pessoas de Relações com aniversário (11/09) */
+  pessoas: PessoaAgendavel[];
+  /** tarefas de manutenção de Casa já feitas alguma vez (11/09) */
+  manutencao: ManutencaoAgendavel[];
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -121,6 +126,12 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     jaPreencheuHoje: Object.keys(diarioDieta[hoje]?.meals ?? {}).length > 0,
     remedios,
     remediosLigado: get<boolean>(CHAVE_REMEDIOS_LIGADO, true) !== false,
+    pessoas: (get<{ name?: string; birthday?: string }[]>("rel-people", []) ?? [])
+      .filter((p) => p?.name && p?.birthday)
+      .map((p) => ({ nome: String(p.name), aniversario: String(p.birthday) })),
+    manutencao: (get<{ task?: string; lastDone?: string; frequencyMonths?: number }[]>("casa-maint-tasks", []) ?? [])
+      .filter((t) => t?.task && t?.lastDone)
+      .map((t) => ({ tarefa: String(t.task), ultimaVez: String(t.lastDone), frequenciaMeses: Number(t.frequencyMonths) || 6 })),
   };
 }
 
@@ -141,6 +152,8 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     prefs.leitura && dados.leitura,
     prefs.dieta && dados.jaPreencheuHoje,
     dados.remediosLigado && dados.remedios,
+    prefs.aniversario && dados.pessoas,
+    prefs.casa && dados.manutencao,
   ]);
 }
 
@@ -164,5 +177,7 @@ export async function reagendarTudo(
     leitura: await agendarLeitura(d.leitura, { hora: prefs.horaLeitura, ligado: prefs.leitura }),
     dieta: await agendarDieta({ jaPreencheuHoje: d.jaPreencheuHoje }, { hora: prefs.horaDieta, ligado: prefs.dieta }),
     saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
+    aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
+    casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
   };
 }

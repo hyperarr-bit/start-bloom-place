@@ -1076,7 +1076,12 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
    de rodapé (`.fixed.inset-x-0`, ex.: Iniciar Sessão do Treino, sheets) também,
    pra não passar por baixo dele. Overlays `inset-0` seguem cobrindo tudo. */
 @media (min-width: 1024px) {
-  body.com-trilho { padding-left: 232px; }
+  /* !important de propósito (12/09, vídeo de cliente): o Select/Dialog do Radix
+     tranca a rolagem injetando `body[data-scroll-locked] { padding-left: 0px;
+     position: relative }` DEPOIS desta folha — a mesma especificidade, mais
+     tarde, ganhava; o conteúdo pulava 232 px pra esquerda enquanto o menu
+     estava aberto, o gatilho saía do lugar e a lista abria no canto da tela. */
+  body.com-trilho { padding-left: 232px !important; }
   body.com-trilho .fixed.inset-x-0,
   body.com-trilho .fixed.left-0.right-0 { left: 232px; }
 }

@@ -17,6 +17,7 @@ export interface RascunhoAprendizado {
   referencia: string;
   aprendi: string;
   porque: string;
+  pergunta: string;
 }
 
 /** Formulário compartilhado entre "novo" e "editar". `extra` é o checkbox de
@@ -36,11 +37,14 @@ export const FormularioAprendizado = ({ rascunho, onChange, onSalvar, onCancelar
         placeholder="Referência: aula, slide, capítulo (ex: Aula 12 · slide 8)" aria-label="Referência"
         className="h-9 text-xs rounded-lg" />
       <Textarea autoFocus value={rascunho.aprendi} onChange={(e) => onChange({ ...rascunho, aprendi: e.target.value })}
-        placeholder="O que aprendi" aria-label="O que aprendi"
+        placeholder="O que aprendi (explica como se fosse pra um amigo)" aria-label="O que aprendi"
         className="text-sm rounded-lg min-h-[64px] resize-none" />
       <Textarea value={rascunho.porque} onChange={(e) => onChange({ ...rascunho, porque: e.target.value })}
         placeholder="Por que é bom / como aplicar (opcional)" aria-label="Por que é bom ou como aplicar"
         className="text-xs rounded-lg min-h-[48px] resize-none" />
+      <Input value={rascunho.pergunta} onChange={(e) => onChange({ ...rascunho, pergunta: e.target.value })}
+        placeholder="Pergunta pra revisar depois (opcional): ex. O que é juro composto?" aria-label="Pergunta pra revisar"
+        className="h-8 text-xs" />
       {extra}
       <div className="flex items-center gap-2 pt-0.5">
         <button type="button" onClick={onSalvar} disabled={!podeSalvar}
@@ -64,7 +68,7 @@ export const EntradaAprendizado = ({ entrada, cursoNome, onEditar, onApagar }: {
   onApagar: () => void;
 }) => {
   const [editando, setEditando] = useState(false);
-  const [rascunho, setRascunho] = useState<RascunhoAprendizado>({ referencia: "", aprendi: "", porque: "" });
+  const [rascunho, setRascunho] = useState<RascunhoAprendizado>({ referencia: "", aprendi: "", porque: "", pergunta: "" });
   /** Apagar em DOIS toques, sem window.confirm (que o app não usa em lugar
    *  nenhum): é texto que a pessoa escreveu, não pode ir embora num esbarrão. */
   const [confirmandoApagar, setConfirmandoApagar] = useState(false);
@@ -83,6 +87,7 @@ export const EntradaAprendizado = ({ entrada, cursoNome, onEditar, onApagar }: {
             aprendi,
             referencia: rascunho.referencia.trim() || undefined,
             porque: rascunho.porque.trim() || undefined,
+            pergunta: rascunho.pergunta.trim() || undefined,
           });
           setEditando(false);
         }}
@@ -107,7 +112,7 @@ export const EntradaAprendizado = ({ entrada, cursoNome, onEditar, onApagar }: {
         <div className="flex items-center shrink-0 -mr-1">
           <button type="button" aria-label="Editar aprendizado"
             onClick={() => {
-              setRascunho({ referencia: entrada.referencia || "", aprendi: entrada.aprendi, porque: entrada.porque || "" });
+              setRascunho({ referencia: entrada.referencia || "", aprendi: entrada.aprendi, porque: entrada.porque || "", pergunta: entrada.pergunta || "" });
               setConfirmandoApagar(false);
               setEditando(true);
             }}

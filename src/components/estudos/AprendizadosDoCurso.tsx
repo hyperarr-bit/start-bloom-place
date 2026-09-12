@@ -18,7 +18,7 @@ import { EntradaAprendizado, FormularioAprendizado, type RascunhoAprendizado } f
 import { maisRecentesPrimeiro, rotuloAprendizados, type Aprendizado } from "./aprendizados";
 import { localDayKey } from "@/lib/utils";
 
-const RASCUNHO_VAZIO: RascunhoAprendizado = { referencia: "", aprendi: "", porque: "" };
+const RASCUNHO_VAZIO: RascunhoAprendizado = { referencia: "", aprendi: "", porque: "", pergunta: "" };
 
 export interface ProgressoDoCurso {
   aulasFeitas?: number;
@@ -97,6 +97,7 @@ export const AprendizadosDoCurso = ({ cursoId, nome, progresso, entradas, aberto
       aprendi,
       referencia: rascunho.referencia.trim() || undefined,
       porque: rascunho.porque.trim() || undefined,
+      pergunta: rascunho.pergunta.trim() || undefined,
     }, avancar);
     setEscrevendo(false);
     setRascunho(RASCUNHO_VAZIO);

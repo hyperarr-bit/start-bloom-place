@@ -17,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { AprendizadosDoCurso } from "@/components/estudos/AprendizadosDoCurso";
 import { CadernoDeAprendizados } from "@/components/estudos/CadernoDeAprendizados";
+import { RevisaoDoDia } from "@/components/estudos/RevisaoDoDia";
+import { comoRevisoes, responder, type Revisoes } from "@/components/estudos/revisao";
 import { comoAprendizados, type Aprendizado, type AprendizadosPorCurso } from "@/components/estudos/aprendizados";
 
 
@@ -125,6 +127,11 @@ const Estudos = () => {
   // infla o array de cursos, e curso antigo sem entrada continua igual.
   // `comoAprendizados` blinda contra chave torta de versão antiga.
   const [aprendizadosBrutos, setAprendizados] = usePersistedState<AprendizadosPorCurso>("estudos-aprendizados", {});
+  // agenda dos flashcards (11/09) — ver revisao.ts
+  const [revisoesBrutas, setRevisoes] = usePersistedState<Revisoes>("estudos-revisoes", {});
+  const revisoes = useMemo(() => comoRevisoes(revisoesBrutas), [revisoesBrutas]);
+  const responderRevisao = (id: string, lembrou: boolean) =>
+    setRevisoes(prev => { const mapa = comoRevisoes(prev); return { ...mapa, [id]: responder(mapa[id], lembrou) }; });
   const aprendizados = useMemo(() => comoAprendizados(aprendizadosBrutos), [aprendizadosBrutos]);
   /** Qual curso está com a lista de aprendizados expandida. */
   const [aprendizadosAberto, setAprendizadosAberto] = useState<string | null>(null);
@@ -1034,6 +1041,9 @@ const Estudos = () => {
           </div>}
 
           {activeTab === "caderno" && <div className="space-y-4">
+            {/* Flashcards do dia (11/09): primeiro o que a memória pede. */}
+            <RevisaoDoDia mapa={aprendizados} cursos={cursosAndamento} revisoes={revisoes} onResponder={responderRevisao} />
+
             {/* Releitura do que se registrou nos cursos (busca + filtro por
                 curso). Acima das anotações longas: frase curta de muitos dias
                 se consulta mais que texto longo de um dia. Justificativa

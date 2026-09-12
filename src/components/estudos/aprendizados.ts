@@ -28,6 +28,9 @@ export interface Aprendizado {
   aprendi: string;
   /** "é bom por causa disso" / como aplicar. */
   porque?: string;
+  /** Pergunta pra revisar depois (11/09, flashcard). Sem ela, a frente do
+   *  cartão é a referência com "o que você aprendeu aqui?". */
+  pergunta?: string;
 }
 
 /** `{ [courseId]: Aprendizado[] }` — é o formato salvo na chave. */

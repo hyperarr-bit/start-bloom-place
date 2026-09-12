@@ -28,6 +28,18 @@
     var ua = navigator.userAgent || "";
     var ios = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     var android = /Android/i.test(ua);
+    /* 12/09: o mesmo link serve outras portas do Instagram (campanha de mensagens no
+       Direct, stories). ?c=ig_dm&m=dm troca a campanha e o meio do install_referrer
+       da Play, pra cada porta aparecer separada no relatório; sem parâmetro continua
+       ig_bio. Só letras, números, _ e - passam. */
+    try {
+      var q = new URLSearchParams(location.search);
+      var c = (q.get("c") || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
+      var m = (q.get("m") || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 20);
+      var play = document.getElementById("play");
+      if (c) play.href = play.href.replace("utm_campaign%3Dig_bio", "utm_campaign%3D" + c);
+      if (m) play.href = play.href.replace("utm_medium%3Dbio", "utm_medium%3D" + m);
+    } catch (e) {}
     var alvo = ios ? document.getElementById("ios").href : android ? document.getElementById("play").href : null;
     if (alvo) setTimeout(function () { window.location.replace(alvo); }, 150);
   })();

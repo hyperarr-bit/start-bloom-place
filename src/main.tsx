@@ -5,6 +5,7 @@ import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";
 import { instalarResizeObserverSePreciso } from "@/lib/resize-observer-fallback";
+import { instalarArrastarComMouse } from "@/lib/arrastar-com-mouse";
 
 // Rede de segurança da classe core-shell (o index.html já tenta no boot):
 // se a injeção do Capacitor chegar depois do bloco inline por qualquer
@@ -16,6 +17,9 @@ if (isNativeShell()) document.documentElement.classList.add("core-shell");
 // (o Recharts exige, e o throw sobe até o RouteErrorBoundary). Instala antes
 // do React montar; em navegador moderno isto é um `if` e nada mais.
 instalarResizeObserverSePreciso();
+
+// Mouse arrasta as faixas que rolam pro lado (web/PC). No toque não faz nada.
+instalarArrastarComMouse();
 
 // Telemetria de crash (15/07): cliente reportou "tela branca ao pagar" e a
 // gente só tinha silêncio nos eventos — sem isso, todo crash é adivinhação.

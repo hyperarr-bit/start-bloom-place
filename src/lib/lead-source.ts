@@ -79,8 +79,14 @@ export function getLeadSource(): LeadSource | null {
 }
 
 /** Persists the captured lead source to a user's profile (best-effort). */
+// Tipo do cliente REAL, só como tipo (nada de import em runtime: este
+// arquivo roda na landing antes do Supabase carregar). O parâmetro
+// estrutural que existia aqui (`{ from: (table: string) => … }`) obrigava o
+// TypeScript a conferir o cliente inteiro contra "qualquer tabela" — estourava
+// a profundidade de instanciação (TS2589) e, dependendo da ORDEM dos arquivos,
+// contaminava a checagem dos RPCs do /admin com 6 erros fantasmas (11/09).
 export async function persistLeadSource(
-  supabase: { from: (table: string) => { update: (v: object) => { eq: (col: string, val: string) => Promise<unknown> } } },
+  supabase: typeof import("@/integrations/supabase/client").supabase,
   userId: string
 ) {
   const src = getLeadSource();

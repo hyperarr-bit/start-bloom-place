@@ -358,8 +358,10 @@ export const QuickActions = () => {
 
   return (
     <div ref={raizRef} className="space-y-2">
-      {/* Action buttons row */}
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      {/* Faixa das ações. No celular rola pro lado com o dedo. No computador
+          (md+) quebra em duas linhas: as 12 cabem no espaço e ninguém precisa
+          descobrir que existe algo escondido à direita (cliente na web, 11/09). */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide md:flex-wrap md:overflow-visible">
         {actions.map((a, i) => (
           <motion.button
             key={a.id}

@@ -212,6 +212,15 @@ const Biblioteca = () => {
   // função ({showForm && BookForm()}), então hook lá dentro seria hook
   // condicional do componente pai.
   const capaInputRef = useRef<HTMLInputElement>(null);
+  // O formulário abre onde a pessoa está olhando. Editar: logo abaixo do
+  // livro clicado (antes nascia no topo da aba e quem estava no fim da
+  // estante tinha que rolar até lá em cima — cliente na web, 11/09). Novo:
+  // continua no topo, e a página rola até ele — o "+" flutuante fica no pé.
+  const formRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!showForm) return;
+    formRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [showForm, editId]);
   const [subindoCapa, setSubindoCapa] = useState(false);
   const [erroCapa, setErroCapa] = useState("");
 
@@ -362,7 +371,7 @@ const Biblioteca = () => {
 
   // ── Book Form Modal ──
   const BookForm = () => (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div ref={formRef} className="rounded-xl border border-border overflow-hidden scroll-mt-32">
       <div className="bg-orange-300 dark:bg-orange-700/60 px-4 py-2.5 flex justify-between items-center">
         <span className="text-sm font-black uppercase tracking-wider">📖 {editId ? "EDITAR" : "NOVO"} LIVRO</span>
         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowForm(false)}><X className="w-4 h-4" /></Button>
@@ -720,7 +729,7 @@ const Biblioteca = () => {
               </div>
             </div>
 
-            {showForm && BookForm()}
+            {showForm && editId === null && BookForm()}
 
             {/* Com filtro de formato e status "Todos" os grupos continuam; se
                 nenhum grupo sobrar, cai na mensagem em vez de tela em branco. */}
@@ -735,7 +744,10 @@ const Biblioteca = () => {
                     </div>
                     <div className={`${group.body} p-3 space-y-2`}>
                       {groupBooks.map(book => (
-                        <BookRow key={book.id} book={book} onEdit={() => openEdit(book)} onRemove={() => remove(book.id)} onUpdatePage={updatePage} />
+                        <div key={book.id} className="space-y-2">
+                          <BookRow book={book} onEdit={() => openEdit(book)} onRemove={() => remove(book.id)} onUpdatePage={updatePage} />
+                          {showForm && editId === book.id && BookForm()}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -745,7 +757,10 @@ const Biblioteca = () => {
               <div className="space-y-2">
                 {filteredBooks.length === 0 && <p className="text-center text-muted-foreground text-sm py-8">Nenhum livro encontrado 📚</p>}
                 {filteredBooks.map(book => (
-                  <BookRow key={book.id} book={book} onEdit={() => openEdit(book)} onRemove={() => remove(book.id)} onUpdatePage={updatePage} />
+                  <div key={book.id} className="space-y-2">
+                    <BookRow book={book} onEdit={() => openEdit(book)} onRemove={() => remove(book.id)} onUpdatePage={updatePage} />
+                    {showForm && editId === book.id && BookForm()}
+                  </div>
                 ))}
               </div>
             )}

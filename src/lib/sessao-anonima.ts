@@ -244,7 +244,7 @@ export async function batizarConta(
     const { data } = await supabase.auth.getUser();
     if (data?.user?.id) {
       const { persistLeadSource } = await import("@/lib/lead-source");
-      await persistLeadSource(supabase as unknown as Parameters<typeof persistLeadSource>[0], data.user.id);
+      await persistLeadSource(supabase, data.user.id);
     }
   } catch { /* atribuição nunca pode impedir o acesso */ }
   return { erro: null };

@@ -135,6 +135,7 @@ export type Database = {
           id: string
           landing_path: string | null
           phone: string | null
+          referred_by_code: string | null
           referrer: string | null
           source_captured_at: string | null
           tax_id: string | null
@@ -150,6 +151,7 @@ export type Database = {
           id: string
           landing_path?: string | null
           phone?: string | null
+          referred_by_code?: string | null
           referrer?: string | null
           source_captured_at?: string | null
           tax_id?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           id?: string
           landing_path?: string | null
           phone?: string | null
+          referred_by_code?: string | null
           referrer?: string | null
           source_captured_at?: string | null
           tax_id?: string | null

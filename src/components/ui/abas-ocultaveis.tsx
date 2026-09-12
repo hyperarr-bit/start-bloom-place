@@ -85,7 +85,13 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
   const alvo = menu ? visiveis.find(a => a.id === menu.alvo) : null;
 
   return (
-    <div ref={raiz} className={`relative flex gap-1 overflow-x-auto ${className}`}>
+    /* O menu fica FORA da faixa que rola (12/09, vídeo do dono no app da Play):
+       um filho `absolute` dentro de `overflow-x-auto` é cortado e vira rolagem
+       vertical da própria faixa — aparecia uma aba "⋯" esticada por cima do
+       cabeçalho, que dava pra arrastar pra baixo. Agora a faixa rola sozinha
+       e o menu ancora no contêiner de fora, que não corta nada. */
+    <div ref={raiz} className={`relative ${className}`}>
+    <div className="flex gap-1 overflow-x-auto scrollbar-hide">
       {visiveis.map(tab => (
         <button
           key={tab.id}
@@ -118,11 +124,12 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
         <MoreHorizontal className="w-3.5 h-3.5" />
         {ocultas.length > 0 && <span className="text-[10px]">+{ocultas.length}</span>}
       </button>
+    </div>
 
       {menu && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-1 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-lg p-1 text-xs"
+          className="absolute right-4 top-full -mt-1 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-lg p-1 text-xs"
         >
           {alvo && (
             <button

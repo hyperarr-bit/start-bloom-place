@@ -35,6 +35,8 @@ export function SerieHistorico({
   unidade = "",
   formatar,
   id,
+  corPorValor,
+  rotuloPorValor,
 }: {
   /** { "2026-08-23": 6, ... } — a MESMA chave por data que o card já grava */
   registros: Record<string, number>;
@@ -46,6 +48,13 @@ export function SerieHistorico({
   formatar?: (n: number) => string;
   /** identifica a preferência de lente deste card (ex.: "agua", "sono") */
   id: string;
+  /** Cor da barra PELO VALOR (12/09): o humor da Rotina tinha barras que iam
+   *  do vermelho ao verde conforme o dia, e o dono quis isso de volta sem
+   *  perder as lentes de 7/30/mês. Com isto, a barra deixa de esmaecer
+   *  (a cor já carrega o significado). */
+  corPorValor?: (valor: number) => string;
+  /** O que mostrar em cima da barra no lugar do número (ex.: o emoji do humor). */
+  rotuloPorValor?: (valor: number) => string;
 }) {
   const [modo, setModo] = usePersistedState<Modo>(`core-serie-modo-${id}`, "7");
   const [tocado, setTocado] = useState<string | null>(null);
@@ -163,15 +172,15 @@ export function SerieHistorico({
               className="flex-1 flex flex-col items-center justify-end gap-1 relative z-[1] min-w-0"
               aria-label={`${b.rotulo}: ${fmt(b.valor)}${unidade}`}
             >
-              <span className="text-[9.5px] font-bold tabular-nums text-muted-foreground leading-none h-[10px] whitespace-nowrap">
-                {(mostraNumero || tocado === b.chave) && b.valor > 0 ? fmt(b.valor) : ""}
+              <span className={`font-bold tabular-nums text-muted-foreground leading-none whitespace-nowrap ${rotuloPorValor ? "text-[13px] h-[14px]" : "text-[9.5px] h-[10px]"}`}>
+                {(mostraNumero || tocado === b.chave) && b.valor > 0 ? (rotuloPorValor ? rotuloPorValor(b.valor) : fmt(b.valor)) : ""}
               </span>
               <div
                 className="w-full rounded-t-[3px]"
                 style={{
                   height: `${altura}px`,
-                  background: b.valor > 0 ? cor : "hsl(var(--muted))",
-                  opacity: b.valor > 0 ? (b.destaque || tocado === b.chave ? 1 : 0.55) : 1,
+                  background: b.valor > 0 ? (corPorValor ? corPorValor(b.valor) : cor) : "hsl(var(--muted))",
+                  opacity: b.valor > 0 && !corPorValor ? (b.destaque || tocado === b.chave ? 1 : 0.55) : 1,
                 }}
               />
               <span

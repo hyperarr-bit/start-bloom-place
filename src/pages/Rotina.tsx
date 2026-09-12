@@ -26,6 +26,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
 import { useAbasOcultas } from "@/hooks/use-abas-ocultas";
+import { useUserData } from "@/hooks/use-user-data";
+import { trackEvent } from "@/lib/analytics";
 import { AbasOcultaveis } from "@/components/ui/abas-ocultaveis";
 
 const days = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
@@ -110,6 +112,36 @@ const FASES_ROTINA: Fase[] = [
   { id: "r3", nome: "Blocos de estudo", memo: "", counts: {} },
 ];
 
+/* O bloco de fases só aparece na Rotina pra quem já USA (12/09). O dono achou
+   os quatro cards (repete no dia / tarefas de hoje / fechamento da semana e
+   do mês) feios e confusos na aba mais aberta do app, e não há telemetria
+   por card pra saber quantos usam. Regra: contou alguma vez, criou fase
+   própria, tarefa ou nota do mês → continua vendo, nada some; quem nunca
+   tocou volta a ter a Rotina de antes. A Carreira, onde o bloco nasceu,
+   segue igual. O evento `rotina_fases_em_uso` responde em uma semana
+   quantas pessoas são — é o dado que decide se vale redesenhar. */
+export const fasesEmUso = (fases: unknown, tarefas: unknown, notas: unknown, padrao: Fase[] = FASES_ROTINA): boolean => {
+  const lista = Array.isArray(fases) ? (fases as Partial<Fase>[]) : [];
+  const idsPadrao = new Set(padrao.map((f) => f.id));
+  const contou = lista.some((f) => Object.values(f?.counts ?? {}).some((n) => Number(n) > 0));
+  const criou = lista.some((f) => f?.id && !idsPadrao.has(f.id));
+  const temTarefa = Array.isArray(tarefas) && tarefas.length > 0;
+  const temNota = !!notas && typeof notas === "object" && Object.values(notas as Record<string, unknown>).some((v) => typeof v === "string" && v.trim() !== "");
+  return contou || criou || temTarefa || temNota;
+};
+
+const useFasesEmUso = () => {
+  const { get, loaded } = useUserData();
+  const emUso = loaded && fasesEmUso(get("rotina-day-phases", null), get("rotina-day-tasks", null), get("rotina-month-notes", null));
+  const contado = useRef(false);
+  useEffect(() => {
+    if (!emUso || contado.current) return;
+    contado.current = true;
+    trackEvent("rotina_fases_em_uso", {});
+  }, [emUso]);
+  return emUso;
+};
+
 // ============= MOOD TRACKER =============
 const MoodTracker = () => {
   const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string }>>("mood-log", {});
@@ -181,11 +213,16 @@ const MoodTracker = () => {
           </div>
         )}
 
+        {/* As barras coloridas de antes (vermelho → verde pelo humor, com o
+            emoji do dia em cima) dentro das lentes de 7/30/mês. O dono
+            (12/09): "tem como botar esse histórico sem tirar o que era antes". */}
         <SerieHistorico
           registros={serieHumor}
           cor="hsl(292 60% 60%)"
           id="humor"
           formatar={(n) => String(Math.round(n * 10) / 10).replace(".", ",")}
+          corPorValor={(v) => `hsl(${Math.round((Math.min(5, Math.max(1, v)) - 1) * 30)}, 70%, 55%)`}
+          rotuloPorValor={(v) => moodEmojis.find((m) => m.value === Math.round(v))?.emoji ?? ""}
         />
       </div>
     </div>
@@ -1064,6 +1101,7 @@ const Rotina = () => {
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);
   useSetTrackedTab(activeTab);
+  const fasesUsadas = useFasesEmUso();
   const currentMonth = mesAtualExtenso();
 
   // Habits state
@@ -1387,15 +1425,17 @@ const Rotina = () => {
                 Fica DEPOIS dos hábitos porque é outra pergunta: hábito é
                 sim/não no dia, fase é QUANTAS VEZES. Quem precisa das duas
                 (o caso dela) encontra as duas na mesma rolagem. */}
-            <BlocoDeFases
-              chaveFases="rotina-day-phases"
-              chaveTarefas="rotina-day-tasks"
-              fasesPadrao={FASES_ROTINA}
-              tituloFases="🔁 O QUE VOCÊ REPETE NO DIA"
-              vazioFases="Crie o que você repete no dia — cada um vira um contador."
-              placeholderTarefa="Nova tarefa de hoje..."
-              chaveNotaMes="rotina-month-notes"
-            />
+            {fasesUsadas && (
+              <BlocoDeFases
+                chaveFases="rotina-day-phases"
+                chaveTarefas="rotina-day-tasks"
+                fasesPadrao={FASES_ROTINA}
+                tituloFases="🔁 O QUE VOCÊ REPETE NO DIA"
+                vazioFases="Crie o que você repete no dia — cada um vira um contador."
+                placeholderTarefa="Nova tarefa de hoje..."
+                chaveNotaMes="rotina-month-notes"
+              />
+            )}
           </>
         )}
 

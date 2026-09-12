@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { localDayKey, parseLocalDay } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, MapPin, HelpCircle, ChevronDown, CalendarPlus, Pencil, Check, X, Paperclip } from "lucide-react";
+import { AnexosDeSaude } from "./AnexosDeSaude";
 import { toast } from "sonner";
 import { isNativeShell } from "@/lib/native-shell";
 import { adicionarAoCalendario, type EventoDeCalendario } from "@/lib/calendario";
@@ -28,7 +29,27 @@ interface Exam {
   location: string;
   notes: string;
   done: boolean;
+  /** caminhos no bucket privado (11/09) — ver AnexosDeSaude */
+  fotos?: string[];
 }
+
+/** Receita, laudo, atestado, carteirinha: o que a pessoa precisa achar na
+ *  hora da consulta (11/09, pedido de cliente). Foto + data + nota; nada de
+ *  campo obrigatório além do título. */
+interface Documento {
+  id: string;
+  tipo: "receita" | "laudo" | "atestado" | "outro";
+  titulo: string;
+  date: string;
+  notes: string;
+  fotos: string[];
+}
+const TIPOS_DOC: { id: Documento["tipo"]; rotulo: string; emoji: string }[] = [
+  { id: "receita", rotulo: "Receita", emoji: "💊" },
+  { id: "laudo", rotulo: "Laudo", emoji: "🧾" },
+  { id: "atestado", rotulo: "Atestado", emoji: "📄" },
+  { id: "outro", rotulo: "Outro", emoji: "📎" },
+];
 
 interface Biomarker {
   id: string;
@@ -91,6 +112,17 @@ const numeroOu = (texto: string, atual: number) => {
 export const MedicalLog = () => {
   const [appointments, setAppointments] = usePersistedState<Appointment[]>("core-saude-appointments", []);
   const [exams, setExams] = usePersistedState<Exam[]>("core-saude-exams-v2", []);
+  const [documentos, setDocumentos] = usePersistedState<Documento[]>("core-saude-documentos", []);
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [novoDoc, setNovoDoc] = useState<Omit<Documento, "id">>({ tipo: "receita", titulo: "", date: localDayKey(), notes: "", fotos: [] });
+  const [docAberto, setDocAberto] = useState<string | null>(null);
+  const addDocumento = () => {
+    if (!novoDoc.titulo.trim()) return;
+    setDocumentos(prev => [...prev, { ...novoDoc, titulo: novoDoc.titulo.trim(), id: Date.now().toString() }]);
+    setNovoDoc({ tipo: "receita", titulo: "", date: localDayKey(), notes: "", fotos: [] });
+    setShowDocForm(false);
+  };
+  const fotosDoExame = (id: string, fotos: string[]) => setExams(prev => prev.map(e => e.id === id ? { ...e, fotos } : e));
   const [biomarkers, setBiomarkers] = usePersistedState<Biomarker[]>("core-saude-biomarkers", []);
   const [showApptForm, setShowApptForm] = useState(false);
   const [showExamForm, setShowExamForm] = useState(false);
@@ -563,13 +595,15 @@ export const MedicalLog = () => {
                             <MapPin className="w-3.5 h-3.5 text-[hsl(var(--saude-blue))]" />
                           </a>
                         )}
-                        {e.notes && (
-                          <button onClick={() => setExpandedExam(expandedExam === e.id ? null : e.id)}
-                            aria-label={`Ver observações de ${e.name}`}
-                            className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                            <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${expandedExam === e.id ? "rotate-180" : ""}`} />
-                          </button>
-                        )}
+                        {/* Observações e fotos do resultado abrem no mesmo painel
+                            embaixo da linha; o clipe mostra quantas fotos tem. */}
+                        <button onClick={() => setExpandedExam(expandedExam === e.id ? null : e.id)}
+                          aria-label={`Fotos e observações de ${e.name}`}
+                          className="h-9 min-w-9 px-1.5 rounded-lg bg-muted flex items-center justify-center gap-0.5">
+                          <Paperclip className="w-3.5 h-3.5 text-muted-foreground" />
+                          {(e.fotos?.length ?? 0) > 0 && <span className="text-[10px] font-bold text-muted-foreground">{e.fotos!.length}</span>}
+                          <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${expandedExam === e.id ? "rotate-180" : ""}`} />
+                        </button>
                         {/* Exame já feito não vai pra agenda — seria marcar
                             compromisso no passado. */}
                         {naLoja && e.date && !e.done && (
@@ -618,16 +652,88 @@ export const MedicalLog = () => {
         )}
         {expandedExam && (() => {
           const e = exams.find(x => x.id === expandedExam);
-          if (!e?.notes) return null;
+          if (!e) return null;
           return (
-            <div className="px-4 pb-4">
-              <div className="p-3 rounded-xl bg-muted text-xs text-muted-foreground">
-                <p className="font-bold text-foreground mb-1">📝 Observações:</p>
-                {e.notes}
+            <div className="px-4 pb-4 space-y-2">
+              {e.notes && (
+                <div className="p-3 rounded-xl bg-muted text-xs text-muted-foreground">
+                  <p className="font-bold text-foreground mb-1">📝 Observações:</p>
+                  {e.notes}
+                </div>
+              )}
+              <div className="p-3 rounded-xl bg-muted">
+                <p className="text-xs font-bold mb-2">📷 Fotos do resultado</p>
+                <AnexosDeSaude caminhos={e.fotos ?? []} onChange={fotos => fotosDoExame(e.id, fotos)} rotulo={`exame ${e.name}`} />
               </div>
             </div>
           );
         })()}
+      </div>
+
+      {/* ── DOCUMENTOS (11/09): receita, laudo, atestado — foto + data + nota ── */}
+      <div className="rounded-2xl border border-border overflow-hidden bg-card">
+        <div className="bg-amber-200 dark:bg-amber-900/40 px-5 py-4 flex items-center justify-between">
+          <h3 className="text-base font-black uppercase tracking-wide text-foreground">Documentos</h3>
+          <span className="text-3xl">🗂️</span>
+        </div>
+        <div className="p-4 space-y-3">
+          <button onClick={() => setShowDocForm(!showDocForm)}
+            className="w-full h-10 rounded-xl border border-dashed border-border text-xs font-bold text-muted-foreground flex items-center justify-center gap-1.5 hover:bg-muted/40 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> {showDocForm ? "Fechar" : "Guardar receita, laudo ou atestado"}
+          </button>
+          {showDocForm && (
+            <div className="grid gap-2 p-3 rounded-xl bg-muted/40" data-testid="form-documento">
+              <div className="flex gap-1.5 flex-wrap">
+                {TIPOS_DOC.map(t => (
+                  <button key={t.id} type="button" onClick={() => setNovoDoc({ ...novoDoc, tipo: t.id })}
+                    className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors ${novoDoc.tipo === t.id ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border"}`}>
+                    {t.emoji} {t.rotulo}
+                  </button>
+                ))}
+              </div>
+              <Input value={novoDoc.titulo} onChange={e => setNovoDoc({ ...novoDoc, titulo: e.target.value })} placeholder="Título (ex: Receita da Dra. Ana, Laudo do raio-X)" aria-label="Título do documento" className="text-xs h-9" />
+              <CampoData rotulo="Data" value={novoDoc.date} onChange={e => setNovoDoc({ ...novoDoc, date: e.target.value })} className="text-xs h-9" />
+              <Textarea value={novoDoc.notes} onChange={e => setNovoDoc({ ...novoDoc, notes: e.target.value })} placeholder="Notas (posologia, validade, o que o médico disse…)" className="text-xs min-h-[60px]" />
+              <AnexosDeSaude caminhos={novoDoc.fotos} onChange={fotos => setNovoDoc({ ...novoDoc, fotos })} rotulo="documento novo" />
+              <button onClick={addDocumento} disabled={!novoDoc.titulo.trim()}
+                className="h-9 rounded-xl bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center gap-1.5 disabled:opacity-50">
+                <Check className="w-3.5 h-3.5" /> Guardar
+              </button>
+            </div>
+          )}
+          {documentos.length === 0 && !showDocForm && (
+            <p className="text-xs text-muted-foreground text-center py-2">Receitas e laudos ficam aqui, com foto, pra achar na hora da consulta.</p>
+          )}
+          {[...documentos].sort((a, b) => (b.date || "").localeCompare(a.date || "")).map(d => {
+            const tipo = TIPOS_DOC.find(t => t.id === d.tipo) ?? TIPOS_DOC[3];
+            const aberto = docAberto === d.id;
+            return (
+              <div key={d.id} className="rounded-xl border border-border bg-card" data-testid="documento">
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <span className="text-lg">{tipo.emoji}</span>
+                  <button type="button" onClick={() => setDocAberto(aberto ? null : d.id)} className="flex-1 min-w-0 text-left">
+                    <p className="text-xs font-bold truncate">{d.titulo}</p>
+                    <p className="text-[10px] text-muted-foreground">{tipo.rotulo}{d.date ? ` · ${mostrarDia(d.date)}` : ""}{d.fotos.length ? ` · ${d.fotos.length} foto${d.fotos.length > 1 ? "s" : ""}` : ""}</p>
+                  </button>
+                  <button onClick={() => setDocAberto(aberto ? null : d.id)} aria-label={`Abrir ${d.titulo}`}
+                    className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+                    <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${aberto ? "rotate-180" : ""}`} />
+                  </button>
+                  <button onClick={() => setDocumentos(prev => prev.filter(x => x.id !== d.id))} aria-label={`Apagar ${d.titulo}`}
+                    className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+                    <Trash2 className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive transition-colors" />
+                  </button>
+                </div>
+                {aberto && (
+                  <div className="px-3 pb-3 space-y-2">
+                    {d.notes && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{d.notes}</p>}
+                    <AnexosDeSaude caminhos={d.fotos} onChange={fotos => setDocumentos(prev => prev.map(x => x.id === d.id ? { ...x, fotos } : x))} rotulo={d.titulo} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── BIOMARCADORES ── */}

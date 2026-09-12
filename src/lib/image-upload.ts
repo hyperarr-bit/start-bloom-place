@@ -114,3 +114,32 @@ export async function migrateBase64ToStorage(
     return null;
   }
 }
+
+/**
+ * Variante que devolve o CAMINHO no bucket em vez de uma URL assinada de
+ * um ano (11/09, fotos de exame e receita em Saúde). Dado de saúde é
+ * sensível: o que fica gravado em user_data é só o caminho, e a URL pra
+ * mostrar a imagem é assinada na hora, por uma hora (`signedUrlFor`).
+ * O bucket é privado e a política só deixa cada pessoa ler a própria
+ * pasta, então nem o caminho vazado abre a foto.
+ */
+export async function uploadImagePath(bucket: string, file: Blob, subfolder = "general"): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const compressed = await compressImage(file);
+  const fileName = `${user.id}/${subfolder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.webp`;
+  const { error } = await supabase.storage.from(bucket).upload(fileName, compressed, { contentType: "image/webp", upsert: false });
+  if (error) { console.error("[image-upload] failed:", error); return null; }
+  return fileName;
+}
+
+export async function signedUrlFor(bucket: string, path: string, seconds = 3600): Promise<string | null> {
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, seconds);
+  return data?.signedUrl || null;
+}
+
+/** Apaga do bucket (a política deixa apagar só a própria pasta). Falha é silenciosa:
+ *  a referência some do user_data de qualquer jeito. */
+export async function removeImage(bucket: string, path: string): Promise<void> {
+  try { await supabase.storage.from(bucket).remove([path]); } catch { /* órfão no bucket, sem efeito pra pessoa */ }
+}

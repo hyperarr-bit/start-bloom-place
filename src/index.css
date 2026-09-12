@@ -1070,3 +1070,13 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
     opacity: 1;
   }
 }
+
+/* Trilho lateral do computador (TrilhoLateral.tsx): a partir de 1024 px, com a
+   classe no <body>, o conteúdo desloca a largura do trilho e as barras fixas
+   de rodapé (`.fixed.inset-x-0`, ex.: Iniciar Sessão do Treino, sheets) também,
+   pra não passar por baixo dele. Overlays `inset-0` seguem cobrindo tudo. */
+@media (min-width: 1024px) {
+  body.com-trilho { padding-left: 232px; }
+  body.com-trilho .fixed.inset-x-0,
+  body.com-trilho .fixed.left-0.right-0 { left: 232px; }
+}

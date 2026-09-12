@@ -22,6 +22,7 @@ import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
 import { getFunnelArea, AREAS } from "@/lib/funnel";
 import { isNativeShell } from "@/lib/native-shell";
+import { TrilhoLateral } from "@/components/TrilhoLateral";
 import { testeLiberado } from "@/lib/teste-gratis";
 import { TesteBanner, TrilhaDoTeste, RetomadaPosCompra } from "@/components/teste/TesteGratis";
 // v61: tutorial pós-pago do trial (Missão dos 3 dias) — B1 boas-vindas do
@@ -614,6 +615,7 @@ const App = () => {
                 <GuardaDemoShell />
                 <TelemetriaWebView />
                 <GracePeriodBanner />
+                <TrilhoLateral />
                 <Routes>
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").

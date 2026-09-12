@@ -109,7 +109,10 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
             </button>
           </div>
         </div>
-        <div className="space-y-2">
+        {/* No computador os quatro desafios cabem em duas colunas: quatro
+            linhas de 1.200 px com 30 caracteres cada é o que sobra de uma tela
+            desenhada pro celular (web/PC, 11/09). */}
+        <div className="space-y-2 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-2">
           {CHALLENGES.map((c) => (
             <button
               key={c.key}

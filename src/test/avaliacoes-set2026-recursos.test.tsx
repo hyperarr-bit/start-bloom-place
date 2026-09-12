@@ -52,21 +52,28 @@ const PaginaComAbas = () => {
 };
 
 describe("Abas ocultas por módulo", () => {
-  it("oculta pelo menu ⋯, persiste na chave do módulo e continua oculta ao REABRIR", () => {
+  /* 12/09: o "⋯" saiu. Segurar uma aba (ou botão direito) entra no modo de
+     editar com um × em cada aba; o chip "+1 oculta" abre a folha com as
+     chaves, que é onde se traz de volta. */
+  it("segurar → × oculta, persiste na chave do módulo e continua oculta ao REABRIR; a folha traz de volta", () => {
     const store = criarStore();
     const tela = renderComStore(<PaginaComAbas />, store);
     expect(screen.getByRole("button", { name: /MÊS/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Opções das abas" })).not.toBeInTheDocument();
 
-    // vai pra aba MÊS e oculta ela pelo ⋯
+    // vai pra aba MÊS, entra no modo de editar (botão direito = segurar) e oculta pelo ×
     fireEvent.click(screen.getByRole("button", { name: /MÊS/ }));
     expect(screen.getByTestId("ativa")).toHaveTextContent("mes");
-    fireEvent.click(screen.getByRole("button", { name: "Opções das abas" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Ocultar aba/ }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: /MÊS/ }));
+    expect(screen.getByRole("button", { name: "Pronto" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ocultar aba 📆 MÊS" }));
 
     expect(screen.queryByRole("button", { name: /MÊS/ })).not.toBeInTheDocument();
     expect(store.dados["abas-ocultas:teste"]).toEqual(["mes"]);
     // a aba ativa sumiu → cai na primeira visível, nunca numa tela vazia
     expect(screen.getByTestId("ativa")).toHaveTextContent("semana");
+    fireEvent.click(screen.getByRole("button", { name: "Pronto" }));
+    expect(screen.queryByRole("button", { name: "Pronto" })).not.toBeInTheDocument();
 
     // SAI e REABRE
     tela.unmount();
@@ -74,25 +81,28 @@ describe("Abas ocultas por módulo", () => {
     expect(screen.queryByRole("button", { name: /MÊS/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /SEMANA/ })).toBeInTheDocument();
 
-    // "Mostrar abas ocultas" traz de volta
-    fireEvent.click(screen.getByRole("button", { name: "Opções das abas" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: /Mostrar 📆 MÊS/ }));
-    expect(screen.getByRole("button", { name: /MÊS/ })).toBeInTheDocument();
+    // o chip fantasma abre a folha; a chave traz de volta
+    fireEvent.click(screen.getByRole("button", { name: "1 aba oculta" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Mostrar 📆 MÊS" }));
     expect(store.dados["abas-ocultas:teste"]).toEqual([]);
+    // com a folha aberta o resto da tela fica fora da árvore de acessibilidade
+    fireEvent.keyDown(document.activeElement || document.body, { key: "Escape" });
+    expect(screen.getByRole("button", { name: /MÊS/, hidden: true })).toBeInTheDocument();
   });
 
   it("NUNCA deixa ocultar a última aba visível", () => {
     const store = criarStore({ "abas-ocultas:teste": ["mes", "foco"] });
     renderComStore(<PaginaComAbas />, store);
-    expect(screen.getAllByRole("button").filter(b => /SEMANA|MÊS|FOCO/.test(b.textContent || ""))).toHaveLength(1);
+    expect(screen.getAllByRole("button").filter(b => /SEMANA|MÊS|FOCO/.test(b.textContent || "") && !/oculta/.test(b.textContent || ""))).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole("button", { name: "Opções das abas" }));
-    const ocultar = screen.getByRole("menuitem", { name: /Ocultar aba/ });
-    expect(ocultar).toBeDisabled();
-    fireEvent.click(ocultar);
-    expect(screen.getByRole("button", { name: /SEMANA/ })).toBeInTheDocument();
-    expect(store.dados["abas-ocultas:teste"]).toEqual(["mes", "foco"]);
+    fireEvent.contextMenu(screen.getByRole("button", { name: /SEMANA/ }));
+    expect(screen.queryByRole("button", { name: /Ocultar aba/ })).not.toBeInTheDocument();
     expect(screen.getByText(/A última aba não pode ser ocultada/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pronto" }));
+    // na folha, a chave da última visível vem travada
+    fireEvent.click(screen.getByRole("button", { name: "2 abas ocultas" }));
+    expect(screen.getByRole("switch", { name: "Ocultar 📅 SEMANA" })).toBeDisabled();
+    expect(store.dados["abas-ocultas:teste"]).toEqual(["mes", "foco"]);
   });
 
   it("dado corrompido na chave não derruba a barra", () => {

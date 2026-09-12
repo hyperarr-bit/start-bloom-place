@@ -1,27 +1,31 @@
 /**
- * BARRA DE ABAS COM "OCULTAR ABA" (07/09) — par do hook useAbasOcultas.
+ * BARRA DE ABAS COM "OCULTAR ABA" — par do hook useAbasOcultas.
  *
  * Pedido de duas avaliações da Play ("Opção de ocultar certas abas (ex.
  * jejum intermitente)" e "mover, editar, ocultar"). A barra é a MESMA que as
  * páginas já desenhavam na mão (classes `notion-tab`, `data-active` pro
- * useScrollActiveTabIntoView, `data-spotlight="tab-{id}"` pro tutorial); o
- * que entra é um "⋯" discreto no fim da fila e o segurar-o-dedo numa aba.
+ * useScrollActiveTabIntoView, `data-spotlight="tab-{id}"` pro tutorial).
  *
- * Dois caminhos pra mesma ação de propósito: o ⋯ é descobrível (quem lê a
- * avaliação e procura "onde oculto?" acha em 1 toque); o segurar é rápido pra
- * quem já sabe. "Mostrar abas ocultas" mora no mesmo ⋯ — módulo não tem tela
- * de configurações própria, e esse menu É a configuração do módulo.
+ * Segunda versão (12/09, mockup aprovado pelo dono — "não tem forma mais
+ * bonita do que esse quadrado com três pontos?"). O "⋯" que ficava no fim da
+ * fila saiu. Agora:
+ *  - SEGURAR uma aba (ou botão direito) entra no modo de editar: as abas
+ *    balançam de leve e cada uma ganha um "×" no canto, como apagar app no
+ *    iPhone. Toca no × pra ocultar; "Pronto" (ou um toque fora) sai.
+ *  - Quando existe aba oculta, um chip FANTASMA sem borda aparece no fim da
+ *    fila ("+1 oculta"). Um toque abre a folha "Abas deste módulo", com uma
+ *    chave por aba — é lá que se traz de volta. Sem nada oculto, a fila
+ *    fica limpa: zero elemento novo pra quem nunca mexeu.
  *
- * Quando a aba ativa some (ela ocultou a aba em que estava), o componente
- * troca sozinho pra primeira visível — sem isso a página renderizaria nada
- * abaixo do cabeçalho.
- *
- * Sem Radix/Popover de propósito: menu é um <div> absoluto com estado local,
- * fecha em qualquer toque fora — mais leve e testável em jsdom.
+ * A última aba visível nunca some (o × dela não aparece, e o hook recusa).
+ * Quando a aba ativa some, o componente troca sozinho pra primeira visível —
+ * sem isso a página renderizaria nada abaixo do cabeçalho.
  */
 import { useEffect, useRef, useState } from "react";
-import { EyeOff, Eye, MoreHorizontal } from "lucide-react";
+import { X } from "lucide-react";
 import type { AbaOcultavel, AbasOcultas } from "@/hooks/use-abas-ocultas";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
 
 interface AbasOcultaveisProps<T extends AbaOcultavel> {
   abas: AbasOcultas<T>;
@@ -31,16 +35,16 @@ interface AbasOcultaveisProps<T extends AbaOcultavel> {
   className?: string;
 }
 
-const SEGURAR_MS = 550;
+const SEGURAR_MS = 500;
 
 export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, className = "" }: AbasOcultaveisProps<T>) {
-  const { visiveis, ocultas, ocultar, mostrar, mostrarTodas, podeOcultar } = abas;
-  // `alvo` = aba que o menu está oferecendo ocultar (a segurada, ou a ativa no ⋯)
-  const [menu, setMenu] = useState<{ alvo: string } | null>(null);
+  const { visiveis, ocultas, todas, ocultar, mostrar, podeOcultar } = abas;
+  const [editando, setEditando] = useState(false);
+  const [folha, setFolha] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const timer = useRef<number | null>(null);
-  // segurar dispara o menu; o clique que vem logo depois no mesmo toque NÃO
-  // pode trocar de aba (a pessoa nem soltou o dedo pra isso)
+  // segurar entra no modo de editar; o clique que vem logo depois no mesmo
+  // toque NÃO pode trocar de aba (a pessoa nem soltou o dedo pra isso)
   const segurou = useRef(false);
 
   // A aba ativa foi ocultada (ou nunca existiu): cai na primeira visível.
@@ -49,11 +53,11 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
     if (!visiveis.some(a => a.id === ativa)) onTrocar(visiveis[0].id);
   }, [visiveis, ativa, onTrocar]);
 
-  // Fecha o menu num toque fora dele.
+  // Um toque fora da fila sai do modo de editar.
   useEffect(() => {
-    if (!menu) return;
+    if (!editando) return;
     const fora = (e: MouseEvent | TouchEvent) => {
-      if (raiz.current && !raiz.current.contains(e.target as Node)) setMenu(null);
+      if (raiz.current && !raiz.current.contains(e.target as Node)) setEditando(false);
     };
     document.addEventListener("mousedown", fora);
     document.addEventListener("touchstart", fora);
@@ -61,14 +65,14 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
       document.removeEventListener("mousedown", fora);
       document.removeEventListener("touchstart", fora);
     };
-  }, [menu]);
+  }, [editando]);
 
-  const comecarSegurar = (id: string) => {
+  const comecarSegurar = () => {
     segurou.current = false;
     if (timer.current) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
       segurou.current = true;
-      setMenu({ alvo: id });
+      setEditando(true);
     }, SEGURAR_MS);
   };
   const soltar = () => {
@@ -78,107 +82,119 @@ export function AbasOcultaveis<T extends AbaOcultavel>({ abas, ativa, onTrocar, 
 
   const clicarAba = (id: string) => {
     if (segurou.current) { segurou.current = false; return; }
-    setMenu(null);
+    if (editando) return; // no modo de editar, o toque na aba não navega — o × é a ação
     onTrocar(id);
   };
 
-  const alvo = menu ? visiveis.find(a => a.id === menu.alvo) : null;
-
   return (
-    /* O menu fica FORA da faixa que rola (12/09, vídeo do dono no app da Play):
-       um filho `absolute` dentro de `overflow-x-auto` é cortado e vira rolagem
-       vertical da própria faixa — aparecia uma aba "⋯" esticada por cima do
-       cabeçalho, que dava pra arrastar pra baixo. Agora a faixa rola sozinha
-       e o menu ancora no contêiner de fora, que não corta nada. */
+    /* O menu/folha fica FORA da faixa que rola (12/09, vídeo do dono no app da
+       Play): um filho `absolute` dentro de `overflow-x-auto` é cortado e vira
+       rolagem vertical da própria faixa. A faixa rola sozinha; o resto ancora
+       no contêiner de fora. */
     <div ref={raiz} className={`relative ${className}`}>
-    <div className="flex gap-1 overflow-x-auto scrollbar-hide">
-      {visiveis.map(tab => (
-        <button
-          key={tab.id}
-          type="button"
-          data-active={ativa === tab.id}
-          data-spotlight={`tab-${tab.id}`}
-          onClick={() => clicarAba(tab.id)}
-          onContextMenu={e => { e.preventDefault(); setMenu({ alvo: tab.id }); }}
-          onMouseDown={() => comecarSegurar(tab.id)}
-          onMouseUp={soltar}
-          onMouseLeave={soltar}
-          onTouchStart={() => comecarSegurar(tab.id)}
-          onTouchEnd={soltar}
-          onTouchMove={soltar}
-          className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${ativa === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-        >
-          {tab.icon && <span>{tab.icon}</span>}
-          {tab.label}
-        </button>
-      ))}
-
-      {/* ⋯ — a porta descobrível. Sempre presente; com abas ocultas mostra o número. */}
-      <button
-        type="button"
-        aria-label="Opções das abas"
-        aria-expanded={!!menu}
-        onClick={() => setMenu(m => (m ? null : { alvo: ativa }))}
-        className="notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 text-muted-foreground hover:bg-muted shrink-0"
-      >
-        <MoreHorizontal className="w-3.5 h-3.5" />
-        {ocultas.length > 0 && <span className="text-[10px]">+{ocultas.length}</span>}
-      </button>
-    </div>
-
-      {menu && (
-        <div
-          role="menu"
-          className="absolute right-4 top-full -mt-1 z-50 min-w-[200px] rounded-lg border border-border bg-card shadow-lg p-1 text-xs"
-        >
-          {alvo && (
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!podeOcultar}
-              onClick={() => { if (ocultar(alvo.id)) setMenu(null); }}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed text-left"
-            >
-              <EyeOff className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Ocultar aba "{alvo.icon ? `${alvo.icon} ` : ""}{alvo.label}"</span>
-            </button>
-          )}
-          {!podeOcultar && (
-            <p className="px-2.5 py-1 text-[10px] text-muted-foreground">A última aba não pode ser ocultada.</p>
-          )}
-          {ocultas.length > 0 && (
-            <>
-              <div className="border-t border-border my-1" />
-              <p className="px-2.5 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Abas ocultas</p>
-              {ocultas.map(tab => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => mostrar(tab.id)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-muted text-left"
-                >
-                  <Eye className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Mostrar {tab.icon ? `${tab.icon} ` : ""}{tab.label}</span>
-                </button>
-              ))}
-              {ocultas.length > 1 && (
+      <div className="flex gap-1 overflow-x-auto scrollbar-hide pt-2 -mt-2">
+        {visiveis.map(tab => {
+          const mostraX = editando && podeOcultar;
+          const rotulo = `${tab.icon ? `${tab.icon} ` : ""}${tab.label}`;
+          return (
+            /* O × é IRMÃO do botão da aba, não filho: botão dentro de botão
+               não é HTML válido e confunde leitor de tela. */
+            <div key={tab.id} className={`relative shrink-0 ${editando ? "animate-jiggle motion-reduce:animate-none" : ""}`}>
+              <button
+                type="button"
+                data-active={ativa === tab.id}
+                data-spotlight={`tab-${tab.id}`}
+                onClick={() => clicarAba(tab.id)}
+                onContextMenu={e => { e.preventDefault(); setEditando(true); }}
+                onMouseDown={comecarSegurar}
+                onMouseUp={soltar}
+                onMouseLeave={soltar}
+                onTouchStart={comecarSegurar}
+                onTouchEnd={soltar}
+                onTouchMove={soltar}
+                className={`notion-tab whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${
+                  ativa === tab.id ? "notion-tab-active" : "hover:bg-muted"
+                }`}
+              >
+                {tab.icon && <span>{tab.icon}</span>}
+                {tab.label}
+              </button>
+              {mostraX && (
                 <button
                   type="button"
-                  role="menuitem"
-                  onClick={() => { mostrarTodas(); setMenu(null); }}
-                  className="w-full px-2.5 py-2 rounded-md hover:bg-muted text-left font-medium"
+                  aria-label={`Ocultar aba ${rotulo}`}
+                  onClick={() => ocultar(tab.id)}
+                  className="absolute -top-1.5 -right-1.5 w-[18px] h-[18px] rounded-full bg-foreground text-background grid place-items-center ring-2 ring-background shadow"
                 >
-                  Mostrar todas as abas
+                  <X className="w-3 h-3" strokeWidth={3} />
                 </button>
               )}
-            </>
-          )}
-          {ocultas.length === 0 && (
-            <p className="px-2.5 py-1 text-[10px] text-muted-foreground">Segure uma aba pra ocultá-la.</p>
-          )}
+            </div>
+          );
+        })}
+
+        {/* Chip fantasma: só existe quando há aba oculta. É a porta da folha. */}
+        {ocultas.length > 0 && !editando && (
+          <button
+            type="button"
+            onClick={() => setFolha(true)}
+            aria-label={`${ocultas.length} ${ocultas.length === 1 ? "aba oculta" : "abas ocultas"}`}
+            className="notion-tab whitespace-nowrap text-[11px] text-muted-foreground border-transparent hover:bg-muted shrink-0 px-2"
+          >
+            +{ocultas.length} {ocultas.length === 1 ? "oculta" : "ocultas"}
+          </button>
+        )}
+      </div>
+
+      {editando && (
+        <div className="flex items-center justify-between gap-3 pt-2">
+          <p className="text-[11px] text-muted-foreground">
+            {podeOcultar ? "Toque no × pra ocultar uma aba." : "A última aba não pode ser ocultada."}
+          </p>
+          <button
+            type="button"
+            onClick={() => setEditando(false)}
+            className="rounded-full bg-foreground text-background text-[11px] font-bold px-3.5 py-1.5 shrink-0"
+          >
+            Pronto
+          </button>
         </div>
       )}
+
+      <Sheet open={folha} onOpenChange={setFolha}>
+        <SheetContent
+          side="bottom"
+          aria-describedby={undefined}
+          className="p-0 z-[300] rounded-t-[28px] border-x-0 border-b-0 max-h-[85dvh] overflow-y-auto pb-[max(1.25rem,var(--app-safe-bottom))]"
+          overlayClassName="z-[290]"
+        >
+          <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
+            <span className="h-1 w-9 rounded-full bg-muted-foreground/25" />
+          </div>
+          <SheetHeader className="px-5 pt-4 pb-2">
+            <SheetTitle className="text-xs font-black uppercase tracking-wider text-left">Abas deste módulo</SheetTitle>
+          </SheetHeader>
+          <ul className="px-5">
+            {todas.map(tab => {
+              const visivel = visiveis.some(a => a.id === tab.id);
+              const ultima = visivel && visiveis.length === 1;
+              return (
+                <li key={tab.id} className="flex items-center gap-3 py-3 border-t border-border/60 first:border-t-0 text-sm font-semibold">
+                  {tab.icon && <span>{tab.icon}</span>}
+                  <span className="flex-1 min-w-0 truncate">{tab.label}</span>
+                  <Switch
+                    checked={visivel}
+                    disabled={ultima}
+                    aria-label={`${visivel ? "Ocultar" : "Mostrar"} ${tab.icon ? `${tab.icon} ` : ""}${tab.label}`}
+                    onCheckedChange={(on) => { if (on) mostrar(tab.id); else ocultar(tab.id); }}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+          <p className="px-5 pt-2 text-[11px] text-muted-foreground">Segure uma aba na fila pra ocultar por ali também.</p>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

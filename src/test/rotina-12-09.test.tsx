@@ -15,17 +15,18 @@ import { UserDataContext, UserDataContextType } from "@/hooks/use-user-data";
 
 const ctx: UserDataContextType = { get: <T,>(_k: string, fb: T) => fb, set: () => {}, loaded: true, isGuest: true, fetchKey: async () => null };
 
-describe("menu ⋯ das abas fora da faixa que rola", () => {
-  it("o menu é irmão da faixa overflow-x-auto, não filho — nada o corta", () => {
-    const abas = { visiveis: [{ id: "a", label: "A" }, { id: "b", label: "B" }], ocultas: [], ocultar: () => {}, mostrar: () => {}, mostrarTodas: () => {} } as unknown as Parameters<typeof AbasOcultaveis>[0]["abas"];
+describe("abas: editar fora da faixa que rola", () => {
+  it("a linha do Pronto e o chip de ocultas ficam fora do overflow-x-auto — nada os corta", () => {
+    const abas = { visiveis: [{ id: "a", label: "A" }, { id: "b", label: "B" }], ocultas: [{ id: "c", label: "C" }], todas: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "c", label: "C" }], ocultar: () => true, mostrar: () => {}, mostrarTodas: () => {}, podeOcultar: true } as unknown as Parameters<typeof AbasOcultaveis>[0]["abas"];
     render(<AbasOcultaveis abas={abas} ativa="a" onTrocar={() => {}} className="px-4" />);
-    fireEvent.click(screen.getByRole("button", { name: "Opções das abas" }));
-    const menu = screen.getByRole("menu");
-    const faixa = screen.getByRole("button", { name: "Opções das abas" }).parentElement as HTMLElement;
+    const faixa = screen.getByRole("button", { name: "A" }).parentElement!.parentElement as HTMLElement;
     expect(faixa.className).toContain("overflow-x-auto");
-    expect(faixa.contains(menu)).toBe(false);
-    expect(menu.parentElement).toBe(faixa.parentElement);
-    expect(menu.parentElement?.className).not.toContain("overflow");
+    fireEvent.contextMenu(screen.getByRole("button", { name: "A" }));
+    const pronto = screen.getByRole("button", { name: "Pronto" });
+    expect(faixa.contains(pronto)).toBe(false);
+    expect(pronto.closest("div")?.parentElement).toBe(faixa.parentElement);
+    fireEvent.click(pronto);
+    expect(screen.getByRole("button", { name: "1 aba oculta" })).toBeInTheDocument();
   });
 });
 

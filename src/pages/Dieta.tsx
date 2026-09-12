@@ -3,6 +3,7 @@ import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
 import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
@@ -340,6 +341,15 @@ const Dieta = () => {
   // DIETA
   const [mealPlan, setMealPlan] = usePersistedState("saude-meals", presetMealPlan);
   const [editingMeal, setEditingMeal] = useState<string | null>(null);
+  // substitutos por refeição (11/09) — ver src/lib/dieta-substitutos.ts
+  const [substitutosBrutos, setSubstitutos] = usePersistedState<Substitutos>("dieta-substitutos", {});
+  const substitutos = useMemo(() => comoSubstitutos(substitutosBrutos), [substitutosBrutos]);
+  const [novoSubstituto, setNovoSubstituto] = useState("");
+  const guardarSubstituto = (meal: string) => {
+    if (!novoSubstituto.trim()) return;
+    setSubstitutos(prev => adicionarSubstituto(comoSubstitutos(prev), meal, novoSubstituto));
+    setNovoSubstituto("");
+  };
   const [editMealValue, setEditMealValue] = useState("");
   // kcal por refeição — ver CALORIAS (07/09) no topo do arquivo
   const [mealKcal, setMealKcal] = usePersistedState<Record<string, Record<string, number>>>(CHAVE_KCAL, {});
@@ -866,7 +876,7 @@ const Dieta = () => {
                       return (
                         <div key={meal} className={`rounded-lg p-2 border ${mealColors[meal] || "bg-muted/50 border-border"}`}>
                           <p className="text-xs font-bold mb-1">{meal} {mealEmojis[meal] || "🍽️"}</p>
-                          {isEditing ? (
+                          {isEditing ? (<>
                             <div className="flex gap-1">
                               <Textarea value={editMealValue} onChange={e => setEditMealValue(e.target.value)} className="text-[10px] min-h-[50px] flex-1 bg-white/50 dark:bg-background/50" />
                               <div className="flex flex-col gap-1 self-end">
@@ -884,11 +894,37 @@ const Dieta = () => {
                                 <Button size="sm" className="h-7" onClick={() => saveMeal(day, meal)}><Check className="w-3 h-3" /></Button>
                               </div>
                             </div>
-                          ) : (
+                            {/* Substitutos da refeição: "ou A, ou B" — valem pra todos
+                                os dias, como o nutricionista escreve. O diário oferece
+                                essas opções quando a pessoa marca que não seguiu. */}
+                            <div className="mt-1.5 space-y-1" data-testid={`substitutos-${meal}`}>
+                              <p className="text-[10px] font-semibold text-muted-foreground">Substitutos de {meal} (valem pra todos os dias)</p>
+                              {(substitutos[meal] ?? []).length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {(substitutos[meal] ?? []).map(sub => (
+                                    <span key={sub} className="inline-flex items-center gap-1 rounded-full bg-white/70 dark:bg-background/60 border border-border px-2 py-0.5 text-[10px]">
+                                      {sub}
+                                      <button type="button" aria-label={`Remover substituto ${sub}`} onClick={() => setSubstitutos(prev => removerSubstituto(comoSubstitutos(prev), meal, sub))} className="text-muted-foreground hover:text-foreground">×</button>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex gap-1">
+                                <Input value={novoSubstituto} onChange={e => setNovoSubstituto(e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); guardarSubstituto(meal); } }}
+                                  placeholder="ou... (ex: tapioca com queijo)" aria-label={`Novo substituto de ${meal}`}
+                                  className="h-7 text-[10px] bg-white/50 dark:bg-background/50" />
+                                <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => guardarSubstituto(meal)}>+ ou</Button>
+                              </div>
+                            </div>
+                          </>) : (
                             <div className="cursor-pointer hover:opacity-70" onClick={() => startEditMeal(day, meal)}>
                               <p className="text-[11px] leading-relaxed">
                                 {mealPlan[day]?.[meal] || <span className="italic text-muted-foreground">Clique para adicionar...</span>}
                               </p>
+                              {(substitutos[meal] ?? []).length > 0 && (
+                                <p className="text-[10px] text-muted-foreground mt-0.5">ou: {(substitutos[meal] ?? []).join(" · ")}</p>
+                              )}
                               {(mealKcal[day]?.[meal] ?? 0) > 0 && (
                                 <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">{mealKcal[day][meal]} kcal</p>
                               )}
@@ -1366,15 +1402,38 @@ const Dieta = () => {
                               </div>
                             </div>
                             {naoSeguiu && (
-                              <Input
-                                value={mealDiary.note}
-                                onChange={e => updateDayDiary(diaryDate, prev => ({
-                                  ...prev,
-                                  meals: { ...prev.meals, [meal]: { ...mealDiary, note: e.target.value } }
-                                }))}
-                                placeholder="Por que não comeu?"
-                                className="text-xs h-8"
-                              />
+                              <div className="space-y-1.5">
+                                {/* O que comeu no lugar: um toque num substituto grava a
+                                    nota, sem tocar no plano (cliente 11/09: "eu editava a
+                                    dieta e depois tinha que mudar de novo"). */}
+                                {(substitutos[meal] ?? []).length > 0 && (
+                                  <div className="flex flex-wrap gap-1" data-testid={`opcoes-${meal}`}>
+                                    {(substitutos[meal] ?? []).map(sub => {
+                                      const ativo = mealDiary.note === notaDeSubstituto(sub);
+                                      return (
+                                        <button key={sub} type="button"
+                                          onClick={() => updateDayDiary(diaryDate, prev => ({
+                                            ...prev,
+                                            meals: { ...prev.meals, [meal]: { ...mealDiary, note: ativo ? "" : notaDeSubstituto(sub) } }
+                                          }))}
+                                          className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${ativo ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted/50"}`}>
+                                          {sub}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <Input
+                                  value={mealDiary.note}
+                                  onChange={e => updateDayDiary(diaryDate, prev => ({
+                                    ...prev,
+                                    meals: { ...prev.meals, [meal]: { ...mealDiary, note: e.target.value } }
+                                  }))}
+                                  placeholder="O que comeu no lugar? (ou por que não comeu)"
+                                  aria-label={`O que comeu em ${meal}`}
+                                  className="text-xs h-8"
+                                />
+                              </div>
                             )}
                           </div>
                         );

@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- tablet (largura mínima 600dp): segue a rotação do aparelho -->
-    <integer name="orientacao_principal">2</integer>
-</resources>

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- android:screenOrientation da MainActivity. 1 = portrait (celular);
-         values-sw600dp troca pra 2 = user (tablet gira). Ticket do suporte 08/09:
-         "uso o app no tablet e não consigo rotacionar a tela". -->
-    <integer name="orientacao_principal">1</integer>
-</resources>

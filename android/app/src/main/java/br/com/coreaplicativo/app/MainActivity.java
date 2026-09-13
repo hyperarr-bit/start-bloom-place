@@ -1,6 +1,7 @@
 package br.com.coreaplicativo.app;
 
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -26,6 +27,16 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(MetaAdsPlugin.class);
         registerPlugin(SaidaDoAppPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // TABLET GIRA (13/09, ticket do suporte: "uso o app no tablet e não
+        // consigo rotacionar a tela"). O manifest trava retrato — certo no
+        // celular, onde o layout é de uma coluna — mas em tela de 600dp ou mais
+        // a rotação segue o aparelho. O layout já é responsivo (o site no
+        // computador prova). Não dá pra fazer isso por recurso no manifest: o
+        // lint barra recurso que varia por configuração ali.
+        if (getResources().getConfiguration().smallestScreenWidthDp >= 600) {
+            setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_USER);
+        }
 
         // DEFESAS DO RENDERER DO WEBVIEW (02/09) — e a correção da premissa.
         // A hipótese que motivou isto ("o Android mata o renderer com a folha

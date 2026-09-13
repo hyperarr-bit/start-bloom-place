@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { dataSegura } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Lightbulb, Plus, X } from "lucide-react";
@@ -108,7 +109,7 @@ export const IdeasPanel = () => {
               </button>
               <p className="text-sm pr-5">{idea.text}</p>
               <p className="text-[10px] text-muted-foreground mt-1">
-                {format(new Date(idea.date), "dd MMM", { locale: ptBR })} · {String(idea.hour).padStart(2, "0")}h
+                {dataSegura(idea.date, "dd MMM", { locale: ptBR })} · {String(idea.hour).padStart(2, "0")}h
               </p>
             </div>
           ))}

@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { format } from "date-fns";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -62,4 +63,22 @@ export const parseLocalDay = (key: string) => {
 export const mesAtualExtenso = (d: Date = new Date()): string => {
   const t = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   return t.charAt(0).toUpperCase() + t.slice(1);
+};
+
+
+/**
+ * Formata uma data GRAVADA sem derrubar a tela (13/09). Dez cartões faziam
+ * `format(new Date(x.date))` direto: um item antigo sem data (sonho do
+ * Mente semeado pela demo, pet, momento, evento) virava `RangeError:
+ * Invalid time value` dentro de um .map — e o RouteErrorBoundary trocava o
+ * módulo inteiro pela tela de erro. Regras: vazio ou inválido → "—";
+ * "YYYY-MM-DD" é dia LOCAL (parseLocalDay, não UTC — senão à noite no
+ * Brasil mostra o dia anterior); o resto passa pelo `new Date` normal.
+ */
+export const dataSegura = (valor: unknown, padrao: string, opcoes?: Parameters<typeof format>[2]): string => {
+  if (valor == null || valor === "") return "—";
+  const texto = String(valor);
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(texto) ? parseLocalDay(texto) : new Date(texto);
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return "—";
+  try { return format(d, padrao, opcoes); } catch { return "—"; }
 };

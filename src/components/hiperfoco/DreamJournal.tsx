@@ -3,7 +3,7 @@ import { Plus, Trash2, Moon } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
+import { dataSegura } from "@/lib/utils";
 
 interface Dream {
   id: string;
@@ -24,7 +24,20 @@ const emotionTags = [
 
 export const DreamJournal = () => {
   const { get, set } = useUserData();
-  const dreams = get<Dream[]>("mente-dreams", []);
+  const dreamsBrutos = get<unknown>("mente-dreams", []);
+  /* Dado antigo/torto nesta chave (13/09): a demo semeava aqui "sonhos de
+     vida" {title, category}, sem tags nem descrição, e o .map estourava em
+     `dream.tags.length` — o Mente inteiro caía na tela de erro. Normaliza
+     na leitura; nada é gravado de volta. */
+  const dreams: Dream[] = (Array.isArray(dreamsBrutos) ? dreamsBrutos : [])
+    .filter((d): d is Partial<Dream> & { id: string } => !!d && typeof d === "object" && typeof (d as { id?: unknown }).id === "string")
+    .map((d) => ({
+      id: d.id,
+      date: typeof d.date === "string" ? d.date : "",
+      description: typeof d.description === "string" ? d.description : typeof (d as { title?: unknown }).title === "string" ? String((d as { title?: unknown }).title) : "",
+      tags: Array.isArray(d.tags) ? d.tags.filter((t): t is string => typeof t === "string") : [],
+      interpretation: typeof d.interpretation === "string" ? d.interpretation : "",
+    }));
   const [description, setDescription] = useState("");
   const [interpretation, setInterpretation] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -86,7 +99,7 @@ export const DreamJournal = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] text-muted-foreground">{format(new Date(dream.date), "dd/MM/yyyy 'às' HH:mm")}</span>
+                    <span className="text-[10px] text-muted-foreground">{dataSegura(dream.date, "dd/MM/yyyy 'às' HH:mm")}</span>
                   </div>
                   <p className="text-xs leading-relaxed">{dream.description}</p>
                   {dream.tags.length > 0 && (

@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, dataSegura } from "@/lib/utils";
 import { Trash2, Heart, Plus } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
 
 interface Moment {
   id: string;
@@ -50,7 +49,7 @@ export const MomentsTimeline = () => {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] text-muted-foreground">{format(new Date(m.date), "dd/MM/yyyy")}</span>
+                    <span className="text-[10px] text-muted-foreground">{dataSegura(m.date, "dd/MM/yyyy")}</span>
                     {m.person && <span className="text-[10px] font-bold text-rose-400">com {m.person}</span>}
                   </div>
                   <p className="text-xs">{m.description}</p>

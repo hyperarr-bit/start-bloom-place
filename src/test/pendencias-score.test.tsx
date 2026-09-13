@@ -163,12 +163,13 @@ describe("Pendências de hoje espelham o Score do Dia", () => {
     expect(score()).toBe(100);
   });
 
-  it("semana realmente vazia (nenhum dia com exercício ou grupo) continua pedindo pra configurar", () => {
+  it("semana realmente vazia (nenhum dia com exercício ou grupo) mostra 'Configurar treino' como DICA, fora da contagem (13/09: o score já dá os 15)", () => {
     const d = tudoFeitoBasico();
     d["saude-workouts-v2"] = { [diaDaSemana()]: { muscles: [], exercises: [] } };
     d["saude-workout-log"] = [];
     renderHome(d);
-    expect(pendentes()).toEqual(["🏋️Configurar treino da semana"]);
+    expect(screen.getByTestId("aviso-treino").textContent).toContain("Configurar treino da semana");
+    expect(screen.queryByText(/pendente/)).not.toBeInTheDocument();
   });
 
   it("leitura: porcentagem vem de currentPage/pages; mexeu na página hoje → linha feita; sem mexer → 'Continuar' pendente e score 95", () => {

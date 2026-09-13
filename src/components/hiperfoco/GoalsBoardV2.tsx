@@ -77,8 +77,11 @@ const CircleCheck = ({ checked, onToggle }: { checked: boolean; onToggle: () => 
 );
 
 /* ─── MAIN ─── */
-export const GoalsBoardV2 = () => {
-  const [goals, setGoals] = usePersistedState<GoalV2[]>("goals-board-v2", defaultGoals);
+/** `apenasIds` (13/09): o filtro de etiqueta/ano do Dev. Pessoal, que só
+ *  filtrava a lista de etiquetas embaixo e não o quadro em si. null = todas. */
+export const GoalsBoardV2 = ({ apenasIds = null }: { apenasIds?: Set<string> | null } = {}) => {
+  const [goalsTodas, setGoals] = usePersistedState<GoalV2[]>("goals-board-v2", defaultGoals);
+  const goals = apenasIds ? goalsTodas.filter(g => apenasIds.has(g.id)) : goalsTodas;
   const [timeline, setTimeline] = usePersistedState<TimelineData>("goals-timeline", defaultTimeline);
   const [homeData, setHomeData] = usePersistedState<HomeData>("goals-home", defaultHome);
   const [view, setView] = useState<"home" | "detail">("home");
@@ -138,7 +141,7 @@ export const GoalsBoardV2 = () => {
 
       // Goals (hero + gallery)
       const newGoals = await Promise.all(
-        goals.map(async g => {
+        goalsTodas.map(async g => {
           const updates: Partial<GoalV2> = {};
           if (g.heroImage && isBase64Image(g.heroImage)) {
             const url = await migrateBase64ToStorage(g.heroImage, DREAM_BUCKET, `hero/${g.id}`);
@@ -154,10 +157,10 @@ export const GoalsBoardV2 = () => {
           return Object.keys(updates).length ? { ...g, ...updates } : g;
         })
       );
-      if (newGoals.some((g, i) => g !== goals[i])) setGoals(newGoals);
+      if (newGoals.some((g, i) => g !== goalsTodas[i])) setGoals(newGoals);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [goals.length, homeData.dreamBoard.length]);
+  }, [goalsTodas.length, homeData.dreamBoard.length]);
 
   const updateGoal = (updated: GoalV2) => setGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
 
@@ -340,9 +343,10 @@ export const GoalsBoardV2 = () => {
   };
   const addProblem = () => updateGoal({ ...goal, problems: [...goal.problems, { id: Date.now().toString(), problem: "", solution: "" }] });
   const deleteGoal = () => {
-    if (goals.length <= 1) return;
-    const filtered = goals.filter(g => g.id !== goal.id);
-    setGoals(filtered); setView("home");
+    if (goalsTodas.length <= 1) return;
+    // sempre a lista COMPLETA: com o filtro de etiqueta ligado, filtrar a
+    // lista visível apagaria as metas escondidas junto
+    setGoals(goalsTodas.filter(g => g.id !== goal.id)); setView("home");
   };
 
   const SectionHeader = ({ emoji, title, color }: { emoji: string; title: string; color: string }) => (

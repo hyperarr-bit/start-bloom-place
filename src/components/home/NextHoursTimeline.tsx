@@ -79,15 +79,12 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
       priority: 11,
       route: "/treino",
     });
-  } else {
-    items.push({
-      label: "Configurar treino da semana",
-      done: false,
-      emoji: "🏋️",
-      priority: 2,
-      route: "/treino",
-    });
   }
+  /* Plano de treino VAZIO (13/09): o score dá os 15 pontos (sem plano não há
+     o que cobrar), então "Configurar treino da semana" como PENDÊNCIA
+     contradizia o próprio score — 100 pontos com "1 pendente". Vira aviso,
+     fora da contagem, junto da conta a vencer. */
+  const avisoTreino = !data.todayWorkoutGroup && data.workoutStatus !== "descanso";
 
   // Water - always show
   const waterRemaining = data.waterGoal - data.waterGlasses;
@@ -173,16 +170,16 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
     }
   }
 
-  // Finances - next bill
-  if (data.nextBillName) {
-    items.push({
-      label: `Conta próxima: ${data.nextBillName}`,
-      done: false,
-      emoji: "📅",
-      priority: 7,
-      route: "/financas",
-    });
-  }
+  /* CONTA A VENCER NÃO É PENDÊNCIA DO DIA (13/09). Ela entrava na lista e no
+     "N pendentes" — e não entra no score: quem fechava os 12 registros via
+     100 pontos com "1 pendente" na cara, pra sempre, porque sempre há uma
+     conta a vencer em algum dia do mês. Agora é um AVISO à parte, fora da
+     contagem, e só aparece quando vence em até 3 dias (é quando importa).
+     Pagou (checkbox em Finanças) → some. Lista vazia ⇔ score 100 volta a
+     ser verdade. */
+  const avisoConta = data.nextBillName && data.nextBillDaysUntil != null && data.nextBillDaysUntil <= 3
+    ? { nome: data.nextBillName, dias: data.nextBillDaysUntil }
+    : null;
 
   /*
    * REGISTROS DO DIA QUE O SCORE COBRA (10/09). Cliente pagante zerou esta
@@ -276,6 +273,33 @@ export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
                   )}
                 </motion.button>
               ))}
+
+              {avisoTreino && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/treino")}
+                  data-testid="aviso-treino"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-border bg-muted/30 text-left"
+                >
+                  <span className="text-sm">🏋️</span>
+                  <span className="text-[11px] font-medium flex-1">Configurar treino da semana</span>
+                  <span className="text-[10px] text-muted-foreground">dica</span>
+                </button>
+              )}
+              {avisoConta && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/financas")}
+                  data-testid="aviso-conta"
+                  className="w-full flex items-center gap-3 px-3 py-2 rounded-xl border border-dashed border-amber-300/70 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/10 text-left"
+                >
+                  <span className="text-sm">📅</span>
+                  <span className="text-[11px] font-medium flex-1">
+                    {avisoConta.dias === 0 ? "Vence hoje" : avisoConta.dias === 1 ? "Vence amanhã" : `Vence em ${avisoConta.dias} dias`}: {avisoConta.nome}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">aviso</span>
+                </button>
+              )}
 
               {done.length > 0 && (
                 <div className="pt-1">

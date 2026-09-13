@@ -53,6 +53,8 @@ interface DashboardProps {
    *  separado pra não projetar parcela fixa como gasto variável diário. */
   monthlyInstallments?: number;
   onNavigate?: (tab: string) => void;
+  /** Perfil ativo (PF/PJ): sem ele o gráfico anual não recalculava ao trocar o chip (13/09). */
+  perfil?: string;
 }
 
 const COLORS = ["#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#6366f1", "#14b8a6"];
@@ -132,6 +134,7 @@ export const Dashboard = ({
   incomes,
   monthlyInstallments = 0,
   onNavigate,
+  perfil,
 }: DashboardProps) => {
   const { user } = useAuth();
   // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
@@ -142,10 +145,10 @@ export const Dashboard = ({
   // Compute annual data from actual monthly records (current year only)
   const annualData = useMemo(() => {
     return ALL_MONTHS.map((month) => {
-      const totals = getMonthTotals(month, userId, currentYear);
+      const totals = getMonthTotals(month, userId, currentYear, perfil);
       return { month, ...totals };
     });
-  }, [currentYear, userId]);
+  }, [currentYear, userId, perfil]);
 
   // Month progress data
   const monthProgress = useMemo(() => {

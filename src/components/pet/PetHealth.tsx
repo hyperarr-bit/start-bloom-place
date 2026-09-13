@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, dataSegura } from "@/lib/utils";
 import { Plus, Trash2, Syringe, AlertTriangle, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
-import { format, differenceInDays } from "date-fns";
+import { differenceInDays } from "date-fns";
 
 interface HealthRecord {
   id: string;
@@ -137,14 +137,14 @@ export const PetHealth = () => {
                   <span className="flex-1 min-w-0">
                     <span className="block text-xs font-medium truncate">{r.name}</span>
                     <span className="block text-[10px] text-muted-foreground truncate">
-                      {[pet?.name, typeLabels[r.type], format(new Date(r.date), "dd/MM")].filter(Boolean).join(" · ")}
+                      {[pet?.name, typeLabels[r.type], dataSegura(r.date, "dd/MM")].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   {/* a próxima data é o que a pessoa vem conferir aqui — fica
                       com rótulo próprio em vez de virar mais um "dd/MM" solto */}
                   <span className="text-[10px] text-right shrink-0 leading-tight">
                     <span className="block text-[9px] uppercase text-muted-foreground">Próxima</span>
-                    <span className="block font-medium">{r.nextDate ? format(new Date(r.nextDate), "dd/MM") : "—"}</span>
+                    <span className="block font-medium">{dataSegura(r.nextDate, "dd/MM")}</span>
                   </span>
                 </button>
                 <button onClick={() => comecarEdicao(r)} aria-label={`Editar ${r.name}`} className="w-9 h-9 shrink-0 flex items-center justify-center rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">

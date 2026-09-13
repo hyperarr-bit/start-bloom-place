@@ -291,8 +291,8 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       },
     },
     "mente-dreams": [
-      { id: "1", title: "Viver no exterior por 1 ano", category: "Vida" },
-      { id: "2", title: "Lançar meu próprio app", category: "Carreira" },
+      { id: "1", date: `${daysAgo(1)}T06:40:00`, description: "Estava numa casa à beira-mar, organizando caixas que não acabavam nunca. Acordei tranquila.", tags: ["Lúcido"], interpretation: "" },
+      { id: "2", date: `${daysAgo(4)}T07:10:00`, description: "Apresentação no trabalho e o projetor não ligava. Todo mundo esperando.", tags: ["Medo"], interpretation: "Semana de entrega, faz sentido." },
     ],
   },
   estudos: {

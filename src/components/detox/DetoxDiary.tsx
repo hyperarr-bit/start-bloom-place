@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, dataSegura } from "@/lib/utils";
 import { Plus, Trash2, BookOpen } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
 
 interface DiaryEntry {
   id: string;
@@ -52,7 +51,7 @@ export const DetoxDiary = () => {
                   <span className="text-lg mt-0.5">{difficultyEmoji(e.difficulty)}</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] text-muted-foreground">{format(new Date(e.date), "dd/MM/yyyy")}</span>
+                      <span className="text-[10px] text-muted-foreground">{dataSegura(e.date, "dd/MM/yyyy")}</span>
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                         e.difficulty <= 2 ? "bg-green-500/20 text-green-400" :
                         e.difficulty === 3 ? "bg-amber-500/20 text-amber-400" :

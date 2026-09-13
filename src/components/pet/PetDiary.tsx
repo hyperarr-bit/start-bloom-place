@@ -4,7 +4,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PhotoPicker } from "@/components/ui/PhotoPicker";
-import { format } from "date-fns";
+import { dataSegura } from "@/lib/utils";
 
 interface DiaryEntry {
   id: string;
@@ -129,7 +129,7 @@ export const PetDiary = () => {
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-sm">{entry.mood}</span>
                     <span className="text-xs font-bold">{entry.petName || "Meu pet"}</span>
-                    <span className="text-[10px] text-muted-foreground">{format(new Date(entry.date), "dd/MM 'às' HH:mm")}</span>
+                    <span className="text-[10px] text-muted-foreground">{dataSegura(entry.date, "dd/MM 'às' HH:mm")}</span>
                   </div>
                   <p className="text-xs leading-relaxed">{entry.text}</p>
                   {entry.photoUrl && (

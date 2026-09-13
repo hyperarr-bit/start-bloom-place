@@ -24,6 +24,8 @@ export interface LifeHubData {
   streak: number;
   monthBalance: number;
   nextBillName: string | null;
+  /** dias até a conta mais próxima vencer (0 = hoje); null sem conta em aberto */
+  nextBillDaysUntil: number | null;
   nextBillDate: string | null;
   todayWorkoutGroup: string | null;
   workoutDone: boolean;
@@ -109,7 +111,7 @@ export function useLifeHubData(): LifeHubData {
     if (!loaded) {
       return {
         dayScore: 0, streak: 0, monthBalance: 0,
-        nextBillName: null, nextBillDate: null,
+        nextBillName: null, nextBillDate: null, nextBillDaysUntil: null,
         todayWorkoutGroup: null, workoutDone: false, workoutTime: null, workoutStatus: "vazio",
         caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 0, mealsTotal: 4,
         waterGlasses: 0, waterGoal: 8, sleepHours: null,
@@ -383,6 +385,7 @@ export function useLifeHubData(): LifeHubData {
     return {
       dayScore, streak, monthBalance,
       nextBillName: nextBill?.name || null, nextBillDate: nextBill?._day ? `dia ${nextBill._day}` : null,
+      nextBillDaysUntil: nextBill ? nextBill._daysUntil : null,
       todayWorkoutGroup: todayGroup, workoutDone, workoutTime: null, workoutStatus,
       caloriesConsumed, caloriesGoal, mealsLogged, mealsTotal,
       waterGlasses, waterGoal, sleepHours,

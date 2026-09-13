@@ -14,13 +14,16 @@ import { PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil"
 interface Props {
   perfis: Perfil[];
   setPerfis: (p: Perfil[]) => void;
+  /** Chamado ANTES de tirar o perfil da lista: quem tem os lançamentos em
+   *  memória devolve os dele pro Pessoal (Index). */
+  onRemover?: (id: string) => void;
   ativo: string;
   setAtivo: (id: string) => void;
 }
 
 const novoId = () => `pj${Date.now().toString(36)}`;
 
-export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo }: Props) => {
+export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo, onRemover }: Props) => {
   const [criando, setCriando] = useState(false);
   const [nome, setNome] = useState("");
   const [gerindo, setGerindo] = useState(false);
@@ -36,6 +39,7 @@ export const SeletorDePerfil = ({ perfis, setPerfis, ativo, setAtivo }: Props) =
   };
 
   const remover = (id: string) => {
+    onRemover?.(id);
     setPerfis(perfis.filter((p) => p.id !== id));
     // Some o perfil ativo? Volta pro pessoal — nunca deixar a tela num filtro
     // que não existe mais, senão a Finanças aparece vazia sem explicação.

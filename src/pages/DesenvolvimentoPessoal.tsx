@@ -111,7 +111,7 @@ const etiquetaDe = (mapa: Record<string, Partial<EtiquetaDeMeta>> | undefined, i
 export const casaComFiltro = (e: EtiquetaDeMeta, filtro: string | null) =>
   filtro === null || e.tags.includes(filtro) || String(e.ano) === filtro;
 
-export const EtiquetasDasMetas = () => {
+export const EtiquetasDasMetas = ({ onFiltrar }: { onFiltrar?: (ids: Set<string> | null) => void } = {}) => {
   const { get } = useUserData();
   const brutas = get<unknown>("goals-board-v2", []);
   const metas = useMemo(() => (Array.isArray(brutas) ? brutas : [])
@@ -139,6 +139,12 @@ export const EtiquetasDasMetas = () => {
 
   if (metas.length === 0) return null;
   const visiveis = metas.filter(m => casaComFiltro(etiquetaDe(etiquetas, m.id), filtro));
+  // O quadro de cima (GoalsBoardV2) recebe o mesmo filtro (13/09): antes só
+  // esta lista filtrava e o quadro seguia mostrando tudo.
+  useEffect(() => {
+    onFiltrar?.(filtro === null ? null : new Set(visiveis.map(m => m.id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro, visiveis.map(m => m.id).join("|")]);
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">
@@ -270,6 +276,8 @@ const ListEditor = ({ items, setItems, newItem, setNewItem, placeholder, colorCl
 const DesenvolvimentoPessoal = () => {
   const navigate = useNavigate();
   // ?tab= permite deep-link (a demo do funil de metas abre direto na aba Metas)
+  // ids das metas que passam no filtro de etiqueta/ano (null = sem filtro) — ver EtiquetasDasMetas
+  const [metasFiltradas, setMetasFiltradas] = useState<Set<string> | null>(null);
   const [activeTab, setActiveTab] = useState(() => {
     try {
       const t = new URLSearchParams(window.location.search).get("tab");

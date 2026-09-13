@@ -166,7 +166,7 @@ describe("Score do Dia fecha em 100", () => {
 
 describe("Comemoração dos 100", () => {
   const dadosHeader = (dayScore: number) => ({
-    dayScore, streak: 3, monthBalance: 0, nextBillName: null, nextBillDate: null,
+    dayScore, streak: 3, monthBalance: 0, nextBillName: null, nextBillDate: null, nextBillDaysUntil: null,
     todayWorkoutGroup: null, workoutDone: true, workoutTime: null,
     caloriesConsumed: 0, caloriesGoal: 2000, mealsLogged: 4, mealsTotal: 4,
     waterGlasses: 8, waterGoal: 8, sleepHours: 7,

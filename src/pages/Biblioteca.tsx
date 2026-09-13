@@ -4,7 +4,7 @@ import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, X, Trash2, Search, Edit2, BookOpen, Link, Loader2, Star, MessageCircle, Calendar, Target, Hash, Info, Camera, ChevronDown, ChevronRight } from "lucide-react";
-import { localDayKey, mesAtualExtenso } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso, dataSegura } from "@/lib/utils";
 import { uploadFromInput } from "@/lib/image-upload";
 import { limparLivros } from "@/lib/biblioteca-limpeza";
 import { Button } from "@/components/ui/button";
@@ -846,7 +846,7 @@ const Biblioteca = () => {
                             </div>
                             {book.lentReturnDate && (
                               <p className="text-[10px] text-muted-foreground mt-1">
-                                Devolução: {format(new Date(book.lentReturnDate), "dd/MM/yyyy")}
+                                Devolução: {dataSegura(book.lentReturnDate, "dd/MM/yyyy")}
                               </p>
                             )}
                           </div>

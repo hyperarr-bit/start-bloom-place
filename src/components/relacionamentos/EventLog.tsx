@@ -3,7 +3,7 @@ import { Plus, Trash2, MapPin, CheckCircle2, HelpCircle, XCircle, CalendarDays }
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
-import { format } from "date-fns";
+import { dataSegura } from "@/lib/utils";
 
 interface EventItem {
   id: string;
@@ -79,7 +79,7 @@ export const EventLog = () => {
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-xs font-bold">{ev.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{format(new Date(ev.date), "dd/MM/yyyy")}</p>
+                    <p className="text-[10px] text-muted-foreground">{dataSegura(ev.date, "dd/MM/yyyy")}</p>
                     {ev.location && (
                       <p className="text-[10px] text-muted-foreground flex items-center gap-1">
                         <MapPin className="w-2.5 h-2.5" /> {ev.location}

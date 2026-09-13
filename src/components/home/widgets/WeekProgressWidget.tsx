@@ -12,13 +12,29 @@ export const WeekProgressWidget = () => {
     const monday = new Date(today);
     monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
 
-    const habits = get<any[]>("core-rotina-habits", []);
-    const habitLog = get<any>("core-rotina-habit-log", {});
+    /* CHAVES REAIS (13/09). Este widget lia core-rotina-habits, core-rotina-
+       habit-log e core-mood-log — chaves que módulo nenhum grava — e sono só
+       da Saúde. Resultado: hábitos e humor sempre zero, a semana inteira
+       parecia fraca. Agora lê o que a Rotina escreve (rotina-habits +
+       rotina-habit-log {dia: [nomes feitos]}, mood-log) e sono das duas
+       fontes, igual ao Score do Dia. */
+    const habitsBrutos = get<any[]>("rotina-habits", get<any[]>("core-rotina-habits", []));
+    const habits = Array.isArray(habitsBrutos) ? habitsBrutos : [];
+    const habitLog = get<Record<string, unknown>>("rotina-habit-log", {});
+    const habitLogLegado = get<Record<string, unknown>>("core-rotina-habit-log", {});
     const waterLog = get<Record<string, number>>("core-saude-water", {});
-    const waterGoal = get<number>("core-saude-water-goal", 8);
+    const waterGoal = Math.max(1, Number(get<number>("core-saude-water-goal", 8)) || 8);
     const workoutLog = get<string[]>("saude-workout-log", []);
-    const sleepLog = get<Record<string, number>>("core-saude-sleep", {});
-    const moodLog = get<Record<string, any>>("core-mood-log", {});
+    const sleepLog = get<Record<string, number>>("sleep-log", {});
+    const sleepLogSaude = get<Record<string, number>>("core-saude-sleep", {});
+    const moodLog = get<Record<string, any>>("mood-log", {});
+    const moodLogLegado = get<Record<string, any>>("core-mood-log", {});
+    const feitosNoDia = (dateStr: string): number => {
+      const v = habitLog[dateStr] ?? habitLogLegado[dateStr];
+      if (Array.isArray(v)) return v.length;
+      if (v && typeof v === "object") return Object.values(v as Record<string, unknown>).filter(Boolean).length;
+      return 0;
+    };
 
     const todayStr = localDayKey(today);
 
@@ -33,9 +49,7 @@ export const WeekProgressWidget = () => {
 
       // Habits (40pts)
       if (habits.length > 0) {
-        const dayHabits = habitLog[dateStr] || {};
-        const done = Object.keys(dayHabits).length;
-        score += Math.round((done / habits.length) * 40);
+        score += Math.round((Math.min(feitosNoDia(dateStr), habits.length) / habits.length) * 40);
       }
 
       // Water (20pts)
@@ -46,10 +60,10 @@ export const WeekProgressWidget = () => {
       if (workoutLog.includes(dateStr)) score += 20;
 
       // Sleep (10pts)
-      if (sleepLog[dateStr]) score += 10;
+      if (sleepLog[dateStr] || sleepLogSaude[dateStr]) score += 10;
 
       // Mood (10pts)
-      if (moodLog[dateStr]) score += 10;
+      if (moodLog[dateStr] || moodLogLegado[dateStr]) score += 10;
 
       return Math.min(100, score);
     });

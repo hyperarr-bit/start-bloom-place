@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { localDayKey } from "@/lib/utils";
+import { localDayKey, dataSegura } from "@/lib/utils";
 import { Plus, Trash2, TrendingUp, Pencil, Check, X } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
-import { format } from "date-fns";
 
 interface PetExpense {
   id: string;
@@ -179,7 +178,7 @@ export const PetExpenses = () => {
                   <span className="flex-1 min-w-0">
                     <span className="block text-xs truncate">{rotulo}</span>
                     <span className="block text-[10px] text-muted-foreground truncate">
-                      {[pet?.name, e.category, format(new Date(e.date), "dd/MM")].filter(Boolean).join(" · ")}
+                      {[pet?.name, e.category, dataSegura(e.date, "dd/MM")].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   <span className="text-xs font-bold text-destructive shrink-0">-R${e.value.toFixed(0)}</span>

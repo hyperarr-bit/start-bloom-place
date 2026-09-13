@@ -45,7 +45,7 @@ import { YearComparison } from "@/components/finance/YearComparison";
 import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
-import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
+import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
 import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
 import { useFinanceCards } from "@/lib/finance-cards";
@@ -159,6 +159,19 @@ const Index = () => {
      existe mais — Finanças vazia sem explicação. Cai no pessoal. */
   const perfilValido = perfilAtivo === PERFIL_PESSOAL || perfilAtivo === PERFIL_TODOS
     || perfis.some((p) => p.id === perfilAtivo) ? perfilAtivo : PERFIL_PESSOAL;
+  // finance-perfil.ts precisa saber quais perfis existem pra tratar órfão de
+  // empresa apagada como pessoal (13/09). Registra antes de filtrar.
+  registrarPerfis(perfis);
+  /* Apagar uma empresa: os lançamentos dela (mês corrente, em memória) voltam
+     pro Pessoal DE VERDADE — e não só na leitura. Meses passados ficam com a
+     etiqueta antiga, que `perfilDe` já resolve como pessoal. */
+  const removerPerfil = (id: string) => {
+    setIncomesTodos(devolverAoPessoal(incomesTodos, id));
+    setExpensesTodos(devolverAoPessoal(expensesTodos, id));
+    setFixedExpensesTodos(devolverAoPessoal(fixedExpensesTodos, id));
+    setInstallmentsTodos(devolverAoPessoal(installmentsTodos as any[], id));
+    setDueDaysTodos((dueDaysTodos as any[]).map((d: any) => ({ ...d, bills: devolverAoPessoal(Array.isArray(d?.bills) ? d.bills : [], id) })));
+  };
 
   const [incomes, setIncomes] = usarListaDoPerfil(incomesTodos, setIncomesTodos, perfilValido);
   const [expenses, setExpenses] = usarListaDoPerfil(expensesTodos, setExpensesTodos, perfilValido);
@@ -421,7 +434,8 @@ const Index = () => {
                 savingsRate={savingsRate}
                 incomes={incomes}
                 onNavigate={(tab) => setActiveTab(tab)}
-              />
+                            perfil={perfilValido}
+            />
             </TrackedCard>
             <TrackedCard cardKey="month-comparison" tab="dashboard">
               <MonthComparison perfil={perfilValido} />
@@ -466,6 +480,7 @@ const Index = () => {
                   <SeletorDePerfil
                     perfis={perfis}
                     setPerfis={setPerfis}
+                    onRemover={removerPerfil}
                     ativo={perfilValido}
                     setAtivo={setPerfilAtivo}
                   />

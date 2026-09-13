@@ -41,9 +41,33 @@ export interface ItemComPerfil {
   perfil?: string;
 }
 
-/** Perfil efetivo de um item: sem etiqueta = pessoal (retrocompatível). */
-export const perfilDe = (item: ItemComPerfil | undefined | null) =>
-  (item?.perfil ?? PERFIL_PESSOAL) || PERFIL_PESSOAL;
+/* EMPRESA APAGADA NÃO PODE SUMIR COM LANÇAMENTO (13/09). A tela sempre
+   prometeu "apagar uma empresa não apaga os lançamentos — eles voltam para o
+   Pessoal", mas `perfilDe` devolvia a etiqueta crua: item etiquetado com um
+   id que não existe mais ficava fora do Pessoal E fora de qualquer empresa —
+   órfão, visível só em "Tudo junto". Agora o módulo conhece a lista de
+   perfis (Index registra ao carregar; Home/widgets registram do cache local)
+   e etiqueta desconhecida cai no pessoal. Sem lista carregada (null), o
+   comportamento antigo vale — ninguém decide por dado que não leu. */
+let perfisConhecidos: Set<string> | null = null;
+export const registrarPerfis = (perfis: Perfil[] | null | undefined) => {
+  perfisConhecidos = Array.isArray(perfis) ? new Set(perfis.map((p) => p.id)) : null;
+};
+/** Só pra teste: volta ao estado "não sei quais perfis existem". */
+export const esquecerPerfis = () => { perfisConhecidos = null; };
+
+/** Perfil efetivo de um item: sem etiqueta = pessoal (retrocompatível);
+ *  etiqueta de perfil que não existe mais = pessoal (ver acima). */
+export const perfilDe = (item: ItemComPerfil | undefined | null) => {
+  const p = (item?.perfil ?? PERFIL_PESSOAL) || PERFIL_PESSOAL;
+  if (p === PERFIL_PESSOAL || p === PERFIL_TODOS) return p;
+  if (perfisConhecidos && !perfisConhecidos.has(p)) return PERFIL_PESSOAL;
+  return p;
+};
+
+/** Re-etiqueta pro pessoal tudo o que era de um perfil (usado ao apagar a empresa). */
+export const devolverAoPessoal = <T extends ItemComPerfil>(itens: T[], perfilApagado: string): T[] =>
+  (itens || []).map((i) => (i?.perfil === perfilApagado ? { ...i, perfil: PERFIL_PESSOAL } : i));
 
 /** O que a tela mostra. `PERFIL_TODOS` é a visão consolidada de sempre. */
 export const doPerfil = <T extends ItemComPerfil>(itens: T[], perfil: string): T[] => {
@@ -182,6 +206,11 @@ export const perfilAtivoLocal = (userId: string | null | undefined): string => {
     const w = window as unknown as { __PREVIEW_SEEDS__?: Record<string, unknown> };
     if (!userId && w.__PREVIEW_SEEDS__) return String(w.__PREVIEW_SEEDS__["finance-perfil-ativo"] ?? PERFIL_PESSOAL);
     if (!userId) return PERFIL_PESSOAL;
+    // Quem lê o perfil ativo fora de Finanças (Home, widgets) também precisa
+    // saber quais perfis existem, senão órfão de empresa apagada some daqui.
+    if (perfisConhecidos === null) {
+      try { const lista = JSON.parse(localStorage.getItem(`u:${userId}:finance-perfis`) || "null"); if (Array.isArray(lista)) registrarPerfis(lista as Perfil[]); } catch { /* cache ausente: fica null */ }
+    }
     const raw = localStorage.getItem(`u:${userId}:finance-perfil-ativo`);
     if (!raw) return PERFIL_PESSOAL;
     try { const v = JSON.parse(raw); return typeof v === "string" && v ? v : PERFIL_PESSOAL; } catch { return raw || PERFIL_PESSOAL; }

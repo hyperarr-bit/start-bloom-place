@@ -1252,7 +1252,7 @@ const Rotina = () => {
           moduleId="rotina"
           tips={[
             "Adicione seus hábitos diários e marque conforme concluir cada um",
-            "Monte sua rotina semanal hora a hora na aba 📋 Agenda",
+            "Monte sua rotina semanal hora a hora no card Rotina semanal, aqui em Minha Semana",
             "Crie rituais matinais e noturnos para automatizar seu dia",
             "Acompanhe seu humor diário e veja padrões ao longo do tempo"
           ]}

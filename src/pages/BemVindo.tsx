@@ -5,7 +5,7 @@ import { CheckCircle2, Mail, KeyRound, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
-import { PwaInstallCard } from "@/components/PwaInstallCard";
+import { LojasCard } from "@/components/LojasCard";
 import { isNativeShell } from "@/lib/native-shell";
 
 /** /bem-vindo — recepção de quem PAGOU (15/07). Destino do e-mail de
@@ -68,7 +68,7 @@ const BemVindoWeb = () => {
                 Abrir meu CORE <ArrowRight className="w-4 h-4 ml-1" />
               </Button>
             </div>
-            <PwaInstallCard variant="welcome" />
+            <LojasCard variant="welcome" />
           </div>
         ) : (
           <>

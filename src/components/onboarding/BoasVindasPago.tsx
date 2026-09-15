@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check } from "lucide-react";
+import { BotoesDasLojas } from "@/components/LojasCard";
+import { isNativeShell } from "@/lib/native-shell";
 import { Button } from "@/components/ui/button";
 import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
@@ -170,11 +172,31 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
               : <>O CORE inteiro é seu. Vamos começar pelo que mais pesa hoje.</>}
           </motion.p>
 
+          {/* WEB, logo depois de pagar (15/09): a maior causa de reembolso na
+              web é a pessoa achar que comprou "um site". É aqui, no segundo
+              em que ela acabou de pagar, que tem que ver as duas lojas e
+              "mesma conta, sem pagar de novo". No app das lojas não aparece. */}
+          {!isNativeShell() && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.4 }}
+              className="relative mt-7 max-w-[330px] w-full mx-auto rounded-2xl border border-border bg-card/80 p-4 text-left"
+              data-testid="lojas-pos-compra"
+            >
+              <p className="text-[13px] font-bold text-foreground">Baixa o app no celular</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 mb-3 leading-snug">
+                O CORE está na App Store e no Google Play. Entra com o mesmo e-mail — sua compra já está lá.
+              </p>
+              <BotoesDasLojas origem="pos_compra" />
+            </motion.div>
+          )}
+
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7, duration: 0.4 }}
-            className="relative mt-11 max-w-[330px] w-full mx-auto"
+            className="relative mt-6 max-w-[330px] w-full mx-auto"
           >
             <Button
               onClick={seguir}

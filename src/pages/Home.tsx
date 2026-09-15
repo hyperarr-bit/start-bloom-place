@@ -3,7 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { useUserData } from "@/hooks/use-user-data";
 import { AnimatePresence, motion } from "framer-motion";
 import { Plus, LayoutGrid } from "lucide-react";
-import { PwaInstallCard } from "@/components/PwaInstallCard";
+import { LojasCard } from "@/components/LojasCard";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
 import { QuickStartOnboarding, ModuleKey } from "@/components/onboarding/QuickStartOnboarding";
@@ -314,7 +314,10 @@ const HomePage = () => {
               <CelebracaoDia100 score={lifeData.dayScore} streak={lifeData.streak} />
             </div>
 
-            <PwaInstallCard variant="home" />
+            {/* 15/09: era o convite de PWA ("instale na tela inicial") — que fazia
+                quem comprou na web achar que o CORE era só um site, e pedia
+                reembolso. Agora aponta pras lojas de verdade. */}
+            <LojasCard variant="home" />
 
             <div>
               <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Ações rápidas</h3>

@@ -547,8 +547,16 @@ const TRUST_CHIPS_IOS = [
   { emoji: "♾️", label: "Sem mensalidade" },
 ];
 
+/** WEB (15/09): quem compra no site precisa saber ANTES de pagar que o CORE
+ *  é app das lojas — a maior causa de reembolso na web era descobrir depois
+ *  que "era só um site". Chip só na web: no app das lojas é redundante. */
+const TRUST_CHIPS_WEB = [
+  { emoji: "📱", label: "App na App Store e no Google Play" },
+  ...TRUST_CHIPS,
+];
+
 export function TrustChips() {
-  const chips = ehApple() ? TRUST_CHIPS_IOS : TRUST_CHIPS;
+  const chips = ehApple() ? TRUST_CHIPS_IOS : isNativeShell() ? TRUST_CHIPS : TRUST_CHIPS_WEB;
   return (
     <div className="flex items-center justify-center gap-2 flex-wrap">
       {chips.map((c) => (

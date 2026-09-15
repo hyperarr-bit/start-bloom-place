@@ -90,6 +90,14 @@ const welcomeHtml = (firstName: string | null, email: string, acessarUrl: string
       <tr><td align="center" style="padding:24px 28px 8px;">
         <a href="${acessarUrl}" style="display:block;background:#1f9d55;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:15px 24px;border-radius:999px;">Acessar o CORE agora →</a>
       </td></tr>
+      <tr><td style="padding:0 28px 8px;">
+        <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#211d18;"><b>O CORE é app de celular também.</b> Baixa na loja e entra com o mesmo e-mail e senha — sua compra já está lá, sem pagar de novo:</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 6px;"><tr>
+          <td style="padding:0 8px 0 0;"><a href="https://apps.apple.com/br/app/id6806913181" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#63743; App Store</a></td>
+          <td><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_email" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#9654; Google Play</a></td>
+        </tr></table>
+        <p style="margin:0;font-size:12px;color:#8a8378;">No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
+      </td></tr>
       <tr><td align="center" style="padding:6px 28px 24px;">
         <p style="margin:0;font-size:13px;color:#5c5245;">Esqueceu a senha? <a href="${resetUrl}" style="color:#1f9d55;font-weight:700;">Redefina em 30 segundos</a></p>
       </td></tr>

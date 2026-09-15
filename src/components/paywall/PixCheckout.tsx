@@ -121,7 +121,19 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
 /* 07/09 10h40 — VOLTA PRO ASAAS (ordem do dono: "volta pra asaas e 97,90, vou
  * focar no app store e play"). Medido em 13h de Cakto: a tela do CPF que ela
  * exige derrubou QR/abertura de 100% pra 50%, sem nenhum erro de gateway. */
-const FORCE_GATEWAY: Gateway | null = "asaas";
+/* 15/09 — TESTE LIMPO DA CAKTO A PARTIR DA MEIA-NOITE (ordem do dono: "muda
+ * pra cakto à meia-noite pra nós fazer um teste limpo"). Antes da virada o
+ * braço segue Asaas; a partir de 00:00 BRT de 16/09 vira Cakto pra todo
+ * mundo, sem deploy na madrugada. Rollback = GATEWAY_DEPOIS "asaas" + push.
+ * O que a Cakto NÃO dispensa: o CPF. A API dela devolve 400 sem docNumber
+ * (13/07) e recusa o coringa 00000000000 (06/09); CPF inventado é nota
+ * fiscal no nome de outra pessoa — não. O que dá pra tirar é o resto: o form
+ * dela agora é UM campo (CPF), nome sai do cadastro/servidor. */
+const GATEWAY_ANTES: Gateway = "asaas";
+const GATEWAY_DEPOIS: Gateway = "cakto";
+const VIRADA_GATEWAY = Date.parse("2026-09-16T03:00:00Z"); // 00:00 BRT de 16/09
+const forceGateway = (): Gateway | null => (Date.now() >= VIRADA_GATEWAY ? GATEWAY_DEPOIS : GATEWAY_ANTES);
+export const gatewayDaWebAgora = forceGateway;
 const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
 
 const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
@@ -136,7 +148,8 @@ const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
     const t = sessionStorage.getItem("pix-gw-teste");
     if (t === "asaas" || t === "pagarme" || t === "abacate" || t === "cakto") return t;
   } catch { /* noop */ }
-  if (FORCE_GATEWAY) return FORCE_GATEWAY;
+  const forcado = forceGateway();
+  if (forcado) return forcado;
   try {
     const f = localStorage.getItem("pix-ab-force");
     if (f === "asaas" || f === "pagarme" || f === "abacate" || f === "cakto") return f;
@@ -830,7 +843,10 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     mais custa venda. O nome sai do cadastro (e o servidor tem
                     fallback), então some daqui. Autofocus abre o teclado
                     numérico sozinho: a pessoa já chega digitando. */}
-                {!v2 && braco !== "pagarme" && (
+                {/* 15/09: na Cakto também é UM campo — o nome vem do cadastro ou
+                    do servidor (fallback), e cada campo a mais nesta tela custa
+                    venda (07/09: a tela do CPF derrubou QR/abertura de 100% pra 50%). */}
+                {!v2 && braco !== "pagarme" && braco !== "cakto" && (
                   <IconInput Icon={User} placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
                 )}
                 <IconInput

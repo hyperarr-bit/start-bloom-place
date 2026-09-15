@@ -5,11 +5,11 @@ import { ArrowLeft, Check, Crown, ShieldCheck, Loader2, CalendarClock, ExternalL
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
-import { initRevenueCat, restaurar } from "@/lib/revenuecat";
+import { initRevenueCat, restaurar, abrirResgateApple } from "@/lib/revenuecat";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
 import { estadoTeste } from "@/lib/teste-gratis";
-import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura } from "@/lib/loja";
+import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura, ehApple } from "@/lib/loja";
 
 /**
  * "MEU ACESSO" DO APP — a /planos do shell nativo (24/07).
@@ -269,11 +269,27 @@ const PlanosApp = () => {
           {msg && <p className="text-[11px] text-muted-foreground">{msg}</p>}
           {/* "Segue e ganha 7 dias" (14/09) — conta já existe: resgata na hora
               e recarrega, que o gate lê o check-subscription de novo. */}
-          <EntradaDeCodigo
-            modo="resgatar"
-            className="mx-auto max-w-xs"
-            onOk={() => { trackEvent("app_codigo_planos_ok", {}); window.location.href = "/"; }}
-          />
+          {ehApple() ? (
+            /* iPhone: Offer Code da Apple (INSTA7) pela folha do sistema; o
+               "Restaurar compras" logo acima é o que confere depois. */
+            <button
+              type="button"
+              className="text-[12px] font-semibold text-muted-foreground underline underline-offset-2"
+              onClick={async () => {
+                trackEvent("app_codigo_planos_apple", {});
+                const abriu = await abrirResgateApple();
+                setMsg(abriu ? "Resgatou? Toca em «Restaurar compras» pra liberar." : "Não consegui abrir o resgate agora.");
+              }}
+            >
+              Tenho um código
+            </button>
+          ) : (
+            <EntradaDeCodigo
+              modo="resgatar"
+              className="mx-auto max-w-xs"
+              onOk={() => { trackEvent("app_codigo_planos_ok", {}); window.location.href = "/"; }}
+            />
+          )}
           <p className="text-[11px] text-muted-foreground">
             <a href="/privacidade" className="underline underline-offset-2">Política de privacidade</a>
             {" · "}

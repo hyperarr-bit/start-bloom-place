@@ -184,6 +184,8 @@ export function PaywallIOS({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [resgatouCodigo, setResgatouCodigo] = useState(false);
+
   const confirmarPagamento = async () => {
     setConferindo(true);
     try {
@@ -309,6 +311,38 @@ export function PaywallIOS({
             ))}
           </div>
         </motion.div>
+
+        {/* "Segue e ganha 7 dias" (14/09): no iPhone o código é um Offer Code
+            da própria Apple (INSTA7, 1 semana grátis no mensal) e a folha de
+            resgate é do sistema — dentro da 3.1.1. A folha não avisa quando
+            fecha; "Já resgatei" confere pelo restaurar (mesmo caminho do
+            "Já paguei"). */}
+        <div className="text-center pt-3 space-y-1.5">
+          <button
+            type="button"
+            className="text-[12px] font-semibold text-muted-foreground underline underline-offset-2"
+            data-testid="ios-tenho-codigo"
+            onClick={async () => {
+              trackEvent("funnel_click", { cta: "ios_codigo_abrir", funil: "ios" });
+              const rc = await import("@/lib/revenuecat");
+              const abriu = await rc.abrirResgateApple();
+              if (abriu) setResgatouCodigo(true);
+              else setErro("Não consegui abrir o resgate. Tenta de novo em alguns segundos.");
+            }}
+          >
+            Tenho um código
+          </button>
+          {resgatouCodigo && (
+            <button
+              type="button"
+              className="block w-full text-center text-[12.5px] font-bold underline underline-offset-2 disabled:opacity-50"
+              disabled={conferindo}
+              onClick={() => void confirmarPagamento()}
+            >
+              {conferindo ? "Conferindo…" : "Já resgatei — continuar"}
+            </button>
+          )}
+        </div>
 
         {/* Restaurar compras (3.1.1) + Termos e Privacidade (3.1.2). Sem isto
             este paywall reprova, e ele é a primeira tela de um iPhone novo. */}

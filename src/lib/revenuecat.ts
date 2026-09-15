@@ -806,6 +806,24 @@ export async function compraVitaliciaLocal(): Promise<boolean> {
 }
 
 /** Restaurar compras (obrigatório de loja — botão no paywall). */
+/**
+ * Folha de resgate de código de oferta da APPLE (14/09, "segue e ganha 7
+ * dias" no iPhone). A Apple proíbe destravar por código próprio (3.1.1),
+ * mas o Offer Code dela é o caminho oficial: o código INSTA7 vive no App
+ * Store Connect (1 semana grátis no mensal) e a folha é do sistema. Depois
+ * que a pessoa resgata, a assinatura aparece no restaurar()/sincronizar —
+ * a folha não avisa quando fecha, então quem chama mostra "Já resgatei".
+ */
+export async function abrirResgateApple(): Promise<boolean> {
+  if (!configurado || !Purchases) return false;
+  try {
+    await (Purchases as NonNullable<typeof Purchases>).presentCodeRedemptionSheet();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function restaurar(): Promise<boolean> {
   // v83: restaurar é exigência de loja — não pode depender de offerings.
   if (!configurado || !Purchases) return false;

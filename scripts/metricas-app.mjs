@@ -358,7 +358,7 @@ const cancelou = noPeriodo.filter(
 
 // ---- dinheiro (fonte da verdade)
 const vendas = await buscar("subscriptions", {
-  select: "created_at,customer_email,amount_cents,revenuecat_subscription_id,user_id,payment_method",
+  select: "created_at,customer_email,amount_cents,revenuecat_subscription_id,user_id,payment_method,current_period_start,current_period_end",
   "created_at": `gte.${INICIO}`,
   order: "created_at.asc",
 }, token);
@@ -366,7 +366,17 @@ const vendas = await buscar("subscriptions", {
 // R$0 — não é venda; conta à parte lá embaixo
 const noPer = vendas.filter((v) => v.created_at < FIM && v.payment_method !== "codigo");
 const codigos = vendas.filter((v) => v.created_at < FIM && v.payment_method === "codigo");
-const vendasApp = noPer.filter((v) => v.revenuecat_subscription_id);
+// Trial de loja (Offer Code da Apple "INSTA7" = 1 semana grátis no mensal,
+// 14/09; o Play já teve o de 7 dias em agosto) chega como linha com o preço
+// do produto e período < 10 dias — a mesma régua do meta-backfill-app. Não
+// é dinheiro ainda: conta à parte, entra na receita quando o período alonga.
+const ehTrial = (v) => {
+  const ini = v.current_period_start ? Date.parse(v.current_period_start) : NaN;
+  const fim = v.current_period_end ? Date.parse(v.current_period_end) : NaN;
+  return Number.isFinite(ini) && Number.isFinite(fim) && fim - ini < 10 * 86400_000;
+};
+const trials = noPer.filter((v) => v.revenuecat_subscription_id && ehTrial(v));
+const vendasApp = noPer.filter((v) => v.revenuecat_subscription_id && !ehTrial(v));
 const vendasWeb = noPer.filter((v) => !v.revenuecat_subscription_id);
 
 /*
@@ -513,6 +523,7 @@ for (const v of vendasApp) {
 }
 L(`   WEB: ${vendasWeb.length} vendas · ${reais(vendasWeb.reduce((t, v) => t + (v.amount_cents ?? 0), 0) / 100)}`);
 if (codigos.length) L(`   CÓDIGO (7 dias grátis, R$0): ${codigos.length} resgate(s) — não entram na receita`);
+if (trials.length) L(`   TRIAL DE LOJA (7 dias grátis, cobra no dia 8): ${trials.length} iniciado(s) — não entram na receita`);
 const semEvento = vendasApp.length - alcancou.pagou;
 if (semEvento > 0) {
   L(`   ⚠ ${semEvento} venda(s) do app não emitiram evento de sucesso na telemetria`);

@@ -168,6 +168,12 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
       };
     })(),
     "saude-fast-goal": 14,
+    // 15/09: substitutos por refeição (11/09) — o "❌ comi outra coisa" vira "Comi: X"
+    "dieta-substitutos": {
+      Almoço: ["Salada de atum com arroz", "Wrap de frango com folhas"],
+      Lanche: ["Banana com pasta de amendoim", "Ovo cozido + fruta"],
+      Janta: ["Sopa de legumes com frango"],
+    },
     "dieta-recipes-v2": [
       { id: "1", name: "Panqueca de banana fit", ingredients: "1 banana, 2 ovos, aveia, canela", instructions: "Amassa, mistura e frigideira em fogo baixo.", category: "Café", favorite: true, prepTime: "10 min", servings: "2" },
       { id: "2", name: "Frango cremoso rápido", ingredients: "Frango desfiado, requeijão light, milho", instructions: "Refoga tudo e finaliza no forno.", category: "Almoço", favorite: false, prepTime: "25 min", servings: "3" },
@@ -202,6 +208,15 @@ export const PREVIEW_SEEDS: Record<string, Record<string, any>> = {
     },
     "saude-bmi-height": "178",
     "saude-bmi-weight": "76.4",
+    // 15/09: exames e documentos (11/09 entraram fotos de exame e receituário)
+    "core-saude-exams-v2": [
+      { id: "1", name: "Hemograma completo", date: daysAgo(12), time: "07:30", location: "Lab. Central", notes: "Ferritina 48 · Vitamina D 31 — repetir em 6 meses", done: true, fotos: [] },
+      { id: "2", name: "Check-up cardiológico", date: daysAgo(-9), time: "09:00", location: "Clínica Vida", notes: "Jejum de 8h", done: false, fotos: [] },
+    ],
+    "core-saude-documentos": [
+      { id: "1", tipo: "receita", titulo: "Receita — Vitamina D 2000UI", date: daysAgo(12), notes: "1 cápsula por dia, com o café. Válida por 6 meses.", fotos: [] },
+      { id: "2", tipo: "atestado", titulo: "Atestado — 2 dias", date: daysAgo(30), notes: "Gripe. Entregue no RH.", fotos: [] },
+    ],
   },
   desenvolvimento: {
     ...COMMON,

@@ -476,7 +476,9 @@ const Index = () => {
                 {/* Antes de tudo porque muda o significado de todo número
                     abaixo. Some inteiro pra quem não tem empresa — vira um
                     link de uma linha (ver o componente). */}
-                {!isPreview && (
+                {/* 15/09: a demo tem um perfil de empresa semeado — mostra o
+                    seletor pra quem visita ver que existe PF × PJ. */}
+                {(!isPreview || perfis.length > 0) && (
                   <SeletorDePerfil
                     perfis={perfis}
                     setPerfis={setPerfis}

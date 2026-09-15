@@ -47,6 +47,10 @@ const INSTALLMENT = (paid: number) => [{
 }];
 
 export const FINANCAS_SEED: Record<string, any> = {
+  // 15/09: um perfil de empresa ao lado do pessoal (09/09: PF × PJ) — a demo
+  // mostra o seletor; os lançamentos seguem no pessoal.
+  "finance-perfis": [{ id: "pj-demo", nome: "Minha empresa" }],
+  "finance-perfil-ativo": "pessoal",
   "finance-last-seen-month": "Julho-2026",
   "finance-streak": 41,
   "finance-lastCheckIn": "2026-07-06",

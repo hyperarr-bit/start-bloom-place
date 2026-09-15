@@ -202,8 +202,9 @@ export async function entrarComApple(): Promise<{ error: { message: string } | n
   } catch (e) {
     const m = (e as { message?: string })?.message ?? "";
     // Cancelar é decisão, não falha: não vira mensagem de erro na tela.
-    if (/cancel/i.test(m)) return { error: null };
-    return { error: { message: "Não consegui abrir o login da Apple." } };
+    // 1001 = ASAuthorizationError.canceled; a mensagem vem localizada, sem "cancel"
+    if (/cancel|1001/i.test(m)) return { error: null };
+    return { error: { message: "Não deu pra entrar com a Apple agora. Usa o e-mail — sem senha, com o código." } };
   }
 }
 

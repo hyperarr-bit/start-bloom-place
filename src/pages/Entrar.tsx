@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { entrarComGoogle, entrarComApple } from "@/lib/auth-nativo";
+import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { ehApple } from "@/lib/loja";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -283,6 +284,15 @@ const Entrar = () => {
             )}
           </Button>
         </form>
+
+        {/* 15/09: sem senha — código por e-mail, dentro do app. Aparece assim
+            que a pessoa digita um e-mail; é a porta de quem esqueceu a senha
+            e não quer sair pro navegador (ver EntrarComCodigo). */}
+        {/\S+@\S+\.\S+/.test(email) && (
+          <div className="mt-3">
+            <EntrarComCodigo email={email} funil="entrar" onSession={() => { trackEvent("login_completed", { method: "codigo_email", source: "email_access" }); navigate("/home"); }} />
+          </div>
+        )}
 
         {/* Quem criou a conta com Google não tem senha — precisa desta porta.
             Escondido em webview (Instagram/Gmail in-app) porque o OAuth quebra lá.

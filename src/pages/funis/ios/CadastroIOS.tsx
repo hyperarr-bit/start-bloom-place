@@ -43,6 +43,7 @@ import { getAuthRedirectUrl } from "@/lib/utils";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { AREA_TUTORIAL, FUNNEL_AREA_KEY, type AreaKey } from "@/lib/funnel";
 import { BoasVindasPago } from "@/components/onboarding/BoasVindasPago";
+import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 
 
 /* Glifo oficial da Apple: as diretrizes de marca não aceitam emoji nem ícone
@@ -295,9 +296,14 @@ export function SignupIOS({
                 : <>Criar minha conta <ArrowRight className="w-4 h-4" /></>}
         </Button>
         {existingAccount && (
-          <button type="button" onClick={recuperarSenha} className="block mx-auto text-[12.5px] text-muted-foreground underline underline-offset-2">
-            Esqueci minha senha
-          </button>
+          <>
+            {/* 15/09: sem senha e sem provedor — código por e-mail, dentro do
+                app. Foi o que faltou pra quem pagou às 11:51 e ficou fora. */}
+            <EntrarComCodigo email={email} funil="ios" onSession={() => { trackEvent("funnel_click", { cta: "signup_success", via: "codigo_email_existente", funil: "ios", pos_compra: !!posCompra }); onSession(); }} />
+            <button type="button" onClick={recuperarSenha} className="block mx-auto text-[12.5px] text-muted-foreground underline underline-offset-2">
+              Esqueci minha senha
+            </button>
+          </>
         )}
       </form>
 

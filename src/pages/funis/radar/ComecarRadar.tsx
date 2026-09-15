@@ -31,6 +31,7 @@ import {
 } from "@/lib/funnel";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { agendarResgateDoPlano, cancelarResgateDoPlano } from "@/lib/notificacoes";
+import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 
 // Marca que o OAuth partiu do funil: o /auth/callback lê isso pra devolver o
 // usuário NOVO pro paywall do funil (em vez de pular direto pro app).
@@ -1321,9 +1322,14 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
                 : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
         </Button>
         {existingAccount && (
-          <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
-            Esqueci minha senha
-          </button>
+          <>
+            {/* 15/09: código por e-mail, sem senha e sem sair do app — ver
+                EntrarComCodigo (caso real do iPhone que pagou e ficou fora). */}
+            <EntrarComCodigo email={email} funil="w" onSession={onSession} />
+            <button type="button" onClick={handleForgotPassword} className="w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors">
+              Esqueci minha senha
+            </button>
+          </>
         )}
       </form>
       <div className="mt-5"><TrustRow posCompra={posCompra} /></div>

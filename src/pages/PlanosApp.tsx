@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
+import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
 import { estadoTeste } from "@/lib/teste-gratis";
 import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura } from "@/lib/loja";
 
@@ -266,6 +267,13 @@ const PlanosApp = () => {
             {restaurando ? "Restaurando…" : "Restaurar compras"}
           </button>
           {msg && <p className="text-[11px] text-muted-foreground">{msg}</p>}
+          {/* "Segue e ganha 7 dias" (14/09) — conta já existe: resgata na hora
+              e recarrega, que o gate lê o check-subscription de novo. */}
+          <EntradaDeCodigo
+            modo="resgatar"
+            className="mx-auto max-w-xs"
+            onOk={() => { trackEvent("app_codigo_planos_ok", {}); window.location.href = "/"; }}
+          />
           <p className="text-[11px] text-muted-foreground">
             <a href="/privacidade" className="underline underline-offset-2">Política de privacidade</a>
             {" · "}

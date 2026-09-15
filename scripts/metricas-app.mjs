@@ -358,11 +358,14 @@ const cancelou = noPeriodo.filter(
 
 // ---- dinheiro (fonte da verdade)
 const vendas = await buscar("subscriptions", {
-  select: "created_at,customer_email,amount_cents,revenuecat_subscription_id,user_id",
+  select: "created_at,customer_email,amount_cents,revenuecat_subscription_id,user_id,payment_method",
   "created_at": `gte.${INICIO}`,
   order: "created_at.asc",
 }, token);
-const noPer = vendas.filter((v) => v.created_at < FIM);
+// acesso por código ("segue e ganha 7 dias", 14/09) mora na mesma tabela com
+// R$0 — não é venda; conta à parte lá embaixo
+const noPer = vendas.filter((v) => v.created_at < FIM && v.payment_method !== "codigo");
+const codigos = vendas.filter((v) => v.created_at < FIM && v.payment_method === "codigo");
 const vendasApp = noPer.filter((v) => v.revenuecat_subscription_id);
 const vendasWeb = noPer.filter((v) => !v.revenuecat_subscription_id);
 
@@ -509,6 +512,7 @@ for (const v of vendasApp) {
   }
 }
 L(`   WEB: ${vendasWeb.length} vendas · ${reais(vendasWeb.reduce((t, v) => t + (v.amount_cents ?? 0), 0) / 100)}`);
+if (codigos.length) L(`   CÓDIGO (7 dias grátis, R$0): ${codigos.length} resgate(s) — não entram na receita`);
 const semEvento = vendasApp.length - alcancou.pagou;
 if (semEvento > 0) {
   L(`   ⚠ ${semEvento} venda(s) do app não emitiram evento de sucesso na telemetria`);

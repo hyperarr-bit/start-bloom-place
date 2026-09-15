@@ -24,6 +24,7 @@ import { APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, pelaLoja, temEscadaPix, formasDePagamento, erroFolhaNaoConcluiu, avisoRenovacao } from "@/lib/loja";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 import { PixCheckout } from "@/components/paywall/PixCheckout";
+import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
 import { trackEvent } from "@/lib/analytics";
 import { AREAS, type AreaKey } from "@/lib/funnel";
 import { CHAVES_FUNIL_W, guardarChave, lerChave, ehPerfilSimples } from "@/pages/funis/w/retomada";
@@ -586,6 +587,21 @@ export function PaywallW({
           </div>
         </div>
         <motion.div {...stagger(4)}><TrustChips /></motion.div>
+
+        {/* "Segue e ganha 7 dias" (14/09): quem veio do Instagram com código
+            entra por aqui. Só confere e guarda — a conta ainda não existe;
+            o resgate de verdade acontece no "Liberando", depois do cadastro.
+            Some no iPhone (a Apple proíbe destravar por código próprio). */}
+        <div className="text-center pt-3">
+          <EntradaDeCodigo
+            modo="validar"
+            className="mx-auto max-w-xs"
+            onOk={(dias) => {
+              trackEvent("funnel_click", { cta: "w_codigo_ok", funil: "w", dias });
+              onPagoSemConta();
+            }}
+          />
+        </div>
 
         {/*
           RODAPÉ LEGAL — SÓ no iPhone, e não é enfeite: sem ele a Apple

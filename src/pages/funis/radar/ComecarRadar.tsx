@@ -1400,6 +1400,17 @@ export function LiberandoScreen() {
     let vivo = true;
     const t = setTimeout(() => { if (vivo) setDemorou(true); }, 9000);
     (async () => {
+      // CÓDIGO (14/09, "segue e ganha 7 dias"): a pessoa não pagou — validou
+      // um código no paywall e a conta acabou de nascer. Troca o código pelo
+      // acesso e pula a loja: não há compra pra sincronizar.
+      const { resgatarPendente } = await import("@/lib/codigo-promo");
+      const codigo = await resgatarPendente();
+      if (codigo) {
+        try { await supabase.functions.invoke("check-subscription"); } catch { /* melhor esforço */ }
+        trackEvent("app_pos_compra_liberado", { ok: codigo.ok, codigo: true, erro: codigo.erro ?? "" });
+        if (vivo) setPronto(true);
+        return;
+      }
       // WEB (02/09): não há loja nem RevenueCat — a compra foi confirmada no
       // Pix e o webhook já gravou o acesso. Aqui era 3× revenuecat-sync com
       // backoff = 11,8s de "Guardando seu acesso…" pra nada (15/15 ok=false).

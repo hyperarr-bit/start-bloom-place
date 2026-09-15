@@ -99,8 +99,12 @@ serve(async (req) => {
       // acesso de graça (25/07).
       const msSinceExpiry = now.getTime() - endDate.getTime();
       const daysSinceExpiry = msSinceExpiry / (1000 * 60 * 60 * 24);
+      // Acesso por código ("segue e ganha 7 dias", 14/09) também não: os 7
+      // dias são os 7 dias — grace viraria 14 sem ninguém ter decidido isso.
       const semGrace =
-        localSub.status === "cancel_scheduled" || localSub.payment_method === "play_store";
+        localSub.status === "cancel_scheduled" ||
+        localSub.payment_method === "play_store" ||
+        localSub.payment_method === "codigo";
 
       if (!semGrace && daysSinceExpiry <= GRACE_PERIOD_DAYS) {
         const graceDaysLeft = Math.max(0, Math.ceil(GRACE_PERIOD_DAYS - daysSinceExpiry));

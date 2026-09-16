@@ -177,6 +177,39 @@ export const FINANCAS_SEED: Record<string, any> = {
     "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
   ].map((month) => ({ month, value: 4800, hasNote: false })),
 
+  // 16/09: AGOSTO e JULHO arquivados. A demo nasceu em julho e os meses
+  // anteriores pararam em junho — em setembro a Comparação Mensal abria
+  // "ago/2026: R$ 0" pra todo visitante do funil. Espelham junho com
+  // pequenas variações, pra comparação e gráficos terem o mês anterior real.
+  "finance-2026-agosto-incomes": [
+    { id: "ago-i1", date: "2026-08-01", value: 6200, description: "Salário" },
+  ],
+  "finance-2026-agosto-fixed": FIXED("ago"),
+  "finance-2026-agosto-expenses": [
+    { id: "ago-e1", date: "2026-08-02", value: 640, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
+    { id: "ago-e2", date: "2026-08-06", value: 112, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
+    { id: "ago-e3", date: "2026-08-09", value: 131, category: "transporte", description: "Uber", paymentMethod: "pix" },
+    { id: "ago-e4", date: "2026-08-13", value: 168, category: "restaurante", description: "Jantar fora", paymentMethod: "credito", cardName: "nubank" },
+    { id: "ago-e5", date: "2026-08-16", value: 62, category: "lazer", description: "Cinema", paymentMethod: "pix" },
+    { id: "ago-e6", date: "2026-08-19", value: 89, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
+    { id: "ago-e7", date: "2026-08-23", value: 74, category: "alimentacao", description: "Padaria", paymentMethod: "pix" },
+    { id: "ago-e8", date: "2026-08-27", value: 95, category: "pets", description: "Petshop", paymentMethod: "pix" },
+  ],
+  "finance-2026-agosto-installments": INSTALLMENT(9),
+  "finance-2026-julho-incomes": [
+    { id: "jul-i1", date: "2026-07-01", value: 6200, description: "Salário" },
+  ],
+  "finance-2026-julho-fixed": FIXED("jul"),
+  "finance-2026-julho-expenses": [
+    { id: "jul-e1", date: "2026-07-03", value: 598, category: "alimentacao", description: "Mercado do mês", paymentMethod: "pix" },
+    { id: "jul-e2", date: "2026-07-08", value: 84, category: "delivery", description: "iFood", paymentMethod: "credito", cardName: "nubank" },
+    { id: "jul-e3", date: "2026-07-11", value: 122, category: "transporte", description: "Uber", paymentMethod: "pix" },
+    { id: "jul-e4", date: "2026-07-15", value: 139, category: "restaurante", description: "Jantar fora", paymentMethod: "credito", cardName: "nubank" },
+    { id: "jul-e5", date: "2026-07-21", value: 58, category: "farmacia", description: "Farmácia", paymentMethod: "pix" },
+    { id: "jul-e6", date: "2026-07-26", value: 110, category: "vestuario", description: "Tênis", paymentMethod: "debito", cardName: "inter" },
+  ],
+  "finance-2026-julho-installments": INSTALLMENT(8),
+
   // --------------------------------------- meses anteriores (junho / maio)
   // Alimentam o gráfico Receitas vs Despesas, a Evolução do Patrimônio e a
   // Comparação Mensal (todos leem estas chaves, não o array do mês atual).

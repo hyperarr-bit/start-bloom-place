@@ -151,6 +151,20 @@ export const bracoDaPorta = (): "a" | "b" => {
 };
 
 function PortaW({ onPickArea, onBack, totalPassos, contexto }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number; contexto?: boolean }) {
+  /* MEDIÇÃO DA PORTA (16/09). Só 5 de 59 "start" da tarde vinham pelo ramo
+   * do anúncio — a maioria chega na porta pela troca de passo (welcome →
+   * porta). Então a régua do A/B mora AQUI, no mount da tela, e vale pra
+   * todo caminho: `porta_vista` com o braço, e `porta_viva` 4 s depois se a
+   * aba continua visível (separa humano de pré-carga). */
+  useEffect(() => {
+    const braco = contexto ? "b" : "a";
+    trackEvent("funnel_view", { step: "porta_vista", funil: FUNIL, porta: braco, visivel: typeof document !== "undefined" ? document.visibilityState : "?" });
+    const t = window.setTimeout(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") trackEvent("funnel_view", { step: "porta_viva", funil: FUNIL, porta: braco });
+    }, 4000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
       {contexto && (
@@ -440,17 +454,7 @@ export default function ComecarW() {
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
       const visivel = typeof document !== "undefined" ? document.visibilityState : "?";
-      trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio", visivel, porta: naWeb ? bracoDaPorta() : "app" });
-      /* PORTA VIVA (16/09). Medido 09→15/09: 57% das sessões da web têm UM
-       * evento só (o start) e duração 0 s — não dá pra saber se é gente que
-       * bateu o olho e saiu ou carregamento sem ninguém (pré-carga do
-       * navegador do Instagram). Este evento sai só se a aba está VISÍVEL
-       * 4 s depois: é a régua de "humano viu a porta". */
-      window.setTimeout(() => {
-        if (typeof document !== "undefined" && document.visibilityState === "visible") {
-          trackEvent("funnel_view", { step: "porta_viva", funil: FUNIL });
-        }
-      }, 4000);
+      trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio", visivel });
     } else if (step !== "welcome") {
       // retomada depois de reinício (<6h) ou VOLTA (dias depois, 04/09) —
       // medível separado da welcome ("offer" só como funnel_retomada: o

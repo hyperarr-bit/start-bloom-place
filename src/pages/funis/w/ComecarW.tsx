@@ -401,7 +401,18 @@ export default function ComecarW() {
       trackEvent(s === "offer" ? "funnel_retomada" : "funnel_view", { step: s, funil: FUNIL, retomada: true });
     } else if (step === "porta") {
       // clique pago na web caiu direto na porta — o "start" do funil
-      trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio" });
+      const visivel = typeof document !== "undefined" ? document.visibilityState : "?";
+      trackEvent("funnel_view", { step: "start", funil: FUNIL, entrada: "anuncio", visivel });
+      /* PORTA VIVA (16/09). Medido 09→15/09: 57% das sessões da web têm UM
+       * evento só (o start) e duração 0 s — não dá pra saber se é gente que
+       * bateu o olho e saiu ou carregamento sem ninguém (pré-carga do
+       * navegador do Instagram). Este evento sai só se a aba está VISÍVEL
+       * 4 s depois: é a régua de "humano viu a porta". */
+      window.setTimeout(() => {
+        if (typeof document !== "undefined" && document.visibilityState === "visible") {
+          trackEvent("funnel_view", { step: "porta_viva", funil: FUNIL });
+        }
+      }, 4000);
     } else if (step !== "welcome") {
       // retomada depois de reinício (<6h) ou VOLTA (dias depois, 04/09) —
       // medível separado da welcome ("offer" só como funnel_retomada: o

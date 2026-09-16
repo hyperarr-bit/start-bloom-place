@@ -17,17 +17,22 @@ describe("agenda dos cartões", () => {
     expect(vencimento(cartao("1", "2026-09-10"), { "1": { proxima: "2026-09-20", degrau: 2, vezes: 2 } })).toBe("2026-09-20");
   });
 
-  it("lembrou sobe um degrau (1→3→7…); não lembrou volta pro 1; o topo é 120", () => {
-    let e = responder(undefined, true, "2026-09-11");
-    expect(e).toEqual({ proxima: "2026-09-12", degrau: 0, vezes: 1 });
-    e = responder(e, true, "2026-09-12");
-    expect(e.proxima).toBe("2026-09-15"); expect(e.degrau).toBe(1);
-    e = responder(e, true, "2026-09-15");
-    expect(e.proxima).toBe("2026-09-22"); expect(e.degrau).toBe(2);
-    e = responder(e, false, "2026-09-22");
-    expect(e).toEqual({ proxima: "2026-09-23", degrau: 0, vezes: 4 });
-    let topo = responder(undefined, true, "2026-01-01");
-    for (let i = 0; i < 20; i++) topo = responder(topo, true, topo.proxima);
+  it("Lembrei → 7 dias, depois 14, 30…; Quase → 3 dias; Não → amanhã; o topo é 120", () => {
+    let e = responder(undefined, "sim", "2026-09-11");
+    expect(e).toEqual({ proxima: "2026-09-18", degrau: 2, vezes: 1 });
+    e = responder(e, "sim", "2026-09-18");
+    expect(e.proxima).toBe("2026-10-02"); expect(e.degrau).toBe(3);
+    e = responder(e, "quase", "2026-10-02");
+    expect(e.proxima).toBe("2026-10-05"); expect(e.degrau).toBe(1);
+    e = responder(e, "sim", "2026-10-05");
+    expect(e.proxima).toBe("2026-10-12"); expect(e.degrau).toBe(2);
+    e = responder(e, "nao", "2026-10-12");
+    expect(e).toEqual({ proxima: "2026-10-13", degrau: 0, vezes: 5 });
+    // chamadas antigas com booleano continuam valendo
+    expect(responder(undefined, true, "2026-09-11").degrau).toBe(2);
+    expect(responder(undefined, false, "2026-09-11").degrau).toBe(0);
+    let topo = responder(undefined, "sim", "2026-01-01");
+    for (let i = 0; i < 20; i++) topo = responder(topo, "sim", topo.proxima);
     expect(topo.degrau).toBe(INTERVALOS_DIAS.length - 1);
   });
 
@@ -60,27 +65,31 @@ describe("RevisaoDoDia", () => {
   ] };
   const cursos = [{ id: "c1", name: "Cálculo I" }];
 
-  it("frente → mostrar resposta → verso com o aprendizado → Lembrei chama onResponder e passa pro próximo; no fim, resumo", () => {
-    const respostas: [string, boolean][] = [];
-    const { rerender } = render(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={{}} onResponder={(id, ok) => respostas.push([id, ok])} />);
+  it("frente → mostrar resposta → verso com o aprendizado → Lembrei/Quase/Não chamam onResponder; no fim, resumo", () => {
+    const respostas: [string, string][] = [];
+    const { rerender } = render(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={{}} onResponder={(id, r) => respostas.push([id, r])} />);
     expect(screen.getByText("1 de 2")).toBeInTheDocument();
     expect(screen.getByText("O que é derivada?")).toBeInTheDocument();
+    // a resposta fica ESCONDIDA até a tentativa de lembrar (active recall)
     expect(screen.queryByText("Derivada é taxa de variação")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Lembrei/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Mostrar resposta" }));
     expect(screen.getByText("Derivada é taxa de variação")).toBeInTheDocument();
+    expect(screen.getByText("Você conseguiu lembrar antes de ver a resposta?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quase" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Lembrei/ }));
-    expect(respostas).toEqual([["1", true]]);
-    // o pai grava a agenda; o cartão 1 sai da fila
-    const revisoes = { "1": responder(undefined, true) };
-    rerender(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={revisoes} onResponder={(id, ok) => respostas.push([id, ok])} />);
+    expect(respostas).toEqual([["1", "sim"]]);
+    // o pai grava a agenda; o cartão 1 sai da fila (volta em 7 dias)
+    const revisoes = { "1": responder(undefined, "sim") };
+    rerender(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={revisoes} onResponder={(id, r) => respostas.push([id, r])} />);
     expect(screen.getByText("2 de 2")).toBeInTheDocument();
     expect(screen.getByText("O que você aprendeu aqui?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Mostrar resposta" }));
-    fireEvent.click(screen.getByRole("button", { name: /Não lembrei/ }));
-    expect(respostas[1]).toEqual(["2", false]);
-    rerender(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={{ ...revisoes, "2": responder(undefined, false) }} onResponder={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Não$/ }));
+    expect(respostas[1]).toEqual(["2", "nao"]);
+    rerender(<RevisaoDoDia mapa={mapa} cursos={cursos} revisoes={{ ...revisoes, "2": responder(undefined, "nao") }} onResponder={() => {}} />);
     expect(screen.getByTestId("revisao-vazia").textContent).toContain("Revisão de hoje feita: 1 de 2 lembrados");
-    expect(screen.getByTestId("revisao-vazia").textContent).toContain("Amanhã voltam 2 cartões"); // os dois no degrau 1
+    expect(screen.getByTestId("revisao-vazia").textContent).toContain("Amanhã volta 1 cartão"); // só o "não"; o "sim" vai pra daqui a 7 dias
   });
 
   it("sem nenhum aprendizado o bloco não aparece", () => {

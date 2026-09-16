@@ -18,7 +18,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { AprendizadosDoCurso } from "@/components/estudos/AprendizadosDoCurso";
 import { CadernoDeAprendizados } from "@/components/estudos/CadernoDeAprendizados";
 import { RevisaoDoDia } from "@/components/estudos/RevisaoDoDia";
-import { comoRevisoes, responder, type Revisoes } from "@/components/estudos/revisao";
+import { comoRevisoes, responder, type Resposta, type Revisoes } from "@/components/estudos/revisao";
 import { comoAprendizados, type Aprendizado, type AprendizadosPorCurso } from "@/components/estudos/aprendizados";
 
 
@@ -130,8 +130,8 @@ const Estudos = () => {
   // agenda dos flashcards (11/09) — ver revisao.ts
   const [revisoesBrutas, setRevisoes] = usePersistedState<Revisoes>("estudos-revisoes", {});
   const revisoes = useMemo(() => comoRevisoes(revisoesBrutas), [revisoesBrutas]);
-  const responderRevisao = (id: string, lembrou: boolean) =>
-    setRevisoes(prev => { const mapa = comoRevisoes(prev); return { ...mapa, [id]: responder(mapa[id], lembrou) }; });
+  const responderRevisao = (id: string, resposta: Resposta) =>
+    setRevisoes(prev => { const mapa = comoRevisoes(prev); return { ...mapa, [id]: responder(mapa[id], resposta) }; });
   const aprendizados = useMemo(() => comoAprendizados(aprendizadosBrutos), [aprendizadosBrutos]);
   /** Qual curso está com a lista de aprendizados expandida. */
   const [aprendizadosAberto, setAprendizadosAberto] = useState<string | null>(null);

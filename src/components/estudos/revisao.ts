@@ -9,9 +9,9 @@
  * por quê. Nada de cadastrar cartão à parte — cada campo a mais é um
  * motivo pra não registrar.
  *
- * Agenda: intervalos crescentes (1, 3, 7, 14, 30, 60, 120 dias). Lembrou →
- * sobe um degrau. Não lembrou → volta pro 1. Cartão novo entra no dia
- * seguinte ao registro. No máximo 15 por dia, os mais atrasados primeiro:
+ * Agenda: intervalos crescentes (1, 3, 7, 14, 30, 60, 120 dias). Não lembrei
+ * → 1 dia; Quase → 3; Lembrei → 7 e daí sobe (14, 30…). Cartão novo entra
+ * no dia seguinte ao registro. No máximo 15 por dia, os mais atrasados primeiro:
  * uma revisão de 5 minutos que acontece vale mais que uma de 40 que não.
  *
  * Chave própria (`estudos-revisoes`, `{ [idDoAprendizado]: estado }`):
@@ -66,9 +66,22 @@ export const paraRevisarHoje = (lista: AprendizadoComCurso[], revisoes: Revisoes
 export const contarVencendoEm = (lista: AprendizadoComCurso[], revisoes: Revisoes, dia: string): number =>
   lista.filter((a) => vencimento(a, revisoes) === dia).length;
 
-/** Resposta: lembrou sobe um degrau; não lembrou volta pro começo. */
-export const responder = (atual: EstadoRevisao | undefined, lembrou: boolean, hoje: string = localDayKey()): EstadoRevisao => {
-  const degrau = lembrou ? Math.min((atual?.degrau ?? -1) + 1, INTERVALOS_DIAS.length - 1) : 0;
+export type Resposta = "nao" | "quase" | "sim";
+
+/**
+ * Resposta (16/09, régua do dono): "Não lembrei" → amanhã; "Quase" → 3 dias;
+ * "Lembrei" → 7 dias na primeira, e daí 14 → 30 → 60 → 120. Ou seja, "sim"
+ * nunca cai abaixo do degrau dos 7 dias, e "quase" segura no dos 3 — quem
+ * quase lembrou não precisa voltar pro dia seguinte, mas também não sobe.
+ * `true`/`false` continuam aceitos (chamadas antigas) como sim/não.
+ */
+export const responder = (atual: EstadoRevisao | undefined, resposta: Resposta | boolean, hoje: string = localDayKey()): EstadoRevisao => {
+  const r: Resposta = resposta === true ? "sim" : resposta === false ? "nao" : resposta;
+  const degrauAtual = atual?.degrau ?? -1;
+  const degrau =
+    r === "nao" ? 0
+    : r === "quase" ? 1
+    : Math.min(Math.max(2, degrauAtual + 1), INTERVALOS_DIAS.length - 1);
   return { proxima: somarDias(hoje, INTERVALOS_DIAS[degrau]), degrau, vezes: (atual?.vezes ?? 0) + 1 };
 };
 

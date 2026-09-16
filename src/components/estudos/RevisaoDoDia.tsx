@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { Brain, Check, RotateCcw } from "lucide-react";
 import { localDayKey } from "@/lib/utils";
 import { misturarCursos, type AprendizadosPorCurso } from "./aprendizados";
-import { contarVencendoEm, frenteDoCartao, paraRevisarHoje, responder, type Revisoes } from "./revisao";
+import { contarVencendoEm, frenteDoCartao, paraRevisarHoje, responder, type Resposta, type Revisoes } from "./revisao";
 
 const amanha = () => { const d = new Date(); return localDayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)); };
 
@@ -23,7 +23,7 @@ export const RevisaoDoDia = ({ mapa, cursos, revisoes, onResponder }: {
   mapa: AprendizadosPorCurso;
   cursos: { id: string; name: string }[];
   revisoes: Revisoes;
-  onResponder: (id: string, lembrou: boolean) => void;
+  onResponder: (id: string, resposta: Resposta) => void;
 }) => {
   const nomes = useMemo(() => Object.fromEntries(cursos.map((c) => [c.id, c.name])), [cursos]);
   const todos = useMemo(() => misturarCursos(mapa, nomes), [mapa, nomes]);
@@ -54,10 +54,10 @@ export const RevisaoDoDia = ({ mapa, cursos, revisoes, onResponder }: {
   }
 
   const { deixa, pergunta } = frenteDoCartao(cartao);
-  const decidir = (lembrou: boolean) => {
-    onResponder(cartao.id, lembrou);
+  const decidir = (r: Resposta) => {
+    onResponder(cartao.id, r);
     setFeitos((n) => n + 1);
-    if (lembrou) setAcertos((n) => n + 1);
+    if (r === "sim") setAcertos((n) => n + 1);
     setVirado(false);
   };
 
@@ -89,17 +89,24 @@ export const RevisaoDoDia = ({ mapa, cursos, revisoes, onResponder }: {
                 </p>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground">Bateu com o que você explicaria pra um amigo? Responde com honestidade: é assim que o cartão volta na hora certa.</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => decidir(false)}
+            {/* 16/09 (dono): pergunta curta e três respostas — Não lembrei
+                volta amanhã, Quase em 3 dias, Lembrei em 7 e sobe. */}
+            <p className="text-[12px] font-semibold">Você conseguiu lembrar antes de ver a resposta?</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button type="button" onClick={() => decidir("nao")}
                 className="rounded-lg border border-border bg-card text-sm font-semibold py-2.5 flex items-center justify-center gap-1.5 hover:bg-muted/50">
-                <RotateCcw className="w-3.5 h-3.5" /> Não lembrei
+                <RotateCcw className="w-3.5 h-3.5" /> Não
               </button>
-              <button type="button" onClick={() => decidir(true)}
+              <button type="button" onClick={() => decidir("quase")}
+                className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 text-sm font-semibold py-2.5 flex items-center justify-center hover:bg-amber-100">
+                Quase
+              </button>
+              <button type="button" onClick={() => decidir("sim")}
                 className="rounded-lg bg-green-600 text-white text-sm font-semibold py-2.5 flex items-center justify-center gap-1.5 hover:bg-green-700">
                 <Check className="w-3.5 h-3.5" /> Lembrei
               </button>
             </div>
+            <p className="text-[10.5px] text-muted-foreground text-center">Não: volta amanhã · Quase: em 3 dias · Lembrei: em 7, depois 14, 30…</p>
           </div>
         )}
       </div>

@@ -283,6 +283,40 @@ export function PaywallW({
   const [resgatePix, setResgatePix] = useState(false);
   const [reabrindoEm, setReabrindoEm] = useState<number | null>(null);
   const [pixVencendo, setPixVencendo] = useState(false);
+  /* SAÍDA DO PAYWALL (16/09, item 3 do funil da web): 72% de quem vê o
+   * paywall não toca em pagar e eu não sabia se saía no topo ou lá embaixo.
+   * Na saída (aba escondida, fechada, ou tela trocada) sai UM evento com
+   * quanto tempo ficou, até onde rolou (% da página) e se tocou numa coluna
+   * de preço. Só na web; no app o comportamento de folha é outro. */
+  const paywallEntrou = useRef(Date.now());
+  const rolouMax = useRef(0);
+  const tocouPlano = useRef(false);
+  const saidaEnviada = useRef(false);
+  useEffect(() => {
+    if (!naWeb) return;
+    const medirRolagem = () => {
+      const alt = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = alt > 0 ? Math.min(100, Math.round((window.scrollY / alt) * 100)) : 100;
+      if (pct > rolouMax.current) rolouMax.current = pct;
+    };
+    const registrarSaida = (motivo: string) => {
+      if (saidaEnviada.current) return;
+      saidaEnviada.current = true;
+      trackEvent("funnel_view", { step: "w_paywall_saida", funil: "w", motivo, segundos: Math.round((Date.now() - paywallEntrou.current) / 1000), rolou_pct: rolouMax.current, tocou_plano: tocouPlano.current });
+    };
+    const aoEsconder = () => { if (document.visibilityState === "hidden") registrarSaida("escondeu"); };
+    window.addEventListener("scroll", medirRolagem, { passive: true });
+    document.addEventListener("visibilitychange", aoEsconder);
+    window.addEventListener("pagehide", () => registrarSaida("fechou"));
+    medirRolagem();
+    return () => {
+      window.removeEventListener("scroll", medirRolagem);
+      document.removeEventListener("visibilitychange", aoEsconder);
+      registrarSaida("trocou_tela");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const pixVencendoJaFoi = useRef(false);
   const cancelamentos = useRef(0);
   const contagemRef = useRef<number | null>(null);
@@ -561,7 +595,7 @@ export function PaywallW({
             <PrecosLadoALadoW
               naWeb={naWeb}
               plano={plano}
-              onSelect={(p) => { setPlano(p); if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
+              onSelect={(p) => { setPlano(p); tocouPlano.current = true; if (!naWeb) guardarChave(CHAVES_FUNIL_W.plano, p); trackEvent("funnel_click", { cta: "w_plano", plano: p, braco: bracoEvento, funil: "w" }); }}
             />
           ) : (
             <LifetimeCardW naWeb={naWeb} />

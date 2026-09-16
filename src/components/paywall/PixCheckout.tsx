@@ -129,8 +129,12 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  * (13/07) e recusa o coringa 00000000000 (06/09); CPF inventado é nota
  * fiscal no nome de outra pessoa — não. O que dá pra tirar é o resto: o form
  * dela agora é UM campo (CPF), nome sai do cadastro/servidor. */
+/* 16/09 13h50 — VOLTA PRO ASAAS (ordem do dono). Medido no teste limpo:
+ * 4 checkouts na Cakto, 0 QR — todos pararam no CPF; véspera com Asaas,
+ * 7 checkouts → 7 QR → 2 vendas. A Cakto só volta se o suporte dela liberar
+ * cobrança sem documento. */
 const GATEWAY_ANTES: Gateway = "asaas";
-const GATEWAY_DEPOIS: Gateway = "cakto";
+const GATEWAY_DEPOIS: Gateway = "asaas";
 const VIRADA_GATEWAY = Date.parse("2026-09-16T03:00:00Z"); // 00:00 BRT de 16/09
 const forceGateway = (): Gateway | null => (Date.now() >= VIRADA_GATEWAY ? GATEWAY_DEPOIS : GATEWAY_ANTES);
 export const gatewayDaWebAgora = forceGateway;

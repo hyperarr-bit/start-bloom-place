@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { guardarCompraAnonima } from "@/lib/sessao-anonima";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -810,6 +811,10 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
   }, [inApp]);
+  // 17/09: a compra pode estar numa sessão ANÔNIMA. Qualquer botão daqui que
+  // troque de conta (Google, senha, link, código) deixaria o Pix órfão —
+  // guarda a sessão atual antes; o use-auth traz a compra junto depois do login.
+  useEffect(() => { void guardarCompraAnonima(); }, []);
 
   const handleGoogle = async () => {
     if (loading || googleLoading) return;

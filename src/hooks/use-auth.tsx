@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import { isNativeShell } from "@/lib/native-shell";
 import { vincularOrigem } from "@/lib/analytics";
+import { vincularCompraAnonima } from "@/lib/sessao-anonima";
 
 // Purge cached user data on sign-out so nothing leaks across accounts on the
 // same browser. Kept inline (no import from use-user-data) to avoid a circular
@@ -113,7 +114,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // a origem no usuário pra o relatório ligar venda→anúncio sem
           // depender de casar sessão ou GAID.
           void vincularOrigem(session.user.id);
-          setTimeout(() => checkSubscriptionStatus(), 0);
+          // 17/09: se a pessoa pagou numa sessão anônima e acabou de entrar em
+          // OUTRA conta (Google, senha, link, código), a compra vem junto —
+          // antes da primeira leitura, pra não abrir o paywall em cima de
+          // quem pagou.
+          setTimeout(async () => {
+            const uid = session.user.id;
+            await vincularCompraAnonima(uid, true).catch(() => false);
+            checkSubscriptionStatus();
+          }, 0);
         } else {
           setTrialExpired(false);
           setNoTrial(false);
@@ -201,6 +210,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // acabou de comprar via o paywall por cima do acesso que já pagou.
       // Agora, no app da loja, a primeira negativa não vira veredito antes de
       // perguntar à loja. Uma vez por sessão (o ref), pra não virar martelo.
+      // Web (17/09): sem assinatura mas com sessão anônima guardada — quem
+      // gerou o QR, trocou de conta e pagou DEPOIS cai aqui; a checagem
+      // periódica traz a compra assim que ela existir (1 tentativa / 20 s).
+      if (!data?.subscribed && !isNativeShell()) {
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (s?.user?.id && await vincularCompraAnonima(s.user.id)) {
+          await checkSubscriptionStatus();
+          return;
+        }
+      }
       if (!data?.subscribed && isNativeShell() && !lojaConsultadaRef.current) {
         lojaConsultadaRef.current = true;
         if (await reconciliarLoja()) {

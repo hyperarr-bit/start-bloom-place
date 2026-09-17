@@ -21,7 +21,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
-import { precisaBatizar, batizarConta, emailDaSessao } from "@/lib/sessao-anonima";
+import { precisaBatizar, batizarConta, emailDaSessao, guardarCompraAnonima } from "@/lib/sessao-anonima";
 import { getAuthRedirectUrl } from "@/lib/utils";
 import {
   QUIZ, GASTO_ANCHOR, isInAppBrowser,
@@ -971,6 +971,10 @@ export function SignupScreen({ onSession, onConfirm, posCompra }: { onSession: (
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
   }, [inApp]);
+  // 17/09: a compra pode estar numa sessão ANÔNIMA. Qualquer botão daqui que
+  // troque de conta (Google, senha, link, código) deixaria o Pix órfão —
+  // guarda a sessão atual antes; o use-auth traz a compra junto depois do login.
+  useEffect(() => { void guardarCompraAnonima(); }, []);
 
   /* Quem comprou sem conta na web JÁ digitou o e-mail antes do QR — ele está na
    * sessão. Pedir de novo seria atrito bobo logo depois do pagamento, e ainda

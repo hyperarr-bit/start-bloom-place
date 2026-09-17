@@ -164,6 +164,10 @@ export async function definirEmailDaCompra(email: string): Promise<{ erro: ErroE
  * é o caminho certo; depois do pagamento seria o erro mais caro possível.
  */
 export async function entrarNaContaExistente(email: string, senha: string): Promise<{ erro: string | null }> {
+  // 17/09: "antes do dinheiro" nem sempre é verdade — o QR já pode estar na
+  // tela e pago (caso real de 05/09). Guarda a sessão anônima antes de trocar;
+  // se ela tiver Pix, o use-auth traz a compra pra conta em que entrou.
+  await guardarCompraAnonima();
   const { error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password: senha });
   if (error) return { erro: error.message || "falhou" };
   limparBatismo(); // conta de verdade: não deve nada
@@ -248,4 +252,78 @@ export async function batizarConta(
     }
   } catch { /* atribuição nunca pode impedir o acesso */ }
   return { erro: null };
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * COMPRA ÓRFÃ (17/09) — a pessoa paga na sessão anônima e depois TROCA de conta.
+ *
+ * O batismo (acima) cobre quem põe e-mail e senha na mesma conta. Mas na tela
+ * de cadastro depois de pagar existem quatro botões que trocam de sessão em
+ * vez de batizar: "Continuar com o Google" (o Google entra/cria OUTRA conta),
+ * "já tenho conta" com senha, link mágico e código por e-mail. A compra fica
+ * presa na anônima e a conta em que a pessoa entrou cai no paywall. Dois casos
+ * reais em 55 Pix (05/09 e 17/09), os dois pelo Google — um ficou 12 dias fora.
+ *
+ * A solução tem duas pontas: ANTES de qualquer troca, guardar o token da
+ * sessão anônima no aparelho (`guardarCompraAnonima`); DEPOIS de entrar,
+ * mandar esse token pra `pix-vincular` (`vincularCompraAnonima`), que confere
+ * no servidor que a anônima é anônima, tem Pix ativo, e move a linha pra conta
+ * nova. Ter o token é a prova de posse — ninguém mais o tem.
+ *
+ * A guarda dura 24 h e SÓ sai quando o servidor dá um veredito definitivo com
+ * a compra encontrada (movida, ou conta nova já assinante). "origem_sem_pix"
+ * NÃO limpa: quem gerou o QR, trocou de conta e pagou depois cai nesse caso
+ * — a próxima checagem de assinatura tenta de novo.
+ * ───────────────────────────────────────────────────────────────────────── */
+const CHAVE_COMPRA_ANONIMA = "core-compra-anonima";
+const VALIDADE_GUARDA_MS = 24 * 3600e3;
+const INTERVALO_TENTATIVAS_MS = 20e3;
+let ultimaTentativa = 0;
+
+type GuardaAnonima = { uid: string; token: string; refresh: string; em: number };
+
+function lerGuarda(): GuardaAnonima | null {
+  try {
+    const raw = localStorage.getItem(CHAVE_COMPRA_ANONIMA);
+    if (!raw) return null;
+    const g = JSON.parse(raw) as GuardaAnonima;
+    if (!g?.uid || !g?.token || Date.now() - (g.em || 0) > VALIDADE_GUARDA_MS) { localStorage.removeItem(CHAVE_COMPRA_ANONIMA); return null; }
+    return g;
+  } catch { return null; }
+}
+
+export function limparCompraAnonima() {
+  try { localStorage.removeItem(CHAVE_COMPRA_ANONIMA); } catch { /* noop */ }
+}
+
+/** Chamar quando a tela de cadastro pós-compra monta (antes de qualquer botão
+ *  que possa trocar de sessão). Guarda a sessão atual; se ela não for anônima
+ *  o servidor recusa depois, então não custa guardar de mais. */
+export async function guardarCompraAnonima(): Promise<void> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const s = data?.session;
+    if (!s?.user?.id || !s.access_token) return;
+    const g: GuardaAnonima = { uid: s.user.id, token: s.access_token, refresh: s.refresh_token ?? "", em: Date.now() };
+    localStorage.setItem(CHAVE_COMPRA_ANONIMA, JSON.stringify(g));
+  } catch { /* noop */ }
+}
+
+/** Depois de entrar numa conta: se há sessão anônima guardada e ela é OUTRA
+ *  conta, pede ao servidor pra mover a compra. Devolve true quando moveu —
+ *  aí vale reler a assinatura. */
+export async function vincularCompraAnonima(uidAtual: string, forcar = false): Promise<boolean> {
+  const g = lerGuarda();
+  if (!g || g.uid === uidAtual) return false;
+  if (!forcar && Date.now() - ultimaTentativa < INTERVALO_TENTATIVAS_MS) return false;
+  ultimaTentativa = Date.now();
+  try {
+    const { data, error } = await supabase.functions.invoke("pix-vincular", { body: { tokenAnonimo: g.token, refreshAnonimo: g.refresh } });
+    if (error) return false; // rede/servidor: guarda fica, tenta na próxima checagem
+    if (data?.ok) { limparCompraAnonima(); return true; }
+    const motivo = String(data?.motivo ?? "");
+    // Vereditos definitivos com a compra achada (ou sem o que achar): limpa.
+    if (["mesma_conta", "destino_ja_tem_assinatura", "token_invalido", "origem_tem_email"].includes(motivo)) limparCompraAnonima();
+    return false;
+  } catch { return false; }
 }

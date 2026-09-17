@@ -17,6 +17,39 @@ const corsHeaders = {
 };
 const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
 
+/** Move a assinatura Pix de uma conta anônima pra conta que a pessoa usa.
+ *  Regras: origem sem e-mail (ou is_anonymous), com assinatura pix ativa;
+ *  destino existe e NÃO tem assinatura ativa (uma casca expirada/cancelada
+ *  no destino dá lugar à linha paga). A linha paga nunca é apagada. */
+export async function transferirCompraPix(
+  admin: ReturnType<typeof createClient>, deUid: string, paraUid: string,
+): Promise<{ erro: string | null; status?: number; detalhe?: Record<string, unknown> }> {
+  const { data: de } = await admin.auth.admin.getUserById(deUid);
+  if (!de?.user) return { erro: "origem_nao_encontrada", status: 404 };
+  const origemAnonima = de.user.is_anonymous === true || !de.user.email;
+  if (!origemAnonima) return { erro: "origem_tem_email", detalhe: { dica: "não é uma conta anônima — usar absorver/trocar_email" } };
+  const { data: para } = await admin.auth.admin.getUserById(paraUid);
+  if (!para?.user) return { erro: "destino_nao_encontrado", status: 404 };
+
+  const { data: subDe } = await admin.from("subscriptions")
+    .select("id, plan, billing_period, amount_cents, status, payment_method, created_at")
+    .eq("user_id", deUid).eq("payment_method", "pix").maybeSingle();
+  if (!subDe || subDe.status !== "active") return { erro: "origem_sem_pix_ativo" };
+  const { data: subPara } = await admin.from("subscriptions").select("id, status").eq("user_id", paraUid).maybeSingle();
+  if (subPara?.status === "active") return { erro: "destino_ja_tem_assinatura" };
+  if (subPara?.id) await admin.from("subscriptions").delete().eq("id", subPara.id); // casca inativa (expirada/cancelada) dá lugar à paga
+
+  const emailPara = para.user.email ?? null;
+  const { error } = await admin.from("subscriptions")
+    .update({ user_id: paraUid, customer_email: emailPara }).eq("id", subDe.id);
+  if (error) return { erro: `update: ${error.message}`, status: 500 };
+  await admin.from("analytics_events").insert({
+    user_id: paraUid, event_name: "compra_vinculada",
+    event_data: { de: deUid, plan: subDe.plan, amount_cents: subDe.amount_cents, pago_em: subDe.created_at },
+  }).then(() => {}, () => {});
+  return { erro: null, detalhe: { uid: paraUid, plan: subDe.plan, billing_period: subDe.billing_period, amount_cents: subDe.amount_cents, pago_em: subDe.created_at, email: emailPara ? "ok" : "sem_email" } };
+}
+
 const json = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status });
 
@@ -95,6 +128,24 @@ serve(async (req) => {
 
       console.log(`[ADMIN-SUPORTE] absorver: casca ${uidCasca} parqueada em ${alias}; ${de} -> ${para} (uid ${uidPago}, por ${caller})`);
       return json({ ok: true, uid: uidPago, email: upd.user?.email, cascaParqueadaEm: alias });
+    }
+
+    /* TRANSFERIR COMPRA ÓRFÃ (17/09). O funil da web vende ANTES do cadastro:
+     * o Pix nasce numa conta anônima. Se depois de pagar a pessoa entra em
+     * OUTRA conta (Google cria uma nova; "já tenho conta" troca de sessão), a
+     * compra fica presa na anônima e a conta de verdade cai no paywall. Dois
+     * casos reais em 55 Pix (05/09 e 17/09). Isto move a LINHA da assinatura —
+     * não cria venda nova, não duplica receita, mantém data e valor do Pix.
+     * Só aceita origem anônima/sem e-mail e destino sem assinatura.
+     * POST { action: "transferir_pix", deUid, paraUid } */
+    if (action === "transferir_pix") {
+      const deUid = String(body.deUid ?? "");
+      const paraUid = String(body.paraUid ?? "");
+      if (!deUid || !paraUid || deUid === paraUid) return json({ error: "deUid/paraUid inválidos" }, 400);
+      const r = await transferirCompraPix(admin, deUid, paraUid);
+      if (r.erro) return json({ error: r.erro, ...r.detalhe }, r.status ?? 409);
+      console.log(`[ADMIN-SUPORTE] transferir_pix ${deUid} -> ${paraUid} (${r.detalhe?.plan}, ${r.detalhe?.amount_cents}) por ${caller}`);
+      return json({ ok: true, ...r.detalhe });
     }
 
     if (action === "trocar_email") {

@@ -98,7 +98,7 @@ describe("retomada do funil W — o progresso sobrevive ao app morrer", () => {
  * ANÚNCIO NA WEB COMEÇA NA PORTA (02/09) — 69% dos cliques pagos morriam
  * na welcome do app. No shell a welcome fica.
  * ============================================================ */
-import { comecaNaPorta, veioDeAnuncio } from "@/pages/funis/w/retomada";
+import { comecaNaPorta, veioDeAnuncio, WEB_ENTRA_NA_WELCOME } from "@/pages/funis/w/retomada";
 describe("anúncio na web → porta", () => {
   it("reconhece o clique pago pela URL ou pela atribuição guardada", () => {
     // como o anúncio da Meta chega de verdade (06/09: 192 sessões assim)
@@ -122,12 +122,12 @@ describe("anúncio na web → porta", () => {
     // ...mas o link marcado como orgânico vence a atribuição antiga
     expect(veioDeAnuncio("?utm_medium=organic&utm_campaign=ig_tipos", { utm_campaign: "120250123961310041", utm_medium: "paid" })).toBe(false);
   });
-  it("clique pago na web cai na PERGUNTA; o app e o orgânico veem a welcome", () => {
-    // 02/09: a welcome antiga matava 69% do clique pago. 05/09 13:10–17:00: a
-    // welcome NOVA entrou em teste pra todo mundo e derrubou entrada→paywall
-    // de 16,4% pra 8,0% na web, enquanto o app subia de 21,4% pra 27,3% na
-    // mesma janela. Revertido em 3h40. Orgânico continua vendo a welcome.
-    expect(comecaNaPorta(false, true)).toBe(true);
+  it("17/09: todo mundo começa na welcome (chave WEB_ENTRA_NA_WELCOME); com ela desligada o clique pago cai na PERGUNTA", () => {
+    // 02/09: a welcome antiga matava 69% do clique pago. 05/09: a welcome nova
+    // derrubou entrada→paywall de 16,4% pra 8,0% e foi revertida em 3h40.
+    // 17/09: o dono quer a welcome (agora com notas e selos das lojas) na
+    // frente do pago também — a chave decide, e o teste pina os dois modos.
+    expect(comecaNaPorta(false, true)).toBe(!WEB_ENTRA_NA_WELCOME);
     expect(comecaNaPorta(true, true)).toBe(false);
     expect(comecaNaPorta(false, false)).toBe(false);
     expect(veioDeAnuncio("?utm_campaign=120250123961310041", {})).toBe(true);

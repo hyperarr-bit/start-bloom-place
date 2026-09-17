@@ -130,7 +130,18 @@ export const veioDeAnuncio = (search: string, atribuicao: Record<string, string>
  * entrada do tráfego pago volta a ser a PERGUNTA.
  *
  * Orgânico continua vendo a welcome — é a marca, e ele tem paciência. */
-export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !noShell && deAnuncio;
+/* 17/09 — WELCOME PRA TODO MUNDO NA WEB, DE NOVO (ordem do dono).
+ *
+ * O teste de 05/09 (acima) perdeu com a welcome ANTIGA. Desde então ela ganhou
+ * as notas das lojas (App Store 5,0 · Google Play 4,8) e os selos "App Store /
+ * Google Play" embaixo das +1000 pessoas — a objeção "isso é só um site" agora
+ * é respondida na primeira tela. O dono quer o clique pago começando na marca,
+ * igual ao app. Régua, mesma de 05/09: entrada → paywall do tráfego pago
+ * (`funnel_view step=welcome entrada=anuncio` → `offer`). Antes da troca:
+ * porta direto = 23% (backstage, 17/09). Se cair abaixo de 12% em 24 h, esta
+ * chave volta pra `false` e o clique pago cai na pergunta outra vez. */
+export const WEB_ENTRA_NA_WELCOME = true;
+export const comecaNaPorta = (noShell: boolean, deAnuncio: boolean): boolean => !WEB_ENTRA_NA_WELCOME && !noShell && deAnuncio;
 
 /**
  * BOTÃO VOLTAR DO ANDROID (02/09).

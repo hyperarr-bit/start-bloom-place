@@ -129,61 +129,27 @@ const PORTAS_W: Array<{ area: AreaKey; emoji: string; label: string }> = [
  * começado, e a barra só aparecia depois — parecia outro app. Agora nasce com
  * o mesmo cabeçalho do QuizScreen, com a barra no primeiro degrau de 8.
  * O botão de voltar existe mas leva pras promessas (não há pergunta antes). */
-/* PORTA COM CONTEXTO — braço B do teste de 16/09. Medido 09→15/09 na web:
- * 57% das sessões chegam na porta e somem com 0 s, sem tocar em nada; quem
- * escolhe uma área segue 99% pro quiz e 10% paga. A porta era só a pergunta,
- * sem nome do app, sem promessa, sem prova — quem vem de um post do
- * Instagram cai numa tela que não diz o que é isso. O braço B põe três linhas
- * em cima: marca, notas das lojas (reais: App Store 5,0 · Google Play 4,8 em
- * 16/09) e o que a pessoa ganha em 60 s. Sorteio 50/50 por sessão, gravado
- * em `porta` no start e na resposta — régua: % que escolhe uma área. */
-const PORTA_AB_KEY = "core-w-porta";
-export const bracoDaPorta = (): "a" | "b" => {
-  try {
-    const url = new URLSearchParams(window.location.search).get("porta");
-    if (url === "a" || url === "b") { sessionStorage.setItem(PORTA_AB_KEY, url); return url; }
-    const t = sessionStorage.getItem(PORTA_AB_KEY);
-    if (t === "a" || t === "b") return t;
-    const b = Math.random() < 0.5 ? "a" : "b";
-    sessionStorage.setItem(PORTA_AB_KEY, b);
-    return b;
-  } catch { return "a"; }
-};
-
-function PortaW({ onPickArea, onBack, totalPassos, contexto }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number; contexto?: boolean }) {
-  /* MEDIÇÃO DA PORTA (16/09). Só 5 de 59 "start" da tarde vinham pelo ramo
-   * do anúncio — a maioria chega na porta pela troca de passo (welcome →
-   * porta). Então a régua do A/B mora AQUI, no mount da tela, e vale pra
-   * todo caminho: `porta_vista` com o braço, e `porta_viva` 4 s depois se a
-   * aba continua visível (separa humano de pré-carga). */
+/* PORTA ÚNICA (17/09, dono: "tira o A/B e deixa só 1"). O braço B de 16/09
+ * (marca + notas das lojas + promessa em cima da pergunta) existia porque a
+ * porta era a PRIMEIRA tela do clique pago. Com a welcome na frente de todo
+ * mundo (ver WEB_ENTRA_NA_WELCOME em retomada.ts) esse papel é dela — a porta
+ * volta a ser só a pergunta 1, no uniforme do quiz. Medido em 2 dias de
+ * sorteio (77 sessões): B segurava mais gente por 4 s (58% × 32%), mas os dois
+ * levavam 9% ao paywall. */
+function PortaW({ onPickArea, onBack, totalPassos }: { onPickArea: (a: AreaKey, label: string) => void; onBack: () => void; totalPassos: number }) {
+  /* MEDIÇÃO DA PORTA (16/09). A régua mora AQUI, no mount da tela, e vale pra
+   * todo caminho: `porta_vista`, e `porta_viva` 4 s depois se a aba continua
+   * visível (separa humano de pré-carga). */
   useEffect(() => {
-    const braco = contexto ? "b" : "a";
-    trackEvent("funnel_view", { step: "porta_vista", funil: FUNIL, porta: braco, visivel: typeof document !== "undefined" ? document.visibilityState : "?" });
+    trackEvent("funnel_view", { step: "porta_vista", funil: FUNIL, visivel: typeof document !== "undefined" ? document.visibilityState : "?" });
     const t = window.setTimeout(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "visible") trackEvent("funnel_view", { step: "porta_viva", funil: FUNIL, porta: braco });
+      if (typeof document !== "undefined" && document.visibilityState === "visible") trackEvent("funnel_view", { step: "porta_viva", funil: FUNIL });
     }, 4000);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
     <div className="flex-1 flex flex-col w-full max-w-md mx-auto">
-      {contexto && (
-        <div className="mb-5" data-testid="porta-contexto">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[17px] font-black tracking-tight">CORE</span>
-            {/* Notas reais das lojas em 16/09 (App Store 5,0 · Google Play 4,8).
-                Sem o glifo da maçã: no Android ele vira quadrado. */}
-            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground whitespace-nowrap">
-              <span className="text-amber-500">★</span><span className="text-foreground">5,0</span> App Store
-              <span aria-hidden className="mx-0.5">·</span>
-              <span className="text-amber-500">★</span><span className="text-foreground">4,8</span> Google Play
-            </span>
-          </div>
-          <p className="text-[14px] text-muted-foreground leading-snug mt-2">
-            O app que organiza a vida inteira, em 16 módulos. Responde 8 perguntas e em 60 segundos você vê o seu plano.
-          </p>
-        </div>
-      )}
       <div className="flex items-center gap-3 mb-8">
         <button onClick={onBack} aria-label="Voltar" className="-ml-1 p-1 text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="w-5 h-5" />
@@ -463,7 +429,10 @@ export default function ComecarW() {
       const motivo = idade !== null && idade > REINICIO_ATE_MS ? "volta" : "reinicio";
       trackEvent(step === "offer" ? "funnel_retomada" : "funnel_view", { step, funil: FUNIL, retomada: true, motivo, idade_h: idade === null ? null : Math.round(idade / 3600e3) });
     } else {
-      trackEvent("funnel_view", { step: "welcome", funil: FUNIL });
+      // 17/09: a welcome recebe o clique pago também — `entrada: "anuncio"` é
+      // o que separa a régua entrada→paywall do pago (WEB_ENTRA_NA_WELCOME).
+      const pago = naWeb && veioDeAnuncio(window.location.search, getAttributionParams());
+      trackEvent("funnel_view", { step: "welcome", funil: FUNIL, ...(pago ? { entrada: "anuncio" } : {}) });
     }
     /* COMPRA FEITA COM O APP MORTO (02/09): a Play concluiu, o app não viu.
      * Pergunta pra loja no boot; se ela diz "tem compra", pula pro cadastro
@@ -762,13 +731,12 @@ export default function ComecarW() {
                 <PortaW
                   onBack={() => setStep("promessas")}
                   totalPassos={itensQuiz.length + 1}
-                  contexto={naWeb && bracoDaPorta() === "b"}
                   onPickArea={(a, label) => {
                     setArea(a);
                     const r = { ...answers, area: a, area_label: label };
                     setAnswers(r);
                     guardar(a, r);
-                    trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL, porta: naWeb ? bracoDaPorta() : "app" });
+                    trackEvent("funnel_quiz_answer", { step: "porta", answer: label, funil: FUNIL });
                     setStep("quiz");
                   }}
                 />

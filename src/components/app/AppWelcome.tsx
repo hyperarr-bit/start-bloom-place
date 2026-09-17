@@ -123,6 +123,17 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           >
             <span className="apw-st">★★★★★</span> <b><Contador ate={1000} /> pessoas</b> organizando a vida
           </motion.p>
+          {/* 16/09 (dono): na WEB, as lojas embaixo da prova — quem chega pelo
+              site tem que ver que é app de verdade (maior causa de reembolso
+              da web era "achei que era só site"). No app das lojas não faz
+              sentido mostrar a própria loja. Ícones em SVG: o glifo da maçã
+              em texto vira quadrado no Android. */}
+          {!isNativeShell() && (
+            <motion.p className="apw-lojas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7, duration: 0.4 }} data-testid="welcome-lojas">
+              <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/></svg>App Store</span>
+              <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3.3v17.4c0 .8.9 1.3 1.6.9l14.6-8.7c.6-.4.6-1.3 0-1.7L5.6 2.4C4.9 2 4 2.5 4 3.3z"/></svg>Google Play</span>
+            </motion.p>
+          )}
         </div>
 
         <motion.div
@@ -218,6 +229,9 @@ const CSS_APW = `
 .apw-prova { margin: 1.4vh 0 0; font-size: 14px; color: #7d8691; }
 .apw-prova b { color: #141414; }
 .apw-st { color: #f0a500; letter-spacing: .06em; }
+.apw-lojas { margin: 1.2vh 0 0; display: flex; justify-content: center; gap: 8px; }
+.apw-lojas span { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; background: #141414; color: #fff; font-size: 12px; font-weight: 700; }
+.apw-lojas svg { width: 12px; height: 12px; fill: #fff; }
 /* margens em vez de gap de proposito: gap em FLEX e Chrome 84+ — com gap, o
    rodape colava CTA/link/termos em WebView velho. Margem rende IGUAL em
    qualquer motor (zero divergencia emulador × aparelho). */

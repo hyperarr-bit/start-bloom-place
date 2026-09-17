@@ -89,8 +89,14 @@ const ANDROID_DUAS_COLUNAS = true;
 /* 07/09 10h40 (ordem do dono): de volta a 97,90 (w97) — o 47,90 (w47) rodou
  * de 06/09 18h35 a 07/09 10h20. As chaves w47/w27 continuam existindo nas
  * functions pra QR antigo. */
-const PRECO_WEB = "97,90";
-const OFERTA_WEB: "w97" = "w97";
+/* 16/09 22h (ordem do dono, depois da autópsia da fack de 08/08): DE VOLTA A
+ * 27,90 (w27), UMA coluna. O que a conta mostrou: a 27,90 compravam 6,7% dos
+ * visitantes (35 de 523 em 08/08); a 97,90/24,90, 2%. Receita por visitante
+ * empatou (R$ 1,84 × R$ 1,70) — a diferença de ROI era o CPC. O dono
+ * escolheu 3× mais clientes pelo mesmo dinheiro. O app segue em 97,90.
+ * Rollback = PRECO_WEB "97,90" + OFERTA_WEB "w97" + WEB_DUAS_COLUNAS true. */
+const PRECO_WEB = "27,90";
+const OFERTA_WEB: "w27" = "w27";
 /* 2ª COLUNA NA WEB — 1 mês por R$ 24,90 (03/09).
  *
  * Por que: o app rodou os dois arranjos com dinheiro em cima e a régua limpa
@@ -112,7 +118,7 @@ const OFERTA_WEB: "w97" = "w97";
  *
  * Na web o Pix não tem débito automático, então isto é PRÉ-PAGO: 30 dias, sem
  * renovar sozinho. Toda copy desta tela e do checkout diz isso. */
-const WEB_DUAS_COLUNAS = true;
+const WEB_DUAS_COLUNAS = false; // 16/09: com vitalício a 27,90, mensal de 24,90 não faz sentido
 const OFERTA_WEB_MES: "w25" = "w25";
 /* QUEM NASCE SELECIONADO NO ANDROID — vira "vitalicio" em 01/09.
  *

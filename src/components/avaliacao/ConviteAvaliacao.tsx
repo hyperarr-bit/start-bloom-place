@@ -74,7 +74,7 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
     // A caixa do Google só depois da folha sair da tela (≈300ms de animação):
     // a diretriz proíbe sobrepor a caixa, e a pessoa acabou de decidir — não
     // precisa de mais nada nossa na frente.
-    window.setTimeout(() => { void pedirAvaliacaoSePuder(motivo, { pagante, forte: true }); }, 380);
+    window.setTimeout(() => { void pedirAvaliacaoSePuder(motivo, { pagante, forte: true, tocouParaAvaliar: true }); }, 380);
   };
 
   const recusar = () => {

@@ -694,6 +694,78 @@ type ProdutoRC = import("@revenuecat/purchases-capacitor").PurchasesStoreProduct
 // id e a pré-busca traz os dois numa ida só à Play.
 // 27/08 (v81): terceiro irmão, core_vitalicio_97 — o vitalício vira a oferta
 // única do paywall. Mesma família = herda todas as guardas startsWith.
+/* ANUAL DO iPHONE (18/09): `core_anual_97` — R$ 97,90/ano com 3 dias grátis
+ * (oferta introdutória da própria App Store; a folha aplica sozinha pra quem
+ * é elegível). Comprado DIRETO pelo produto, como o vitalício, pra não
+ * depender de um offering novo no painel do RevenueCat. */
+const ID_ANUAL_IOS = "core_anual_97";
+let produtoAnualIos: ProdutoRC | undefined;
+let prefetchAnualDesfecho = "nao_rodou";
+
+export async function prefetchAnualIos(): Promise<void> {
+  if (produtoAnualIos) return;
+  if (!configurado || !Purchases) { prefetchAnualDesfecho = "nao_configurado"; return; }
+  try {
+    const mod = await import("@revenuecat/purchases-capacitor");
+    const { products } = await Purchases.getProducts({ productIdentifiers: [ID_ANUAL_IOS], type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
+    produtoAnualIos = (products ?? []).find((p) => p?.identifier === ID_ANUAL_IOS || p?.identifier?.startsWith(ID_ANUAL_IOS + ":"));
+    prefetchAnualDesfecho = `respondeu_${(products ?? []).length}`;
+  } catch (e) {
+    prefetchAnualDesfecho = "lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 80);
+  }
+}
+
+/** A loja já carregou o anual? (a vitrine só promete o que a loja tem) */
+export const temAnualIos = (): boolean => !!produtoAnualIos;
+/** Preço real do anual na moeda da loja (ex.: "R$ 97,90"), se já carregou. */
+export const precoAnualIos = (): string | null => produtoAnualIos?.priceString ?? null;
+/** A folha vai oferecer os 3 dias grátis pra esta conta? (intro só pra quem nunca assinou o grupo) */
+export const anualIosTemTrial = (): boolean => !!(produtoAnualIos as { introPrice?: unknown } | undefined)?.introPrice;
+
+/** Compra pro SDK da Meta no iPhone (ver logCompra no AppDelegate.swift).
+ *  Nunca lança: falha do plugin vira nada — a compra já aconteceu. */
+async function logCompraMeta(produto: string, valor: number) {
+  try {
+    const { Capacitor, registerPlugin } = await import("@capacitor/core");
+    if (Capacitor.getPlatform() !== "ios") return;
+    const MetaAds = registerPlugin<{ logCompra(o: { valor: number; moeda: string; produto: string }): Promise<{ ok: boolean }> }>("MetaAds");
+    await MetaAds.logCompra({ valor, moeda: "BRL", produto });
+  } catch { /* SDK desligado ou build antiga */ }
+}
+
+export async function comprarAnualIos(): Promise<boolean> {
+  ultimoMotivo = null;
+  if (!(await garantirPronto())) {
+    ultimoMotivo = "catalogo";
+    trackEvent("app_compra_falhou", { motivo: "rc_" + estado, produto: ID_ANUAL_IOS, retentou: true });
+    return false;
+  }
+  try {
+    if (!produtoAnualIos) { await initRevenueCat(); await prefetchAnualIos(); }
+    if (!produtoAnualIos) {
+      ultimoMotivo = "produto_ausente";
+      trackEvent("app_compra_falhou", { motivo: "produto_ausente", produto: ID_ANUAL_IOS, retentou: true, estado_rc: estado, prefetch: prefetchAnualDesfecho });
+      return false;
+    }
+    trackEventBeacon("app_compra_opcao", {
+      desde_toque_ms: consumirToque(),
+      produto: ID_ANUAL_IOS,
+      escolhida: produtoAnualIos.identifier ?? ID_ANUAL_IOS,
+      preco: produtoAnualIos.priceString ?? null,
+      trial: anualIosTemTrial(),
+    });
+    marcarFolhaAberta();
+    await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    // Trial: a Meta recebe 0 agora (StartTrial seria o certo, mas Purchase de
+    // valor 0 não polui o ROAS e ainda casa instalação↔pagante quando cobrar).
+    void logCompraMeta(ID_ANUAL_IOS, anualIosTemTrial() ? 0 : produtoAnualIos.price ?? 97.9);
+    await sincronizarAssinatura();
+    return true;
+  } catch (e) {
+    return desfechoDaFalha(e, ID_ANUAL_IOS);
+  }
+}
+
 const IDS_VITALICIOS = ["core_vitalicio", "core_vitalicio_19", "core_vitalicio_97"] as const;
 export type IdVitalicio = (typeof IDS_VITALICIOS)[number];
 const produtosVitalicios: Partial<Record<IdVitalicio, ProdutoRC>> = {};

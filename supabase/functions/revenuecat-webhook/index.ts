@@ -123,6 +123,9 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   "core_mensal:coremensalvista": { billing: "monthly_prepaid", cents: 2490 },
   "core_anual:coreanual97": { billing: "annual_prepaid", cents: 9790 },
   "core_anual:coreanualvista": { billing: "annual_prepaid", cents: 15990 },
+  // 18/09 iOS: anual de R$ 97,90 com 3 dias grátis (substitui o vitalício no
+  // iPhone). ANTES do genérico: "core_anual_97".startsWith("core_anual").
+  core_anual_97: { billing: "annual", cents: 9790 },
   core_anual: { billing: "annual", cents: 15990 },
   core_mensal: { billing: "monthly", cents: 2490 },
   // 06/08: era do produto único — compra ÚNICA do Play (não assinatura).
@@ -395,7 +398,7 @@ async function mandarCompraProMeta(
     const PRECOS: Record<number, { evento: string; sufixo: string; aceita: string[]; junto?: { evento: string; sufixo: string } }> = {
       1990:  { evento: "compra_mensal_pix", sufixo: "mp",  aceita: ["monthly_prepaid"], junto: MENSAL_GERAL },
       2490:  { evento: "compra_mensal",     sufixo: "m",   aceita: ["monthly_prepaid", "monthly"], junto: MENSAL_GERAL },
-      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid"] },
+      9790:  { evento: "compra_anual_97",   sufixo: "a97", aceita: ["annual_prepaid", "annual"] }, // 18/09: + anual iOS (core_anual_97)
       15990: { evento: "compra_anual",      sufixo: "a",   aceita: ["annual_prepaid", "annual"] },
     };
     // v81 (27/08): vitalício herói tem evento por plano PRÓPRIO — o par

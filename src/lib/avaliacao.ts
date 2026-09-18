@@ -202,9 +202,25 @@ export function reservarConvitePrimeiroGasto(userId: string | null | undefined, 
  */
 export async function pedirAvaliacaoSePuder(
   motivo: MotivoAvaliacao,
-  { pagante = false, vezes = 1, forte = false }: { pagante?: boolean; vezes?: number; forte?: boolean } = {},
+  { pagante = false, vezes = 1, forte = false, tocouParaAvaliar = false }: { pagante?: boolean; vezes?: number; forte?: boolean; tocouParaAvaliar?: boolean } = {},
 ): Promise<boolean> {
   if (!pagante && !forte && vezes < 2) return false;
+  /* iPHONE, TOQUE EXPLÍCITO (18/09): a caixinha da Apple (SKStoreReviewController)
+   * é uma SUGESTÃO — a Apple decide se mostra, no máximo 3× por ano, e não
+   * avisa quando não mostra. 454 pedidos em 7 dias no iPhone renderam poucas
+   * notas. Quando a pessoa TOCOU em "Deixar minha nota", ela quer avaliar:
+   * abre a página de avaliação da App Store direto (permitido: é ação dela). */
+  if (tocouParaAvaliar) {
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.getPlatform() === "ios") {
+        trackEvent("app_avaliacao_pedida", { motivo, pagante, vezes, ordem: lerNumero(CHAVE_TOTAL) + 1, loja_direto: true });
+        try { localStorage.setItem(CHAVE_ULTIMA, String(Date.now())); } catch { /* noop */ }
+        window.location.href = "itms-apps://itunes.apple.com/app/id6806913181?action=write-review";
+        return true;
+      }
+    } catch { /* cai na caixinha */ }
+  }
   // shell, /preview, 3 na vida, 90 dias — as travas comuns moram numa função
   // só, pra folha de convite conferir as mesmas antes de aparecer.
   if (!podePedirAvaliacao()) return false;

@@ -146,9 +146,9 @@ export const GreetingHeader = ({ data, onNameChange, onReplayTutorial }: Greetin
             whileTap={{ scale: 0.9 }}
             aria-label="Minha conta"
           >
-            <span className="block rounded-full p-[2px] bg-gradient-to-br from-primary/70 to-primary/20">
+            <span className="block rounded-full p-[2px]" style={{ background: "linear-gradient(to bottom right, hsl(var(--fixo-tinta) / 0.7), hsl(var(--fixo-tinta) / 0.2))" }}>
               <Avatar className="h-8 w-8 border-2 border-background">
-                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
+                <AvatarFallback className="text-[10px] font-bold" style={{ background: "hsl(var(--fixo-tinta) / 0.1)", color: "hsl(var(--fixo-tinta))" }}>
                   {initials}
                 </AvatarFallback>
               </Avatar>

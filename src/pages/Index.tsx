@@ -359,7 +359,7 @@ const Index = () => {
             <button
               onClick={() => setAskOpen(true)}
               aria-label="Pergunte ao CORE"
-              className="grid place-items-center w-8 h-8 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              className="grid place-items-center w-8 h-8 rounded-lg transition-colors" style={{ background: "hsl(var(--fixo-ia) / 0.1)", color: "hsl(var(--fixo-ia))" }}
             >
               <Sparkles className="w-4 h-4" />
             </button>

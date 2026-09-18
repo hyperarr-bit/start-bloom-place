@@ -23,7 +23,7 @@ export const ThemeToggle = ({ showPalette = false }: { showPalette?: boolean }) 
       {/* Dark mode toggle */}
       <motion.button
         onClick={toggleMode}
-        className="relative w-9 h-9 rounded-xl bg-primary/10 text-primary hover:bg-primary/15 flex items-center justify-center transition-colors"
+        className="relative w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
         whileTap={{ scale: 0.9 }}
         aria-label="Toggle dark mode"
       >
@@ -45,7 +45,7 @@ export const ThemeToggle = ({ showPalette = false }: { showPalette?: boolean }) 
         <div className="relative" ref={menuRef}>
           <motion.button
             onClick={() => setShowPaletteMenu(!showPaletteMenu)}
-            className="w-9 h-9 rounded-xl bg-primary/10 text-primary hover:bg-primary/15 flex items-center justify-center transition-colors"
+            className="w-9 h-9 rounded-xl bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors"
             whileTap={{ scale: 0.9 }}
             aria-label="Change theme"
           >

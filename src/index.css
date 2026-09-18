@@ -63,6 +63,10 @@
     --muted-foreground: 0 0% 45%;
 
     --accent: 330 65% 50%;
+    /* 18/09 (dono): avatar do menu e botão da IA NÃO mudam com o tema — ficam
+       no grafite/magenta do Original. Nenhum tema alternativo escreve estes. */
+    --fixo-tinta: 0 0% 20%;
+    --fixo-ia: 330 65% 50%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 55%;
@@ -147,6 +151,8 @@
     --muted: 220 16% 15%;
     --muted-foreground: 220 10% 68%;   /* #A3A9B6 */
     --accent: 330 55% 62%;             /* magenta de noite */
+    --fixo-tinta: 222 16% 92%;
+    --fixo-ia: 330 55% 62%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 60% 62%;          /* #E07070 */
     --destructive-foreground: 0 0% 100%;
@@ -305,10 +311,9 @@
   }
 
   .notion-tab-active {
-    /* 18/09: aba ativa é o --primary (no Original continua grafite; nos temas
-       alternativos vira o acento). No escuro segue a superfície, que é o que
-       o modo escuro como sistema pede. */
-    @apply bg-primary text-primary-foreground dark:bg-muted dark:text-foreground dark:border-border;
+    /* Aba ativa fica na TINTA (grafite) em todo tema — dono, 18/09: "não
+       precisa mudar a cor das abas". */
+    @apply bg-foreground text-background dark:bg-muted dark:text-foreground dark:border-border;
   }
 
   .scrollbar-hide {

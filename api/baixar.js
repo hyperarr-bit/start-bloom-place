@@ -51,6 +51,20 @@ export default async function handler(req, res) {
     clearTimeout(t);
   } catch { /* nunca atrapalha o redirect */ }
   res.setHeader("Cache-Control", "no-store");
+  /* NAVEGADOR DE DENTRO DO INSTAGRAM/FACEBOOK (18/09, print do dono): o
+   * webview deles não segue um 302 pra loja — mostra "Ocorreu um erro
+   * desconhecido". Pra ele a resposta é uma página mínima que pula pra loja
+   * por JavaScript (e por meta refresh), com um botão de reserva caso o
+   * webview bloqueie o pulo. Navegador normal continua no 302, que é o
+   * mais rápido. */
+  if (/Instagram|FBAN|FBAV|FB_IAB|Threads|Barcelona/i.test(String(req.headers["user-agent"] || ""))) {
+    const loja = plataforma === "ios" ? "App Store" : plataforma === "android" ? "Google Play" : "site";
+    const seguro = url.replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.end(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta http-equiv="refresh" content="1;url=${seguro}"><title>Baixar o CORE</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;color:#16121c;font-family:Inter,-apple-system,system-ui,sans-serif;text-align:center;padding:24px}.m{font-weight:900;font-size:28px;letter-spacing:-.02em;margin-bottom:6px}p{color:#6b6661;font-size:15px;margin:0 0 22px}a{display:block;margin:0 auto;max-width:320px;padding:15px 20px;border-radius:999px;background:#16121c;color:#fff;font-weight:700;text-decoration:none;font-size:16px}</style></head><body><div><div class="m">CORE</div><p>Abrindo a ${loja}…</p><a href="${seguro}">Abrir na ${loja}</a></div><script>location.replace(${JSON.stringify(url)});</script></body></html>`);
+    return;
+  }
   res.statusCode = 302;
   res.setHeader("Location", url);
   res.end();

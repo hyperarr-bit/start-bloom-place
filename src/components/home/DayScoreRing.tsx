@@ -27,10 +27,12 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
   // CelebracaoDia100, montada pela Home ao lado deste anel. Aqui ficam só o
   // pulso e o número em verde. (Até 11/09 era um toast disparado daqui.)
 
+  // Abaixo de 80 o anel usa a cor do tema (--score-ring; nos temas
+  // alternativos é o acento, no Original cai no aviso âmbar de sempre).
+  // ≥ 80 continua verde em todo tema: é informação, não decoração.
   const getScoreColor = () => {
     if (score >= 80) return "hsl(var(--success))";
-    if (score >= 50) return "hsl(var(--warning))";
-    return "hsl(var(--warning))";
+    return "hsl(var(--score-ring, var(--warning)))";
   };
 
   return (
@@ -104,13 +106,14 @@ export const DayScoreRing = ({ score, streak }: DayScoreRingProps) => {
              * não é conserto. A palavra "consecutivos" é a parte dispensável:
              * 🔥 + "20 dias" já diz sequência sozinho. Então ela só entra
              * quando há largura pra ela. */
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warning/10 border border-warning/20 whitespace-nowrap max-w-full"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full whitespace-nowrap max-w-full"
+            style={{ background: "hsl(var(--streak, var(--warning)) / 0.1)", border: "1px solid hsl(var(--streak, var(--warning)) / 0.2)" }}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.7, type: "spring" }}
           >
-            <Flame className="w-3.5 h-3.5 text-warning" />
-            <span className="text-xs font-bold text-warning">{streak} dia{streak > 1 ? "s" : ""}</span>
+            <Flame className="w-3.5 h-3.5" style={{ color: "hsl(var(--streak, var(--warning)))" }} />
+            <span className="text-xs font-bold" style={{ color: "hsl(var(--streak, var(--warning)))" }}>{streak} dia{streak > 1 ? "s" : ""}</span>
             <span className="hidden min-[350px]:inline text-[10px] text-muted-foreground">consecutivo{streak > 1 ? "s" : ""}</span>
           </motion.div>
         )}

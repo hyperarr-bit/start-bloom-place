@@ -305,7 +305,10 @@
   }
 
   .notion-tab-active {
-    @apply bg-foreground text-background dark:bg-muted dark:text-foreground dark:border-border;
+    /* 18/09: aba ativa é o --primary (no Original continua grafite; nos temas
+       alternativos vira o acento). No escuro segue a superfície, que é o que
+       o modo escuro como sistema pede. */
+    @apply bg-primary text-primary-foreground dark:bg-muted dark:text-foreground dark:border-border;
   }
 
   .scrollbar-hide {

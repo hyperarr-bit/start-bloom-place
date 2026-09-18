@@ -93,7 +93,13 @@ const varsDoLado = (l: Lado, modo: ThemeMode): Record<string, string> => {
     "--background": l.paper, "--foreground": l.ink,
     "--card": l.card, "--card-foreground": l.ink,
     "--popover": l.card, "--popover-foreground": l.ink,
-    "--primary": l.ink, "--primary-foreground": l.paper,
+    /* 18/09 (dono: "com a troca de tema as cores têm que mudar mais"): nos
+       temas alternativos o botão principal, barras de progresso, checkbox,
+       switch e aba ativa são o ACENTO do tema (regra do Todoist), não a
+       tinta. O anel do score e o selo de sequência também. O Original fica
+       como está: grafite. */
+    "--primary": l.accent, "--primary-foreground": escuro ? l.paper : "0 0% 100%",
+    "--score-ring": l.accent, "--streak": l.accent,
     "--secondary": l.chip, "--secondary-foreground": l.ink,
     "--muted": l.chip, "--muted-foreground": l.ink2,
     "--accent": l.accent, "--accent-foreground": escuro ? l.paper : "0 0% 100%",

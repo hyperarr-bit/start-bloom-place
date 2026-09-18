@@ -283,6 +283,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const doneRef = useRef(false);
   const cpfRef = useRef<HTMLInputElement>(null);
+  /* 18/09: o e-mail é pedido NA HORA CERTA — depois que a pessoa copiou o
+   * código Pix (já decidiu pagar). Antes o campo ficava quieto embaixo do
+   * botão: 3 de 13 QR de hoje com e-mail; 35% dos pagantes desde 02/09
+   * ficaram sem e-mail e não conseguem entrar pelo app. Ao copiar, o campo
+   * ganha destaque, rola pra tela e recebe o foco. Não barra nada. */
+  const emailQrRef = useRef<HTMLInputElement>(null);
+  const [emailEmDestaque, setEmailEmDestaque] = useState(false);
   const price = PIX_PRICES[offer];
 
   // AbacatePay: sem form pra NINGUÉM — gera direto (nome vem do profile no
@@ -712,6 +719,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     setCopiadoJa(true);
     trackEvent("pix_copied", { offer, context });
     setTimeout(() => setCopied(false), 2500);
+    if (pedirEmailNoQr && !emailSalvo) {
+      setEmailEmDestaque(true);
+      trackEvent("funnel_view", { step: "pix_email_destaque", offer, context });
+      window.setTimeout(() => {
+        emailQrRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        emailQrRef.current?.focus({ preventScroll: true });
+      }, 350);
+    }
   };
 
   const enterApp = () => { window.location.href = "/"; };
@@ -1010,10 +1025,21 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
 
               {/* QR primeiro (02/09): o e-mail entra AQUI, depois do código, sem barrar nada. */}
               {pedirEmailNoQr && !emailSalvo && (
-                <div className="text-left rounded-xl border border-border bg-card p-3 mb-3">
-                  <p className="text-[12.5px] font-bold leading-tight">Pra onde mandamos seu acesso?</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">Só o e-mail. Se fechar a aba depois de pagar, é por ele que você entra.</p>
+                <div
+                  data-testid="pix-email-qr"
+                  data-destaque={emailEmDestaque ? "1" : "0"}
+                  className={`text-left rounded-xl border p-3 mb-3 transition-colors ${emailEmDestaque ? "border-accent bg-accent/5" : "border-border bg-card"}`}
+                >
+                  <p className="text-[12.5px] font-bold leading-tight">
+                    {emailEmDestaque ? "Código copiado ✓ — pra onde mando seu acesso?" : "Pra onde mandamos seu acesso?"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 mb-2">
+                    {emailEmDestaque
+                      ? "Só o e-mail. É por ele que você entra pelo app do celular e em outro aparelho."
+                      : "Só o e-mail. Se fechar a aba depois de pagar, é por ele que você entra."}
+                  </p>
                   <input
+                    ref={emailQrRef}
                     type="email" inputMode="email" autoComplete="email"
                     value={emailCompra}
                     onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) setContaExiste(false); }}

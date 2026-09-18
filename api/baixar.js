@@ -22,32 +22,36 @@ const SITE = "https://coreaplicativo.com.br/";
 const SUPABASE_URL = "https://itoylenzvahbscgjgtqf.supabase.co";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0b3lsZW56dmFoYnNjZ2pndHFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzMTc4NzUsImV4cCI6MjA4OTg5Mzg3NX0.G3bJEdD5B5lmc1cic6UYGeu2xv4XrbmZ9MA_afoYnLg";
 
-const limpa = (s) => String(s || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "ig_bio";
+const limpa = (s, padrao) => String(s || "").replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || padrao;
 
-export function destino(userAgent, origem) {
+/* `?c=` e `?m=` são os nomes que a página antiga (07/09) aceitava — links já
+ * publicados continuam valendo. `?origem=` é o nome novo. */
+export function destino(userAgent, origem, meio) {
   const ua = String(userAgent || "");
-  const o = limpa(origem);
-  const utm = `utm_source=${o.split("_")[0] || "link"}&utm_medium=link&utm_campaign=${o}`;
+  const o = limpa(origem, "ig_bio");
+  const utm = `utm_source=${o.split("_")[0] || "link"}&utm_medium=${limpa(meio, "link")}&utm_campaign=${o}`;
   if (/iPhone|iPad|iPod/i.test(ua)) return { plataforma: "ios", url: `${APP_STORE}?ct=${o}` };
   if (/Android/i.test(ua)) return { plataforma: "android", url: `${PLAY}&referrer=${encodeURIComponent(utm)}` };
   return { plataforma: "web", url: `${SITE}?${utm}` };
 }
 
 export default async function handler(req, res) {
-  const { plataforma, url } = destino(req.headers["user-agent"], req.query?.origem);
+  const origem = req.query?.origem ?? req.query?.c;
+  const { plataforma, url } = destino(req.headers["user-agent"], origem, req.query?.m);
+  // Registro do clique ANTES do redirect, com teto de 300 ms: a Vercel congela
+  // a função assim que a resposta sai, então "depois" não roda.
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 300);
+    await fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
+      method: "POST", signal: ctl.signal,
+      headers: { apikey: ANON, Authorization: `Bearer ${ANON}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ event_name: "baixar_click", session_id: null, event_data: { plataforma, origem: limpa(origem, "ig_bio"), ua: String(req.headers["user-agent"] || "").slice(0, 120), ref: String(req.headers.referer || "").slice(0, 120) } }),
+    });
+    clearTimeout(t);
+  } catch { /* nunca atrapalha o redirect */ }
   res.setHeader("Cache-Control", "no-store");
   res.statusCode = 302;
   res.setHeader("Location", url);
   res.end();
-  // registro do clique (depois do redirect já ter saído; teto de 400 ms)
-  try {
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 400);
-    await fetch(`${SUPABASE_URL}/rest/v1/analytics_events`, {
-      method: "POST", signal: ctl.signal,
-      headers: { apikey: ANON, Authorization: `Bearer ${ANON}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ event_name: "baixar_click", session_id: null, event_data: { plataforma, origem: limpa(req.query?.origem), ua: String(req.headers["user-agent"] || "").slice(0, 120), ref: String(req.headers.referer || "").slice(0, 120) } }),
-    });
-    clearTimeout(t);
-  } catch { /* nunca atrapalha o redirect */ }
 }

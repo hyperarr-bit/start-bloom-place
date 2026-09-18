@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 export type ThemeMode = "light" | "dark";
-export type ThemePalette = "default" | "midnight" | "ocean" | "rose" | "forest";
+export type ThemePalette = "default" | "midnight" | "ocean" | "rose" | "forest" | "areia";
 
 interface ThemeContextType {
   mode: ThemeMode;
@@ -17,252 +17,104 @@ const ThemeContext = createContext<ThemeContextType>({
   setPalette: () => {},
 });
 
-export const palettes: Record<ThemePalette, { name: string; preview: string[]; accent: string }> = {
-  default: { name: "Original", preview: ["#f5f0e8", "#1a1a1a", "#d6336c", "#f59f00"], accent: "330 65% 50%" },
-  midnight: { name: "Midnight", preview: ["#0f172a", "#818cf8", "#6366f1", "#4f46e5"], accent: "239 84% 67%" },
-  ocean: { name: "Ocean", preview: ["#f0f9ff", "#0ea5e9", "#06b6d4", "#0284c7"], accent: "199 89% 48%" },
-  rose: { name: "Rosé", preview: ["#fff1f2", "#f43f5e", "#fb7185", "#e11d48"], accent: "350 89% 60%" },
-  forest: { name: "Forest", preview: ["#f0fdf4", "#22c55e", "#16a34a", "#15803d"], accent: "142 71% 45%" },
+/**
+ * TEMAS (refeitos 18/09, pedido do dono: "o Original é lindo, os outros
+ * são muito abaixo").
+ *
+ * O que estava errado nos antigos: eram o Original com uma lavagem de cor —
+ * fundo tingido, botão principal saturado (#2b2bd6 no Midnight) e, pior, as
+ * cores SEMÂNTICAS trocadas: no Midnight "sucesso" virava roxo e "aviso"
+ * lilás; no Rosé, sucesso era rosa. Verde é verde em qualquer tema, porque é
+ * informação. E gráficos/dinheiro nem mudavam, então o tema pintava só a
+ * moldura.
+ *
+ * A regra agora, a mesma do Todoist, Bear, Things e Linear: um tema é
+ * PAPEL + TINTA + ACENTO. Superfícies e texto mudam; o que significa alguma
+ * coisa (sucesso, aviso, erro, receita, despesa, gráficos) fica igual ao
+ * Original. O botão principal é a tinta (grafite do tema), não o acento —
+ * é o que faz o Original ser bonito: uma cor só, usada pouco.
+ *
+ * Cada tema tem uma referência de paleta conhecida no escuro (Catppuccin,
+ * Nord, Rosé Pine, Everforest, Gruvbox) — identidades que gente reconhece e
+ * gosta — e um claro próprio, de papel quase branco com um sopro da cor.
+ * Contraste verificado antes de entrar: tinta/papel ≥ 11:1, texto
+ * secundário ≥ 5:1, acento como texto ≥ 4.5:1 (claro) / ≥ 5.8:1 (escuro).
+ * No escuro o texto em cima do acento é o PAPEL (escuro), não branco —
+ * acento claro + branco dava 2:1.
+ *
+ * Os ids (midnight, ocean, rose, forest) ficam: estão salvos no aparelho de
+ * quem já escolheu. Só o nome e as cores mudam. "default" continua vazio:
+ * o Original é o :root do index.css, intocado.
+ */
+type Lado = { paper: string; card: string; chip: string; border: string; ink: string; ink2: string; accent: string };
+type Spec = { name: string; preview: string[]; light: Lado; dark: Lado };
+
+const SPEC: Record<Exclude<ThemePalette, "default">, Spec> = {
+  midnight: { // Índigo — claro: papel frio; escuro: Catppuccin Mocha (base #1E1E2E, lavender #B4BEFE)
+    name: "Índigo", preview: ["#f4f6fc", "#1a1d33", "#5b62d6", "#b4befe"],
+    light: { paper: "228 33% 98%", card: "0 0% 100%", chip: "228 28% 94%", border: "228 20% 88%", ink: "232 35% 12%", ink2: "232 12% 44%", accent: "239 65% 56%" },
+    dark:  { paper: "240 21% 12%", card: "240 21% 15%", chip: "240 19% 19%", border: "240 17% 24%", ink: "226 64% 88%", ink2: "228 24% 72%", accent: "232 97% 85%" },
+  },
+  ocean: { // Oceano — claro: papel azul-gelo; escuro: Nord (polar night #2E3440, frost #88C0D0)
+    name: "Oceano", preview: ["#f3f8fc", "#132436", "#1a7fb0", "#88c0d0"],
+    light: { paper: "204 40% 98%", card: "0 0% 100%", chip: "204 33% 94%", border: "204 22% 88%", ink: "208 40% 11%", ink2: "208 14% 42%", accent: "199 78% 38%" },
+    dark:  { paper: "220 16% 14%", card: "220 16% 18%", chip: "220 16% 22%", border: "220 15% 27%", ink: "218 27% 92%", ink2: "219 15% 68%", accent: "193 43% 67%" },
+  },
+  rose: { // Rosé — claro: papel blush; escuro: Rosé Pine (base #191724, love #EB6F92, text #E0DEF4)
+    name: "Rosé", preview: ["#fdf5f6", "#2b1a20", "#d6336c", "#eb6f92"],
+    light: { paper: "350 40% 98%", card: "0 0% 100%", chip: "350 33% 95%", border: "350 20% 89%", ink: "345 30% 12%", ink2: "345 10% 44%", accent: "350 70% 50%" },
+    dark:  { paper: "249 22% 12%", card: "247 21% 15%", chip: "248 19% 19%", border: "248 16% 25%", ink: "245 50% 91%", ink2: "246 17% 68%", accent: "343 76% 68%" },
+  },
+  forest: { // Floresta — claro: papel verde-oliva; escuro: Everforest (bg #2D353B, green #A7C080, fg #D3C6AA)
+    name: "Floresta", preview: ["#f6f8f2", "#13221a", "#237a4f", "#a7c080"],
+    light: { paper: "80 25% 97%", card: "0 0% 100%", chip: "90 22% 93%", border: "90 15% 87%", ink: "150 25% 10%", ink2: "150 8% 40%", accent: "152 55% 32%" },
+    dark:  { paper: "200 13% 15%", card: "200 12% 19%", chip: "200 11% 23%", border: "200 10% 29%", ink: "40 30% 82%", ink2: "40 12% 64%", accent: "96 33% 63%" },
+  },
+  areia: { // Areia — claro: papel creme (Bear Dieci / Craft); escuro: Gruvbox (bg #282828, orange #FE8019, fg #EBDBB2)
+    name: "Areia", preview: ["#f7f2ea", "#2a1d14", "#c0552a", "#fe8019"],
+    light: { paper: "38 40% 96%", card: "36 30% 99%", chip: "36 30% 92%", border: "34 20% 85%", ink: "25 30% 12%", ink2: "25 10% 42%", accent: "18 70% 44%" },
+    dark:  { paper: "0 0% 16%", card: "0 0% 20%", chip: "0 0% 24%", border: "0 0% 30%", ink: "43 59% 81%", ink2: "40 20% 66%", accent: "24 99% 55%" },
+  },
 };
 
-// Comprehensive CSS variable overrides per palette per mode
+export const palettes: Record<ThemePalette, { name: string; preview: string[] }> = {
+  default: { name: "Original", preview: ["#ffffff", "#1a1a1a", "#d6336c", "#f5f0e8"] },
+  ...(Object.fromEntries(Object.entries(SPEC).map(([k, v]) => [k, { name: v.name, preview: v.preview }])) as Record<Exclude<ThemePalette, "default">, { name: string; preview: string[] }>),
+};
+
+/* Todas as variáveis de SUPERFÍCIE/TEXTO que o app usa, derivadas do lado.
+ * Inclui as dos módulos que têm token próprio (Rotina --rt-*, Saúde
+ * --saude-card/muted): sem isso, Rotina ficava branco puro em cima de papel
+ * tingido. Semânticas (success/warning/destructive/card-receitas/income/
+ * expense/chart) NÃO entram — são as do Original em todo tema. */
+const varsDoLado = (l: Lado, modo: ThemeMode): Record<string, string> => {
+  const escuro = modo === "dark";
+  return {
+    "--background": l.paper, "--foreground": l.ink,
+    "--card": l.card, "--card-foreground": l.ink,
+    "--popover": l.card, "--popover-foreground": l.ink,
+    "--primary": l.ink, "--primary-foreground": l.paper,
+    "--secondary": l.chip, "--secondary-foreground": l.ink,
+    "--muted": l.chip, "--muted-foreground": l.ink2,
+    "--accent": l.accent, "--accent-foreground": escuro ? l.paper : "0 0% 100%",
+    "--border": l.border, "--input": l.border, "--ring": l.accent,
+    "--sidebar-background": l.paper, "--sidebar-foreground": l.ink,
+    "--sidebar-primary": l.accent, "--sidebar-primary-foreground": escuro ? l.paper : "0 0% 100%",
+    "--sidebar-accent": l.chip, "--sidebar-accent-foreground": l.ink,
+    "--sidebar-border": l.border, "--sidebar-ring": l.accent,
+    "--rt-surface": l.paper, "--rt-card": l.card, "--rt-card-2": l.chip, "--rt-border": l.border,
+    "--rt-text": l.ink, "--rt-text-soft": l.ink2,
+    "--saude-card": l.card, "--saude-muted": l.ink2,
+  };
+};
+
 const paletteVars: Record<ThemePalette, Record<string, Record<string, string>>> = {
-  default: {
-    light: {},
-    dark: {},
-  },
-  midnight: {
-    light: {
-      "--background": "230 25% 95%",
-      "--foreground": "230 50% 10%",
-      "--card": "230 25% 98%",
-      "--card-foreground": "230 50% 10%",
-      "--popover": "230 25% 98%",
-      "--popover-foreground": "230 50% 10%",
-      "--primary": "239 84% 50%",
-      "--primary-foreground": "0 0% 100%",
-      "--secondary": "230 20% 93%",
-      "--secondary-foreground": "230 50% 10%",
-      "--muted": "230 15% 92%",
-      "--muted-foreground": "230 15% 45%",
-      "--accent": "239 84% 67%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "230 15% 88%",
-      "--input": "230 15% 88%",
-      "--ring": "239 84% 50%",
-      "--success": "250 60% 55%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "270 55% 60%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "239 84% 67%",
-      "--chart-2": "260 60% 55%",
-      "--chart-3": "220 70% 50%",
-      "--chart-4": "280 60% 55%",
-      "--chart-5": "200 70% 50%",
-    },
-    dark: {
-      "--background": "230 30% 8%",
-      "--foreground": "230 10% 90%",
-      "--card": "230 30% 12%",
-      "--card-foreground": "230 10% 90%",
-      "--popover": "230 30% 12%",
-      "--popover-foreground": "230 10% 90%",
-      "--primary": "239 84% 75%",
-      "--primary-foreground": "230 30% 8%",
-      "--secondary": "230 20% 16%",
-      "--secondary-foreground": "230 10% 90%",
-      "--muted": "230 20% 16%",
-      "--muted-foreground": "230 10% 55%",
-      "--accent": "239 84% 67%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "230 20% 20%",
-      "--input": "230 20% 20%",
-      "--ring": "239 84% 67%",
-      "--success": "250 60% 65%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "270 55% 65%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "239 84% 67%",
-      "--chart-2": "260 60% 60%",
-      "--chart-3": "220 70% 55%",
-      "--chart-4": "280 60% 60%",
-      "--chart-5": "200 70% 55%",
-    },
-  },
-  ocean: {
-    light: {
-      "--background": "200 30% 97%",
-      "--foreground": "200 50% 10%",
-      "--card": "200 25% 99%",
-      "--card-foreground": "200 50% 10%",
-      "--popover": "200 25% 99%",
-      "--popover-foreground": "200 50% 10%",
-      "--primary": "199 89% 38%",
-      "--primary-foreground": "0 0% 100%",
-      "--secondary": "200 20% 94%",
-      "--secondary-foreground": "200 50% 10%",
-      "--muted": "200 15% 93%",
-      "--muted-foreground": "200 15% 40%",
-      "--accent": "199 89% 48%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "200 15% 88%",
-      "--input": "200 15% 88%",
-      "--ring": "199 89% 38%",
-      "--success": "180 60% 40%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "210 70% 50%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "199 89% 48%",
-      "--chart-2": "180 60% 40%",
-      "--chart-3": "210 70% 50%",
-      "--chart-4": "170 50% 45%",
-      "--chart-5": "220 60% 55%",
-    },
-    dark: {
-      "--background": "200 30% 7%",
-      "--foreground": "200 10% 92%",
-      "--card": "200 30% 11%",
-      "--card-foreground": "200 10% 92%",
-      "--popover": "200 30% 11%",
-      "--popover-foreground": "200 10% 92%",
-      "--primary": "199 89% 65%",
-      "--primary-foreground": "200 30% 7%",
-      "--secondary": "200 20% 15%",
-      "--secondary-foreground": "200 10% 92%",
-      "--muted": "200 20% 15%",
-      "--muted-foreground": "200 10% 55%",
-      "--accent": "199 89% 55%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "200 20% 18%",
-      "--input": "200 20% 18%",
-      "--ring": "199 89% 55%",
-      "--success": "180 60% 45%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "210 70% 55%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "199 89% 55%",
-      "--chart-2": "180 60% 45%",
-      "--chart-3": "210 70% 55%",
-      "--chart-4": "170 50% 50%",
-      "--chart-5": "220 60% 60%",
-    },
-  },
-  rose: {
-    light: {
-      "--background": "350 30% 97%",
-      "--foreground": "350 40% 10%",
-      "--card": "350 25% 99%",
-      "--card-foreground": "350 40% 10%",
-      "--popover": "350 25% 99%",
-      "--popover-foreground": "350 40% 10%",
-      "--primary": "350 89% 45%",
-      "--primary-foreground": "0 0% 100%",
-      "--secondary": "350 20% 94%",
-      "--secondary-foreground": "350 40% 10%",
-      "--muted": "350 15% 93%",
-      "--muted-foreground": "350 10% 45%",
-      "--accent": "350 89% 60%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "350 15% 88%",
-      "--input": "350 15% 88%",
-      "--ring": "350 89% 45%",
-      "--success": "330 60% 55%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "10 70% 55%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "350 89% 60%",
-      "--chart-2": "330 60% 55%",
-      "--chart-3": "10 70% 55%",
-      "--chart-4": "320 50% 50%",
-      "--chart-5": "0 60% 50%",
-    },
-    dark: {
-      "--background": "350 25% 7%",
-      "--foreground": "350 10% 92%",
-      "--card": "350 25% 11%",
-      "--card-foreground": "350 10% 92%",
-      "--popover": "350 25% 11%",
-      "--popover-foreground": "350 10% 92%",
-      "--primary": "350 89% 70%",
-      "--primary-foreground": "350 25% 7%",
-      "--secondary": "350 20% 15%",
-      "--secondary-foreground": "350 10% 92%",
-      "--muted": "350 15% 15%",
-      "--muted-foreground": "350 10% 55%",
-      "--accent": "350 89% 60%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "350 15% 18%",
-      "--input": "350 15% 18%",
-      "--ring": "350 89% 60%",
-      "--success": "330 60% 60%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "10 70% 60%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "350 89% 60%",
-      "--chart-2": "330 60% 60%",
-      "--chart-3": "10 70% 60%",
-      "--chart-4": "320 50% 55%",
-      "--chart-5": "0 60% 55%",
-    },
-  },
-  forest: {
-    light: {
-      "--background": "140 25% 96%",
-      "--foreground": "140 40% 10%",
-      "--card": "140 20% 99%",
-      "--card-foreground": "140 40% 10%",
-      "--popover": "140 20% 99%",
-      "--popover-foreground": "140 40% 10%",
-      "--primary": "142 71% 30%",
-      "--primary-foreground": "0 0% 100%",
-      "--secondary": "140 15% 93%",
-      "--secondary-foreground": "140 40% 10%",
-      "--muted": "140 12% 92%",
-      "--muted-foreground": "140 10% 42%",
-      "--accent": "142 71% 45%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "140 12% 87%",
-      "--input": "140 12% 87%",
-      "--ring": "142 71% 30%",
-      "--success": "142 71% 45%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "80 60% 42%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "142 71% 45%",
-      "--chart-2": "160 55% 40%",
-      "--chart-3": "120 50% 40%",
-      "--chart-4": "170 45% 42%",
-      "--chart-5": "100 50% 45%",
-    },
-    dark: {
-      "--background": "140 25% 6%",
-      "--foreground": "140 10% 92%",
-      "--card": "140 25% 10%",
-      "--card-foreground": "140 10% 92%",
-      "--popover": "140 25% 10%",
-      "--popover-foreground": "140 10% 92%",
-      "--primary": "142 71% 65%",
-      "--primary-foreground": "140 25% 6%",
-      "--secondary": "140 15% 14%",
-      "--secondary-foreground": "140 10% 92%",
-      "--muted": "140 15% 14%",
-      "--muted-foreground": "140 10% 55%",
-      "--accent": "142 71% 50%",
-      "--accent-foreground": "0 0% 100%",
-      "--border": "140 15% 17%",
-      "--input": "140 15% 17%",
-      "--ring": "142 71% 50%",
-      "--success": "142 71% 50%",
-      "--success-foreground": "0 0% 100%",
-      "--warning": "80 60% 47%",
-      "--warning-foreground": "0 0% 100%",
-      "--chart-1": "142 71% 50%",
-      "--chart-2": "160 55% 45%",
-      "--chart-3": "120 50% 45%",
-      "--chart-4": "170 45% 47%",
-      "--chart-5": "100 50% 50%",
-    },
-  },
+  default: { light: {}, dark: {} },
+  midnight: { light: varsDoLado(SPEC.midnight.light, "light"), dark: varsDoLado(SPEC.midnight.dark, "dark") },
+  ocean: { light: varsDoLado(SPEC.ocean.light, "light"), dark: varsDoLado(SPEC.ocean.dark, "dark") },
+  rose: { light: varsDoLado(SPEC.rose.light, "light"), dark: varsDoLado(SPEC.rose.dark, "dark") },
+  forest: { light: varsDoLado(SPEC.forest.light, "light"), dark: varsDoLado(SPEC.forest.dark, "dark") },
+  areia: { light: varsDoLado(SPEC.areia.light, "light"), dark: varsDoLado(SPEC.areia.dark, "dark") },
 };
 
 // Collect all CSS variable keys used across all palettes

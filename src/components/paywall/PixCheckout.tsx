@@ -1099,6 +1099,15 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                   📩 Pagou? Seu acesso vai pra <strong className="text-foreground">{emailCompra}</strong> —
                   pode fechar esta tela sem medo.
                 </p>
+              ) : pedirEmailNoQr && !emailSalvo ? (
+                /* 18/09: sem e-mail salvo NÃO existe e-mail pra mandar — a frase
+                   antiga prometia um que nunca chegava (35% dos pagantes do Pix
+                   desde 02/09 ficaram sem e-mail na conta). Diz a verdade e
+                   aponta pro campo de cima. */
+                <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
+                  ✅ Pagou? Libera aqui na hora. Pra entrar pelo <strong className="text-foreground">app do celular</strong> ou
+                  em outro aparelho, salva seu e-mail acima.
+                </p>
               ) : (
                 <p className="text-[11.5px] text-muted-foreground mt-2 leading-snug px-3">
                   📩 Pagou? Além de liberar aqui na hora, seu acesso e o passo a passo

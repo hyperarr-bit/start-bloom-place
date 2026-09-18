@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { trackEvent } from "@/lib/analytics";
+import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 
@@ -51,6 +51,15 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
   const [msgRestore, setMsgRestore] = useState<string | null>(null);
 
   useEffect(() => { trackEvent("app_welcome_view", {}); }, []);
+  /* Referrer da Play chega por plugin, assíncrono: confere agora e de novo
+     em 2 s. Quem veio do card pós-compra do site já tem conta paga. */
+  const [veioDoSite, setVeioDoSite] = useState(() => instalouVindoDoSite());
+  useEffect(() => {
+    if (veioDoSite) { trackEvent("app_welcome_pos_compra_web", {}); return; }
+    const t = window.setTimeout(() => { if (instalouVindoDoSite()) { setVeioDoSite(true); trackEvent("app_welcome_pos_compra_web", {}); } }, 2000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const TILES: Array<[string, string]> = [
     ["💰", "#fdeccb"], ["💪", "#d9e4fb"], ["🥗", "#d7f0dd"], ["📅", "#cdeeee"],
@@ -141,20 +150,40 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.72, duration: 0.4 }}
         >
-          <button
-            className="apw-cta btn-shine"
-            onClick={() => { trackEvent("app_welcome_start", {}); onComecar(); }}
-          >
-            Começar
-          </button>
+          {veioDoSite && (
+            <div className="apw-aviso" data-testid="welcome-veio-do-site">
+              Você já comprou pelo site? <b>Entra com o mesmo e-mail</b> — não precisa pagar de novo.
+            </div>
+          )}
+          {veioDoSite ? (
+            <button
+              className="apw-cta btn-shine"
+              onClick={() => { trackEvent("app_welcome_login", { pos_compra_web: true }); if (onEntrar) onEntrar(); else navigate("/entrar"); }}
+            >
+              Entrar na minha conta
+            </button>
+          ) : (
+            <button
+              className="apw-cta btn-shine"
+              onClick={() => { trackEvent("app_welcome_start", {}); onComecar(); }}
+            >
+              Começar
+            </button>
+          )}
           {/* 23/08 (dono): welcome SEM preço — preço é papel do paywall,
               depois do compromisso. Aqui só a promessa e o Começar. */}
           {/* v60: no funil do teste o login fica DENTRO do funil (SignupScreen
               tem a esteira de conta existente); /entrar é o fallback do uso
               antigo em Comecar/Radar. */}
-          <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
-            Já tenho conta? <b>Entrar</b>
-          </button>
+          {veioDoSite ? (
+            <button className="apw-link" onClick={() => { trackEvent("app_welcome_start", { pos_compra_web: true }); onComecar(); }}>
+              Ainda não tenho conta? <b>Começar</b>
+            </button>
+          ) : (
+            <button className="apw-link" onClick={() => { trackEvent("app_welcome_login", {}); if (onEntrar) onEntrar(); else navigate("/entrar"); }}>
+              Já tenho conta? <b>Entrar</b>
+            </button>
+          )}
           {isNativeShell() && (
             <button className="apw-restore" onClick={tentarRestaurar} disabled={restaurando}>
               {restaurando ? "Verificando…" : "Restaurar compras"}
@@ -257,6 +286,7 @@ const CSS_APW = `
  * sublinhado e cor mais escura pra ANUNCIAR que é tocável. É a única saída de
  * quem pagou e voltou depois. */
 .apw-link { border: 0; background: none; padding: 11px 16px; font-size: 14.5px; color: #4f5a64; font-family: inherit; cursor: pointer; }
+.apw-aviso { margin: 0 0 10px; padding: 10px 14px; border-radius: 12px; background: #fff; border: 1px solid #d9e6f2; color: #16121c; font-size: 13.5px; line-height: 1.4; text-align: center; }
 .apw-link b { color: #16121c; }
 .apw-restore { border: 0; background: none; padding: 12px 16px; font-size: 13px; color: #4f5a64; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

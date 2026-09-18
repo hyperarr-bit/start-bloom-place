@@ -109,6 +109,19 @@ const lerReferrerDaPlay = async (): Promise<string> => {
   return String(res?.referrer || "");
 };
 
+/**
+ * INSTALOU VINDO DO SITE DEPOIS DE PAGAR? (18/09)
+ *
+ * Caso real de hoje: pagou R$27,90 no Pix às 06:59, tocou no card "O CORE
+ * também é app de celular", instalou pela Play, caiu na welcome, tocou em
+ * "Começar" e pagou DE NOVO R$97,90 na folha do Google às 07:02. O referrer
+ * da Play já dizia `utm_campaign=web_pos_compra` — o app sabia e não usou.
+ * A welcome lê isto e põe o "Entrar" na frente, com o aviso.
+ */
+export const instalouVindoDoSite = (): boolean => {
+  try { return /utm_campaign=web_/.test(localStorage.getItem(REFERRER_RAW) ?? ""); } catch { return false; }
+};
+
 export const captureInstallReferrer = async () => {
   try {
     if (localStorage.getItem(REFERRER_FLAG)) {

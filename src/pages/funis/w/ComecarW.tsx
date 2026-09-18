@@ -687,7 +687,7 @@ export default function ComecarW() {
   };
 
   return (
-    <div style={{ ...LIGHT_VARS, background: "#ffffff" }} className="min-h-[calc(100dvh-var(--app-safe-top,0px))] text-foreground flex flex-col">
+    <div style={{ ...LIGHT_VARS, background: "#ffffff" }} className="tema-claro min-h-[calc(100dvh-var(--app-safe-top,0px))] text-foreground flex flex-col">
       <AnimatePresence>
         {step === "welcome" && (
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>

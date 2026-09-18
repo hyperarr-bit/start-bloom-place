@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import "./styles/escuro.css"; // modo escuro como sistema (gerado por scripts/gerar-escuro.mjs) — depois do index.css de propósito
 import { trackEvent, captureLandingMeta } from "@/lib/analytics";
 import { initPwaInstall } from "@/lib/pwa-install";
 import { isNativeShell } from "@/lib/native-shell";

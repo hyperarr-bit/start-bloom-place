@@ -29,8 +29,8 @@ export const WrappedBanner = () => {
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative w-full flex items-center gap-3 rounded-xl p-3.5 text-left text-white"
-        style={{ background: "linear-gradient(120deg, #1c1917 30%, #D22D80 160%)" }}
+        className="relative w-full flex items-center gap-3 rounded-xl p-3.5 text-left text-white dark:!bg-none dark:!bg-card dark:border dark:border-border dark:border-l-[3px] dark:border-l-[#D4568C]"
+        style={{ background: "linear-gradient(120deg, #1c1917 30%, #D22D80 160%)" }} /* 17/09: no escuro o gradiente vira card + filete magenta (cor é sinal, não superfície) */
       >
         <button
           onClick={() => { trackEvent("wrapped_open", { month: retro.mes, origem: "banner" }); setOpen(true); }}

@@ -1449,7 +1449,7 @@ export default function Comecar() {
   return (
     <div
       style={{ ...LIGHT_VARS, ...(ceuShell ? { background: CEU_SUAVE_APP } : {}) }}
-      className={`min-h-dvh ${ceuShell ? "" : "bg-white"} text-foreground flex flex-col`}
+      className={`min-h-dvh ${ceuShell ? "tema-claro " : "bg-white"} text-foreground flex flex-col`}
     >
       {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
           pergunta no mesmo y em toda tela) + transição em slide horizontal —

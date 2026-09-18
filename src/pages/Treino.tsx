@@ -1,3 +1,4 @@
+import { usePaletaGrafico } from "@/lib/paleta-grafico";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -173,6 +174,7 @@ function estimate1RM(weight: number, reps: number): number {
 }
 
 const Treino = () => {
+  const paleta = usePaletaGrafico(); // 17/09: linhas dos gráficos por tema
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("hoje");
   useScrollActiveTabIntoView(activeTab);
@@ -1114,7 +1116,7 @@ const Treino = () => {
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
-                    <Line type="monotone" dataKey="carga" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Carga (kg)" />
+                    <Line type="monotone" dataKey="carga" stroke={paleta.azul} strokeWidth={2} dot={{ r: 3 }} name="Carga (kg)" />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -1133,7 +1135,7 @@ const Treino = () => {
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                    <Line type="monotone" dataKey="volume" stroke="#a855f7" strokeWidth={2} dot={{ r: 3 }} name="Volume (kg)" />
+                    <Line type="monotone" dataKey="volume" stroke={paleta.roxo} strokeWidth={2} dot={{ r: 3 }} name="Volume (kg)" />
                   </LineChart>
                 </ResponsiveContainer>
               </div>

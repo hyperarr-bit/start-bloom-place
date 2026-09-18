@@ -1020,7 +1020,7 @@ export function PaywallDia14({
   };
 
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground overflow-y-auto">
+    <div style={LIGHT_VARS} className="tema-claro min-h-dvh w-full bg-white text-foreground overflow-y-auto">
       {pixOffer && (
         <PixCheckout offer={pixOffer} context={context} onClose={fecharPix} v2={onPagoSemConta ? { onConfirmado: onPagoSemConta } : undefined} />
       )}

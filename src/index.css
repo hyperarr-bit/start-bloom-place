@@ -128,64 +128,64 @@
 
   .dark {
     color-scheme: dark;
-    /* ===== Premium graphite base (Notion / Linear / Stripe inspired) ===== */
-    --background: 222 16% 7%;          /* #0F1115 */
-    --foreground: 0 0% 100%;           /* #FFFFFF */
+    /* ===== MODO ESCURO COMO SISTEMA (17/09) =====
+       Três leis: cor é sinal, nunca superfície · escada de 3 superfícies com
+       borda · texto a 90 % e cores a ~60 % de saturação. Tudo aqui foi
+       verificado ≥ 7:1 sobre o card (#171A20). As cores vivas dos componentes
+       são remapeadas em src/styles/escuro.css (gerado). O claro não muda. */
+    --background: 222 16% 7%;          /* #0F1115 fundo */
+    --foreground: 222 16% 92%;         /* #E6E8EE texto (90 % branco, não #FFF) */
 
-    --card: 222 14% 11%;               /* #161A22 */
-    --card-foreground: 0 0% 100%;
-    --popover: 222 14% 11%;            /* #161A22 */
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 96%;
+    --card: 220 16% 11%;               /* #171A20 card */
+    --card-foreground: 222 16% 92%;
+    --popover: 220 16% 11%;
+    --popover-foreground: 222 16% 92%;
+    --primary: 222 16% 92%;
     --primary-foreground: 222 16% 7%;
-    --secondary: 222 14% 14%;          /* #1B2030 */
-    --secondary-foreground: 0 0% 100%;
-    --muted: 222 14% 14%;              /* #1B2030 */
-    --muted-foreground: 220 8% 67%;    /* #A1A7B3 */
-    --accent: 330 55% 58%;
+    --secondary: 220 16% 15%;          /* #1F232B card dentro do card / chip */
+    --secondary-foreground: 222 16% 92%;
+    --muted: 220 16% 15%;
+    --muted-foreground: 220 10% 68%;   /* #A3A9B6 */
+    --accent: 330 55% 62%;             /* magenta de noite */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 65% 52%;
+    --destructive: 0 60% 62%;          /* #E07070 */
     --destructive-foreground: 0 0% 100%;
-    --success: 170 45% 50%;
+    --success: 150 45% 55%;            /* #4FB88A */
     --success-foreground: 0 0% 100%;
-    --warning: 38 75% 55%;
-    --warning-foreground: 0 0% 100%;
+    --warning: 38 55% 60%;             /* #D9A857 */
+    --warning-foreground: 222 16% 7%;
 
-    /* ===== Financial identity — deep, low-saturation tones ===== */
-    /* Receitas: dourado escuro / amarelo queimado */
-    --card-receitas: 38 35% 12%;
-    --card-receitas-border: 38 55% 32%;
-    --card-receitas-text: 42 75% 70%;
-    /* Despesas: roxo profundo */
-    --card-despesas: 258 22% 14%;
-    --card-despesas-border: 258 35% 32%;
-    --card-despesas-text: 258 60% 78%;
-    /* Dívidas: vermelho vinho */
+    /* ===== Identidade financeira: tinta escura, texto de noite ===== */
+    --card-receitas: 38 30% 12%;
+    --card-receitas-border: 38 32% 30%;
+    --card-receitas-text: 40 58% 63%;   /* #D9B26A */
+    --card-despesas: 258 26% 14%;
+    --card-despesas-border: 258 30% 32%;
+    --card-despesas-text: 250 62% 77%;  /* #A99FEA */
     --card-dividas: 350 28% 13%;
-    --card-dividas-border: 350 40% 32%;
-    --card-dividas-text: 350 70% 76%;
-    /* Investimentos: verde petróleo */
-    --card-investimentos: 175 35% 11%;
-    --card-investimentos-border: 175 40% 28%;
-    --card-investimentos-text: 170 50% 70%;
+    --card-dividas-border: 350 30% 30%;
+    --card-dividas-text: 0 64% 73%;     /* #E68C8C */
+    --card-investimentos: 170 28% 11%;
+    --card-investimentos-border: 170 30% 28%;
+    --card-investimentos-text: 150 44% 61%; /* #6FC79C */
 
-    --income: 38 30% 12%;
-    --income-foreground: 42 75% 72%;
-    --expense: 258 22% 13%;
-    --expense-foreground: 258 60% 78%;
+    --income: 150 28% 11%;
+    --income-foreground: 150 44% 61%;
+    --expense: 0 28% 14%;
+    --expense-foreground: 0 64% 73%;
 
-    --border: 222 12% 18%;             /* #2A3042 */
-    --input: 222 12% 18%;
-    --ring: 220 8% 70%;
+    --border: 220 16% 18%;             /* #262B34 borda visível */
+    --input: 220 16% 18%;
+    --ring: 220 10% 70%;
 
     --sidebar-background: 222 16% 8%;
-    --sidebar-foreground: 0 0% 96%;
-    --sidebar-primary: 224 76% 52%;
+    --sidebar-foreground: 222 16% 92%;
+    --sidebar-primary: 220 60% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 14% 14%;
-    --sidebar-accent-foreground: 0 0% 96%;
-    --sidebar-border: 222 12% 18%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 220 16% 15%;
+    --sidebar-accent-foreground: 222 16% 92%;
+    --sidebar-border: 220 16% 18%;
+    --sidebar-ring: 220 60% 62%;
   }
 }
 
@@ -362,12 +362,13 @@
   }
 
   .dark {
-    --saude-green: 145 100% 50%;
-    --saude-blue: 186 100% 50%;
-    --saude-yellow: 50 100% 50%;
-    --saude-red: 0 100% 59%;
-    --saude-card: 0 0% 15%;
-    --saude-muted: 0 0% 60%;
+    /* 17/09: neon (100 % de saturação) virou tom de noite */
+    --saude-green: 150 44% 61%;
+    --saude-blue: 190 50% 62%;
+    --saude-yellow: 40 58% 63%;
+    --saude-red: 0 64% 73%;
+    --saude-card: 220 16% 11%;
+    --saude-muted: 220 10% 68%;
   }
 
   .saude-card {
@@ -407,18 +408,19 @@
     --rt-text: 220 8% 91%;              /* #E6E8EB */
     --rt-text-soft: 220 6% 64%;         /* #9AA0AA */
 
-    --rt-accent: 142 71% 45%;           /* #22C55E */
-    --rt-accent-soft: 142 60% 16%;      /* #14532D-ish bg */
-    --rt-warning: 48 96% 53%;           /* #FACC15 */
-    --rt-warning-soft: 35 40% 10%;      /* #1F1A12 */
-    --rt-warning-text: 48 90% 70%;
-    --rt-danger: 0 75% 60%;
-    --rt-info: 210 90% 62%;
+    /* 17/09: tons de noite (antes #22C55E/#FACC15 puros) */
+    --rt-accent: 160 58% 40%;           /* #2AA379 */
+    --rt-accent-soft: 160 28% 12%;
+    --rt-warning: 40 58% 63%;           /* #D9B26A */
+    --rt-warning-soft: 38 30% 12%;
+    --rt-warning-text: 40 58% 63%;
+    --rt-danger: 0 64% 73%;
+    --rt-info: 215 62% 72%;             /* #86B4E8 */
 
-    --rt-heat-0: 222 12% 18%;           /* #2A2E38 */
-    --rt-heat-1: 142 60% 22%;           /* #14532D */
-    --rt-heat-2: 142 71% 45%;           /* #22C55E */
-    --rt-heat-3: 142 76% 64%;           /* #4ADE80 */
+    --rt-heat-0: 220 16% 18%;
+    --rt-heat-1: 160 30% 22%;
+    --rt-heat-2: 160 50% 38%;
+    --rt-heat-3: 150 44% 61%;
   }
 
   .rt-card {

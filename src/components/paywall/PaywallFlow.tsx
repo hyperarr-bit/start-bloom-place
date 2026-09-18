@@ -1336,7 +1336,7 @@ export function PaywallFlow({
    * nunca precisou existir.
    */
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh w-full bg-white text-foreground">
+    <div style={LIGHT_VARS} className="tema-claro min-h-dvh w-full bg-white text-foreground">
       {pixOffer && (
         <PixCheckout offer={pixOffer} context={context} onClose={() => setPixOffer(null)} />
       )}

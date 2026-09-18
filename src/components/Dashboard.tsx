@@ -1,3 +1,4 @@
+import { usePaletaGrafico } from "@/lib/paleta-grafico";
 import { useMemo } from "react";
 import { localDayKey } from "@/lib/utils";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
@@ -57,7 +58,7 @@ interface DashboardProps {
   perfil?: string;
 }
 
-const COLORS = ["#8b5cf6", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#ef4444", "#6366f1", "#14b8a6"];
+// 17/09: a paleta agora depende do tema — ver src/lib/paleta-grafico.ts (usePaletaGrafico dentro do componente)
 
 const categoryLabels: Record<string, string> = {
   alimentacao: "Alimentação",
@@ -136,6 +137,7 @@ export const Dashboard = ({
   onNavigate,
   perfil,
 }: DashboardProps) => {
+  const { cores: COLORS, positivo: COR_RECEITA, negativo: COR_DESPESA } = usePaletaGrafico();
   const { user } = useAuth();
   // categorias personalizadas: resolve nome/cor no gráfico e no top de gastos
   const { labelOf, barOf } = useFinanceCategories();
@@ -531,8 +533,8 @@ export const Dashboard = ({
                 <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Receitas" fill={COR_RECEITA} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Despesas" fill={COR_DESPESA} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -549,14 +551,14 @@ export const Dashboard = ({
             <AreaChart data={patrimonyData}>
               <defs>
                 <linearGradient id="colorPatrimony" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  <stop offset="5%" stopColor={COLORS[0]} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={COLORS[0]} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="month" tick={{ fontSize: 10 }} />
               <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
               <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
-              <Area type="monotone" dataKey="Patrimônio" stroke="#8b5cf6" fill="url(#colorPatrimony)" strokeWidth={2} />
+              <Area type="monotone" dataKey="Patrimônio" stroke={COLORS[0]} fill="url(#colorPatrimony)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         ) : (

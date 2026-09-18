@@ -1734,7 +1734,7 @@ export default function ComecarRadar() {
          exata + overflow-hidden — nada de deslizar o quiz pra cima e pra
          baixo. Cadastro, resultado e central continuam roláveis (lá o
          conteúdo é maior que a tela de propósito). Web intocada. */
-      className={`min-h-dvh ${ceuShell ? "h-dvh overflow-hidden" : "bg-white"} text-foreground flex flex-col`}
+      className={`min-h-dvh ${ceuShell ? "tema-claro h-dvh overflow-hidden" : "bg-white"} text-foreground flex flex-col`}
     >
       {/* Shell: porta e quiz TOP-ALIGNED com a mesma geometria (barra e
           pergunta no mesmo y em toda tela) + transição em slide horizontal —

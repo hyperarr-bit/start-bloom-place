@@ -1097,7 +1097,7 @@ export default function ComecarDia14() {
   if (step === "offer") return <PaywallFlow context="funnel" answers={answers} />;
 
   return (
-    <div style={LIGHT_VARS} className="min-h-dvh bg-white text-foreground flex flex-col">
+    <div style={LIGHT_VARS} className="tema-claro min-h-dvh bg-white text-foreground flex flex-col">
       <div className={`flex-1 flex flex-col ${step === "start" ? "px-5 pt-3 pb-7" : "items-center justify-center px-5 py-12"}`}>
         <AnimatePresence mode="wait">
           <motion.div key={step} {...fade} className={step === "start" ? "w-full flex-1 flex flex-col" : "w-full"}>

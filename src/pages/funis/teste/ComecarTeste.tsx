@@ -1127,7 +1127,7 @@ export default function ComecarTeste() {
         marginTop: "calc(var(--app-safe-top, 0px) * -1)",
         paddingTop: "var(--app-safe-top, 0px)",
       }}
-      className={`relative min-h-dvh ${telaCheia ? "" : "h-dvh overflow-hidden"} text-foreground flex flex-col`}
+      className={`relative min-h-dvh ${telaCheia ? "tema-claro " : "h-dvh overflow-hidden"} text-foreground flex flex-col`}
     >
       {/* Véu grafite: o modo escuro entra em CROSS-FADE (trocar o background
           seco fazia a tela clara sair por cima do preto num flash feio). */}

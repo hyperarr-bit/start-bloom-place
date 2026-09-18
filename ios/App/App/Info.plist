@@ -5,7 +5,11 @@
     <key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>pt-BR</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>pt-BR</string>
+	</array>
 	<key>CFBundleDisplayName</key>
         <string>CORE</string>
 	<key>CFBundleExecutable</key>
@@ -42,6 +46,53 @@
 	  quem entrava por Google não tinha senha pra tentar o outro caminho.
 	  No Android o esquema está no AndroidManifest; aqui é este bloco.
 	-->
+	<!--
+	  META / ANÚNCIOS NO iPHONE (06/09). Espelha o que o Android faz desde a
+	  v49, com as três exigências que a Apple acrescenta:
+
+	  1. FacebookClientToken nasce VAZIO no repositório — este repo é PÚBLICO.
+	     O `npm run loja:ios` injeta o valor real lido de android/key.properties
+	     (metaClientToken) antes do build, igual ao resValue do Gradle. Vazio,
+	     o AppDelegate simplesmente NÃO liga o SDK.
+
+	     NUNCA restaure este arquivo com `git checkout` depois do build: se este
+	     bloco ainda não estiver commitado, o checkout apaga o bloco INTEIRO
+	     junto com o token — foi o que matou a primeira build 11 (06/09). O
+	     jeito certo é zerar só o valor entre <string></string>.
+
+	  2. SKAdNetworkItems é o que permite a Meta receber o postback de
+	     instalação da própria Apple. Sem esta lista a campanha de App
+	     Promotion roda cega no iPhone — não existe equivalente do
+	     install_referrer do Android. São os dois IDs que a Meta publica como
+	     anunciante; se um dia entrar TikTok ou Google, os deles entram AQUI.
+
+	  3. SEM ATT (07/09, decisão do dono após duas recusas 2.1): não há
+	     NSUserTrackingUsageDescription e FacebookAdvertiserIDCollectionEnabled
+	     é false. O SKAdNetwork atribui sem consentimento; o que se perde é a
+	     atribuição por aparelho (IDFA). Ligar qualquer um dos dois sem pôr o
+	     pedido de volta = a recusa de volta.
+	-->
+	<key>FacebookAppID</key>
+	<string>1693551238598114</string>
+	<key>FacebookClientToken</key>
+	<string></string>
+	<key>FacebookDisplayName</key>
+	<string>CORE</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookAdvertiserIDCollectionEnabled</key>
+	<false/>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>v9wttpbfk9.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>n38lu8286q.skadnetwork</string>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

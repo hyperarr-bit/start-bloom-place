@@ -22,6 +22,14 @@
 -->
 <plist version="1.0">
 <dict>
+  <!--
+    NSPrivacyTracking = false (07/09, decisão do dono após duas recusas 2.1).
+    O SDK da Meta está dentro, mas com a coleta do identificador de anúncio
+    DESLIGADA e sem ATT: a atribuição vai pelo SKAdNetwork, que a Apple não
+    classifica como rastreamento. Ligar IDFA/ATT exige virar isto pra true,
+    listar os domínios da Meta e marcar "rastreia" no questionário — os três
+    juntos, ou é reprovação.
+  -->
   <key>NSPrivacyTracking</key>
   <false/>
 

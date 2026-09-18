@@ -56,6 +56,9 @@ const SOURCE: Record<string, string> = {
   sugestao: "app_sugestao",
 };
 
+/** Quem recebe o aviso de chamado novo (mesma lista do admin-suporte). */
+const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
+
 const ROTULO: Record<string, string> = {
   erro: "ERRO",
   duvida: "DÚVIDA",
@@ -183,6 +186,38 @@ serve(async (req) => {
         anexos,
       },
     });
+
+    /* AVISO PRO DONO (17/09). Chamado que fica esperando no /admin sem ninguém
+     * saber é chamado sem resposta: 8 ficaram abertos de 13 a 17/09 sem o dono
+     * ver. Um e-mail por chamado, com o texto e o link do painel. Destinatário
+     * vem do secret SUPORTE_AVISO_PARA (lista separada por vírgula); sem ele,
+     * os mesmos e-mails de admin do admin-suporte. Nunca trava o chamado:
+     * falha do Resend só vai pro log. */
+    try {
+      const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+      const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+      const para = (Deno.env.get("SUPORTE_AVISO_PARA") || ADMIN_EMAILS.join(",")).split(",").map((e) => e.trim()).filter(Boolean);
+      if (resendKey && para.length) {
+        const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] ?? c));
+        const prints = anexos.length ? `<p>${anexos.length} print(s) anexado(s) — abre no painel.</p>` : "";
+        const resumo = mensagem.replace(/\s+/g, " ").slice(0, 60);
+        const r = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            from, to: para,
+            subject: `[CORE suporte] ${ROTULO[tipo]}: ${resumo}${mensagem.length > 60 ? "…" : ""}`,
+            html:
+              `<p><b>${ROTULO[tipo]}</b> · ${esc(user.email ?? "sem e-mail")} · ${esc(String(diagnostico.plataforma ?? ""))} ${esc(String(diagnostico.versao ?? ""))} · tela ${esc(String(diagnostico.modulo ?? diagnostico.tela ?? "?"))}</p>` +
+              `<blockquote style="border-left:3px solid #ccc;padding-left:12px;white-space:pre-wrap">${esc(mensagem)}</blockquote>${prints}` +
+              `<p><a href="https://coreaplicativo.com.br/admin/suporte">Abrir no painel</a> · responder direto: <a href="mailto:${esc(user.email ?? "")}">${esc(user.email ?? "")}</a></p>`,
+          }),
+        });
+        logStep("aviso por e-mail", { ok: r.ok, status: r.status });
+      }
+    } catch (e) {
+      logStep("aviso por e-mail falhou", { msg: e instanceof Error ? e.message : String(e) });
+    }
 
     logStep("chamado gravado", {
       ticket: ticket.id,

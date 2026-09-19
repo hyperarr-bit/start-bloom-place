@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({ trackEvent: vi.fn(), requestReview: vi.fn(asyn
 vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => true }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: mocks.trackEvent }));
 vi.mock("@capacitor-community/in-app-review", () => ({ InAppReview: { requestReview: mocks.requestReview } }));
+// 18/09: pedirAvaliacaoSePuder faz `await import("@capacitor/core")` pra saber se
+// é iPhone. Sem mock, esse import real demora um tempo REAL (não de timer) e,
+// com a suíte inteira rodando, o pedido do teste anterior resolvia dentro do
+// teste seguinte — flake que barrava o deploy. Mockado, resolve no microtask.
+vi.mock("@capacitor/core", () => ({ Capacitor: { getPlatform: () => "android", isNativePlatform: () => true } }));
 
 import { reservarConvitePrimeiroGasto, reservarConviteDoFunil, jaLancouGastoAntes, podePedirAvaliacao } from "@/lib/avaliacao";
 import { ExpenseTable } from "@/components/ExpenseTable";

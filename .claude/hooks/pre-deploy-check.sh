@@ -79,7 +79,7 @@ exit 0
 # um erro de deploy, não uma descoberta no GitHub.
 # (19/09) a chave e o <string> ficam em linhas diferentes: grep por linha nunca
 # achava — a checagem passava sempre. Junta o arquivo numa linha antes.
-if tr -d '\n\t ' < ios/App/App/Info.plist 2>/dev/null | grep -qE '<key>FacebookClientToken</key><string>.+</string>'; then
+if tr -d '\n\t ' < ios/App/App/Info.plist 2>/dev/null | grep -qE '<key>FacebookClientToken</key><string>[^<]+</string>'; then
   echo "✗ FacebookClientToken PREENCHIDO no Info.plist — o build injetou e não limpou."
   echo "  Rode: git checkout ios/App/App/Info.plist"
   exit 1

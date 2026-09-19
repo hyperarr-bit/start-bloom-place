@@ -171,10 +171,12 @@ const FUNIS_TESTE: Record<string, { path: string; volta: "signup" }> = {
   // 27/07: os TRÊS voltam em ?step=signup. O radar voltava em "plano" porque
   // tinha a tela SEU PLANO entre a demo e o cadastro — ela saiu quando o funil
   // do app foi alinhado ao esqueleto do dia 14 (ver ComecarRadar).
-  // 31/08: o /inicio virou o funil W (Pix). O dia 14 continua vivo, mas agora
-  // só em /funil-dia14 — quem entra na demo por ele tem que voltar pra lá, e
-  // não cair no funil novo no meio do caminho.
-  dia14: { path: "/funil-dia14", volta: "signup" },
+  // 31/08: o /inicio virou o funil W (Pix); o dia 14 ficou só em /funil-dia14.
+  // 19/09 (ordem do dono, "como era no dia 8 de agosto"): o dia 14 VOLTOU a
+  // ser o /inicio — a volta da demo tem que cair na porta do tráfego pago, não
+  // na rota de teste (o /funil-dia14 é o mesmo componente; quem entrou por
+  // ele volta pra ele pelo referrer, sem quebrar o teste).
+  dia14: { path: "/inicio", volta: "signup" },
   radar: { path: "/funil-radar", volta: "signup" },
   v1: { path: "/funil-v1", volta: "signup" },
 };
@@ -184,7 +186,10 @@ const FUNIS_TESTE: Record<string, { path: string; volta: "signup" }> = {
 const voltaFunilTeste = (from: string, tour?: boolean) => {
   const f = FUNIS_TESTE[from];
   if (!f) return null;
-  return `${f.path}?step=${f.volta}${tour ? "&porta=vida" : ""}`;
+  // quem entrou na demo pela rota de TESTE volta pra ela (o funil abre a demo
+  // por navegação completa, então o referrer é a página do funil)
+  const path = from === "dia14" && typeof document !== "undefined" && /\/funil-dia14/.test(document.referrer) ? "/funil-dia14" : f.path;
+  return `${path}?step=${f.volta}${tour ? "&porta=vida" : ""}`;
 };
 
 /** CTA fixo no rodapé da demo — no funil volta pro funil; fora dele, cria conta.

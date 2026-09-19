@@ -387,7 +387,10 @@ type PaywallArm = "a" | "b";
 // Medido: paywall→Pix era 21-23% (04-07/08) e caiu pra 8,8-12,1% (09-10/08),
 // no preço BARATO, então não é preço. A prova migra do anúncio pro paywall.
 // Rollback instantâneo = "a" nesta constante.
-const PAYWALL_AB_FORCE: PaywallArm | null = "b";
+// 19/09 (ordem do dono): "como era no dia 8 de agosto" — braço "a" de volta
+// (garantia antes do preço, sem mural). O "b" ficou de 10/08 a 19/09; religar
+// a prova no paywall = "b" aqui.
+const PAYWALL_AB_FORCE: PaywallArm | null = "a";
 
 const bracoPaywall = (uid: string | null | undefined): PaywallArm => {
   if (PAYWALL_AB_FORCE) return PAYWALL_AB_FORCE;

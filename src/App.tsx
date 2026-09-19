@@ -277,9 +277,10 @@ import LandingPage from "./pages/lp/LpFinancas";
 // 02/09: fora do bundle principal — a porta do /inicio não usa (49 KB raw);
 // o Suspense das rotas já cobre o flash.
 const Comecar = lazy(() => import("./pages/Comecar"));
-// dia14 é o funil do /inicio (25/07) — import EAGER: a URL do tráfego de
-// anúncio não pode ter flash de loading (lazy quebraria fora do Suspense).
-import ComecarWEager from "./pages/funis/w/ComecarW";
+// dia14 é o funil do /inicio (25/07; de volta em 19/09) — import EAGER: a URL
+// do tráfego de anúncio não pode ter flash de loading (lazy quebraria fora do
+// Suspense). O W segue lazy: vende no app (/app) e fica de teste em /funil-w.
+import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
 const TutorialLab = lazy(() => import("./pages/TutorialLab"));
 import NotFound from "./pages/NotFound";
 
@@ -620,18 +621,18 @@ const App = () => {
                   <Route path="/acesso" element={<Acesso />} />
                   {/* URL limpa do funil vitrine (criativo "app pra vida inteira").
                       A WelcomeScreen legada que morava aqui não tinha nenhum link interno. */}
-                  {/* 31/08 — /inicio VIRA O FUNIL W (ordem do dono). É o mesmo
-                      funil que vende no app, cobrando por Pix (oferta w97,
-                      R$ 97,90) em vez da folha do Google. Motivo é caixa e
-                      conversão: a folha paga 13-27% de quem a abre (medido
-                      27-31/08), cobra 15% e libera o dinheiro em 60 dias; o
-                      Pix cai em 1 dia com ~7%. Import EAGER porque esta é a
-                      porta do tráfego pago — esperar chunk aqui é desistência.
-                      O funil do dia 14 continua vivo em /funil-dia14.
-                      SoNaWeb continua obrigatório: sem ele, um link no
-                      histórico ou deep link recoloca pagamento externo dentro
-                      do app, que é violação de política da Play. */}
-                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil-w-web"><ComecarWEager /></RouteErrorBoundary></SoNaWeb>} />
+                  {/* 19/09 (ordem do dono: "volta o funil da web como era no
+                      dia 8 de agosto") — /inicio VOLTA AO FUNIL DO DIA 14:
+                      quiz → preparo → central → demo → CRIAR CONTA → paywall
+                      de 27,90 (w27, Asaas). De 31/08 a 19/09 esta rota foi o
+                      funil W (welcome, promessas, compromissos, contrato, Pix
+                      antes do cadastro); ele continua vendendo no app (/app)
+                      e fica de teste em /funil-w. Import EAGER porque esta é
+                      a porta do tráfego pago — esperar chunk aqui é
+                      desistência. SoNaWeb continua obrigatório: sem ele, um
+                      link no histórico ou deep link recoloca pagamento
+                      externo dentro do app, que é violação de política da Play. */}
+                  <Route path="/inicio" element={<SoNaWeb><RouteErrorBoundary routeName="funil"><ComecarDia14Eager /></RouteErrorBoundary></SoNaWeb>} />
                   {/* Porta de entrada do e-mail pós-compra da Cakto */}
                   <Route path="/entrar" element={<Entrar />} />
                   <Route path="/auth" element={<Auth />} />

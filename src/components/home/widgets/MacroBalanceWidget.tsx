@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useUserData } from "@/hooks/use-user-data";
 
 export const MacroBalanceWidget = () => {
   const { get } = useUserData();
+  const navigate = useNavigate();
   const d = new Date();
   const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const todayLog = get<any>("core-dieta-log", {});
@@ -30,7 +32,11 @@ export const MacroBalanceWidget = () => {
     <div className="bg-card rounded-2xl p-4 border border-border/50 shadow-sm">
       <h4 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">🥩 Macros do Dia</h4>
       {total === 0 ? (
-        <p className="text-xs text-muted-foreground">Registre refeições para ver os macros</p>
+        /* 18/09: o widget existia, mas nada escrevia protein/carbs/fat — ficava
+           em branco pra sempre. Agora diz ONDE anotar e leva lá. */
+        <button type="button" onClick={() => navigate("/dieta")} className="text-left text-xs text-muted-foreground" data-testid="macros-vazio">
+          Anote P · C · G no cardápio da Dieta e marque o que comeu — <span className="font-medium text-foreground">abrir Dieta</span>
+        </button>
       ) : (
         <>
           <div className="flex h-3 rounded-full overflow-hidden mb-3">

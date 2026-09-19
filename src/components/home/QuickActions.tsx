@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Droplets, DollarSign, Banknote, Scale, Lightbulb, ListTodo, Heart, SmilePlus, X, Check, Dumbbell, Moon, Utensils, Shield } from "lucide-react";
 import { useUserData } from "@/hooks/use-user-data";
+import { CHAVE_MACROS, type MacrosPlano, entradaDoPlano, formatarMacros, idDoPlano, temMacros } from "@/lib/dieta-macros";
 import { useLifeHubData } from "@/hooks/use-life-hub-data";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -322,9 +323,16 @@ export const QuickActions = () => {
     const tStr = todayStr();
     const dietLog = get<Record<string, any>>("core-dieta-log", {});
     const dayMeals = { ...(dietLog[tStr] || {}) };
-    const mealId = crypto.randomUUID();
     const calories = Math.max(0, Math.round(Number(String(kcalTexto).replace(",", ".")) || 0));
-    dayMeals[mealId] = { name: `${mealType}: ${food}`, calories };
+    /* 18/09: id determinístico por refeição do plano — registrar o mesmo
+       almoço aqui e marcar "segui" no diário da Dieta escrevem a MESMA
+       entrada (nunca somam em dobro). As gramas vêm do cardápio: a pessoa
+       digitou uma vez lá, aqui só confirma que comeu. */
+    const weekDayNames = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+    const hojeNome = weekDayNames[new Date().getDay()];
+    const macrosPlan = get<MacrosPlano>(CHAVE_MACROS, {});
+    const macros = macrosPlan[hojeNome.toUpperCase()]?.[mealType] || macrosPlan[hojeNome]?.[mealType];
+    dayMeals[idDoPlano(mealType)] = entradaDoPlano(mealType, food, calories, macros);
     set("core-dieta-log", { ...dietLog, [tStr]: dayMeals });
     vibrate();
     showSuccess("meal");
@@ -603,6 +611,8 @@ export const QuickActions = () => {
                 const todayPlan = mealPlan[todayDay.toUpperCase()] || mealPlan[todayDay] || {};
                 const kcalPlan = get<Record<string, Record<string, number>>>("saude-meals-kcal", {});
                 const kcalHoje = kcalPlan[todayDay.toUpperCase()] || kcalPlan[todayDay] || {};
+                const macrosPlan = get<MacrosPlano>(CHAVE_MACROS, {});
+                const macrosHoje = macrosPlan[todayDay.toUpperCase()] || macrosPlan[todayDay] || {};
                 const mealEmojis: Record<string, string> = { "Café da Manhã": "🌅", "Almoço": "🍽️", "Lanche": "🍎", "Janta": "🌙", "Pré-Treino": "⚡", "Pós-Treino": "💪", "Ceia": "🌙", "Café da Tarde": "☕" };
                 const entries = Object.entries(todayPlan).filter(([_, food]) => food && food.trim());
                 
@@ -620,6 +630,9 @@ export const QuickActions = () => {
                     <div className="space-y-1.5">
                       <p className="text-[10px] text-muted-foreground">
                         {mealEmojis[mealEscolhida.tipo] || "🍴"} <span className="font-medium text-foreground">{mealEscolhida.tipo}</span> — {mealEscolhida.comida}
+                        {temMacros(macrosHoje[mealEscolhida.tipo]) && (
+                          <span className="ml-1 text-muted-foreground/80" data-testid="macros-do-plano">· {formatarMacros(macrosHoje[mealEscolhida.tipo])}</span>
+                        )}
                       </p>
                       <div className="flex gap-2">
                         <Input

@@ -4,6 +4,7 @@ import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { adicionarSubstituto, comoSubstitutos, notaDeSubstituto, removerSubstituto, type Substitutos } from "@/lib/dieta-substitutos";
+import { CHAVE_MACROS, type Macros, type MacrosPlano, type EntradaLog, comoMacros, entradaDoPlano, formatarMacros, lerGramas, macrosDoPlano, macrosRegistradas, sincronizarLogDoDiario, temMacros } from "@/lib/dieta-macros";
 import { localDayKey, parseLocalDay, mesAtualExtenso } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
@@ -354,8 +355,11 @@ const Dieta = () => {
   // kcal por refeição — ver CALORIAS (07/09) no topo do arquivo
   const [mealKcal, setMealKcal] = usePersistedState<Record<string, Record<string, number>>>(CHAVE_KCAL, {});
   const [editMealKcal, setEditMealKcal] = useState("");
+  // macros por refeição (18/09) — ver src/lib/dieta-macros.ts
+  const [mealMacros, setMealMacros] = usePersistedState<MacrosPlano>(CHAVE_MACROS, {});
+  const [editMacros, setEditMacros] = useState<{ p: string; c: string; g: string }>({ p: "", c: "", g: "" });
   // o que a Home registrou hoje (widget e ação rápida): entra no total do dia
-  const [dietaLog] = usePersistedState<Record<string, Record<string, { calories?: number }>>>("core-dieta-log", {});
+  const [dietaLog, setDietaLog] = usePersistedState<Record<string, Record<string, EntradaLog>>>("core-dieta-log", {});
 
   // FASTING
   const [fastingGoal, setFastingGoal] = usePersistedState("saude-fast-goal", 16);
@@ -441,6 +445,8 @@ const Dieta = () => {
     setEditMealValue(mealPlan[day]?.[meal] || "");
     const kcal = mealKcal[day]?.[meal];
     setEditMealKcal(kcal && kcal > 0 ? String(kcal) : "");
+    const m = comoMacros(mealMacros[day]?.[meal]);
+    setEditMacros({ p: m.p > 0 ? String(m.p) : "", c: m.c > 0 ? String(m.c) : "", g: m.g > 0 ? String(m.g) : "" });
   };
   const saveMeal = (day: string, meal: string) => {
     setMealPlan({ ...mealPlan, [day]: { ...mealPlan[day], [meal]: editMealValue } });
@@ -450,7 +456,21 @@ const Dieta = () => {
       if (kcal > 0) dia[meal] = kcal; else delete dia[meal];
       return { ...prev, [day]: dia };
     });
+    const macros: Macros = { p: lerGramas(editMacros.p), c: lerGramas(editMacros.c), g: lerGramas(editMacros.g) };
+    setMealMacros(prev => {
+      const dia = { ...(prev[day] ?? {}) };
+      if (temMacros(macros)) dia[meal] = macros; else delete dia[meal];
+      return { ...prev, [day]: dia };
+    });
     setEditingMeal(null);
+  };
+  /* Diário ↔ log do dia. "Segui" grava a refeição planejada (kcal + gramas)
+   * em core-dieta-log — o que os widgets Calorias e Macros do Dia leem.
+   * Antes o diário só contava refeições; caloria e macro ficavam em branco
+   * mesmo pra quem marcava tudo certinho. */
+  const sincronizarLog = (data: string, dayName: string, meal: string, seguiu: boolean) => {
+    const entrada = entradaDoPlano(meal, mealPlan[dayName]?.[meal] || "", mealKcal[dayName]?.[meal] ?? 0, mealMacros[dayName]?.[meal]);
+    setDietaLog(prev => sincronizarLogDoDiario(prev, data, meal, seguiu, entrada));
   };
 
   const formatTime = (secs: number) => { const h = Math.floor(secs / 3600); const m = Math.floor((secs % 3600) / 60); const s = secs % 60; return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`; };
@@ -811,6 +831,7 @@ const Dieta = () => {
                                 return updated;
                               });
                               setMealKcal(prev => { const updated = { ...prev }; delete updated[day]; return updated; });
+                              setMealMacros(prev => { const updated = { ...prev }; delete updated[day]; return updated; });
                             }}>Limpar</AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -861,6 +882,11 @@ const Dieta = () => {
                             copyTargetDays.forEach(targetDay => { updated[targetDay] = { ...(prev[day] || {}) }; });
                             return updated;
                           });
+                          setMealMacros(prev => {
+                            const updated = { ...prev };
+                            copyTargetDays.forEach(targetDay => { updated[targetDay] = { ...(prev[day] || {}) }; });
+                            return updated;
+                          });
                           setCopyFromDay(null);
                           setCopyTargetDays([]);
                         }}
@@ -877,22 +903,33 @@ const Dieta = () => {
                         <div key={meal} className={`rounded-lg p-2 border ${mealColors[meal] || "bg-muted/50 border-border"}`}>
                           <p className="text-xs font-bold mb-1">{meal} {mealEmojis[meal] || "🍽️"}</p>
                           {isEditing ? (<>
-                            <div className="flex gap-1">
-                              <Textarea value={editMealValue} onChange={e => setEditMealValue(e.target.value)} className="text-[10px] min-h-[50px] flex-1 bg-white/50 dark:bg-background/50" />
-                              <div className="flex flex-col gap-1 self-end">
-                                <Input
-                                  type="number"
-                                  inputMode="numeric"
-                                  min={0}
-                                  placeholder="kcal"
-                                  aria-label={`Calorias de ${meal} de ${day}`}
-                                  value={editMealKcal}
-                                  onChange={e => setEditMealKcal(e.target.value)}
-                                  onKeyDown={e => e.key === "Enter" && saveMeal(day, meal)}
-                                  className="h-7 w-[4.5rem] text-[10px] bg-white/50 dark:bg-background/50"
-                                />
-                                <Button size="sm" className="h-7" onClick={() => saveMeal(day, meal)}><Check className="w-3 h-3" /></Button>
-                              </div>
+                            <Textarea value={editMealValue} onChange={e => setEditMealValue(e.target.value)} className="text-[10px] min-h-[50px] bg-white/50 dark:bg-background/50" />
+                            {/* kcal e macros numa linha só, embaixo do texto: quatro
+                                caixinhas com o rótulo dentro (kcal · P · C · G, em
+                                gramas). Tudo opcional; o que ficar em branco some. */}
+                            <div className="mt-1 flex items-center gap-1" data-testid={`macros-editor-${meal}`}>
+                              {([
+                                { k: "kcal", v: editMealKcal, set: (t: string) => setEditMealKcal(t), label: `Calorias de ${meal} de ${day}` },
+                                { k: "P", v: editMacros.p, set: (t: string) => setEditMacros(m => ({ ...m, p: t })), label: `Proteína de ${meal} de ${day} (g)` },
+                                { k: "C", v: editMacros.c, set: (t: string) => setEditMacros(m => ({ ...m, c: t })), label: `Carboidrato de ${meal} de ${day} (g)` },
+                                { k: "G", v: editMacros.g, set: (t: string) => setEditMacros(m => ({ ...m, g: t })), label: `Gordura de ${meal} de ${day} (g)` },
+                              ] as const).map(campo => (
+                                <label key={campo.k} className="flex h-7 flex-1 min-w-0 items-center rounded-md border border-input bg-white/50 dark:bg-background/50 px-1.5 focus-within:ring-1 focus-within:ring-ring">
+                                  <span className="text-[9px] font-semibold text-muted-foreground mr-1 shrink-0">{campo.k}</span>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={0}
+                                    aria-label={campo.label}
+                                    value={campo.v}
+                                    onChange={e => campo.set(e.target.value)}
+                                    onKeyDown={e => e.key === "Enter" && saveMeal(day, meal)}
+                                    className="w-full min-w-0 bg-transparent text-[10px] outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  />
+                                  {campo.k !== "kcal" && <span className="text-[8px] text-muted-foreground shrink-0">g</span>}
+                                </label>
+                              ))}
+                              <Button size="sm" className="h-7 px-2 shrink-0" aria-label={`Salvar ${meal} de ${day}`} onClick={() => saveMeal(day, meal)}><Check className="w-3 h-3" /></Button>
                             </div>
                             {/* Substitutos da refeição: "ou A, ou B" — valem pra todos
                                 os dias, como o nutricionista escreve. O diário oferece
@@ -925,8 +962,10 @@ const Dieta = () => {
                               {(substitutos[meal] ?? []).length > 0 && (
                                 <p className="text-[10px] text-muted-foreground mt-0.5">ou: {(substitutos[meal] ?? []).join(" · ")}</p>
                               )}
-                              {(mealKcal[day]?.[meal] ?? 0) > 0 && (
-                                <p className="text-[10px] font-semibold text-muted-foreground mt-0.5">{mealKcal[day][meal]} kcal</p>
+                              {((mealKcal[day]?.[meal] ?? 0) > 0 || temMacros(mealMacros[day]?.[meal])) && (
+                                <p className="text-[10px] font-semibold text-muted-foreground mt-0.5" data-testid={`macros-linha-${day}-${meal}`}>
+                                  {[(mealKcal[day]?.[meal] ?? 0) > 0 ? `${mealKcal[day][meal]} kcal` : "", formatarMacros(mealMacros[day]?.[meal])].filter(Boolean).join(" · ")}
+                                </p>
                               )}
                             </div>
                           )}
@@ -938,18 +977,28 @@ const Dieta = () => {
                         coisa. Só aparece quando há caloria em algum lugar. */}
                     {(() => {
                       const planejado = kcalDoPlano(mealKcal[day]);
+                      const macrosPlan = macrosDoPlano(mealMacros[day]);
                       const ehHoje = day === getDiaryDayName(today);
                       const registrado = ehHoje ? kcalRegistradas(dietaLog[today]) : 0;
-                      if (planejado <= 0 && registrado <= 0) return null;
+                      const macrosReg = ehHoje ? macrosRegistradas(dietaLog[today]) : null;
+                      if (planejado <= 0 && registrado <= 0 && !temMacros(macrosPlan)) return null;
                       return (
-                        <div className="flex items-center justify-between rounded-lg bg-muted/40 px-2 py-1.5" data-testid={`kcal-total-${day}`}>
-                          <span className="text-[10px] font-bold text-muted-foreground">TOTAL DO DIA</span>
-                          <span className="text-[11px] font-bold">
-                            {planejado} kcal
-                            {ehHoje && registrado > 0 && (
-                              <span className="font-normal text-muted-foreground"> · {registrado} registradas hoje</span>
-                            )}
-                          </span>
+                        <div className="rounded-lg bg-muted/40 px-2 py-1.5" data-testid={`kcal-total-${day}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-muted-foreground">TOTAL DO DIA</span>
+                            <span className="text-[11px] font-bold">
+                              {planejado > 0 ? `${planejado} kcal` : ""}
+                              {ehHoje && registrado > 0 && (
+                                <span className="font-normal text-muted-foreground">{planejado > 0 ? " · " : ""}{registrado} registradas hoje</span>
+                              )}
+                            </span>
+                          </div>
+                          {temMacros(macrosPlan) && (
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground" data-testid={`macros-total-${day}`}>
+                              <span>{formatarMacros(macrosPlan)}</span>
+                              {ehHoje && temMacros(macrosReg) && <span>{formatarMacros(macrosReg)} hoje</span>}
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1368,13 +1417,16 @@ const Dieta = () => {
                         const naoSeguiu = !!diary.meals[meal] && !mealDiary.followed;
                         // clicar no estado já ativo DESMARCA (remove o registro
                         // do dia — pedido de cliente 18/07): volta ao neutro
-                        const marcar = (followed: boolean, jaAtivo: boolean) =>
+                        const marcar = (followed: boolean, jaAtivo: boolean) => {
                           updateDayDiary(diaryDate, prev => {
                             const meals = { ...prev.meals };
                             if (jaAtivo) delete meals[meal];
                             else meals[meal] = { ...mealDiary, followed, ...(followed ? { note: "" } : {}) };
                             return { ...prev, meals };
                           });
+                          // seguiu = comeu o planejado → kcal e macros entram no dia
+                          sincronizarLog(diaryDate, dayName, meal, followed && !jaAtivo);
+                        };
                         return (
                           <div key={meal} className={`bg-card rounded-xl border p-3 space-y-2 ${seguiu ? "border-green-300 dark:border-green-500/30" : "border-border"}`}>
                             <div className="flex items-center justify-between">

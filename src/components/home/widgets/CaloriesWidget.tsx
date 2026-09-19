@@ -5,6 +5,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { ProgressBar } from "@/components/home/ProgressBar";
 import { WidgetSize } from "@/hooks/use-home-widgets";
 import { useState } from "react";
+import { macrosRegistradas } from "@/lib/dieta-macros";
 
 export const CaloriesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
   const navigate = useNavigate();
@@ -78,11 +79,20 @@ export const CaloriesWidget = ({ size = "small" }: { size?: WidgetSize }) => {
       </div>
       <ProgressBar value={data.caloriesConsumed} max={data.caloriesGoal} colorClass="bg-emerald-500" />
 
-      <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground">
-        <span>🥩 P: {data.mealsLogged}</span>
-        <span>🍞 C: —</span>
-        <span>🥑 G: —</span>
-      </div>
+      {/* 18/09: antes "P:" mostrava o NÚMERO DE REFEIÇÕES e C/G eram traço
+          fixo. Agora soma as gramas do log do dia (mesma conta do widget
+          Macros do Dia); sem gramas, some — nada de traço. */}
+      {(() => {
+        const m = macrosRegistradas(get<Record<string, Record<string, { name: string; protein?: number; carbs?: number; fat?: number }>>>("core-dieta-log", {})[todayStr]);
+        if (m.p + m.c + m.g <= 0) return null;
+        return (
+          <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground" data-testid="calorias-macros">
+            <span>🥩 P {m.p}g</span>
+            <span>🍞 C {m.c}g</span>
+            <span>🥑 G {m.g}g</span>
+          </div>
+        );
+      })()}
 
       {showQuickAdd && (
         <form onSubmit={handleQuickMeal} className="mt-3 space-y-2 border-t border-border/50 pt-3" onClick={e => e.stopPropagation()}>

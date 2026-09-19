@@ -23,15 +23,15 @@
 <plist version="1.0">
 <dict>
   <!--
-    NSPrivacyTracking = false (07/09, decisão do dono após duas recusas 2.1).
-    O SDK da Meta está dentro, mas com a coleta do identificador de anúncio
-    DESLIGADA e sem ATT: a atribuição vai pelo SKAdNetwork, que a Apple não
-    classifica como rastreamento. Ligar IDFA/ATT exige virar isto pra true,
-    listar os domínios da Meta e marcar "rastreia" no questionário — os três
-    juntos, ou é reprovação.
+    NSPrivacyTracking = true (19/09, build 15): o app pede ATT e, com o
+    aceite, o SDK da Meta lê o IDFA pra atribuir a instalação ao anúncio.
+    Os domínios de rastreio ficam no manifesto do PRÓPRIO FBSDKCoreKit
+    (ep1.facebook.com), que a Apple lê junto; repetir aqui bloquearia o
+    tráfego não-rastreado (ep2) de quem negou. O questionário "Privacidade
+    do App" no App Store Connect precisa dizer "rastreia" + ID do dispositivo.
   -->
   <key>NSPrivacyTracking</key>
-  <false/>
+  <true/>
 
   <key>NSPrivacyTrackingDomains</key>
   <array/>
@@ -47,6 +47,19 @@
   -->
   <key>NSPrivacyCollectedDataTypes</key>
   <array>
+    <!-- ID de publicidade (IDFA), só com o aceite do ATT: atribuição de anúncio. -->
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypeDeviceID</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array>
+        <string>NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising</string>
+      </array>
+    </dict>
     <!-- Conta: e-mail e id do usuário (Supabase Auth). -->
     <dict>
       <key>NSPrivacyCollectedDataType</key>

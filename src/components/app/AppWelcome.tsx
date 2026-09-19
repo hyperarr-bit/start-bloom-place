@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
+import { pedirRastreamentoIos } from "@/lib/att-ios";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
 
 /**
@@ -165,7 +166,7 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
           ) : (
             <button
               className="apw-cta btn-shine"
-              onClick={() => { trackEvent("app_welcome_start", {}); onComecar(); }}
+              onClick={async () => { trackEvent("app_welcome_start", {}); await pedirRastreamentoIos("welcome"); onComecar(); }}
             >
               Começar
             </button>
@@ -176,7 +177,7 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
               tem a esteira de conta existente); /entrar é o fallback do uso
               antigo em Comecar/Radar. */}
           {veioDoSite ? (
-            <button className="apw-link" onClick={() => { trackEvent("app_welcome_start", { pos_compra_web: true }); onComecar(); }}>
+            <button className="apw-link" onClick={async () => { trackEvent("app_welcome_start", { pos_compra_web: true }); await pedirRastreamentoIos("welcome"); onComecar(); }}>
               Ainda não tenho conta? <b>Começar</b>
             </button>
           ) : (

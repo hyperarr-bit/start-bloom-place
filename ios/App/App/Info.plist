@@ -66,11 +66,12 @@
 	     install_referrer do Android. São os dois IDs que a Meta publica como
 	     anunciante; se um dia entrar TikTok ou Google, os deles entram AQUI.
 
-	  3. SEM ATT (07/09, decisão do dono após duas recusas 2.1): não há
-	     NSUserTrackingUsageDescription e FacebookAdvertiserIDCollectionEnabled
-	     é false. O SKAdNetwork atribui sem consentimento; o que se perde é a
-	     atribuição por aparelho (IDFA). Ligar qualquer um dos dois sem pôr o
-	     pedido de volta = a recusa de volta.
+	  3. ATT DE VOLTA, COM PEDIDO (19/09, build 15). As recusas 2.1 de 04/09
+	     vieram do framework de ATT SEM diálogo. Agora o diálogo existe
+	     (NSUserTrackingUsageDescription em português, pedido pelo plugin
+	     MetaAds.pedirRastreamento depois da welcome), a coleta do IDFA está
+	     ligada e o manifesto de privacidade diz NSPrivacyTracking=true. Os
+	     três juntos, sempre — um sem os outros é reprovação.
 	-->
 	<key>FacebookAppID</key>
 	<string>1693551238598114</string>
@@ -81,7 +82,9 @@
 	<key>FacebookAutoLogAppEventsEnabled</key>
 	<true/>
 	<key>FacebookAdvertiserIDCollectionEnabled</key>
-	<false/>
+	<true/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Usamos isso só pra saber qual anúncio te trouxe ao CORE. Nada é vendido nem compartilhado com outros apps.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

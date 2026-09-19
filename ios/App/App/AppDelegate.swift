@@ -1,6 +1,8 @@
 import UIKit
 import Capacitor
 import FacebookCore
+import AppTrackingTransparency
+import AdSupport
 
 /*
  * SDK DA META NO iPHONE (06/09, refeito 07/09 SEM ATT) — espelho da v49 do
@@ -11,21 +13,19 @@ import FacebookCore
  * do SERVIDOR por CAPI, com e-mail/id em hash — fecha com o app em segundo
  * plano, e um evento do cliente ali seria perdido ou duplicado.
  *
- * POR QUE NÃO HÁ ATT AQUI (decisão do dono, 07/09, depois de duas recusas
- * 2.1 "unable to locate the ATT permission request"): a atribuição da Apple
- * pra anúncio (SKAdNetwork) NÃO depende de consentimento nem de IDFA. Sem o
- * pedido, a Meta perde a atribuição POR APARELHO e fica com o agregado por
- * campanha — que é o que ela teria pros 60-75% que negam de qualquer jeito.
- * Em troca: nenhum diálogo na primeira tela, nenhum framework de rastreio
- * pra Apple cobrar, manifesto com NSPrivacyTracking=false. É o desenho do
- * Cal AI e da maioria dos apps de consumo. Se um dia a campanha do iPhone
- * escalar e o agregado ficar curto, o ATT entra numa atualização — como
- * decisão, não como pré-requisito.
+ * ATT (19/09, build 15): a build 13 nasceu sem o pedido (decisão de 07/09,
+ * depois de duas recusas 2.1 "unable to locate the ATT permission request" —
+ * o framework estava embarcado SEM diálogo). Resultado medido no Gerenciador
+ * de Eventos: 0% de rastreamento ligado, e a Meta distribuindo as compras
+ * de iPhone entre campanhas por modelo estatístico. Agora o pedido existe de
+ * verdade: o JS chama `MetaAds.pedirRastreamento()` depois da welcome, o
+ * sistema mostra o diálogo com o texto do Info.plist, e o SDK só passa a
+ * tratar o aparelho como rastreável se a pessoa aceitar. Quem nega segue
+ * exatamente como antes (SKAdNetwork + agregado).
  *
- * Coerência que a Apple confere: FacebookAdvertiserIDCollectionEnabled=false
- * no Info.plist, sem NSUserTrackingUsageDescription, sem import de
- * AppTrackingTransparency, isAdvertiserTrackingEnabled=false. Um desses
- * ligado sem o pedido = a recusa de volta.
+ * Coerência que a Apple confere, os três juntos: NSUserTrackingUsageDescription
+ * no Info.plist, FacebookAdvertiserIDCollectionEnabled=true, e
+ * NSPrivacyTracking=true no manifesto. Um sem os outros = recusa.
  *
  * Token ausente = SDK DESLIGADO, de propósito. O repo é público, então o
  * client token nasce vazio no Info.plist e o `npm run loja:ios` injeta o real.
@@ -44,12 +44,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         if AppDelegate.metaConfigurada {
-            // Sem ATT o SDK NUNCA pode achar que tem permissão de rastreio.
-            Settings.shared.isAdvertiserTrackingEnabled = false
-            Settings.shared.isAdvertiserIDCollectionEnabled = false
+            // O SDK só trata o aparelho como rastreável com o aceite do ATT —
+            // lido do sistema a cada abertura, porque a pessoa pode mudar nos Ajustes.
+            AppDelegate.aplicarStatusATT()
             ApplicationDelegate.shared.application(application, didFinishLaunchingWithOptions: launchOptions)
         }
         return true
+    }
+
+    /// Espelha a resposta do ATT no SDK da Meta. Chamado na abertura e logo
+    /// depois do diálogo; sem aceite, o IDFA nunca sai deste aparelho.
+    static func aplicarStatusATT() {
+        let aceitou: Bool
+        if #available(iOS 14, *) {
+            aceitou = ATTrackingManager.trackingAuthorizationStatus == .authorized
+        } else {
+            aceitou = ASIdentifierManager.shared().isAdvertisingTrackingEnabled
+        }
+        Settings.shared.isAdvertiserTrackingEnabled = aceitou
+        Settings.shared.isAdvertiserIDCollectionEnabled = aceitou
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -107,8 +120,8 @@ class CoreViewController: CAPBridgeViewController {
  * Ponte pro JS — MESMO nome e MESMO formato de resposta do plugin Android
  * (br/com/coreaplicativo/app/MetaAdsPlugin.java), porque `src/lib/analytics.ts`
  * já chama `MetaAds.idPublicidade()` e espera `{ gaid, anonId }`.
- * "gaid" vem VAZIO de propósito: sem ATT não existe IDFA. O que vale aqui é o
- * anonId — o id que a PRÓPRIA Meta deu a este aparelho, o mesmo que o SDK
+ * "gaid" leva o IDFA quando a pessoa aceitou o ATT (build 15); sem aceite vai
+ * vazio, e o que vale é o anonId — o id que a PRÓPRIA Meta deu a este aparelho, o mesmo que o SDK
  * usou pra registrar a instalação. O servidor manda ele no Purchase e a Meta
  * casa a compra com a instalação sem precisar de identificador de anúncio.
  */
@@ -118,8 +131,31 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     public let jsName = "MetaAds"
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "idPublicidade", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "logCompra", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "logCompra", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pedirRastreamento", returnType: CAPPluginReturnPromise)
     ]
+
+    /* PEDIDO DE ATT (19/09). Mostra o diálogo do sistema (uma vez por
+     * instalação; depois o sistema devolve a resposta guardada sem mostrar
+     * nada) e espelha o resultado no SDK. Sempre na thread principal — a
+     * Apple exige e, fora dela, o diálogo simplesmente não aparece. */
+    @objc func pedirRastreamento(_ call: CAPPluginCall) {
+        guard #available(iOS 14, *) else { call.resolve(["status": "restricted"]); return }
+        DispatchQueue.main.async {
+            ATTrackingManager.requestTrackingAuthorization { status in
+                AppDelegate.aplicarStatusATT()
+                let nome: String
+                switch status {
+                case .authorized: nome = "authorized"
+                case .denied: nome = "denied"
+                case .restricted: nome = "restricted"
+                case .notDetermined: nome = "notDetermined"
+                @unknown default: nome = "unknown"
+                }
+                call.resolve(["status": nome])
+            }
+        }
+    }
 
     /* COMPRA PELO SDK (18/09). Até a build 13 a Meta só sabia da compra pelo
      * CAPI do servidor e casava 5 em 18 (anon_id/e-mail) — o resto ela
@@ -141,6 +177,13 @@ public class MetaAdsPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func idPublicidade(_ call: CAPPluginCall) {
         var anonId = ""
         if AppDelegate.metaConfigurada { anonId = AppEvents.shared.anonymousID }
-        call.resolve(["gaid": "", "anonId": anonId])
+        // IDFA só com o aceite do ATT; sem ele o sistema devolve zeros e aqui
+        // vai vazio, como sempre foi. Com ele, o servidor manda como `madid`.
+        var idfa = ""
+        if #available(iOS 14, *), ATTrackingManager.trackingAuthorizationStatus == .authorized {
+            let id = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+            if id != "00000000-0000-0000-0000-000000000000" { idfa = id }
+        }
+        call.resolve(["gaid": idfa, "anonId": anonId])
     }
 }

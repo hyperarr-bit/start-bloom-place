@@ -72,3 +72,13 @@ exit 0
 #     | grep -E '^[^ ]+\([0-9]+,[0-9]+\): error TS' \
 #     | sed -E 's/^([^(]+)\([0-9]+,[0-9]+\): error (TS[0-9]+):.*/\1|\2/' \
 #     | sort | uniq -c | awk '{print $1" "$2}' > .claude/hooks/tsc-baseline.txt
+
+# TOKEN DA META NO Info.plist (06/09). O `npm run loja:ios` injeta o client
+# token real no plist versionado pra o archive enxergar. Este repo é PÚBLICO:
+# se alguém commitar depois de um build, o token vaza. Aqui ele volta a ser
+# um erro de deploy, não uma descoberta no GitHub.
+if grep -qE '<key>FacebookClientToken</key>[[:space:]]*<string>.+</string>' ios/App/App/Info.plist 2>/dev/null; then
+  echo "✗ FacebookClientToken PREENCHIDO no Info.plist — o build injetou e não limpou."
+  echo "  Rode: git checkout ios/App/App/Info.plist"
+  exit 1
+fi

@@ -33,8 +33,8 @@ const teste = process.argv.includes("--teste");
  *   - a pasta que o cap sync alimenta é outra (ios/App/App/public);
  *   - a chave do RevenueCat é appl_, não goog_ (chave trocada = getOfferings
  *     vazio = app na loja sem forma de pagamento, o mesmo desastre do topo);
- *   - não existe SDK nativo da Meta no iOS, então a trava do client token
- *     não se aplica (checá-la aqui abortaria um build correto).
+ *   - o client token da Meta é INJETADO no Info.plist (o repo é público, então
+ *     ele nasce vazio lá) em vez de virar resValue do Gradle.
  * A poda de peso morto e o strip dos pixels JS valem IGUAL nos dois: o
  * Capacitor copia a mesma pasta public pros dois lados.
  */
@@ -94,9 +94,9 @@ console.log(`✓ chave do RevenueCat: ${chave.slice(0, 12)}… ${teste ? "(build
 // preenchido no strings.xml. Ou seja, build de produção com token vazio não
 // quebra nada visível — o app funciona e a campanha volta a ficar CEGA em
 // silêncio. Esse tipo de silêncio é o que barra aqui.
-if (!teste && !alvoIOS) {
-  // Mora no key.properties (gitignored) e não no strings.xml: o repo é
-  // público, e token vazado vira evento falso no nosso dataset.
+if (!teste) {
+  // Mora no key.properties (gitignored) e não no strings.xml/Info.plist: o
+  // repo é público, e token vazado vira evento falso no nosso dataset.
   const props = existsSync("android/key.properties")
     ? readFileSync("android/key.properties", "utf8") : "";
   const clientToken = props.match(/^\s*metaClientToken\s*=\s*(.+)$/m)?.[1]?.trim() ?? "";
@@ -107,6 +107,22 @@ if (!teste && !alvoIOS) {
     process.exit(1);
   }
   console.log(`✓ client token da Meta: ${clientToken.slice(0, 6)}…`);
+
+  /* iOS: o Gradle resolve isso com resValue; aqui é escrita direta no
+   * Info.plist, IMEDIATAMENTE antes do archive. O arquivo versionado guarda
+   * <string></string> vazio — se este passo não rodar, o AppDelegate
+   * simplesmente não liga o SDK (falha fechada, não evento sem identidade). */
+  if (alvoIOS) {
+    const plist = "ios/App/App/Info.plist";
+    const txt = readFileSync(plist, "utf8");
+    const re = /(<key>FacebookClientToken<\/key>\s*<string>)([^<]*)(<\/string>)/;
+    if (!re.test(txt)) {
+      console.error(`\n✗ ${plist} não tem a chave FacebookClientToken — o bloco da Meta sumiu do plist.\n`);
+      process.exit(1);
+    }
+    writeFileSync(plist, txt.replace(re, `$1${clientToken}$3`));
+    console.log("✓ client token injetado no Info.plist");
+  }
 }
 
 // Trava dupla do mock da loja (09/08): o build de teste liga RC_MOCK=1 (o

@@ -72,13 +72,7 @@ const stagger = (i: number) => ({
  * única alavanca de posicionamento desta tela, e trocar tem que ser trocar
  * uma linha, não refazer o paywall.
  */
-/* 18/09: o vitalício SAI do iPhone e entra o ANUAL de R$ 97,90 com 3 dias
- * grátis (oferta introdutória da App Store). Motivo, medido 15–18/09: 381
- * pessoas abriram a folha da Apple e 40 pagaram — 6% no vitalício, 11% no
- * mensal. A folha com "3 dias grátis, depois R$ 97,90/ano" é o que derruba
- * o susto do preço; e o anual renova, o vitalício não. Trial só no plano
- * longo (regra dos grandes): o mensal segue sem trial, como âncora. */
-const PLANO_INICIAL: "anual" | "mensal" = "anual";
+const PLANO_INICIAL: "vitalicio" | "mensal" = "vitalicio";
 
 /**
  * SELOS DE CONFIANÇA do iPhone. Os do Android ("🇧🇷 Pix na hora",
@@ -104,8 +98,8 @@ const SELOS = [
  * que faz a comparação sem precisar de tabela.
  */
 function DuasColunas({
-  plano, onSelect, precoAnual, comTrial,
-}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; comTrial: boolean }) {
+  plano, onSelect,
+}: { plano: "vitalicio" | "mensal"; onSelect: (p: "vitalicio" | "mensal") => void }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -129,18 +123,17 @@ function DuasColunas({
         </div>
       </div>
 
-      <div onClick={() => onSelect("anual")} role="button" className={moldura(plano === "anual")} data-testid="ios-coluna-anual">
+      <div onClick={() => onSelect("vitalicio")} role="button" className={moldura(plano === "vitalicio")}>
         <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-0 pb-3.5 text-center text-[#16121c] flex flex-col overflow-hidden">
-          <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "anual" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
-            {comTrial ? "3 DIAS GRÁTIS" : "MELHOR ESCOLHA"}
+          <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "vitalicio" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
+            MELHOR ESCOLHA
           </span>
-          <span className="text-[30px] font-black leading-none mt-1.5">12</span>
-          <span className="text-[12.5px] font-bold text-black/45">meses</span>
-          <span className="text-[17px] font-extrabold mt-2">{precoAnual}</span>
-          <span className="text-[10px] font-semibold text-black/40">{comTrial ? "por ano, depois dos 3 dias" : "por ano"}</span>
+          <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">Pra sempre</span>
+          <span className="text-[17px] font-extrabold mt-1.5">{APP_PRECOS.vitalicio97.preco}</span>
+          <span className="text-[10px] font-semibold text-black/40">vitalício · uma única vez</span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
-            4 meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b>
+            4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b>
           </span>
         </div>
       </div>
@@ -157,10 +150,8 @@ export function PaywallIOS({
   const [erro, setErro] = useState<string | null>(null);
   const vivoRef = useRef(true);
   // Disponibilidade real do vitalício: otimista até resposta NEGATIVA da loja.
-  const [anualNaLoja, setAnualNaLoja] = useState<boolean | null>(null);
-  const [precoAnual, setPrecoAnual] = useState<string>(APP_PRECOS.anual97.preco);
-  const [comTrial, setComTrial] = useState(true);
-  const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
+  const [vitalicioNaLoja, setVitalicioNaLoja] = useState<boolean | null>(null);
+  const [plano, setPlano] = useState<"vitalicio" | "mensal">(PLANO_INICIAL);
 
   useEffect(() => {
     vivoRef.current = true;
@@ -175,17 +166,14 @@ export function PaywallIOS({
     void (async () => {
       const rc = await import("@/lib/revenuecat");
       await rc.initRevenueCat();
-      await rc.prefetchAnualIos();
+      await rc.prefetchVitalicio();
       if (!vivoRef.current) return;
-      const lido = () => {
-        if (rc.estadoRevenueCat() === "pronto") setAnualNaLoja(rc.temAnualIos());
-        if (rc.temAnualIos()) { setPrecoAnual(rc.precoAnualIos() ?? APP_PRECOS.anual97.preco); setComTrial(rc.anualIosTemTrial()); }
-      };
-      lido();
-      if (!rc.temAnualIos()) {
+      if (rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
+      if (!rc.temVitalicio97()) {
         retry = window.setTimeout(async () => {
-          await rc.prefetchAnualIos();
-          if (vivoRef.current) lido();
+          await rc.initRevenueCat();
+          await rc.prefetchVitalicio();
+          if (vivoRef.current && rc.estadoRevenueCat() === "pronto") setVitalicioNaLoja(rc.temVitalicio97());
         }, 2500);
       }
     })();
@@ -209,16 +197,16 @@ export function PaywallIOS({
     setConferindo(false);
   };
 
-  const comprar = async (produto: "anual" | "mensal") => {
+  const comprar = async (produto: "vitalicio" | "mensal") => {
     if (comprando) return;
     setErro(null);
     setComprando(true);
     try {
       const rc = await import("@/lib/revenuecat");
-      const idProduto = produto === "mensal" ? "core_mensal" : "core_anual_97";
+      const idProduto = produto === "mensal" ? "core_mensal" : "core_vitalicio_97";
       const ok = produto === "mensal"
         ? await rc.comprar("core_mensal", { semTrial: true })
-        : await rc.comprarAnualIos();
+        : await rc.comprarVitalicio("core_vitalicio_97");
       if (ok) {
         trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios" });
         onPagoSemConta();
@@ -282,8 +270,8 @@ export function PaywallIOS({
           {(() => {
             // A âncora do topo acompanha a coluna escolhida — resolve o medo
             // de "a pessoa se assusta com 97,90 antes de ver que tem mensal".
-            const preco = mostraMensal ? "24,90" : precoAnual.replace(/^R\$\s?/, "");
-            const precoSub = mostraMensal ? "por mês" : comTrial ? "por ano · 3 dias grátis" : "por ano";
+            const preco = mostraMensal ? "24,90" : "97,90";
+            const precoSub = mostraMensal ? "por mês" : "1x, pra sempre";
             const precoTitulo = mostraMensal
               ? <>CORE mensal,<br />pra começar hoje</>
               : undefined;
@@ -298,8 +286,6 @@ export function PaywallIOS({
         <motion.div {...stagger(3)}>
           <DuasColunas
             plano={plano}
-            precoAnual={precoAnual}
-            comTrial={comTrial}
             onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios" }); }}
           />
         </motion.div>
@@ -391,7 +377,7 @@ export function PaywallIOS({
               onClick={() => {
                 trackEvent("funnel_click", {
                   cta: "app_paywall_cta", funil: "ios", loja: "ios",
-                  produto: mostraMensal ? "core_mensal" : "core_anual_97",
+                  produto: mostraMensal ? "core_mensal" : "core_vitalicio_97",
                 });
                 void comprar(plano);
               }}
@@ -400,9 +386,7 @@ export function PaywallIOS({
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : mostraMensal
                   ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
-                  : comTrial
-                    ? <>Começar 3 dias grátis <ArrowRight className="w-4 h-4" /></>
-                    : <>Quero o ano — {precoAnual} <ArrowRight className="w-4 h-4" /></>}
+                  : <>Quero pra sempre — {APP_PRECOS.vitalicio97.preco} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
@@ -412,9 +396,7 @@ export function PaywallIOS({
                   aviso de renovação automática que a 3.1.2 exige. */}
               {mostraMensal
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar</>
-                : comTrial
-                  ? <>3 dias grátis, depois <strong className="text-foreground font-semibold">{precoAnual}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
-                  : <>Assinatura de {precoAnual}/ano pela App Store · renova automaticamente até você cancelar</>}
+                : <>Pagamento <strong className="text-foreground font-semibold">único</strong> pela App Store · sem mensalidade</>}
             </span>
           </p>
         </div>

@@ -41,6 +41,8 @@ describe("dieta: macros por refeição", () => {
     expect(entradaDoPlano("Almoço", "arroz, feijão e frango", 650, { p: 40, c: 70, g: 0 }))
       .toEqual({ name: "Almoço: arroz, feijão e frango", calories: 650, protein: 40, carbs: 70 });
     expect(entradaDoPlano("Lanche", "fruta", 0, undefined)).toEqual({ name: "Lanche: fruta" });
+    // só macros, sem kcal digitada → kcal estimada 4/4/9 pro widget de Calorias contar
+    expect(entradaDoPlano("Janta", "sopa", 0, { p: 20, c: 30, g: 10 })).toEqual({ name: "Janta: sopa", calories: 290, protein: 20, carbs: 30, fat: 10 });
   });
 
   it("diário e Home escrevem a MESMA entrada (id determinístico) — nunca soma em dobro", () => {

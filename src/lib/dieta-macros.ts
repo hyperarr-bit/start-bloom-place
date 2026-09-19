@@ -98,7 +98,10 @@ export const entradaDoPlano = (
 ): EntradaLog => {
   const m = comoMacros(macros);
   const e: EntradaLog = { name: `${refeicao}: ${comida}` };
-  if (kcal > 0) e.calories = kcal;
+  // Sem kcal digitada mas com gramas: estima 4/4/9. Quem preenche só os
+  // macros também quer ver o widget de Calorias andar (dono, 18/09 à noite).
+  const kcalFinal = kcal > 0 ? kcal : kcalDasMacros(m);
+  if (kcalFinal > 0) e.calories = kcalFinal;
   if (m.p > 0) e.protein = m.p;
   if (m.c > 0) e.carbs = m.c;
   if (m.g > 0) e.fat = m.g;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AdminWebRoi } from "./AdminWebRoi";
 import { Loader2, RefreshCw, ChevronDown, ChevronRight, Pencil, Megaphone, Leaf, HelpCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -177,6 +178,10 @@ export default function AdminCampaigns() {
         <Panel><EmptyState label={`Erro: ${error}`} /></Panel>
       ) : !data ? null : (
         <>
+          {/* 20/09: ROI real da web por campanha e anúncio — a tabela que o
+              dono pediu pra decidir orçamento sem a atribuição modelada da Meta. */}
+          <AdminWebRoi from={rangeToDates(range).from} to={rangeToDates(range).to} tick={updatedAt ? updatedAt.getTime() : 0} />
+
           {/* Gastou → voltou */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <StatTile label="💸 Gastou (Meta)" value={spend ? brl(totalSpend) : "—"} sub={spendErr === "token_missing" ? "configure o token" : undefined} />

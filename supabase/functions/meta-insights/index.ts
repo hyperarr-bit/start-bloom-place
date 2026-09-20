@@ -131,7 +131,7 @@ serve(async (req) => {
       adUrl.searchParams.set("level", "ad");
       adUrl.searchParams.set(
         "fields",
-        "ad_id,ad_name,adset_name,campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type",
+        "ad_id,ad_name,adset_name,campaign_id,campaign_name,spend,impressions,clicks,ctr,actions,cost_per_action_type",
       );
       adUrl.searchParams.set("time_range", JSON.stringify({ since, until }));
       /*
@@ -179,6 +179,7 @@ serve(async (req) => {
       };
       const anuncios = ((d.data ?? []) as Record<string, unknown>[]).map((l) => ({
         ad_id: l.ad_id,
+        campaign_id: l.campaign_id,
         criativo: l.ad_name,
         conjunto: l.adset_name,
         campanha: l.campaign_name,

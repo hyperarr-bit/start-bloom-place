@@ -306,7 +306,11 @@ function GuaranteeTimeline() {
 
 /** Contraste "o que some por ano" vs "o que o CORE custa" — usa a estimativa
  *  que a própria pessoa deu no quiz. Sem resposta útil, não renderiza nada. */
-export function AnchorCard({ gasto, preco = PRICING.lifetime.total, precoSub = "1x, pra sempre", precoTitulo }: { gasto: string; preco?: string; precoSub?: string; precoTitulo?: React.ReactNode }) {
+/* `prefixo` (20/09): o iPhone recebe o preço já formatado pela App Store
+ * ("R$ 97,90" no Brasil, "$14.99" na vitrine dos EUA que o revisor vê). Quem
+ * chama passa "" quando a string já traz a moeda; o padrão "R$ " mantém a web
+ * e o Android como sempre foram. */
+export function AnchorCard({ gasto, preco = PRICING.lifetime.total, precoSub = "1x, pra sempre", precoTitulo, prefixo = "R$ " }: { gasto: string; preco?: string; precoSub?: string; precoTitulo?: React.ReactNode; prefixo?: string }) {
   const anchor = GASTO_ANCHOR[gasto] ?? null;
   /* 04/09: "Não faço ideia" é 42% de quem escolhe dinheiro e ficava SEM
    * âncora (return null). Sem inventar número: a coluna da esquerda vira a
@@ -332,7 +336,7 @@ export function AnchorCard({ gasto, preco = PRICING.lifetime.total, precoSub = "
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">{precoTitulo ?? <>CORE vitalício,<br />pra enxergar tudo</>}</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {preco}<span className="block text-[10px] font-semibold text-muted-foreground">{precoSub}</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">{prefixo}{preco}<span className="block text-[10px] font-semibold text-muted-foreground">{precoSub}</span></p>
         </div>
       </div>
     </div>
@@ -341,7 +345,7 @@ export function AnchorCard({ gasto, preco = PRICING.lifetime.total, precoSub = "
 
 /** Âncora de custo das trilhas de vida: o custo de CONTINUAR ASSIM
  *  (recomeços/sintomas) vs o preço por mês. Espelha o AnchorCard de finanças. */
-export function AreaAnchorCard({ area, preco = PRICING.lifetime.total, precoSub = "1x, pra sempre", precoTitulo }: { area: Exclude<AreaKey, "dinheiro">; preco?: string; precoSub?: string; precoTitulo?: React.ReactNode }) {
+export function AreaAnchorCard({ area, preco = PRICING.lifetime.total, precoSub = "1x, pra sempre", precoTitulo, prefixo = "R$ " }: { area: Exclude<AreaKey, "dinheiro">; preco?: string; precoSub?: string; precoTitulo?: React.ReactNode; prefixo?: string }) {
   const anchor = AREA_ANCHOR[area];
   if (!anchor) return null;
   return (
@@ -354,7 +358,7 @@ export function AreaAnchorCard({ area, preco = PRICING.lifetime.total, precoSub 
         </div>
         <div className="pl-3 text-center">
           <p className="text-[11px] text-muted-foreground leading-tight mb-1">{precoTitulo ?? <>Com o CORE,<br />sai por</>}</p>
-          <p className="text-xl font-extrabold text-accent tracking-tight">R$ {preco}<span className="block text-[10px] font-semibold text-muted-foreground">{precoSub}</span></p>
+          <p className="text-xl font-extrabold text-accent tracking-tight">{prefixo}{preco}<span className="block text-[10px] font-semibold text-muted-foreground">{precoSub}</span></p>
         </div>
       </div>
     </div>

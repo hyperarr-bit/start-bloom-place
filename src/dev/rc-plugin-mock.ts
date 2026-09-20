@@ -45,12 +45,31 @@ const info = () => ({
   },
 });
 
-const PRECOS: Record<string, string> = {
+// 20/09: preços do iPhone entram no mock (anual com 3 dias grátis) e podem ser
+// trocados por `localStorage.__rc_mock_precos` (JSON id→priceString) pra
+// ensaiar outra vitrine da App Store — ex.: "$14.99" na storefront dos EUA.
+const PRECOS_BASE: Record<string, string> = {
+  core_anual_97: "R$ 97,90",
+  core_mensal: "R$ 24,90",
+  core_vitalicio_97: "R$ 97,90",
   core_vitalicio: "R$ 27,90",
   core_vitalicio_19: "R$ 19,90",
   "core_anual:coreanual": "R$ 159,90",
   "core_mensal:coremensal": "R$ 24,90",
   "core_mensal:coremensalpix": "R$ 19,90",
+};
+const PRECOS: Record<string, string> = new Proxy(PRECOS_BASE, {
+  get(alvo, id: string) {
+    try {
+      const extra = JSON.parse(localStorage.getItem("__rc_mock_precos") || "{}");
+      if (typeof extra[id] === "string") return extra[id];
+    } catch { /* noop */ }
+    return alvo[id];
+  },
+});
+// Oferta introdutória só no anual do iPhone (3 dias grátis), como na App Store.
+const INTRO: Record<string, unknown> = {
+  core_anual_97: { price: 0, priceString: "R$ 0,00", period: "P3D", periodUnit: "DAY", periodNumberOfUnits: 3, cycles: 1 },
 };
 
 export const PRODUCT_CATEGORY = { NON_SUBSCRIPTION: "NON_SUBSCRIPTION", SUBSCRIPTION: "SUBSCRIPTION" } as const;
@@ -85,7 +104,8 @@ export const Purchases: any = {
       products: productIdentifiers.map((id) => ({
         identifier: id,
         priceString: PRECOS[id] ?? "R$ 0,00",
-        title: "CORE vitalício (mock)",
+        title: `CORE ${id} (mock)`,
+        ...(INTRO[id] ? { introPrice: INTRO[id] } : {}),
       })),
     };
   },

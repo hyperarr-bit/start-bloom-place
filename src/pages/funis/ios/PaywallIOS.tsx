@@ -282,14 +282,23 @@ export function PaywallIOS({
           {(() => {
             // A âncora do topo acompanha a coluna escolhida — resolve o medo
             // de "a pessoa se assusta com 97,90 antes de ver que tem mensal".
-            const preco = mostraMensal ? "24,90" : precoAnual.replace(/^R\$\s?/, "");
+            /* 20/09 (dono viu no simulador "CORE vitalício · R$ $14.99"): o
+             * título do anual é dito aqui — o padrão do cartão é o vitalício da
+             * web — e o "R$" só entra quando o preço da loja vem em reais; na
+             * vitrine dos EUA (revisor) a App Store manda "$14.99" e o cartão
+             * mostra a string como veio. */
+            const emReais = /^R\$/.test(precoAnual);
+            const preco = mostraMensal ? "24,90" : emReais ? precoAnual.replace(/^R\$\s?/, "") : precoAnual;
+            const prefixo = mostraMensal || emReais ? "R$ " : "";
             const precoSub = mostraMensal ? "por mês" : comTrial ? "por ano · 3 dias grátis" : "por ano";
             const precoTitulo = mostraMensal
               ? <>CORE mensal,<br />pra começar hoje</>
-              : undefined;
+              : area === "dinheiro"
+                ? <>CORE anual,<br />pra enxergar tudo</>
+                : undefined;
             return area === "dinheiro"
-              ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />
-              : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} precoSub={precoSub} precoTitulo={precoTitulo} />;
+              ? <AnchorCard gasto={answers?.gasto ?? ""} preco={preco} prefixo={prefixo} precoSub={precoSub} precoTitulo={precoTitulo} />
+              : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} prefixo={prefixo} precoSub={precoSub} precoTitulo={precoTitulo} />;
           })()}
         </motion.div>
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>

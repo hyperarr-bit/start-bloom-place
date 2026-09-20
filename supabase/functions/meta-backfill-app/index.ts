@@ -140,17 +140,27 @@ async function mandarCompraProMeta(
   }
   const s = (k: string) => String(d[k] ?? "");
   const n = (k: string) => Number(d[k] ?? 0) || 0;
+  /* PLATAFORMA (06/09, entrada do iPhone em campanha). O primeiro item do
+   * extinfo é o que diz à Meta de qual sistema veio o evento: "a2" Android,
+   * "i2" iOS. Enquanto o iPhone não tinha campanha isso era inofensivo — sem
+   * SDK não havia atribuição pra estragar. Agora estragaria: compra de iPhone
+   * chegando rotulada como Android é dado ERRADO, não faltante, e a Meta
+   * otimizaria em cima disso. A ficha `app_device_info` grava `plataforma`
+   * desde 30/08 justamente pra este momento.
+   *
+   * O RESTO DO ARRAY é igual nos dois — mesma ordem, mesmos 16 campos. Só os
+   * palpites de reserva mudam: num iPhone o padrão honesto não é "13"/"Android". */
+  const ehIOS = s("plataforma") === "ios";
   const extinfo = [
-    "a2",                                    // versão do extinfo (Android)
+    ehIOS ? "i2" : "a2",                     // versão do extinfo (i2 = iOS)
     s("pacote") || "br.com.coreaplicativo.app",
     s("build"),
     s("versao"),
     // A Meta RECUSA o evento inteiro se a versão do SO vier vazia (subcode
     // 2804043). Com a busca por sessão acima isso virou raro, mas quando
-    // sobrar sem nada é melhor um SO aproximado do que perder a venda: sem o
-    // evento a atribuição é ZERO, e o app é Android por construção.
-    s("os") || "13",
-    s("modelo") || "Android",
+    // sobrar sem nada é melhor um SO aproximado do que perder a venda.
+    s("os") || (ehIOS ? "18" : "13"),
+    s("modelo") || (ehIOS ? "iPhone" : "Android"),
     s("locale") || "pt-BR",
     "",                                      // fuso abreviado: não temos
     "",                                      // operadora: não temos

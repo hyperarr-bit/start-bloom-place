@@ -84,6 +84,31 @@ serve(async (req) => {
       return null;
     };
 
+    /* ACHAR POR NOME (19/09). Caso real: cliente entrou com "Sign in with Apple"
+     * escondendo o e-mail — a conta ficou com um @privaterelay.appleid.com que
+     * ela não sabe de cor, e o print veio ilegível. O nome que a Apple entrega
+     * no primeiro login mora no user_metadata; procurar por ele é o único
+     * jeito de achar a conta sem pedir o e-mail de relay pra ela. Devolve só
+     * uid, domínio e datas — o e-mail inteiro fica no servidor. */
+    if (action === "achar_por_nome") {
+      const nome = String(body.nome ?? "").trim().toLowerCase();
+      if (nome.length < 3) return json({ error: "nome curto" }, 400);
+      const achados: Record<string, unknown>[] = [];
+      for (let page = 1; page <= 20; page++) {
+        const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error || !data.users.length) break;
+        for (const u of data.users) {
+          const m = (u.user_metadata ?? {}) as Record<string, unknown>;
+          const nomes = [m.full_name, m.name, m.display_name, m.nome].map((x) => String(x ?? "").toLowerCase()).filter(Boolean);
+          if (nomes.some((n) => n.includes(nome))) {
+            achados.push({ uid: u.id, dominio: (u.email ?? "").split("@")[1] ?? "", nomeMascarado: nomes[0].split(" ").map((w, i) => (i ? w[0] + "." : w)).join(" "), criado: u.created_at, ultimoLogin: u.last_sign_in_at, provedor: (u.app_metadata as Record<string, unknown> | undefined)?.provider ?? "" });
+          }
+        }
+        if (data.users.length < 1000) break;
+      }
+      return json({ achados });
+    }
+
     if (action === "status") {
       const email = String(body.email ?? "").trim().toLowerCase();
       const uid = await acharUid(email);

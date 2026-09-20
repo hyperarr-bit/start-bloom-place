@@ -47,6 +47,12 @@ function Contador({ ate }: { ate: number }) {
 }
 
 export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onEntrar?: () => void }) {
+  /* ATT (20/09, dono olhando o FitFolio): a pessoa vê a welcome e a animação
+   * PRIMEIRO; o pedido de rastreamento chega 3 s depois de a tela estar na
+   * frente dela. Fora do iPhone devolve na hora. O nativo (AppDelegate) tem
+   * uma reserva aos 10 s pra quem nunca passar por aqui; o sistema só mostra
+   * o diálogo uma vez, então os dois nunca se atropelam. */
+  useEffect(() => { const t = window.setTimeout(() => { void pedirRastreamentoIos("welcome_auto"); }, 3000); return () => window.clearTimeout(t); }, []);
   const navigate = useNavigate();
   const [restaurando, setRestaurando] = useState(false);
   const [msgRestore, setMsgRestore] = useState<string | null>(null);

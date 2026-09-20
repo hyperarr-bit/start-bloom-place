@@ -96,12 +96,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard #available(iOS 14, *), !attEmAndamento else { return }
         guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
         attEmAndamento = true
-        /* 20/09 (dono, olhando o FitFolio): a pessoa vê a tela inicial e a
-         * animação PRIMEIRO, e o pedido chega depois — não por cima da
-         * abertura. 4 s depois de ativar. Se ela tocar em "Começar" antes
-         * disso, o JS pede na hora (MetaAdsPlugin.pedirRastreamento) e este
-         * timer encontra o status já decidido e não faz nada. */
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+        /* 20/09 (dono, olhando o FitFolio): quem pede de verdade é a welcome
+         * (JS), 3 s depois de estar na tela — a pessoa vê o app e a animação
+         * primeiro. Este timer é só a RESERVA (10 s) pra um caminho que nunca
+         * passe pela welcome; se o JS já pediu, encontra o status decidido e
+         * não faz nada. */
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
             guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { AppDelegate.attEmAndamento = false; return }
             ATTrackingManager.requestTrackingAuthorization { status in
                 AppDelegate.aplicarStatusATT()

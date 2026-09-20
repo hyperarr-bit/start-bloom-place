@@ -250,7 +250,10 @@ serve(async (req) => {
      *
      * Lista vazia = ninguém é pulado. Pra restaurar a mira antiga, devolve
      * ["h24","h48","h72"] aqui — o mecanismo continua inteiro embaixo. */
-    const PULAR_QUEM_GEROU_QR: Stage[] = [];
+    // 20/09: quem gerou Pix recebe o e-mail próprio de Pix pendente (função
+    // pix-pendente-email, 20 min depois, com o valor certo) — o h1 pula essa
+    // gente, senão eram dois e-mails na mesma hora.
+    const PULAR_QUEM_GEROU_QR: Stage[] = ["h1"];
     const idsDs = [...new Set((candidates as Array<{ user_id: string; stage: Stage }>)
       .filter((c) => PULAR_QUEM_GEROU_QR.includes(c.stage)).map((c) => c.user_id))];
     const comQR = new Set<string>();

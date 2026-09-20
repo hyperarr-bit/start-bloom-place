@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { guardarCompraAnonima } from "@/lib/sessao-anonima";
 import { useSearchParams, useLocation, Link, Navigate } from "react-router-dom";
+import { varianteCadastro } from "@/lib/cadastro-ab";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight, Check, Sparkles, ShieldCheck,
@@ -13,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserData } from "@/hooks/use-user-data";
-import { trackEvent, captureLandingMeta } from "@/lib/analytics";
+import { trackEvent, trackEventBeacon, captureLandingMeta } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { supabase } from "@/integrations/supabase/client";
 import { getAuthRedirectUrl } from "@/lib/utils";
@@ -808,8 +809,37 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
   // ~metade dos cliques falhavam e era ONDE o cadastro morria). Some com o
   // botão nesse ambiente e vai direto pro e-mail — igual o Auth.tsx já faz.
   const [inApp] = useState(isInAppBrowser);
+  /* 20/09 — TESTE A/B "e-mail primeiro" (ver src/lib/cadastro-ab.ts) + medição
+   * do que a pessoa faz nesta tela: em 20/09, 11 de 13 no navegador normal
+   * saíam sem tocar em nada e a gente não sabia em quê. Agora cada tela
+   * registra a variante, o 1º toque em cada campo e o que estava preenchido
+   * quando a pessoa saiu (beacon no pagehide). */
+  const [variante] = useState(varianteCadastro);
+  const emailPrimeiro = inApp || variante === "email_primeiro";
+  const tocouRef = useRef<Set<string>>(new Set());
+  const estadoRef = useRef({ name: "", email: "", password: "", t0: Date.now(), saiu: false });
+  estadoRef.current.name = name; estadoRef.current.email = email; estadoRef.current.password = password;
+  const tocou = (campo: string) => {
+    if (tocouRef.current.has(campo)) return;
+    tocouRef.current.add(campo);
+    trackEvent("funnel_click", { cta: "signup_campo", campo, variante, inapp: inApp });
+  };
   useEffect(() => {
     if (inApp) trackEvent("funnel_view", { step: "signup_inapp_browser" });
+    trackEvent("funnel_view", { step: "signup_tela", variante, inapp: inApp });
+    const saiu = () => {
+      const e = estadoRef.current;
+      if (e.saiu) return;
+      e.saiu = true;
+      trackEventBeacon("funnel_view", {
+        step: "signup_saiu", variante, inapp: inApp,
+        nome: !!e.name.trim(), email: /\S+@\S+\.\S+/.test(e.email), senha: e.password.length >= 6,
+        campos_tocados: [...tocouRef.current].join(","), segundos: Math.round((Date.now() - e.t0) / 1000),
+      });
+    };
+    window.addEventListener("pagehide", saiu);
+    return () => { window.removeEventListener("pagehide", saiu); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inApp]);
   // 17/09: a compra pode estar numa sessão ANÔNIMA. Qualquer botão daqui que
   // troque de conta (Google, senha, link, código) deixaria o Pix órfão —
@@ -820,7 +850,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
     if (loading || googleLoading) return;
     setErr(null);
     setGoogleLoading(true);
-    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp });
+    trackEvent("funnel_click", { cta: "signup_google", inapp: inApp, variante });
     // O VALOR é o caminho do funil (17/08): o AuthCallback usa pra voltar pro
     // funil CERTO — antes voltava fixo pro /comecar, o funil velho.
     try { localStorage.setItem(FUNNEL_OAUTH_KEY, window.location.pathname); } catch { /* noop */ }
@@ -889,7 +919,8 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
       return;
     }
 
-    trackEvent("funnel_click", { cta: "signup_submit" });
+    trackEvent("funnel_click", { cta: "signup_submit", variante, inapp: inApp });
+    estadoRef.current.saiu = true; // enviou: não conta como "saiu"
     const { error, session } = await signUp(email.trim().toLowerCase(), password, name.trim());
     if (error) {
       // O MOTIVO importa: sem ele, "7 submits sem sucesso" (caso real de
@@ -955,7 +986,7 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
 
       {/* Fora do webview: Google é o caminho rápido. Dentro do Instagram/FB
           o OAuth trava, então nem mostra — e-mail vira o único caminho. */}
-      {!inApp ? (
+      {!emailPrimeiro ? (
         <>
           <Button type="button" variant="outline" onClick={handleGoogle} disabled={loading || googleLoading} className="w-full h-12 gap-2 text-[15px] font-semibold">
             {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><GoogleIcon /> Continuar com Google</>}
@@ -968,15 +999,15 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
           </div>
         </>
       ) : (
-        <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4">
+        <p className="text-[12px] text-muted-foreground leading-snug text-center mb-4" data-testid="signup-email-primeiro">
           Crie sua conta com e-mail e senha — leva 10 segundos.
         </p>
       )}
 
       <form onSubmit={submit} className="space-y-3">
-        <Input placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
-        <Input type="email" placeholder="Seu melhor e-mail" value={email} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
-        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
+        <Input placeholder="Seu nome" value={name} onFocus={() => tocou("nome")} onChange={(e) => setName(e.target.value)} autoComplete="name" className="h-12" />
+        <Input type="email" placeholder="Seu melhor e-mail" value={email} onFocus={() => tocou("email")} onChange={(e) => { setEmail(e.target.value); if (existingAccount) { setExistingAccount(false); setErr(null); } }} autoComplete="email" className="h-12" />
+        <Input type="password" placeholder={existingAccount ? "Sua senha" : "Crie uma senha (mín. 6)"} value={password} onFocus={() => tocou("senha")} onChange={(e) => setPassword(e.target.value)} autoComplete={existingAccount ? "current-password" : "new-password"} className="h-12" />
         {err && <p className="text-sm text-destructive">{err}</p>}
         <Button type="submit" size="lg" className="w-full h-12 text-base" disabled={!valid || loading}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : existingAccount ? <>Entrar e continuar <ArrowRight className="w-4 h-4" /></> : <>Criar conta e continuar <ArrowRight className="w-4 h-4" /></>}
@@ -1002,6 +1033,13 @@ function SignupScreen({ onSession, onConfirm }: { onSession: () => void; onConfi
           </p>
         )}
       </form>
+      {/* variante "e-mail primeiro" fora do navegador embutido: o Google continua
+          existindo, como link discreto — some onde o OAuth trava (webview). */}
+      {emailPrimeiro && !inApp && (
+        <button type="button" onClick={handleGoogle} disabled={loading || googleLoading} className="mt-4 w-full text-center text-[13px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50" data-testid="signup-google-link">
+          {googleLoading ? "Abrindo o Google…" : "ou continuar com Google"}
+        </button>
+      )}
       <div className="mt-5"><TrustRow /></div>
     </div>
   );

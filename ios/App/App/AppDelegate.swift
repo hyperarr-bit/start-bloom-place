@@ -87,8 +87,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
      * revisor entrou pela tela de login com a conta demo e o pedido, que só
      * saía do JS pela welcome/Home, não apareceu). Aqui não depende de rota:
      * na primeira vez que o app fica ativo com status "não decidido", pede.
-     * O atraso de 1 s é obrigatório na prática — chamado no instante em que
-     * o app ativa, o iOS 15+ devolve "notDetermined" sem mostrar nada. Se
+     * Chamado no instante em que o app ativa, o iOS 15+ devolve "notDetermined"
+     * sem mostrar nada — por isso sempre com atraso. Se
      * mesmo assim não mostrar (app foi pro fundo no meio), fica armado pra
      * próxima ativação; o JS (welcome/Home) continua como segunda chance. */
     static var attEmAndamento = false
@@ -96,7 +96,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard #available(iOS 14, *), !attEmAndamento else { return }
         guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
         attEmAndamento = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        /* 20/09 (dono, olhando o FitFolio): a pessoa vê a tela inicial e a
+         * animação PRIMEIRO, e o pedido chega depois — não por cima da
+         * abertura. 4 s depois de ativar. Se ela tocar em "Começar" antes
+         * disso, o JS pede na hora (MetaAdsPlugin.pedirRastreamento) e este
+         * timer encontra o status já decidido e não faz nada. */
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { AppDelegate.attEmAndamento = false; return }
             ATTrackingManager.requestTrackingAuthorization { status in
                 AppDelegate.aplicarStatusATT()
                 AppDelegate.attEmAndamento = false

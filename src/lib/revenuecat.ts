@@ -722,16 +722,6 @@ export const precoAnualIos = (): string | null => produtoAnualIos?.priceString ?
 /** A folha vai oferecer os 3 dias grátis pra esta conta? (intro só pra quem nunca assinou o grupo) */
 export const anualIosTemTrial = (): boolean => !!(produtoAnualIos as { introPrice?: unknown } | undefined)?.introPrice;
 
-/** Compra pro SDK da Meta no iPhone (ver logCompra no AppDelegate.swift).
- *  Nunca lança: falha do plugin vira nada — a compra já aconteceu. */
-async function logCompraMeta(produto: string, valor: number) {
-  try {
-    const { Capacitor, registerPlugin } = await import("@capacitor/core");
-    if (Capacitor.getPlatform() !== "ios") return;
-    const MetaAds = registerPlugin<{ logCompra(o: { valor: number; moeda: string; produto: string }): Promise<{ ok: boolean }> }>("MetaAds");
-    await MetaAds.logCompra({ valor, moeda: "BRL", produto });
-  } catch { /* SDK desligado ou build antiga */ }
-}
 
 export async function comprarAnualIos(): Promise<boolean> {
   ultimoMotivo = null;
@@ -756,9 +746,14 @@ export async function comprarAnualIos(): Promise<boolean> {
     });
     marcarFolhaAberta();
     await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
-    // Trial: a Meta recebe 0 agora (StartTrial seria o certo, mas Purchase de
-    // valor 0 não polui o ROAS e ainda casa instalação↔pagante quando cobrar).
-    void logCompraMeta(ID_ANUAL_IOS, anualIosTemTrial() ? 0 : produtoAnualIos.price ?? 97.9);
+    /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
+     * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
+     * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe
+     * na cobrança. A VENDA (Purchase 97,90) sai do servidor pelo CAPI quando o
+     * trial vira cobrança (meta-backfill-app: período < 10 dias = StartTrial,
+     * depois Purchase no período cheio). Um Purchase de R$ 0 aqui contava
+     * "compra" sem dinheiro e ensinava a campanha a buscar quem só começa o
+     * teste. */
     await sincronizarAssinatura();
     return true;
   } catch (e) {

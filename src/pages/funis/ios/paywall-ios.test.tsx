@@ -22,6 +22,12 @@ import { PaywallIOS } from "./PaywallIOS";
 vi.mock("@/lib/revenuecat", () => ({
   initRevenueCat: vi.fn().mockResolvedValue(undefined),
   prefetchVitalicio: vi.fn().mockResolvedValue(undefined),
+  // 18/09: anual com 3 dias grátis no lugar do vitalício
+  prefetchAnualIos: vi.fn().mockResolvedValue(undefined),
+  temAnualIos: () => true,
+  precoAnualIos: () => "R$ 97,90",
+  anualIosTemTrial: () => true,
+  comprarAnualIos: vi.fn(),
   estadoRevenueCat: () => "pronto",
   temVitalicio97: () => true,
   comprar: vi.fn(), comprarVitalicio: vi.fn(),
@@ -47,7 +53,7 @@ afterEach(cleanup);
 describe("Paywall do iPhone", () => {
   it("mostra os DOIS preços — spec do dono", () => {
     montar();
-    expect(screen.getByText("Pra sempre")).toBeInTheDocument();
+    expect(screen.getByText("meses")).toBeInTheDocument(); // 18/09: anual com 3 dias grátis no lugar do vitalício
     expect(screen.getByText("mês")).toBeInTheDocument();
     expect(screen.getAllByText("R$ 97,90").length).toBeGreaterThan(0);
     expect(screen.getAllByText("R$ 24,90").length).toBeGreaterThan(0);
@@ -90,7 +96,7 @@ describe("Paywall do iPhone", () => {
     localStorage.setItem("core-w-braco", "a");
     montar();
     // braço "a" no Android = um preço só; aqui as duas colunas continuam
-    expect(screen.getByText("Pra sempre")).toBeInTheDocument();
+    expect(screen.getByText("meses")).toBeInTheDocument(); // 18/09: anual com 3 dias grátis no lugar do vitalício
     expect(screen.getByText("mês")).toBeInTheDocument();
   });
 });

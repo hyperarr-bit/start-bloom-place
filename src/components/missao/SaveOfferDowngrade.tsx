@@ -18,6 +18,7 @@ import { trackEvent } from "@/lib/analytics";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { trialCartaoAtivo } from "@/lib/teste-gratis";
+import { ehApple } from "@/lib/loja";
 
 const CHAVE_VISTO = "core-save-offer-visto"; // nas 2 allowlists (regra eterna)
 
@@ -82,7 +83,10 @@ export function SaveOfferDowngrade() {
             <span className="text-[22px] font-extrabold">{APP_PRECOS.mensal.preco}<small className="text-[12px] font-bold text-muted-foreground">/mês</small></span>
           </div>
           <p className="text-[12px] font-semibold text-[#4f5a64] mt-1">
-            em vez de {APP_PRECOS.anual.preco} de uma vez · muda em 1 toque
+            {/* 20/09: no iPhone o anual é R$ 97,90 por ano (assinatura), não
+                159,90 "de uma vez" — o texto errado dispararia pra quem
+                cancelar o teste de 3 dias. */}
+            em vez de {ehApple() ? `${APP_PRECOS.anual97.preco} por ano` : `${APP_PRECOS.anual.preco} de uma vez`} · muda em 1 toque
           </p>
         </motion.div>
 

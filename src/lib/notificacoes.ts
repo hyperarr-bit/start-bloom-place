@@ -709,7 +709,9 @@ export function proximaManha(agora: Date): Date {
  */
 export function copyDoResgate(nomeArea: string | null | undefined, tocou: boolean, plano?: "vitalicio" | "mensal") {
   const daArea = nomeArea ? ` de ${nomeArea}` : "";
-  const oPlano = plano === "mensal" ? "Seu mês de CORE" : "Seu CORE vitalício";
+  // 20/09: sem plano dito, o texto é neutro — o padrão silencioso era
+  // "vitalício", e no iPhone o plano longo virou assinatura anual.
+  const oPlano = plano === "mensal" ? "Seu mês de CORE" : plano === "vitalicio" ? "Seu CORE vitalício" : "Seu plano do CORE";
   return {
     agora: tocou
       ? { title: `${oPlano} ficou reservado`, body: `Seu plano${daArea} está montado te esperando. É um toque pra abrir de novo.` }
@@ -757,6 +759,67 @@ export async function agendarResgateDoPlano(
 
 export async function cancelarResgateDoPlano(): Promise<void> {
   await limparFaixa(BASE_RESGATE);
+}
+
+/* -------------------------------------- lembrete do teste grátis da loja */
+
+const BASE_TESTE_LOJA = 910000;
+
+/**
+ * LEMBRETE "ACABA AMANHÃ" (20/09, iPhone). A Apple NÃO avisa antes de cobrar
+ * o fim de um teste (nada nos termos, no suporte, nem no App Store Connect);
+ * e exige cancelar com 24 h de antecedência. O aviso sai 36 h antes do fim,
+ * puxado pra hora acordada (9h–21h) do MESMO dia — nunca depois das 48 h
+ * antes do fim, senão a pessoa lê "amanhã" quando já não dá mais tempo.
+ * Blinkist: prometer e cumprir esse aviso deu +23% de conversão do teste e
+ * −55% de reclamações.
+ */
+export function quandoLembrarDoTeste(inicio: Date, dias: number): Date {
+  const fim = inicio.getTime() + Math.max(2, dias) * 86400e3;
+  const alvo = new Date(fim - 36 * 3600e3);
+  if (alvo.getHours() < 9) alvo.setHours(9, 0, 0, 0);
+  else if (alvo.getHours() >= 21) alvo.setHours(20, 30, 0, 0);
+  return alvo;
+}
+
+export function copyDoLembreteDoTeste(precoAno: string) {
+  return {
+    title: "Seu teste grátis do CORE acaba amanhã",
+    body: `Se quiser continuar, não precisa fazer nada: ${precoAno} pelo ano inteiro. Se não, cancela hoje em Ajustes › Assinaturas e não paga nada. Já cancelou? Pode ignorar.`,
+  };
+}
+
+export async function agendarLembreteDoTeste(opts: { dias: number; precoAno: string }): Promise<boolean> {
+  const p = await plugin();
+  if (!p) return false;
+  if (!(await temPermissao())) return false;
+  await garantirCanal();
+  await limparFaixa(BASE_TESTE_LOJA);
+  const { LN } = p;
+  const at = quandoLembrarDoTeste(new Date(), opts.dias);
+  const copy = copyDoLembreteDoTeste(opts.precoAno);
+  try {
+    await LN.schedule({
+      notifications: [{
+        id: BASE_TESTE_LOJA + 1,
+        title: copy.title,
+        body: copy.body,
+        schedule: { at, allowWhileIdle: true },
+        channelId: CANAL,
+        smallIcon: ICONE,
+        iconColor: COR_MARCA,
+        extra: { rota: "/planos" },
+      }],
+    });
+    trackEvent("notif_lembrete_teste_armada", { dias: opts.dias, em_h: Math.round((at.getTime() - Date.now()) / 3600e3) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function cancelarLembreteDoTeste(): Promise<void> {
+  await limparFaixa(BASE_TESTE_LOJA);
 }
 
 /* ------------------------------------------------------- régua do teste 3d */

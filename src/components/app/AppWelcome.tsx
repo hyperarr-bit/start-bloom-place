@@ -5,6 +5,7 @@ import { trackEvent, instalouVindoDoSite } from "@/lib/analytics";
 import { isNativeShell } from "@/lib/native-shell";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
 import { initRevenueCat, restaurar } from "@/lib/revenuecat";
+import { ehApple } from "@/lib/loja";
 
 /**
  * TELA 1 DO APP DAS LOJAS (Capacitor) — welcome "grade viva" aprovada nos
@@ -82,7 +83,7 @@ export function AppWelcome({ onComecar, onEntrar }: { onComecar: () => void; onE
     const ok = await restaurar();
     setRestaurando(false);
     if (ok) { window.location.href = "/"; return; }
-    setMsgRestore("Nenhuma assinatura encontrada nesta conta Google.");
+    setMsgRestore(`Nenhuma assinatura encontrada nesta conta ${ehApple() ? "da App Store" : "Google"}.`);
   };
 
   return (

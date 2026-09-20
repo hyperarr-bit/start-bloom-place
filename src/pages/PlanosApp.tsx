@@ -8,7 +8,8 @@ import { trackEvent } from "@/lib/analytics";
 import { initRevenueCat, restaurar, abrirResgateApple } from "@/lib/revenuecat";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 import { EntradaDeCodigo } from "@/components/paywall/EntradaDeCodigo";
-import { estadoTeste } from "@/lib/teste-gratis";
+import { estadoTeste, trialCartaoAtivo } from "@/lib/teste-gratis";
+import { APP_PRECOS } from "@/lib/native-shell";
 import { pelaLoja, sufixoPagamento, lojaParaCancelar, urlGerenciarAssinatura, ehApple } from "@/lib/loja";
 
 /**
@@ -78,6 +79,12 @@ const PlanosApp = () => {
     const quando = d.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
     if (inGracePeriod) return `Pagamento pendente. O acesso segue até ${quando}.`;
     if (prePago) return `Vale até ${quando}. NÃO renova sozinho — quando chegar a data, é só pagar outro mês se quiser.`;
+    // 20/09: assinante em TESTE GRÁTIS (anual do iPhone) lê a verdade inteira:
+    // até quando é grátis, quanto cobra depois, e que cancelar antes é de graça.
+    if (ehAssinaturaDaLoja && billingPeriod === "annual" && trialCartaoAtivo()) {
+      const precoAno = ehApple() ? APP_PRECOS.anual97.preco : APP_PRECOS.anual.preco;
+      return `Teste grátis até ${quando}. Depois, ${precoAno} por ano, renovando automaticamente — cancele antes e não paga nada.`;
+    }
     return ehAssinaturaDaLoja
       ? `Renova automaticamente em ${quando}. Você pode cancelar antes disso.`
       : `Seu acesso vai até ${quando}.`;
@@ -103,7 +110,7 @@ const PlanosApp = () => {
     const ok = await restaurar();
     setRestaurando(false);
     if (ok) { window.location.href = "/"; return; }
-    setMsg("Nenhuma assinatura encontrada nesta conta Google.");
+    setMsg(`Nenhuma assinatura encontrada nesta conta ${ehApple() ? "da App Store" : "Google"}.`);
   };
 
   return (
@@ -252,7 +259,10 @@ const PlanosApp = () => {
               {/* v81: a vitrine virou compra ÚNICA — "cancele quando quiser"
                   prometia gestão de assinatura que não existe no vitalício. */}
               <p className="flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
-                <ShieldCheck className="w-3.5 h-3.5" /> Pagamento único {pelaLoja()}{sufixoPagamento()}
+                {/* 20/09: no iPhone a vitrine é ASSINATURA (anual com teste / mensal) —
+                    "pagamento único" era a promessa do vitalício, que saiu de lá. */}
+                <ShieldCheck className="w-3.5 h-3.5" />
+                {ehApple() ? <>Assinatura pela App Store · cancele quando quiser</> : <>Pagamento único {pelaLoja()}{sufixoPagamento()}</>}
               </p>
             </div>
           </>

@@ -501,17 +501,23 @@ function DepoCard({ d, neutra = false }: { d: Depo; neutra?: boolean }) {
  *  do Cal AI sem custar uma tela a mais no funil. */
 /** `semLoja`: o paywall do iPhone passa true — lá a loja não pode ser citada
  *  (3.1.1) e dizer "App Store" seria mentira, as avaliações são da Play. */
-export function MuralDepoimentos({ area, semLoja = false }: { area: AreaKey; semLoja?: boolean }) {
+/* `soAssinatura` (20/09): o iPhone vende ASSINATURA anual com teste — um
+ * depoimento elogiando "pagamento único" (real, da Sabrina) contradiz a tela
+ * e a Apple lê isso como promessa. Não editamos avaliação de ninguém: só não
+ * mostramos essa lá. Web e Android seguem com todas. */
+export function MuralDepoimentos({ area, semLoja = false, soAssinatura = false }: { area: AreaKey; semLoja?: boolean; soAssinatura?: boolean }) {
   const [aberto, setAberto] = useState(false);
   const neutra = semLoja || ehApple();
-  const extras = MURAL_EXTRA_TODAS.filter((d) => !MURAL_POR_AREA[area].includes(d));
+  const cabe = (d: Depo) => !soAssinatura || !/pagamento único|vitalíc|pra sempre|uma vez só/i.test(d.texto);
+  const daArea = MURAL_POR_AREA[area].filter(cabe);
+  const extras = MURAL_EXTRA_TODAS.filter((d) => !MURAL_POR_AREA[area].includes(d)).filter(cabe);
   return (
     <div className="text-left">
       <div className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">
         {neutra ? "O que dizem quem já usa" : "O que dizem na Google Play"}
       </div>
       <div className="space-y-3">
-        {MURAL_POR_AREA[area].map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
+        {daArea.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
         {aberto && extras.map((d) => <DepoCard key={d.nome} d={d} neutra={neutra} />)}
       </div>
       {!aberto && (
@@ -551,7 +557,7 @@ const TRUST_CHIPS = [
 const TRUST_CHIPS_IOS = [
   { emoji: "", label: "Compra pela App Store" },
   { emoji: "⚡", label: "Acesso na hora" },
-  { emoji: "♾️", label: "Sem mensalidade" },
+  { emoji: "✕", label: "Cancele quando quiser" }, // 20/09: assinatura renova — "sem mensalidade" saiu
 ];
 
 /** WEB (15/09): quem compra no site precisa saber ANTES de pagar que o CORE

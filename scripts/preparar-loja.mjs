@@ -156,6 +156,16 @@ for (const bloco of html.match(/<script[\s\S]*?<\/script>/gi) ?? []) {
 // Os comentários que embrulhavam os blocos ficam órfãos e são inertes, mas um
 // binário com "<!-- Meta Pixel Code -->" dentro engana quem for auditar.
 html = html.replace(/[ \t]*<!--[^>]*(TikTok Pixel|Meta Pixel|Google tag)[^>]*-->\n?/gi, "");
+// 20/09: a descrição do SITE diz "Pagamento único no Pix, sem mensalidade" —
+// dentro do binário da loja isso cita Pix (3.1.1) e contradiz a assinatura do
+// iPhone. O app das lojas leva uma descrição neutra, igual nas duas.
+const DESCRICAO_APP = "O CORE junta as 16 áreas da sua vida — dinheiro, rotina, treino, saúde, casa, estudos — num aplicativo só.";
+html = html.replace(/(<meta\s+(?:name|property)="(?:description|og:description|twitter:description)"\s+content=")[^"]*(")/gi, `$1${DESCRICAO_APP}$2`);
+if (/Pagamento único no Pix|sem mensalidade/i.test(html)) {
+  console.error("\n✗ a descrição com 'Pagamento único no Pix' sobrou no index.html do binário.\n");
+  process.exit(1);
+}
+console.log("  ✓ descrição do app neutra (sem Pix / pagamento único)");
 writeFileSync(indexApp, html);
 
 // A prova. Se o build da Vite um dia mudar o formato do index.html e um

@@ -12,6 +12,7 @@ import { UserDataProvider } from "@/hooks/use-user-data";
 import { PageTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { TrialBanner } from "@/components/TrialBanner";
+import { PaywallAssinatura } from "@/components/paywall/PaywallAssinatura";
 import { PortaoBoasVindas } from "@/components/onboarding/PortaoBoasVindas";
 import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -525,7 +526,16 @@ const AnimatedRoutes = () => {
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />
-        <Route path="/comecar" element={<PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition>} />
+        {/* 20/09: só-web. Dentro do app este funil vendia vitalício no Pix
+            (PaywallFlow) e era alcançável por link antigo — no iPhone isso
+            contradiz a assinatura e cita Pix (3.1.1). */}
+        <Route path="/comecar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil"><Comecar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
+        {/* Só no servidor de desenvolvimento (some do build): o paywall de
+            quem entra logado sem assinatura, pra olhar a tela sem precisar de
+            uma conta sem pagamento. */}
+        {import.meta.env.DEV && (
+          <Route path="/dev/gate" element={<div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>} />
+        )}
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/plano" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v3"><PlanoV3 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

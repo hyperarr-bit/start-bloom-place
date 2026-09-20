@@ -198,7 +198,7 @@ function LifetimeCardW({ naWeb = false }: { naWeb?: boolean }) {
           {preco}
         </div>
         <div className="relative text-[12px] font-semibold text-black/50 mt-1.5">
-          {ehApple() ? "pagamento único · uma vez, pra sempre"
+          {ehApple() ? "pela App Store" /* 20/09: no iPhone o plano longo é assinatura; este cartão é do Android */
             : naWeb ? "pagamento único · Pix, acesso na hora"
             : "pagamento único · Pix ou cartão na tela do Google"}
         </div>

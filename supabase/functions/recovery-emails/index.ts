@@ -261,10 +261,29 @@ serve(async (req) => {
       for (const q of qs ?? []) comQR.add(String(q.user_id));
     }
 
-    let sent = 0, failed = 0, skippedQr = 0;
+    /* 20/09: quem já ABRIU O APP das lojas (Android ou iPhone) sai desta régua.
+     * A copy é da web (Pix, "vitalício", link pro checkout do site) e o
+     * comprador do iPhone entra em assinatura anual com teste: a conta nasce
+     * DEPOIS de pagar e, se o sync do RevenueCat atrasar, este e-mail sairia
+     * contradizendo a loja. Marca o estágio como feito pra não reavaliar. */
+    const idsTodos = [...new Set(candidates.map((c) => String(c.user_id)))];
+    const doApp = new Set<string>();
+    for (let i = 0; i < idsTodos.length; i += 50) {
+      const { data: ev } = await supabase
+        .from("analytics_events").select("user_id")
+        .eq("event_name", "app_device_info").in("user_id", idsTodos.slice(i, i + 50)).limit(500);
+      for (const e of ev ?? []) doApp.add(String(e.user_id));
+    }
+
+    let sent = 0, failed = 0, skippedQr = 0, skippedApp = 0;
     for (const c of candidates) {
       try {
         const stage = c.stage as Stage;
+        if (doApp.has(String(c.user_id))) {
+          await supabase.from("funnel_recovery_emails").insert({ user_id: c.user_id, stage });
+          skippedApp++;
+          continue;
+        }
         if (PULAR_QUEM_GEROU_QR.includes(stage) && comQR.has(String(c.user_id))) {
           // marca como "enviado" pra régua não tentar de novo a cada 30min
           await supabase.from("funnel_recovery_emails").insert({ user_id: c.user_id, stage });
@@ -302,8 +321,8 @@ serve(async (req) => {
       }
     }
 
-    log("Done", { sent, failed, skippedQr });
-    return Response.json({ sent, failed, skippedQr });
+    log("Done", { sent, failed, skippedQr, skippedApp });
+    return Response.json({ sent, failed, skippedQr, skippedApp });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     log("ERROR", { msg });

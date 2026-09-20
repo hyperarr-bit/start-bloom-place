@@ -55,6 +55,7 @@ import { APP_PRECOS } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { type AreaKey } from "@/lib/funnel";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
+import { estadoPermissao, pedirPermissao, agendarLembreteDoTeste } from "@/lib/notificacoes";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -88,11 +89,51 @@ const PLANO_INICIAL: "anual" | "mensal" = "anual";
  * dívida de suporte com quem cobra a promessa depois.
  * Estes três são fatos verificáveis.
  */
-const SELOS = [
-  { emoji: "", label: "Compra pela App Store" },
-  { emoji: "⚡", label: "Acesso na hora" },
-  { emoji: "♾️", label: "Sem mensalidade" },
-];
+/* 20/09: o "♾️ Sem mensalidade" saiu — a assinatura RENOVA, e o selo
+ * contradizia a linha legal logo abaixo (a Apple lê isso como promessa). Com
+ * teste grátis os selos falam do que tira o medo de quem hesita (Blinkist):
+ * aviso antes de cobrar e cancelar em um toque. Sem teste, ou no mensal,
+ * falam da assinatura como ela é. */
+const selosPara = (teste: boolean) => teste
+  ? [
+      { emoji: "", label: "Compra pela App Store" },
+      { emoji: "🔔", label: "Aviso antes de cobrar" },
+      { emoji: "✕", label: "Cancele em 1 toque" },
+    ]
+  : [
+      { emoji: "", label: "Compra pela App Store" },
+      { emoji: "⚡", label: "Acesso na hora" },
+      { emoji: "✕", label: "Cancele quando quiser" },
+    ];
+
+/** Enquanto a loja não responde: R$ 97,90 ÷ 12. */
+const PRECO_MES_PADRAO = "R$ 8,16";
+
+/* (B) CRONOGRAMA DO TESTE — o bloco que deu +23% no Blinkist e que a Apple
+ * recomenda na sessão sobre testes: a pessoa sabe exatamente quando (e se)
+ * vai pagar. O dia do aviso e o da cobrança vêm da duração lida da loja
+ * (trocar 3 por 7 dias no App Store Connect muda o texto sozinho). */
+function ComoFuncionaOTeste({ dias, precoAnual }: { dias: number; precoAnual: string }) {
+  const passos = [
+    { cheio: true, t: "Hoje · acesso a tudo", s: "Sem cobrança nenhuma agora." },
+    { cheio: false, t: `Dia ${Math.max(1, dias - 1)} · a gente te avisa`, s: "Notificação antes de qualquer cobrança." },
+    { cheio: false, t: `Dia ${dias} · só se você continuar`, s: `${precoAnual} pelo ano inteiro. Cancelou antes, não paga nada.` },
+  ];
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 text-left" data-testid="ios-cronograma">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Como funciona o teste</div>
+      {passos.map((p) => (
+        <div key={p.t} className="grid grid-cols-[18px_1fr] gap-2.5 items-start py-1.5">
+          <span className={`mt-[3px] w-[14px] h-[14px] rounded-full border-2 border-accent ${p.cheio ? "bg-accent" : "bg-accent/15"}`} aria-hidden />
+          <span>
+            <b className="block text-[13px] leading-tight">{p.t}</b>
+            <span className="text-[11.5px] text-muted-foreground leading-tight">{p.s}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /**
  * As duas colunas, de PESO IGUAL — mesma largura, mesma altura, preço no
@@ -104,8 +145,8 @@ const SELOS = [
  * que faz a comparação sem precisar de tabela.
  */
 function DuasColunas({
-  plano, onSelect, precoAnual, comTrial,
-}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; comTrial: boolean }) {
+  plano, onSelect, precoAnual, precoMes, comTrial, dias,
+}: { plano: "anual" | "mensal"; onSelect: (p: "anual" | "mensal") => void; precoAnual: string; precoMes: string; comTrial: boolean; dias: number }) {
   const moldura = (ativo: boolean) =>
     `rounded-3xl p-[2px] transition-all ${ativo
       ? "bg-gradient-to-br from-accent via-accent/45 to-accent/15 shadow-[0_14px_40px_-16px_hsl(var(--accent)/0.5)]"
@@ -132,12 +173,16 @@ function DuasColunas({
       <div onClick={() => onSelect("anual")} role="button" className={moldura(plano === "anual")} data-testid="ios-coluna-anual">
         <div className="rounded-[calc(1.5rem-2px)] bg-white h-full px-3 pt-0 pb-3.5 text-center text-[#16121c] flex flex-col overflow-hidden">
           <span className={`-mx-3 text-[10px] font-extrabold tracking-[0.08em] py-[5px] ${plano === "anual" ? "bg-accent text-accent-foreground" : "bg-accent/10 text-accent"}`}>
-            {comTrial ? "3 DIAS GRÁTIS" : "MELHOR ESCOLHA"}
+            {comTrial ? `${dias} DIAS GRÁTIS` : "MELHOR ESCOLHA"}
           </span>
           <span className="text-[30px] font-black leading-none mt-1.5">12</span>
           <span className="text-[12.5px] font-bold text-black/45">meses</span>
-          <span className="text-[17px] font-extrabold mt-2">{precoAnual}</span>
-          <span className="text-[10px] font-semibold text-black/40">{comTrial ? "por ano, depois dos 3 dias" : "por ano"}</span>
+          {/* (A) 20/09: o número que a pessoa compara com o mensal é o POR MÊS;
+              o valor cheio do ano fica logo abaixo, como a Apple exige. */}
+          <span className="text-[17px] font-extrabold mt-2">{precoMes}</span>
+          <span className="text-[10px] font-semibold text-black/40 leading-tight px-1">
+            por mês · {precoAnual}/ano{comTrial ? `, depois dos ${dias} dias` : ""}
+          </span>
           <span className="mx-3 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-1 px-1 leading-tight mt-auto">
             4 meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b>
@@ -160,7 +205,12 @@ export function PaywallIOS({
   const [anualNaLoja, setAnualNaLoja] = useState<boolean | null>(null);
   const [precoAnual, setPrecoAnual] = useState<string>(APP_PRECOS.anual97.preco);
   const [comTrial, setComTrial] = useState(true);
+  const [dias, setDias] = useState(3);
+  const [precoMes, setPrecoMes] = useState<string>(PRECO_MES_PADRAO);
   const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
+  // (D) pedido de permissão pro lembrete do teste, logo depois da compra
+  const [pedindoAviso, setPedindoAviso] = useState(false);
+  const respostaAviso = useRef<((quer: boolean) => void) | null>(null);
 
   useEffect(() => {
     vivoRef.current = true;
@@ -179,7 +229,12 @@ export function PaywallIOS({
       if (!vivoRef.current) return;
       const lido = () => {
         if (rc.estadoRevenueCat() === "pronto") setAnualNaLoja(rc.temAnualIos());
-        if (rc.temAnualIos()) { setPrecoAnual(rc.precoAnualIos() ?? APP_PRECOS.anual97.preco); setComTrial(rc.anualIosTemTrial()); }
+        if (rc.temAnualIos()) {
+          setPrecoAnual(rc.precoAnualIos() ?? APP_PRECOS.anual97.preco);
+          setComTrial(rc.anualIosTemTrial());
+          setDias(rc.diasTrialIos() || 3);
+          setPrecoMes(rc.precoMensalDoAnualIos() ?? PRECO_MES_PADRAO);
+        }
       };
       lido();
       if (!rc.temAnualIos()) {
@@ -221,6 +276,14 @@ export function PaywallIOS({
         : await rc.comprarAnualIos();
       if (ok) {
         trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios" });
+        /* (D) LEMBRETE DO TESTE: a Apple não avisa antes de cobrar. Se a
+         * compra entrou em teste, o app arma a notificação de "acaba amanhã"
+         * — e, se nunca perguntou, pede a permissão AGORA, com o motivo na
+         * cara (Blinkist: aceite de 6% → 74% pedindo assim). */
+        if (produto === "anual" && rc.ultimaCompraAnualFoiTrial()) {
+          setComprando(false);
+          await armarLembreteDoTeste();
+        }
         onPagoSemConta();
         return;
       }
@@ -247,6 +310,25 @@ export function PaywallIOS({
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
     }
     setComprando(false);
+  };
+
+  const armarLembreteDoTeste = async () => {
+    try {
+      const estado = await estadoPermissao();
+      if (estado === "granted") {
+        await agendarLembreteDoTeste({ dias, precoAno: precoAnual });
+        trackEvent("trial_aviso", { acao: "ja_permitido" });
+        return;
+      }
+      if (estado !== "prompt") { trackEvent("trial_aviso", { acao: "sem_permissao", estado }); return; }
+      trackEvent("trial_aviso", { acao: "perguntou" });
+      const quer = await new Promise<boolean>((resolve) => { respostaAviso.current = resolve; setPedindoAviso(true); });
+      setPedindoAviso(false);
+      if (!quer) { trackEvent("trial_aviso", { acao: "recusou" }); return; }
+      const deu = await pedirPermissao();
+      if (deu) await agendarLembreteDoTeste({ dias, precoAno: precoAnual });
+      trackEvent("trial_aviso", { acao: deu ? "aceitou" : "negou_no_sistema" });
+    } catch { /* lembrete nunca segura quem acabou de pagar */ }
   };
 
   const chartLabel = CHART_LABEL[area] ?? CHART_LABEL.dinheiro;
@@ -287,10 +369,16 @@ export function PaywallIOS({
              * web — e o "R$" só entra quando o preço da loja vem em reais; na
              * vitrine dos EUA (revisor) a App Store manda "$14.99" e o cartão
              * mostra a string como veio. */
-            const emReais = /^R\$/.test(precoAnual);
-            const preco = mostraMensal ? "24,90" : emReais ? precoAnual.replace(/^R\$\s?/, "") : precoAnual;
-            const prefixo = mostraMensal || emReais ? "R$ " : "";
-            const precoSub = mostraMensal ? "por mês" : comTrial ? "por ano · 3 dias grátis" : "por ano";
+            /* (A) 20/09: no anual a âncora mostra o POR MÊS (R$ 8,16) — é o
+             * número comparável com o mensal e com o que some por mês; o
+             * valor cheio do ano vai na linha de baixo. */
+            const valor = mostraMensal ? APP_PRECOS.mensal.preco : precoMes;
+            const emReais = /^R\$/.test(valor);
+            const preco = emReais ? valor.replace(/^R\$\s?/, "") : valor;
+            const prefixo = emReais ? "R$ " : "";
+            // (sub curto de propósito: cabe numa linha; o teste grátis já grita
+            // no selo da coluna, no cronograma e no botão)
+            const precoSub = mostraMensal ? "por mês" : `por mês · ${precoAnual}/ano`;
             const precoTitulo = mostraMensal
               ? <>CORE mensal,<br />pra começar hoje</>
               : area === "dinheiro"
@@ -301,6 +389,9 @@ export function PaywallIOS({
               : <AreaAnchorCard area={area as Exclude<AreaKey, "dinheiro">} preco={preco} prefixo={prefixo} precoSub={precoSub} precoTitulo={precoTitulo} />;
           })()}
         </motion.div>
+        {comTrial && !mostraMensal && (
+          <motion.div {...stagger(1)}><ComoFuncionaOTeste dias={dias} precoAnual={precoAnual} /></motion.div>
+        )}
         <motion.div {...stagger(1)}><TransformChart label={chartLabel} /></motion.div>
         <ValueStack area={area} />
         <motion.div {...stagger(2)}>{area === "dinheiro" ? <CompareTable /> : <ModulesIncludedCard />}</motion.div>
@@ -308,11 +399,13 @@ export function PaywallIOS({
           <DuasColunas
             plano={plano}
             precoAnual={precoAnual}
+            precoMes={precoMes}
+            dias={dias}
             comTrial={comTrial}
             onSelect={(p) => { setPlano(p); trackEvent("funnel_click", { cta: "ios_plano", plano: p, funil: "ios" }); }}
           />
         </motion.div>
-        <MuralDepoimentos area={area} semLoja />
+        <MuralDepoimentos area={area} semLoja soAssinatura />
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-border bg-card py-3.5 text-center">
             <div className="text-[13px] text-[#f0a500] tracking-wide" aria-label="5 estrelas">★★★★★</div>
@@ -327,7 +420,7 @@ export function PaywallIOS({
         </div>
         <motion.div {...stagger(4)}>
           <div className="flex items-center justify-center gap-2 flex-wrap">
-            {SELOS.map((c) => (
+            {selosPara(comTrial && !mostraMensal).map((c) => (
               <span key={c.label} className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-[11.5px] font-semibold">
                 {c.emoji && <span>{c.emoji}</span>} {c.label}
               </span>
@@ -410,10 +503,18 @@ export function PaywallIOS({
                 : mostraMensal
                   ? <>Começar por {APP_PRECOS.mensal.preco}/mês <ArrowRight className="w-4 h-4" /></>
                   : comTrial
-                    ? <>Começar 3 dias grátis <ArrowRight className="w-4 h-4" /></>
+                    ? <>Começar {dias} dias grátis <ArrowRight className="w-4 h-4" /></>
                     : <>Quero o ano — {precoAnual} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
+          {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje e o
+              app avisa antes de cobrar (Cal AI: "No payment due now"). */}
+          {!mostraMensal && comTrial && (
+            <p className="text-[11.5px] text-center mt-2 font-semibold" data-testid="ios-sem-cobranca">
+              <span className="text-foreground">Sem cobrança hoje</span>
+              <span className="text-muted-foreground"> · avisamos 1 dia antes de cobrar</span>
+            </p>
+          )}
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 shrink-0 mt-[1px]" />
             <span>
@@ -422,12 +523,30 @@ export function PaywallIOS({
               {mostraMensal
                 ? <>Assinatura de {APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar</>
                 : comTrial
-                  ? <>3 dias grátis, depois <strong className="text-foreground font-semibold">{precoAnual}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
+                  ? <>{dias} dias grátis, depois <strong className="text-foreground font-semibold">{precoAnual}/ano</strong> pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada</>
                   : <>Assinatura de {precoAnual}/ano pela App Store · renova automaticamente até você cancelar</>}
             </span>
           </p>
         </div>
       </div>
+
+      {pedindoAviso && (
+        <div className="fixed inset-0 z-[90] bg-black/45 grid place-items-center px-6" data-testid="ios-aviso-prompt">
+          <div className="w-full max-w-sm rounded-3xl bg-white text-[#16121c] p-6 text-center shadow-2xl">
+            <div className="text-[34px] leading-none mb-2" aria-hidden>🔔</div>
+            <h2 className="text-[20px] font-extrabold tracking-tight leading-tight">Te aviso 1 dia antes de cobrar?</h2>
+            <p className="text-[13.5px] text-black/60 mt-2 leading-snug">
+              É só esse aviso: no dia {Math.max(1, dias - 1)}, antes de qualquer cobrança dos {precoAnual}. Você decide com calma.
+            </p>
+            <Button size="lg" className="w-full h-12 rounded-full text-[15px] font-bold mt-5" onClick={() => respostaAviso.current?.(true)}>
+              Sim, me avisa
+            </Button>
+            <button type="button" className="w-full text-center text-[13px] font-semibold text-black/55 mt-3 py-1" onClick={() => respostaAviso.current?.(false)}>
+              Agora não
+            </button>
+          </div>
+        </div>
+      )}
 
       {comprando && (
         <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">

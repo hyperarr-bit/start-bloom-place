@@ -710,6 +710,14 @@ export async function prefetchAnualIos(): Promise<void> {
     const { products } = await Purchases.getProducts({ productIdentifiers: [ID_ANUAL_IOS], type: mod.PRODUCT_CATEGORY.SUBSCRIPTION });
     produtoAnualIos = (products ?? []).find((p) => p?.identifier === ID_ANUAL_IOS || p?.identifier?.startsWith(ID_ANUAL_IOS + ":"));
     prefetchAnualDesfecho = `respondeu_${(products ?? []).length}`;
+    if (produtoAnualIos) {
+      try {
+        const r = await Purchases.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: [ID_ANUAL_IOS] });
+        // INTRO_ELIGIBILITY_STATUS: 0 desconhecido · 1 inelegível · 2 elegível · 3 sem oferta
+        const st = (r as Record<string, { status?: number }> | null)?.[ID_ANUAL_IOS]?.status;
+        elegivelIntroAnual = st === 1 ? "ineligible" : st === 2 ? "eligible" : "unknown";
+      } catch { elegivelIntroAnual = "unknown"; }
+    }
   } catch (e) {
     prefetchAnualDesfecho = "lancou_" + String((e as { message?: string })?.message ?? e).slice(0, 80);
   }
@@ -719,8 +727,48 @@ export async function prefetchAnualIos(): Promise<void> {
 export const temAnualIos = (): boolean => !!produtoAnualIos;
 /** Preço real do anual na moeda da loja (ex.: "R$ 97,90"), se já carregou. */
 export const precoAnualIos = (): string | null => produtoAnualIos?.priceString ?? null;
-/** A folha vai oferecer os 3 dias grátis pra esta conta? (intro só pra quem nunca assinou o grupo) */
-export const anualIosTemTrial = (): boolean => !!(produtoAnualIos as { introPrice?: unknown } | undefined)?.introPrice;
+/* ELEGIBILIDADE (20/09): o StoreKit devolve a oferta introdutória no produto
+ * pra TODO MUNDO; quem já usou o teste no grupo não ganha de novo e a folha
+ * cobra na hora. O RevenueCat sabe dizer quem é (checkTrialOrIntroductory-
+ * PriceEligibility); sem resposta, a vitrine assume elegível — a folha da
+ * Apple é quem manda no fim. */
+let elegivelIntroAnual: "eligible" | "ineligible" | "unknown" = "unknown";
+type IntroAnual = { price?: number; priceString?: string; periodUnit?: string; periodNumberOfUnits?: number } | null;
+const introDoAnual = (): IntroAnual => (produtoAnualIos as { introPrice?: IntroAnual } | undefined)?.introPrice ?? null;
+
+/** A folha vai oferecer os dias grátis pra esta conta? */
+export const anualIosTemTrial = (): boolean => !!introDoAnual() && elegivelIntroAnual !== "ineligible";
+
+/** Dias grátis da oferta introdutória, lidos da LOJA e não do código: 3 hoje;
+ *  trocar pra 7 no App Store Connect não pede build nova. 0 = sem teste. */
+export const diasTrialIos = (): number => {
+  const intro = introDoAnual();
+  if (!intro || !anualIosTemTrial()) return 0;
+  const n = Number(intro.periodNumberOfUnits ?? 0) || 0;
+  const u = String(intro.periodUnit ?? "DAY").toUpperCase();
+  return u === "WEEK" ? n * 7 : u === "MONTH" ? n * 30 : u === "YEAR" ? n * 365 : n;
+};
+
+const formatarMoeda = (valor: number, moeda: string): string => {
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(valor).replace(/\u00A0/g, " ");
+  } catch {
+    return `${moeda} ${valor.toFixed(2).replace(".", ",")}`;
+  }
+};
+
+/** O anual dividido por 12, na moeda da loja ("R$ 8,16") — é o número que a
+ *  pessoa compara com o mensal. null enquanto a loja não respondeu. */
+export const precoMensalDoAnualIos = (): string | null => {
+  const p = produtoAnualIos as { price?: number; currencyCode?: string } | undefined;
+  if (!p?.price || !(p.price > 0)) return null;
+  return formatarMoeda(p.price / 12, p.currencyCode || "BRL");
+};
+
+let ultimaCompraFoiTrial = false;
+/** A última compra do anual entrou em período de TESTE (a Apple aplicou a
+ *  oferta)? É o que decide se o app arma o lembrete "acaba amanhã". */
+export const ultimaCompraAnualFoiTrial = (): boolean => ultimaCompraFoiTrial;
 
 
 export async function comprarAnualIos(): Promise<boolean> {
@@ -745,7 +793,12 @@ export async function comprarAnualIos(): Promise<boolean> {
       trial: anualIosTemTrial(),
     });
     marcarFolhaAberta();
-    await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    const resultado = await Purchases.purchaseStoreProduct({ product: produtoAnualIos });
+    const ativos = Object.values(
+      (resultado as { customerInfo?: { entitlements?: { active?: Record<string, { periodType?: string }> } } } | undefined)
+        ?.customerInfo?.entitlements?.active ?? {},
+    );
+    ultimaCompraFoiTrial = ativos.length ? ativos.some((e) => e?.periodType === "TRIAL") : anualIosTemTrial();
     /* SEM logPurchase manual (20/09, build 20). O app da Meta tem "registro
      * automático de compras" LIGADO (bitmask do app, bit 1) e o SDK 18 lê o
      * StoreKit 2: ele mesmo registra StartTrial nos 3 dias grátis e Subscribe

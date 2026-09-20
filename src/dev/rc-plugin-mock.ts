@@ -74,6 +74,13 @@ const INTRO: Record<string, unknown> = {
 
 export const PRODUCT_CATEGORY = { NON_SUBSCRIPTION: "NON_SUBSCRIPTION", SUBSCRIPTION: "SUBSCRIPTION" } as const;
 
+// valor numérico + moeda a partir da string ("R$ 97,90" → 97.9 BRL; "$14.99" → 14.99 USD)
+const VALOR = (s: string): { price: number; currencyCode: string } => {
+  const n = Number(s.replace(/[^\d,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".")) || 0;
+  const currencyCode = /^R\$/.test(s) ? "BRL" : /^(US)?\$/.test(s) ? "USD" : /^€/.test(s) ? "EUR" : "BRL";
+  return { price: n, currencyCode };
+};
+
 export const Purchases: any = {
   async configure(_: any) {
     console.warn("[RC MOCK] loja simulada ativa — build de TESTE, nunca de loja");
@@ -104,10 +111,16 @@ export const Purchases: any = {
       products: productIdentifiers.map((id) => ({
         identifier: id,
         priceString: PRECOS[id] ?? "R$ 0,00",
+        ...VALOR(PRECOS[id] ?? "R$ 0,00"),
         title: `CORE ${id} (mock)`,
         ...(INTRO[id] ? { introPrice: INTRO[id] } : {}),
       })),
     };
+  },
+  async checkTrialOrIntroductoryPriceEligibility({ productIdentifiers }: { productIdentifiers: string[] }) {
+    const r: Record<string, { status: number; description: string }> = {};
+    for (const id of productIdentifiers) r[id] = { status: INTRO[id] ? 2 : 3, description: "mock" };
+    return r;
   },
   async purchaseStoreProduct({ product }: { product: { identifier: string } }) {
     const m = modo();

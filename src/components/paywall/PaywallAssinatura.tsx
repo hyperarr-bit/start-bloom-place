@@ -54,7 +54,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { estadoTeste, limparGuiaSemente } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
-import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
+import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste, temPermissao, agendarLembreteDoTeste } from "@/lib/notificacoes";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
@@ -190,6 +190,13 @@ export function PaywallAssinatura({
   // promessa antes da resposta (varredura v81: o primeiro paint mostrava o
   // fallback por 1-3s pra TODO mundo).
   const [loja, setLoja] = useState<{ vitalicio97: boolean | null; anual97: boolean; mensalVista: boolean }>({ vitalicio97: null, anual97: false, mensalVista: false });
+  /* iPHONE (20/09): o vitalício saiu de lá — a coluna longa é o ANUAL de
+   * R$ 97,90 com dias grátis, e preço, dias e elegibilidade vêm da App Store
+   * (a mesma leitura do PaywallIOS do funil). O Android segue intocado. */
+  const [apple] = useState(() => ehApple());
+  const [anualApple, setAnualApple] = useState<{ preco: string; mes: string; dias: number; trial: boolean }>({
+    preco: APP_PRECOS.anual97.preco, mes: "R$ 8,16", dias: 3, trial: true,
+  });
   const cancelamentos = useRef(0);
   const pixVencendoJaFoi = useRef(false);
   const vivoRef = useRef(true);
@@ -197,7 +204,7 @@ export function PaywallAssinatura({
   useEffect(() => {
     vivoRef.current = true;
     trackEvent("app_paywall_view", {
-      contexto, modo: "vitalicio", d3,
+      contexto, modo: ehApple() ? "anual_ios" : "vitalicio", d3,
       dia: teste.fase === "ativo" ? teste.dia : teste.fase,
     });
     let retry: number | null = null;
@@ -217,6 +224,17 @@ export function PaywallAssinatura({
         mensalVista: rc.temMensalVista(),
       });
       ler();
+      if (apple) {
+        await rc.prefetchAnualIos();
+        if (vivoRef.current && rc.temAnualIos()) {
+          setAnualApple({
+            preco: rc.precoAnualIos() ?? APP_PRECOS.anual97.preco,
+            mes: rc.precoMensalDoAnualIos() ?? "R$ 8,16",
+            dias: rc.diasTrialIos() || 3,
+            trial: rc.anualIosTemTrial(),
+          });
+        }
+      }
       // Produto criado por API demora a propagar (varredura: o herói ficava
       // botão morto no dia do lançamento). Re-tentativa curta cobre a folga;
       // a terceira chance é o re-prefetch do próprio toque.
@@ -325,6 +343,11 @@ export function PaywallAssinatura({
       trackEvent("app_sheet_success", { contexto, produto });
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
+      // (D) iPhone: compra que entrou em teste ganha o lembrete "acaba amanhã"
+      // (quem chega aqui já respondeu ao pedido de notificação do app).
+      if (apple && produto === "core_anual_97" && rc.ultimaCompraAnualFoiTrial() && (await temPermissao())) {
+        void agendarLembreteDoTeste({ dias: anualApple.dias, precoAno: anualApple.preco });
+      }
       limparGuiaSemente();
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
       if (!user) { navigate("/app?step=signup", { replace: true }); return; }
@@ -403,8 +426,19 @@ export function PaywallAssinatura({
   /* Herói vitalício por padrão (null = loja ainda não respondeu); só rebaixa
    * pro anual97 com resposta NEGATIVA do catálogo — provado, mesma folha,
    * mesmo preço. A promessa muda JUNTO com o produto (regra de ouro). */
-  const vitalicio = loja.vitalicio97 !== false;
-  const colunaDireita = vitalicio
+  const vitalicio = !apple && loja.vitalicio97 !== false;
+  const colunaDireita = apple
+    ? {
+        fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarAnualIos(),
+        id: "core_anual_97",
+        cta: anualApple.trial
+          ? <>Começar {anualApple.dias} dias grátis <ArrowRight className="w-4 h-4" /></>
+          : <>Quero o ano — {anualApple.preco} <ArrowRight className="w-4 h-4" /></>,
+        legal: anualApple.trial
+          ? `${anualApple.dias} dias grátis, depois ${anualApple.preco}/ano pela App Store · renova automaticamente até você cancelar · cancele antes do fim do teste e não paga nada`
+          : `Assinatura de ${anualApple.preco}/ano pela App Store · renova automaticamente até você cancelar`,
+      }
+    : vitalicio
     ? {
         fn: (rc: typeof import("@/lib/revenuecat")) => rc.comprarVitalicio("core_vitalicio_97"),
         id: APP_PRECOS.vitalicio97.id,
@@ -424,7 +458,9 @@ export function PaywallAssinatura({
       loja.mensalVista ? rc.comprarMensalVista() : rc.comprar(APP_PRECOS.mensal.id, { semTrial: true }),
     id: loja.mensalVista ? APP_PRECOS.mensalVista.id : APP_PRECOS.mensal.id,
     cta: <>Continuar <ArrowRight className="w-4 h-4" /></>,
-    legal: `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}`,
+    legal: apple
+      ? `Assinatura de ${APP_PRECOS.mensal.preco}/mês pela App Store · renova automaticamente até você cancelar`
+      : `${APP_PRECOS.mensal.preco} · 30 dias de acesso · ${loja.mensalVista ? "Pix ou cartão · renova só se você quiser" : "cancele quando quiser"}`,
   };
   const compraAtual = plano === "vitalicio" ? colunaDireita : colunaMensal;
   // O interval da contagem captura closure velha — o ref entrega sempre a atual.
@@ -656,7 +692,7 @@ export function PaywallAssinatura({
               coluna — âncora de aluguel mora na comparação do vitalício, não
               no produto. Verdade do pré-pago: renovação manual. */}
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-            {loja.mensalVista ? "renova só se você quiser" : "cancele quando quiser"}
+            {apple ? <>renova sozinho<br />cancele quando quiser</> : loja.mensalVista ? "renova só se você quiser" : "cancele quando quiser"}
           </span>
         </button>
         <button
@@ -664,18 +700,22 @@ export function PaywallAssinatura({
           className={`rounded-2xl border-2 overflow-hidden transition-all flex flex-col text-center ${plano === "vitalicio" ? "border-accent shadow-[0_14px_30px_-14px_rgba(0,0,0,.4)]" : "border-border"} bg-white text-[#16121c]`}
         >
           <span className={`text-[10px] font-extrabold tracking-wide py-1 ${plano === "vitalicio" ? "bg-accent text-white" : "bg-accent/10 text-accent"}`}>
-            {vitalicio ? "MELHOR ESCOLHA" : "MELHOR PREÇO"}
+            {apple ? (anualApple.trial ? `${anualApple.dias} DIAS GRÁTIS` : "MELHOR ESCOLHA") : vitalicio ? "MELHOR ESCOLHA" : "MELHOR PREÇO"}
           </span>
           <span className="text-[21px] font-black leading-[1.05] mt-1.5 px-1 tracking-tight">
             {vitalicio ? "Pra sempre" : "12 meses"}
           </span>
           <span className="text-[16px] font-extrabold mt-1.5">
-            {(vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
+            {apple ? anualApple.mes : (vitalicio ? APP_PRECOS.vitalicio97 : APP_PRECOS.anual97).preco}
           </span>
-          <span className="text-[10px] font-semibold text-black/40">{vitalicio ? "vitalício · uma única vez" : "R$ 8,16/mês"}</span>
+          <span className="text-[10px] font-semibold text-black/40 leading-tight px-1">
+            {apple ? `por mês · ${anualApple.preco}/ano` : vitalicio ? "vitalício · uma única vez" : "R$ 8,16/mês"}
+          </span>
           <span className="mx-4 my-2 border-t border-black/10" aria-hidden />
           <span className="text-[10.5px] font-semibold text-black/45 pb-3 px-2 leading-tight">
-            {vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
+            {apple
+              ? <>4 meses de mensal =<br /><b className="text-black/60">1 ano inteiro</b></>
+              : vitalicio ? <>4 meses de mensal =<br /><b className="text-black/60">CORE pra sempre</b></> : <>{APP_PRECOS.anual97.preco} por 1 ano<br />sem renovação</>}
           </span>
         </button>
       </div>
@@ -736,7 +776,7 @@ export function PaywallAssinatura({
                       setResgatePix(false);
                       const rc = await import("@/lib/revenuecat");
                       if (await rc.restaurar()) { window.location.href = "/"; return; }
-                      setErro("Nenhuma compra encontrada nesta conta Google. Se pagou agora há pouco, espera 1 minuto e tenta de novo.");
+                      setErro(`Nenhuma compra encontrada nesta conta ${apple ? "da App Store" : "Google"}. Se pagou agora há pouco, espera 1 minuto e tenta de novo.`);
                     }}
                   >
                     Restaurar compras

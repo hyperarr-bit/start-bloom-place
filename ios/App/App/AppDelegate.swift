@@ -80,6 +80,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if AppDelegate.metaConfigurada {
             AppEvents.shared.activateApp()
         }
+        AppDelegate.pedirATTSePrecisar()
+    }
+
+    /* PEDIDO NATIVO NA PRIMEIRA ABERTURA (20/09, recusa 2.1 na build 16: o
+     * revisor entrou pela tela de login com a conta demo e o pedido, que só
+     * saía do JS pela welcome/Home, não apareceu). Aqui não depende de rota:
+     * na primeira vez que o app fica ativo com status "não decidido", pede.
+     * O atraso de 1 s é obrigatório na prática — chamado no instante em que
+     * o app ativa, o iOS 15+ devolve "notDetermined" sem mostrar nada. Se
+     * mesmo assim não mostrar (app foi pro fundo no meio), fica armado pra
+     * próxima ativação; o JS (welcome/Home) continua como segunda chance. */
+    static var attEmAndamento = false
+    static func pedirATTSePrecisar() {
+        guard #available(iOS 14, *), !attEmAndamento else { return }
+        guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
+        attEmAndamento = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            ATTrackingManager.requestTrackingAuthorization { status in
+                AppDelegate.aplicarStatusATT()
+                AppDelegate.attEmAndamento = false
+            }
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

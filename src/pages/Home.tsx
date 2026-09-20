@@ -43,6 +43,7 @@ import { MacroBalanceWidget } from "@/components/home/widgets/MacroBalanceWidget
 import { SleepLogWidget } from "@/components/home/widgets/SleepLogWidget";
 import { CountdownWidget } from "@/components/home/widgets/CountdownWidget";
 import { WeekCalendarWidget } from "@/components/home/widgets/WeekCalendarWidget";
+import { pedirRastreamentoIos } from "@/lib/att-ios";
 
 type WidgetComponent = React.FC<{ size?: "small" | "large" }>;
 
@@ -71,6 +72,12 @@ const HomePage = () => {
   // Virada de dia com o app VIVO (celular mantém a aba em memória): sem isso,
   // hub/widgets seguem mostrando "hoje" de ontem — mesmo bug do diário da
   // Dieta (18/07). Re-render ao voltar ao foco/visível + tique de 60s.
+  // ATT (20/09, recusa 2.1 "unable to locate the ATT permission request"):
+  // o revisor entrou com a conta demo direto pelo login e nunca passou pelo
+  // "Começar" da welcome — e o efeito estava no Index (Finanças), não aqui.
+  // A Home é a primeira tela de TODO mundo logado. O nativo também pede na
+  // primeira abertura (AppDelegate); o sistema só mostra o diálogo uma vez.
+  useEffect(() => { void pedirRastreamentoIos("home"); }, []);
   useEffect(() => {
     let ultimoDia = localDayKey();
     const sync = () => {

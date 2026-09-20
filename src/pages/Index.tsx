@@ -57,7 +57,6 @@ import { QuizWelcome, ImportStarterHint } from "@/components/onboarding/QuizWelc
 import { ImportExtrato } from "@/components/finance/ImportExtrato";
 import { getQuizAnswers, GASTO_ANCHOR, VICTORY_PHRASE } from "@/lib/funnel";
 import { WeeklyChallenge } from "@/components/challenges/WeeklyChallenge";
-import { pedirRastreamentoIos } from "@/lib/att-ios";
 
 const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -209,10 +208,6 @@ const Index = () => {
   // Fase 2 do feedback da Aline: custo fixo com "dia" vira conta do mês
   // automaticamente (checkbox de pago + alertas + valor real no "a vencer").
   // O sync devolve null quando nada mudou — sem loop de render.
-  // ATT (19/09): quem instalou antes da build 15 nunca viu o pedido; a Home
-  // é a primeira tela que todo mundo passa. No iPhone o sistema só pergunta
-  // uma vez; fora dele devolve na hora.
-  useEffect(() => { void pedirRastreamentoIos("home"); }, []);
   useEffect(() => {
     if (!userDataLoaded) return;
     /* LISTA COMPLETA de propósito. O sync apaga toda conta cujo custo fixo

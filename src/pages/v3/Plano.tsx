@@ -87,7 +87,7 @@ export default function PlanoV3() {
   const [cobra, setCobra] = useState<boolean | null>(null);
   const [demoAberta, setDemoAberta] = useState(false);
   const [pixAberto, setPixAberto] = useState(false);
-  const [pixOffer, setPixOffer] = useState<PixOffer>("lifetime");
+  const [pixOffer, setPixOffer] = useState<PixOffer>("w27"); // 20/09: web a 27,90
   // DOWNSELL-ROLETA (estilo Cal AI, 20/07): só em rotas de FUGA do paywall
   // (fechou pix / voltar / 40s parado), 1× por sessão, nunca pra assinante.
   const [roletaAberta, setRoletaAberta] = useState(false);
@@ -548,7 +548,7 @@ export default function PlanoV3() {
                 <p className="fv3-checkline">✓ Acesso liberado em minutos, no seu e-mail</p>
                 <div className="fv3-rodape" style={{ width: "100%" }}>
                   <button className="fv3-cta" onClick={() => { track("funnel_v3_softask_ok"); avancar(); }}>Continuar</button>
-                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pagamento único de R$ 97,90 · sem mensalidade, nunca</p>
+                  <p className="fv3-mini" style={{ textAlign: "center", marginTop: 8 }}>Pagamento único de R$ 27,90 · sem mensalidade, nunca</p>
                 </div>
               </div>
             )}
@@ -565,7 +565,7 @@ export default function PlanoV3() {
                 <h2>Tudo isso é seu.<br />Pra sempre.</h2>
                 <div className="fv3-card" style={{ padding: "14px 16px" }}>
                   <div className="fv3-preco">
-                    <b>R$ 97,90</b>
+                    <b>R$ 27,90</b>
                     <span className="fv3-mini">pagamento único · vitalício</span>
                   </div>
                   <div className="fv3-modgrid">
@@ -579,7 +579,7 @@ export default function PlanoV3() {
                 </div>
                 {trilha === "dinheiro" && (
                   <p className="fv3-ancora-pessoal">
-                    Você disse que <b>R$ {vazamento} somem</b> da sua conta todo mês.<br />O CORE custa <b>R$ 97,90 — uma vez.</b>
+                    Você disse que <b>R$ {vazamento} somem</b> da sua conta todo mês.<br />O CORE custa <b>R$ 27,90 — uma vez.</b>
                   </p>
                 )}
                 {trilha !== "dinheiro" && (
@@ -591,7 +591,7 @@ export default function PlanoV3() {
                     onClick={() => {
                       track("funnel_v3_checkout_click");
                       if (KIWIFY) { irKiwify("lifetime"); return; }
-                      setPixOffer("lifetime"); setPixAberto(true);
+                      setPixOffer("w27"); setPixAberto(true);
                     }}
                   >
                     Garantir meu acesso vitalício →
@@ -837,7 +837,7 @@ function RoletaDownsell({ onAceitar, onFechar }: { onAceitar: () => void; onFech
             <div className="fv3-premio-sub">PRA SEMPRE — acesso vitalício</div>
           </div>
           <div className="fv3-premio-preco">
-            <span className="fv3-anchor">R$ 97,90</span>
+            <span className="fv3-anchor">R$ 27,90</span>
             <b>R$ 14,90</b>
             <span className="fv3-mini">pagamento único</span>
           </div>

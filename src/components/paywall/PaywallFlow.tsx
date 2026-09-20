@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
 import { WinbackWheel } from "@/components/retention/WinbackWheel";
-import { PixCheckout, type PixOffer } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES, type PixOffer } from "@/components/paywall/PixCheckout";
 import { isNativeShell, APP_PRECOS } from "@/lib/native-shell";
 import { ehApple, lojaParaCancelar, erroSemFalarComALoja, erroSemAbrirALoja } from "@/lib/loja";
 // (TrialTimeline saiu em 06/08 — o app vitalício usa a GuaranteeTimeline da web)
@@ -49,8 +49,16 @@ import { limparGuiaSemente } from "@/lib/teste-gratis";
  *
  * A âncora riscada de 99,90 saiu junto: acima de 97,90 ela anunciava 2% de
  * desconto, que lê como piada e não como oferta. */
+/* 20/09 (ordem do dono, "troca aí pra 27,90"): a web volta a UM preço, 27,90,
+ * como em 8 de agosto — o funil do /inicio já vendia 27,90 (w27) e esta tela
+ * seguia em 97,90, então quem criava conta via 97,90 no gate antes de ver o
+ * funil. Medido 28/08→20/09 por 100 paywalls: a 97,90 4,2 pagam (R$ 285); a
+ * 27,90 8,5–12 pagam (R$ 334–358) — mais gente, mesma receita ou mais. A
+ * oferta é a MESMA `w27` do funil: o servidor já cobra 2790 nela. */
 const PRICING = {
-  lifetime: { total: "97,90" },
+  // getter de propósito: PixCheckout e este arquivo se importam em círculo, e
+  // ler PIX_PRICES no topo do módulo dava undefined (pegou no vitest).
+  lifetime: { get total() { return PIX_PRICES.w27; } },
   downsell: { total: "14,90" }, // prêmio da roleta: vitalício com desconto
 };
 
@@ -944,7 +952,7 @@ function OfferScreen({
                   void assinarDireto();
                   return;
                 }
-                openPixIntent("lifetime", "paywall_lifetime", context, onBuy);
+                openPixIntent("w27", "paywall_lifetime", context, onBuy);
               }}
             >
               {nativo

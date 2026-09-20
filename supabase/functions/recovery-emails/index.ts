@@ -67,7 +67,7 @@ const checkoutLink = (stage: Stage) => {
 
 /* ------------------------------------------------------------------ COPY */
 
-const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 97,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
+const PRECO_CHEIO = `<div style="font-size:28px;font-weight:800;">R$ 27,90<span style="font-size:14px;font-weight:600;color:#888;"> uma vez, seu pra sempre</span></div>`;
 const PRECO_DS = `<span style="font-size:16px;font-weight:600;color:#aaa;text-decoration:line-through;">R$ 27,90</span> <span style="font-size:28px;font-weight:800;color:#D22D80;">R$ 19,90</span><span style="font-size:14px;font-weight:600;color:#888;"> uma vez</span>`;
 
 /** Primeiro nome utilizável pro assunto. O SQL faz COALESCE pro prefixo do
@@ -99,11 +99,11 @@ const COPY: Record<Stage, {
     // esperar — foi o que custou 7 pontos de conversão cheia no paywall.
     subject: (nome) => nome ? `${nome}, seu plano ficou pronto. e você sumiu.` : "seu plano ficou pronto. e você sumiu.",
     headline: "Você parou a 1 Pix de distância",
-    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 97,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 97,90 uma vez.</b> Sem mensalidade, nunca — o que você montou fica seu.`,
+    intro: (n) => `${n}, direto ao ponto: seu plano tá montado e suas respostas estão salvas. O CORE inteiro — 16 módulos, sua vida num lugar só — tá do outro lado de um Pix de <b>R$ 27,90</b>. Uma vez. Pra sempre. Sem mensalidade, nunca.<br><br>E você já sabe o que acontece se não fizer nada: mais um mês igual ao passado. Conta que vence sem avisar, dinheiro que some sem explicação, aquela meta que você escreveu e não olhou mais.<br><br><b>R$ 97,90 uma vez.</b> Sem mensalidade, nunca — o que você montou fica seu.`,
     selo: "SEU ACESSO VITALÍCIO ESTÁ RESERVADO",
     preco: PRECO_CHEIO,
     cta: "Destravar meu acesso agora →",
-    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 97,90.",
+    rodape: "1 minuto: entra, gera o Pix, libera na hora. Garantia de 7 dias — não era pra você, devolvo os R$ 27,90.",
   },
   h24: {
     subject: () => "R$ 19,90 hoje. R$ 27,90 amanhã.",

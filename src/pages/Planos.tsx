@@ -220,7 +220,8 @@ const Planos = () => {
   // quem chegava pelo h24 (link com ?oferta=ds) via o preço cheio na página e
   // o valor com desconto no QR. Enquanto o QR abre sozinho isso passa batido,
   // mas basta fechar o QR pra ficar de cara com a contradição.
-  const precoNaTela = PIX_PRICES[ofertaDs ? "downsell" : "lifetime"];
+  // 20/09: web a 27,90 (oferta w27, a mesma do funil) — ver PaywallFlow
+  const precoNaTela = PIX_PRICES[ofertaDs ? "downsell" : "w27"];
   const dsJaAbriu = useRef(false);
   useEffect(() => {
     if (!querDs || !subLoaded || isSubscribed || dsJaAbriu.current) return;
@@ -257,7 +258,7 @@ const Planos = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {pixOpen && <PixCheckout offer={ofertaDs ? "downsell" : "lifetime"} context="app" onClose={() => setPixOpen(false)} />}
+      {pixOpen && <PixCheckout offer={ofertaDs ? "downsell" : "w27"} context="app" onClose={() => setPixOpen(false)} />}
       <PaymentStatus />
 
       <header className="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur">

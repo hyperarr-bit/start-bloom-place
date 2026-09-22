@@ -22,8 +22,10 @@ import { trackEvent } from "@/lib/analytics";
 
 const TAMANHO = 8;
 
-export function EntrarComCodigo({ email, funil, onSession, className = "" }: {
+export function EntrarComCodigo({ email, funil, onSession, className = "", rotulo = "Entrar sem senha — receber código por e-mail" }: {
   email: string;
+  /** Texto do botão (o checkout Pix já explica em cima e usa um curto). */
+  rotulo?: string;
   funil: string;
   onSession: () => void;
   className?: string;
@@ -77,7 +79,7 @@ export function EntrarComCodigo({ email, funil, onSession, className = "" }: {
           className="w-full h-12 rounded-xl border-2 border-foreground text-foreground text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60"
           data-testid="entrar-com-codigo"
         >
-          {fase === "enviando" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><MailCheck className="w-4 h-4" /> Entrar sem senha — receber código por e-mail</>}
+          {fase === "enviando" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><MailCheck className="w-4 h-4" /> {rotulo}</>}
         </button>
         {erro && <p className="text-[12.5px] text-destructive mt-2" role="alert">{erro}</p>}
       </div>

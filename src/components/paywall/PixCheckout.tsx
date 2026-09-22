@@ -8,7 +8,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
-import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail } from "@/lib/sessao-anonima";
+import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
+import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
 import { AppPurchaseSheet } from "@/components/app/AppPurchaseSheet";
 
@@ -263,6 +264,11 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
    * compra). Mostra o campo de senha, com "usar outro e-mail" ao lado. */
   const [contaExiste, setContaExiste] = useState(false);
   const [senhaExistente, setSenhaExistente] = useState("");
+  /* 22/09 (dono, caso Eliza): e-mail que já tem conta pedia SENHA — ela não
+   * lembrava (conta de 06/08), o login falhou, pagou o QR anônimo e ficou 4
+   * dias fora. Agora o caminho principal é o código por e-mail (serve pra conta
+   * de senha E de Google); a senha fica num link pra quem prefere. */
+  const [usarSenha, setUsarSenha] = useState(false);
   // QR PRIMEIRO (02/09): o e-mail é pedido na tela do QR, sem barrar o código.
   const [pedirEmailNoQr, setPedirEmailNoQr] = useState(false);
   const [emailSalvo, setEmailSalvo] = useState(false);
@@ -366,7 +372,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       if (r.erro === "email_em_uso") {
         // Antes do dinheiro: dá pra simplesmente entrar. Nada fica órfão.
         setContaExiste(true);
-        setEmailErr("Esse e-mail já tem conta no CORE. Põe sua senha que eu sigo daqui.");
+        void guardarCompraAnonima();
+        setEmailErr(null);
         trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer });
         return;
       }
@@ -407,7 +414,8 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       if (r.erro === "invalido") { setEmailErr("Esse e-mail não parece certo. Confere?"); return; }
       if (r.erro === "email_em_uso") {
         setContaExiste(true);
-        setEmailErr("Esse e-mail já tem conta no CORE. Põe sua senha que eu passo o Pix pra ela.");
+        void guardarCompraAnonima();
+        setEmailErr(null);
         trackEvent("funnel_view", { step: "pix_email_ja_tem_conta", offer, no_qr: true });
         return;
       }
@@ -422,6 +430,14 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     } finally {
       setEmailIndo(false);
     }
+  };
+
+  /** Entrou pela conta existente com o código do e-mail: mesmo destino da senha. */
+  const entrouPorCodigo = async (noQr: boolean) => {
+    limparBatismo();
+    trackEvent("funnel_click", { cta: "pix_email_login_ok", via: "codigo", offer, ...(noQr ? { no_qr: true } : {}) });
+    if (noQr) setEmailSalvo(true);
+    await generate("", "");
   };
 
   const generate = async (nm: string, doc: string) => {
@@ -775,14 +791,23 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               <input
                 type="email" inputMode="email" autoComplete="email" autoFocus
                 value={emailCompra}
-                onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) setContaExiste(false); }}
+                onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) { setContaExiste(false); setUsarSenha(false); } }}
                 placeholder="seu@email.com"
                 className="w-full h-12 rounded-xl border-2 border-border bg-background px-4 text-[16px] outline-none focus:border-accent transition-colors"
               />
 
               {/* Já tem conta: entra agora, ANTES de pagar — é seguro justamente
                   porque nenhum dinheiro se moveu ainda. */}
-              {contaExiste && (
+              {contaExiste && !usarSenha && (
+                <div className="mt-2.5" data-testid="pix-ja-tem-conta">
+                  <p className="text-[12.5px] text-left leading-snug mb-2">Esse e-mail já tem conta no CORE. Te mando um código pra entrar — sem senha.</p>
+                  <EntrarComCodigo rotulo="Receber código no e-mail" email={emailCompra} funil="pix_ja_tem_conta" onSession={() => void entrouPorCodigo(false)} />
+                  <button type="button" className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-2" onClick={() => { setUsarSenha(true); setEmailErr(null); }}>
+                    Prefiro usar minha senha
+                  </button>
+                </div>
+              )}
+              {contaExiste && usarSenha && (
                 <input
                   type="password" autoComplete="current-password"
                   value={senhaExistente}
@@ -794,18 +819,20 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
 
               {emailErr && <p className="text-[12.5px] text-destructive mt-2 leading-snug">{emailErr}</p>}
 
-              <Button
-                size="lg" className="w-full h-12 text-base mt-3.5"
-                disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
-                onClick={() => void seguirDoEmail()}
-              >
-                {emailIndo ? "Só um instante…" : contaExiste ? "Entrar e gerar o Pix" : "Gerar meu Pix"}
-              </Button>
+              {(!contaExiste || usarSenha) && (
+                <Button
+                  size="lg" className="w-full h-12 text-base mt-3.5"
+                  disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
+                  onClick={() => void seguirDoEmail()}
+                >
+                  {emailIndo ? "Só um instante…" : contaExiste ? "Entrar e gerar o Pix" : "Gerar meu Pix"}
+                </Button>
+              )}
 
               {contaExiste && (
                 <button
                   className="w-full text-center text-[12.5px] font-semibold text-muted-foreground underline underline-offset-2 mt-2.5"
-                  onClick={() => { setContaExiste(false); setSenhaExistente(""); setEmailCompra(""); setEmailErr(null); }}
+                  onClick={() => { setContaExiste(false); setUsarSenha(false); setSenhaExistente(""); setEmailCompra(""); setEmailErr(null); }}
                 >
                   Usar outro e-mail
                 </button>
@@ -1042,11 +1069,20 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     ref={emailQrRef}
                     type="email" inputMode="email" autoComplete="email"
                     value={emailCompra}
-                    onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) setContaExiste(false); }}
+                    onChange={(e) => { setEmailCompra(e.target.value); setEmailErr(null); if (contaExiste) { setContaExiste(false); setUsarSenha(false); } }}
                     placeholder="seu@email.com"
                     className="w-full h-11 rounded-xl border-2 border-border bg-background px-3 text-[15px] outline-none focus:border-accent transition-colors"
                   />
-                  {contaExiste && (
+                  {contaExiste && !usarSenha && (
+                    <div className="mt-2" data-testid="pix-ja-tem-conta-qr">
+                      <p className="text-[12px] leading-snug mb-2">Esse e-mail já tem conta no CORE. Te mando um código pra entrar e o Pix vai pra ela.</p>
+                      <EntrarComCodigo rotulo="Receber código no e-mail" email={emailCompra} funil="pix_ja_tem_conta_qr" onSession={() => void entrouPorCodigo(true)} />
+                      <button type="button" className="w-full text-center text-[12px] text-muted-foreground underline underline-offset-2 mt-2" onClick={() => { setUsarSenha(true); setEmailErr(null); }}>
+                        Prefiro usar minha senha
+                      </button>
+                    </div>
+                  )}
+                  {contaExiste && usarSenha && (
                     <input
                       type="password" autoComplete="current-password"
                       value={senhaExistente}
@@ -1056,13 +1092,15 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                     />
                   )}
                   {emailErr && <p className="text-[12px] text-destructive mt-1.5 leading-snug">{emailErr}</p>}
-                  <Button
-                    size="sm" variant="outline" className="w-full h-10 mt-2 font-semibold"
-                    disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
-                    onClick={() => void salvarEmailNoQr()}
-                  >
-                    {emailIndo ? "Salvando…" : contaExiste ? "Entrar e passar o Pix pra minha conta" : "Salvar e-mail"}
-                  </Button>
+                  {(!contaExiste || usarSenha) && (
+                    <Button
+                      size="sm" variant="outline" className="w-full h-10 mt-2 font-semibold"
+                      disabled={emailIndo || !emailCompra.trim() || (contaExiste && senhaExistente.length < 6)}
+                      onClick={() => void salvarEmailNoQr()}
+                    >
+                      {emailIndo ? "Salvando…" : contaExiste ? "Entrar e passar o Pix pra minha conta" : "Salvar e-mail"}
+                    </Button>
+                  )}
                 </div>
               )}
               {pedirEmailNoQr && emailSalvo && (

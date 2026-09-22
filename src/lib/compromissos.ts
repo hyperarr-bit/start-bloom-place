@@ -50,6 +50,10 @@ export interface Compromisso {
   /** Minutos antes do horário pra avisar; -1 = sem aviso; ausente = AVISO_PADRAO. */
   aviso?: number;
   local?: string;
+  /** Quem criou (22/09): "estudos" = bloco de estudo/revisão do Método. Ausente = a pessoa, na Rotina. */
+  origem?: string;
+  /** Referência de quem criou (ex.: id do curso). */
+  ref?: string;
 }
 
 export interface Ocorrencia {

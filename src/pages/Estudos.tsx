@@ -18,6 +18,7 @@ import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { AprendizadosDoCurso } from "@/components/estudos/AprendizadosDoCurso";
 import { CadernoDeAprendizados } from "@/components/estudos/CadernoDeAprendizados";
 import { RevisaoDoDia } from "@/components/estudos/RevisaoDoDia";
+import { Metodo } from "@/components/estudos/Metodo";
 import { comoRevisoes, responder, type Resposta, type Revisoes } from "@/components/estudos/revisao";
 import { comoAprendizados, type Aprendizado, type AprendizadosPorCurso } from "@/components/estudos/aprendizados";
 
@@ -100,6 +101,8 @@ const hourBadgeColors = [
 
 const TABS = [
   { v: "estudos", l: "Estudos", icon: "📝" },
+  // 22/09 (dono): os 5 passos de quem quer aprender de verdade, costurados — ver components/estudos/metodo-contas.ts
+  { v: "metodo", l: "Método", icon: "🎯" },
   { v: "grade", l: "Grade", icon: "🎓" },
   { v: "tarefas", l: "Tarefas", icon: "✅" },
   { v: "caderno", l: "Caderno", icon: "📓" },
@@ -1147,6 +1150,22 @@ const Estudos = () => {
               </div>
             )}
           </div>}
+
+          {activeTab === "metodo" && (
+            <Metodo
+              cursos={cursosAndamento}
+              mapa={aprendizados}
+              revisoes={revisoes}
+              onResponder={responderRevisao}
+              onRegistrar={(cursoId, novo) => salvarAprendizado(cursoId, novo, false)}
+              pomodoro={{
+                tempo: pomodoroTime, rodando: pomodoroRunning, concluidos: pomodoroCount,
+                iniciar: () => setPomodoroRunning(true), pausar: () => setPomodoroRunning(false),
+                definir: (min) => { setPomodoroRunning(false); setPomodoroTime(min * 60); },
+              }}
+              onIrParaCursos={() => handleTabChange("estudos")}
+            />
+          )}
 
           {activeTab === "pomodoro" && <div className="space-y-4">
             <div className="rounded-xl border border-border overflow-hidden">

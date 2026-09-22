@@ -109,6 +109,41 @@ serve(async (req) => {
       return json({ achados });
     }
 
+    /* E-MAIL AVULSO (22/09). Pra falar com quem NÃO abriu chamado (caso: quem
+     * cancelou pelo fluxo do app deixando um motivo). Mesmo embrulho do
+     * "responder" — e-mail resolvido pelo uid/e-mail no servidor, "Oi, Nome!"
+     * e assinatura — mas não toca em support_tickets.
+     * POST { action: "email_livre", uid | email, assunto, texto } */
+    if (action === "email_livre") {
+      const texto = String(body.texto ?? "").trim();
+      const assunto = String(body.assunto ?? "").trim() || "CORE — sobre a sua conta";
+      if (texto.length < 5) return json({ error: "texto curto" }, 400);
+      const alvo = String(body.uid ?? "") || (body.email ? await acharUid(String(body.email)) : null);
+      if (!alvo) return json({ error: "usuario_nao_encontrado" }, 404);
+      const { data: u } = await admin.auth.admin.getUserById(alvo);
+      const email = u?.user?.email ?? null;
+      if (!email) return json({ error: "sem_email" }, 400);
+      const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const nome = String(meta.full_name ?? meta.name ?? meta.display_name ?? "").trim().split(" ")[0] || "";
+      const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+      if (!resendKey) return json({ error: "sem_resend" }, 503);
+      const from = Deno.env.get("WELCOME_EMAIL_FROM") || "onboarding@resend.dev";
+      const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] ?? c));
+      const paragrafos = texto.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+      const html =
+        `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.55;color:#1c1917;max-width:560px">` +
+        `<p style="margin:0 0 14px">Oi${nome ? `, ${esc(nome)}` : ""}!</p>` + paragrafos +
+        `<p style="margin:0 0 6px">Um abraço,<br>João, do CORE</p>` +
+        `<p style="margin:0;color:#78716c;font-size:13px">Pode responder este e-mail que eu leio.</p></div>`;
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST", headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [email], reply_to: "suporte@coreaplicativo.com.br", subject: assunto, html }),
+      });
+      if (!r.ok) return json({ error: `resend_${r.status}`, detalhe: (await r.text().catch(() => "")).slice(0, 200) }, 502);
+      await admin.from("analytics_events").insert({ user_id: alvo, event_name: "email_livre_enviado", event_data: { assunto, chars: texto.length } }).then(() => {}, () => {});
+      return json({ ok: true, para: email.split("@")[1] ?? "", nome: nome ? "ok" : "sem_nome" });
+    }
+
     /* RESPONDER UM CHAMADO (22/09). O "Responder" do /admin abria o mailto do
      * dono e nada ficava registrado — o painel não sabia o que já tinha sido
      * respondido. Agora a resposta sai daqui pelo Resend, com o e-mail da

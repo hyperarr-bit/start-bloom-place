@@ -9,6 +9,9 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { BlocoDeFases, type Fase } from "@/components/fases/BlocoDeFases";
 import { PedirLembreteRotina } from "@/components/rotina/PedirLembreteRotina";
+import { CompromissosDoDia, ProximosCompromissos } from "@/components/rotina/Compromissos";
+import { CHAVE_COMPROMISSOS, ocorrencias, type Compromisso } from "@/lib/compromissos";
+import { parseLocalDay } from "@/lib/utils";
 import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { sequenciaAtual } from "@/lib/reagendar";
 import { 
@@ -143,14 +146,29 @@ const useFasesEmUso = () => {
 };
 
 // ============= MOOD TRACKER =============
+/* EMOÇÕES além do humor (22/09, chamado: "além de colocar o humor, seria legal
+   ter a opção de incluir as emoções, sentimentos"). Chips de toque, várias por
+   dia, gravadas no MESMO registro do dia (`emocoes`) — o histórico de humor
+   continua lendo só o `mood` e não muda nada. */
+const EMOCOES = ["Calmo", "Ansioso", "Grato", "Cansado", "Animado", "Triste", "Irritado", "Focado", "Estressado", "Feliz", "Entediado", "Esperançoso"];
+
 const MoodTracker = () => {
-  const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string }>>("mood-log", {});
+  const [moodLog, setMoodLog] = usePersistedState<Record<string, { mood: number; note: string; emocoes?: string[] }>>("mood-log", {});
   const today = getDateKey();
   const todayMood = moodLog[today];
   const [note, setNote] = useState(todayMood?.note || "");
+  const emocoesHoje = Array.isArray(todayMood?.emocoes) ? todayMood!.emocoes! : [];
 
   const logMood = (value: number) => {
-    setMoodLog(prev => ({ ...prev, [today]: { mood: value, note: prev[today]?.note || "" } }));
+    setMoodLog(prev => ({ ...prev, [today]: { ...prev[today], mood: value, note: prev[today]?.note || "" } }));
+  };
+
+  const toggleEmocao = (e: string) => {
+    setMoodLog(prev => {
+      const atual = Array.isArray(prev[today]?.emocoes) ? prev[today]!.emocoes! : [];
+      const emocoes = atual.includes(e) ? atual.filter(x => x !== e) : [...atual, e];
+      return { ...prev, [today]: { ...prev[today], mood: prev[today]?.mood ?? 0, note: prev[today]?.note || "", emocoes } };
+    });
   };
 
   const saveNote = () => {
@@ -199,6 +217,25 @@ const MoodTracker = () => {
             </button>
           ))}
         </div>
+
+        {todayMood && (
+          <div className="flex flex-wrap gap-1.5" data-testid="emocoes-do-dia">
+            {EMOCOES.map(e => {
+              const on = emocoesHoje.includes(e);
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => toggleEmocao(e)}
+                  aria-pressed={on}
+                  className={`px-2 h-7 rounded-full text-[11px] font-medium border transition-colors ${on ? "bg-purple-500 text-white border-purple-500" : "bg-background text-muted-foreground border-border hover:border-purple-300"}`}
+                >
+                  {e}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {todayMood && (
           <div className="flex gap-2">
@@ -669,6 +706,9 @@ const MonthlyPlanning = () => {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [newGoal, setNewGoal] = useState("");
   const [retroText, setRetroText] = usePersistedState<Record<string, string>>("month-retro", {});
+  // Compromissos com hora (22/09, dois chamados) — modelo em lib/compromissos,
+  // tela em components/rotina/Compromissos. Só o ponto azul no dia mora aqui.
+  const [compromissos, setCompromissos] = usePersistedState<Compromisso[]>(CHAVE_COMPROMISSOS, []);
 
   const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`;
   const goals = monthGoals[monthKey] || [];
@@ -676,6 +716,16 @@ const MonthlyPlanning = () => {
 
   const totalDays = getMonthDays(currentYear, currentMonth);
   const firstDayOfWeek = new Date(currentYear, currentMonth, 1).getDay();
+  const diasComCompromisso = useMemo(
+    () => new Set(ocorrencias(compromissos, new Date(currentYear, currentMonth, 1), totalDays).map((o) => o.dia)),
+    [compromissos, currentYear, currentMonth, totalDays],
+  );
+  const abrirDia = (dia: string) => {
+    const d = parseLocalDay(dia);
+    setCurrentYear(d.getFullYear());
+    setCurrentMonth(d.getMonth());
+    setSelectedDay(dia);
+  };
 
   const addGoal = () => {
     if (!newGoal.trim()) return;
@@ -741,25 +791,35 @@ const MonthlyPlanning = () => {
                   `}
                 >
                   {dayNum}
-                  {hasNote && <div className="absolute bottom-0.5 w-1 h-1 rounded-full bg-teal-500" />}
+                  {(hasNote || diasComCompromisso.has(dayKey)) && (
+                    <div className="absolute bottom-0.5 flex gap-0.5">
+                      {hasNote && <div className="w-1 h-1 rounded-full bg-teal-500" />}
+                      {diasComCompromisso.has(dayKey) && <div className="w-1 h-1 rounded-full bg-sky-500" data-testid="ponto-compromisso" />}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
 
           {selectedDay && (
-            <div className="mt-3 p-3 bg-muted/30 rounded-md space-y-2">
-              <span className="text-xs font-bold">📝 Notas — {selectedDay}</span>
-              <Textarea
-                placeholder="O que tem pra esse dia?"
-                value={dayNotes[selectedDay] || ""}
-                onChange={e => setDayNotes(prev => ({ ...prev, [selectedDay]: e.target.value }))}
-                className="text-xs min-h-[60px]"
-              />
+            <div className="mt-3 p-3 bg-muted/30 rounded-md space-y-3">
+              <CompromissosDoDia dia={selectedDay} lista={compromissos} onChange={setCompromissos} />
+              <div className="space-y-2">
+                <span className="text-xs font-bold">📝 Notas — {selectedDay}</span>
+                <Textarea
+                  placeholder="O que tem pra esse dia?"
+                  value={dayNotes[selectedDay] || ""}
+                  onChange={e => setDayNotes(prev => ({ ...prev, [selectedDay]: e.target.value }))}
+                  className="text-xs min-h-[60px]"
+                />
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      <ProximosCompromissos lista={compromissos} onChange={setCompromissos} onAbrirDia={abrirDia} />
 
       {/* Monthly Goals */}
       <div className="bg-card rounded-lg border border-border overflow-hidden">
@@ -1096,7 +1156,14 @@ const Rotina = () => {
   )), [heatmapDoConvite]);
 
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("semana");
+  // `?aba=mes` (22/09): o toque na notificação de compromisso abre direto o
+  // Meu mês; qualquer outra rota chega como sempre, na semana.
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const aba = new URLSearchParams(window.location.search).get("aba");
+      return aba && ABAS_ROTINA.some((a) => a.id === aba) ? aba : "semana";
+    } catch { return "semana"; }
+  });
   const abas = useAbasOcultas("rotina", ABAS_ROTINA);
   const { onModuleComplete: onRotinaComplete, CompletionDialog: RotinaCompletionDialog } = useModuleCompletionFlow("rotina");
   useScrollActiveTabIntoView(activeTab);

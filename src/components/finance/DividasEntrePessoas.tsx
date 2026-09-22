@@ -52,6 +52,15 @@ export interface LancamentoDivida {
   nota?: string;
 }
 
+/** Parcela PREVISTA (22/09): "emprestei 10 mil e ele me paga 10× de 1.000". É
+ *  só o calendário combinado; o dinheiro que entra continua sendo lançamento. */
+export interface ParcelaPrevista {
+  n: number;
+  data: string;
+  valor: number;
+  paga?: boolean;
+}
+
 export interface DividaPessoal {
   id: string;
   pessoa: string;
@@ -61,6 +70,10 @@ export interface DividaPessoal {
   lancamentos: LancamentoDivida[];
   /** Perfil PF/PJ dono da dívida. Ausente = pessoal (legado). */
   perfil?: string;
+  /** Calendário combinado (22/09). Ausente = sem parcelas, como sempre foi. */
+  parcelas?: ParcelaPrevista[];
+  /** Juros combinados, % ao mês sobre o saldo (22/09). Ausente = sem juros. */
+  jurosMes?: number;
 }
 
 interface Props {
@@ -68,7 +81,29 @@ interface Props {
   perfil?: string;
   /** Só pra dar nome ao selo em "Tudo junto". */
   perfis?: Perfil[];
+  /** Juros de quem ME deve viram receita do mês em Finanças (22/09, chamado:
+   *  "se eu emprestar a juros, como coloco esse rendimento mensal na minha
+   *  conta?"). Só o JURO entra — o principal continua fora do caixa. */
+  onReceita?: (r: { descricao: string; valor: number; data: string }) => void;
 }
+
+/** Gera as parcelas previstas: valor dividido igual, última ajustada pro centavo; datas mês a mês a partir da primeira. */
+export const gerarParcelas = (total: number, n: number, primeira: string): ParcelaPrevista[] => {
+  if (!Number.isInteger(n) || n < 2 || !(total > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(primeira)) return [];
+  const [a, m, d] = primeira.split("-").map(Number);
+  const base = Math.floor((total / n) * 100) / 100;
+  const out: ParcelaPrevista[] = [];
+  let soma = 0;
+  for (let i = 0; i < n; i++) {
+    const dt = new Date(a, m - 1 + i, 1);
+    const ultimo = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+    dt.setDate(Math.min(d, ultimo));
+    const valor = i === n - 1 ? Math.round((total - soma) * 100) / 100 : base;
+    soma += valor;
+    out.push({ n: i + 1, data: localDayKey(dt), valor });
+  }
+  return out;
+};
 
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -86,14 +121,15 @@ const dataCurta = (k: string) => {
   }
 };
 
-export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Props) => {
+export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [], onReceita }: Props) => {
   const [dividasTodas, setDividasTodas] = usePersistedState<DividaPessoal[]>("finance-dividas-pessoas", []);
   /* A tela só enxerga o perfil ativo; a escrita volta mesclada com as dívidas
      dos outros perfis (finance-perfil.ts). */
   const [dividas, setDividas] = usarListaDoPerfil(dividasTodas, setDividasTodas, perfil);
   const consolidado = perfil === PERFIL_TODOS;
   const [aberta, setAberta] = useState<string | null>(null);
-  const [nova, setNova] = useState({ pessoa: "", valor: "", direcao: "devo" as DividaPessoal["direcao"] });
+  const [nova, setNova] = useState({ pessoa: "", valor: "", direcao: "devo" as DividaPessoal["direcao"], parcelas: "", primeira: "", juros: "" });
+  const [combinado, setCombinado] = useState(false);
   const [movimento, setMovimento] = useState<{ id: string; valor: string; sinal: 1 | -1 } | null>(null);
 
   const criar = () => {
@@ -101,6 +137,10 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Pr
     if (!nova.pessoa.trim()) { toast.error("Escreva o nome da pessoa"); return; }
     if (!Number.isFinite(valor) || valor <= 0) { toast.error("Informe um valor maior que zero"); return; }
     const hoje = localDayKey();
+    const nParcelas = parseInt(nova.parcelas, 10);
+    const parcelas = combinado && Number.isInteger(nParcelas) && nParcelas >= 2 ? gerarParcelas(valor, nParcelas, nova.primeira || hoje) : [];
+    if (combinado && nova.parcelas && !parcelas.length) { toast.error("Parcelas: número de 2 a 99 e a data da primeira"); return; }
+    const juros = numeroBR(nova.juros);
     setDividas([
       ...dividas,
       // Nasce etiquetada com o perfil ativo (a mesclagem também etiquetaria;
@@ -113,9 +153,39 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Pr
         // O valor de abertura é o PRIMEIRO lançamento, não um campo à parte:
         // é o que mantém saldo e histórico sempre contando a mesma história.
         lancamentos: [{ id: novoId(), data: hoje, valor, nota: "Valor inicial" }],
+        ...(parcelas.length ? { parcelas } : {}),
+        ...(combinado && Number.isFinite(juros) && juros > 0 ? { jurosMes: juros } : {}),
       }, perfil),
     ]);
-    setNova({ pessoa: "", valor: "", direcao: nova.direcao });
+    setNova({ pessoa: "", valor: "", direcao: nova.direcao, parcelas: "", primeira: "", juros: "" });
+    setCombinado(false);
+  };
+
+  /** Parcela prevista recebida/paga: vira lançamento de abatimento e fica marcada. */
+  const quitarParcela = (d: DividaPessoal, p: ParcelaPrevista) => {
+    setDividas(dividas.map((x) => x.id !== d.id ? x : {
+      ...x,
+      lancamentos: [...x.lancamentos, { id: novoId(), data: localDayKey(), valor: -p.valor, nota: `Parcela ${p.n}/${x.parcelas?.length ?? 0}` }],
+      parcelas: (x.parcelas ?? []).map((q) => (q.n === p.n ? { ...q, paga: true } : q)),
+    }));
+  };
+
+  /** Juros do mês sobre o saldo: aumenta a dívida; se me devem, é rendimento e pode ir pra receita. */
+  const lancarJuros = (d: DividaPessoal) => {
+    const saldo = Math.max(0, saldoDaDivida(d));
+    const juros = Math.round(saldo * ((d.jurosMes ?? 0) / 100) * 100) / 100;
+    if (!(juros > 0)) { toast.error("Sem saldo pra render juros"); return; }
+    const hoje = localDayKey();
+    const mesRotulo = new Date().toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", "");
+    setDividas(dividas.map((x) => x.id !== d.id ? x : {
+      ...x, lancamentos: [...x.lancamentos, { id: novoId(), data: hoje, valor: juros, nota: `Juros ${mesRotulo} (${d.jurosMes}%)` }],
+    }));
+    if (d.direcao === "medevem" && onReceita) {
+      onReceita({ descricao: `Juros — ${d.pessoa}`, valor: juros, data: hoje });
+      toast.success(`R$ ${brl(juros)} de juros lançados na dívida e como receita do mês`);
+    } else {
+      toast.success(`R$ ${brl(juros)} de juros lançados`);
+    }
   };
 
   const lancar = (id: string, valorBruto: number, sinal: 1 | -1, nota: string) => {
@@ -194,6 +264,32 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Pr
             <Plus className="w-4 h-4" />
           </button>
         </div>
+        {/* COMBINADO (22/09): parcelas previstas e juros ao mês, opcionais */}
+        <button
+          type="button"
+          onClick={() => setCombinado(!combinado)}
+          aria-expanded={combinado}
+          className="text-[11px] text-muted-foreground underline underline-offset-2"
+          data-testid="divida-combinado"
+        >
+          {combinado ? "Sem parcelas nem juros" : "Parcelado? Com juros?"}
+        </button>
+        {combinado && (
+          <div className="grid grid-cols-3 gap-1.5" data-testid="divida-combinado-campos">
+            <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+              Parcelas
+              <Input type="number" inputMode="numeric" min={2} max={99} placeholder="Ex: 10" value={nova.parcelas} onChange={(e) => setNova({ ...nova, parcelas: e.target.value })} className="h-8 text-xs" aria-label="Número de parcelas" />
+            </label>
+            <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+              1ª parcela
+              <Input type="date" value={nova.primeira} onChange={(e) => setNova({ ...nova, primeira: e.target.value })} className="h-8 text-xs" aria-label="Data da primeira parcela" />
+            </label>
+            <label className="text-[10px] text-muted-foreground flex flex-col gap-0.5">
+              Juros % ao mês
+              <Input type="number" inputMode="decimal" min={0} step="0.1" placeholder="Ex: 2" value={nova.juros} onChange={(e) => setNova({ ...nova, juros: e.target.value })} className="h-8 text-xs" aria-label="Juros ao mês em porcento" />
+            </label>
+          </div>
+        )}
       </div>
 
       {/* Lista */}
@@ -283,6 +379,40 @@ export const DividasEntrePessoas = ({ perfil = PERFIL_PESSOAL, perfis = [] }: Pr
                       Aumentou
                     </Button>
                   </div>
+
+                  {/* Calendário combinado (22/09): cada parcela vira abatimento com um toque */}
+                  {(d.parcelas?.length ?? 0) > 0 && (
+                    <div className="space-y-1" data-testid="parcelas-previstas">
+                      <p className="text-[10px] font-bold text-muted-foreground">
+                        PARCELAS COMBINADAS · {d.parcelas!.filter((p) => p.paga).length}/{d.parcelas!.length}
+                      </p>
+                      {d.parcelas!.map((p) => (
+                        <div key={p.n} className={`flex items-center gap-2 text-[11px] rounded-md border px-2 py-1 ${p.paga ? "bg-muted/40 border-border/40 text-muted-foreground" : "bg-card border-border/60"}`}>
+                          <span className="tabular-nums w-8 shrink-0">{p.n}/{d.parcelas!.length}</span>
+                          <span className="tabular-nums text-muted-foreground shrink-0">{dataCurta(p.data)}</span>
+                          <span className={`flex-1 text-right tabular-nums font-semibold ${p.paga ? "line-through" : ""}`}>R$ {brl(p.valor)}</span>
+                          {p.paga ? (
+                            <span className="text-green-600 dark:text-green-400 text-[10px] font-semibold shrink-0">✓ {devo ? "paga" : "recebida"}</span>
+                          ) : (
+                            <button type="button" onClick={() => quitarParcela(d, p)} className="h-6 px-2 rounded-md bg-primary/10 text-primary text-[10px] font-semibold shrink-0">
+                              {devo ? "Paguei" : "Recebi"}
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {(d.jurosMes ?? 0) > 0 && !quitada && (
+                    <button
+                      type="button"
+                      onClick={() => lancarJuros(d)}
+                      className="w-full h-8 rounded-md border border-dashed border-border text-[11px] text-muted-foreground hover:bg-muted/40"
+                      data-testid="lancar-juros"
+                    >
+                      Lançar juros do mês: {d.jurosMes}% de R$ {brl(Math.max(0, saldo))} = R$ {brl(Math.round(Math.max(0, saldo) * (d.jurosMes! / 100) * 100) / 100)}
+                      {!devo && onReceita ? " (entra como receita)" : ""}
+                    </button>
+                  )}
 
                   {movimento?.id === d.id && (
                     <div className="flex items-center gap-2">

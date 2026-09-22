@@ -23,7 +23,14 @@ interface Expense {
   date: string;
   paymentMethod: string;
   cardName?: string;
+  /** Conta/banco de onde saiu (Pix, dinheiro, boleto) — 22/09, chamado: "que
+   *  a aba de financeiro possa ser separada por contas, tipo C6, Nubank".
+   *  Cartão (crédito/débito) continua em `cardName`, como sempre. Opcional. */
+  conta?: string;
 }
+
+/** Em que "conta" o gasto vive, pra filtrar e somar: cartão ou banco. */
+const contaDoGasto = (e: Expense) => (isCardPayment(e.paymentMethod) ? e.cardName : e.conta) || "";
 
 /** O gasto recém-salvo, no vocabulário de quem vai comemorar (ConviteAvaliacao). */
 export interface GastoLancado {
@@ -70,9 +77,15 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
   const { labelOf: getCardLabel, styleOf: getCardStyle, configOf } = useFinanceCards();
   const mesDaChave = mes ?? mesCorrenteId();
   const [newExpense, setNewExpense] = useState({
-    description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
+    description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "", conta: "",
   });
   const [showMore, setShowMore] = useState(expenses.length === 0);
+  /* FILTRO POR CONTA (22/09). Chips com os bancos/cartões que aparecem na
+     lista deste mês; escolher um mostra só os gastos dele e o subtotal. */
+  const [filtroConta, setFiltroConta] = useState("");
+  const contasPresentes = Array.from(new Set(expenses.map(contaDoGasto).filter(Boolean)));
+  const visiveis = filtroConta ? expenses.filter((e) => contaDoGasto(e) === filtroConta) : expenses;
+  const subtotalFiltro = visiveis.reduce((s, e) => s + (Number(e.value) || 0), 0);
 
   /**
    * PARCELAR PELO FLUXO NORMAL (08/08, feedback de assinante: "senti falta da
@@ -98,7 +111,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       ? `${nParcelas}x de R$ ${brl(totalDigitado / nParcelas)}`
       : null;
 
-  const limparForm = () => setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "" });
+  const limparForm = () => setNewExpense({ description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "", conta: "" });
 
   /**
    * "REPETE TODO MÊS" (07/09) — avaliação 4★ da Play: "as contas recorrentes.
@@ -196,6 +209,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
         date: newExpense.date || localDayKey(),
         paymentMethod: newExpense.paymentMethod || "pix",
         cardName: isCardPayment(newExpense.paymentMethod) ? (newExpense.cardName || "outro") : undefined,
+        ...(!isCardPayment(newExpense.paymentMethod) && newExpense.conta ? { conta: newExpense.conta } : {}),
       };
       setExpenses([...expenses, novo]);
       limparForm();
@@ -223,7 +237,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
    */
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState({
-    description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "",
+    description: "", category: "", value: "", date: "", paymentMethod: "", cardName: "", conta: "",
   });
 
   const comecarEdicao = (e: Expense) => {
@@ -235,6 +249,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       date: e.date,
       paymentMethod: e.paymentMethod,
       cardName: e.cardName ?? "",
+      conta: e.conta ?? "",
     });
   };
 
@@ -250,6 +265,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
       date: rascunho.date || e.date,
       paymentMethod: rascunho.paymentMethod || "pix",
       cardName: isCardPayment(rascunho.paymentMethod) ? (rascunho.cardName || "outro") : undefined,
+      conta: !isCardPayment(rascunho.paymentMethod) && rascunho.conta ? rascunho.conta : undefined,
     }));
     setEditandoId(null);
   };
@@ -424,12 +440,45 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
               <div className="min-w-0">
                 <CardSelect value={newExpense.cardName} onValueChange={(v) => setNewExpense({ ...newExpense, cardName: v })} />
               </div>
+            ) : newExpense.paymentMethod ? (
+              <div className="min-w-0">
+                <CardSelect value={newExpense.conta} onValueChange={(v) => setNewExpense({ ...newExpense, conta: v })} placeholder="Conta/banco (opcional)" />
+              </div>
             ) : (
               <div />
             )}
           </div>
         )}
       </div>
+
+      {/* Filtro por conta (22/09) — só aparece quando há mais de uma conta na lista */}
+      {contasPresentes.length > 1 && (
+        <div className="px-3 py-2 border-b border-border/50 flex items-center gap-1.5 flex-wrap" data-testid="filtro-conta">
+          <button
+            type="button"
+            onClick={() => setFiltroConta("")}
+            className={`h-6 px-2 rounded-full text-[10px] font-semibold border ${!filtroConta ? "bg-foreground text-background border-foreground" : "bg-background text-muted-foreground border-border"}`}
+          >
+            Todas
+          </button>
+          {contasPresentes.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setFiltroConta(filtroConta === c ? "" : c)}
+              aria-pressed={filtroConta === c}
+              className={`h-6 px-2 rounded-full text-[10px] font-semibold border ${filtroConta === c ? "bg-foreground text-background border-foreground" : `${getCardStyle(c)} border-transparent`}`}
+            >
+              {getCardLabel(c)}
+            </button>
+          ))}
+          {filtroConta && (
+            <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">
+              {visiveis.length} gasto{visiveis.length !== 1 ? "s" : ""} · R$ {brl(subtotalFiltro)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Lista */}
       <div>
@@ -439,7 +488,7 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
             <p className="text-[10px] text-muted-foreground mt-1">Adicione compras, restaurantes, lazer, presentes...</p>
           </div>
         ) : (
-          expenses.map((expense) => editandoId === expense.id ? (
+          visiveis.map((expense) => editandoId === expense.id ? (
             <div key={expense.id} className="px-3 py-3 border-b border-border/50 bg-primary/[0.04] space-y-2">
               <div className="flex items-center gap-2">
                 <Input
@@ -481,7 +530,11 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
                   <div className="min-w-0">
                     <CardSelect value={rascunho.cardName} onValueChange={(v) => setRascunho({ ...rascunho, cardName: v })} />
                   </div>
-                ) : <div />}
+                ) : (
+                  <div className="min-w-0">
+                    <CardSelect value={rascunho.conta} onValueChange={(v) => setRascunho({ ...rascunho, conta: v })} placeholder="Conta/banco (opcional)" />
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2 pt-0.5">
                 <button
@@ -528,6 +581,12 @@ export const ExpenseTable = ({ expenses, setExpenses, onPrimeiroGasto, mes }: Ex
                         <>
                           <span>·</span>
                           <span className={`category-badge ${getCardStyle(expense.cardName)}`}>{getCardLabel(expense.cardName)}</span>
+                        </>
+                      )}
+                      {!expense.cardName && expense.conta && (
+                        <>
+                          <span>·</span>
+                          <span className={`category-badge ${getCardStyle(expense.conta)}`} data-testid="badge-conta">{getCardLabel(expense.conta)}</span>
                         </>
                       )}
                       {adiado(expense) && (

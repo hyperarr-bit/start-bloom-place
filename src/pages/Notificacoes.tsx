@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, Dumbbell, Pill, Receipt, Salad, Sparkles, Wrench } from "lucide-react";
+import { ArrowLeft, BellOff, BookOpen, Cake, CalendarCheck, CalendarClock, Dumbbell, Pill, Receipt, Salad, Sparkles, Wrench } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -32,7 +32,7 @@ import { trackEvent } from "@/lib/analytics";
 
 const HORAS = [6, 7, 8, 9, 10, 12, 18, 20, 21, 22];
 
-type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa";
+type ChaveLiga = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "aniversario" | "casa" | "compromissos";
 
 const Notificacoes = () => {
   // 30/07 (dono): na web/PWA não existe como ENTREGAR notificação local, e a
@@ -207,6 +207,15 @@ const Notificacoes = () => {
           rodape={rodapeDe("aniversario", p.aniversario, "Cadastre alguém com data de aniversário em Relações")}
           hora={p.aniversario ? p.horaAniversario : undefined}
           onHora={(h) => void aplicar({ horaAniversario: h })}
+        />
+
+        <LinhaAviso
+          icone={<CalendarClock className="w-4 h-4" />}
+          titulo="Compromissos"
+          descricao="Consulta, reunião, aula: na antecedência que você escolhe em cada compromisso (Rotina → Meu mês)."
+          ligado={p.compromissos}
+          onChange={(v) => void alternar("compromissos", v)}
+          rodape={rodapeDe("compromisso", p.compromissos, "Cadastre um compromisso com hora em Rotina → Meu mês")}
         />
 
         <LinhaAviso

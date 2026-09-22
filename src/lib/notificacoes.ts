@@ -1,5 +1,6 @@
 import { isNativeShell } from "./native-shell";
 import { trackEvent } from "./analytics";
+import { planejarCompromissos, type Compromisso } from "./compromissos";
 
 /**
  * Notificações LOCAIS do app da loja (26/07).
@@ -29,7 +30,7 @@ const COR_MARCA = "#1C1917";
  * outros, e são a ÚNICA marca que sobrevive dentro do sistema (o Android só
  * guarda o id, não sabe o que é "lembrete de treino").
  */
-export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "outro";
+export type TipoDeLembrete = "contas" | "retrospectiva" | "rotina" | "treino" | "leitura" | "dieta" | "saude" | "aniversario" | "casa" | "compromisso" | "outro";
 
 const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   contas: 100000,
@@ -41,6 +42,7 @@ const BASES: Record<Exclude<TipoDeLembrete, "outro">, number> = {
   saude: 800000, // 700000 é o resgate do paywall (BASE_RESGATE, mais abaixo)
   aniversario: 900000,
   casa: 1000000,
+  compromisso: 1100000, // 22/09: compromissos com hora da Rotina (lib/compromissos)
 };
 const BASE_CONTAS = BASES.contas;
 const BASE_RETRO = BASES.retrospectiva;
@@ -599,6 +601,17 @@ export async function agendarManutencao(tarefas: ManutencaoAgendavel[], opcoes: 
   if (!opcoes.ligado) { await limparFaixa(BASES.casa); return 0; }
   const hora = Number.isInteger(opcoes.hora) ? (opcoes.hora as number) : 10;
   return agendarSerie("casa", "/casa", planejarManutencao(tarefas, hora));
+}
+
+/* ─── Compromissos com hora (22/09, dois chamados: "médico dia 29 às 9h, me
+   avisar antes" e "jiu-jitsu seg/qua/sex, o app me lembra?") ─────────────────
+   A conta mora em lib/compromissos (pura): um aviso por ocorrência, na
+   antecedência escolhida em cada compromisso, com id explícito na faixa —
+   dois compromissos no mesmo dia não podem dividir o id "BASE + MMDD". O
+   toque abre a aba Meu mês da Rotina. */
+export async function agendarCompromissos(lista: Compromisso[], opcoes: { ligado: boolean }): Promise<number> {
+  if (!opcoes.ligado) { await limparFaixa(BASES.compromisso); return 0; }
+  return agendarSerie("compromisso", "/rotina?aba=mes", planejarCompromissos(lista, BASES.compromisso));
 }
 
 /** De qual lembrete é este id — a faixa é a única marca que sobrevive no sistema. */

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload, Loader2, FileCheck2 } from "lucide-react";
+import { Upload, Loader2, FileCheck2, Undo2 } from "lucide-react";
+import { CardSelect } from "@/components/finance/CardSelect";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -58,12 +59,41 @@ interface Props {
  * Correções de categoria viram regra aprendida (finance-categorization-rules):
  * na próxima importação, o mesmo estabelecimento já vem certo.
  */
+/** Registro da última importação — é o que o "Desfazer" procura. */
+type UltimaImportacao = { stamp: number; gastos: number; receitas: number; quando: string };
+export const CHAVE_ULTIMA_IMPORTACAO = "finance-ultima-importacao";
+
+/** Todo lançamento importado tem id `${stamp}-e0`, `${stamp}-i3`… — o carimbo é o elo pra desfazer. */
+export const doCarimbo = (id: unknown, stamp: number) => typeof id === "string" && id.startsWith(`${stamp}-`);
+
 export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Props) => {
   const { get, set } = useUserData();
   const { isSubscribed } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<ReviewRow[] | null>(null);
   const [busy, setBusy] = useState(false);
+  /* DE ONDE É O EXTRATO (22/09, chamado: "na hora de importar poderia ter a
+     opção de escolher se é crédito, débito e o banco"). Um arquivo é de UMA
+     origem: extrato de conta (Pix/débito) ou fatura de cartão (crédito). A
+     escolha vale pro arquivo inteiro; a categoria continua linha a linha. */
+  const [origem, setOrigem] = useState<"conta" | "cartao">("conta");
+  const [banco, setBanco] = useState("");
+  const ultima = get<UltimaImportacao | null>(CHAVE_ULTIMA_IMPORTACAO, null);
+  const importadosNaTela = ultima
+    ? expenses.filter((e: any) => doCarimbo(e?.id, ultima.stamp)).length + incomes.filter((i: any) => doCarimbo(i?.id, ultima.stamp)).length
+    : 0;
+
+  /* DESFAZER (22/09, chamado: "importei meu extrato, mas não deu muito certo e
+     gostaria de excluir, mas não sei como"). Remove só o que aquela importação
+     criou, pelo carimbo do id — o que a pessoa lançou à mão fica. */
+  const desfazer = () => {
+    if (!ultima) return;
+    setExpenses(expenses.filter((e: any) => !doCarimbo(e?.id, ultima.stamp)));
+    setIncomes(incomes.filter((i: any) => !doCarimbo(i?.id, ultima.stamp)));
+    set(CHAVE_ULTIMA_IMPORTACAO, null);
+    trackEvent("extrato_desfeito", { n: importadosNaTela });
+    toast.success(`Importação desfeita: ${importadosNaTela} lançamento${importadosNaTela !== 1 ? "s" : ""} removido${importadosNaTela !== 1 ? "s" : ""}`);
+  };
 
   const handleFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,14 +151,22 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
     if (outgoing.length > 0) {
       setExpenses([
         ...expenses,
-        ...outgoing.map((r, i) => ({
-          id: `${stamp}-e${i}`,
-          date: r.date,
-          value: Math.abs(r.amount),
-          description: r.description.slice(0, 60),
-          category: r.category || "outros",
-          paymentMethod: suggestPaymentMethod(r.description),
-        })),
+        ...outgoing.map((r, i) => {
+          // fatura de cartão = tudo crédito no cartão escolhido; extrato de
+          // conta = Pix ou débito pela descrição, no banco escolhido (débito
+          // grava em cardName como sempre; Pix ganha `conta`, o campo novo)
+          const metodo = origem === "cartao" ? "credito" : suggestPaymentMethod(r.description);
+          return {
+            id: `${stamp}-e${i}`,
+            date: r.date,
+            value: Math.abs(r.amount),
+            description: r.description.slice(0, 60),
+            category: r.category || "outros",
+            paymentMethod: metodo,
+            ...(banco && (metodo === "credito" || metodo === "debito") ? { cardName: banco } : {}),
+            ...(banco && metodo === "pix" ? { conta: banco } : {}),
+          };
+        }),
       ]);
     }
     if (incoming.length > 0) {
@@ -143,10 +181,12 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
       ]);
     }
 
-    trackEvent("extrato_imported", { expenses: outgoing.length, incomes: incoming.length, learned: learnedCount });
+    set(CHAVE_ULTIMA_IMPORTACAO, { stamp, gastos: outgoing.length, receitas: incoming.length, quando: new Date().toISOString() } satisfies UltimaImportacao);
+    trackEvent("extrato_imported", { expenses: outgoing.length, incomes: incoming.length, learned: learnedCount, origem, banco: !!banco });
     toast.success(
       `${outgoing.length} gasto${outgoing.length !== 1 ? "s" : ""} e ${incoming.length} receita${incoming.length !== 1 ? "s" : ""} importados` +
-        (learnedCount > 0 ? ` · ${learnedCount} regra${learnedCount > 1 ? "s" : ""} aprendida${learnedCount > 1 ? "s" : ""}` : ""),
+        (learnedCount > 0 ? ` · ${learnedCount} regra${learnedCount > 1 ? "s" : ""} aprendida${learnedCount > 1 ? "s" : ""}` : "") +
+        " · dá pra desfazer no botão ao lado de Importar",
     );
     setRows(null);
 
@@ -179,6 +219,11 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
         {busy ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
         Importar extrato
       </Button>
+      {importadosNaTela > 0 && (
+        <Button size="sm" variant="ghost" onClick={desfazer} className="text-muted-foreground" title="Remove só os lançamentos da última importação" data-testid="desfazer-importacao">
+          <Undo2 className="w-4 h-4 mr-1" /> Desfazer ({importadosNaTela})
+        </Button>
+      )}
 
       <Sheet open={!!rows} onOpenChange={(o) => !o && setRows(null)}>
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[88dvh] flex flex-col p-0">
@@ -190,6 +235,22 @@ export const ImportExtrato = ({ expenses, incomes, setExpenses, setIncomes }: Pr
             <p className="text-xs text-muted-foreground !mt-1">
               Categoria já sugerida — corrige o que precisar, que eu aprendo pra próxima.
             </p>
+            <div className="!mt-3 grid grid-cols-[auto_1fr] items-center gap-2" data-testid="origem-extrato">
+              <div className="inline-flex rounded-lg border border-border bg-muted p-0.5">
+                {([["conta", "Conta (Pix/débito)"], ["cartao", "Fatura do cartão"]] as const).map(([id, rotulo]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setOrigem(id)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors ${origem === id ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"}`}
+                    aria-pressed={origem === id}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+              <CardSelect value={banco} onValueChange={setBanco} placeholder={origem === "cartao" ? "Qual cartão?" : "Qual banco?"} className="h-8 text-xs w-full" />
+            </div>
           </SheetHeader>
 
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5">

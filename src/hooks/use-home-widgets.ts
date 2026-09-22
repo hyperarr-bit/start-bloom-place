@@ -19,7 +19,8 @@ export type WidgetId =
   | "macro-balance"
   | "sleep-log"
   | "countdown"
-  | "week-calendar";
+  | "week-calendar"
+  | "tasks";
 
 export interface WidgetDef {
   id: WidgetId;
@@ -42,6 +43,8 @@ export const WIDGET_CATALOG: WidgetDef[] = [
   { id: "calories", label: "Calorias", description: "Consumo calórico do dia", emoji: "🍎", category: "saúde", defaultSize: "small" },
   { id: "health", label: "Saúde", description: "Água e indicadores de saúde", emoji: "❤️", category: "saúde", defaultSize: "small" },
   { id: "habits", label: "Hábitos", description: "Tarefas e hábitos do dia", emoji: "✅", category: "produtividade", defaultSize: "small" },
+  // 22/09, chamado: "tarefas criadas em Carreira, Rotina, Casa não aparecem no dashboard inicial"
+  { id: "tasks", label: "Tarefas de hoje", description: "Rotina, Carreira e Casa numa lista só, com ✓", emoji: "☑️", category: "produtividade", defaultSize: "large" },
   { id: "reading", label: "Leitura", description: "Livro atual e progresso", emoji: "📖", category: "bem-estar", defaultSize: "small" },
   // Custom widgets
   { id: "week-progress", label: "Progresso Semanal", description: "Gráfico do seu score ao longo da semana", emoji: "📊", category: "produtividade", defaultSize: "large" },

@@ -1,9 +1,17 @@
 import {
-  agendarAniversarios, agendarContas, agendarDieta, agendarLeitura, agendarManutencao, agendarRemedios,
+  agendarAniversarios, agendarCompromissos, agendarContas, agendarDieta, agendarLeitura, agendarManutencao, agendarRemedios,
   agendarRetrospectiva, agendarRotina, agendarTreino, type ManutencaoAgendavel, type PessoaAgendavel,
   type RemedioAgendavel,
 } from "@/lib/notificacoes";
+import { CHAVE_COMPROMISSOS, compromissosValidos, type Compromisso } from "@/lib/compromissos";
+import { CARD_CONFIG_KEY, CUSTOM_CARDS_KEY, DEFAULT_CARDS, type CustomCard } from "@/lib/finance-cards";
+import type { CardConfig } from "@/lib/finance-fatura";
+import { CHAVE_FATURAS_PAGAS, faturasDoMes, injetarFaturas } from "@/lib/finance-faturas";
+import { somarMeses } from "@/lib/finance-parcelas";
+import { mesCorrenteId } from "@/lib/virada-contas";
+import { chaveArquivada } from "@/lib/virada-do-mes";
 import type { PrefsNotificacoes } from "@/lib/prefs-notificacoes";
+import { nomeComQuem } from "@/lib/saude-dependentes";
 import { localDayKey } from "@/lib/utils";
 
 /**
@@ -64,6 +72,8 @@ export interface DadosDosLembretes {
   pessoas: PessoaAgendavel[];
   /** tarefas de manutenção de Casa já feitas alguma vez (11/09) */
   manutencao: ManutencaoAgendavel[];
+  /** compromissos com hora da Rotina (22/09) */
+  compromissos: Compromisso[];
 }
 
 /** Lê de uma vez tudo o que os lembretes precisam saber. */
@@ -97,20 +107,49 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
   const diarioDieta = get<Record<string, { meals?: Record<string, unknown> }>>("dieta-diary-v2", {}) ?? {};
 
   // Remédios (07/09): a lista do PharmacyChecklist + o log de "tomado hoje"
-  type Suplemento = { id?: string; name?: string; time?: string };
+  type Suplemento = { id?: string; name?: string; time?: string; quem?: string };
   const suplementos = get<Suplemento[]>("core-saude-supplements", []) ?? [];
   const tomadosHoje = (get<Record<string, string[]>>("core-saude-supplement-log", {}) ?? {})[hoje] ?? [];
   const remedios: RemedioAgendavel[] = (Array.isArray(suplementos) ? suplementos : [])
     .filter((s) => s?.name && s?.time)
     .map((s) => ({
       id: String(s.id ?? ""),
-      nome: String(s.name),
+      // remédio do dependente leva o nome dele no aviso (22/09): "Hora do Ômega 3 (Mãe)"
+      nome: nomeComQuem(String(s.name), s.quem),
       hora: String(s.time),
       tomadoHoje: Array.isArray(tomadosHoje) && tomadosHoje.includes(String(s.id)),
     }));
 
+  /* FATURA DO CARTÃO no aviso de conta a vencer (22/09): a mesma conta da
+     tela (lib/finance-faturas), pelo NOME só — o texto da notificação congela
+     no agendamento e um valor de ontem seria mentira amanhã. */
+  const mes = mesCorrenteId();
+  const mesAnterior = somarMeses(mes, -1);
+  const chaveAnterior = chaveArquivada(Number(mesAnterior.slice(0, 4)), Number(mesAnterior.slice(5, 7)) - 1, "expenses");
+  const configCartoes = get<Record<string, CardConfig>>(CARD_CONFIG_KEY, {}) ?? {};
+  const personalizados = get<CustomCard[]>(CUSTOM_CARDS_KEY, []) ?? [];
+  const rotulos = new Map<string, string>([
+    ...DEFAULT_CARDS.map((c) => [c.value, c.label] as [string, string]),
+    ...(Array.isArray(personalizados) ? personalizados : []).map((c) => [c.value, c.label] as [string, string]),
+  ]);
+  let dueDays = get<DadosDosLembretes["dueDays"]>("finance-dueDays", []) ?? [];
+  try {
+    const faturas = faturasDoMes({
+      mes,
+      variaveis: get<unknown[]>("finance-expenses", []) as never[],
+      variaveisAnterior: get<unknown[]>(chaveAnterior, []) as never[],
+      fixos: get<unknown[]>("finance-fixed-expenses", []) as never[],
+      parcelas: get<unknown[]>("finance-installments", []) as never[],
+      cards: [...rotulos.keys()],
+      configOf: (card) => configCartoes?.[card],
+      labelOf: (card) => rotulos.get(card) ?? card,
+      pagas: get<Record<string, boolean>>(CHAVE_FATURAS_PAGAS, {}) ?? {},
+    });
+    dueDays = injetarFaturas(dueDays as never[], faturas, true) as DadosDosLembretes["dueDays"];
+  } catch { /* dado torto em alguma chave: o aviso sai sem a fatura, nunca sem as contas */ }
+
   return {
-    dueDays: get("finance-dueDays", []) ?? [],
+    dueDays,
     marcados,
     sequencia: sequenciaAtual(marcados),
     diasAtivos: get<string[]>("treino-active-days", []) ?? [],
@@ -132,6 +171,7 @@ export function lerDadosDosLembretes(get: Leitor): DadosDosLembretes {
     manutencao: (get<{ task?: string; lastDone?: string; frequencyMonths?: number }[]>("casa-maint-tasks", []) ?? [])
       .filter((t) => t?.task && t?.lastDone)
       .map((t) => ({ tarefa: String(t.task), ultimaVez: String(t.lastDone), frequenciaMeses: Number(t.frequencyMonths) || 6 })),
+    compromissos: compromissosValidos(get<unknown>(CHAVE_COMPROMISSOS, [])),
   };
 }
 
@@ -154,6 +194,7 @@ export function assinaturaDos(dados: DadosDosLembretes, prefs: PrefsNotificacoes
     dados.remediosLigado && dados.remedios,
     prefs.aniversario && dados.pessoas,
     prefs.casa && dados.manutencao,
+    prefs.compromissos && dados.compromissos,
   ]);
 }
 
@@ -179,5 +220,6 @@ export async function reagendarTudo(
     saude: await agendarRemedios(d.remedios, { ligado: d.remediosLigado }),
     aniversario: await agendarAniversarios(d.pessoas, { hora: prefs.horaAniversario, ligado: prefs.aniversario }),
     casa: await agendarManutencao(d.manutencao, { hora: prefs.horaCasa, ligado: prefs.casa }),
+    compromisso: await agendarCompromissos(d.compromissos, { ligado: prefs.compromissos }),
   };
 }

@@ -109,6 +109,60 @@ serve(async (req) => {
       return json({ achados });
     }
 
+    /* RESPONDER UM CHAMADO (22/09). O "Responder" do /admin abria o mailto do
+     * dono e nada ficava registrado — o painel não sabia o que já tinha sido
+     * respondido. Agora a resposta sai daqui pelo Resend, com o e-mail da
+     * conta do chamado (nunca digitado — o servidor resolve pelo user_id),
+     * e fica gravada no próprio chamado (resposta/respondido_em) + resolvido.
+     * POST { action: "responder", id, texto } → { ok, para: "dominio" } */
+    if (action === "responder") {
+      const id = String(body.id ?? "").trim();
+      const texto = String(body.texto ?? "").trim();
+      if (!id) return json({ error: "id" }, 400);
+      if (texto.length < 5) return json({ error: "texto curto" }, 400);
+      const { data: t } = await admin.from("support_tickets").select("id, user_id, source, message, status").eq("id", id).maybeSingle();
+      if (!t) return json({ error: "chamado não encontrado" }, 404);
+      const { data: u } = await admin.auth.admin.getUserById(t.user_id as string);
+      const email = u?.user?.email ?? null;
+      if (!email) return json({ error: "sem_email" }, 400);
+      const meta = (u?.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const nomeCompleto = String(meta.full_name ?? meta.name ?? meta.display_name ?? "").trim();
+      const nome = nomeCompleto.split(" ")[0] || "";
+      const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+      if (!resendKey) return json({ error: "sem_resend" }, 503);
+      const from = Deno.env.get("WELCOME_EMAIL_FROM") || "onboarding@resend.dev";
+      const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] ?? c));
+      const tipo = String(t.source ?? "");
+      const assunto = tipo === "app_sugestao" ? "CORE — sobre a sua sugestão" : tipo === "app_erro" ? "CORE — sobre o erro que você relatou" : "CORE — sobre a sua dúvida";
+      const original = String(t.message ?? "").split("———— diagnóstico")[0].replace(/^\[[^\]]+\]\s*/, "").trim();
+      const paragrafos = texto.split(/\n{2,}/).map((p) => `<p style="margin:0 0 14px">${esc(p).replace(/\n/g, "<br>")}</p>`).join("");
+      const html =
+        `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.55;color:#1c1917;max-width:560px">` +
+        `<p style="margin:0 0 14px">Oi${nome ? `, ${esc(nome)}` : ""}!</p>` + paragrafos +
+        `<p style="margin:0 0 6px">Um abraço,<br>João, do CORE</p>` +
+        `<p style="margin:0 0 22px;color:#78716c;font-size:13px">Pode responder este e-mail que eu leio.</p>` +
+        (original ? `<blockquote style="border-left:3px solid #d6d3d1;margin:0;padding:2px 0 2px 12px;color:#78716c;font-size:13px;white-space:pre-wrap">${esc(original)}</blockquote>` : "") +
+        `</div>`;
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to: [email], reply_to: "suporte@coreaplicativo.com.br", subject: assunto, html }),
+      });
+      if (!r.ok) {
+        const detalhe = await r.text().catch(() => "");
+        return json({ error: `resend_${r.status}`, detalhe: detalhe.slice(0, 200) }, 502);
+      }
+      const agora = new Date().toISOString();
+      const { error: uErr } = await admin.from("support_tickets")
+        .update({ resposta: texto, respondido_em: agora, status: "resolved", resolved_at: agora }).eq("id", id);
+      if (uErr) return json({ ok: true, enviado: true, aviso: `enviado, mas não gravou: ${uErr.message}` });
+      await admin.from("analytics_events").insert({
+        user_id: t.user_id, event_name: "support_ticket_answered",
+        event_data: { ticket_id: id, source: tipo, chars: texto.length },
+      }).then(() => {}, () => {});
+      return json({ ok: true, para: email.split("@")[1] ?? "", nome: nome ? "ok" : "sem_nome" });
+    }
+
     if (action === "status") {
       const email = String(body.email ?? "").trim().toLowerCase();
       const uid = await acharUid(email);

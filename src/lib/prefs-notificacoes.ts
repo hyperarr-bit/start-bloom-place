@@ -43,6 +43,8 @@ export interface PrefsNotificacoes {
   /** manutenção da casa vencendo (11/09) */
   casa: boolean;
   horaCasa: number;
+  /** compromissos com hora da Rotina (22/09) — a antecedência é por compromisso, aqui é só o interruptor geral */
+  compromissos: boolean;
 }
 
 /**
@@ -72,6 +74,9 @@ export const PREFS_PADRAO: PrefsNotificacoes = {
   horaAniversario: 10,
   casa: false,
   horaCasa: 10,
+  // nasce LIGADO como os remédios: cadastrar um compromisso escolhendo
+  // "avisar 1 hora antes" JÁ é pedir pra ser lembrado — a escolha mora em cada um
+  compromissos: true,
 };
 
 export const CHAVE_PREFS = "notif-prefs";
@@ -102,6 +107,7 @@ export const lerPrefs = (bruto: unknown): PrefsNotificacoes => {
     horaAniversario: horaValida(p.horaAniversario, PREFS_PADRAO.horaAniversario),
     casa: p.casa === true,
     horaCasa: horaValida(p.horaCasa, PREFS_PADRAO.horaCasa),
+    compromissos: p.compromissos !== false,
   };
 };
 

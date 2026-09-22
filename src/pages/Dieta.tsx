@@ -29,6 +29,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { useModuleCompletionFlow } from "@/hooks/use-module-completion-flow";
 import { Switch } from "@/components/ui/switch";
+import { BuscaAlimento } from "@/components/dieta/BuscaAlimento";
+import { toast } from "sonner";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const dayColors: Record<string, string> = {
@@ -382,6 +384,8 @@ const Dieta = () => {
 
   // DIÁRIO v2
   const [diaryDate, setDiaryDate] = useState(localDayKey());
+  // busca na tabela de alimentos (22/09) — aberta sob demanda no diário
+  const [buscandoAlimento, setBuscandoAlimento] = useState(false);
 
   // Vira o dia quando o app reabre/volta ao foco (celular mantém a aba viva).
   // Se a pessoa estava vendo "Hoje", arrasta o diário pro novo hoje; se ela
@@ -1498,6 +1502,67 @@ const Dieta = () => {
                       <p className="text-[10px] text-muted-foreground mt-1">Adicione refeições na aba Cardápio</p>
                     </div>
                   )}
+
+                  {/* O QUE COMEU, COM CALORIAS (22/09, chamado com print: "coloco a
+                      refeição e não aparece nem caloria nem macro no widget"). É a
+                      lista do core-dieta-log do dia — exatamente o que os widgets
+                      Calorias e Macros do Dia leem — com busca na tabela TACO. */}
+                  {(() => {
+                    const entradas = Object.entries(dietaLog[diaryDate] ?? {}).filter(([, e]) => e && typeof e === "object");
+                    const tot = entradas.reduce(
+                      (s, [, e]) => ({ kcal: s.kcal + (Number(e?.calories) || 0), p: s.p + (Number(e?.protein) || 0), c: s.c + (Number(e?.carbs) || 0), g: s.g + (Number(e?.fat) || 0) }),
+                      { kcal: 0, p: 0, c: 0, g: 0 },
+                    );
+                    const r1 = (n: number) => Math.round(n * 10) / 10;
+                    return (
+                      <div className="bg-card rounded-xl border border-border p-3 space-y-2" data-testid="comeu-hoje">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-bold">O que você comeu · com calorias</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {entradas.length === 0 ? "Busque o alimento na tabela e informe a quantidade — kcal e macros entram sozinhos." : `${Math.round(tot.kcal)} kcal · P ${r1(tot.p)} g · C ${r1(tot.c)} g · G ${r1(tot.g)} g`}
+                            </p>
+                          </div>
+                          {!buscandoAlimento && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => setBuscandoAlimento(true)} data-testid="add-alimento">
+                              <Plus className="w-3.5 h-3.5 mr-1" /> Alimento
+                            </Button>
+                          )}
+                        </div>
+                        {entradas.length > 0 && (
+                          <div className="space-y-1">
+                            {entradas.map(([id, e]) => (
+                              <div key={id} className="flex items-center gap-2 text-[11px] rounded-md border border-border/60 px-2 py-1.5" data-testid="entrada-log">
+                                <span className="flex-1 truncate">{String(e?.name ?? id)}</span>
+                                <span className="tabular-nums text-muted-foreground shrink-0">
+                                  {Math.round(Number(e?.calories) || 0)} kcal
+                                  {(Number(e?.protein) || Number(e?.carbs) || Number(e?.fat)) ? ` · ${r1(Number(e?.protein) || 0)}/${r1(Number(e?.carbs) || 0)}/${r1(Number(e?.fat) || 0)}` : ""}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`Remover ${String(e?.name ?? id)}`}
+                                  onClick={() => setDietaLog(prev => { const dia = { ...(prev[diaryDate] ?? {}) }; delete dia[id]; return { ...prev, [diaryDate]: dia }; })}
+                                  className="text-muted-foreground hover:text-destructive shrink-0"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {buscandoAlimento && (
+                          <BuscaAlimento
+                            onFechar={() => setBuscandoAlimento(false)}
+                            onAdicionar={(entrada) => {
+                              const id = `taco-${Date.now()}`;
+                              setDietaLog(prev => ({ ...prev, [diaryDate]: { ...(prev[diaryDate] ?? {}), [id]: entrada } }));
+                              toast.success(`${entrada.calories} kcal adicionadas ao dia`);
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Extra food section */}
                   <div className="bg-card rounded-xl border border-border p-3 space-y-2">

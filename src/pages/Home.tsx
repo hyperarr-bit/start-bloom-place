@@ -43,6 +43,7 @@ import { MacroBalanceWidget } from "@/components/home/widgets/MacroBalanceWidget
 import { SleepLogWidget } from "@/components/home/widgets/SleepLogWidget";
 import { CountdownWidget } from "@/components/home/widgets/CountdownWidget";
 import { WeekCalendarWidget } from "@/components/home/widgets/WeekCalendarWidget";
+import { TasksWidget } from "@/components/home/widgets/TasksWidget";
 import { pedirRastreamentoIos } from "@/lib/att-ios";
 
 type WidgetComponent = React.FC<{ size?: "small" | "large" }>;
@@ -64,6 +65,7 @@ const WIDGET_COMPONENTS: Record<WidgetId, WidgetComponent> = {
   "sleep-log": SleepLogWidget as WidgetComponent,
   countdown: CountdownWidget as WidgetComponent,
   "week-calendar": WeekCalendarWidget as WidgetComponent,
+  tasks: TasksWidget as WidgetComponent,
 };
 
 const HomePage = () => {

@@ -4,6 +4,8 @@ import { Clock, ChevronRight, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { LifeHubData } from "@/hooks/use-life-hub-data";
 import { abrirAcaoRapida, type ActionId } from "@/components/home/QuickActions";
+import { useUserData } from "@/hooks/use-user-data";
+import { CHAVE_COMPROMISSOS, proximosDeHoje, type Compromisso } from "@/lib/compromissos";
 
 interface NextHoursTimelineProps {
   data: LifeHubData;
@@ -22,7 +24,22 @@ interface PendingItem {
 export const NextHoursTimeline = ({ data }: NextHoursTimelineProps) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const { get } = useUserData();
   const items: PendingItem[] = [];
+
+  /* COMPROMISSOS DE HOJE (22/09, chamado: "tarefas criadas em Rotina não
+     aparecem no dashboard"). O que tem hora vem PRIMEIRO — é a única linha
+     desta lista que perde sentido se passar. Só os que ainda não passaram;
+     o de 15h ainda aparece até 15h30. Toque abre o Meu mês. */
+  proximosDeHoje(get<Compromisso[]>(CHAVE_COMPROMISSOS, []) ?? [], new Date()).forEach((o, i) => {
+    items.push({
+      label: `${o.compromisso.hora} · ${o.compromisso.titulo}${o.compromisso.local ? ` · ${o.compromisso.local}` : ""}`,
+      done: false,
+      emoji: "📅",
+      priority: -10 + i * 0.01,
+      route: "/rotina?aba=mes",
+    });
+  });
 
   // Habits - always show
   const pendingHabits = data.habits.filter(h => !h.done);

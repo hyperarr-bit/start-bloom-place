@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { isNativeShell } from "@/lib/native-shell";
 import { adicionarAoCalendario, type EventoDeCalendario } from "@/lib/calendario";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { Input } from "@/components/ui/input";
 import { CampoData } from "@/components/ui/campo-data";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,7 +20,11 @@ interface Appointment {
   time: string;
   address: string;
   questions: string;
+  /** De quem é a consulta (22/09, chamado: "quem tem filho pequeno e/ou pai
+   *  idoso… escolher qual médico seria meu ou do dependente"). Ausente = sua. */
+  quem?: string;
 }
+
 
 interface Exam {
   id: string;
@@ -130,14 +135,21 @@ export const MedicalLog = () => {
   const [expandedAppt, setExpandedAppt] = useState<string | null>(null);
   const [expandedExam, setExpandedExam] = useState<string | null>(null);
 
-  const [newAppt, setNewAppt] = useState<Omit<Appointment, "id">>({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "" });
+  const [newAppt, setNewAppt] = useState<Omit<Appointment, "id">>({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "", quem: "" });
+  const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
+  const lembrarDependente = (quem?: string) => {
+    const q = (quem ?? "").trim();
+    if (q && !dependentes.includes(q)) setDependentes([...dependentes, q]);
+  };
   const [newExam, setNewExam] = useState<Omit<Exam, "id" | "done">>({ name: "", date: "", time: "", location: "", notes: "" });
   const [newBio, setNewBio] = useState({ name: "", unit: "ng/dL", refMin: "", refMax: "" });
 
   const addAppointment = () => {
     if (!newAppt.doctor.trim()) return;
-    setAppointments(prev => [...prev, { ...newAppt, id: Date.now().toString() }]);
-    setNewAppt({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "" });
+    const quem = (newAppt.quem ?? "").trim();
+    setAppointments(prev => [...prev, { ...newAppt, ...(quem ? { quem } : { quem: undefined }), id: Date.now().toString() }]);
+    lembrarDependente(quem);
+    setNewAppt({ doctor: "", specialty: "", date: "", time: "", address: "", questions: "", quem: "" });
     setShowApptForm(false);
   };
 
@@ -340,6 +352,20 @@ export const MedicalLog = () => {
                 <div className="grid gap-2 p-3 rounded-xl bg-muted">
                   <Input value={newAppt.doctor} onChange={e => setNewAppt({ ...newAppt, doctor: e.target.value })} placeholder="Nome do médico" className="text-xs h-9" />
                   <Input value={newAppt.specialty} onChange={e => setNewAppt({ ...newAppt, specialty: e.target.value })} placeholder="Especialidade (ex: Dermatologista)" className="text-xs h-9" />
+                  <div>
+                    <Input
+                      value={newAppt.quem ?? ""}
+                      onChange={e => setNewAppt({ ...newAppt, quem: e.target.value })}
+                      placeholder="Pra quem? (vazio = você · ex.: Filho, Mãe)"
+                      className="text-xs h-9"
+                      list="saude-dependentes"
+                      aria-label="Pra quem é a consulta"
+                      data-testid="consulta-quem"
+                    />
+                    <datalist id="saude-dependentes">
+                      {dependentes.map(d => <option key={d} value={d} />)}
+                    </datalist>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative">
                       <CampoData rotulo="Data" value={newAppt.date} onChange={e => setNewAppt({ ...newAppt, date: e.target.value })} className="text-xs h-9" />
@@ -411,6 +437,11 @@ export const MedicalLog = () => {
                       {a.specialty && a.doctor && (
                         <span className={`mt-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold ${getSpecialtyColor(a.specialty)}`}>
                           {a.specialty}
+                        </span>
+                      )}
+                      {a.quem?.trim() && (
+                        <span className="mt-1 ml-1 inline-block px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300" data-testid="consulta-de">
+                          👤 {a.quem.trim()}
                         </span>
                       )}
                     </td>

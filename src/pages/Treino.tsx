@@ -26,6 +26,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import { trackEvent } from "@/lib/analytics";
 
 const weekDays = ["SEGUNDA", "TERÇA", "QUARTA", "QUINTA", "SEXTA", "SÁBADO", "DOMINGO"];
 const dayColors: Record<string, string> = {
@@ -294,6 +295,9 @@ const Treino = () => {
 
   const [expandedDay, setExpandedDay] = useState<string | null>(todayDayName);
   const [showObsFor, setShowObsFor] = useState<string | null>(null);
+  // copiar treino pra outros dias (22/09) — mesmo par de estados da Dieta
+  const [copyFromDay, setCopyFromDay] = useState<string | null>(null);
+  const [copyTargetDays, setCopyTargetDays] = useState<string[]>([]);
 
   // 1RM calculator
   const [rmWeight, setRmWeight] = useState("");
@@ -522,14 +526,77 @@ const Treino = () => {
               <p className="font-bold text-sm">{day} {day === todayDayName ? "⬅️ HOJE" : ""}</p>
               <p className="text-xs opacity-80">{muscleEmoji} {muscleLabel}</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs opacity-80">{doneCount}/{totalCount}</p>
-              <div className="w-16 h-1.5 bg-white/30 rounded-full mt-1">
-                <div className="h-full bg-white rounded-full transition-all" style={{ width: `${doneCount / Math.max(totalCount, 1) * 100}%` }} />
+            <div className="flex items-center gap-2">
+              {/* COPIAR PRA OUTROS DIAS (22/09, chamado: "no treino senti a falta
+                  de ter como copiar para outro dia da semana igual tem na
+                  dieta") — mesmo gesto da Dieta: botão no cabeçalho, painel
+                  com os dias, copia músculos + exercícios (zerando os ✓). */}
+              <button
+                type="button"
+                onClick={() => { if (copyFromDay === day) { setCopyFromDay(null); setCopyTargetDays([]); } else { setCopyFromDay(day); setCopyTargetDays([]); } }}
+                className="p-1 rounded hover:bg-white/20 transition-colors flex items-center gap-0.5"
+                title="Copiar este treino para outros dias"
+                aria-label={`Copiar treino de ${day} para outros dias`}
+                data-testid={`copiar-treino-${day}`}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-normal">Copiar</span>
+              </button>
+              <div className="text-right">
+                <p className="text-xs opacity-80">{doneCount}/{totalCount}</p>
+                <div className="w-16 h-1.5 bg-white/30 rounded-full mt-1">
+                  <div className="h-full bg-white rounded-full transition-all" style={{ width: `${doneCount / Math.max(totalCount, 1) * 100}%` }} />
+                </div>
               </div>
             </div>
           </div>
         </div>
+        {copyFromDay === day && (
+          <div className="p-2 bg-muted/50 border-b border-border space-y-2" data-testid="painel-copiar-treino">
+            <p className="text-[10px] font-bold text-muted-foreground">Copiar para:</p>
+            <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+              <Checkbox
+                checked={copyTargetDays.length === weekDays.length - 1}
+                onCheckedChange={(checked) => setCopyTargetDays(checked ? weekDays.filter(d => d !== day) : [])}
+              />
+              Todos
+            </label>
+            <div className="grid grid-cols-2 gap-1">
+              {weekDays.filter(d => d !== day).map(d => (
+                <label key={d} className="flex items-center gap-1.5 text-[11px] cursor-pointer">
+                  <Checkbox
+                    checked={copyTargetDays.includes(d)}
+                    onCheckedChange={(checked) => setCopyTargetDays(prev => checked ? [...prev, d] : prev.filter(x => x !== d))}
+                  />
+                  {d}
+                </label>
+              ))}
+            </div>
+            <Button
+              size="sm"
+              className="w-full h-7 text-xs"
+              disabled={copyTargetDays.length === 0}
+              onClick={() => {
+                setWorkoutPlan(prev => {
+                  const src = prev[day] ?? { muscles: [], exercises: [] };
+                  const updated = { ...prev };
+                  copyTargetDays.forEach(t => {
+                    updated[t] = { ...src, muscles: [...(src.muscles ?? [])], exercises: (src.exercises ?? []).map(e => ({ ...e, done: false })) };
+                  });
+                  return updated;
+                });
+                // dia que recebe um treino vira dia de treino — senão o card
+                // continua "descanso" e o copiado não aparece
+                setActiveDays(prev => Array.from(new Set([...prev, ...copyTargetDays])));
+                trackEvent("treino_copiado", { de: day, para: copyTargetDays.length });
+                setCopyFromDay(null);
+                setCopyTargetDays([]);
+              }}
+            >
+              Copiar ({copyTargetDays.length})
+            </Button>
+          </div>
+        )}
         <div className="p-3">
           {/* Cabeçalho de tabela só existe onde a linha É uma tabela (≥640px).
               No celular a linha vira duas, e um cabeçalho de 4 colunas em cima

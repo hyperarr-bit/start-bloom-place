@@ -32,6 +32,9 @@ interface Ticket {
   status: string;
   created_at: string;
   resolved_at: string | null;
+  /** resposta enviada pelo painel (22/09) — fica no chamado */
+  resposta?: string | null;
+  respondido_em?: string | null;
 }
 interface Cancelamento {
   id: string;
@@ -126,7 +129,7 @@ export default function AdminSuporte() {
     const [tk, ca, ev] = await Promise.all([
       supabase
         .from("support_tickets")
-        .select("id, user_id, source, message, status, created_at, resolved_at")
+        .select("id, user_id, source, message, status, created_at, resolved_at, resposta, respondido_em")
         .order("created_at", { ascending: false })
         .limit(300),
       supabase
@@ -144,7 +147,8 @@ export default function AdminSuporte() {
         .limit(2000),
     ]);
     if (tk.error) { setError(tk.error.message); setLoading(false); return; }
-    const lista = (tk.data ?? []) as Ticket[];
+    // `resposta`/`respondido_em` (22/09) ainda não estão nos tipos gerados do Supabase
+    const lista = (tk.data ?? []) as unknown as Ticket[];
     setRows(lista);
     const cl = (ca.data ?? []) as Cancelamento[];
     setCancels(cl);
@@ -188,6 +192,26 @@ export default function AdminSuporte() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  /* RESPONDER PELO PAINEL (22/09): a caixa abre no próprio chamado, o texto
+     vai pela função admin-suporte (que resolve o e-mail pelo user_id e manda
+     pelo Resend com "Oi, Nome!" e assinatura) e a resposta fica gravada. */
+  const [respondendo, setRespondendo] = useState<string | null>(null);
+  const [textoResposta, setTextoResposta] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const enviarResposta = async (t: Ticket) => {
+    const texto = textoResposta.trim();
+    if (texto.length < 5) return;
+    setEnviando(true);
+    const { data, error: err } = await supabase.functions.invoke("admin-suporte", { body: { action: "responder", id: t.id, texto } });
+    setEnviando(false);
+    const falha = err?.message ?? (data && typeof data === "object" && "error" in data ? String((data as { error: unknown }).error) : null);
+    if (falha) { setError(`Não enviou: ${falha}`); return; }
+    const agora = new Date().toISOString();
+    setRows((r) => (r ?? []).map((x) => (x.id === t.id ? { ...x, status: "resolved", resolved_at: agora, resposta: texto, respondido_em: agora } : x)));
+    setRespondendo(null);
+    setTextoResposta("");
+  };
 
   const resolver = async (t: Ticket) => {
     setResolvendo(t.id);
@@ -311,12 +335,20 @@ export default function AdminSuporte() {
                         <div className="text-[11px] text-muted-foreground font-mono break-all">{t.user_id}</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => { setRespondendo(respondendo === t.id ? null : t.id); setTextoResposta(""); }}
+                          className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-[12.5px] font-medium hover:bg-muted transition-colors"
+                        >
+                          <Mail className="w-3.5 h-3.5" /> {t.resposta ? "Responder de novo" : "Responder"}
+                        </button>
                         {email && (
                           <a
                             href={mailtoResposta(email, r.txt, texto)}
-                            className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-[12.5px] font-medium hover:bg-muted transition-colors"
+                            title="Abrir no seu e-mail (o de sempre)"
+                            className="text-[11.5px] text-muted-foreground underline underline-offset-2"
                           >
-                            <Mail className="w-3.5 h-3.5" /> Responder
+                            no e-mail
                           </a>
                         )}
                         {t.status !== "resolved" && (
@@ -334,6 +366,40 @@ export default function AdminSuporte() {
                     </div>
 
                     <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">{texto}</p>
+
+                    {t.resposta && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-3">
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300 mb-1">
+                          Sua resposta{t.respondido_em ? ` · ${fmtDT(t.respondido_em)}` : ""}
+                        </div>
+                        <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{t.resposta}</p>
+                      </div>
+                    )}
+
+                    {respondendo === t.id && (
+                      <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                        <textarea
+                          value={textoResposta}
+                          onChange={(e) => setTextoResposta(e.target.value)}
+                          rows={6}
+                          autoFocus
+                          placeholder={`Escreve só o miolo — o e-mail já sai com "Oi, Nome!" no começo e "João, do CORE" no fim, e leva a mensagem da pessoa citada embaixo.`}
+                          className="w-full rounded-lg border border-input bg-background p-3 text-[13.5px] leading-relaxed outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void enviarResposta(t)}
+                            disabled={enviando || textoResposta.trim().length < 5}
+                            className="flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-2 text-[12.5px] font-semibold disabled:opacity-60"
+                          >
+                            {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />} Enviar e resolver
+                          </button>
+                          <button type="button" onClick={() => setRespondendo(null)} className="text-[12.5px] text-muted-foreground">cancelar</button>
+                          <span className="text-[11px] text-muted-foreground ml-auto">vai pro e-mail da conta do chamado</span>
+                        </div>
+                      </div>
+                    )}
 
                     {anexos.length > 0 && (
                       <div>

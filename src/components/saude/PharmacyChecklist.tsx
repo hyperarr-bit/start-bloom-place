@@ -3,6 +3,7 @@ import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Trash2, Check, Package } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { useUserData } from "@/hooks/use-user-data";
 import { Input } from "@/components/ui/input";
 import { isNativeShell } from "@/lib/native-shell";
@@ -17,6 +18,9 @@ interface Supplement {
   time: string;
   stock: number;
   dosesPerDay: number;
+  /** De quem é o remédio (22/09, mesmo chamado das consultas: "qual medicação
+   *  seria meu ou do dependente"). Ausente = seu. Vai no texto do lembrete. */
+  quem?: string;
 }
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
@@ -39,6 +43,8 @@ export const PharmacyChecklist = () => {
   const [supplementLog, setSupplementLog] = usePersistedState<Record<string, string[]>>("core-saude-supplement-log", {});
   const [newName, setNewName] = useState("");
   const [newTime, setNewTime] = useState("08:00");
+  const [newQuem, setNewQuem] = useState("");
+  const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const takenToday = supplementLog[today] || [];
 
   const toggleTaken = (id: string) => {
@@ -76,9 +82,12 @@ export const PharmacyChecklist = () => {
 
   const addSupplement = () => {
     if (!newName.trim()) return;
-    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock: 30, dosesPerDay: 1 }];
+    const quem = newQuem.trim();
+    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock: 30, dosesPerDay: 1, ...(quem ? { quem } : {}) }];
     setSupplements(lista);
+    if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
     setNewName("");
+    setNewQuem("");
     void rearmarLembretes(lista, true);
   };
 
@@ -145,6 +154,11 @@ export const PharmacyChecklist = () => {
                         <span className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold ${taken ? "line-through opacity-60" : ""} ${color}`}>
                           {s.name}
                         </span>
+                        {s.quem?.trim() && (
+                          <span className="ml-1 inline-block px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300" data-testid="remedio-de">
+                            👤 {s.quem.trim()}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">
                         <input
@@ -193,26 +207,42 @@ export const PharmacyChecklist = () => {
       )}
 
       {/* Add form */}
-      <div className="px-4 pb-4 pt-2 flex gap-2">
+      <div className="px-4 pb-4 pt-2 space-y-2">
+        <div className="flex gap-2">
+          <Input
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addSupplement()}
+            placeholder="Novo suplemento..."
+            className="text-xs h-9 flex-1"
+          />
+          <Input
+            type="time"
+            value={newTime}
+            onChange={e => setNewTime(e.target.value)}
+            className="text-xs h-9 w-24"
+          />
+          <button
+            onClick={addSupplement}
+            className="h-9 w-9 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary flex items-center justify-center flex-shrink-0 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+        {/* de quem é (22/09): vazio = seu; o nome vai no lembrete ("Hora do Ômega 3 (Mãe)") */}
         <Input
-          value={newName}
-          onChange={e => setNewName(e.target.value)}
+          value={newQuem}
+          onChange={e => setNewQuem(e.target.value)}
           onKeyDown={e => e.key === "Enter" && addSupplement()}
-          placeholder="Novo suplemento..."
-          className="text-xs h-9 flex-1"
+          placeholder="Pra quem? (vazio = você · ex.: Filho, Mãe)"
+          className="text-xs h-9"
+          list="saude-dependentes-remedio"
+          aria-label="Pra quem é o remédio"
+          data-testid="remedio-quem"
         />
-        <Input
-          type="time"
-          value={newTime}
-          onChange={e => setNewTime(e.target.value)}
-          className="text-xs h-9 w-24"
-        />
-        <button
-          onClick={addSupplement}
-          className="h-9 w-9 rounded-xl bg-primary/10 hover:bg-primary/15 text-primary flex items-center justify-center flex-shrink-0 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        <datalist id="saude-dependentes-remedio">
+          {dependentes.map(d => <option key={d} value={d} />)}
+        </datalist>
       </div>
     </div>
   );

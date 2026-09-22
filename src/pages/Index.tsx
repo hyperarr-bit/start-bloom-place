@@ -46,8 +46,9 @@ import { TrackedCard } from "@/components/admin/TrackedCard";
 import { computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
 import { syncFixedExpensesToBills } from "@/lib/finance-sync";
 import { usarListaDoPerfil, usarDueDaysDoPerfil, mesclarPerfil, mesclarPerfilDueDays, doPerfil, devolverAoPessoal, registrarPerfis, PERFIL_PESSOAL, PERFIL_TODOS, type Perfil } from "@/lib/finance-perfil";
-import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses } from "@/lib/finance-parcelas";
+import { type Parcela, viradaDeParcelas, mesesAnteriores, chaveArquivadaDeParcelas, somaParcelasDoMes, somarMeses, marcarParcelaDoMes, parcelaPagaNoMes, valorDaParcelaNoMes } from "@/lib/finance-parcelas";
 import { variaveisDoMes } from "@/lib/finance-fatura";
+import { CHAVE_FATURAS_PAGAS, chaveDaFatura, extrairFaturas, faturasDoMes, injetarFaturas } from "@/lib/finance-faturas";
 import { useFinanceCards } from "@/lib/finance-cards";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { mesCorrenteId } from "@/lib/virada-contas";
@@ -142,7 +143,7 @@ const Index = () => {
   const expensesAnteriorTodos = getUserData<any[]>(
     chaveArquivada(Number(mesAnterior.slice(0, 4)), Number(mesAnterior.slice(5, 7)) - 1, "expenses"), [],
   ) || [];
-  const { configOf } = useFinanceCards();
+  const { configOf, labelOf: labelDoCartao, cards: cartoes } = useFinanceCards();
 
   /* PERFIS PF/PJ (01/09, pedido por WhatsApp: "separar a questão da pf e pj...
      isso aqui é da empresa x isso aqui é da empresa y").
@@ -182,6 +183,43 @@ const Index = () => {
      O calendário, o "a vencer" e o "quanto posso gastar" veem só as contas
      do perfil ativo; a escrita volta mesclada (finance-perfil.ts). */
   const [dueDays, setDueDays] = usarDueDaysDoPerfil(dueDaysTodos, setDueDaysTodos, perfilValido);
+
+  /* FATURAS DO CARTÃO COMO CONTA DO MÊS (22/09, lib/finance-faturas). Uma
+     linha "Fatura Nubank · R$ X" por cartão com vencimento cadastrado, DERIVADA
+     dos gastos no crédito + parcelas + fixos do cartão e injetada nas contas
+     do mês só pra tela. O que se grava é o "paguei" (`finance-faturas-pagas`);
+     pagar a fatura marca as parcelas daquele cartão no mês como pagas — o
+     pedido literal do chamado de 14/09. Nada disso entra nas despesas (os
+     gastos que compõem a fatura já estão lá). */
+  const [faturasPagas, setFaturasPagas] = usePersistedState<Record<string, boolean>>(CHAVE_FATURAS_PAGAS, {});
+  const faturas = useMemo(() => faturasDoMes({
+    mes: mesAgora, variaveis: expenses, variaveisAnterior: expensesAnterior, fixos: fixedExpenses,
+    parcelas: installments as Parcela[], cards: cartoes.map((c) => c.value), configOf, labelOf: labelDoCartao, pagas: faturasPagas ?? {},
+  }), [mesAgora, expenses, expensesAnterior, fixedExpenses, installments, cartoes, configOf, labelDoCartao, faturasPagas]);
+  const dueDaysComFaturas = useMemo(() => injetarFaturas(dueDays as any[], faturas), [dueDays, faturas]);
+  const setDueDaysComFaturas = (lista: any[]) => {
+    const { dueDays: reais, faturas: marcadas } = extrairFaturas(lista, dueDays as any[]);
+    setDueDays(reais as any[]);
+    if (!marcadas.length) return;
+    const pagas = { ...(faturasPagas ?? {}) };
+    let parcelasNovas = installments as Parcela[];
+    let mudouParcela = false;
+    for (const m of marcadas) {
+      const chave = chaveDaFatura(mesAgora, m.card);
+      if (m.paga) {
+        pagas[chave] = true;
+        parcelasNovas = parcelasNovas.map((p) => {
+          if (p.cardName !== m.card || valorDaParcelaNoMes(p) <= 0 || parcelaPagaNoMes(p)) return p;
+          mudouParcela = true;
+          return marcarParcelaDoMes(p, true, mesAgora);
+        });
+      } else {
+        delete pagas[chave];
+      }
+    }
+    setFaturasPagas(pagas);
+    if (mudouParcela) setInstallments(parcelasNovas as any[]);
+  };
 
   /* A PORTA DA CÓPIA DO MÊS — ligada pela primeira vez em 02/09.
      O MonthTurnover declarou esta prop em 08/08 e ninguém nunca a passou
@@ -430,7 +468,7 @@ const Index = () => {
                 totalInvestments={totalInvestments}
                 expenses={expenses}
                 fixedExpenses={fixedExpenses}
-                dueDays={dueDays}
+                dueDays={dueDaysComFaturas as any[]}
                 savingsRate={savingsRate}
                 incomes={incomes}
                 onNavigate={(tab) => setActiveTab(tab)}
@@ -533,8 +571,8 @@ const Index = () => {
                     incomes={incomes}
                     expenses={expenses}
                     fixedExpenses={fixedExpenses}
-                    dueDays={dueDays}
-                    setDueDays={setDueDays}
+                    dueDays={dueDaysComFaturas as any[]}
+                    setDueDays={setDueDaysComFaturas}
                     installments={installments}
                     totalIncome={totalIncome}
                     monthlyOutflow={monthlyOutflow}
@@ -570,7 +608,12 @@ const Index = () => {
                     ("e a dívida que não é do cartão?"), e longe o bastante do
                     topo pra deixar claro que não conversa com os totais. */}
                 <TrackedCard cardKey="dividas-pessoas" tab="financeiro">
-                  <DividasEntrePessoas perfil={perfilValido} perfis={perfis} />
+                  <DividasEntrePessoas
+                    perfil={perfilValido}
+                    perfis={perfis}
+                    // juros de quem me deve viram receita do mês (22/09)
+                    onReceita={(r) => setIncomes([...incomes, { id: `juros-${Date.now()}`, description: r.descricao, value: r.valor, date: r.data }])}
+                  />
                 </TrackedCard>
                 <div className="grid lg:grid-cols-[1fr_200px] gap-4">
                   <TrackedCard cardKey="annual-budget" tab="financeiro">

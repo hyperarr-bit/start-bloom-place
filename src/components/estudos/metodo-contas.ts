@@ -16,7 +16,7 @@
 import { localDayKey } from "@/lib/utils";
 import type { Compromisso } from "@/lib/compromissos";
 import { misturarCursos, type Aprendizado, type AprendizadoComCurso, type AprendizadosPorCurso } from "./aprendizados";
-import { vencimento, type Revisoes } from "./revisao";
+import { responder, vencimento, type EstadoRevisao, type Resposta, type Revisoes } from "./revisao";
 
 export const CHAVE_SESSOES = "estudos-sessoes";
 export const CHAVE_INTRO_FECHADA = "estudos-metodo-intro-fechada";
@@ -125,4 +125,74 @@ export const resumoDaSemana = (sessoes: SessaoEstudo[], agora = new Date()) => {
     cartoes: semana.reduce((n, s) => n + (Number(s.recall?.feitos) || 0), 0),
     lembrados: semana.reduce((n, s) => n + (Number(s.recall?.acertos) || 0), 0),
   };
+};
+
+/* ───────────────────────── MÉTODO SOCRÁTICO (22/09) ─────────────────────────
+ * Pedido de cliente (já tinha aparecido em 11/09) e do dono: "também é
+ * sensacional se conseguir inserir". Sem IA: é a escada clássica de perguntas
+ * socráticas (clareza → suposições → evidência → outro ponto de vista →
+ * consequência → a pergunta que falta), uma de cada vez, que a pessoa responde
+ * sozinha sobre um tema. Cada resposta vira um cartão do curso (frente = a
+ * pergunta, verso = a resposta) — então o que ela descobriu entra na mesma
+ * repetição espaçada dos outros cartões. */
+export const PERGUNTAS_SOCRATICAS: { tipo: string; pergunta: (tema: string) => string; dica: string }[] = [
+  { tipo: "Clareza", pergunta: (t) => `O que é ${t}, numa frase sua?`, dica: "Sem copiar a definição do material." },
+  { tipo: "Suposições", pergunta: (t) => `O que você está assumindo como verdade sobre ${t}?`, dica: "O que precisa ser verdade pra isso funcionar?" },
+  { tipo: "Evidência", pergunta: (t) => `Como você sabe disso sobre ${t}? Dê um exemplo.`, dica: "Um caso real, um exercício, um dado." },
+  { tipo: "Outro ponto de vista", pergunta: (t) => `Como alguém que discorda explicaria ${t}?`, dica: "Qual a objeção mais forte?" },
+  { tipo: "Consequência", pergunta: (t) => `Se isso sobre ${t} é verdade, o que mais precisa ser verdade?`, dica: "Onde isso se aplica? O que muda?" },
+  { tipo: "A pergunta que falta", pergunta: (t) => `Que pergunta sobre ${t} você ainda não sabe responder?`, dica: "Essa é a próxima coisa a estudar." },
+];
+
+/** Respostas → cartões do curso. Resposta vazia não vira cartão. */
+export const cartoesSocraticos = (tema: string, respostas: string[], idBase: string, hoje = localDayKey()): Aprendizado[] => {
+  const t = tema.trim();
+  return PERGUNTAS_SOCRATICAS.flatMap((p, i) => {
+    const r = (respostas[i] ?? "").trim();
+    if (!r) return [];
+    const ultima = i === PERGUNTAS_SOCRATICAS.length - 1;
+    return [{
+      id: `${idBase}-${i}`,
+      data: hoje,
+      referencia: `Socrático · ${p.tipo}`,
+      pergunta: ultima ? `Dúvida em aberto sobre ${t}` : p.pergunta(t),
+      aprendi: r,
+      porque: ultima ? "Pergunta que você levantou — procure a resposta e revise." : undefined,
+    }];
+  });
+};
+
+/* ─────────────── referências aplicadas (22/09, dono: "vê referências") ───────────────
+ * Anki mostra, em cada botão de resposta, QUANDO o cartão volta — a pessoa
+ * entende a repetição espaçada sem ler explicação. RemNote/Duolingo abrem
+ * com UM próximo passo em vez de um menu. */
+const diasEntre = (de: string, ate: string) => {
+  const [a1, m1, d1] = de.split("-").map(Number);
+  const [a2, m2, d2] = ate.split("-").map(Number);
+  return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1)) / 86400e3);
+};
+
+export const rotuloIntervalo = (dias: number): string =>
+  dias <= 1 ? "amanhã"
+  : dias < 14 ? `${dias} dias`
+  : dias < 30 ? `${Math.round(dias / 7)} sem`
+  : dias < 60 ? "1 mês"
+  : `${Math.round(dias / 30)} meses`;
+
+/** "volta em …" de cada resposta, calculado pela mesma régua que grava. */
+export const intervalosDasRespostas = (atual: EstadoRevisao | undefined, hoje = localDayKey()): Record<Resposta, string> => ({
+  nao: rotuloIntervalo(diasEntre(hoje, responder(atual, "nao", hoje).proxima)),
+  quase: rotuloIntervalo(diasEntre(hoje, responder(atual, "quase", hoje).proxima)),
+  sim: rotuloIntervalo(diasEntre(hoje, responder(atual, "sim", hoje).proxima)),
+});
+
+export type ProximoPasso = { acao: "revisao" | "blocos" | "sessao" | "cursos"; texto: string; botao: string };
+
+/** O que fazer agora, em ordem de valor: revisar o que vence > ter horário > estudar. */
+export const proximoPasso = (o: { temCurso: boolean; venceHoje: number; blocos: number; sessoesHoje: number }): ProximoPasso => {
+  if (!o.temCurso) return { acao: "cursos", texto: "Cadastre o curso ou a matéria que você está estudando.", botao: "Cadastrar curso" };
+  if (o.venceHoje > 0) return { acao: "revisao", texto: `${o.venceHoje} ${o.venceHoje === 1 ? "cartão vence" : "cartões vencem"} hoje. Leva ~${Math.max(1, Math.ceil(o.venceHoje / 3))} min.`, botao: "Revisar agora" };
+  if (o.blocos === 0) return { acao: "blocos", texto: "Quem estuda com hora marcada estuda mais. Defina seus horários.", botao: "Marcar horário" };
+  if (o.sessoesHoje === 0) return { acao: "sessao", texto: "Revisões em dia. Bora estudar: sessão guiada de ~30 min.", botao: "Começar sessão" };
+  return { acao: "sessao", texto: "Sessão de hoje feita. Mais uma rodada?", botao: "Nova sessão" };
 };

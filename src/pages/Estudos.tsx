@@ -1164,6 +1164,7 @@ const Estudos = () => {
                 definir: (min) => { setPomodoroRunning(false); setPomodoroTime(min * 60); },
               }}
               onIrParaCursos={() => handleTabChange("estudos")}
+              onIrPara={handleTabChange}
             />
           )}
 

@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { trackEvent, captureInstallReferrer, capturarDispositivoApp } from "@/lib/analytics";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
@@ -615,12 +615,16 @@ const App = () => {
         <AuthProvider>
           <UserDataProvider>
           <TooltipProvider>
+          {/* 22/09: quem liga "reduzir movimento" no celular vê o app sem as animações
+              do framer-motion (entrada de página, listas) — acessibilidade e menos
+              trabalho de GPU em aparelho fraco. Sem a preferência, nada muda. */}
+          <MotionConfig reducedMotion="user">
           <AppShell>
             <Toaster />
             <Sonner />
             <div className="app-safe-shell">
               <OfflineBanner />
-              <BrowserRouter>
+              <BrowserRouter future={{ v7_startTransition: true }}>
                 <ScrollToTop />
                 <DeepLinks />
                 <GuardaDemoShell />
@@ -667,6 +671,7 @@ const App = () => {
             </div>
             <div className="app-safe-top-guard" aria-hidden="true" />
           </AppShell>
+          </MotionConfig>
           </TooltipProvider>
           </UserDataProvider>
         </AuthProvider>

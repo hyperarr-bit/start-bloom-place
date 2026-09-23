@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, Link, Navigate, useSearchParams } from "react-router-dom";
 import { PreviewUserDataProvider } from "@/hooks/use-preview-user-data";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
@@ -9,25 +9,46 @@ import { DEMO_MODULES } from "@/lib/funnel";
 
 // Fechamento ativo do tour (pico-fim): quem abre o 2º módulo já está engajado —
 // é a hora de puxar pro cadastro, antes de esfriar fuçando.
+/** Enquanto o chunk do módulo desce: mesma altura do cabeçalho + um pulso, sem texto que pisque. */
+const CarregandoModulo = () => (
+  <div className="min-h-[60vh] px-4 pt-6 space-y-3 animate-pulse" aria-busy="true" aria-label="Carregando">
+    <div className="h-8 w-40 rounded-lg bg-muted" />
+    <div className="h-10 rounded-xl bg-muted/70" />
+    <div className="h-40 rounded-2xl bg-muted/60" />
+    <div className="h-24 rounded-2xl bg-muted/50" />
+  </div>
+);
+
 const TOUR_VISITED_KEY = "core_tour_visited";
 const TOUR_NUDGE_DISMISSED_KEY = "core_tour_nudge_dismissed";
 
-import Index from "@/pages/Index";
-import Rotina from "@/pages/Rotina";
-import DesenvolvimentoPessoal from "@/pages/DesenvolvimentoPessoal";
-import Saude from "@/pages/Saude";
-import Casa from "@/pages/Casa";
-import Estudos from "@/pages/Estudos";
-import Biblioteca from "@/pages/Biblioteca";
-import Beleza from "@/pages/Beleza";
-import Viagens from "@/pages/Viagens";
-import Carreira from "@/pages/Carreira";
-import Treino from "@/pages/Treino";
-import Dieta from "@/pages/Dieta";
-import Hiperfoco from "@/pages/Hiperfoco";
-import Relacionamentos from "@/pages/Relacionamentos";
-import PetPage from "@/pages/Pet";
-import Detox from "@/pages/Detox";
+/* MÓDULOS SOB DEMANDA (22/09, varredura de velocidade): a demo importava os 16
+ * módulos de uma vez — abrir /preview/financas baixava ~1,4 MB de JS antes de
+ * pintar qualquer coisa, no passo da demo do funil pago. Agora cada módulo desce
+ * quando é aberto (o mesmo lazy das rotas do App), e um chunk vazio vira erro
+ * de chunk de verdade, que o RouteErrorBoundary sabe recarregar. */
+const lazyModulo = (carregar: () => Promise<{ default?: unknown }>) =>
+  lazy(async () => {
+    const mod = await carregar();
+    if (mod && typeof mod.default !== "undefined") return mod as { default: React.ComponentType };
+    throw new Error("Failed to fetch dynamically imported module (módulo resolveu vazio)");
+  });
+const Index = lazyModulo(() => import("@/pages/Index"));
+const Rotina = lazyModulo(() => import("@/pages/Rotina"));
+const DesenvolvimentoPessoal = lazyModulo(() => import("@/pages/DesenvolvimentoPessoal"));
+const Saude = lazyModulo(() => import("@/pages/Saude"));
+const Casa = lazyModulo(() => import("@/pages/Casa"));
+const Estudos = lazyModulo(() => import("@/pages/Estudos"));
+const Biblioteca = lazyModulo(() => import("@/pages/Biblioteca"));
+const Beleza = lazyModulo(() => import("@/pages/Beleza"));
+const Viagens = lazyModulo(() => import("@/pages/Viagens"));
+const Carreira = lazyModulo(() => import("@/pages/Carreira"));
+const Treino = lazyModulo(() => import("@/pages/Treino"));
+const Dieta = lazyModulo(() => import("@/pages/Dieta"));
+const Hiperfoco = lazyModulo(() => import("@/pages/Hiperfoco"));
+const Relacionamentos = lazyModulo(() => import("@/pages/Relacionamentos"));
+const PetPage = lazyModulo(() => import("@/pages/Pet"));
+const Detox = lazyModulo(() => import("@/pages/Detox"));
 
 const MODULE_COMPONENTS: Record<string, React.ComponentType> = {
   financas: Index,
@@ -391,7 +412,9 @@ const Preview = () => {
       {tour && funnel && isNativeShell() && <DicaDemoShell />}
       <PreviewUserDataProvider key={key} moduleKey={key}>
         <RouteErrorBoundary routeName={`preview-${key}`}>
-          <Component />
+          <Suspense fallback={<CarregandoModulo />}>
+            <Component />
+          </Suspense>
         </RouteErrorBoundary>
       </PreviewUserDataProvider>
       {tour && nudgeCount >= 2 && <DemoTourNudge count={nudgeCount} from={from} />}

@@ -1095,3 +1095,20 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
   body.com-trilho .fixed.inset-x-0,
   body.com-trilho .fixed.left-0.right-0 { left: 232px; }
 }
+
+/*
+ * ALVO DE TOQUE DOS BOTÕES SÓ-ÍCONE "NUS" (22/09, varredura de usabilidade).
+ *
+ * A sonda achou 479 botões com menos de 28 px no celular — quase todos a
+ * lixeira/lápis de 12–14 px das listas (o botão tem o tamanho exato do ícone,
+ * sem padding). Aqui o botão sem fundo e sem tamanho fixo ganha 8 px de área
+ * de toque de cada lado, e a margem negativa devolve o espaço: NADA muda de
+ * lugar nem de aparência, só passa a acertar no dedo. Botões com fundo (bg-),
+ * tamanho (w-/h-) ou posição absoluta ficam como estão. WebView antigo sem
+ * :has() ignora a regra inteira, sem quebrar.
+ */
+button:has(> svg:only-child):not([class*="bg-"]):not([class*="border"]):not([class*="absolute"]):not([class*="fixed"]):not([class^="p-"]):not([class*=" p-"]):not([class*=" px-"]):not([class*=" py-"]) {
+  padding: 8px;
+  margin: -8px;
+  box-sizing: content-box;
+}

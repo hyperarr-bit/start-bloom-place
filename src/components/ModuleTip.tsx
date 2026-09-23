@@ -23,7 +23,10 @@ export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => 
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ opacity: 0, y: -10, height: 0 }}
+          /* 22/09 (varredura): o card nascia com height 0 e crescia por 350 ms
+           * EMPURRANDO o módulo inteiro pra baixo a cada abertura (CLS 0,10–0,16
+           * em todos os módulos). Agora monta já no tamanho certo; só o fechar anima. */
+          initial={false}
           animate={{ opacity: 1, y: 0, height: "auto" }}
           exit={{ opacity: 0, y: -10, height: 0 }}
           className="mb-4 overflow-hidden"
@@ -31,7 +34,8 @@ export const ModuleTip = ({ moduleId, tips, icon = "💡" }: ModuleTipProps) => 
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 relative">
             <button
               onClick={dismiss}
-              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors"
+              aria-label="Fechar dicas"
+              className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-muted/80 flex items-center justify-center hover:bg-muted transition-colors"
             >
               <X className="w-3 h-3" />
             </button>

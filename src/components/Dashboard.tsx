@@ -1,7 +1,10 @@
 import { usePaletaGrafico } from "@/lib/paleta-grafico";
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { localDayKey } from "@/lib/utils";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, Legend } from "recharts";
+// Gráficos (recharts) num chunk próprio — ver components/finance/DashboardGraficos.tsx (22/09).
+const GraficoCategorias = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoCategorias })));
+const GraficoReceitasDespesas = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoReceitasDespesas })));
+const GraficoPatrimonio = lazy(() => import("@/components/finance/DashboardGraficos").then((m) => ({ default: m.GraficoPatrimonio })));
 import { AlertTriangle, Bell, CheckCircle, TrendingUp, TrendingDown, Calendar, DollarSign, Lightbulb, Clock, ArrowRight, Lock, ShoppingCart, CreditCard, Banknote, Smartphone, Receipt, Wallet } from "lucide-react";
 import { getMonthTotals, getCurrentYear } from "@/components/finance/storage-keys";
 import { computeDailyBudget, computeUnpaidBillsEstimate } from "@/lib/finance-totals";
@@ -498,16 +501,9 @@ export const Dashboard = ({
           <h3 className="text-xs font-bold mb-3">📊 GASTOS POR CATEGORIA</h3>
           {expensesByCategory.length > 0 ? (
             <div className="flex items-center gap-4">
-              <ResponsiveContainer width="50%" height={180}>
-                <PieChart>
-                  <Pie data={expensesByCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2}>
-                    {expensesByCategory.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
-                </PieChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<div style={{ width: "50%", height: 180 }} className="shrink-0" />}>
+                <GraficoCategorias dados={expensesByCategory} cores={COLORS} />
+              </Suspense>
               <div className="flex-1 space-y-1">
                 {expensesByCategory.slice(0, 5).map((cat, i) => (
                   <div key={cat.name} className="flex items-center gap-2 text-xs">
@@ -527,16 +523,9 @@ export const Dashboard = ({
         <div className="bg-card rounded-lg border border-border p-4">
           <h3 className="text-xs font-bold mb-3">📈 RECEITAS VS DESPESAS</h3>
           {monthlyBarData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={monthlyBarData}>
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
-                <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="Receitas" fill={COR_RECEITA} radius={[4, 4, 0, 0]} />
-                <Bar dataKey="Despesas" fill={COR_DESPESA} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div style={{ height: 180 }} />}>
+              <GraficoReceitasDespesas dados={monthlyBarData} corReceita={COR_RECEITA} corDespesa={COR_DESPESA} />
+            </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-8">Preencha o orçamento anual para ver o gráfico</p>
           )}
@@ -547,20 +536,9 @@ export const Dashboard = ({
       <div className="bg-card rounded-lg border border-border p-4">
         <h3 className="text-xs font-bold mb-3">💰 EVOLUÇÃO DO PATRIMÔNIO</h3>
         {patrimonyData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={150}>
-            <AreaChart data={patrimonyData}>
-              <defs>
-                <linearGradient id="colorPatrimony" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS[0]} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={COLORS[0]} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-              <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip formatter={(value: number) => `R$ ${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`} />
-              <Area type="monotone" dataKey="Patrimônio" stroke={COLORS[0]} fill="url(#colorPatrimony)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<div style={{ height: 150 }} />}>
+            <GraficoPatrimonio dados={patrimonyData} cor={COLORS[0]} />
+          </Suspense>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">Dados insuficientes</p>
         )}

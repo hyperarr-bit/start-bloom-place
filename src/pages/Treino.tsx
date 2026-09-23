@@ -1,5 +1,5 @@
 import { usePaletaGrafico } from "@/lib/paleta-grafico";
-import { useState, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
 import { useScrollActiveTabIntoView } from "@/hooks/use-scroll-active-tab";
@@ -24,7 +24,9 @@ import { ModuleTip } from "@/components/ModuleTip";
 import { SerieHistorico } from "@/components/historico/SerieHistorico";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SpotlightOverlay } from "@/components/onboarding/SpotlightOverlay";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+// Gráficos (recharts) num chunk próprio — só descem na aba de progressão (22/09).
+const GraficoProgressao = lazy(() => import("@/components/treino/TreinoGraficos").then((m) => ({ default: m.GraficoProgressao })));
+const GraficoVolume = lazy(() => import("@/components/treino/TreinoGraficos").then((m) => ({ default: m.GraficoVolume })));
 import { motion, AnimatePresence } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 
@@ -1177,15 +1179,9 @@ const Treino = () => {
                 </SelectContent>
               </Select>
               {progressionData.length > 1 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={progressionData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(var(--border))" }} />
-                    <Line type="monotone" dataKey="carga" stroke={paleta.azul} strokeWidth={2} dot={{ r: 3 }} name="Carga (kg)" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div style={{ height: 200 }} />}>
+                  <GraficoProgressao dados={progressionData} cor={paleta.azul} />
+                </Suspense>
               ) : (
                 <p className="text-xs text-muted-foreground text-center py-8">
                   {selectedExercise ? "Precisa de pelo menos 2 registros para gerar o gráfico" : "Selecione um exercício acima"}
@@ -1196,15 +1192,9 @@ const Treino = () => {
             {selectedExercise && progressionData.length > 1 && (
               <div className="bg-card rounded-xl border border-border p-4">
                 <h3 className="text-xs font-bold mb-3 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-purple-500" /> VOLUME TOTAL ({selectedExercise})</h3>
-                <ResponsiveContainer width="100%" height={160}>
-                  <LineChart data={progressionData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-                    <Line type="monotone" dataKey="volume" stroke={paleta.roxo} strokeWidth={2} dot={{ r: 3 }} name="Volume (kg)" />
-                  </LineChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<div style={{ height: 160 }} />}>
+                  <GraficoVolume dados={progressionData} cor={paleta.roxo} />
+                </Suspense>
               </div>
             )}
 

@@ -1,5 +1,7 @@
 import { useUserData } from "@/hooks/use-user-data";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
+import { lazy, Suspense } from "react";
+// Gráfico (recharts) num chunk próprio (22/09) — ver DetoxGrafico.tsx.
+const GraficoSemanas = lazy(() => import("@/components/detox/DetoxGrafico").then((m) => ({ default: m.GraficoSemanas })));
 import { differenceInDays, format, subDays } from "date-fns";
 import { TrendingUp, Calendar, Target, Flame } from "lucide-react";
 
@@ -112,17 +114,9 @@ export const DetoxStats = () => {
 
             <p className="text-[10px] text-muted-foreground mb-1">Últimas 4 semanas</p>
             <div className="h-20">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weekData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <YAxis hide domain={[0, 7]} />
-                  <Bar dataKey="pure" radius={[4, 4, 0, 0]}>
-                    {weekData.map((_, i) => (
-                      <Cell key={i} fill="hsl(var(--primary))" opacity={0.7} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<div className="h-full" />}>
+                <GraficoSemanas dados={weekData} />
+              </Suspense>
             </div>
           </div>
         );

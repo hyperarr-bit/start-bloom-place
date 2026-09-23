@@ -18,6 +18,7 @@ import { GracePeriodBanner } from "@/components/GracePeriodBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { TrackedModule } from "@/components/TrackedModule";
 import { GlobalWinback } from "@/components/retention/GlobalWinback";
+import { ConviteDeValor } from "@/components/avaliacao/ConviteDeValor";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import ScrollToTop from "@/components/ScrollToTop";
 import { captureLeadSource } from "@/lib/lead-source";
@@ -666,6 +667,8 @@ const App = () => {
                     produto cru (pedido do dono 27/07, inspirado no BitePal). */}
                 <PortaoBoasVindas />
                 <GlobalWinback />
+                {/* 23/09: convite de avaliação só pra quem paga e voltou — iPhone. Ver ConviteDeValor. */}
+                <ConviteDeValor />
                 {/* QuickSignupModal APOSENTADO 16/07: era o gate do modo visitante (teste grátis) — prendia cliente com sessão expirada numa tela sem saída ("Entrar" navegava por baixo do overlay). Visitante agora nem entra no app: ProtectedRoute sem allowGuest redireciona pro /auth. */}
               </BrowserRouter>
             </div>

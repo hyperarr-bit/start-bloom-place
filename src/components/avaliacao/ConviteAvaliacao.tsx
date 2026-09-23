@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { Check, Star } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
-import { pedirAvaliacaoSePuder } from "@/lib/avaliacao";
+import { noIPhone, pedirAvaliacaoSePuder } from "@/lib/avaliacao";
 import { trackEvent } from "@/lib/analytics";
 
 /**
@@ -43,9 +43,21 @@ export interface PlanoDoConvite {
   nome: string;
 }
 
+/** Momento de valor de quem paga e voltou (iPhone, 23/09). */
+export interface MomentoDoConvite {
+  /** O que acabou de acontecer ("Treino registrado"). */
+  rotulo: string;
+  /** Dias diferentes em que a pessoa usou o app. */
+  dias: number;
+}
+
 interface ConviteAvaliacaoProps {
   /** O gasto recém-lançado; `null` quando o convite não é esse. */
   gasto?: GastoDoConvite | null;
+  /** Ação de valor recém-concluída; `null` quando o convite não é esse. */
+  momento?: MomentoDoConvite | null;
+  /** Chamado quando a pessoa recusa (Agora não / arrastou pra baixo). */
+  onRecusou?: () => void;
   /** O plano recém-montado; `null` quando o convite não é esse. */
   plano?: PlanoDoConvite | null;
   pagante: boolean;
@@ -54,10 +66,12 @@ interface ConviteAvaliacaoProps {
 
 const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar }: ConviteAvaliacaoProps) => {
+export const ConviteAvaliacao = ({ gasto = null, plano = null, momento = null, onRecusou, pagante, onFechar }: ConviteAvaliacaoProps) => {
   const semMovimento = useReducedMotion();
-  const motivo: "primeiro_gasto" | "plano_pronto" = gasto ? "primeiro_gasto" : "plano_pronto";
-  const aberto = !!gasto || !!plano;
+  const motivo: "primeiro_gasto" | "plano_pronto" | "momento_valor" = gasto ? "primeiro_gasto" : momento ? "momento_valor" : "plano_pronto";
+  const aberto = !!gasto || !!plano || !!momento;
+  // 23/09: a folha dizia "Play" também no iPhone.
+  const loja = noIPhone() ? "App Store" : "Play";
   // Distingue "fechou porque aceitou" de "fechou porque deslizou/recusou" —
   // o Drawer avisa `open=false` nos dois casos.
   const decidiu = useRef(false);
@@ -81,6 +95,7 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
     if (decidiu.current) return;
     decidiu.current = true;
     trackEvent("app_avaliacao_convite", { motivo, acao: "recusou", pagante });
+    onRecusou?.();
     onFechar();
   };
 
@@ -99,7 +114,7 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
         <div className="px-6 pt-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] space-y-5">
           {/* O gasto que acabou de entrar — a prova de que funcionou, antes de
               qualquer pedido. */}
-          {(gasto || plano) && (
+          {(gasto || plano || momento) && (
             <motion.div
               {...entra(0)}
               className="flex items-center gap-3 rounded-2xl bg-white/10 ring-1 ring-white/10 px-4 py-3"
@@ -120,6 +135,11 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
                   </span>
                   <span className="text-[15px] font-bold tabular-nums shrink-0">{brl(gasto.valor)}</span>
                 </>
+              ) : momento ? (
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-semibold leading-tight truncate">{momento.rotulo}</span>
+                  <span className="block text-[12px] text-white/55 mt-0.5 truncate">agora mesmo</span>
+                </span>
               ) : (
                 <>
                   <span className="flex-1 min-w-0">
@@ -136,22 +156,24 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
 
           <motion.div {...entra(0.1)} className="space-y-2">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-white/50">
-              {gasto ? "PRIMEIRO GASTO LANÇADO" : "SEU PLANO ESTÁ PRONTO"}
+              {gasto ? "PRIMEIRO GASTO LANÇADO" : momento ? `${momento.dias} DIAS USANDO O CORE` : "SEU PLANO ESTÁ PRONTO"}
             </p>
             <DrawerTitle className="text-[24px] font-bold leading-[1.15] tracking-tight text-white [text-wrap:balance]">
-              {gasto ? "Agora o CORE cuida do resto." : "Montado do jeito que você respondeu."}
+              {gasto ? "Agora o CORE cuida do resto." : momento ? "Você está fazendo o CORE funcionar." : "Montado do jeito que você respondeu."}
             </DrawerTitle>
             <DrawerDescription className="text-[14px] leading-relaxed text-white/70">
               {gasto
                 ? "Cada gasto que você lançar vira gráfico, orçamento e retrospectiva no fim do mês. Sem planilha, sem conta de cabeça."
-                : "Suas respostas viraram um plano com os 16 módulos do CORE — e ele começa pela área que você escolheu."}
+                : momento
+                  ? "Cada coisa que você registra aqui vira organização de verdade no seu dia — é pra isso que o CORE existe."
+                  : "Suas respostas viraram um plano com os 16 módulos do CORE — e ele começa pela área que você escolheu."}
             </DrawerDescription>
           </motion.div>
 
           <motion.div {...entra(0.2)} className="border-t border-white/10 pt-4 space-y-1.5">
             <p className="text-[14px] leading-relaxed text-white/85">
-              O CORE é feito por uma equipe pequena, sem investidor. É a sua nota na Play
-              que faz o app chegar em mais gente.
+              O CORE é feito por uma equipe pequena, sem investidor. É a sua nota na {loja} que
+              faz o app chegar em mais gente.
             </p>
             <p className="text-[12px] text-white/50">Leva 10 segundos e não precisa escrever nada.</p>
           </motion.div>
@@ -163,7 +185,7 @@ export const ConviteAvaliacao = ({ gasto = null, plano = null, pagante, onFechar
               className="w-full h-12 rounded-full bg-white text-[#1c1917] font-semibold text-[15px] flex items-center justify-center gap-2 active:scale-[0.98] transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <Star className="w-4 h-4 fill-[#D22D80] text-[#D22D80]" />
-              Deixar minha nota na Play
+              Deixar minha nota na {loja}
             </button>
             <button
               type="button"

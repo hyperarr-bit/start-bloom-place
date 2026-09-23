@@ -64,7 +64,10 @@ export type MotivoAvaliacao =
   // agora quem chama a caixa do Google é a PESSOA, tocando na folha de
   // convite. Quem recusa não gasta a janela de 90 dias, que era a única
   // objeção legítima do commit que matou o gatilho.
-  | "plano_pronto";
+  | "plano_pronto"
+  // iPhone (23/09): convite depois de uma ação de valor de quem PAGA e VOLTOU
+  // (2+ dias de uso). Ver `reservarConviteDeValor`.
+  | "momento_valor";
 
 const lerNumero = (chave: string): number => {
   try {
@@ -73,6 +76,111 @@ const lerNumero = (chave: string): number => {
     return 0;
   }
 };
+
+/** iPhone? Lê o global do Capacitor direto (mesmo motivo do native-shell: nada
+ *  de import novo no caminho da web, e os testes antigos mockam o native-shell). */
+export const noIPhone = (): boolean => {
+  try {
+    const c = (window as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+    return c?.getPlatform?.() === "ios";
+  } catch {
+    return false;
+  }
+};
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * iPHONE: NOTA SÓ DE QUEM PAGA E VOLTOU (23/09, ordem do dono).
+ *
+ * Medido 17–23/09: 1.659 pedidos de avaliação no iPhone, 1.608 (97%) no
+ * "plano pronto" do funil — ninguém ali tinha pago nem usado o app, e 1.560
+ * nunca pagaram. O cliente que usa foi pedido 51 vezes. As notas baixas
+ * vinham de quem instalou pelo anúncio, fez o quiz, foi pedido pra avaliar e
+ * caiu no paywall.
+ *
+ * Regra nova, SÓ no iPhone (o Android segue como estava):
+ *   - nada de pedido no funil nem da caixinha automática da Apple;
+ *   - o único caminho é a NOSSA folha (ConviteAvaliacao, motivo
+ *     "momento_valor"), e o toque em "Deixar minha nota" abre a tela de
+ *     avaliar da App Store (sempre abre; a caixinha só quando a Apple quer);
+ *   - só aparece pra quem PAGA (fora do trial), usou o app em 2+ dias
+ *     diferentes, e ACABOU de concluir uma ação de valor (lançar gasto,
+ *     treino, hábito, conta, água…);
+ *   - uma semana entre convites, 90 dias depois de um pedido real, e depois
+ *     de 2 "Agora não" nunca mais.
+ * ───────────────────────────────────────────────────────────────────────── */
+const CHAVE_DIAS_DE_USO = "core-dias-de-uso";
+const CHAVE_RECUSAS_VALOR = "core-avaliacao-valor-recusas";
+const MAX_RECUSAS_VALOR = 2;
+export const DIAS_MINIMOS_PRA_CONVIDAR = 2;
+
+/** Ações que contam como "acabei de conseguir algo" → rótulo da folha. */
+export const ACOES_DE_VALOR: Record<string, string> = {
+  first_transaction: "Gasto lançado",
+  first_bill: "Conta registrada",
+  first_income: "Receita lançada",
+  first_fixed_expense: "Gasto fixo salvo",
+  first_workout: "Treino registrado",
+  first_habit: "Hábito marcado",
+  first_water_log: "Água registrada",
+  first_meal: "Refeição registrada",
+  first_task: "Tarefa salva",
+  first_schedule: "Rotina atualizada",
+  first_goal: "Meta salva",
+  first_investment: "Investimento salvo",
+};
+
+const hojeLocal = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const lerDias = (): string[] => {
+  try {
+    const v = JSON.parse(localStorage.getItem(CHAVE_DIAS_DE_USO) ?? "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Marca hoje como dia de uso (distintos, últimos 60). Devolve quantos dias. */
+export function registrarDiaDeUso(agora = new Date()): number {
+  const hoje = hojeLocal(agora);
+  const dias = lerDias();
+  if (!dias.includes(hoje)) {
+    dias.push(hoje);
+    try { localStorage.setItem(CHAVE_DIAS_DE_USO, JSON.stringify(dias.slice(-60))); } catch { /* modo privado */ }
+  }
+  return Math.min(dias.length, 60);
+}
+
+export const diasDeUso = (): number => lerDias().length;
+
+/** A regra pura — sem efeito colateral, testável. */
+export function deveConvidarNoMomentoDeValor(o: {
+  iphone: boolean; acao: string | null | undefined; pagante: boolean; emTrial: boolean; dias: number;
+  podePedir: boolean; conviteRecente: boolean; recusas: number;
+}): boolean {
+  if (!o.iphone) return false;
+  if (!o.acao || !(o.acao in ACOES_DE_VALOR)) return false;
+  if (!o.pagante || o.emTrial) return false;
+  if (o.dias < DIAS_MINIMOS_PRA_CONVIDAR) return false;
+  if (!o.podePedir || o.conviteRecente) return false;
+  return o.recusas < MAX_RECUSAS_VALOR;
+}
+
+/** Reserva o convite de momento de valor (marca a semana ANTES de a folha abrir). */
+export function reservarConviteDeValor(acao: string | null | undefined, { pagante, emTrial }: { pagante: boolean; emTrial: boolean }): boolean {
+  const ok = deveConvidarNoMomentoDeValor({
+    iphone: noIPhone(), acao, pagante, emTrial, dias: diasDeUso(),
+    podePedir: podePedirAvaliacao(), conviteRecente: conviteRecente(), recusas: lerNumero(CHAVE_RECUSAS_VALOR),
+  });
+  if (ok) marcarConvite("core-avaliacao-convite-valor");
+  return ok;
+}
+
+/** "Agora não" no convite de valor — depois de 2, não convida mais. */
+export function registrarRecusaDeValor(): void {
+  try { localStorage.setItem(CHAVE_RECUSAS_VALOR, String(lerNumero(CHAVE_RECUSAS_VALOR) + 1)); } catch { /* noop */ }
+}
 
 /**
  * As travas que valem pra QUALQUER pedido — sem efeito colateral nenhum.
@@ -130,6 +238,7 @@ const marcarConvite = (chave: string) => {
  * inteiro pros momentos de valor de quem vira usuário de verdade.
  */
 export function reservarConviteDoFunil(): boolean {
+  if (noIPhone()) return false; // 23/09: no iPhone, nada de pedido no funil
   if (!podePedirAvaliacao()) return false;
   if (lerNumero(CHAVE_CONVITE_FUNIL)) return false;
   if (conviteRecente()) return false;
@@ -177,6 +286,9 @@ export function jaLancouGastoAntes(userId: string | null | undefined, exceto?: s
  */
 export function reservarConvitePrimeiroGasto(userId: string | null | undefined, gastoId?: string): boolean {
   if (!userId) return false;
+  // iPhone (23/09): o 1º gasto é no dia da compra, muitas vezes no trial —
+  // lá o convite é só o de momento de valor (paga + 2 dias de uso).
+  if (noIPhone()) return false;
   if (!podePedirAvaliacao()) return false;
   if (lerNumero(CHAVE_PRIMEIRO_GASTO)) return false;
   if (conviteRecente()) return false;
@@ -205,6 +317,10 @@ export async function pedirAvaliacaoSePuder(
   { pagante = false, vezes = 1, forte = false, tocouParaAvaliar = false }: { pagante?: boolean; vezes?: number; forte?: boolean; tocouParaAvaliar?: boolean } = {},
 ): Promise<boolean> {
   if (!pagante && !forte && vezes < 2) return false;
+  /* iPHONE (23/09): nada de caixinha automática (plano pronto, conta paga,
+   * sequência, retrospectiva…). O único caminho é a pessoa tocar em "Deixar
+   * minha nota" na folha de momento de valor — ver reservarConviteDeValor. */
+  if (noIPhone() && !tocouParaAvaliar) return false;
   /* iPHONE, TOQUE EXPLÍCITO (18/09): a caixinha da Apple (SKStoreReviewController)
    * é uma SUGESTÃO — a Apple decide se mostra, no máximo 3× por ano, e não
    * avisa quando não mostra. 454 pedidos em 7 dias no iPhone renderam poucas
@@ -269,6 +385,7 @@ const CHAVE_PLANO_PRONTO = "core-avaliacao-plano-pronto";
  * Devolve `true` só quando a caixa foi realmente pedida.
  */
 export async function pedirAvaliacaoPlanoPronto(): Promise<boolean> {
+  if (noIPhone()) return false; // 23/09: 97% das notas do iPhone vinham daqui, de quem nunca usou
   if (!podePedirAvaliacao()) return false;
   if (lerNumero(CHAVE_PLANO_PRONTO)) return false;
   try { localStorage.setItem(CHAVE_PLANO_PRONTO, "1"); } catch { /* modo privado */ }

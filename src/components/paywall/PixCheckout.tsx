@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { trackEvent, getAttributionParams } from "@/lib/analytics";
 import { markPixPurchasePending, firePixPurchaseOnce } from "@/lib/purchase-tracking";
 import { isNativeShell } from "@/lib/native-shell";
+import { isInAppBrowser } from "@/lib/funnel";
 import { garantirSessao, anonimoLigado, emailDaSessao, definirEmailDaCompra, entrarNaContaExistente, marcarBatismoSeSemEmail, guardarCompraAnonima, limparBatismo } from "@/lib/sessao-anonima";
 import { EntrarComCodigo } from "@/components/auth/EntrarComCodigo";
 import { useAuth } from "@/hooks/use-auth";
@@ -1058,15 +1059,33 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
                       {pix.qrCode}
                     </p>
                   </div>
+                  {/* 22/09 (dono): dos que copiam e não pagam, 100% estão no navegador do
+                      Instagram — vão pro banco e o Instagram mata a tela. Não recupera a
+                      sessão, recupera a pessoa: diz onde entrar. Só no navegador embutido. */}
+                  {isInAppBrowser() && (
+                    <p className="text-left text-[12px] text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mb-4" data-testid="pix-volta-instagram">
+                      Pagou e o Instagram fechou esta tela? Entra em <strong className="text-foreground">coreaplicativo.com.br</strong> com seu e-mail — o acesso já vai estar lá.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
                   {/* HIERARQUIA INVERTIDA — o botão é o dinheiro (75% de
                       conversão em quem copia); o QR serve ~5% e vira opção. */}
                   <h2 className="text-[22px] font-bold tracking-tight mb-1">Pague R$ {fmtBRL(pix.amount)} no Pix</h2>
-                  <p className="text-[13px] text-muted-foreground mb-4">
+                  <p className="text-[13px] text-muted-foreground mb-2.5">
                     Copia o código, cola no app do banco e o acesso libera <strong className="text-foreground">sozinho nesta tela</strong>.
                   </p>
+                  {/* 22/09 (dono): garantia e prova SUBIRAM pra cá. Ficavam só no rodapé,
+                      depois do timer — e 24% de quem não copia fecha em ~6 s, sem nunca
+                      rolar até lá. Mesmos três pontos do paywall, na hora do preço. */}
+                  <div className="flex items-center justify-center gap-1.5 whitespace-nowrap mb-4 text-[11px] font-semibold text-muted-foreground" data-testid="pix-confianca">
+                    <span className="inline-flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-accent" /> Garantia 7 dias</span>
+                    <span aria-hidden>·</span>
+                    <span>★ +1000 pessoas</span>
+                    <span aria-hidden>·</span>
+                    <span className="inline-flex items-center gap-1"><Zap className="w-3 h-3 text-accent" /> acesso na hora</span>
+                  </div>
                 </>
               )}
 

@@ -15,6 +15,7 @@ const m = vi.hoisted(() => ({
   entrarSenha: vi.fn(),
   definirEmail: vi.fn(),
   track: vi.fn(),
+  inapp: { on: true },
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -36,6 +37,7 @@ vi.mock("@/lib/sessao-anonima", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: m.track, getAttributionParams: () => ({}) }));
 vi.mock("@/lib/native-shell", () => ({ isNativeShell: () => false }));
+vi.mock("@/lib/funnel", async (orig) => ({ ...(await orig()), isInAppBrowser: () => m.inapp.on }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ markPixPurchasePending: vi.fn(), firePixPurchaseOnce: vi.fn() }));
 
@@ -95,5 +97,33 @@ describe("Pix: e-mail que já tem conta", () => {
     fireEvent.change(screen.getByPlaceholderText("seu@email.com"), { target: { value: "outro@gmail.com" } });
     expect(screen.queryByTestId("pix-ja-tem-conta-qr")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Salvar e-mail/i })).toBeInTheDocument();
+  }, 20000);
+
+  it("tela do QR: garantia e prova logo abaixo do título; depois de copiar, no Instagram, diz onde entrar (22/09)", async () => {
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    render(<PixCheckout offer="w27" context="funnel" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Copiar código Pix/i })).toBeInTheDocument(), { timeout: 6000 });
+    const confianca = screen.getByTestId("pix-confianca");
+    expect(confianca).toHaveTextContent("Garantia 7 dias");
+    expect(confianca).toHaveTextContent("+1000 pessoas");
+    expect(confianca).toHaveTextContent("acesso na hora");
+    // a linha vem ANTES do botão de copiar (é pra quem some em 6 s)
+    const botao = screen.getByRole("button", { name: /Copiar código Pix/i });
+    expect(confianca.compareDocumentPosition(botao) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByTestId("pix-volta-instagram")).not.toBeInTheDocument();
+    await act(async () => { fireEvent.click(botao); });
+    expect(screen.getByText(/Código copiado!/)).toBeInTheDocument();
+    expect(screen.getByTestId("pix-volta-instagram")).toHaveTextContent("Instagram fechou esta tela");
+  }, 20000);
+
+  it("fora do Instagram a frase de volta não aparece", async () => {
+    m.inapp.on = false;
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } });
+    render(<PixCheckout offer="w27" context="funnel" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Copiar código Pix/i })).toBeInTheDocument(), { timeout: 6000 });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: /Copiar código Pix/i })); });
+    expect(screen.getByText(/Código copiado!/)).toBeInTheDocument();
+    expect(screen.queryByTestId("pix-volta-instagram")).not.toBeInTheDocument();
+    m.inapp.on = true;
   }, 20000);
 });

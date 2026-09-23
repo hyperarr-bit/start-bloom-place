@@ -295,6 +295,35 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
    * ficaram sem e-mail e não conseguem entrar pelo app. Ao copiar, o campo
    * ganha destaque, rola pra tela e recebe o foco. Não barra nada. */
   const emailQrRef = useRef<HTMLInputElement>(null);
+
+  /* SAÍDA DA TELA DO QR (22/09, telemetria só). Nos dias 21–22, 34% de quem viu
+   * o QR não copiou e 71% deles não deixaram evento nenhum depois — não dá pra
+   * saber se fecharam na hora ou ficaram olhando. Um evento por QR, na PRIMEIRA
+   * saída: "escondeu" (trocou de app/aba — no copiador é o caminho do banco),
+   * "pagehide" (fechou/navegou) ou "desmontou" (fechou no X, voltou ao paywall).
+   * Leva segundos na tela e se copiou. Nada de UI muda. */
+  const copiadoJaRef = useRef(false);
+  useEffect(() => { copiadoJaRef.current = copiadoJa; }, [copiadoJa]);
+  useEffect(() => {
+    if (step !== "qr" || !pix) return;
+    const t0 = Date.now();
+    let mandou = false;
+    const sair = (motivo: string) => {
+      if (mandou) return;
+      mandou = true;
+      trackEvent("pix_qr_saida", { offer, context, motivo, segundos: Math.round((Date.now() - t0) / 1000), copiou: copiadoJaRef.current });
+    };
+    const aoEsconder = () => { if (document.visibilityState === "hidden") sair("escondeu"); };
+    const aoSumir = () => sair("pagehide");
+    document.addEventListener("visibilitychange", aoEsconder);
+    window.addEventListener("pagehide", aoSumir);
+    return () => {
+      document.removeEventListener("visibilitychange", aoEsconder);
+      window.removeEventListener("pagehide", aoSumir);
+      sair("desmontou");
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, pix?.orderId]);
   const [emailEmDestaque, setEmailEmDestaque] = useState(false);
   const price = PIX_PRICES[offer];
 

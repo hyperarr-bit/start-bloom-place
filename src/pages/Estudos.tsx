@@ -106,7 +106,6 @@ const TABS = [
   { v: "grade", l: "Grade", icon: "🎓" },
   { v: "tarefas", l: "Tarefas", icon: "✅" },
   { v: "caderno", l: "Caderno", icon: "📓" },
-  { v: "pomodoro", l: "Pomodoro", icon: "🍅" },
 ];
 
 const Estudos = () => {
@@ -1164,44 +1163,11 @@ const Estudos = () => {
                 definir: (min) => { setPomodoroRunning(false); setPomodoroTime(min * 60); },
               }}
               onIrParaCursos={() => handleTabChange("estudos")}
-              onIrPara={handleTabChange}
             />
           )}
 
-          {activeTab === "pomodoro" && <div className="space-y-4">
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="bg-red-300 dark:bg-red-700/60 px-4 py-2.5 text-center">
-                <span className="text-sm font-black uppercase tracking-wider">🍅 POMODORO DE ESTUDOS</span>
-              </div>
-              <div className="bg-red-50 dark:bg-red-950/20 p-6 text-center">
-                <div className="w-40 h-40 mx-auto rounded-full border-8 border-red-200 dark:border-red-500/30 flex items-center justify-center mb-4">
-                  <div className="text-center">
-                    <p className="text-3xl font-black font-mono">
-                      {Math.floor(pomodoroTime / 60).toString().padStart(2, "0")}:{(pomodoroTime % 60).toString().padStart(2, "0")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">minutos</p>
-                  </div>
-                </div>
-                <div className="flex justify-center gap-2 mb-4">
-                  {!pomodoroRunning ? (
-                    <Button onClick={() => setPomodoroRunning(true)} className="bg-red-500 hover:bg-red-600 text-white">▶ Iniciar</Button>
-                  ) : (
-                    <Button variant="outline" onClick={() => setPomodoroRunning(false)}>⏸ Pausar</Button>
-                  )}
-                  <Button variant="ghost" onClick={() => { setPomodoroRunning(false); setPomodoroTime(25 * 60); }}>🔄 Resetar</Button>
-                </div>
-                <div className="flex justify-center gap-2 mb-4">
-                  {[15, 25, 45, 60].map(m => (
-                    <button key={m} onClick={() => { setPomodoroRunning(false); setPomodoroTime(m * 60); }}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold border transition-colors ${pomodoroTime === m * 60 && !pomodoroRunning ? "bg-red-500 text-white border-red-500" : "border-border"}`}>
-                      {m}min
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">🍅 Pomodoros concluídos: <span className="font-bold">{pomodoroCount}</span></p>
-              </div>
-            </div>
-          </div>}
+          {/* 22/09 (dono): a aba Pomodoro saiu — o timer mora no Método (técnica 2), com os
+              mesmos 15/25/45/60 min. O estado do cronômetro continua aqui (relógio de parede). */}
       </main>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Brain, CalendarClock, Check, ExternalLink, MessageCircleQuestion, MessageSquareText, Play, Plus, Repeat, RotateCcw, Timer, Trash2, X } from "lucide-react";
+import { Brain, CalendarClock, Check, MessageCircleQuestion, MessageSquareText, Play, Plus, Repeat, RotateCcw, Timer, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,8 +60,6 @@ interface Props {
   onRegistrar: (cursoId: string, a: Aprendizado) => void;
   pomodoro: { tempo: number; rodando: boolean; concluidos: number; iniciar: () => void; pausar: () => void; definir: (min: number) => void };
   onIrParaCursos?: () => void;
-  /** Leva pra outra aba do módulo (ex.: "pomodoro", "caderno"). */
-  onIrPara?: (aba: string) => void;
 }
 
 /* ─────────────────────────── peças reaproveitadas ─────────────────────────── */
@@ -135,8 +133,8 @@ function QuizRecall({ fila, revisoes, onResponder, vazio, fim }: {
 }
 
 /** Anel do Pomodoro que esvazia com o tempo (como o Forest). */
-function AnelPomodoro({ tempo, rodando, tamanho }: { tempo: number; rodando: boolean; tamanho: number }) {
-  const total = tempo > 5 * 60 ? Math.max(25 * 60, tempo) : 5 * 60;
+function AnelPomodoro({ tempo, duracao, rodando, tamanho }: { tempo: number; duracao: number; rodando: boolean; tamanho: number }) {
+  const total = Math.max(duracao, tempo, 1);
   const r = 44, c = 2 * Math.PI * r;
   const fracao = Math.min(1, Math.max(0, tempo / total));
   const mm = `${Math.floor(tempo / 60).toString().padStart(2, "0")}:${(tempo % 60).toString().padStart(2, "0")}`;
@@ -188,7 +186,7 @@ function FormFeynman({ onSalvar, rotuloSalvar, testid }: {
 
 /* ──────────────────────────────── a aba ──────────────────────────────── */
 
-export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomodoro, onIrParaCursos, onIrPara }: Props) => {
+export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomodoro, onIrParaCursos }: Props) => {
   const { get } = useUserData();
   const [compromissos, setCompromissos] = usePersistedState<Compromisso[]>(CHAVE_COMPROMISSOS, []);
   const [sessoesBrutas, setSessoes] = usePersistedState<SessaoEstudo[]>(CHAVE_SESSOES, []);
@@ -289,6 +287,12 @@ export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomod
     trackEvent("estudos_sessao_inicio", { curso: curso.id });
   };
   const pomodorosDaSessao = Math.max(0, pomodoro.concluidos - pomodorosNoInicio);
+  // duração escolhida (15/25/45/60 ou pausa de 5) — o anel esvazia a partir dela;
+  // quando o cronômetro zera, o Estudos volta pra 25:00 e o anel acompanha.
+  const [duracao, setDuracao] = useState(25 * 60);
+  const definirPomodoro = (min: number) => { setDuracao(min * 60); pomodoro.definir(min); };
+  useEffect(() => { if (!pomodoro.rodando && pomodoro.tempo === 25 * 60 && duracao !== 25 * 60) setDuracao(25 * 60); }, [pomodoro.rodando, pomodoro.tempo, duracao]);
+  const PRESETS = [15, 25, 45, 60];
   const terminar = () => {
     if (!curso) return;
     const sessao: SessaoEstudo = {
@@ -419,10 +423,10 @@ export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomod
 
             {etapa === 2 && (
               <div className="space-y-3 text-center" data-testid="etapa-pomodoro">
-                <AnelPomodoro tempo={pomodoro.tempo} rodando={pomodoro.rodando} tamanho={150} />
+                <AnelPomodoro tempo={pomodoro.tempo} duracao={duracao} rodando={pomodoro.rodando} tamanho={150} />
                 <div className="flex justify-center gap-2">
                   {!pomodoro.rodando ? <Button onClick={pomodoro.iniciar} className="bg-red-500 hover:bg-red-600 text-white">▶ Iniciar</Button> : <Button variant="outline" onClick={pomodoro.pausar}>⏸ Pausar</Button>}
-                  <Button variant="ghost" onClick={() => pomodoro.definir(25)}>🔄 25 min</Button>
+                  <Button variant="ghost" onClick={() => definirPomodoro(25)}>🔄 Resetar</Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">Estude {curso?.name}. Acabou o tempo, respira 5 minutos. Pomodoros nesta sessão: <b>{pomodorosDaSessao}</b></p>
                 <Button className="w-full h-11" variant="outline" onClick={() => setEtapa(3)} data-testid="ir-feynman">Terminei de estudar → Feynman</Button>
@@ -546,14 +550,19 @@ export const Metodo = ({ cursos, mapa, revisoes, onResponder, onRegistrar, pomod
                     {/* 2 · Pomodoro */}
                     {ferramenta.id === "pomodoro" && (
                       <div className="space-y-3 text-center">
-                        <AnelPomodoro tempo={pomodoro.tempo} rodando={pomodoro.rodando} tamanho={170} />
+                        <AnelPomodoro tempo={pomodoro.tempo} duracao={duracao} rodando={pomodoro.rodando} tamanho={170} />
                         <div className="flex justify-center gap-2">
                           {!pomodoro.rodando ? <Button onClick={pomodoro.iniciar} className="bg-red-500 hover:bg-red-600 text-white h-11 px-6">▶ Iniciar</Button> : <Button variant="outline" className="h-11 px-6" onClick={pomodoro.pausar}>⏸ Pausar</Button>}
-                          <Button variant="ghost" className="h-11" onClick={() => pomodoro.definir(25)}>🔄 25 min</Button>
-                          <Button variant="ghost" className="h-11" onClick={() => pomodoro.definir(5)}>☕ 5 min</Button>
+                          <Button variant="ghost" className="h-11" onClick={() => definirPomodoro(25)}>🔄 Resetar</Button>
                         </div>
-                        <p className="text-[11px] text-muted-foreground">Pomodoros feitos: <b>{pomodoro.concluidos}</b>. O tempo continua rodando se você trocar de aba.</p>
-                        {onIrPara && <button type="button" onClick={() => onIrPara("pomodoro")} className="text-xs font-semibold underline underline-offset-2 inline-flex items-center gap-1">Abrir a aba Pomodoro <ExternalLink className="w-3 h-3" /></button>}
+                        <div className="flex justify-center gap-1.5 flex-wrap" role="group" aria-label="Duração do pomodoro">
+                          {PRESETS.map((m) => {
+                            const on = duracao === m * 60 && pomodoro.tempo <= m * 60 && duracao !== 5 * 60;
+                            return <button key={m} type="button" aria-pressed={on} onClick={() => definirPomodoro(m)} className={`px-3 h-9 rounded-lg text-xs font-bold border transition-colors ${on ? "bg-red-500 text-white border-red-500" : "bg-card border-border"}`}>{m} min</button>;
+                          })}
+                          <button type="button" aria-pressed={duracao === 5 * 60} onClick={() => definirPomodoro(5)} className={`px-3 h-9 rounded-lg text-xs font-bold border transition-colors ${duracao === 5 * 60 ? "bg-red-500 text-white border-red-500" : "bg-card border-border"}`}>☕ 5 min</button>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">Pomodoros feitos: <b>{pomodoro.concluidos}</b>. O tempo continua rodando se você trocar de aba ou bloquear a tela.</p>
                       </div>
                     )}
 

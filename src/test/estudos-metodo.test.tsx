@@ -157,8 +157,7 @@ describe("Metodo (tela)", () => {
 
   it("as 6 técnicas aparecem como botões; cada uma abre a ferramenta na própria aba", () => {
     const store = criarStore();
-    const onIrPara = vi.fn();
-    render(<UserDataContext.Provider value={store.valor}><Metodo cursos={cursos} mapa={mapa} revisoes={{}} onResponder={vi.fn()} onRegistrar={vi.fn()} pomodoro={pomodoro} onIrPara={onIrPara} /></UserDataContext.Provider>);
+    render(<UserDataContext.Provider value={store.valor}><Metodo cursos={cursos} mapa={mapa} revisoes={{}} onResponder={vi.fn()} onRegistrar={vi.fn()} pomodoro={pomodoro} /></UserDataContext.Provider>);
     for (const id of ["blocos", "pomodoro", "recall", "feynman", "revisao", "socratico"]) {
       fireEvent.click(screen.getByTestId(`ferramenta-${id}`));
       expect(screen.getByTestId(`painel-${id}`)).toBeInTheDocument();
@@ -167,10 +166,12 @@ describe("Metodo (tela)", () => {
     // tocar de novo fecha
     fireEvent.click(screen.getByTestId("ferramenta-socratico"));
     expect(screen.queryByTestId("painel-socratico")).not.toBeInTheDocument();
-    // pomodoro leva pra aba dele
+    // pomodoro com as durações da aba antiga (a aba Pomodoro saiu em 22/09)
     fireEvent.click(screen.getByTestId("ferramenta-pomodoro"));
-    fireEvent.click(screen.getByRole("button", { name: /Abrir a aba Pomodoro/i }));
-    expect(onIrPara).toHaveBeenCalledWith("pomodoro");
+    fireEvent.click(screen.getByRole("button", { name: "45 min" }));
+    expect(pomodoro.definir).toHaveBeenCalledWith(45);
+    fireEvent.click(screen.getByRole("button", { name: "☕ 5 min" }));
+    expect(pomodoro.definir).toHaveBeenCalledWith(5);
   });
 
   it("recall avulso responde o cartão do curso", () => {

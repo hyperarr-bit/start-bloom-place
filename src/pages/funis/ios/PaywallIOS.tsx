@@ -55,7 +55,6 @@ import { APP_PRECOS } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { type AreaKey } from "@/lib/funnel";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
-import { estadoPermissao, pedirPermissao, agendarLembreteDoTeste } from "@/lib/notificacoes";
 import {
   TransformChart, ValueStack, ModulesIncludedCard, AnchorCard, AreaAnchorCard,
   MuralDepoimentos, CompareTable, CHART_LABEL,
@@ -93,11 +92,14 @@ const PLANO_INICIAL: "anual" | "mensal" = "anual";
  * contradizia a linha legal logo abaixo (a Apple lê isso como promessa). Com
  * teste grátis os selos falam do que tira o medo de quem hesita (Blinkist):
  * aviso antes de cobrar e cancelar em um toque. Sem teste, ou no mensal,
- * falam da assinatura como ela é. */
+ * falam da assinatura como ela é.
+ * 24/09 (ordem do dono): o aviso antes de cobrar SAIU — os 6 primeiros testes
+ * que venceram cancelaram, 5 deles com o aviso armado. Sem aviso, nenhuma
+ * tela pode prometer aviso: o selo saiu (e não virou "Acesso na hora" — o
+ * quadro "⚡ Na hora · acesso liberado" logo acima já diz isso). */
 const selosPara = (teste: boolean) => teste
   ? [
       { emoji: "", label: "Compra pela App Store" },
-      { emoji: "🔔", label: "Aviso antes de cobrar" },
       { emoji: "✕", label: "Cancele em 1 toque" },
     ]
   : [
@@ -111,12 +113,12 @@ const PRECO_MES_PADRAO = "R$ 8,16";
 
 /* (B) CRONOGRAMA DO TESTE — o bloco que deu +23% no Blinkist e que a Apple
  * recomenda na sessão sobre testes: a pessoa sabe exatamente quando (e se)
- * vai pagar. O dia do aviso e o da cobrança vêm da duração lida da loja
- * (trocar 3 por 7 dias no App Store Connect muda o texto sozinho). */
+ * vai pagar. O dia da cobrança vem da duração lida da loja (trocar 3 por 7
+ * dias no App Store Connect muda o texto sozinho). 24/09: o passo "Dia 2 · a
+ * gente te avisa" saiu junto com o aviso (ver selosPara). */
 function ComoFuncionaOTeste({ dias, precoAnual }: { dias: number; precoAnual: string }) {
   const passos = [
     { cheio: true, t: "Hoje · acesso a tudo", s: "Sem cobrança nenhuma agora." },
-    { cheio: false, t: `Dia ${Math.max(1, dias - 1)} · a gente te avisa`, s: "Notificação antes de qualquer cobrança." },
     { cheio: false, t: `Dia ${dias} · só se você continuar`, s: `${precoAnual} pelo ano inteiro. Cancelou antes, não paga nada.` },
   ];
   return (
@@ -208,9 +210,6 @@ export function PaywallIOS({
   const [dias, setDias] = useState(3);
   const [precoMes, setPrecoMes] = useState<string>(PRECO_MES_PADRAO);
   const [plano, setPlano] = useState<"anual" | "mensal">(PLANO_INICIAL);
-  // (D) pedido de permissão pro lembrete do teste, logo depois da compra
-  const [pedindoAviso, setPedindoAviso] = useState(false);
-  const respostaAviso = useRef<((quer: boolean) => void) | null>(null);
 
   useEffect(() => {
     vivoRef.current = true;
@@ -276,14 +275,10 @@ export function PaywallIOS({
         : await rc.comprarAnualIos();
       if (ok) {
         trackEvent("app_sheet_success", { produto: idProduto, funil: "ios", loja: "ios" });
-        /* (D) LEMBRETE DO TESTE: a Apple não avisa antes de cobrar. Se a
-         * compra entrou em teste, o app arma a notificação de "acaba amanhã"
-         * — e, se nunca perguntou, pede a permissão AGORA, com o motivo na
-         * cara (Blinkist: aceite de 6% → 74% pedindo assim). */
-        if (produto === "anual" && rc.ultimaCompraAnualFoiTrial()) {
-          setComprando(false);
-          await armarLembreteDoTeste();
-        }
+        /* 24/09 (ordem do dono): compra em teste NÃO arma mais o lembrete
+         * "acaba amanhã" nem pede permissão pra ele — segue direto pro
+         * cadastro. Quem começou o teste antes disso ainda recebe o aviso que
+         * já estava agendado no aparelho (foi prometido na hora da compra). */
         onPagoSemConta();
         return;
       }
@@ -310,25 +305,6 @@ export function PaywallIOS({
       setErro("A Apple não concluiu o pagamento. Tenta de novo em instantes.");
     }
     setComprando(false);
-  };
-
-  const armarLembreteDoTeste = async () => {
-    try {
-      const estado = await estadoPermissao();
-      if (estado === "granted") {
-        await agendarLembreteDoTeste({ dias, precoAno: precoAnual });
-        trackEvent("trial_aviso", { acao: "ja_permitido" });
-        return;
-      }
-      if (estado !== "prompt") { trackEvent("trial_aviso", { acao: "sem_permissao", estado }); return; }
-      trackEvent("trial_aviso", { acao: "perguntou" });
-      const quer = await new Promise<boolean>((resolve) => { respostaAviso.current = resolve; setPedindoAviso(true); });
-      setPedindoAviso(false);
-      if (!quer) { trackEvent("trial_aviso", { acao: "recusou" }); return; }
-      const deu = await pedirPermissao();
-      if (deu) await agendarLembreteDoTeste({ dias, precoAno: precoAnual });
-      trackEvent("trial_aviso", { acao: deu ? "aceitou" : "negou_no_sistema" });
-    } catch { /* lembrete nunca segura quem acabou de pagar */ }
   };
 
   const chartLabel = CHART_LABEL[area] ?? CHART_LABEL.dinheiro;
@@ -507,12 +483,12 @@ export function PaywallIOS({
                     : <>Quero o ano — {precoAnual} <ArrowRight className="w-4 h-4" /></>}
             </Button>
           </motion.div>
-          {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje e o
-              app avisa antes de cobrar (Cal AI: "No payment due now"). */}
+          {/* (C) o que a folha vai dizer, dito antes: nada é cobrado hoje
+              (Cal AI: "No payment due now"). 24/09: o "· avisamos 1 dia antes
+              de cobrar" saiu junto com o aviso. */}
           {!mostraMensal && comTrial && (
             <p className="text-[11.5px] text-center mt-2 font-semibold" data-testid="ios-sem-cobranca">
               <span className="text-foreground">Sem cobrança hoje</span>
-              <span className="text-muted-foreground"> · avisamos 1 dia antes de cobrar</span>
             </p>
           )}
           <p className="text-[11px] text-muted-foreground text-center mt-2 flex w-full items-start justify-center gap-1.5">
@@ -529,24 +505,6 @@ export function PaywallIOS({
           </p>
         </div>
       </div>
-
-      {pedindoAviso && (
-        <div className="fixed inset-0 z-[90] bg-black/45 grid place-items-center px-6" data-testid="ios-aviso-prompt">
-          <div className="w-full max-w-sm rounded-3xl bg-white text-[#16121c] p-6 text-center shadow-2xl">
-            <div className="text-[34px] leading-none mb-2" aria-hidden>🔔</div>
-            <h2 className="text-[20px] font-extrabold tracking-tight leading-tight">Te aviso 1 dia antes de cobrar?</h2>
-            <p className="text-[13.5px] text-black/60 mt-2 leading-snug">
-              É só esse aviso: no dia {Math.max(1, dias - 1)}, antes de qualquer cobrança dos {precoAnual}. Você decide com calma.
-            </p>
-            <Button size="lg" className="w-full h-12 rounded-full text-[15px] font-bold mt-5" onClick={() => respostaAviso.current?.(true)}>
-              Sim, me avisa
-            </Button>
-            <button type="button" className="w-full text-center text-[13px] font-semibold text-black/55 mt-3 py-1" onClick={() => respostaAviso.current?.(false)}>
-              Agora não
-            </button>
-          </div>
-        </div>
-      )}
 
       {comprando && (
         <div className="fixed inset-0 z-[80] grid place-items-end pointer-events-none pb-28">

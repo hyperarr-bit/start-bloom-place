@@ -41,7 +41,6 @@ vi.mock("@/hooks/use-user-data", () => ({ useUserData: () => ({ data: {}, loaded
 vi.mock("@/lib/teste-gratis", () => ({ estadoTeste: () => ({ fase: "nunca" }), limparGuiaSemente: vi.fn() }));
 vi.mock("@/lib/notificacoes", () => ({
   agendarResgateDoPlano: vi.fn(), cancelarResgateDoPlano: vi.fn(), cancelarReguaDoTeste: vi.fn(),
-  temPermissao: async () => false, agendarLembreteDoTeste: vi.fn(),
 }));
 vi.mock("@/lib/analytics", () => ({ trackEvent: vi.fn(), getAttributionParams: () => ({}) }));
 

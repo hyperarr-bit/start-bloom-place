@@ -54,7 +54,7 @@ import { useUserData } from "@/hooks/use-user-data";
 import { trackEvent } from "@/lib/analytics";
 import { estadoTeste, limparGuiaSemente } from "@/lib/teste-gratis";
 import { AREAS, type AreaKey } from "@/lib/funnel";
-import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste, temPermissao, agendarLembreteDoTeste } from "@/lib/notificacoes";
+import { agendarResgateDoPlano, cancelarResgateDoPlano, cancelarReguaDoTeste } from "@/lib/notificacoes";
 import { AppLegalFooter } from "@/components/paywall/PaywallFlow";
 
 export type ContextoPaywall = "funil" | "gate" | "planos";
@@ -343,11 +343,8 @@ export function PaywallAssinatura({
       trackEvent("app_sheet_success", { contexto, produto });
       void cancelarResgateDoPlano();
       void cancelarReguaDoTeste();
-      // (D) iPhone: compra que entrou em teste ganha o lembrete "acaba amanhã"
-      // (quem chega aqui já respondeu ao pedido de notificação do app).
-      if (apple && produto === "core_anual_97" && rc.ultimaCompraAnualFoiTrial() && (await temPermissao())) {
-        void agendarLembreteDoTeste({ dias: anualApple.dias, precoAno: anualApple.preco });
-      }
+      // 24/09 (ordem do dono): o teste do iPhone não arma mais o lembrete
+      // "acaba amanhã" — ver PaywallIOS.
       limparGuiaSemente();
       if (!user && onPagoSemConta) { onPagoSemConta(); return; }
       if (!user) { navigate("/app?step=signup", { replace: true }); return; }

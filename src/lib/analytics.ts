@@ -5,14 +5,48 @@ import { plataformaApp } from "@/lib/native-shell";
 const SESSION_KEY = "core_session_id";
 const UTM_KEY = "core_utm";
 
+/*
+ * MEMÓRIA DA PÁGINA (25/09). No navegador do Instagram o storage inteiro da
+ * página (sessionStorage, localStorage e cookies) às vezes é ZERADO com a
+ * página viva, segundos depois da chegada do anúncio: a sessão da chegada
+ * morria com 1 evento e o resto do funil (quiz, demo, cadastro, Pix) seguia
+ * numa sessão nova, sem campanha. Foram 47–82 visitas de anúncio por dia em
+ * 22–24/09 (1 em cada 4 que passava da 1ª tela) e 13 das 26 vendas web "sem
+ * sinal" de 20–24/09 — o fbclid no cookie do Pix provou que eram do anúncio.
+ * O heap do JS sobrevive à zerada: estas cópias re-semeiam o storage.
+ */
+let sessaoMemoria: string | null = null;
+let metaMemoria: Record<string, string> | null = null;
+
+const CHAVES_DE_ATRIBUICAO = ["utm_source", "utm_campaign", "fbclid", "ttclid", "gclid", "gbraid", "wbraid"] as const;
+const temAtribuicao = (m: Record<string, unknown> | null | undefined): boolean =>
+  !!m && CHAVES_DE_ATRIBUICAO.some((k) => !!m[k]);
+
 const getSessionId = (): string => {
   if (typeof window === "undefined") return "ssr";
-  let id = sessionStorage.getItem(SESSION_KEY);
+  let id: string | null = null;
+  try { id = sessionStorage.getItem(SESSION_KEY); } catch { /* storage bloqueado */ }
   if (!id) {
-    id = crypto.randomUUID();
-    sessionStorage.setItem(SESSION_KEY, id);
+    id = sessaoMemoria ?? crypto.randomUUID();
+    try { sessionStorage.setItem(SESSION_KEY, id); } catch { /* noop */ }
   }
+  sessaoMemoria = id;
   return id;
+};
+
+/** fbclid do cookie `_fbc` (fb.1.<ts>.<fbclid>) — último recurso quando storage
+ *  e memória perderam a campanha: é o que o Pix já manda pra CAPI, e liga a
+ *  sessão à chegada do anúncio (mesmo fbclid) na análise. */
+const fbclidDoCookie = (): { fbclid: string; criado: number } | null => {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)_fbc=([^;]+)/);
+    const partes = m ? decodeURIComponent(m[1]).split(".") : [];
+    const fbclid = partes.length >= 4 ? partes.slice(3).join(".") : "";
+    const criado = Number(partes[2]);
+    return fbclid && Number.isFinite(criado) ? { fbclid, criado } : null;
+  } catch {
+    return null;
+  }
 };
 
 /** Captura UTM params da URL atual e persiste pra ficarem disponíveis durante toda a sessão (mesmo após o cadastro). */
@@ -44,6 +78,12 @@ export const captureLandingMeta = () => {
     const existing = localStorage.getItem(UTM_KEY);
     if (!existing || utm.utm_source || utm.fbclid || utm.ttclid || utm.gclid || utm.gbraid || utm.wbraid) {
       localStorage.setItem(UTM_KEY, JSON.stringify(utm));
+    }
+    // cópia na memória da página (ver sessaoMemoria): a da URL se trouxe
+    // campanha, senão a que já estava guardada
+    if (temAtribuicao(utm)) metaMemoria = utm;
+    else if (!metaMemoria && existing) {
+      try { const salvo = JSON.parse(existing); if (temAtribuicao(salvo)) metaMemoria = salvo; } catch { /* noop */ }
     }
     return utm;
   } catch {
@@ -267,7 +307,7 @@ export const capturarDispositivoApp = async () => {
 export const getAttributionParams = (): Record<string, string> => {
   if (typeof window === "undefined") return {};
   try {
-    const m = JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
+    const m = getStoredMeta();
     const out: Record<string, string> = {};
     for (const k of ["fbclid", "ttclid", "gclid", "gbraid", "wbraid", "utm_source", "utm_medium", "utm_campaign", "utm_content"]) {
       if (m[k]) out[k] = m[k];
@@ -278,13 +318,34 @@ export const getAttributionParams = (): Record<string, string> => {
   }
 };
 
+/** Clique de 7 dias, igual à janela da Meta: `_fbc` mais velho que isso é
+ *  de outra visita e não pode carimbar esta. */
+const FBC_VALIDADE_MS = 7 * 86_400_000;
+
+/** core_utm com a rede da memória da página (ver sessaoMemoria): storage
+ *  zerado → devolve a cópia da memória e re-semeia o storage, pra próxima
+ *  página (a demo é navegação cheia) já nascer com a campanha. Sem memória
+ *  (página nova), o fbclid do `_fbc` recente liga a sessão ao anúncio. */
 const getStoredMeta = (): Record<string, string> => {
   if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem(UTM_KEY) || "{}");
-  } catch {
-    return {};
+  let salvo: Record<string, string> = {};
+  try { salvo = JSON.parse(localStorage.getItem(UTM_KEY) || "{}"); } catch { salvo = {}; }
+  if (temAtribuicao(salvo)) {
+    if (!metaMemoria) metaMemoria = salvo;
+    return salvo;
   }
+  let recuperado = metaMemoria;
+  if (!recuperado) {
+    const c = fbclidDoCookie();
+    if (c && Date.now() - c.criado < FBC_VALIDADE_MS) {
+      recuperado = { fbclid: c.fbclid, atribuicao: "cookie_fbc" };
+      metaMemoria = recuperado;
+    }
+  }
+  if (!recuperado) return salvo;
+  const junto = { ...salvo, ...recuperado };
+  try { localStorage.setItem(UTM_KEY, JSON.stringify(junto)); } catch { /* noop */ }
+  return junto;
 };
 
 interface TrackOptions {

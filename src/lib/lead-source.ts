@@ -18,17 +18,47 @@ export interface LeadSource {
 
 const UTM_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term"] as const;
 
+/* Memória da página (25/09) — a mesma rede do analytics.ts (sessaoMemoria):
+ * o navegador do Instagram às vezes zera o storage com a página viva, logo
+ * depois da chegada do anúncio. Sem esta cópia, a conta nascia com a origem
+ * da DEMO (landing_path=/preview/…&from=dia14) e sem campanha. */
+let memoria: LeadSource | null = null;
+
 function readStored(): LeadSource | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as LeadSource) : null;
-  } catch {
-    return null;
-  }
+    if (raw) return JSON.parse(raw) as LeadSource;
+  } catch { /* noop */ }
+  if (memoria) { writeStored(memoria); return memoria; }
+  return null;
 }
 
 function writeStored(data: LeadSource) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch { /* noop */ }
+  memoria = data;
+}
+
+/** Página NOVA depois da zerada (a demo abre com navegação cheia): a origem
+ *  some daqui, mas o analytics re-semeou o `core_utm` antes de sair do
+ *  /inicio — é dele que a origem volta. */
+function daAtribuicaoDoAnalytics(): LeadSource | null {
+  try {
+    const m = JSON.parse(localStorage.getItem("core_utm") || "{}") as Record<string, string>;
+    if (!m.utm_source && !m.utm_campaign) return null;
+    return {
+      utm_source: m.utm_source || null,
+      utm_medium: m.utm_medium || null,
+      utm_campaign: m.utm_campaign || null,
+      utm_content: m.utm_content || null,
+      utm_term: null,
+      referrer: m.referrer || null,
+      landing_path: m.path || null,
+      source_captured_at: new Date().toISOString(),
+      ref: null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -53,7 +83,11 @@ export function captureLeadSource() {
     const cleanReferrer = referrer && !referrer.startsWith(window.location.origin) ? referrer : null;
 
     const ref = params.get("ref");
-    const existing = readStored();
+    let existing = readStored();
+    if (!existing && !hasUtm && !ref) {
+      const doAnalytics = daAtribuicaoDoAnalytics();
+      if (doAnalytics) { writeStored(doAnalytics); existing = doAnalytics; }
+    }
 
     // Skip if we already have data AND no new signal (UTM or ref) present
     if (existing && !hasUtm && !ref) return;
@@ -107,5 +141,6 @@ export async function persistLeadSource(
 }
 
 export function clearLeadSource() {
+  memoria = null;
   try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
 }

@@ -32,7 +32,7 @@ vi.mock("@/lib/funnel", async (orig) => ({ ...(await orig()), isInAppBrowser: ()
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: null }) }));
 vi.mock("@/lib/purchase-tracking", () => ({ markPixPurchasePending: vi.fn(), firePixPurchaseOnce: vi.fn() }));
 
-import { PixCheckout, bracoPorSemente } from "@/components/paywall/PixCheckout";
+import { PixCheckout, bracoPorSemente, aquecerCheckoutPix } from "@/components/paywall/PixCheckout";
 
 const qr = (id: string) => ({ data: { orderId: id, qrCode: `000201${id}`, amount: "27.9", expiresAt: new Date(Date.now() + 30 * 60e3).toISOString() }, error: null });
 const chamadas = (fn: string, action?: string) =>
@@ -111,5 +111,54 @@ describe("sorteio do braço", () => {
   it("oferta que a Cakto cobraria diferente da tela (lifetime = 97,90 na tela) nunca vai pra Cakto", () => {
     expect(uids.some((u) => bracoPorSemente(u, "lifetime") === "cakto")).toBe(false);
     expect(uids.some((u) => bracoPorSemente(u, "w97") === "cakto")).toBe(false);
+  });
+});
+
+/* 25/09 00h30 — Cakto em 100% na web (dono: "faz 100% a cakto logo"). Estes
+ * testes valem enquanto FORCE_GATEWAY = "cakto". O do disjuntor fica por
+ * ÚLTIMO: o estado "Cakto desligada" é do módulo e vale pro resto do arquivo. */
+describe("Cakto em 100% (sem link de teste)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    window.history.replaceState(null, "", "/inicio");
+  });
+
+  it("a w27 vai pra Cakto sem precisar do ?gw=cakto", async () => {
+    m.invoke.mockImplementation(async (fn: string, opts?: { body?: Record<string, unknown> }) => {
+      if (fn === "cakto-pix") return opts?.body?.warm ? { data: { ok: true, ativa: true }, error: null } : qr("uuid-cakto-100");
+      return { data: { subscribed: false }, error: null };
+    });
+    render(<PixCheckout offer="w27" context="funnel" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Copiar código Pix/i })).toBeInTheDocument(), { timeout: 6000 });
+    expect(m.invoke.mock.calls.some((c) => c[0] === "cakto-pix" && !c[1]?.body?.warm)).toBe(true);
+    expect(chamadas("asaas-pix")).toBe(0);
+    expect(m.track).toHaveBeenCalledWith("pix_checkout_open", expect.objectContaining({ gateway: "cakto" }));
+  });
+
+  it("a lifetime (97,90 na tela; na Cakto cobraria 27,90) nunca vai pra Cakto", async () => {
+    m.invoke.mockImplementation(async (fn: string, opts?: { body?: Record<string, unknown> }) => {
+      if (fn === "asaas-pix" && opts?.body?.action === "create") return qr("pay_asaas_lifetime");
+      return { data: { paid: false }, error: null };
+    });
+    render(<PixCheckout offer="lifetime" context="funnel" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Copiar código Pix/i })).toBeInTheDocument(), { timeout: 6000 });
+    expect(chamadas("cakto-pix")).toBe(0);
+    expect(chamadas("asaas-pix", "create")).toBe(1);
+  });
+
+  it("disjuntor aberto (aquecimento diz ativa:false): nem tenta a Cakto, o Pix sai direto pela Asaas", async () => {
+    m.invoke.mockImplementation(async (fn: string, opts?: { body?: Record<string, unknown> }) => {
+      if (fn === "cakto-pix") return opts?.body?.warm ? { data: { ok: true, ativa: false }, error: null } : qr("nao-devia");
+      if (fn === "asaas-pix" && opts?.body?.action === "create") return qr("pay_asaas_disjuntor");
+      return { data: { paid: false }, error: null };
+    });
+    aquecerCheckoutPix(null, "w27"); // o paywall aquece enquanto a pessoa lê
+    await new Promise((r) => setTimeout(r, 20));
+    render(<PixCheckout offer="w27" context="funnel" onClose={vi.fn()} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Copiar código Pix/i })).toBeInTheDocument(), { timeout: 6000 });
+    expect(m.invoke.mock.calls.some((c) => c[0] === "cakto-pix" && !c[1]?.body?.warm)).toBe(false);
+    expect(m.track).toHaveBeenCalledWith("pix_fallback", expect.objectContaining({ de: "cakto", para: "asaas", motivo: "cakto_desligada" }));
+    expect(m.track).toHaveBeenCalledWith("pix_generated", expect.objectContaining({ gateway: "asaas", braco: "cakto" }));
   });
 });

@@ -150,7 +150,13 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  *   vê erro nem campo de CPF, e a queda fica medida.
  * Régua: pagos ÷ checkouts abertos, por braço (pix_checkout_open.gateway).
  * LIGAR = FORCE_GATEWAY null. ENCERRAR = FORCE_GATEWAY "asaas"/"cakto" + push. */
-const FORCE_GATEWAY: Gateway | null = "asaas";
+/* 25/09 00h30 — CAKTO EM 100% (dono: "faz 100% a cakto logo, nós já testa
+ * hoje"). Sem os 3 dias do 50/50: a comparação é com os dias de Asaas. Duas
+ * redes, nenhuma exige ninguém: (1) Cakto falhou num checkout → o Pix daquela
+ * pessoa sai pela Asaas na hora; (2) DISJUNTOR na cakto-pix: 3 falhas em 24 h →
+ * a Cakto desliga sozinha, a Asaas volta a ser a principal e o dono recebe
+ * e-mail. Só a w27 vai pra Cakto (ver OFERTAS_NA_CAKTO). */
+const FORCE_GATEWAY: Gateway | null = "cakto";
 const forceGateway = (): Gateway | null => FORCE_GATEWAY;
 export const gatewayDaWebAgora = forceGateway;
 const AB_BRACOS: Gateway[] = ["asaas", "cakto"];
@@ -176,7 +182,14 @@ const sementeSemConta = (): string => {
   return sementeDaSessao;
 };
 
+/** Braço de quem abre o checkout — com a trava de preço: oferta fora de
+ *  OFERTAS_NA_CAKTO nunca vai pra Cakto, venha o braço de onde vier. */
 const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer): Gateway => {
+  const braco = bracoSemTrava(uid, offer);
+  return braco === "cakto" && !OFERTAS_NA_CAKTO.includes(offer) ? "asaas" : braco;
+};
+
+const bracoSemTrava = (uid: string | null | undefined, offer: PixOffer): Gateway => {
   /* TESTE DE GATEWAY POR LINK (02/09): `?gw=cakto` na URL grava a escolha na
    * sessão e vale ANTES do FORCE_GATEWAY — é como se testa outro gateway
    * sem tocar no funil de todo mundo. A Cakto recusou 2 de 8 pedidos de
@@ -204,7 +217,16 @@ const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer): Gatewa
 export const aquecerCheckoutPix = (uid: string | null | undefined, offer: PixOffer) => {
   if (isNativeShell()) return;
   if (bracoDoUsuario(uid, offer) !== "cakto") return;
-  supabase.functions.invoke("cakto-pix", { body: { warm: true } }).catch(() => { /* noop */ });
+  aquecerCakto();
+};
+
+/* O aquecimento também diz se o DISJUNTOR da cakto-pix abriu (3 falhas em
+ * 24 h). Desligada: o checkout nem tenta a Cakto — vai direto pra Asaas. */
+let caktoAtiva: boolean | null = null;
+const aquecerCakto = () => {
+  supabase.functions.invoke("cakto-pix", { body: { warm: true } })
+    .then(({ data }) => { if (typeof data?.ativa === "boolean") caktoAtiva = data.ativa; })
+    .catch(() => { /* noop */ });
 };
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
@@ -388,9 +410,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     trackEvent("pix_checkout_open", { offer, context, gateway: braco });
     // Cakto: aquece instância+token OAuth enquanto a pessoa digita o CPF —
     // o create dela leva 5-7s frio; isso tira 1-2s da espera real.
-    if (braco === "cakto") {
-      supabase.functions.invoke("cakto-pix", { body: { warm: true } }).catch(() => { /* noop */ });
-    }
+    if (braco === "cakto") aquecerCakto();
     if (SEM_FORM) {
       /* Quem chega aqui sem e-mail está comprando SEM CONTA (funil web, sessão
        * anônima). Pede o endereço ANTES do QR — medido: 26,1% dos pagantes do
@@ -619,6 +639,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
          * Cakto chegou a pendurar minutos. Sem QR em 12 s, o Pix sai pela Asaas
          * na hora, sem CPF; a queda fica medida em pix_fallback. */
         try {
+          if (caktoAtiva === false) throw new Error("cakto_desligada");
           ({ data, error } = await Promise.race([
             supabase.functions.invoke("cakto-pix", {
               body: {

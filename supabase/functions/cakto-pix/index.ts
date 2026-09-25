@@ -54,6 +54,83 @@ const DUMMY_PHONE = "5511999999999";
 
 const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
 
+/* DISJUNTOR DA CAKTO (25/09, dono: "se a cakto falhar mais de 2 vezes a asaas
+ * fica como principal dnv, automático, sem vc nem eu mexer").
+ * - Toda falha num create de verdade (recusa, erro, mais de 10 s, prazo de
+ *   15 s) vira `cakto_falha` — gravado AQUI, pelo servidor.
+ * - 3 falhas em 24 h (contadas a partir de VIRADA_CAKTO) → grava
+ *   `cakto_disjuntor_aberto` e manda e-mail pro dono. Daí em diante esta função
+ *   responde na hora {error:"cakto_desligada"} e o checkout gera pela Asaas (o
+ *   front já cai pra Asaas em qualquer falha da Cakto — ninguém fica sem Pix).
+ * - Fica desligada até alguém religar: mover VIRADA_CAKTO pra depois do evento
+ *   e redeployar. */
+const VIRADA_CAKTO = "2026-09-25T03:25:00Z"; // 00:25 BRT de 25/09 — Cakto em 100% na web (o teste do disjuntor, 00:17, fica antes e não conta)
+const FALHAS_PRA_DESLIGAR = 3;
+const JANELA_FALHAS_MS = 24 * 60 * 60 * 1000;
+const CAKTO_LENTA_MS = 10_000;
+
+// deno-lint-ignore no-explicit-any
+type Admin = any;
+
+async function disjuntorAberto(admin: Admin): Promise<boolean> {
+  const { data } = await admin.from("analytics_events").select("id")
+    .eq("event_name", "cakto_disjuntor_aberto").gte("created_at", VIRADA_CAKTO).limit(1);
+  return !!data?.length;
+}
+
+async function avisarDono(falhas: number, motivo: string, teste = false): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY") ?? "";
+  if (!resendKey) return false;
+  const from = Deno.env.get("WELCOME_EMAIL_FROM") || Deno.env.get("RECOVERY_EMAIL_FROM") || "onboarding@resend.dev";
+  const para = (Deno.env.get("SUPORTE_AVISO_PARA") || ADMIN_EMAILS.join(",")).split(",").map((e) => e.trim()).filter(Boolean);
+  const esc = (t: string) => t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] ?? c));
+  const hora = new Date(Date.now() - 3 * 3600e3).toISOString().slice(11, 16);
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from, to: para,
+      subject: `${teste ? "TESTE — " : ""}[CORE] Cakto desligada sozinha — a Asaas voltou a ser a principal`,
+      html:
+        `<p>A Cakto falhou <b>${falhas} vezes</b> nas últimas 24 h e o checkout da web voltou pra <b>Asaas</b> sozinho às ${hora} (Brasília).</p>` +
+        `<p>Nenhuma venda se perde por isso: quem estava pagando recebeu o Pix pela Asaas na hora.</p>` +
+        `<p>Última falha: <code>${esc(motivo.slice(0, 300))}</code></p>` +
+        `<p>Pra religar a Cakto é preciso mexer no código (VIRADA_CAKTO na função cakto-pix).</p>` +
+        (teste ? `<p><b>Isto é um TESTE do disjuntor</b> — nada foi desligado de verdade.</p>` : ""),
+    }),
+  });
+  logStep("aviso do disjuntor", { ok: r.ok, status: r.status });
+  return r.ok;
+}
+
+/** Grava a falha e, na 3ª em 24 h, abre o disjuntor (e avisa). Nunca lança. */
+async function registrarFalha(admin: Admin, userId: string, motivo: string, ms: number, teste = false): Promise<Record<string, unknown>> {
+  try {
+    await admin.from("analytics_events").insert({ event_name: "cakto_falha", user_id: userId, event_data: { motivo: motivo.slice(0, 300), ms } });
+    const desde = new Date(Math.max(Date.parse(VIRADA_CAKTO), Date.now() - JANELA_FALHAS_MS)).toISOString();
+    const { count } = await admin.from("analytics_events").select("id", { count: "exact", head: true })
+      .eq("event_name", "cakto_falha").gte("created_at", desde);
+    logStep("cakto_falha", { motivo: motivo.slice(0, 120), ms, falhas_24h: count });
+    if ((count ?? 0) < FALHAS_PRA_DESLIGAR) return { falhas_24h: count, abriu: false };
+    if (await disjuntorAberto(admin)) return { falhas_24h: count, abriu: false, ja_aberto: true }; // outra instância já abriu
+    await admin.from("analytics_events").insert({ event_name: "cakto_disjuntor_aberto", user_id: userId, event_data: { falhas: count, ultimo_motivo: motivo.slice(0, 300) } });
+    logStep("DISJUNTOR ABERTO — Cakto desligada, Asaas principal", { falhas: count });
+    const avisou = await avisarDono(count ?? FALHAS_PRA_DESLIGAR, motivo, teste);
+    return { falhas_24h: count, abriu: true, avisou };
+  } catch (e) {
+    logStep("registrarFalha falhou", { message: e instanceof Error ? e.message : String(e) });
+    return { erro: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** Roda depois da resposta (a pessoa não espera o registro da falha). */
+function emSegundoPlano(p: Promise<unknown>) {
+  // deno-lint-ignore no-explicit-any
+  const rt = (globalThis as any).EdgeRuntime;
+  if (rt?.waitUntil) rt.waitUntil(p);
+  else p.catch(() => {});
+}
+
 /** Token OAuth da Cakto (JWT ~10h). Cache em memória — instâncias quentes
  *  da edge function reaproveitam; frias pedem outro (barato). */
 let tokenCache: { token: string; expiresAt: number } | null = null;
@@ -103,6 +180,8 @@ serve(async (req) => {
       return jsonResponse({ error: "Pagamento indisponível no momento. Tente de novo em instantes." }, 503);
     }
 
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
+
     let rawBody: unknown;
     try {
       rawBody = await req.json();
@@ -116,15 +195,18 @@ serve(async (req) => {
      * e ali o comprador da web ainda não tem sessão (a anônima nasce no toque em
      * pagar) — exigir usuário devolvia 401 e não aquecia nada. */
     if ((rawBody as Record<string, unknown>)?.warm === true) {
-      try { await getCaktoToken(clientId, clientSecret); } catch { /* create tenta de novo */ }
-      return jsonResponse({ ok: true });
+      // `ativa`: o front pula a Cakto direto pra Asaas quando o disjuntor abriu.
+      const [aberto] = await Promise.all([
+        disjuntorAberto(supabaseAdmin).catch(() => false),
+        getCaktoToken(clientId, clientSecret).catch(() => null), // create tenta de novo
+      ]);
+      return jsonResponse({ ok: true, ativa: !aberto });
     }
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) return jsonResponse({ error: "Authorization header missing" }, 401);
 
     const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey);
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } });
 
     const token = authHeader.replace("Bearer ", "");
     const { data: authData, error: authError } = await supabaseAnon.auth.getUser(token);
@@ -174,6 +256,15 @@ serve(async (req) => {
      * tráfego nela, a pergunta é se voltou a aceitar Pix SEM documento. Só
      * admin; cria cobranças reais NÃO pagas (expiram sozinhas) e devolve o
      * veredito cru. Não grava pix_order_created: o reconcile não as vê. */
+    /* SONDA DO DISJUNTOR (25/09, só admin): registra UMA falha de mentira —
+     * na 3ª em 24 h o disjuntor abre de verdade e o e-mail sai com "TESTE" no
+     * assunto. Testar com VIRADA_CAKTO antes do teste e, depois, mover a virada
+     * pra depois dele (as falhas de teste param de contar). */
+    if ((rawBody as Record<string, unknown>)?.sonda === "falha") {
+      if (!ADMIN_EMAILS.includes(user.email ?? "")) return jsonResponse({ error: "forbidden" }, 403);
+      const r = await registrarFalha(supabaseAdmin, user.id, "TESTE do disjuntor (sonda admin)", 0, true);
+      return jsonResponse({ ...r, aberto_agora: await disjuntorAberto(supabaseAdmin) });
+    }
     if ((rawBody as Record<string, unknown>)?.sonda === "cpf") {
       if (!ADMIN_EMAILS.includes(user.email ?? "")) return jsonResponse({ error: "forbidden" }, 403);
       const tokenSonda = await getCaktoToken(clientId, clientSecret);
@@ -236,11 +327,14 @@ serve(async (req) => {
     // lá, mas NÃO pedimos do cliente: vai o DUMMY_PHONE (decisão do dono).
     // Erros conhecidos voltam com HTTP 200 + código: o invoke() do supabase-js
     // descarta o body em non-2xx e o front nunca via o motivo.
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("display_name, phone, tax_id")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [{ data: profile }, desligada] = await Promise.all([
+      supabaseAdmin.from("profiles").select("display_name, phone, tax_id").eq("id", user.id).maybeSingle(),
+      disjuntorAberto(supabaseAdmin).catch(() => false),
+    ]);
+    if (desligada) {
+      logStep("cakto_desligada (disjuntor aberto) — o checkout vai pela Asaas");
+      return jsonResponse({ error: "cakto_desligada" }, 503);
+    }
 
     const name = (body.customer?.name || profile?.display_name || user.email?.split("@")[0] || "Cliente CORE").trim();
     // Anônimo: a Cakto exige um e-mail no cliente. Vai um apelido determinístico
@@ -277,7 +371,14 @@ serve(async (req) => {
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", user.id);
     }
 
-    const caktoToken = await getCaktoToken(clientId, clientSecret);
+    const tCakto = Date.now();
+    let caktoToken: string;
+    try {
+      caktoToken = await getCaktoToken(clientId, clientSecret);
+    } catch (e) {
+      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `token: ${e instanceof Error ? e.message : String(e)}`, Date.now() - tCakto));
+      return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
+    }
 
     const attribution = body.attribution ?? {};
     const payload = {
@@ -309,21 +410,31 @@ serve(async (req) => {
     logStep("Creating pix", { offer: body.offer, offerId, doc: docNumber === CPF_CORINGA ? "coringa" : "cpf" });
     // 25/09: prazo de 15 s — em 06/09 a Cakto chegou a pendurar minutos. O
     // checkout desiste aos 12 s e gera pela Asaas; aqui só evita a função presa.
-    const res = await fetch(`${CAKTO_API}/payments/`, {
-      method: "POST",
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        Authorization: `Bearer ${caktoToken}`,
-        "Content-Type": "application/json",
-        "X-Idempotency-Key": crypto.randomUUID(),
-      },
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${CAKTO_API}/payments/`, {
+        method: "POST",
+        signal: AbortSignal.timeout(15_000),
+        headers: {
+          Authorization: `Bearer ${caktoToken}`,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      const motivo = e instanceof Error ? e.message : String(e);
+      logStep("Cakto payments fetch error", { motivo, ms: Date.now() - tCakto });
+      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `fetch: ${motivo}`, Date.now() - tCakto));
+      return jsonResponse({ error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos." }, 502);
+    }
     const data = await res.json().catch(() => ({}));
+    const msCakto = Date.now() - tCakto;
 
     if (!res.ok || !data?.pix?.qrCode) {
       // Log completo do erro — a visibilidade que o checkout hospedado nunca deu
       logStep("Cakto payments error", { status: res.status, body: JSON.stringify(data).slice(0, 600) });
+      emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `http ${res.status}: ${JSON.stringify(data).slice(0, 250)}`, msCakto));
       return jsonResponse({
         error: "Não consegui gerar o Pix agora. Tenta de novo em alguns segundos.",
         // diagnóstico opt-in (QA, 17/07 — conta em análise): corpo cru do
@@ -334,7 +445,9 @@ serve(async (req) => {
       }, 502);
     }
 
-    logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount });
+    logStep("Pix created", { orderId: data.id, refId: data.refId, amount: data.amount, ms: msCakto });
+    // Deu QR, mas devagar demais: o checkout desiste aos 12 s — conta como falha.
+    if (msCakto > CAKTO_LENTA_MS) emSegundoPlano(registrarFalha(supabaseAdmin, user.id, `lenta: ${msCakto} ms`, msCakto));
     // Registro server-side do create (24/07, padrão dos outros 3 gateways):
     // é o que o pix-reconcile varre — sem ele, cobrança cakto paga com
     // webhook mudo viraria pago-sem-acesso invisível. amount vem em reais.

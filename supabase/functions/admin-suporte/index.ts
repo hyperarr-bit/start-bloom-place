@@ -291,10 +291,15 @@ serve(async (req) => {
       let corrigidos = 0;
       for (const it of itens) {
         const billing = String(it.billing ?? "");
+        // 24/09: assinatura de LOJA pelo id do RevenueCat (o anual do iPhone
+        // foi gravado 159,90 em vez de 97,90 — faltava core_anual_97 no sync)
+        const rcId = String(it.rcId ?? "");
         const cents = Number(it.cents);
-        if (!billing || !Number.isFinite(cents) || cents < 100) continue;
-        const { data: upd } = await admin.from("subscriptions")
-          .update({ amount_cents: cents }).eq("abacatepay_billing_id", billing).select("id");
+        if ((!billing && !rcId) || !Number.isFinite(cents) || cents < 100) continue;
+        const q = admin.from("subscriptions").update({ amount_cents: cents });
+        const { data: upd } = billing
+          ? await q.eq("abacatepay_billing_id", billing).select("id")
+          : await q.eq("revenuecat_subscription_id", rcId).eq("payment_method", "play_store").select("id");
         if (upd?.length) corrigidos++;
       }
       console.log(`[ADMIN-SUPORTE] corrigir_valores: ${corrigidos}/${itens.length} (por ${caller})`);

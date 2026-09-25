@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { trackEvent, trackEventBeacon } from "@/lib/analytics";
 import { fireMetaEvent } from "@/lib/meta-pixel";
-import { PixCheckout, PIX_PRICES, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
+import { PixCheckout, PIX_PRICES, aquecerCheckoutPix, type PixOffer, type Step as PixStep } from "@/components/paywall/PixCheckout";
 import { WinbackWheel, SLICES_FUNIL } from "@/components/retention/WinbackWheel";
 import { isNativeShell } from "@/lib/native-shell";
 import { ehApple } from "@/lib/loja";
@@ -1009,6 +1009,13 @@ export function PaywallDia14({
   // Braço congelado no mount: ninguém vê a tela trocar de cara no meio.
   const { user: abUser } = useAuth();
   const [braco] = useState<PaywallArm>(() => bracoPaywall(abUser?.id));
+  // 25/09 (teste Asaas × Cakto): quem vai cair na Cakto aquece a função dela
+  // enquanto lê a oferta. Não cria cobrança.
+  useEffect(() => {
+    if (nativoNoMount.current) return;
+    aquecerCheckoutPix(abUser?.id, OFERTA_WEB);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Respostas do quiz: prop (funil na mesma sessão) ou localStorage
   // (volta do OAuth / gate in-app de quem veio do funil).

@@ -130,6 +130,13 @@ initPwaInstall();
  * inofensivo (a linha 40 da analytics não sobrescreve pago com vazio). */
 captureLandingMeta();
 
+// Teste de gateway por link (?gw=cakto): grava NA CHEGADA. O checkout lê isso
+// quando abre, mas o funil troca a URL antes e o parâmetro se perdia (25/09).
+try {
+  const gw = new URLSearchParams(window.location.search).get("gw");
+  if (gw && /^(asaas|cakto|pagarme|abacate)$/.test(gw)) sessionStorage.setItem("pix-gw-teste", gw);
+} catch { /* noop */ }
+
 createRoot(document.getElementById("root")!).render(<App />);
 // 02/09: os pixels de anúncio (index.html) só carregam depois da 1ª pintura —
 // o aviso sai no frame seguinte ao mount, quando a porta já está na tela.

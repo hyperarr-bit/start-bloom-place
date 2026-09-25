@@ -52,6 +52,8 @@ const toE164 = (raw?: string | null): string | null => {
 // O documento que importa (nota) é o CPF.
 const DUMMY_PHONE = "5511999999999";
 
+const ADMIN_EMAILS = ["jv20101958@gmail.com", "hyperarr@gmail.com"];
+
 /** Token OAuth da Cakto (JWT ~10h). Cache em memória — instâncias quentes
  *  da edge function reaproveitam; frias pedem outro (barato). */
 let tokenCache: { token: string; expiresAt: number } | null = null;
@@ -99,6 +101,23 @@ serve(async (req) => {
     if (!clientId || !clientSecret) {
       logStep("Missing CAKTO_CLIENT_ID/SECRET secrets");
       return jsonResponse({ error: "Pagamento indisponível no momento. Tente de novo em instantes." }, 503);
+    }
+
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return jsonResponse({ error: "Invalid JSON body" }, 400);
+    }
+    // WARM-UP (24/07): o create da Cakto leva 5-7s; o front chama {warm:true}
+    // pra aquecer a instância + cachear o token OAuth — o create que ela espera
+    // fica só com o POST /payments. Não cria nada, não loga dados.
+    /* 25/09: ANTES da autenticação. O aquecimento sai quando o paywall aparece,
+     * e ali o comprador da web ainda não tem sessão (a anônima nasce no toque em
+     * pagar) — exigir usuário devolvia 401 e não aquecia nada. */
+    if ((rawBody as Record<string, unknown>)?.warm === true) {
+      try { await getCaktoToken(clientId, clientSecret); } catch { /* create tenta de novo */ }
+      return jsonResponse({ ok: true });
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -149,19 +168,57 @@ serve(async (req) => {
       sourceUrl: z.string().max(500).nullable().optional(),
     });
 
-    let rawBody: unknown;
-    try {
-      rawBody = await req.json();
-    } catch {
-      return jsonResponse({ error: "Invalid JSON body" }, 400);
-    }
-    // WARM-UP (24/07): o create da Cakto leva 5-7s; o front chama {warm:true}
-    // na ABERTURA do checkout (enquanto a pessoa digita o CPF) pra aquecer a
-    // instância + cachear o token OAuth — o create que ela espera fica só com
-    // o POST /payments. Não cria nada, não loga dados.
-    if ((rawBody as Record<string, unknown>)?.warm === true) {
-      try { await getCaktoToken(clientId, clientSecret); } catch { /* create tenta de novo */ }
-      return jsonResponse({ ok: true });
+    /* SONDA DO CPF (25/09, dono: "to pensando em mudar pra cakto, bora testar").
+     * A Cakto saiu da web em 16/09 porque exige CPF e recusa o coringa desde
+     * 06/09 — o form de CPF derrubou o QR (4 checkouts, 0 QR). Antes de pôr
+     * tráfego nela, a pergunta é se voltou a aceitar Pix SEM documento. Só
+     * admin; cria cobranças reais NÃO pagas (expiram sozinhas) e devolve o
+     * veredito cru. Não grava pix_order_created: o reconcile não as vê. */
+    if ((rawBody as Record<string, unknown>)?.sonda === "cpf") {
+      if (!ADMIN_EMAILS.includes(user.email ?? "")) return jsonResponse({ error: "forbidden" }, 403);
+      const tokenSonda = await getCaktoToken(clientId, clientSecret);
+      const variantes: Array<[string, Record<string, string>]> = [
+        ["coringa", { docType: "cpf", docNumber: "00000000000" }],
+        ["sem_doc", {}],
+      ];
+      // controle: o CPF do próprio admin (se salvo no perfil) — prova que a API
+      // está de pé; o número nunca volta na resposta.
+      const { data: perfilAdmin } = await supabaseAdmin.from("profiles").select("tax_id").eq("id", user.id).maybeSingle();
+      const cpfAdmin = onlyDigits(perfilAdmin?.tax_id);
+      if (cpfAdmin.length === 11 && !/^(\d)\1{10}$/.test(cpfAdmin)) variantes.push(["cpf_do_admin", { docType: "cpf", docNumber: cpfAdmin }]);
+      const resultado: Record<string, unknown>[] = [];
+      for (const [variante, doc] of variantes) {
+        const t0 = Date.now();
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 25_000);
+        try {
+          const r = await fetch(`${CAKTO_API}/payments/`, {
+            method: "POST",
+            signal: ctrl.signal,
+            headers: { Authorization: `Bearer ${tokenSonda}`, "Content-Type": "application/json", "X-Idempotency-Key": crypto.randomUUID() },
+            body: JSON.stringify({
+              paymentMethod: "pix",
+              // e-mail NOVO a cada tentativa: a Cakto guarda o documento por
+              // e-mail e o "sem documento" passava em cima do anterior (25/09)
+              customer: { name: "Sonda CORE", email: `sonda-${variante}-${crypto.randomUUID().slice(0, 8)}@coreaplicativo.com.br`, phone: DUMMY_PHONE, fingerprint: crypto.randomUUID(), ...doc },
+              items: [{ offerId: OFFER_IDS.w27, quantity: 1, offerType: "main" }],
+              metadata: { sck: "sonda-cpf" },
+            }),
+          });
+          const d = await r.json().catch(() => ({}));
+          resultado.push({
+            variante, http: r.status, ms: Date.now() - t0, status: d?.status ?? null,
+            qr: !!d?.pix?.qrCode, amount: d?.amount ?? null,
+            ...(d?.pix?.qrCode ? {} : { corpo: JSON.stringify(d).slice(0, 400) }),
+          });
+        } catch (e) {
+          resultado.push({ variante, ms: Date.now() - t0, erro: e instanceof Error ? e.message : String(e) });
+        } finally {
+          clearTimeout(timer);
+        }
+      }
+      logStep("sonda_cpf", { resultado });
+      return jsonResponse({ resultado });
     }
     const parsed = RequestSchema.safeParse(rawBody);
     if (!parsed.success) return jsonResponse({ error: parsed.error.flatten().fieldErrors }, 400);
@@ -196,20 +253,26 @@ serve(async (req) => {
     // CONSUMIDOR NÃO IDENTIFICADO (a Cakto exige 11 dígitos mas não valida,
     // testado; NÃO fingimos o CPF de uma pessoa real). O zerado nunca é salvo
     // no perfil (o guard abaixo já exige body.customer.docNumber).
-    let docNumber = onlyDigits(body.customer?.docNumber) || onlyDigits(profile?.tax_id) || "";
-    /* 06/09: o coringa 00000000000 passou a ser RECUSADO pela Cakto (ou fica
-     * minutos sem resposta). Sem CPF de 11 dígitos, devolve cpf_required
-     * (HTTP 200 + código, como a pagarme-pix) e o checkout reabre o form. */
-    if (docNumber.length !== 11 || /^(\d)\1{10}$/.test(docNumber)) {
-      logStep("cpf_required", { hasBody: !!body.customer?.docNumber, hasProfile: !!profile?.tax_id });
-      return jsonResponse({ error: "cpf_required" });
-    }
+    const cpfValido = (d: string) => d.length === 11 && !/^(\d)\1{10}$/.test(d);
+    const docBody = onlyDigits(body.customer?.docNumber);
+    const docPerfil = onlyDigits(profile?.tax_id);
+    /* 06/09: o coringa 00000000000 passou a ser RECUSADO pela Cakto e o form de
+     * CPF voltou — e derrubou o QR (16/09: 4 checkouts, 0 QR).
+     * 25/09: a Cakto voltou a ACEITAR o coringa (sonda com e-mail novo a cada
+     * tentativa). Sem documento ela segue recusando cliente novo: 400 "O campo
+     * docNumber é obrigatório para pagamentos no Brasil" — na 1ª sonda o "sem
+     * documento" só passou porque o e-mail já tinha documento guardado lá.
+     * Então: CPF real quando a pessoa já tem (digitado ou salvo no perfil);
+     * senão o coringa = CONSUMIDOR NÃO IDENTIFICADO, como em julho/agosto — nunca
+     * o CPF de outra pessoa. Se a Cakto recusar, o checkout cai pra Asaas. */
+    const CPF_CORINGA = "00000000000";
+    const docNumber = cpfValido(docBody) ? docBody : cpfValido(docPerfil) ? docPerfil : CPF_CORINGA;
 
     // CPF (e telefone REAL, se algum dia voltar) vão pro profile — próxima
     // compra não pede de novo. O coringa nunca é salvo.
     const profileUpdate: Record<string, string> = {};
     if (phone !== DUMMY_PHONE && phone !== toE164(profile?.phone)) profileUpdate.phone = phone;
-    if (body.customer?.docNumber && docNumber !== onlyDigits(profile?.tax_id)) profileUpdate.tax_id = docNumber;
+    if (cpfValido(docBody) && docBody !== docPerfil) profileUpdate.tax_id = docBody;
     if (Object.keys(profileUpdate).length) {
       await supabaseAdmin.from("profiles").update(profileUpdate).eq("id", user.id);
     }
@@ -243,9 +306,12 @@ serve(async (req) => {
       },
     };
 
-    logStep("Creating pix", { offer: body.offer, offerId, hasDoc: !!docNumber });
+    logStep("Creating pix", { offer: body.offer, offerId, doc: docNumber === CPF_CORINGA ? "coringa" : "cpf" });
+    // 25/09: prazo de 15 s — em 06/09 a Cakto chegou a pendurar minutos. O
+    // checkout desiste aos 12 s e gera pela Asaas; aqui só evita a função presa.
     const res = await fetch(`${CAKTO_API}/payments/`, {
       method: "POST",
+      signal: AbortSignal.timeout(15_000),
       headers: {
         Authorization: `Bearer ${caktoToken}`,
         "Content-Type": "application/json",

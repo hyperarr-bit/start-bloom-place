@@ -135,14 +135,48 @@ type Gateway = "asaas" | "pagarme" | "abacate" | "cakto";
  * 4 checkouts na Cakto, 0 QR — todos pararam no CPF; véspera com Asaas,
  * 7 checkouts → 7 QR → 2 vendas. A Cakto só volta se o suporte dela liberar
  * cobrança sem documento. */
-const GATEWAY_ANTES: Gateway = "asaas";
-const GATEWAY_DEPOIS: Gateway = "asaas";
-const VIRADA_GATEWAY = Date.parse("2026-09-16T03:00:00Z"); // 00:00 BRT de 16/09
-const forceGateway = (): Gateway | null => (Date.now() >= VIRADA_GATEWAY ? GATEWAY_DEPOIS : GATEWAY_ANTES);
+/* 25/09 — TESTE A/B ASAAS × CAKTO (dono: "to pensando em mudar pra cakto, bora
+ * testar"). O que tirou a Cakto em setembro foi o CPF. A sonda de hoje
+ * (cakto-pix {sonda:"cpf"}, 3 rodadas, 9/9) mostrou que ela voltou a emitir Pix
+ * SEM documento, então os dois braços têm a MESMA tela, sem formulário; muda só
+ * o cano (a Cakto leva ~4 s pra criar o Pix, a Asaas <1 s).
+ * - 50/50 por hash do user.id: estável entre sessões e aparelhos, recomputável
+ *   na análise. Sem conta: semente aleatória da sessão (antes, todo anônimo caía
+ *   no mesmo braço, porque a semente era a palavra "anon").
+ * - Só a w27 entra na Cakto: é a oferta 3e6pp6n (R$ 27,90) conferida na sonda.
+ *   A `lifetime` NÃO: na tela ela é 97,90 e na Cakto aponta pra oferta de
+ *   27,90 — a tela prometeria um preço e o QR cobraria outro.
+ * - Cakto falhou → o Pix sai pela Asaas na hora (evento pix_fallback). Ninguém
+ *   vê erro nem campo de CPF, e a queda fica medida.
+ * Régua: pagos ÷ checkouts abertos, por braço (pix_checkout_open.gateway).
+ * LIGAR = FORCE_GATEWAY null. ENCERRAR = FORCE_GATEWAY "asaas"/"cakto" + push. */
+const FORCE_GATEWAY: Gateway | null = "asaas";
+const forceGateway = (): Gateway | null => FORCE_GATEWAY;
 export const gatewayDaWebAgora = forceGateway;
-const AB_BRACOS: Gateway[] = ["asaas", "pagarme"];
+const AB_BRACOS: Gateway[] = ["asaas", "cakto"];
+const OFERTAS_NA_CAKTO: PixOffer[] = ["w27"];
 
-const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
+/** Braço do A/B pela semente (user.id ou semente da sessão). Puro — a análise
+ *  recomputa o braço de cada pessoa com esta mesma conta. */
+export const bracoPorSemente = (seed: string, offer: PixOffer): Gateway => {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
+  const braco = AB_BRACOS[Math.abs(h) % AB_BRACOS.length];
+  return braco === "cakto" && !OFERTAS_NA_CAKTO.includes(offer) ? "asaas" : braco;
+};
+
+let sementeDaSessao: string | null = null;
+const sementeSemConta = (): string => {
+  try {
+    const s = sessionStorage.getItem("pix-ab-semente");
+    if (s) return s;
+  } catch { /* noop */ }
+  sementeDaSessao ??= Math.random().toString(36).slice(2);
+  try { sessionStorage.setItem("pix-ab-semente", sementeDaSessao); } catch { /* noop */ }
+  return sementeDaSessao;
+};
+
+const bracoDoUsuario = (uid: string | null | undefined, offer: PixOffer): Gateway => {
   /* TESTE DE GATEWAY POR LINK (02/09): `?gw=cakto` na URL grava a escolha na
    * sessão e vale ANTES do FORCE_GATEWAY — é como se testa outro gateway
    * sem tocar no funil de todo mundo. A Cakto recusou 2 de 8 pedidos de
@@ -160,10 +194,17 @@ const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
     const f = localStorage.getItem("pix-ab-force");
     if (f === "asaas" || f === "pagarme" || f === "abacate" || f === "cakto") return f;
   } catch { /* noop */ }
-  const seed = uid || "anon";
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = ((h << 5) - h + seed.charCodeAt(i)) | 0;
-  return AB_BRACOS[Math.abs(h) % AB_BRACOS.length];
+  return bracoPorSemente(uid || sementeSemConta(), offer);
+};
+
+/** Aquece a Cakto enquanto a pessoa lê o paywall (25/09). O Pix dela leva
+ *  ~4 s pra nascer e, no toque em pagar, a instância fria + o token OAuth
+ *  somavam mais 1–2 s. Só dispara pra quem vai cair no braço Cakto; não cria
+ *  cobrança nem pede sessão. */
+export const aquecerCheckoutPix = (uid: string | null | undefined, offer: PixOffer) => {
+  if (isNativeShell()) return;
+  if (bracoDoUsuario(uid, offer) !== "cakto") return;
+  supabase.functions.invoke("cakto-pix", { body: { warm: true } }).catch(() => { /* noop */ });
 };
 
 // SEM FORMULÁRIO (19/07, decisão do dono): a AbacatePay dispensa CPF e o nome
@@ -178,6 +219,10 @@ const bracoDoUsuario = (uid: string | null | undefined): Gateway => {
  * demais; acima disso é só atrito. As linhas do checklist aceleraram junto
  * (stagger 0.65s → 0.28s) pra animação caber na janela nova. */
 const PREPARO_MIN_MS = 900;
+// Depois que o Pix chega: tempo de "Gerando seu Pix" e o último item marcarem.
+const PREPARO_FECHO_MS = 420;
+// Cakto: ~4–6 s normais (sonda 25/09). Passou disso, o Pix sai pela Asaas.
+const PRAZO_CAKTO_MS = 12_000;
 const PREPARO_LINHAS = [
   "Criando seu acesso vitalício",
   "Gerando seu Pix seguro",
@@ -236,7 +281,13 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
   if (isNativeShell()) return <AppPurchaseSheet onClose={onClose} />;
   const { user: abUser } = useAuth();
   // braço congelado no mount: a pessoa nunca vê o checkout trocar de cara
-  const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id));
+  const [braco] = useState<Gateway>(() => bracoDoUsuario(abUser?.id, offer));
+  // Quem EMITIU o Pix na tela — a Cakto cai pra Asaas se falhar, e aí a
+  // confirmação tem que perguntar pra Asaas, não pro braço.
+  const [gwDoPix, setGwDoPix] = useState<Gateway>(braco);
+  // A preparação só marca "Gerando seu Pix seguro" quando o Pix chega de
+  // verdade (a Cakto leva ~4 s; antes a lista terminava em 1 s e a tela parava).
+  const [pixChegou, setPixChegou] = useState(false);
   // FORM REMOVIDO (25/07, ordem do dono): o form nome+CPF do dia 14 saiu — a
   // fricção não compensava (dado: pagantes/abertura ~40-47% com ou sem form).
   // Só a Pagar.me ainda mostra o form, porque o QR dinâmico dela EXIGE CPF
@@ -248,7 +299,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
    * CPF válido = QR em 5s, nas duas ofertas. Então no braço Cakto o form
    * nome+CPF volta, igual ao da Pagar.me. Dado de julho: pagantes/abertura
    * ficou em ~40–47% com ou sem form. */
-  const SEM_FORM = braco !== "pagarme" && braco !== "cakto";
+  /* 25/09: a Cakto voltou a emitir Pix sem documento (sonda 9/9) — o form sai
+   * do braço dela de novo. Só a Pagar.me ainda exige CPF. */
+  const SEM_FORM = braco !== "pagarme";
   const [step, setStep] = useState<Step>(SEM_FORM ? "generating" : "form");
   const [name, setName] = useState("");
   const [cpf, setCpf] = useState("");
@@ -499,23 +552,26 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     // Pix numa sessão sem e-mail → depois de pagar, cadastro antes de liberar (QR primeiro, 02/09)
     void marcarBatismoSeSemEmail();
     const t0 = Date.now();
+    setPixChegou(false);
+    const cookie = (n: string) =>
+      document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
+    // Asaas (QR estático): sem CPF, contrato de resposta idêntico.
+    // fbp/fbc/sourceUrl vão NO CREATE (22/07): metade dos pagantes paga no
+    // app do banco e nunca volta — o webhook fazia o CAPI só com e-mail.
+    // Capturando os cookies AGORA (navegador ainda aberto) e guardando no
+    // pix_order_created, o webhook manda o Purchase com sinal completo.
+    const criarNaAsaas = () => supabase.functions.invoke("asaas-pix", {
+      body: {
+        action: "create", offer,
+        fbp: cookie("_fbp"), fbc: cookie("_fbc"),
+        sourceUrl: window.location.href,
+      },
+    });
     try {
       let data: any, error: any;
+      let gwUsado: Gateway = braco;
       if (braco === "asaas") {
-        // Asaas (QR estático): sem CPF, contrato de resposta idêntico.
-        // fbp/fbc/sourceUrl vão NO CREATE (22/07): metade dos pagantes paga no
-        // app do banco e nunca volta — o webhook fazia o CAPI só com e-mail.
-        // Capturando os cookies AGORA (navegador ainda aberto) e guardando no
-        // pix_order_created, o webhook manda o Purchase com sinal completo.
-        const cookie = (n: string) =>
-          document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
-        ({ data, error } = await supabase.functions.invoke("asaas-pix", {
-          body: {
-            action: "create", offer,
-            fbp: cookie("_fbp"), fbc: cookie("_fbc"),
-            sourceUrl: window.location.href,
-          },
-        }));
+        ({ data, error } = await criarNaAsaas());
       } else if (braco === "pagarme") {
         // Pagar.me: MESMO contrato; exige CPF — devolve {error:"cpf_required"}
         // e o handler abaixo reabre o form.
@@ -558,57 +614,53 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
          * Capturados AQUI e não no confirm porque metade dos pagantes sai pro
          * app do banco e nunca volta pra tela — no create o navegador ainda
          * está aberto e os cookies existem. */
-        const cookie = (n: string) =>
-          document.cookie.split("; ").find((c) => c.startsWith(`${n}=`))?.slice(n.length + 1) ?? null;
-
-        ({ data, error } = await supabase.functions.invoke("cakto-pix", {
-          body: {
-            offer,
-            customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
-            fingerprint,
-            antifraudRef,
-            attribution: getAttributionParams(),
-            fbp: cookie("_fbp"),
-            fbc: cookie("_fbc"),
-            // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
-            // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
-            // dentro de attribution (getAttributionParams).
-            ttp: cookie("_ttp"),
-            sourceUrl: window.location.href,
-          },
-        }));
-        /* Recusa intermitente (medido 02/09: 2 de 8 pedidos nascem "refused"
-         * e a repetição idêntica passa): uma 2ª tentativa antes de mostrar
-         * erro. Chave de idempotência é nova a cada chamada (função). */
+        /* 25/09: UMA tentativa, com prazo. Antes eram duas (02/09: 2 de 8
+         * pedidos nasciam "refused") — mas cada uma leva ~4 s, e em 06/09 a
+         * Cakto chegou a pendurar minutos. Sem QR em 12 s, o Pix sai pela Asaas
+         * na hora, sem CPF; a queda fica medida em pix_fallback. */
+        try {
+          ({ data, error } = await Promise.race([
+            supabase.functions.invoke("cakto-pix", {
+              body: {
+                offer,
+                customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
+                fingerprint,
+                antifraudRef,
+                attribution: getAttributionParams(),
+                fbp: cookie("_fbp"),
+                fbc: cookie("_fbc"),
+                // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
+                // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
+                // dentro de attribution (getAttributionParams).
+                ttp: cookie("_ttp"),
+                sourceUrl: window.location.href,
+              },
+            }),
+            new Promise<never>((_, rejeita) => setTimeout(() => rejeita(new Error("prazo_cakto")), PRAZO_CAKTO_MS)),
+          ]));
+        } catch (e: any) {
+          error = e;
+        }
         if (error || !data?.qrCode) {
-          trackEvent("pix_retry", { offer, context, gateway: braco });
-          await new Promise((r) => setTimeout(r, 1200));
-          ({ data, error } = await supabase.functions.invoke("cakto-pix", {
-          body: {
-            offer,
-            customer: { name: nm || undefined, phone: DUMMY_PHONE, docNumber: doc || undefined },
-            fingerprint,
-            antifraudRef,
-            attribution: getAttributionParams(),
-            fbp: cookie("_fbp"),
-            fbc: cookie("_fbc"),
-            // TikTok (16/08): mesmo raciocínio do fbp/fbc acima. `_ttp` é o
-            // cookie de navegador do TikTok; o ttclid vem na URL e já viaja
-            // dentro de attribution (getAttributionParams).
-            ttp: cookie("_ttp"),
-            sourceUrl: window.location.href,
-          },
-        }));
+          trackEvent("pix_fallback", {
+            offer, context, de: "cakto", para: "asaas", ms: Date.now() - t0,
+            motivo: String(error?.message || data?.error || "sem_qr").slice(0, 120),
+          });
+          gwUsado = "asaas";
+          ({ data, error } = await criarNaAsaas());
         }
       }
       if (error) throw error;
       if (data?.error === "cpf_required") { setStep("form"); setErrMsg("Confere o CPF — o banco exige pra emitir o Pix."); return; }
       if (data?.error || !data?.qrCode) throw new Error(data?.error || "Sem QR na resposta");
-      // segura o QR até o checklist de preparação terminar (~2,3s) — resposta
-      // mais rápida que isso deixaria a "preparação" com cara de mentira
+      setGwDoPix(gwUsado);
+      // A lista da preparação marca "Gerando seu Pix" agora; segura o QR o
+      // mínimo da preparação (resposta rápida demais deixaria a lista com cara
+      // de mentira) ou o tempo de os dois últimos itens marcarem.
+      setPixChegou(true);
       if (SEM_FORM) {
-        const falta = PREPARO_MIN_MS - (Date.now() - t0);
-        if (falta > 0) await new Promise((r) => setTimeout(r, falta));
+        const falta = Math.max(PREPARO_MIN_MS - (Date.now() - t0), PREPARO_FECHO_MS);
+        await new Promise((r) => setTimeout(r, falta));
       }
       // Código NOVO reseta o estado (07d5175, 30/07): sem isso, quem deixa o
       // 1º QR expirar cai numa tela que já diz "copiado" pra um código que
@@ -617,7 +669,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       setMostrarQR(false);
       setPix({ orderId: data.orderId ?? null, qrCode: data.qrCode, qrCodeBase64: data.qrCodeBase64, amount: data.amount ?? price, expiresAt: data.expiresAt });
       setStep("qr");
-      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: braco });
+      trackEvent("pix_generated", { offer, context, order_id: data.orderId, gateway: gwUsado, braco });
       // dia-14: o CPF digitado vira tax_id no perfil → próximo open pula o
       // form. Pagar.me/Cakto salvam no servidor; Asaas/Abacate ignoram o doc,
       // então salva daqui. Não-bloqueante: falha não afeta a venda.
@@ -687,8 +739,9 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
     let ultima = 0;           // trava anti-rajada de troca de aba
     // asaas, abacate e pagarme confirmam E liberam no mesmo passo (check da
     // própria função); só a Cakto depende de webhook + check-subscription.
-    const proprio = braco === "asaas" || braco === "abacate" || braco === "pagarme";
-    const fnNome = braco === "asaas" ? "asaas-pix" : braco === "pagarme" ? "pagarme-pix" : "abacate-pix";
+    // Pergunta a quem EMITIU o Pix (gwDoPix): a Cakto pode ter caído pra Asaas.
+    const proprio = gwDoPix === "asaas" || gwDoPix === "abacate" || gwDoPix === "pagarme";
+    const fnNome = gwDoPix === "asaas" ? "asaas-pix" : gwDoPix === "pagarme" ? "pagarme-pix" : "abacate-pix";
     const orderId = pix?.orderId;
     const poll = async () => {
       const agora = Date.now();
@@ -712,7 +765,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
           : await supabase.functions.invoke("check-subscription");
         if (proprio ? data?.paid : data?.subscribed) {
           doneRef.current = true;
-          trackEvent("pix_confirmed", { offer, context, gateway: braco });
+          trackEvent("pix_confirmed", { offer, context, gateway: gwDoPix, braco });
           // Purchase (Meta+Google) via marca-única: dispara aqui OU no rescue
           // do app se a pessoa já tiver voltado paga. eventID = orderId dedup.
           firePixPurchaseOnce("checkout");
@@ -746,7 +799,7 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
       window.removeEventListener("pageshow", aoVoltar);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, offer, context, pix?.orderId, braco]);
+  }, [step, offer, context, pix?.orderId, gwDoPix]);
 
   const copyCode = async () => {
     if (!pix) return;
@@ -1001,25 +1054,40 @@ export function PixCheckout({ offer, onClose, context, v2 }: Props) {
               </div>
 
               <div className="space-y-3 px-1">
-                {PREPARO_LINHAS.map((txt, i) => (
-                  <motion.div
-                    key={txt}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + i * 0.28 }}
-                    className="flex items-center gap-2.5"
-                  >
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: 0.35 + i * 0.28, type: "spring", stiffness: 300, damping: 18 }}
-                      className="grid place-items-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0"
+                {/* 25/09: o 1º item marca sozinho; "Gerando seu Pix" gira até o
+                    Pix chegar de verdade e o último marca logo depois. Com a
+                    Asaas (<1 s) fica igual a antes; com a Cakto (~4 s) a tela
+                    mostra que está trabalhando em vez de parar com tudo marcado. */}
+                {PREPARO_LINHAS.map((txt, i) => {
+                  const marcado = i === 0 || pixChegou;
+                  return (
+                    <motion.div
+                      key={txt}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + i * 0.28 }}
+                      className="flex items-center gap-2.5"
+                      data-testid={`preparo-${i}`}
+                      data-marcado={marcado ? "1" : "0"}
                     >
-                      <Check className="w-3 h-3" strokeWidth={3.5} />
-                    </motion.span>
-                    <span className="text-[13.5px] font-medium">{txt}…</span>
-                  </motion.div>
-                ))}
+                      {marcado ? (
+                        <motion.span
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ delay: i === 0 ? 0.35 : i === 2 ? 0.16 : 0, type: "spring", stiffness: 300, damping: 18 }}
+                          className="grid place-items-center w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 shrink-0"
+                        >
+                          <Check className="w-3 h-3" strokeWidth={3.5} />
+                        </motion.span>
+                      ) : i === 1 ? (
+                        <span aria-hidden className="w-5 h-5 rounded-full border-2 border-emerald-200 border-t-emerald-600 dark:border-emerald-900 dark:border-t-emerald-400 animate-spin shrink-0" />
+                      ) : (
+                        <span aria-hidden className="w-5 h-5 rounded-full border-2 border-border shrink-0" />
+                      )}
+                      <span className={`text-[13.5px] font-medium ${marcado || i === 1 ? "" : "text-muted-foreground"}`}>{txt}…</span>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}

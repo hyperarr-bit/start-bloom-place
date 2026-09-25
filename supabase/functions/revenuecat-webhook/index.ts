@@ -567,7 +567,11 @@ async function mandarCompraProTikTok(
 
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
-  const chave = Object.keys(PRODUTOS).find((k) => id.startsWith(k));
+  // 24/09: a chave MAIS LONGA que casa, não a primeira da lista. A ordem do
+  // mapa já custou caro 4 vezes (vitalicio_19, vitalicio_97, pré-pagos e o
+  // core_anual_97 do iPhone — que faltava no mapa do sync e gravava todo
+  // teste anual como R$ 159,90, mandado assim pra Meta).
+  const chave = Object.keys(PRODUTOS).filter((k) => id.startsWith(k)).sort((a, b) => b.length - a.length)[0];
   return chave ? PRODUTOS[chave] : { billing: "unknown", cents: null as number | null };
 };
 

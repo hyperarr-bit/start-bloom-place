@@ -99,6 +99,10 @@ const PRODUTOS: Record<string, { billing: string; cents: number }> = {
   "core_mensal:coremensalvista": { billing: "monthly_prepaid", cents: 2490 },
   "core_anual:coreanual97": { billing: "annual_prepaid", cents: 9790 },
   "core_anual:coreanualvista": { billing: "annual_prepaid", cents: 15990 },
+  // 18/09 iOS: anual de R$ 97,90 com 3 dias grátis. Faltava AQUI (o webhook
+  // tinha): o sync roda logo depois da compra, casava "core_anual" e gravava
+  // 159,90 em todo anual do iPhone (24/09).
+  core_anual_97: { billing: "annual", cents: 9790 },
   core_anual: { billing: "annual", cents: 15990 },
   core_mensal: { billing: "monthly", cents: 2490 },
   // Era do produto único (06-08/08): seguem no mapa pra base vitalícia
@@ -522,7 +526,11 @@ async function mandarCompraProTikTok(
 
 const infoProduto = (storeId: string | null | undefined) => {
   const id = storeId ?? "";
-  const chave = Object.keys(PRODUTOS).find((k) => id.startsWith(k));
+  // 24/09: a chave MAIS LONGA que casa, não a primeira da lista. A ordem do
+  // mapa já custou caro 4 vezes (vitalicio_19, vitalicio_97, pré-pagos e o
+  // core_anual_97 do iPhone — que faltava no mapa do sync e gravava todo
+  // teste anual como R$ 159,90, mandado assim pra Meta).
+  const chave = Object.keys(PRODUTOS).filter((k) => id.startsWith(k)).sort((a, b) => b.length - a.length)[0];
   return chave ? PRODUTOS[chave] : { billing: "unknown", cents: null as number | null };
 };
 

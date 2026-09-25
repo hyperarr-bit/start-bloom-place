@@ -116,12 +116,22 @@ serve(async (req) => {
 
     const { data: sub } = await admin
       .from("subscriptions")
-      .select("id, status, plan, current_period_end, abacatepay_subscription_id")
+      .select("id, status, plan, current_period_end, abacatepay_subscription_id, payment_method, revenuecat_subscription_id")
       .eq("user_id", user.id)
       .in("status", ["active", "trialing"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    /* 24/09: assinatura de LOJA (App Store / Google Play) NÃO se cancela
+     * aqui — só a loja cobra e só a loja cancela. Este fluxo gravava pausa,
+     * +7 dias e cancel_scheduled no NOSSO banco e a Apple seguia cobrando
+     * (caso 3d79e6b4, teste do anual do iPhone: "cancelou" pelo site, abriu
+     * chamado "estão me cobrando algo que não estou devendo", e o cron da
+     * Meta leu o período esticado como compra paga de R$ 159,90). */
+    const loja = sub?.payment_method === "play_store"
+      ? (/Aap/.test(String(sub.revenuecat_subscription_id ?? "")) ? "app_store" : "google_play")
+      : null;
 
     if (body.action === "eligibility") {
       return jsonResponse({
@@ -129,6 +139,7 @@ serve(async (req) => {
         canUsePause,
         canUseExtension,
         subscription: sub ?? null,
+        loja,
       });
     }
 
@@ -144,13 +155,14 @@ serve(async (req) => {
         .select("id")
         .single();
       if (error) throw error;
-      logStep("attempt_opened", { attemptId: attempt.id });
+      logStep("attempt_opened", { attemptId: attempt.id, loja });
       return jsonResponse({
         attemptId: attempt.id,
         canUseDiscount,
         canUsePause,
         canUseExtension,
         subscription: sub ?? null,
+        loja,
       });
     }
 
@@ -162,6 +174,20 @@ serve(async (req) => {
       .single();
     if (attemptErr || !attempt || attempt.user_id !== user.id) {
       return jsonResponse({ error: "attempt_not_found" }, 404);
+    }
+
+    // Nada de pausa/desconto/+7 dias/cancelamento de mentira em assinatura de
+    // loja: o cliente é mandado pra tela de assinaturas da Apple/Google.
+    if (loja && ["extend_trial", "apply_discount", "pause_subscription", "confirm_cancel"].includes(body.action)) {
+      // (outcome de cancel_attempts tem CHECK com lista fechada — o registro
+      // vai como evento, sem tocar na tentativa)
+      await admin.from("analytics_events").insert({
+        user_id: user.id,
+        event_name: "cancel_loja_bloqueado",
+        event_data: { action: body.action, loja, attempt_id: attempt.id },
+      });
+      logStep("loja_bloqueada", { userId: user.id, action: body.action, loja });
+      return jsonResponse({ error: "assinatura_da_loja", loja }, 409);
     }
 
     if (body.action === "log_reason") {

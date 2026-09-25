@@ -6,16 +6,43 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Gift, Pause, MessageCircle, Wrench, Clock } from "lucide-react";
+import { Loader2, Gift, Pause, MessageCircle, Wrench, Clock, ExternalLink } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 type Step = "reason" | "offer" | "support" | "done";
 type Reason = "too_expensive" | "not_using" | "missing_feature" | "technical_issue" | "other";
+
+export type LojaDaAssinatura = "app_store" | "google_play";
 
 interface CancelFlowDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCanceled?: () => void;
+  /** 24/09: assinatura feita no app (App Store/Google Play). Só a loja cobra e
+   *  só a loja cancela — este fluxo (motivo → oferta → pausa/desconto) mexia
+   *  só no NOSSO banco e a loja seguia cobrando. Com loja, o diálogo vira o
+   *  passo a passo de cancelar lá. */
+  loja?: LojaDaAssinatura | null;
 }
+
+const PASSOS_DA_LOJA: Record<LojaDaAssinatura, { titulo: string; quem: string; onde: string; passos: string[]; url: string; botao: string }> = {
+  app_store: {
+    titulo: "Cancelar pela App Store",
+    quem: "a Apple",
+    onde: "no iPhone, pela App Store",
+    passos: ["Abra os Ajustes do iPhone", "Toque no seu nome, lá no topo", "Toque em Assinaturas", "Escolha CORE e toque em Cancelar assinatura"],
+    url: "https://apps.apple.com/account/subscriptions",
+    botao: "Abrir assinaturas da App Store",
+  },
+  google_play: {
+    titulo: "Cancelar pelo Google Play",
+    quem: "o Google",
+    onde: "no Android, pelo Google Play",
+    passos: ["Abra a Play Store", "Toque na sua foto, no canto de cima", "Toque em Pagamentos e assinaturas → Assinaturas", "Escolha CORE e toque em Cancelar assinatura"],
+    url: "https://play.google.com/store/account/subscriptions?package=br.com.coreaplicativo.app",
+    botao: "Abrir assinaturas do Google Play",
+  },
+};
 
 const REASONS: { value: Reason; label: string; emoji: string }[] = [
   { value: "too_expensive", label: "Tá caro pra mim agora", emoji: "💸" },
@@ -51,7 +78,13 @@ const OFFER_HEADERS: Record<Reason, { title: string; description: string }> = {
   },
 };
 
-export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowDialogProps) {
+export function CancelFlowDialog({ open, onOpenChange, onCanceled, loja = null }: CancelFlowDialogProps) {
+  // a página pode não saber (consulta falhou); o servidor diz e a gente troca
+  const [lojaDoServidor, setLojaDoServidor] = useState<LojaDaAssinatura | null>(null);
+  const lojaAtiva = loja ?? lojaDoServidor;
+  useEffect(() => {
+    if (open && lojaAtiva) trackEvent("cancel_loja_view", { loja: lojaAtiva });
+  }, [open, lojaAtiva]);
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("reason");
   const [loading, setLoading] = useState(false);
@@ -83,7 +116,14 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
 
   const invoke = async (body: Record<string, unknown>) => {
     const { data, error } = await supabase.functions.invoke("cancel-subscription-flow", { body });
-    if (error) throw error;
+    if (error) {
+      try {
+        const corpo = await (error as { context?: Response }).context?.json?.();
+        if (corpo?.error === "assinatura_da_loja" && corpo?.loja) setLojaDoServidor(corpo.loja);
+      } catch { /* corpo ilegível: segue o erro normal */ }
+      throw error;
+    }
+    if (data?.loja) setLojaDoServidor(data.loja);
     return data as any;
   };
 
@@ -270,6 +310,37 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        {lojaAtiva && (() => {
+          const l = PASSOS_DA_LOJA[lojaAtiva];
+          return (
+            <div className="space-y-4" data-testid="cancelar-na-loja">
+              <DialogHeader>
+                <DialogTitle>{l.titulo}</DialogTitle>
+                <DialogDescription>
+                  Sua assinatura foi feita {l.onde}: quem cobra e quem cancela é {l.quem}. Daqui do site não dá pra parar essa cobrança.
+                </DialogDescription>
+              </DialogHeader>
+              <ol className="space-y-2">
+                {l.passos.map((p, i) => (
+                  <li key={p} className="flex gap-3 text-sm">
+                    <span className="grid place-items-center w-6 h-6 rounded-full bg-muted text-xs font-bold shrink-0">{i + 1}</span>
+                    <span className="pt-0.5">{p}</span>
+                  </li>
+                ))}
+              </ol>
+              <Button asChild className="w-full">
+                <a href={l.url} target="_blank" rel="noopener" onClick={() => trackEvent("cancel_loja_abriu", { loja: lojaAtiva })}>
+                  {l.botao} <ExternalLink className="w-4 h-4 ml-1.5" />
+                </a>
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                Cancelando lá, a loja não cobra a próxima renovação. Seu acesso continua até o fim do período atual.
+              </p>
+              <Button variant="ghost" className="w-full" onClick={() => handleOpenChange(false)}>Fechar</Button>
+            </div>
+          );
+        })()}
+        {!lojaAtiva && (<>
         {/* ============ STEP 1: REASON ============ */}
         {step === "reason" && (
           <>
@@ -517,6 +588,7 @@ export function CancelFlowDialog({ open, onOpenChange, onCanceled }: CancelFlowD
             <Button onClick={() => handleOpenChange(false)}>Fechar</Button>
           </>
         )}
+        </>)}
       </DialogContent>
     </Dialog>
   );

@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { PaymentStatus } from "@/components/PaymentStatus";
 import { PixCheckout, PIX_PRICES } from "@/components/paywall/PixCheckout";
-import { CancelFlowDialog } from "@/components/retention/CancelFlowDialog";
+import { CancelFlowDialog, type LojaDaAssinatura } from "@/components/retention/CancelFlowDialog";
 import { useWinbackTrigger } from "@/hooks/use-winback-trigger";
 
 // A assinatura é o app COMPLETO (16 módulos) — a página de assinatura tem
@@ -231,15 +231,20 @@ const Planos = () => {
   }, [querDs, subLoaded, isSubscribed]);
   // Assinante lifetime não tem o que cancelar (nada renova) — esconde o botão.
   const [isLifetime, setIsLifetime] = useState(false);
+  // 24/09: assinatura feita no APP (App Store/Google Play) só se cancela na
+  // loja — o "Cancelar assinatura" daqui vira o passo a passo de lá.
+  const [loja, setLoja] = useState<LojaDaAssinatura | null>(null);
   useEffect(() => {
     if (!isSubscribed || !user) return;
     // .limit(1) + order: contas antigas podem ter MAIS de uma linha (maybeSingle
     // com 2+ linhas devolve erro e o vitalício não era detectado).
-    supabase.from("subscriptions").select("billing_period, plan")
+    supabase.from("subscriptions").select("billing_period, plan, payment_method, revenuecat_subscription_id")
       .eq("user_id", user.id).order("current_period_end", { ascending: false }).limit(1)
       .then(({ data }) => {
-        const s = data?.[0];
+        // revenuecat_subscription_id existe na tabela mas não nos tipos gerados
+        const s = (data as unknown as Array<{ billing_period?: string | null; plan?: string | null; payment_method?: string | null; revenuecat_subscription_id?: string | null }> | null)?.[0];
         if (s?.billing_period === "lifetime" || s?.plan === "lifetime" || s?.plan === "premium") setIsLifetime(true);
+        if (s?.payment_method === "play_store") setLoja(/Aap/.test(String(s.revenuecat_subscription_id ?? "")) ? "app_store" : "google_play");
       });
   }, [isSubscribed, user]);
 
@@ -292,7 +297,7 @@ const Planos = () => {
             )}
           </div>
         )}
-        <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} />
+        <CancelFlowDialog open={cancelOpen} onOpenChange={setCancelOpen} loja={loja} />
 
         {/* Hero */}
         <div className="text-center space-y-3">

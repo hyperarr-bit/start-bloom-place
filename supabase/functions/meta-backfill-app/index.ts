@@ -34,6 +34,34 @@ let ultimoErroMeta: string | null = null;
 let ultimoPacote: { nomes: string[]; resposta: string } | null = null;
 let ultimoErroTikTok: string | null = null;
 
+/* 24/09: "compra paga" de ASSINATURA só com cobrança CONFIRMADA no
+ * RevenueCat. O detector antigo lia o tamanho do período na NOSSA tabela
+ * (≥10 dias = pago) — e o fluxo de cancelar do site esticava esse período
+ * no nosso banco ("pausa" +30 dias) sem a loja cobrar nada: a Meta recebeu
+ * um Purchase de R$ 159,90 de quem estava no teste grátis (conta 3d79e6b4)
+ * e a ilusao apareceu com ROAS 1,78. Agora: status "trialing" = não pagou;
+ * pago = receita bruta > 0 na assinatura. Sem resposta do RevenueCat, NÃO
+ * manda (o cron de 15 min tenta de novo) — atrasar é melhor que inventar. */
+const RC_API = "https://api.revenuecat.com/v2";
+const PROJETO = Deno.env.get("REVENUECAT_PROJECT_ID") ?? "proj1f095041";
+async function cobrancaConfirmadaNoRevenueCat(userId: string, txId: string): Promise<boolean | null> {
+  const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
+  if (!secret) return null;
+  try {
+    const r = await fetch(`${RC_API}/projects/${PROJETO}/customers/${encodeURIComponent(userId)}/subscriptions`, {
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const sub = (j?.items ?? []).find((x: { id?: string }) => x?.id === txId);
+    if (!sub) return null;
+    if (sub.status === "trialing") return false;
+    return Number(sub?.total_revenue_in_usd?.gross ?? 0) > 0;
+  } catch {
+    return null;
+  }
+}
+
 const sha256 = async (txt: string): Promise<string> => {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -474,6 +502,27 @@ serve(async (req) => {
     const cron = !ehAdmin;
     if (cron && String(body?.modo ?? "") !== "cron") return json({ error: "forbidden" }, 403);
 
+    /* DIAGNÓSTICO (24/09, só admin): o que o RevenueCat diz de uma assinatura
+     * — status e receita — sem mandar nada pra Meta. Existe pra conferir o
+     * formato da resposta que o cobrancaConfirmadaNoRevenueCat lê. */
+    if (!cron && body?.diagnosticoRC?.userId && body?.diagnosticoRC?.tx) {
+      const secret = Deno.env.get("REVENUECAT_SECRET_KEY") ?? "";
+      const r = await fetch(`${RC_API}/projects/${PROJETO}/customers/${encodeURIComponent(String(body.diagnosticoRC.userId))}/subscriptions`, {
+        headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      });
+      const j = r.ok ? await r.json() : null;
+      const sub = (j?.items ?? []).find((x: { id?: string }) => x?.id === String(body.diagnosticoRC.tx));
+      return json({
+        http: r.status,
+        achou: !!sub,
+        status: sub?.status ?? null,
+        gives_access: sub?.gives_access ?? null,
+        total_revenue_in_usd: sub?.total_revenue_in_usd ?? null,
+        auto_renewal_status: sub?.auto_renewal_status ?? null,
+        veredito: await cobrancaConfirmadaNoRevenueCat(String(body.diagnosticoRC.userId), String(body.diagnosticoRC.tx)),
+      });
+    }
+
     /* REENVIO FORÇADO — lista EXPLÍCITA de tx, só pra admin logado. Nunca uma
      * flag "força tudo": o estrago de reenviar a base inteira seria o mesmo
      * bug de 17-22/08 (1.292 Purchase fantasma), e ninguém quer repetir. */
@@ -568,6 +617,15 @@ serve(async (req) => {
           .contains("event_data", { tx: v.revenuecat_subscription_id })
           .maybeSingle();
         if (antes.data) { feitos.push({ tx: v.revenuecat_subscription_id, resultado: "ja_enviado" }); continue; }
+      }
+      // Assinatura (sub…): só com cobrança confirmada na loja. Compra única
+      // (otp…, vitalício) é dinheiro na hora — segue como sempre.
+      if (/^sub/.test(String(v.revenuecat_subscription_id)) && !forcarEsta) {
+        const pago = await cobrancaConfirmadaNoRevenueCat(v.user_id, String(v.revenuecat_subscription_id));
+        if (pago !== true) {
+          feitos.push({ tx: v.revenuecat_subscription_id, resultado: pago === false ? "sem_cobranca_ainda" : "revenuecat_sem_resposta" });
+          continue;
+        }
       }
       await mandarCompraProMeta(
         admin, v.user_id, v.customer_email, v.amount_cents ?? 2790,

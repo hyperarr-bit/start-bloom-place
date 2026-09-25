@@ -318,6 +318,8 @@ const ExcluirConta = lazyPage(() => import("./pages/Legal").then((m) => ({ defau
 // contato. Ver src/pages/site/SiteHome.tsx e src/lib/empresa.ts.
 const SiteHome = lazyPage(() => import("./pages/site/SiteHome"));
 const Suporte = lazyPage(() => import("./pages/site/Suporte"));
+// 24/09: passo a passo de como entrar no app com a conta da compra da web
+const ComoEntrar = lazyPage(() => import("./pages/ComoEntrar"));
 // Ajuda e suporte DENTRO do app (07/09, pedido de cliente por DM). Não é a
 // /suporte do site: aquela é SoNaWeb e nunca abriu no shell — que era
 // exatamente o buraco. Esta funciona nos dois.
@@ -524,6 +526,7 @@ const AnimatedRoutes = () => {
             externo, a mesma trava dos funis. O revisor da Apple abre pelo
             NAVEGADOR, então a exigência dela continua atendida. */}
         <Route path="/suporte" element={<SoNaWeb><PageTransition><Suporte /></PageTransition></SoNaWeb>} />
+        <Route path="/como-entrar" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="como-entrar"><ComoEntrar /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/" element={<RootGate />} />
         {/* LP aposentada — o funil (/comecar) é a entrada. Redireciona links/ads antigos. */}
         <Route path="/lp" element={<Navigate to="/comecar" replace />} />

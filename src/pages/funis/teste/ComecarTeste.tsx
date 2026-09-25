@@ -1146,7 +1146,7 @@ export default function ComecarTeste() {
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
             <AppWelcome
               onComecar={() => setStep("promessas")}
-              onEntrar={() => { /* "Já tenho conta" = LOGIN, não cadastro (bug 20/08: caía na tela de criar conta) */ navigate("/auth"); }}
+              onEntrar={() => { /* "Já tenho conta" = LOGIN, não cadastro (bug 20/08: caía na tela de criar conta). 24/09: /entrar (código por e-mail + Apple/Google), não o /auth antigo */ navigate("/entrar"); }}
             />
           </motion.div>
         )}

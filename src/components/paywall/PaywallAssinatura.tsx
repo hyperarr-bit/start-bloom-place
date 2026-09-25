@@ -739,6 +739,30 @@ export function PaywallAssinatura({
         </button>
       )}
 
+      {/* 24/09: o GATE cobre a tela inteira e não tinha saída. Quem entrou
+          na conta errada — ou criou uma sem querer no "Crie agora" do login
+          antigo (80 contas assim em 17–24/09) — ficava entre pagar de novo e
+          apagar o app. Mostra em que conta a pessoa está e deixa trocar. */}
+      {contexto === "gate" && user && (
+        <p className="mt-3 text-center text-[12px] leading-snug text-muted-foreground" data-testid="gate-trocar-conta">
+          Você está na conta <b className="text-foreground break-all">{user.email ?? "sem e-mail"}</b>.{" "}
+          <button
+            type="button"
+            className="font-semibold text-foreground underline underline-offset-2"
+            onClick={async () => {
+              trackEvent("gate_trocar_conta", {});
+              try {
+                const { supabase } = await import("@/integrations/supabase/client");
+                await supabase.auth.signOut();
+              } catch { /* sem rede: o /entrar resolve */ }
+              navigate("/entrar", { replace: true });
+            }}
+          >
+            Entrar com outra conta
+          </button>
+        </p>
+      )}
+
       {/* /planos e GATE levam o AppLegalFooter completo (o gate tinha perdido
           o "Excluir conta" — exigência da Play pra conta logada). No funil a
           letra miúda mora na barra fixa. */}

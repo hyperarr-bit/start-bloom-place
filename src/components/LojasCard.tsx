@@ -110,6 +110,14 @@ export const LojasCard = ({ variant }: { variant: "home" | "welcome" }) => {
           : "Baixa da loja e entra com o mesmo e-mail — sua compra já está lá, sem pagar de novo."}
       </p>
       <BotoesDasLojas origem={variant} />
+      {/* 24/09: o toque certo no app (o botão grande de lá é "Começar", que
+          cria conta nova) + o passo a passo com fotos */}
+      <p className="text-xs text-muted-foreground mt-3" data-testid="lojas-como-entrar">
+        No app, toque em <b className="text-foreground">“Já tenho conta? Entrar”</b>.{" "}
+        <a href="/como-entrar" className="font-semibold underline underline-offset-2 text-foreground" onClick={() => trackEvent("como_entrar_click", { origem: variant })}>
+          Passo a passo
+        </a>
+      </p>
     </div>
   );
 };

@@ -154,6 +154,13 @@ const welcomeHtml = (firstName: string | null, email: string) => `<!doctype html
       <td style="padding:0 8px 0 0;"><a href="https://apps.apple.com/br/app/id6806913181" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#63743; App Store</a></td>
       <td><a href="https://play.google.com/store/apps/details?id=br.com.coreaplicativo.app&referrer=utm_source%3Dweb%26utm_medium%3Demail%26utm_campaign%3Dweb_email" style="display:inline-block;background:#16121c;color:#fff;text-decoration:none;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;">&#9654; Google Play</a></td>
     </tr></table>
+    <table role="presentation" width="100%" style="margin:14px 0 6px;background:#fdf2f8;border-radius:12px;"><tr><td style="padding:14px 16px;font-size:13px;line-height:1.7;color:#211d18;">
+      <b style="font-size:14px;">Como entrar no app (1 minuto)</b><br>
+      <b>1.</b> Baixe o CORE na App Store ou no Google Play.<br>
+      <b>2.</b> Abra e toque em <b>&ldquo;Já tenho conta? Entrar&rdquo;</b> &mdash; <u>não</u> em &ldquo;Começar&rdquo; (ele cria uma conta nova, sem a sua compra).<br>
+      <b>3.</b> Entre com <b>${email}</b> e a sua senha. Não lembra? Toque em &ldquo;Entrar sem senha &mdash; receber código por e-mail&rdquo; ou em &ldquo;Esqueci minha senha&rdquo;.
+    </td></tr></table>
+    <a href="https://www.coreaplicativo.com.br/como-entrar" style="display:inline-block;margin:2px 0 10px;color:#c2185b;font-size:13px;font-weight:700;text-decoration:underline;">Ver o passo a passo com fotos &rarr;</a>
     <p style="font-size:12px;color:#8a8378;margin:0 0 4px;">No computador, é o mesmo CORE em coreaplicativo.com.br.</p>
     <p style="font-size:12px;color:#8a8378;margin:16px 0 0;">Esqueceu a senha? Use "Esqueci minha senha" com esse mesmo e-mail.</p>
   </td></tr></table>

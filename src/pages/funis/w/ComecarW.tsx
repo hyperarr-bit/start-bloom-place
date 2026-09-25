@@ -693,7 +693,12 @@ export default function ComecarW() {
           <motion.div key="welcome" exit={{ opacity: 0 }} transition={{ duration: 0.45 }}>
             <AppWelcome
               onComecar={() => setStep("promessas")}
-              onEntrar={() => navigate("/auth")}
+              onEntrar={() => navigate("/entrar")} /* 24/09: /entrar é o login completo do app —
+                 código por e-mail + Apple/Google. O /auth antigo, no app, só tinha
+                 e-mail e senha: quem criou a conta com Google no site ou esqueceu
+                 a senha travava ali. 17–24/09, das 374 sessões que tocaram em
+                 "Entrar": 80 nunca logaram e outras 80 acabaram no "Crie agora"
+                 do /auth → conta nova sem compra → paywall. */
             />
           </motion.div>
         )}

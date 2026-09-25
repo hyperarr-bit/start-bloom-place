@@ -189,6 +189,15 @@ export const BoasVindasPago = ({ nome, onComecar, imediato }: {
                 O CORE está na App Store e no Google Play. Entra com o mesmo e-mail — sua compra já está lá.
               </p>
               <BotoesDasLojas origem="pos_compra" />
+              {/* 24/09: 57 de 153 compradores da web nunca entraram no app com a
+                  conta que pagou — no app o botão grande é "Começar" (conta
+                  nova, pede pagamento). O toque certo, dito aqui e com fotos. */}
+              <p className="text-[12px] text-muted-foreground mt-3 leading-snug" data-testid="pos-compra-como-entrar">
+                No app, toque em <b className="text-foreground">“Já tenho conta? Entrar”</b> — não em “Começar”.{" "}
+                <a href="/como-entrar" className="font-semibold underline underline-offset-2 text-foreground" onClick={() => trackEvent("como_entrar_click", { origem: "pos_compra" })}>
+                  Ver o passo a passo
+                </a>
+              </p>
             </motion.div>
           )}
 

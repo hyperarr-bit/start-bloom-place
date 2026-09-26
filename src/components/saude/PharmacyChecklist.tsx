@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { localDayKey } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Trash2, Check, Package } from "lucide-react";
+import { Plus, Trash2, Check, Package, Pencil } from "lucide-react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { CHAVE_DEPENDENTES } from "@/lib/saude-dependentes";
 import { useUserData } from "@/hooks/use-user-data";
@@ -25,6 +25,58 @@ interface Supplement {
 
 const todayStr = () => localDayKey(); // dia LOCAL — toISOString virava amanhã depois das 21h (fix 16/07)
 
+/* ESTOQUE EDITÁVEL (25/09, cliente: "como alterar a quantidade de
+ * medicamentos"). Todo remédio nascia com 30 e o número só descia marcando
+ * "tomado" — caixa de 60 ou caixa nova não tinha como acertar sem apagar e
+ * recadastrar. Agora: "Qtd" no cadastro e toque no número pra corrigir. */
+const ESTOQUE_PADRAO = 30;
+const soDigitos = (v: string) => v.replace(/\D/g, "").slice(0, 4);
+const lerEstoque = (v: string): number | null => {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= 0 ? Math.min(9999, n) : null;
+};
+
+const EstoqueEditavel = ({ nome, valor, baixo, onSalvar }: { nome: string; valor: number; baixo: boolean; onSalvar: (n: number) => void }) => {
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState("");
+  const salvar = () => {
+    const n = lerEstoque(rascunho);
+    if (n !== null && n !== valor) onSalvar(n); // vazio ou inválido não zera nada
+    setEditando(false);
+  };
+  if (editando) {
+    return (
+      <input
+        type="text"
+        inputMode="numeric"
+        autoFocus
+        value={rascunho}
+        aria-label={`Estoque de ${nome}`}
+        onChange={e => setRascunho(soDigitos(e.target.value))}
+        onFocus={e => e.currentTarget.select()}
+        onBlur={salvar}
+        onKeyDown={e => { if (e.key === "Enter") salvar(); if (e.key === "Escape") setEditando(false); }}
+        className="w-14 h-7 rounded-md border border-border bg-background px-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        data-testid="estoque-input"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => { setRascunho(String(valor)); setEditando(true); }}
+      aria-label={`Alterar estoque de ${nome} (${valor})`}
+      title="Toque pra alterar a quantidade"
+      className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 -mx-1.5 border border-dashed border-transparent hover:border-border transition-colors ${baixo ? "text-[10px] font-semibold text-[hsl(var(--saude-yellow))]" : "text-xs text-muted-foreground"}`}
+      data-testid="estoque-botao"
+    >
+      {baixo && <Package className="w-3 h-3" />}
+      {valor}
+      <Pencil className="w-2.5 h-2.5 opacity-40" aria-hidden />
+    </button>
+  );
+};
+
 const nameColors = [
   "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -44,6 +96,7 @@ export const PharmacyChecklist = () => {
   const [newName, setNewName] = useState("");
   const [newTime, setNewTime] = useState("08:00");
   const [newQuem, setNewQuem] = useState("");
+  const [newStock, setNewStock] = useState(String(ESTOQUE_PADRAO));
   const [dependentes, setDependentes] = usePersistedState<string[]>(CHAVE_DEPENDENTES, []);
   const takenToday = supplementLog[today] || [];
 
@@ -83,11 +136,13 @@ export const PharmacyChecklist = () => {
   const addSupplement = () => {
     if (!newName.trim()) return;
     const quem = newQuem.trim();
-    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock: 30, dosesPerDay: 1, ...(quem ? { quem } : {}) }];
+    const stock = lerEstoque(newStock) ?? ESTOQUE_PADRAO;
+    const lista = [...supplements, { id: Date.now().toString(), name: newName.trim(), time: newTime, stock, dosesPerDay: 1, ...(quem ? { quem } : {}) }];
     setSupplements(lista);
     if (quem && !dependentes.includes(quem)) setDependentes([...dependentes, quem]);
     setNewName("");
     setNewQuem("");
+    setNewStock(String(ESTOQUE_PADRAO));
     void rearmarLembretes(lista, true);
   };
 
@@ -104,6 +159,10 @@ export const PharmacyChecklist = () => {
     const lista = supplements.map(s => s.id === id ? { ...s, time } : s);
     setSupplements(lista);
     void rearmarLembretes(lista, false);
+  };
+
+  const changeStock = (id: string, stock: number) => {
+    setSupplements(prev => prev.map(s => s.id === id ? { ...s, stock } : s));
   };
 
   return (
@@ -123,7 +182,7 @@ export const PharmacyChecklist = () => {
                 <th className="w-10 px-3 py-3" />
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Nome</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Horário</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Estoque</th>
+                <th className="text-left pl-3 pr-2 py-3 text-xs font-semibold text-muted-foreground">Estoque</th>
                 <th className="px-2 py-3" />
               </tr>
             </thead>
@@ -145,6 +204,7 @@ export const PharmacyChecklist = () => {
                       <td className="px-3 py-3">
                         <button
                           onClick={() => toggleTaken(s.id)}
+                          aria-label={taken ? `Desmarcar ${s.name}` : `Marcar ${s.name} como tomado`}
                           className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${taken ? "bg-[hsl(var(--saude-green))] border-[hsl(var(--saude-green))]" : "border-muted-foreground/30 hover:border-[hsl(var(--saude-green)/0.5)]"}`}
                         >
                           {taken && <Check className="w-3 h-3 text-white" />}
@@ -169,14 +229,8 @@ export const PharmacyChecklist = () => {
                           className="bg-transparent text-xs text-muted-foreground min-w-[5.5rem] w-auto focus:outline-none focus:text-foreground"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        {lowStock ? (
-                          <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--saude-yellow))] font-semibold">
-                            <Package className="w-3 h-3" /> {s.stock}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">{s.stock}</span>
-                        )}
+                      <td className="pl-3 pr-2 py-3">
+                        <EstoqueEditavel nome={s.name} valor={s.stock} baixo={lowStock} onSalvar={n => changeStock(s.id, n)} />
                       </td>
                       <td className="px-2 py-3">
                         <button onClick={() => removeSupplement(s.id)} className="text-muted-foreground hover:text-destructive transition-colors">
@@ -230,16 +284,33 @@ export const PharmacyChecklist = () => {
           </button>
         </div>
         {/* de quem é (22/09): vazio = seu; o nome vai no lembrete ("Hora do Ômega 3 (Mãe)") */}
-        <Input
-          value={newQuem}
-          onChange={e => setNewQuem(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && addSupplement()}
-          placeholder="Pra quem? (vazio = você · ex.: Filho, Mãe)"
-          className="text-xs h-9"
-          list="saude-dependentes-remedio"
-          aria-label="Pra quem é o remédio"
-          data-testid="remedio-quem"
-        />
+        <div className="flex gap-2">
+          <Input
+            value={newQuem}
+            onChange={e => setNewQuem(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && addSupplement()}
+            placeholder="Pra quem? (vazio = você · ex.: Filho, Mãe)"
+            className="text-xs h-9 flex-1"
+            list="saude-dependentes-remedio"
+            aria-label="Pra quem é o remédio"
+            data-testid="remedio-quem"
+          />
+          {/* quantidade da caixa (25/09): vira o estoque inicial; vazio = 30 */}
+          <label className="flex items-center gap-1.5 h-9 rounded-md border border-input bg-background px-2.5 text-xs text-muted-foreground flex-shrink-0">
+            Qtd
+            <input
+              type="text"
+              inputMode="numeric"
+              value={newStock}
+              onChange={e => setNewStock(soDigitos(e.target.value))}
+              onFocus={e => e.currentTarget.select()}
+              onKeyDown={e => e.key === "Enter" && addSupplement()}
+              aria-label="Quantidade em estoque"
+              data-testid="remedio-qtd"
+              className="w-9 bg-transparent text-foreground focus:outline-none"
+            />
+          </label>
+        </div>
         <datalist id="saude-dependentes-remedio">
           {dependentes.map(d => <option key={d} value={d} />)}
         </datalist>

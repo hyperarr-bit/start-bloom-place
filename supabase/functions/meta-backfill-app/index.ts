@@ -580,6 +580,7 @@ serve(async (req) => {
        * como Purchase de verdade. */
       const ini = v.current_period_start ? Date.parse(v.current_period_start) : null;
       const fim = v.current_period_end ? Date.parse(v.current_period_end) : null;
+      let cobrancaJaConfirmada = false;
       if (ini && fim && fim - ini < 10 * 86400_000 && fim - ini > 0) {
         // Purchase NÃO (dinheiro ainda não existe) — mas StartTrial SIM
         // (18/08): folha aprovada com cartão preso é o sinal de intenção que
@@ -597,8 +598,22 @@ serve(async (req) => {
           v.revenuecat_subscription_id, v.current_period_start ?? v.created_at,
           true,
         );
-        feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_starttrial" });
-        continue;
+        /* TESTE QUE JÁ VENCEU (26/09): a linha só vira 365 dias quando o
+         * webhook/sync a reescreve depois da cobrança — e isso não aconteceu em
+         * 5 dos 8 testes do iPhone que PAGARAM (turmas 21–23/09). A Apple
+         * cobrou, a linha seguiu com os 3 dias do teste e este detector mandava
+         * só StartTrial pra sempre: a Meta viu 3 de 8 vendas. Com o teste
+         * vencido, pergunta ao RevenueCat; se cobrou, segue pro Purchase abaixo
+         * como qualquer venda paga (marcador e idempotência iguais). */
+        const tx = String(v.revenuecat_subscription_id);
+        const pago = fim <= Date.now() && /^sub/.test(tx)
+          ? await cobrancaConfirmadaNoRevenueCat(v.user_id, tx)
+          : false;
+        if (pago !== true) {
+          feitos.push({ tx: v.revenuecat_subscription_id, resultado: "trial_starttrial" });
+          continue;
+        }
+        cobrancaJaConfirmada = true;
       }
       // TikTok ANTES do `continue` da Meta: os marcadores são separados, e a
       // venda que a Meta já recebeu ainda pode dever o evento pro TikTok
@@ -620,7 +635,7 @@ serve(async (req) => {
       }
       // Assinatura (sub…): só com cobrança confirmada na loja. Compra única
       // (otp…, vitalício) é dinheiro na hora — segue como sempre.
-      if (/^sub/.test(String(v.revenuecat_subscription_id)) && !forcarEsta) {
+      if (/^sub/.test(String(v.revenuecat_subscription_id)) && !forcarEsta && !cobrancaJaConfirmada) {
         const pago = await cobrancaConfirmadaNoRevenueCat(v.user_id, String(v.revenuecat_subscription_id));
         if (pago !== true) {
           feitos.push({ tx: v.revenuecat_subscription_id, resultado: pago === false ? "sem_cobranca_ainda" : "revenuecat_sem_resposta" });

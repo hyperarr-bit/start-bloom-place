@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText, Loader2 } from "lucide-react";
+import { Plus, Trash2, ChevronDown, ChevronLeft, ImagePlus, Link, X, FileText, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadFromInput, isBase64Image, migrateBase64ToStorage } from "@/lib/image-upload";
@@ -167,7 +167,8 @@ export const GoalsBoardV2 = ({ apenasIds = null }: { apenasIds?: Set<string> | n
   const openGoal = (id: string) => { setSelectedGoalId(id); setView("detail"); };
 
   /* ─── HOME VIEW ─── */
-  if (view === "home") {
+  // sem meta nenhuma (a última foi apagada) o detalhe não tem o que mostrar
+  if (view === "home" || !goal) {
     const addTimelineItem = (period: keyof TimelineData, text: string) => {
       if (!text.trim()) return;
       setTimeline(prev => {
@@ -342,8 +343,12 @@ export const GoalsBoardV2 = ({ apenasIds = null }: { apenasIds?: Set<string> | n
     setNewLinkUrl("");
   };
   const addProblem = () => updateGoal({ ...goal, problems: [...goal.problems, { id: Date.now().toString(), problem: "", solution: "" }] });
+  /* 25/09 (chamado do app: "apertei enter sem querer escrevendo uma meta e não
+   * consigo mais editar nem apagar"): a lixeira só aparecia com 2+ metas e a
+   * troca de nome nunca era ligada. Agora apaga sempre (com confirmação) e o
+   * lápis ao lado do nome renomeia. */
   const deleteGoal = () => {
-    if (goalsTodas.length <= 1) return;
+    if (!window.confirm(`Apagar a meta "${goal.title}"?`)) return;
     // sempre a lista COMPLETA: com o filtro de etiqueta ligado, filtrar a
     // lista visível apagaria as metas escondidas junto
     setGoals(goalsTodas.filter(g => g.id !== goal.id)); setView("home");
@@ -373,7 +378,9 @@ export const GoalsBoardV2 = ({ apenasIds = null }: { apenasIds?: Set<string> | n
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {editingTitle ? (
             <input value={goal.title} onChange={e => updateGoal({ ...goal, title: e.target.value })}
-              onBlur={() => setEditingTitle(false)} onKeyDown={e => e.key === "Enter" && setEditingTitle(false)}
+              onBlur={() => { if (!goal.title.trim()) updateGoal({ ...goal, title: "Minha meta" }); setEditingTitle(false); }}
+              onKeyDown={e => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+              aria-label="Nome da meta"
               autoFocus className="w-full bg-transparent text-xl font-black tracking-tight outline-none border-b-2 border-primary pb-1" />
           ) : (
             <button onClick={() => setShowDropdown(!showDropdown)} className="flex items-center gap-2 text-xl font-black tracking-tight truncate">
@@ -381,11 +388,14 @@ export const GoalsBoardV2 = ({ apenasIds = null }: { apenasIds?: Set<string> | n
             </button>
           )}
         </div>
-        {goals.length > 1 && (
-          <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground" onClick={deleteGoal}>
-            <Trash2 className="w-4 h-4" />
+        {!editingTitle && (
+          <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground" onClick={() => { setShowDropdown(false); setEditingTitle(true); }} aria-label="Renomear meta">
+            <Pencil className="w-4 h-4" />
           </Button>
         )}
+        <Button size="icon" variant="ghost" className="shrink-0 h-8 w-8 text-muted-foreground" onClick={deleteGoal} aria-label="Apagar meta">
+          <Trash2 className="w-4 h-4" />
+        </Button>
       </div>
       {/* Goal switcher dropdown */}
       {showDropdown && (

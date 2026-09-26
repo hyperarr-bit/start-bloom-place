@@ -137,7 +137,8 @@ export const EtiquetasDasMetas = ({ onFiltrar }: { onFiltrar?: (ids: Set<string>
     return { tags: [...tags].sort((a, b) => a.localeCompare(b)), anos: [...anos].sort((a, b) => b.localeCompare(a)) };
   }, [metas, etiquetas]);
 
-  if (metas.length === 0) return null;
+  // 25/09: o `return null` vinha ANTES do useEffect — criar a 1ª meta mudava o
+  // número de hooks e derrubava a tela. Agora os hooks rodam sempre.
   const visiveis = metas.filter(m => casaComFiltro(etiquetaDe(etiquetas, m.id), filtro));
   // O quadro de cima (GoalsBoardV2) recebe o mesmo filtro (13/09): antes só
   // esta lista filtrava e o quadro seguia mostrando tudo.
@@ -145,6 +146,7 @@ export const EtiquetasDasMetas = ({ onFiltrar }: { onFiltrar?: (ids: Set<string>
     onFiltrar?.(filtro === null ? null : new Set(visiveis.map(m => m.id)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtro, visiveis.map(m => m.id).join("|")]);
+  if (metas.length === 0) return null;
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">

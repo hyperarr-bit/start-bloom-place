@@ -1076,7 +1076,11 @@ html.core-shell [data-sem-expansao-toque] :is(button, a[href], [role="button"]):
    ============================================================ */
 @media (hover: none) {
   .group-hover\:opacity-100.group-hover\:opacity-100,
-  .group-hover\/img\:opacity-100.group-hover\/img\:opacity-100 {
+  .group-hover\/img\:opacity-100.group-hover\/img\:opacity-100,
+  /* 25/09: grupos nomeados das Metas (itens da linha do tempo e tarefas do
+     plano) — o X de apagar ficava invisível no iPhone */
+  .group-hover\/item\:opacity-100.group-hover\/item\:opacity-100,
+  .group-hover\/task\:opacity-100.group-hover\/task\:opacity-100 {
     opacity: 1;
   }
 }

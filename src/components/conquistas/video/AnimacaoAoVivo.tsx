@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { ArteComVideo, DadosArtes } from "../artes-dados";
-import { ALTURA, DURACAO, LARGURA, desenharQuadro, type Camadas } from "./animacao";
-import { prepararCamadas } from "./camadas";
+import { ALTURA, LARGURA } from "./animacao";
+import { prepararRoteiro, type Roteiro } from "./camadas";
 
 /**
  * A PRÉVIA AO VIVO (27/09): a mesma animação do vídeo tocando num canvas do
  * tamanho do palco, em laço, por cima da arte parada (que fica visível até
- * as camadas ficarem prontas). As camadas ficam guardadas: o "Postar vídeo"
+ * as camadas ficarem prontas). O roteiro fica guardado: o "Postar vídeo"
  * logo depois não fotografa de novo. Pausa enquanto o vídeo é gerado (o fio
  * é um só).
  */
@@ -19,17 +19,17 @@ interface Props {
 
 const AnimacaoAoVivo = ({ arte, dados, largura, pausado }: Props) => {
   const ref = useRef<HTMLCanvasElement>(null);
-  const camadas = useRef<Camadas | null>(null);
+  const roteiro = useRef<Roteiro | null>(null);
   const t0 = useRef(0);
   const [pronto, setPronto] = useState(false);
 
   useEffect(() => {
     let vivo = true;
     setPronto(false);
-    prepararCamadas(arte, dados).then((c) => {
+    prepararRoteiro(arte, dados).then((r) => {
       if (!vivo) return;
-      camadas.current = c;
-      if (c) {
+      roteiro.current = r;
+      if (r) {
         t0.current = performance.now();
         setPronto(true);
       }
@@ -39,8 +39,8 @@ const AnimacaoAoVivo = ({ arte, dados, largura, pausado }: Props) => {
 
   useEffect(() => {
     const canvas = ref.current;
-    const c = camadas.current;
-    if (!pronto || !canvas || !c || pausado) return;
+    const r = roteiro.current;
+    if (!pronto || !canvas || !r || pausado) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.round(largura * dpr);
     const h = Math.round(((largura * ALTURA) / LARGURA) * dpr);
@@ -49,7 +49,7 @@ const AnimacaoAoVivo = ({ arte, dados, largura, pausado }: Props) => {
     if (!ctx) return;
     let raf = 0;
     const passo = () => {
-      desenharQuadro(ctx, c, ((performance.now() - t0.current) / 1000) % DURACAO, w / LARGURA);
+      r.desenhar(ctx, ((performance.now() - t0.current) / 1000) % r.duracao, w / LARGURA);
       raf = requestAnimationFrame(passo);
     };
     passo();

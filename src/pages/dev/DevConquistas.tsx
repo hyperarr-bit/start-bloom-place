@@ -12,8 +12,10 @@ import { useConquistas } from "@/components/conquistas/use-conquistas";
  * dentro de `import.meta.env.DEV`; some do build). A tela de Conquistas de
  * verdade com os dados da demo "Ana Beatriz", pra olhar, fotografar e filmar
  * sem conta: ?semana=completa · ?momento=epico|lendario|raro|comum ·
- * ?sem=1 (pouco dado: 1 adesivo, o álbum mostra os próximos) · ?zero=1 (nada
- * colado: "COMEÇANDO O ÁLBUM") · ?desafios=off · ?bar=0.
+ * ?sem=1 (pouco dado: 1 adesivo, as primeiras insígnias) · ?zero=1 (nada
+ * colado: "COMEÇANDO O ÁLBUM") · ?desafios=off · ?bar=0 · ?valores=1
+ * (mostrar R$/peso) · ?dica=0 (sem a dica do planner) · ?novas=2 (pacotinho
+ * com 2 figurinhas novas) · ?tema=escuro.
  */
 
 const dias = (de: number, ate: number, hoje: string, pular: string[] = []) => {
@@ -27,18 +29,38 @@ const dias = (de: number, ate: number, hoje: string, pular: string[] = []) => {
 
 const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean, zero = false): Record<string, unknown> => {
   const mes = hoje.slice(0, 7);
+  const diaDoMes = Number(hoje.slice(8, 10));
+  /** Os dias do mês corrente até hoje, a cada `passo` (com um deslocamento). */
+  const doMes = (passo = 1, desloca = 0, ate = diaDoMes) => {
+    const out: string[] = [];
+    for (let d = 1 + desloca; d <= ate; d += passo) out.push(`${mes}-${String(d).padStart(2, "0")}`);
+    return out;
+  };
   // semana normal (sábado): SEG…SEX feitos com QUA protegida, SÁB hoje em aberto, DOM futuro
   const lista = semanaCompleta ? dias(19, 0, hoje, [somarDias(hoje, -4)]) : dias(18, 1, hoje, [somarDias(hoje, -3)]);
   const heat: Record<string, boolean> = {};
-  for (const d of dias(21, 1, hoje)) heat[d] = true;
+  for (const d of dias(48, 1, hoje)) heat[d] = true;
   const agua: Record<string, number> = {};
   for (const d of dias(24, 2, hoje)) agua[d] = 8;
-  const treinos = dias(64, 1, hoje).filter((_, i) => i % 2 === 0).slice(0, 32);
+  // 19 treinos no mês (dias ímpares + alguns), 68 no total desde julho
+  const treinosDoMes = doMes(1).filter((_, i) => i % 3 !== 2);
+  const treinosAntes = dias(90, diaDoMes + 1, hoje).filter((_, i) => i % 2 === 0);
+  const treinos = [...treinosAntes, ...treinosDoMes].slice(-68);
+  const volume: Record<string, number> = {};
+  treinosDoMes.forEach((d, i) => { volume[d] = 1100 + (i % 4) * 90; });
   const humor: Record<string, { mood: number; note: string }> = {};
   for (const d of dias(9, 1, hoje)) humor[d] = { mood: 4, note: "" };
+  // dieta: todas as refeições marcadas em 21 dias do mês
+  const dieta: Record<string, { meals: Record<string, { followed: boolean }> }> = {};
+  doMes(1).slice(0, 21).forEach((d) => { dieta[d] = { meals: { cafe: { followed: true }, almoco: { followed: true }, jantar: { followed: true }, lanche: { followed: true } } }; });
+  // rotina: "Meditar" em 22 dias, "Ler" em 15
+  const habitLog: Record<string, string[]> = {};
+  doMes(1).forEach((d, i) => { habitLog[d] = i % 5 === 4 ? ["Ler"] : i % 3 === 2 ? ["Meditar", "Ler"] : ["Meditar", "Água"]; });
+  const sono: Record<string, number> = {};
+  doMes(1).forEach((d, i) => { sono[d] = i % 4 === 3 ? 6.5 : 8; });
   // receitas 4.200 − (variáveis 1.540 + fixos 1.420) = sobrou R$ 1.240 (o Painel da demo)
   const gastos = ["Mercado", "Uber", "Farmácia", "Padaria", "Restaurante", "Ônibus", "Ifood", "Cinema"].map((n, i) => ({
-    id: `g${i}`, name: n, value: [620, 88, 142, 54, 260, 42, 165, 169][i], category: ["mercado", "transporte", "saúde", "mercado", "lazer", "transporte", "lazer", "lazer"][i], date: `${mes}-${String(3 + i * 2).padStart(2, "0")}`,
+    id: `g${i}`, name: n, value: [620, 88, 142, 54, 260, 42, 165, 169][i], category: ["mercado", "transporte", "saúde", "mercado", "lazer", "transporte", "delivery", "lazer"][i], date: `${mes}-${String(3 + i * 2).padStart(2, "0")}`,
   }));
   const base: Record<string, unknown> = {
     "core-user-name": "Ana Beatriz",
@@ -47,25 +69,35 @@ const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean, zero = fa
     "conquistas-capa": "grafite",
     // sem o piso gravado, 1.200 XP viraria Platina pela escada antiga (a migração de quem já tinha nível)
     "conquistas-nivel-piso": "Ouro",
-    "finance-incomes": [{ id: "r1", name: "Salário", value: 4200, date: `${mes}-05` }],
+    "finance-incomes": [{ id: "r1", description: "Salário", value: 4200, date: `${mes}-05` }],
     "finance-expenses": gastos,
     "finance-fixed-expenses": [{ id: "f1", name: "Aluguel", value: 1300 }, { id: "f2", name: "Internet", value: 120 }],
     "finance-investments": [{ id: "i1", name: "Tesouro Selic", type: "renda fixa", value: 5000 }],
-    "treino-meta-semanal": 5,
+    "finance-emergency-fund": { meses: 6, guardado: 5300, registrada: true },
+    "treino-meta-semanal": 4,
     "finance-challenges": { active: null, history: [{ key: "sem-delivery", weekStart: somarDias(hoje, -13), result: "win" }, { key: "cafe-em-casa", weekStart: somarDias(hoje, -6), result: "win" }] },
     "heatmap-log": heat,
+    "rotina-habit-log": habitLog,
     "mood-log": humor,
+    "sleep-log": sono,
     "lib-books": [
-      { id: "l1", title: "Essencialismo", status: "lido", endDate: somarDias(hoje, -40) },
-      { id: "l2", title: "Hábitos Atômicos", status: "lido", endDate: somarDias(hoje, -22) },
-      { id: "l3", title: "Rápido e Devagar", status: "lido", endDate: somarDias(hoje, -6) },
+      { id: "l1", title: "Essencialismo", status: "lido", pages: 260, endDate: somarDias(hoje, -40) },
+      { id: "l2", title: "Hábitos Atômicos", status: "lido", pages: 320, endDate: `${mes}-08` },
+      { id: "l3", title: "Rápido e Devagar", status: "lido", pages: 320, endDate: `${mes}-${String(Math.max(1, diaDoMes - 3)).padStart(2, "0")}` },
       { id: "l4", title: "O Poder do Agora", status: "lendo" },
       { id: "l5", title: "Mindset", status: "quero-ler" },
     ],
+    "lib-read-log": doMes(1).filter((_, i) => i % 3 !== 1),
     "saude-workout-log": treinos,
+    "treino-weekly-volume": volume,
+    "dieta-diary-v2": dieta,
     "water-log": agua,
     "core-saude-water-goal": 8,
     "journal-entries": { [somarDias(hoje, -1)]: { gratitude: ["Café da manhã com calma"] }, [somarDias(hoje, -2)]: { learned: "Dormir cedo rende" } },
+    "month-goals": { [mes]: [{ id: "m1", text: "Fechar o mês no azul", done: true }, { id: "m2", text: "4 treinos por semana", done: true }, { id: "m3", text: "Ler 2 livros", done: true }, { id: "m4", text: "Zerar o cartão", done: true }, { id: "m5", text: "Dormir 8 h", done: false }] },
+    "detox-habits": [{ id: "d1", name: "Instagram", icon: "📱", startDate: somarDias(hoje, -41), createdAt: somarDias(hoje, -41), relapses: [], record: 41 }],
+    "pomodoro-total-focus": 372,
+    "pomodoro-log": { [somarDias(hoje, -1)]: 50, [somarDias(hoje, -2)]: 75, [hoje]: 25 },
     "conquistas-desbloqueadas": {
       "first-income": "2026-07-12", "first-expense": "2026-07-12", "rotina-1": "2026-07-13", "treino-1": "2026-07-14",
       "sequencia-7": "2026-07-19", "rotina-7": "2026-07-19", "saver-20": "2026-07-31", "leitura-estante": "2026-08-02",
@@ -74,13 +106,16 @@ const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean, zero = fa
     },
   };
   if (zero) {
-    return { "core-user-name": "Ana Beatriz", "conquistas-desbloqueadas": {} };
+    return { "core-user-name": "Ana Beatriz", "conquistas-desbloqueadas": {}, "conquistas-album-visto": [] };
   }
   if (poucos) {
     return {
       "core-user-name": "Ana Beatriz",
       "core-dias-anotados": dias(4, 1, hoje),
       "finance-expenses": gastos.slice(0, 2),
+      "water-log": Object.fromEntries(dias(6, 2, hoje).map((d) => [d, 8])),
+      "heatmap-log": Object.fromEntries(dias(4, 1, hoje).map((d) => [d, true])),
+      "saude-workout-log": dias(5, 1, hoje).filter((_, i) => i % 2 === 0),
       "conquistas-desbloqueadas": { "first-expense": somarDias(hoje, -3) },
     };
   }
@@ -137,6 +172,13 @@ const DevConquistas = () => {
   const inicial = useMemo(() => {
     const s = seeds(hoje, semanaCompleta, poucos, zero);
     if (params.get("desafios") === "off") s["finance-challenges-hidden"] = true;
+    if (params.get("valores") === "1") s["conquistas-mostrar-valores"] = true;
+    if (params.get("dica") === "0") s["conquistas-dica-planner"] = { vistas: 3, fim: true };
+    const novas = Number(params.get("novas") || 0);
+    if (novas > 0 && !zero) {
+      const coladas = Object.keys((s["conquistas-desbloqueadas"] as Record<string, string>) ?? {});
+      s["conquistas-album-visto"] = coladas.slice(0, Math.max(0, coladas.length - novas));
+    }
     return s;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoje, semanaCompleta, poucos, zero]);

@@ -3,12 +3,14 @@ import { CORES_ANEL, HALO_ANEL, corDoAnel } from "../adesivos-raridade";
 
 /**
  * A ANIMAÇÃO DO ÁLBUM (27/09, dono: "compartilhar meu planner nos Stories
- * podia ser um GIF que abre e mostra os adesivos"). 5 s, 30 fps, 9:16:
+ * podia ser um GIF que abre e mostra os adesivos"; desde a noite de 27/09 é
+ * o ÁLBUM DE FIGURINHAS que abre — a capa do álbum, com lombada, e a página
+ * dos mais raros com as vagas numeradas). 5 s, 30 fps, 9:16:
  *
  *   0,0–0,55  a capa assenta na mesa (cresce de 96,5 % e desce 18 px)
  *   0,8–1,5   a capa abre na lombada (scaleX = cos θ até 168°, com a sombra
  *             correndo sobre a página e o verso escuro ficando por baixo)
- *   1,6+      os mais raros pipocam um a um a cada 0,3 s (do mais raro pro
+ *   1,6+      os mais raros colam um a um a cada 0,3 s (do mais raro pro
  *             mais comum): clarão, sobrepasso, anel holográfico/ouro girando,
  *             faíscas no lendário
  *   depois    o nome e o nível sobem embaixo; um brilho varre os épicos e
@@ -17,10 +19,10 @@ import { CORES_ANEL, HALO_ANEL, corDoAnel } from "../adesivos-raridade";
  *             laço sem pulo (Reels/feed repetem)
  *
  * Tudo é `drawImage` das camadas pré-renderizadas (fundo, capa, página,
- * espiral, sprite dos adesivos, bloco do nome) com transform — nada é
- * rasterizado por quadro. O anel, as faíscas, o clarão e o brilho são
- * desenhados no canvas (poucos arcos). As coordenadas são do espaço 1080 ×
- * 1920; `escala` ajusta pra 720p.
+ * sprite das figurinhas, bloco do nome) com transform — nada é rasterizado
+ * por quadro. O anel, as faíscas, o clarão e o brilho são desenhados no
+ * canvas (poucos arcos). As coordenadas são do espaço 1080 × 1920; `escala`
+ * ajusta pra 720p.
  */
 
 export const DURACAO = 5;
@@ -44,7 +46,8 @@ export interface Camadas {
   capa: CanvasImageSource;
   pagina: CanvasImageSource;
   margem: number;
-  espiral: CanvasImageSource;
+  /** A espiral do planner (null no álbum de figurinhas, que tem lombada). */
+  espiral: CanvasImageSource | null;
   espiralW: number;
   sprite: CanvasImageSource | null;
   adesivos: AdesivoAnimado[];
@@ -300,7 +303,7 @@ function desenharCena(ctx: CanvasRenderingContext2D, c: Camadas, t: number) {
     );
   }
   // a espiral fica no lugar, por cima de tudo
-  comAssento(() => ctx.drawImage(c.espiral, caixa.x, caixa.y, c.espiralW, caixa.h));
+  if (c.espiral) comAssento(() => ctx.drawImage(c.espiral!, caixa.x, caixa.y, c.espiralW, caixa.h));
 
   const { texto } = tempos(c.adesivos.length);
   const pt = saiCubico(prog(t, texto, texto + 0.4));

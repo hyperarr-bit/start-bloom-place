@@ -18,6 +18,8 @@ import { ordenarParaFolha } from "@/lib/conquistas-registro";
 
 export const ORDEM_RARIDADE: Raridade[] = ["lendario", "epico", "raro", "comum"];
 export const TITULO_SECAO: Record<Raridade, string> = { lendario: "LENDÁRIOS", epico: "ÉPICOS", raro: "RAROS", comum: "COMUNS" };
+/** "figurinha épica", "figurinha rara" — a raridade no feminino (o álbum fala de FIGURINHAS). */
+export const RARIDADE_FEM: Record<Raridade, string> = { comum: "Comum", raro: "Rara", epico: "Épica", lendario: "Lendária" };
 /** Quantos adesivos a página "OS MAIS RAROS" mostra. */
 export const MAIS_RAROS = 6;
 /** Vagas por página das seções (4 × 3, como a folha). */

@@ -2,6 +2,7 @@ import { Badge, Raridade, XP_RARIDADE } from "./types";
 import { chaveArquivada } from "@/lib/virada-do-mes";
 import { somaParcelasDoMes, type Parcela } from "@/lib/finance-parcelas";
 import { computeMonthlyBalance, computeMonthlyOutflow, computeSavingsRate } from "@/lib/finance-totals";
+import { PERFIL_PESSOAL, doPerfil } from "@/lib/finance-perfil";
 
 /**
  * Conquistas de FINANÇAS — saíram do AchievementsPage (26/09) pra serem lidas
@@ -67,15 +68,17 @@ export interface MesArquivado {
   saldo: number;
 }
 
-export const lerMesesArquivados = (get: Leitor, hoje = new Date()): MesArquivado[] => {
+/** `perfil` (27/09): só os lançamentos daquele perfil (PF ou uma empresa) — sem ele, tudo junto, como sempre foi. */
+export const lerMesesArquivados = (get: Leitor, hoje = new Date(), perfil?: string): MesArquivado[] => {
   const out: MesArquivado[] = [];
+  const filtrar = <T extends Item>(itens: T[]): T[] => (perfil ? doPerfil(itens as (T & { perfil?: string })[], perfil) : itens);
   for (let i = 1; i <= MESES_OLHADOS; i++) {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
     const ano = d.getFullYear(), mes = d.getMonth();
-    const incomes = lista(get, chaveArquivada(ano, mes, "incomes"));
-    const expenses = lista(get, chaveArquivada(ano, mes, "expenses"));
-    const fixed = lista(get, chaveArquivada(ano, mes, "fixed"));
-    const parcelas = lista(get, chaveArquivada(ano, mes, "installments")) as unknown as Parcela[];
+    const incomes = filtrar(lista(get, chaveArquivada(ano, mes, "incomes")));
+    const expenses = filtrar(lista(get, chaveArquivada(ano, mes, "expenses")));
+    const fixed = filtrar(lista(get, chaveArquivada(ano, mes, "fixed")));
+    const parcelas = filtrar(lista(get, chaveArquivada(ano, mes, "installments"))) as unknown as Parcela[];
     const receitas = soma(incomes);
     const saida = computeMonthlyOutflow(soma(expenses), soma(fixed), somaParcelasDoMes(parcelas));
     const lancamentos = incomes.length + expenses.length + fixed.length;
@@ -101,8 +104,35 @@ export const mesesSeguidosNoAzul = (arquivados: MesArquivado[]): number => {
   return n;
 };
 
-/** As medidas do mês corrente que os adesivos e as insígnias usam. */
-export function medirFinancas(get: Leitor) {
+/** "AAAA-MM" do mês de `hoje`. */
+const idDoMes = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+/** Só os lançamentos datados NO mês (os sem data ficam — na dúvida não se tira nada de ninguém). */
+const doMes = (itens: Item[], mesId: string) =>
+  itens.filter((i) => typeof i.date !== "string" || !/^\d{4}-\d{2}/.test(i.date) || i.date.startsWith(`${mesId}-`));
+/** "Salário" e "salário " são a MESMA fonte de renda. */
+const fonteDaRenda = (i: Item) => String(i.description ?? i.name ?? i.source ?? "").trim().toLowerCase();
+
+/**
+ * As medidas do mês corrente que os adesivos e as insígnias usam.
+ *
+ * CONSERTOS DA AUDITORIA (27/09, LEIA §4):
+ *  1. "Múltiplas Rendas" contava LANÇAMENTOS (a receita só tem `description`;
+ *     `name`/`source` nunca existiram, e `id` é único por linha): 3 salários
+ *     do mesmo emprego abriam "3+ fontes". Agora conta descrições distintas,
+ *     no mês corrente e nos meses arquivados.
+ *  2. "Comprador Consciente" nunca abria: ninguém grava `acquired`. A lista de
+ *     desejos guarda `savedAmount`/`price` — o desejo com o valor inteiro
+ *     juntado é o que o app sabe de verdade.
+ *  3. A taxa de poupança ignorava as PARCELAS do mês (o Painel inclui: a
+ *     regra da casa é fixos + variáveis + parcelas).
+ *  4. Tudo somava PF + PJ sem olhar perfil nem data: a renda da empresa
+ *     inflava a poupança pessoal, e um gasto de mês passado ainda no balde
+ *     entrava no mês. As medidas de DINHEIRO agora são do perfil ativo e do
+ *     mês; as de CONTAGEM ("registre 1 receita") continuam somando tudo.
+ */
+export function medirFinancas(get: Leitor, hoje = new Date()) {
+  const mesId = idDoMes(hoje);
+  const perfil = get<string>("finance-perfil-ativo", PERFIL_PESSOAL) || PERFIL_PESSOAL;
   const incomes = lista(get, "finance-incomes");
   const expenses = lista(get, "finance-expenses");
   const fixedExpenses = lista(get, "finance-fixed-expenses");
@@ -111,18 +141,25 @@ export function medirFinancas(get: Leitor) {
   const dueDays = lista(get, "finance-dueDays");
   const wishlist = lista(get, "finance-wishlist");
 
-  const totalIncome = soma(incomes);
-  const totalExpenses = soma(expenses);
-  const totalFixed = soma(fixedExpenses);
+  // dinheiro: o perfil ativo, o mês pela data
+  const incomesDoMes = doPerfil(doMes(incomes, mesId), perfil);
+  const expensesDoMes = doPerfil(doMes(expenses, mesId), perfil);
+  const fixosDoPerfil = doPerfil(fixedExpenses, perfil);
+  const parcelasDoPerfil = doPerfil(installments, perfil) as unknown as Parcela[];
+  const totalIncome = soma(incomesDoMes);
+  const totalExpenses = soma(expensesDoMes);
+  const totalFixed = soma(fixosDoPerfil);
   const monthlyExpenses = totalExpenses + totalFixed;
-  const savingsRate = totalIncome > 0 ? ((totalIncome - monthlyExpenses) / totalIncome) * 100 : 0;
+  /* A saída do mês é a do Painel: variáveis + fixos + parcelas do mês. */
+  const saidaDoMes = computeMonthlyOutflow(totalExpenses, totalFixed, somaParcelasDoMes(parcelasDoPerfil));
+  const savingsRate = computeSavingsRate(totalIncome, saidaDoMes);
   /*
    * Poupança só vale com o mês anotado (26/09). Com o desbloqueio agora
    * PERMANENTE, a conta antiga virava brinde: a 1ª receita, antes de qualquer
    * gasto, dava "100% poupado" e abria Poupador, Super Poupador e Formiguinha
    * de uma vez — pra sempre. Antes ela trancava de novo no 1º gasto.
    */
-  const mesAnotado = expenses.length + fixedExpenses.length >= MIN_GASTOS_POUPANCA && monthlyExpenses > 0;
+  const mesAnotado = expensesDoMes.length + fixosDoPerfil.length >= MIN_GASTOS_POUPANCA && saidaDoMes > 0;
   const totalInvestments = investments.reduce((s, i) => s + (num(i.currentValue) || num(i.value)), 0);
   const uniqueAssets = new Set(investments.map((i) => i.type || i.name)).size;
 
@@ -131,29 +168,37 @@ export function medirFinancas(get: Leitor) {
   const hasActiveDebt = installments.some((i) => num(i.paidInstallments) < num(i.totalInstallments));
   const hasQuitado = installments.some((i) => num(i.paidInstallments) >= num(i.totalInstallments) && num(i.totalInstallments) > 0);
 
-  const uniqueIncomes = new Set(incomes.map((i) => i.name || i.source || i.id)).size;
+  // fontes de renda: descrições distintas, hoje e nos meses arquivados
+  const fontes = new Set(incomes.map(fonteDaRenda).filter(Boolean));
+  for (let i = 1; i <= MESES_OLHADOS; i++) {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    for (const inc of lista(get, chaveArquivada(d.getFullYear(), d.getMonth(), "incomes"))) {
+      const f = fonteDaRenda(inc);
+      if (f) fontes.add(f);
+    }
+  }
+  const uniqueIncomes = fontes.size;
   const categorizedExpenses = expenses.filter((e) => !!e.category).length;
-  const monthLaunches = incomes.length + expenses.length + fixedExpenses.length;
+  const monthLaunches = doMes(incomes, mesId).length + doMes(expenses, mesId).length + fixedExpenses.length;
 
-  const reservaAlvo = monthlyExpenses * 3;
-  const acquiredWish = wishlist.some((w) => !!(w.acquired || w.purchased));
+  const reservaAlvo = saidaDoMes * 3;
+  const acquiredWish = wishlist.some((w) => !!(w.acquired || w.purchased) || (num(w.price) > 0 && num(w.savedAmount) >= num(w.price)));
 
   const challenges = get<{ history?: { result: string }[] } | null>("finance-challenges", { history: [] });
   const challengeWins = (Array.isArray(challenges?.history) ? challenges!.history : []).filter((h) => h?.result === "win").length;
 
-  const arquivados = lerMesesArquivados(get);
-  const mesesFechados = arquivados.filter((m) => m.lancamentos > 0).length;
+  const arquivados = lerMesesArquivados(get, hoje, perfil);
+  const mesesFechados = lerMesesArquivados(get, hoje).filter((m) => m.lancamentos > 0).length;
   const mesesNoAzul = mesesSeguidosNoAzul(arquivados);
 
   /* A insígnia "Sobrou no mês" (27/09) fala o mesmo número do Painel:
    * receitas − (variáveis + fixos + parcelas do mês). Só com o mês anotado. */
-  const saidaDoMes = computeMonthlyOutflow(totalExpenses, totalFixed, somaParcelasDoMes(installments as unknown as Parcela[]));
   const sobrouNoMes = computeMonthlyBalance(totalIncome, saidaDoMes);
-  const taxaDoMes = computeSavingsRate(totalIncome, saidaDoMes);
+  const taxaDoMes = savingsRate;
 
   return {
-    incomes, expenses, fixedExpenses, investments, installments, wishlist,
-    totalIncome, monthlyExpenses, savingsRate, mesAnotado, totalInvestments, uniqueAssets,
+    incomes, expenses, fixedExpenses, investments, installments, wishlist, perfil,
+    totalIncome, monthlyExpenses, saidaDoMes, savingsRate, mesAnotado, totalInvestments, uniqueAssets,
     billsPaid, hasActiveDebt, hasQuitado, uniqueIncomes, categorizedExpenses, monthLaunches,
     reservaAlvo, acquiredWish, challengeWins, mesesFechados, mesesNoAzul, sobrouNoMes, taxaDoMes,
   };
@@ -200,7 +245,7 @@ export function buildBadgesFinancas(get: Leitor): Badge[] {
 
     // Wishlist
     comProgresso({ ...base, id: "wishlist", name: "Lista de Desejos", description: "1+ item na lista", icon: "📝", raridade: "comum", unidade: ["item na lista", "itens na lista"] }, m.wishlist.length, 1),
-    booleana({ ...base, id: "conscious-buyer", name: "Comprador Consciente", description: "Adquira item da lista", icon: "🛍️", raridade: "comum" }, m.acquiredWish),
+    booleana({ ...base, id: "conscious-buyer", name: "Comprador Consciente", description: "Junte o valor inteiro de um desejo da lista", icon: "🛍️", raridade: "comum" }, m.acquiredWish),
 
     // Desafios semanais
     comProgresso({ ...base, id: "challenger", name: "Desafiante", description: "Vença 1 desafio semanal", icon: "🎯", raridade: "comum", unidade: ["desafio vencido", "desafios vencidos"] }, m.challengeWins, 1),

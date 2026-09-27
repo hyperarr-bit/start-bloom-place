@@ -30,13 +30,16 @@ vi.mock("@/components/conquistas/gerar-imagem", () => ({
 
 import { compartilharVideo } from "@/lib/compartilhar";
 import { compartilharVideoDaArte } from "@/components/conquistas/compartilhar-conquistas";
+import { CATALOGO, montarInsignia } from "@/components/conquistas/insignias";
 import type { DadosArtes } from "@/components/conquistas/artes-dados";
 
 const mp4 = () => new Blob([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])], { type: "video/mp4" });
+const heroi = montarInsignia(CATALOGO.find((d) => d.id === "tre-mes")!, { valor: 19 });
 const dados: DadosArtes = {
-  capa: "grafite", nome: "Ana Beatriz", membroDesde: "julho de 2026", dias: 12, nivel: "Ouro", xp: 1200, adesivos: 15, total: 65, ano: 2026,
-  maisRaros: [], proximos: [], mes: "SETEMBRO · 2026",
+  nome: "Ana Beatriz", membroDesde: "julho de 2026", dias: 12, nivel: "Ouro", xp: 1200, adesivos: 15, total: 65, ano: 2026, mesIdx: 8,
+  maisRaros: [], proximos: [], figurinhas: [], mes: "SETEMBRO · 2026",
   porRaridade: { comum: { abertos: 6, total: 23 }, raro: { abertos: 5, total: 21 }, epico: { abertos: 3, total: 14 }, lendario: { abertos: 1, total: 7 } },
+  heroi, tres: [heroi], candidatas: [heroi], valoresLigados: false,
 };
 const semWebShare = () => {
   Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
@@ -101,11 +104,21 @@ describe("compartilharVideoDaArte: vídeo → imagem", () => {
     expect(toasts.success).toHaveBeenCalledWith(expect.stringMatching(/Imagem salva/));
   });
 
-  it("o gerador explode: também cai pra imagem (da capa, quando a arte é a capa)", async () => {
+  it("o gerador explode: também cai pra imagem (da conquista, quando a arte é a conquista do mês)", async () => {
     gerador.fn.mockRejectedValue(new Error("boom"));
-    expect(await compartilharVideoDaArte("capa", dados)).toBe("downloaded");
-    expect(eventos).toContainEqual(["stories_video", expect.objectContaining({ arte: "capa", ok: false, fallback: "imagem" })]);
-    expect(eventos.some(([n]) => n === "capa_share")).toBe(true);
+    expect(await compartilharVideoDaArte("conquista", dados)).toBe("downloaded");
+    expect(eventos).toContainEqual(["stories_video", expect.objectContaining({ arte: "conquista", ok: false, fallback: "imagem" })]);
+    expect(eventos.some(([n]) => n === "conquista_share")).toBe(true);
+    expect(eventos.find(([n]) => n === "conquista_share")![1]).toMatchObject({ id: "tre-mes", faixa: "ouro", valor: 19 });
+  });
+
+  it("'Minhas 3 conquistas' é UM arquivo (11 s): com o vídeo ok manda o MP4; sem 3 candidatas a imagem não sai", async () => {
+    gerador.fn.mockResolvedValue({ blob: mp4(), formato: "webcodecs", largura: 1080, altura: 1920, ms: 2100, duracao: 11.3 });
+    expect(await compartilharVideoDaArte("tres", dados)).toBe("downloaded");
+    expect(eventos).toContainEqual(["stories_video", expect.objectContaining({ arte: "tres", ok: true, duracao: 11.3 })]);
+    gerador.fn.mockResolvedValue(null);
+    expect(await compartilharVideoDaArte("tres", dados)).toBe("failed");
+    expect(toasts.error).toHaveBeenCalled();
   });
 
   it("o compartilhar recusa o vídeo (failed): manda a imagem pelo mesmo canal", async () => {

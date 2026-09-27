@@ -3,20 +3,18 @@ import { trackEvent } from "@/lib/analytics";
 import { compartilharImagem, compartilharVideo, type ResultadoCompartilhar } from "@/lib/compartilhar";
 import type { Raridade } from "@/components/gamification/types";
 import { gerarPng } from "./gerar-imagem";
-import { RECORTE_ROSETA, STORIES, StoriesAdesivo, StoriesAlbum, StoriesCapa, StoriesCarteirinha, StoriesRoseta } from "./Stories";
-import type { CapaId, DadosCapa } from "./CapaPlanner";
-import type { DadosCarteirinha } from "./Carteirinha";
+import { RECORTE_ROSETA, STORIES, StoriesAdesivo, StoriesAlbum, StoriesConquista, StoriesRoseta, StoriesTres } from "./Stories";
 import type { ArteComVideo, DadosArtes } from "./artes-dados";
 
 /**
- * Compartilhar das Conquistas (26/09; carteirinha em 27/09; o álbum e o
- * VÍDEO na mesma tarde) — substitui o profile-share/badge-share de canvas.
- * Os nomes de evento antigos ficam (`profile_share`, `badge_share`) pra
- * série histórica não quebrar; `capa_share`, `carteirinha_share` e
- * `album_share` dizem qual arte saiu; `stories_video` conta o vídeo (e o
- * que caiu pra imagem). O resultado é tratado como nos outros
- * compartilhares do app: "downloaded" avisa que salvou, "failed" diz a
- * verdade.
+ * Compartilhar das Conquistas (26/09; o álbum e o VÍDEO em 27/09; as
+ * INSÍGNIAS v3 — "minha conquista do mês" e "minhas 3 conquistas" — na noite
+ * de 27/09; Capa e Carteirinha saíram do seletor). Os nomes de evento antigos
+ * ficam (`badge_share`, `album_share`) pra série histórica não quebrar;
+ * `conquista_share` e `tres_share` dizem as artes novas; `stories_video`
+ * conta o vídeo (e o que caiu pra imagem). O resultado é tratado como nos
+ * outros compartilhares do app: "downloaded" avisa que salvou, "failed" diz
+ * a verdade.
  */
 
 const avisar = (r: ResultadoCompartilhar | "sem-imagem", tipo: "imagem" | "video" = "imagem") => {
@@ -35,13 +33,6 @@ async function enviar(blob: Blob | null, arquivo: string, titulo: string, origem
   return r;
 }
 
-export async function compartilharCapa(dados: DadosCapa & { capa: CapaId; adesivos: number }) {
-  trackEvent("profile_share", { level: dados.nivel, badges: dados.adesivos, capa: dados.capa });
-  trackEvent("capa_share", { capa: dados.capa, nivel: dados.nivel, dias: dados.dias });
-  const blob = await gerarPng(<StoriesCapa {...dados} />, { largura: STORIES.w, altura: STORIES.h });
-  return enviar(blob, "core-meu-planner.png", "Meu planner no CORE", "capa");
-}
-
 export async function compartilharRoseta(dados: { dias: number; nome: string; membroDesde: string; nivel: string; transparente?: boolean }) {
   trackEvent("badge_share", { badge: `sequencia-${dados.dias}`, formato: dados.transparente ? "roseta-transparente" : "roseta" });
   const blob = dados.transparente
@@ -53,37 +44,54 @@ export async function compartilharRoseta(dados: { dias: number; nome: string; me
 export async function compartilharAdesivo(dados: { id: string; titulo: string; descricao: string; raridade?: Raridade; nome: string; membroDesde: string }) {
   trackEvent("badge_share", { badge: dados.id, formato: "adesivo", raridade: dados.raridade ?? "comum" });
   const blob = await gerarPng(<StoriesAdesivo {...dados} />, { largura: STORIES.w, altura: STORIES.h });
-  return enviar(blob, `core-adesivo-${dados.id}.png`, `Adesivo: ${dados.titulo}`, "conquista");
-}
-
-export async function compartilharCarteirinha(dados: DadosCarteirinha) {
-  trackEvent("carteirinha_share", { nivel: dados.nivel, dias: dados.dias, adesivos: dados.adesivos });
-  const blob = await gerarPng(<StoriesCarteirinha {...dados} />, { largura: STORIES.w, altura: STORIES.h });
-  return enviar(blob, "core-carteirinha.png", "Minha carteirinha do CORE", "carteirinha");
+  return enviar(blob, `core-figurinha-${dados.id}.png`, `Figurinha: ${dados.titulo}`, "conquista");
 }
 
 export async function compartilharAlbum(dados: DadosArtes) {
   trackEvent("album_share", { nivel: dados.nivel, adesivos: dados.adesivos, raros: dados.maisRaros.map((b) => b.id).join(",") });
   const blob = await gerarPng(<StoriesAlbum {...dados} />, { largura: STORIES.w, altura: STORIES.h });
-  return enviar(blob, "core-meu-album.png", "Meu álbum de adesivos no CORE", "album");
+  return enviar(blob, "core-meu-album.png", "Meu álbum de figurinhas no CORE", "album");
+}
+
+/** "Minha conquista do mês" — a insígnia enorme (imagem). */
+export async function compartilharConquista(dados: DadosArtes) {
+  const h = dados.heroi;
+  if (!h) {
+    avisar("sem-imagem");
+    return "failed" as const;
+  }
+  trackEvent("conquista_share", { id: h.id, faixa: h.faixa, valor: Math.round(h.valor), sensivel: !!h.sensivel });
+  const blob = await gerarPng(<StoriesConquista ins={h} nome={dados.nome} membroDesde={dados.membroDesde} nivel={dados.nivel} mesIdx={dados.mesIdx} ano={dados.ano} />, { largura: STORIES.w, altura: STORIES.h });
+  return enviar(blob, `core-conquista-${h.id}.png`, `${h.nome} no CORE`, "conquista");
+}
+
+/** "Minhas 3 conquistas" — o resumo (imagem). */
+export async function compartilharTres(dados: DadosArtes) {
+  const tres = dados.tres.slice(0, 3);
+  if (tres.length < 3) {
+    avisar("sem-imagem");
+    return "failed" as const;
+  }
+  trackEvent("tres_share", { ids: tres.map((i) => i.id).join(",") });
+  const blob = await gerarPng(<StoriesTres tres={tres} nome={dados.nome} membroDesde={dados.membroDesde} nivel={dados.nivel} mesIdx={dados.mesIdx} />, { largura: STORIES.w, altura: STORIES.h });
+  return enviar(blob, "core-minhas-3-conquistas.png", "Minhas 3 conquistas no CORE", "tres");
 }
 
 /** A imagem parada da arte que também existe em vídeo. */
 export const compartilharImagemDaArte = (arte: ArteComVideo, d: DadosArtes) =>
-  arte === "capa"
-    ? compartilharCapa({ capa: d.capa, nome: d.nome, membroDesde: d.membroDesde, dias: d.dias, nivel: d.nivel, adesivos: d.adesivos })
-    : compartilharAlbum(d);
+  arte === "conquista" ? compartilharConquista(d) : arte === "tres" ? compartilharTres(d) : compartilharAlbum(d);
 
 const ARQUIVO_VIDEO: Record<ArteComVideo, [string, string]> = {
-  capa: ["core-meu-planner.mp4", "Meu planner no CORE"],
-  album: ["core-meu-album.mp4", "Meu álbum de adesivos no CORE"],
+  conquista: ["core-minha-conquista.mp4", "Minha conquista do mês no CORE"],
+  tres: ["core-minhas-3-conquistas.mp4", "Minhas 3 conquistas no CORE"],
+  album: ["core-meu-album.mp4", "Meu álbum de figurinhas no CORE"],
 };
 
 /**
- * O VÍDEO dos Stories (o planner abrindo e os adesivos pipocando): gera no
- * aparelho (só baixa o código do vídeo neste toque) e compartilha pelos
- * mesmos caminhos da imagem. Sem como gerar, ou se o compartilhar recusar o
- * arquivo, cai pra IMAGEM — e o `stories_video` conta o que aconteceu.
+ * O VÍDEO dos Stories: gera no aparelho (só baixa o código do vídeo neste
+ * toque) e compartilha pelos mesmos caminhos da imagem. Sem como gerar, ou
+ * se o compartilhar recusar o arquivo, cai pra IMAGEM — e o `stories_video`
+ * conta o que aconteceu.
  */
 export async function compartilharVideoDaArte(arte: ArteComVideo, d: DadosArtes, onProgresso?: (fracao: number) => void): Promise<ResultadoCompartilhar> {
   const t0 = performance.now();
@@ -107,7 +115,7 @@ export async function compartilharVideoDaArte(arte: ArteComVideo, d: DadosArtes,
     trackEvent("stories_video", { arte, ok: false, ms: ms(), formato: gerado.formato, resolucao: `${gerado.largura}x${gerado.altura}`, fallback: "imagem" });
     return compartilharImagemDaArte(arte, d);
   }
-  trackEvent("stories_video", { arte, ok: true, ms: ms(), geracao_ms: gerado.ms, formato: gerado.formato, resolucao: `${gerado.largura}x${gerado.altura}`, resultado: r, fallback: null });
+  trackEvent("stories_video", { arte, ok: true, ms: ms(), geracao_ms: gerado.ms, formato: gerado.formato, resolucao: `${gerado.largura}x${gerado.altura}`, duracao: gerado.duracao, resultado: r, fallback: null });
   avisar(r, "video");
   return r;
 }

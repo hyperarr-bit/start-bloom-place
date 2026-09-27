@@ -25,6 +25,20 @@ export const minutosValidos = (m: Partial<Minutos> | null | undefined): Minutos 
 export const diaLocal = (d = new Date()) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+/** Quantos dias o registro por dia guarda (mais de um ano: a insígnia é do mês). */
+export const DIAS_NO_LOG_DE_FOCO = 400;
+
+/** `pomodoro-log[dia] += minutos`, guardando só os últimos 400 dias (dado torto vira {}). */
+export const somarFocoDoDia = (log: unknown, dia: string, minutos: number): Record<string, number> => {
+  const base = log && typeof log === "object" && !Array.isArray(log) ? (log as Record<string, unknown>) : {};
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(base)) if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(Number(v)) && Number(v) > 0) out[k] = Number(v);
+  out[dia] = (out[dia] ?? 0) + Math.max(0, minutos);
+  const dias = Object.keys(out).sort();
+  for (const k of dias.slice(0, Math.max(0, dias.length - DIAS_NO_LOG_DE_FOCO))) delete out[k];
+  return out;
+};
+
 /** Timer compartilhado. Nasceu na aba FOCO da Rotina e agora também serve a
  *  aba MEU DIA da Carreira — as chaves persistidas são as mesmas de sempre,
  *  então quem já usava não perde as sessões nem o histórico. */
@@ -42,6 +56,10 @@ export const PomodoroTimer = () => {
   const [diaSessoes, setDiaSessoes] = usePersistedState<string>("pomodoro-sessions-dia", "");
   const sessoesHoje = diaSessoes === diaLocal() ? sessions : 0;
   const [totalFocusMin, setTotalFocusMin] = usePersistedState<number>("pomodoro-total-focus", 0);
+  // Foco por DIA (27/09): `pomodoro-log` { "AAAA-MM-DD": minutos } — é o que
+  // deixa a insígnia "Horas de foco no mês" existir; o acumulado de sempre
+  // (`pomodoro-total-focus`) continua sendo gravado do mesmo jeito.
+  const [focoPorDia, setFocoPorDia] = usePersistedState<Record<string, number>>("pomodoro-log", {});
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   // Fim da contagem no RELÓGIO DE PAREDE (20/08, review ★4: "o Pomodoro
   // pausa quando a tela é bloqueada"). Com a tela travada o WebView congela
@@ -82,6 +100,7 @@ export const PomodoroTimer = () => {
         setSessions(feitasHoje);
         setDiaSessoes(hoje);
         setTotalFocusMin(t => t + minutos.focus);
+        setFocoPorDia(l => somarFocoDoDia(l, hoje, minutos.focus));
         // Auto switch to break
         const nextMode = feitasHoje % 4 === 0 ? "longBreak" : "break";
         setMode(nextMode);

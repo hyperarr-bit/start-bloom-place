@@ -6,6 +6,7 @@ import { Sparkles, ArrowRight, X } from "lucide-react";
 import { isNativeShell } from "@/lib/native-shell";
 import { trackEvent } from "@/lib/analytics";
 import { DEMO_MODULES } from "@/lib/funnel";
+import { ehFunilRoi2 } from "@/lib/funil-roi2";
 
 // Fechamento ativo do tour (pico-fim): quem abre o 2º módulo já está engajado —
 // é a hora de puxar pro cadastro, antes de esfriar fuçando.
@@ -82,7 +83,10 @@ const voltaDaDemoShell = () => {
   try { return sessionStorage.getItem("core-demo-volta") || "/app?step=compromissos"; } catch { return "/app?step=compromissos"; }
 };
 
-const PreviewBanner = ({ funnel }: { funnel?: boolean }) => {
+/** `modulo` (27/09, funil ROI 2): na demo guiada da WEB a faixa diz que o
+ *  módulo aberto é só o começo — "Finanças é só o começo — os 16 vêm juntos".
+ *  É a única frase da demo que muda (a tela é o app real). */
+const PreviewBanner = ({ funnel, modulo }: { funnel?: boolean; modulo?: string }) => {
   /* v83.5 (dono): no APP o roxo era identidade que o app nunca teve — a demo
      é o app real, então o aviso VESTE o app (fundo do tema + grafite, faixa
      da status bar fica na cor padrão). O gradiente roxo segue na WEB. */
@@ -101,10 +105,12 @@ const PreviewBanner = ({ funnel }: { funnel?: boolean }) => {
       <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <Sparkles className="w-4 h-4 shrink-0" />
-          <span className="truncate">
-            {funnel
-              ? <><strong>Experimente à vontade</strong> — dados de exemplo.</>
-              : <><strong>Demonstração</strong> — dados fictícios, nada é salvo.</>}
+          <span className={modulo ? "leading-snug" : "truncate"} data-testid="demo-faixa">
+            {funnel && modulo
+              ? <><strong>Demo</strong> · dados de exemplo · <strong>{modulo} é só o começo — os 16 vêm juntos</strong></>
+              : funnel
+                ? <><strong>Experimente à vontade</strong> — dados de exemplo.</>
+                : <><strong>Demonstração</strong> — dados fictícios, nada é salvo.</>}
           </span>
         </div>
         {!funnel && (
@@ -285,7 +291,9 @@ const DemoCta = ({ funnel, tour, from }: { funnel?: boolean; tour?: boolean; fro
         <p className="text-xs text-muted-foreground leading-tight flex-1">
           {shell
             ? <>Isso tudo trabalhando com os <strong className="text-foreground">seus dados</strong>.</>
-            : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
+            : funnel && ehFunilRoi2()
+              ? <>Gostou? Leva isso com os <strong className="text-foreground">seus números</strong>.</>
+              : <>Gostou? Crie sua conta e leve isso com os <strong className="text-foreground">seus números</strong>.</>}
         </p>
         <Link
           to={to}
@@ -439,7 +447,12 @@ const Preview = () => {
 
   return (
     <div className={`min-h-screen bg-background pb-20 ${tour ? "demo-com-tour" : ""}`}>
-      {!embed && <PreviewBanner funnel={funnel} />}
+      {!embed && (
+        <PreviewBanner
+          funnel={funnel}
+          modulo={tour && funnel && !isNativeShell() && ehFunilRoi2() ? DEMO_MODULES.find((m) => m.key === key)?.label : undefined}
+        />
+      )}
       {tour && <DemoTourNav current={key} from={from} />}
       {tour && funnel && isNativeShell() && <DicaDemoShell />}
       <PreviewUserDataProvider key={key} moduleKey={key}>

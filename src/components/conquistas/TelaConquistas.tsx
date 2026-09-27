@@ -14,11 +14,12 @@ import { CAPAS, ORDEM_CAPAS, ehCapa, type CapaId } from "./CapaPlanner";
 import { CardSequencia } from "./CardSequencia";
 import { CardProximo, GradeAdesivos } from "./GradeAdesivos";
 import { PlannerAberto, mesDaPagina } from "./PlannerAberto";
+import type { DadosAlbum } from "./Album";
+import { montarAlbum } from "./album-paginas";
 import { SeloNivel } from "./SeloNivel";
 import { Previa, SeletorDeArte, type ArteId, type DadosArtes } from "./SeletorDeArte";
 import { StoriesAdesivo } from "./Stories";
 import { compartilharAdesivo } from "./compartilhar-conquistas";
-import { escolherInsignias, montarInsignias } from "./insignias";
 import { anoDeMembro, useConquistas, usePerfilConquistas, useSequencia } from "./use-conquistas";
 import "./conquistas.css";
 
@@ -36,11 +37,13 @@ const ORIGENS = ["home", "menu", "celebracao"];
 const DURACAO_ENTRADA = 950;
 
 /**
- * CONQUISTAS (refeita 26/09; v2 em 27/09, aprovada pelo dono): a capa do
- * planner que ABRE na primeira página das insígnias, a sequência com a semana,
- * a folha de adesivos com raridade, o próximo adesivo com as coleções, e o
- * "Postar nos Stories" com 4 artes. A tela entra numa coreografia só (≤ 900
- * ms, pulável, fade com movimento reduzido).
+ * CONQUISTAS (refeita 26/09; v2 em 27/09, aprovada pelo dono; o ÁLBUM no
+ * lugar das insígnias na mesma tarde): a capa do planner que ABRE no álbum de
+ * adesivos (os mais raros primeiro, páginas por raridade com as vagas do que
+ * falta), a sequência com a semana, a folha de adesivos com raridade, o
+ * próximo adesivo com as coleções, e o "Postar nos Stories" com 4 artes (Capa
+ * e Álbum também em vídeo). A tela entra numa coreografia só (≤ 900 ms,
+ * pulável, fade com movimento reduzido).
  */
 export const TelaConquistas = () => {
   const navigate = useNavigate();
@@ -86,21 +89,29 @@ export const TelaConquistas = () => {
     trackEvent("capa_trocar", { capa: id });
   };
 
-  const insignias = useMemo(() => escolherInsignias(montarInsignias(get, seq.dias, hoje)), [get, seq.dias, hoje]);
   const faltaXp = conq.proximoNivel ? Math.max(0, conq.proximoNivel.minXP - conq.xp) : 0;
   const base = conq.nivel.minXP;
   const fracaoNivel = conq.proximoNivel ? Math.max(0, Math.min(1, (conq.xp - base) / (conq.proximoNivel.minXP - base))) : 1;
 
+  // o álbum: os mais raros na 1ª página, depois a coleção por raridade (vagas fixas)
+  const paginas = useMemo(() => montarAlbum(conq.adesivos, conq.desbloqueadas), [conq.adesivos, conq.desbloqueadas]);
+  const mes = mesDaPagina();
+  const album: DadosAlbum = useMemo(() => ({
+    paginas, nivel: conq.nivel.name, xp: conq.xp, faltaXp, proximoNivel: conq.proximoNivel?.name ?? null,
+    adesivos: conq.abertos, total: conq.adesivos.length, porRaridade: conq.porRaridade, mes, diasDeSequencia: seq.dias,
+  }), [paginas, conq.nivel.name, conq.xp, faltaXp, conq.proximoNivel?.name, conq.abertos, conq.adesivos.length, conq.porRaridade, mes, seq.dias]);
+
   const dadosArtes: DadosArtes = useMemo(() => ({
     capa, nome: perfil.nome, membroDesde: perfil.membroDesde, dias: seq.dias, nivel: conq.nivel.name, xp: conq.xp,
-    adesivos: conq.abertos, total: conq.adesivos.length, insignias, ano: anoDeMembro(perfil.membroDesde, hoje),
-  }), [capa, perfil.nome, perfil.membroDesde, seq.dias, conq.nivel.name, conq.xp, conq.abertos, conq.adesivos.length, insignias, hoje]);
+    adesivos: conq.abertos, total: conq.adesivos.length, ano: anoDeMembro(perfil.membroDesde, hoje),
+    maisRaros: paginas[0].vagas, proximos: paginas[0].proximos, porRaridade: conq.porRaridade, mes,
+  }), [capa, perfil.nome, perfil.membroDesde, seq.dias, conq.nivel.name, conq.xp, conq.abertos, conq.adesivos.length, conq.porRaridade, paginas, mes, hoje]);
 
   const abrirPlanner = () => {
     setPlannerAberto(true);
-    trackEvent("planner_abrir", { insignias: insignias.filter((i) => i.temDado).length });
+    trackEvent("planner_abrir", { adesivos: conq.abertos, paginas: paginas.length });
   };
-  const compartilharInsignias = () => { setArteDireta("insignias"); setSeletorAberto(true); };
+  const compartilharAlbum = () => { setArteDireta("album"); setSeletorAberto(true); };
   const consumirDireto = useCallback(() => setArteDireta(null), []);
   const ligarDesafios = () => {
     set(CHAVE_DESAFIOS_OCULTOS, false);
@@ -137,21 +148,17 @@ export const TelaConquistas = () => {
             dias={seq.dias}
             nivel={conq.nivel.name}
             onSelo={() => setNivelAberto(true)}
-            insignias={insignias}
-            xp={conq.xp}
-            faltaXp={faltaXp}
-            proximoNivel={conq.proximoNivel?.name ?? null}
-            adesivos={conq.abertos}
-            total={conq.adesivos.length}
-            mes={mesDaPagina()}
+            album={album}
+            onSelecionar={setSelecionado}
             aberto={plannerAberto}
             onAbrir={abrirPlanner}
             onFechar={() => setPlannerAberto(false)}
-            onCompartilhar={compartilharInsignias}
+            onCompartilhar={compartilharAlbum}
           />
 
           {/* 27/09 (dono): "vai ter gente que nunca vai tocar nele e ver o que tem dentro" —
-              o toque na capa continua abrindo; este botão só existe com o planner fechado. */}
+              o toque na capa continua abrindo; este botão só existe com o planner fechado.
+              Diz o que tem dentro (o álbum), não o objeto. */}
           {!plannerAberto && (
             <button
               type="button"
@@ -161,7 +168,7 @@ export const TelaConquistas = () => {
               data-testid="abrir-planner"
             >
               <BookOpen className="w-[18px] h-[18px]" aria-hidden />
-              Abrir meu planner
+              Abrir meu álbum de adesivos
             </button>
           )}
 

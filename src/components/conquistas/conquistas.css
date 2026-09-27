@@ -60,14 +60,32 @@
 /* inclina com o dedo (épico/lendário no detalhe) */
 .ad-parallax { transition: transform .18s ease-out; transform-style: preserve-3d; will-change: transform; }
 
-/* ============================== INSÍGNIA (patch bordado) ============================== */
-.patch { display: inline-block; line-height: 0; }
-.patch svg { overflow: visible; display: block; }
-.patch .p-stitch { stroke-dasharray: 3.2 2.4; }
-.patch[data-costura] { animation: patch-pop .38s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: var(--d, 0ms); }
-.patch[data-costura] .p-cover { stroke-dashoffset: 0; animation: patch-costura .46s ease-in-out both; animation-delay: calc(var(--d, 0ms) + 150ms); }
-@keyframes patch-pop { from { transform: scale(.55) rotate(-9deg); opacity: 0; } 40% { opacity: 1; } to { transform: none; opacity: 1; } }
-@keyframes patch-costura { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 100; } }
+/* ============================== ÁLBUM DE ADESIVOS (planner aberto) ============================== */
+/* as páginas viram com o dedo (scroll-snap nativo: sem JS de gesto) ou pelos botões ‹ › */
+.alb-trilho { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; outline: none; }
+.alb-trilho::-webkit-scrollbar { display: none; }
+.alb-trilho:focus-visible { box-shadow: 0 0 0 2px hsl(var(--accent) / .5); border-radius: 8px; }
+.alb-pagina { flex: none; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+.alb-vaga { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; border-radius: 12px; transition: transform .12s; }
+.alb-vaga:active { transform: scale(.95); }
+.alb-slot { position: relative; display: grid; place-items: center; }
+/* a vaga vazia: círculo tracejado por trás da silhueta (é o lugar dele no álbum) */
+.alb-slot[data-vazia]::before { content: ""; position: absolute; inset: 4%; border-radius: 50%; border: 1.5px dashed hsl(var(--foreground) / .22); }
+.alb-slot[data-vazia][data-rar="epico"]::before { border-color: rgba(139,92,246,.45); }
+.alb-slot[data-vazia][data-rar="lendario"]::before { border-color: rgba(212,166,41,.6); }
+.dark .alb-slot[data-vazia][data-rar="epico"]::before { border-color: rgba(169,159,234,.5); }
+.dark .alb-slot[data-vazia][data-rar="lendario"]::before { border-color: rgba(217,178,106,.6); }
+.alb-nome { font-size: 10.5px; font-weight: 800; line-height: 1.1; text-align: center; padding: 0 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* ao abrir o planner, os mais raros pipocam um a um (do mais raro pro mais comum) */
+.alb-pop { animation: alb-pop .42s cubic-bezier(.34, 1.56, .64, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes alb-pop { from { transform: scale(.3) rotate(-14deg); opacity: 0; } 45% { opacity: 1; } to { transform: none; opacity: 1; } }
+.alb-nav { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: hsl(var(--foreground)); flex-shrink: 0; }
+.alb-nav:hover { background: hsl(var(--muted)); }
+.alb-nav:disabled { opacity: .25; }
+.alb-dots { display: flex; justify-content: center; gap: 2px; }
+.alb-dot { width: 16px; height: 18px; display: grid; place-items: center; padding: 0; }
+.alb-dot > i { display: block; width: 6px; height: 6px; border-radius: 999px; background: hsl(var(--foreground) / .2); transition: width .2s, background .2s; }
+.alb-dot[data-ativo] > i { width: 14px; background: hsl(var(--accent)); }
 
 /* ============================== SEMANA DA SEQUÊNCIA ============================== */
 .seq-dias { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 12px 8px 2px; }
@@ -152,7 +170,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ad-anel, .ad-sheen::before, .ad-faisca, .capa-tag-pula { animation: none !important; }
   .seq-dia[data-estado="feito-agora"] * { animation: none !important; }
-  .patch[data-costura], .patch[data-costura] .p-cover { animation: none !important; }
+  .alb-pop { animation: none !important; }
+  .alb-trilho { scroll-behavior: auto; }
 }
 
 /* ============================== MOMENTO (festa por raridade) ============================== */

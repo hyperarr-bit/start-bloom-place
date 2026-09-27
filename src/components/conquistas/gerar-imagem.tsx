@@ -10,9 +10,14 @@ import { FotoWebKit } from "./foto-contexto";
  *
  * pixelRatio 1: o componente já é desenhado em 1080×1920; o padrão (o DPR do
  * aparelho, 3 no celular) geraria 3240×5760 e estouraria o canvas do iPhone.
+ *
+ * `gerarCanvas` (27/09) é a mesma foto devolvida como canvas — as camadas do
+ * vídeo do álbum (fundo, capa, página, adesivos) saem daqui e são animadas
+ * num canvas só com transform.
  */
 
 type HtmlToImage = typeof import("html-to-image");
+interface Medidas { largura: number; altura: number }
 
 const quadro = () => new Promise<void>((ok) => requestAnimationFrame(() => ok()));
 const esperar = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
@@ -105,7 +110,8 @@ function virarSombras(raiz: HTMLElement) {
   }
 }
 
-export async function gerarPng(elemento: ReactElement, { largura, altura }: { largura: number; altura: number }): Promise<Blob | null> {
+/** Monta o elemento fora da tela, espera tudo assentar e entrega o nó pronto pra foto. */
+async function comElementoMontado<T>(elemento: ReactElement, { largura, altura }: Medidas, foto: (alvo: HTMLElement, lib: HtmlToImage) => Promise<T>): Promise<T | null> {
   const host = document.createElement("div");
   host.setAttribute("aria-hidden", "true");
   host.setAttribute("data-gerador-stories", "");
@@ -127,16 +133,7 @@ export async function gerarPng(elemento: ReactElement, { largura, altura }: { la
     const alvo = host.firstElementChild as HTMLElement | null;
     if (!alvo) return null;
     if (inverte) virarSombras(alvo);
-    // SEM preferredFontFormat: na 1.11.13 ele usa uma regex global que guarda a
-    // posição entre chamadas — uma foto sim, outra não, a fonte sumia (a serifada
-    // da manchete caía na Georgia). Embutir woff2 + woff custa ~40 KB e acerta sempre.
-    const opcoes = { width: largura, height: altura, pixelRatio: 1, cacheBust: false };
-    let blob = await lib.toBlob(alvo, opcoes);
-    if (ehWebKit()) {
-      await esperar(80);
-      blob = (await lib.toBlob(alvo, opcoes)) ?? blob;
-    }
-    return blob;
+    return await foto(alvo, lib);
   } catch (e) {
     console.error("[conquistas] a imagem dos Stories falhou:", e);
     return null;
@@ -144,4 +141,34 @@ export async function gerarPng(elemento: ReactElement, { largura, altura }: { la
     root.unmount();
     host.remove();
   }
+}
+
+// SEM preferredFontFormat: na 1.11.13 ele usa uma regex global que guarda a
+// posição entre chamadas — uma foto sim, outra não, a fonte sumia (a serifada
+// da manchete caía na Georgia). Embutir woff2 + woff custa ~40 KB e acerta sempre.
+const opcoesDe = ({ largura, altura }: Medidas) => ({ width: largura, height: altura, pixelRatio: 1, cacheBust: false });
+
+export async function gerarPng(elemento: ReactElement, medidas: Medidas): Promise<Blob | null> {
+  return comElementoMontado(elemento, medidas, async (alvo, lib) => {
+    const opcoes = opcoesDe(medidas);
+    let blob = await lib.toBlob(alvo, opcoes);
+    if (ehWebKit()) {
+      await esperar(80);
+      blob = (await lib.toBlob(alvo, opcoes)) ?? blob;
+    }
+    return blob;
+  });
+}
+
+/** A mesma foto, como canvas (as camadas do vídeo). */
+export async function gerarCanvas(elemento: ReactElement, medidas: Medidas): Promise<HTMLCanvasElement | null> {
+  return comElementoMontado(elemento, medidas, async (alvo, lib) => {
+    const opcoes = opcoesDe(medidas);
+    let canvas = await lib.toCanvas(alvo, opcoes);
+    if (ehWebKit()) {
+      await esperar(80);
+      canvas = await lib.toCanvas(alvo, opcoes);
+    }
+    return canvas;
+  });
 }

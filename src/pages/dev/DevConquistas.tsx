@@ -12,7 +12,8 @@ import { useConquistas } from "@/components/conquistas/use-conquistas";
  * dentro de `import.meta.env.DEV`; some do build). A tela de Conquistas de
  * verdade com os dados da demo "Ana Beatriz", pra olhar, fotografar e filmar
  * sem conta: ?semana=completa · ?momento=epico|lendario|raro|comum ·
- * ?sem=1 (poucos dados: insígnias "a conquistar") · ?desafios=off · ?bar=0.
+ * ?sem=1 (pouco dado: 1 adesivo, o álbum mostra os próximos) · ?zero=1 (nada
+ * colado: "COMEÇANDO O ÁLBUM") · ?desafios=off · ?bar=0.
  */
 
 const dias = (de: number, ate: number, hoje: string, pular: string[] = []) => {
@@ -24,7 +25,7 @@ const dias = (de: number, ate: number, hoje: string, pular: string[] = []) => {
   return out;
 };
 
-const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean): Record<string, unknown> => {
+const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean, zero = false): Record<string, unknown> => {
   const mes = hoje.slice(0, 7);
   // semana normal (sábado): SEG…SEX feitos com QUA protegida, SÁB hoje em aberto, DOM futuro
   const lista = semanaCompleta ? dias(19, 0, hoje, [somarDias(hoje, -4)]) : dias(18, 1, hoje, [somarDias(hoje, -3)]);
@@ -72,6 +73,9 @@ const seeds = (hoje: string, semanaCompleta: boolean, poucos: boolean): Record<s
       "investor-1k": "2026-09-03", "rotina-21": "2026-09-10", "challenger": "2026-09-21", "protetor-1": somarDias(hoje, -2),
     },
   };
+  if (zero) {
+    return { "core-user-name": "Ana Beatriz", "conquistas-desbloqueadas": {} };
+  }
   if (poucos) {
     return {
       "core-user-name": "Ana Beatriz",
@@ -128,13 +132,14 @@ const DevConquistas = () => {
   const hoje = localDayKey();
   const semanaCompleta = params.get("semana") === "completa";
   const poucos = params.get("sem") === "1";
+  const zero = params.get("zero") === "1";
   const momento = params.get("momento");
   const inicial = useMemo(() => {
-    const s = seeds(hoje, semanaCompleta, poucos);
+    const s = seeds(hoje, semanaCompleta, poucos, zero);
     if (params.get("desafios") === "off") s["finance-challenges-hidden"] = true;
     return s;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hoje, semanaCompleta, poucos]);
+  }, [hoje, semanaCompleta, poucos, zero]);
 
   useEffect(() => {
     if (params.get("tema") === "escuro") document.documentElement.classList.add("dark");

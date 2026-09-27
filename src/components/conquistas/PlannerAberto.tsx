@@ -1,20 +1,20 @@
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from "framer-motion";
 import { Instagram, Loader2 } from "lucide-react";
+import type { Badge } from "@/components/gamification/types";
 import { CapaPlanner, Espiral, MEDIDAS_CAPA, ARGOLAS_APP, type CapaId } from "./CapaPlanner";
-import { Insignia } from "./Insignia";
-import { SeloNivel } from "./SeloNivel";
+import { AlbumDeAdesivos, type DadosAlbum } from "./Album";
 import { PAPEL_PONTILHADO } from "./papel";
-import type { Insignia as DadosInsignia } from "./insignias";
 import "./conquistas.css";
 
 /**
- * O PLANNER QUE ABRE (B1 · Página, aprovada 27/09): toque na capa e ela gira
- * na lombada (rotateY até 168°, com a sombra correndo sobre a página) e
- * revela a PRIMEIRA PÁGINA — papel pontilhado com furos, "MINHAS INSÍGNIAS ·
- * SETEMBRO · 2026", 3×2 patches bordados costurando um a um (os números
- * contam de zero) e o rodapé com o selo e o nível. A espiral fica no lugar,
- * numa camada própria. O bloco cresce da altura da capa pra da página.
+ * O PLANNER QUE ABRE (B1 · Página, aprovada 27/09; o álbum no lugar das
+ * insígnias na mesma tarde): toque na capa e ela gira na lombada (rotateY até
+ * 168°, com a sombra correndo sobre a página) e revela o ÁLBUM DE ADESIVOS —
+ * papel pontilhado com furos, "MEU ÁLBUM · SETEMBRO · 2026", a página dos
+ * mais raros pipocando um a um e as páginas da coleção pra virar. A espiral
+ * fica no lugar, numa camada própria. O bloco cresce da altura da capa pra da
+ * página.
  *
  * 3D só nas faces (o filtro do selo mora na face, não no nó que gira); a
  * página é pintada por cima da capa a partir de 90° (z-index vira 0), e nada
@@ -26,24 +26,15 @@ const H = MEDIDAS_CAPA.app.h;
 const EASE: [number, number, number, number] = [0.45, 0, 0.55, 1];
 const ANGULO = -168;
 
-export interface DadosPagina {
-  insignias: DadosInsignia[];
-  nivel: string;
-  xp: number;
-  faltaXp: number;
-  proximoNivel: string | null;
-  adesivos: number;
-  total: number;
-  /** "SETEMBRO · 2026" */
-  mes: string;
-}
-
-interface Props extends DadosPagina {
+interface Props {
   capa: CapaId;
   nome: string;
   membroDesde: string;
   dias: number;
+  nivel: string;
   onSelo: () => void;
+  album: DadosAlbum;
+  onSelecionar: (b: Badge) => void;
   aberto: boolean;
   onAbrir: () => void;
   onFechar: () => void;
@@ -57,7 +48,7 @@ type Fase = "fechado" | "abrindo" | "aberto" | "fechando";
 export const mesDaPagina = (d = new Date()): string =>
   `${d.toLocaleDateString("pt-BR", { month: "long" }).toUpperCase()} · ${d.getFullYear()}`;
 
-export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, insignias, xp, faltaXp, proximoNivel, adesivos, total, mes, aberto, onAbrir, onFechar, onCompartilhar, compartilhando }: Props) => {
+export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, album, onSelecionar, aberto, onAbrir, onFechar, onCompartilhar, compartilhando }: Props) => {
   const reduzir = useReducedMotion();
   const caixa = useRef<HTMLDivElement>(null);
   const pagina = useRef<HTMLDivElement>(null);
@@ -121,7 +112,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fase]);
 
-  // aberto: se a página mudar de altura (360 ↔ 390, texto), o bloco acompanha
+  // aberto: se a página mudar de altura (360 ↔ 390, outra página do álbum), o bloco acompanha
   useEffect(() => {
     if (fase !== "aberto" || !pagina.current || typeof ResizeObserver === "undefined") return;
     const el = pagina.current;
@@ -138,8 +129,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
   };
 
   const pagLargura = wCapa;
-  const tamPatch = Math.max(84, Math.min(96, Math.floor((pagLargura - 38 - 16) / 3)));
-  const costurando = fase === "abrindo" || fase === "aberto";
+  const animando = (fase === "abrindo" || fase === "aberto") && !reduzir;
 
   return (
     <div ref={caixa} style={{ width: "100%", maxWidth: W, margin: "0 auto" }} data-planner={fase}>
@@ -171,10 +161,10 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
                 <Espiral f="app" />
               </div>
             </div>
-            {/* a primeira página */}
+            {/* a página: o álbum */}
             <motion.div
               ref={pagina}
-              data-testid="pagina-insignias"
+              data-testid="pagina-album"
               initial={reduzir ? { opacity: 0 } : false}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.18 }}
@@ -186,23 +176,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
                   <i key={i} style={{ position: "absolute", left: 2, top: y * k - 4, width: 8, height: 8, borderRadius: "50%", background: "hsl(var(--background))", boxShadow: "inset 0 1px 2px rgba(0,0,0,.25)" }} />
                 ))}
               </div>
-              <div className="flex items-center">
-                <span className="text-[9.5px] font-extrabold tracking-[.18em] uppercase" style={{ color: "hsl(var(--accent))" }}>Minhas insígnias</span>
-                <span className="ml-auto text-[9.5px] font-extrabold tracking-[.18em] uppercase text-muted-foreground">{mes}</span>
-              </div>
-              <div className="grid grid-cols-3 justify-items-center mt-3" style={{ gap: "12px 8px" }}>
-                {insignias.map((ins, i) => (
-                  <Insignia key={ins.id} ins={ins} tamanho={tamPatch} costurar={costurando && !reduzir ? 330 + i * 85 : undefined} />
-                ))}
-              </div>
-              <div className="flex items-center gap-2.5 mt-3 pt-2.5 border-t border-dashed border-border text-[11px] text-muted-foreground">
-                <SeloNivel nivel={nivel} tamanho={34} />
-                <span>
-                  <b className="text-foreground">Nível {nivel}</b> · {xp.toLocaleString("pt-BR")} XP
-                  {proximoNivel ? ` · faltam ${faltaXp.toLocaleString("pt-BR")} pra ${proximoNivel}` : " · o nível mais alto"}
-                </span>
-                <span className="ml-auto shrink-0 tabular-nums text-right whitespace-nowrap leading-tight">{adesivos} de {total}<br />adesivos</span>
-              </div>
+              <AlbumDeAdesivos {...album} largura={pagLargura - 38} animar={animando} reduzir={!!reduzir} onSelecionar={onSelecionar} />
               {/* a sombra da capa correndo sobre a página */}
               <motion.div aria-hidden style={{ position: "absolute", inset: 0, borderRadius: 18, background: "linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,0) 70%)", opacity: sombra, pointerEvents: "none" }} />
             </motion.div>
@@ -219,7 +193,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ delay: reduzir ? 0 : 1.0, duration: reduzir ? 0.15 : 0.28 }}
+            transition={{ delay: reduzir ? 0 : 1.0, duration: reduzir ? 0 : 0.28 }}
           >
             <button
               type="button"
@@ -228,7 +202,7 @@ export const PlannerAberto = ({ capa, nome, membroDesde, dias, nivel, onSelo, in
               className="w-full h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform disabled:opacity-70"
             >
               {compartilhando ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Instagram className="w-[18px] h-[18px]" aria-hidden />}
-              Compartilhar insígnias
+              Compartilhar meu álbum
             </button>
             <button type="button" onClick={onFechar} className="py-2 text-[12px] font-semibold text-muted-foreground">
               Fechar o planner

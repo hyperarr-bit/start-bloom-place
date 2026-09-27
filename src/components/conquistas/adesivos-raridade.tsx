@@ -63,6 +63,20 @@ export const ChipRaridade = ({ raridade, texto, tam = "p", className }: { rarida
 
 const HOLO = ["#ff7ad9", "#ffd36e", "#7dffb3", "#6ec8ff", "#b98bff", "#ff7ad9"];
 const OURO = ["#fff1b0", "#d4a629", "#8f6a0c", "#fff3c4", "#e9c65a", "#8f6a0c", "#fff1b0"];
+/** As cores do anel (o vídeo do álbum desenha o mesmo anel no canvas). */
+export const CORES_ANEL: Record<"epico" | "lendario", string[]> = { epico: HOLO, lendario: OURO };
+/** Halo por trás do anel (idem). */
+export const HALO_ANEL: Record<"epico" | "lendario", string> = { epico: "rgba(185,139,255,.28)", lendario: "rgba(212,166,41,.35)" };
+
+/** A cor em `t` (0..1) ao longo da lista, misturando os vizinhos. */
+export const corDoAnel = (cores: string[], t: number): string => {
+  const pos = Math.max(0, Math.min(1, t)) * (cores.length - 1);
+  const i = Math.min(cores.length - 2, Math.floor(pos));
+  const f = pos - i;
+  const a = cores[i], b = cores[i + 1];
+  const mix = (k: number) => Math.round(parseInt(a.slice(k, k + 2), 16) * (1 - f) + parseInt(b.slice(k, k + 2), 16) * f);
+  return `rgb(${mix(1)},${mix(3)},${mix(5)})`;
+};
 
 /**
  * O anel da raridade desenhado em SVG (arcos coloridos com degradê entre
@@ -78,14 +92,7 @@ export const AnelRaridadeSvg = ({ raridade, tamanho }: { raridade: "epico" | "le
   const rInt = c * 0.83;
   const n = 72;
   const passo = (Math.PI * 2) / n;
-  const corEm = (t: number) => {
-    const pos = t * (cores.length - 1);
-    const i = Math.min(cores.length - 2, Math.floor(pos));
-    const f = pos - i;
-    const a = cores[i], b = cores[i + 1];
-    const mix = (k: number) => Math.round(parseInt(a.slice(k, k + 2), 16) * (1 - f) + parseInt(b.slice(k, k + 2), 16) * f);
-    return `rgb(${mix(1)},${mix(3)},${mix(5)})`;
-  };
+  const corEm = (t: number) => corDoAnel(cores, t);
   const fatias = Array.from({ length: n }, (_, i) => {
     const a0 = i * passo - Math.PI / 2 + (raridade === "lendario" ? 0.35 : 0);
     const a1 = a0 + passo * 1.15;
@@ -97,7 +104,7 @@ export const AnelRaridadeSvg = ({ raridade, tamanho }: { raridade: "epico" | "le
       <defs>
         <radialGradient id={`${uid}-h`} cx=".5" cy=".5" r=".5">
           <stop offset=".72" stopColor="rgba(255,255,255,0)" />
-          <stop offset="1" stopColor={raridade === "lendario" ? "rgba(212,166,41,.35)" : "rgba(185,139,255,.28)"} />
+          <stop offset="1" stopColor={HALO_ANEL[raridade]} />
         </radialGradient>
       </defs>
       <circle cx={c} cy={c} r={rExt * 1.08} fill={`url(#${uid}-h)`} />

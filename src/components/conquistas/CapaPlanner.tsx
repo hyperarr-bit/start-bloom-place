@@ -156,6 +156,12 @@ export const Espiral = ({ f }: { f: Formato }) => {
 
 /** Furos e argolas no tamanho do app: `y` de cada argola (pra página do planner alinhar os furos). */
 export const ARGOLAS_APP = Array.from({ length: G.app.espiral.n }, (_, i) => G.app.espiral.topo + i * G.app.espiral.passo + G.app.espiral.h * 0.5);
+/** O mesmo no formato dos Stories (a página do álbum na arte e no vídeo). */
+export const ARGOLAS_STORIES = Array.from({ length: G.stories.espiral.n }, (_, i) => G.stories.espiral.topo + i * G.stories.espiral.passo + G.stories.espiral.h * 0.5);
+/** Largura da caixa da espiral nos Stories (a camada da espiral do vídeo). */
+export const CAIXA_ESPIRAL_STORIES = G.stories.espiral.caixa;
+/** Onde fica a lombada (o tecido começa aqui): a dobra da capa quando abre. */
+export const DOBRA_STORIES = G.stories.esq;
 
 interface CapaPlannerProps extends DadosCapa {
   capa: CapaId;

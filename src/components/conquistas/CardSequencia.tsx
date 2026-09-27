@@ -139,7 +139,7 @@ export const CardSequencia = ({ seq, onAcao }: { seq: Sequencia; onAcao: (rota: 
           <AnimatePresence mode="wait" initial={false}>
             {hojeFeito ? (
               <motion.p key="garantido" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={troca}>
-                <span className="text-success font-semibold inline-flex items-center gap-1.5">
+                <span className="font-semibold inline-flex items-center gap-1.5" style={{ color: "hsl(var(--garantido, var(--success)))" }}>
                   Hoje já tá garantido <Check className="w-4 h-4" strokeWidth={3} aria-hidden />
                 </span>
                 {completa

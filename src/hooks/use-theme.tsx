@@ -100,6 +100,9 @@ const varsDoLado = (l: Lado, modo: ThemeMode): Record<string, string> => {
        como está: grafite. */
     "--primary": l.accent, "--primary-foreground": escuro ? l.paper : "0 0% 100%",
     "--score-ring": l.accent, "--streak": l.accent,
+    /* 27/09 (dono): o "garantido hoje ✓" da sequência é verde no Original e segue o
+       acento nos outros temas (índigo no Índigo…). Sem tema: cai no --success. */
+    "--garantido": l.accent,
     "--secondary": l.chip, "--secondary-foreground": l.ink,
     "--muted": l.chip, "--muted-foreground": l.ink2,
     "--accent": l.accent, "--accent-foreground": escuro ? l.paper : "0 0% 100%",

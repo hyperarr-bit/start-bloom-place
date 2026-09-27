@@ -25,7 +25,7 @@ export const LinhaSequencia = ({ seq }: { seq: Sequencia }) => {
           </b>
           <span className="text-muted-foreground" aria-hidden>·</span>
           {seq.hojeFeito ? (
-            <span className="text-success font-semibold inline-flex items-center gap-1">
+            <span className="font-semibold inline-flex items-center gap-1" style={{ color: "hsl(var(--garantido, var(--success)))" }}>
               garantido hoje <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden />
             </span>
           ) : (

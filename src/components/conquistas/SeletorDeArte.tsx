@@ -151,10 +151,15 @@ export const Previa = ({ titulo, elemento, transparente, onPostar, onFechar }: P
       exit={{ opacity: 0 }}
       transition={{ duration: reduzir ? 0.1 : 0.22 }}
     >
-      <header className="h-[52px] shrink-0 flex items-center gap-2.5 px-4 text-[14px] font-extrabold pt-[env(safe-area-inset-top)]">
-        <button type="button" onClick={onFechar} aria-label="Fechar a prévia" className="-ml-1 p-1 rounded-md hover:bg-muted"><X className="w-[18px] h-[18px]" /></button>
-        <span>Prévia · {titulo}</span>
-        <span className="ml-auto text-[11px] font-semibold text-muted-foreground">1080 × 1920</span>
+      {/* 27/09 (dono: "quando clica não tem como sair"): o header tinha altura FIXA de 52 px
+          com o recuo da câmera dentro — no iPhone o recuo (~59 px) empurrava o X pra fora da
+          caixa e a arte cobria. Agora o recuo fica por fora e a faixa do X tem 52 px de verdade. */}
+      <header className="shrink-0 pt-[env(safe-area-inset-top)] relative z-10 bg-background">
+        <div className="h-[52px] flex items-center gap-2 px-3 text-[14px] font-extrabold">
+          <button type="button" onClick={onFechar} aria-label="Fechar a prévia" className="w-10 h-10 grid place-items-center rounded-full hover:bg-muted active:bg-muted" data-testid="previa-fechar"><X className="w-5 h-5" /></button>
+          <span>Prévia · {titulo}</span>
+          <span className="ml-auto pr-1 text-[11px] font-semibold text-muted-foreground">1080 × 1920</span>
+        </div>
       </header>
       <div ref={palco} className="flex-1 min-h-0 grid place-items-center px-4 py-1.5">
         <motion.div
@@ -177,6 +182,10 @@ export const Previa = ({ titulo, elemento, transparente, onPostar, onFechar }: P
             Fundo transparente <span className="font-medium text-muted-foreground">· pra colar na sua foto</span>
           </button>
         )}
+        {/* saída perto do polegar, além do X lá em cima */}
+        <button type="button" onClick={onFechar} className="h-10 rounded-xl text-[13px] font-bold text-muted-foreground hover:text-foreground" data-testid="previa-voltar">
+          Voltar
+        </button>
       </footer>
     </motion.div>
   );

@@ -115,6 +115,40 @@ describe("Postar nos Stories", () => {
   });
 });
 
+describe("saídas e atalhos (dono 27/09)", () => {
+  it("a prévia tem como sair: o X lá em cima e o 'Voltar' embaixo voltam pro seletor", async () => {
+    abrir(montarStore(cenario()));
+    fireEvent.click(screen.getByTestId("postar-stories"));
+    const folha = await screen.findByTestId("seletor-de-arte");
+    fireEvent.click(folha.querySelector('[data-arte="capa"]')!);
+    fireEvent.click(within(await screen.findByTestId("previa-arte")).getByTestId("previa-voltar"));
+    await waitFor(() => expect(screen.queryByTestId("previa-arte")).toBeNull());
+    expect(await screen.findByTestId("seletor-de-arte")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("seletor-de-arte").querySelector('[data-arte="roseta"]')!);
+    fireEvent.click(within(await screen.findByTestId("previa-arte")).getByTestId("previa-fechar"));
+    await waitFor(() => expect(screen.queryByTestId("previa-arte")).toBeNull());
+  });
+
+  it("vindo direto do planner, o 'Voltar' da prévia fecha tudo (não cai na folha)", async () => {
+    abrir(montarStore(cenario()));
+    fireEvent.click(screen.getByTestId("capa-3d"));
+    fireEvent.click(await screen.findByRole("button", { name: /Compartilhar insígnias/ }));
+    fireEvent.click(within(await screen.findByTestId("previa-arte")).getByTestId("previa-voltar"));
+    await waitFor(() => expect(screen.queryByTestId("previa-arte")).toBeNull());
+    expect(screen.queryByTestId("seletor-de-arte")).toBeNull();
+  });
+
+  it("'Abrir meu planner' abre a página das insígnias sem tocar na capa, e some com o planner aberto", async () => {
+    abrir(montarStore(cenario()));
+    fireEvent.click(screen.getByTestId("abrir-planner"));
+    expect(await screen.findByTestId("pagina-insignias")).toHaveTextContent("Minhas insígnias");
+    expect(screen.queryByTestId("abrir-planner")).toBeNull();
+    expect(eventos.some(([n]) => n === "planner_abrir")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Fechar o planner/ }));
+    expect(await screen.findByTestId("abrir-planner")).toBeInTheDocument();
+  });
+});
+
 describe("desafios semanais", () => {
   it("o botão 'Reativar desafios semanais' saiu da tela; o Desafiante trancado oferece 'Ligar os desafios'", async () => {
     const store = montarStore(cenario({ "finance-challenges-hidden": true }));

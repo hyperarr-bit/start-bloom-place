@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Instagram, Trophy } from "lucide-react";
+import { ArrowLeft, Instagram, Trophy, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -149,6 +149,21 @@ export const TelaConquistas = () => {
             onFechar={() => setPlannerAberto(false)}
             onCompartilhar={compartilharInsignias}
           />
+
+          {/* 27/09 (dono): "vai ter gente que nunca vai tocar nele e ver o que tem dentro" —
+              o toque na capa continua abrindo; este botão só existe com o planner fechado. */}
+          {!plannerAberto && (
+            <button
+              type="button"
+              onClick={abrirPlanner}
+              className="w-full h-11 rounded-xl border-2 border-dashed border-accent/45 bg-accent/[0.06] text-accent font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform entra-sobe"
+              style={{ "--d": "100ms" } as React.CSSProperties}
+              data-testid="abrir-planner"
+            >
+              <BookOpen className="w-[18px] h-[18px]" aria-hidden />
+              Abrir meu planner
+            </button>
+          )}
 
           {/* no 360 o rótulo "CAPA" sai pra caber na mesma fileira (as bolinhas logo embaixo da capa já dizem) */}
           <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-2.5 entra-sobe" style={{ "--d": "120ms" } as React.CSSProperties}>

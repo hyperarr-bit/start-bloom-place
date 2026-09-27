@@ -188,7 +188,9 @@ export function VitrineStartScreen({ onPickArea }: { onPickArea: (area: AreaKey,
           ))}
         </div>
         <div className="flex items-center justify-center gap-1.5 flex-wrap mb-3.5">
-          <span className="inline-flex items-center rounded-full bg-accent/10 text-accent text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">16 módulos · 1 pagamento</span>
+          {/* 27/09 (dono): nada de pagamento na 1ª tela — "botar pagamento na 1ª tela afasta".
+              Mesma regra do veto de preço de 23/08; o "pagamento único" fica pro paywall. */}
+          <span className="inline-flex items-center rounded-full bg-accent/10 text-accent text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">16 módulos juntos</span>
           <span className="inline-flex items-center gap-1 rounded-full bg-secondary text-[10.5px] font-bold px-2 py-1 whitespace-nowrap">📱 App Store · Google Play</span>
         </div>
         <h1 className="text-[clamp(27px,7.5vw,38px)] font-extrabold leading-[1.06] tracking-tight mb-2 text-center">

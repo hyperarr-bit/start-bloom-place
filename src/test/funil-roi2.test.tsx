@@ -98,7 +98,9 @@ describe("porta (1ª tela)", () => {
     }
     expect(screen.getByText(PORTA_TUDO.label)).toBeTruthy();
     expect(screen.getByText(PORTA_TUDO.sub)).toBeTruthy();
-    expect(screen.getByText("16 módulos · 1 pagamento")).toBeTruthy();
+    expect(screen.getByText("16 módulos juntos")).toBeTruthy();
+    // dono 27/09: a 1ª tela não fala de pagamento
+    expect(document.body.textContent ?? "").not.toMatch(/pagamento|R\$|pix/i);
     expect(texto()).toMatch(/App Store · Google Play/);
     expect(texto()).toMatch(/Leva 60 s · sem cadastro · os 16 módulos vêm em qualquer escolha/);
     // Ordem do dono (23/08): preço NUNCA na 1ª tela.

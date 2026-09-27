@@ -43,7 +43,7 @@ const ABAS: Record<string, string> = {
   "treino:hoje": "Hoje",
   "treino:semana": "Semana",
   "treino:evolucao": "Evolução",
-  "treino:config": "Configurar",
+  "treino:config": "Plano",
   "treino:resumo": "Resumo",
   "treino:records": "Recordes",
   "treino:progressao": "Progressão",

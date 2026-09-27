@@ -2,7 +2,7 @@
  * SEMANA (26/09, mockup p2): a semana como TABELA de planner — DIA | TREINO |
  * FEITO, a barrinha na cor do dia, descanso esmaecido, hoje destacado. O FEITO
  * vem do registro de treinos (a data daquele dia nesta semana), não do ✓ do
- * plano. Tocar num dia abre o editor dele.
+ * plano. Tocar num dia abre esse dia no 📋 PLANO (27/09: o plano só se edita lá).
  */
 import type { ReactNode } from "react";
 import { cn, localDayKey } from "@/lib/utils";
@@ -154,7 +154,7 @@ export function TreinoSemana({ linhas, onAbrirDia, children }: { linhas: LinhaDa
             })}
           </tbody>
         </table>
-        <p className="px-4 py-2.5 border-t border-blue-100 text-[11.5px] text-muted-foreground">Toque num dia pra montar ou editar os exercícios dele.</p>
+        <p className="px-4 py-2.5 border-t border-blue-100 text-[11.5px] text-muted-foreground">Toque num dia pra montar ou mudar o treino dele no 📋 PLANO.</p>
       </div>
       {children}
     </div>

@@ -5,7 +5,7 @@
  * próximo não concluído — tocar numa linha abre ela.
  */
 import { useEffect, useState } from "react";
-import { Minus, PencilLine, Plus, Settings } from "lucide-react";
+import { ClipboardList, Minus, PencilLine, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   formatarKg,
@@ -34,7 +34,8 @@ export interface AcoesDoHoje {
   nota: (texto: string) => void;
   /** treinar o plano de outro dia hoje (null = voltar pro de hoje) */
   escolherDia: (dia: string | null) => void;
-  abrirConfig: () => void;
+  /** a aba 📋 PLANO (modelos prontos e o plano da semana) */
+  abrirPlano: () => void;
 }
 
 export interface PropsDoHoje {
@@ -208,8 +209,8 @@ export function TreinoHoje(p: PropsDoHoje) {
             <p className="text-[13.5px] font-semibold">Monte o treino de hoje</p>
             <p className="text-[12.5px] text-muted-foreground">
               Adicione o primeiro exercício — ou{" "}
-              <button type="button" onClick={acoes.abrirConfig} className="underline underline-offset-2 font-semibold text-foreground inline-flex items-center gap-1">
-                use um modelo pronto <Settings className="w-3 h-3" aria-hidden="true" />
+              <button type="button" onClick={acoes.abrirPlano} className="underline underline-offset-2 font-semibold text-foreground inline-flex items-center gap-1">
+                use um modelo pronto <ClipboardList className="w-3 h-3" aria-hidden="true" />
               </button>
               .
             </p>

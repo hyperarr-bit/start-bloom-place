@@ -62,7 +62,9 @@ export default function AdminFunnel() {
   // Se existe um marco de reset salvo, abre já em "Desde o reset" — senão o
   // reload voltava pra "30 dias" e os números "voltavam".
   const [resetAt, setResetAt] = useState<string | null>(() => getCounterReset());
-  const [range, setRange] = useState<RangeKey>(() => (getCounterReset() ? "reset" : "30d"));
+  // 27/09: abre em 7 dias. Com ~30 mil eventos/dia, 30 dias passa dos 60 s da
+  // função mesmo depois da migração admin_rapido (7 dias responde em ~5 s).
+  const [range, setRange] = useState<RangeKey>(() => (getCounterReset() ? "reset" : "7d"));
   const [granularity, setGranularity] = useState<Granularity>(() => (getCounterReset() ? "hour" : "day"));
   // Janela custom (dia/hora específico). Quando setada, manda no período —
   // sobrepõe o preset até o admin limpar.
@@ -84,7 +86,7 @@ export default function AdminFunnel() {
   const handleUndoReset = () => {
     setCounterReset(null);
     setResetAt(null);
-    setRange("30d");
+    setRange("7d");
     setGranularity("day");
   };
 

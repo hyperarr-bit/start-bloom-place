@@ -127,8 +127,13 @@ export function ConstanciaTreino({
             ))}
           </div>
           <div className="grid gap-[6px] mt-1.5 text-[9.5px] font-bold text-muted-foreground text-center tabular-nums" style={{ gridTemplateColumns: `repeat(${semanas.length}, minmax(0, 1fr))` }}>
-            {semanas.map((s) => (
-              <span key={s.inicio} className={cn("truncate", s.atual && "text-blue-600")}>{s.rotulo}</span>
+            {semanas.map((s, i) => (
+              // 12 datas não cabem em 12 colunas no celular (saíam "1…", "2…"): uma sim, outra
+              // não, contando da semana atual, que sempre aparece. A coluna vizinha fica vazia
+              // e a data pode passar um pouco da própria coluna.
+              <span key={s.inicio} className={cn("whitespace-nowrap overflow-visible", s.atual && "text-blue-600")}>
+                {(semanas.length - 1 - i) % 2 === 0 ? s.rotulo : ""}
+              </span>
             ))}
           </div>
         </div>

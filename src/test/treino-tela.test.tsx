@@ -213,17 +213,20 @@ describe("Treino — o ciclo inteiro, fechando e reabrindo", () => {
     expect(screen.getByTestId("treino-semana")).toHaveTextContent("1 de 2 feito");
   });
 
-  it("SEMANA: tocar num dia abre o editor; remover tem Desfazer; copiar pra outro dia liga o dia", async () => {
+  it("SEMANA: tocar num dia abre esse dia no 📋 PLANO; remover tem Desfazer; copiar pra outro dia liga o dia", async () => {
     vi.useFakeTimers({ now: new Date(2026, 8, 26, 9, 0), toFake: ["Date"] });
     const store = criarStore({ "saude-workouts-v2": PLANO, "treino-active-days": ["SEGUNDA", "SÁBADO"], "core-tip-seen-treino": "true" });
     abrir(store);
     fireEvent.click(screen.getByRole("button", { name: /SEMANA/ }));
     fireEvent.click(screen.getByRole("button", { name: "Editar o treino de segunda" }));
-    const editor = screen.getByTestId("editor-do-dia");
+    // 27/09: a folha do editor deu lugar à aba PLANO, já com a segunda aberta
+    expect(screen.getByTestId("aba-plano")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("plano-dia-SEGUNDA")).toHaveAttribute("aria-pressed", "true");
+    const editor = screen.getByTestId("plano-do-dia");
     fireEvent.change(within(editor).getByLabelText("Novo exercício de segunda"), { target: { value: "Leg press" } });
     fireEvent.click(within(editor).getByRole("button", { name: "Adicionar exercício" }));
     expect((store.dados["saude-workouts-v2"] as typeof PLANO).SEGUNDA.exercises.map((e) => e.name)).toEqual(["Agachamento", "Leg press"]);
-    fireEvent.click(within(editor).getByRole("button", { name: "Remover exercícios" }));
+    fireEvent.click(within(editor).getByRole("button", { name: "Opções de Agachamento" }));
     fireEvent.click(within(editor).getByRole("button", { name: "Remover Agachamento" }));
     const { avisarApagado } = await import("@/lib/desfazer");
     const ultima = vi.mocked(avisarApagado).mock.calls.at(-1)!;

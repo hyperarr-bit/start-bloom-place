@@ -6,6 +6,13 @@
  * (a tabela da semana + a constância nova) · 📈 EVOLUÇÃO. O CONFIG saiu da fila
  * de abas e virou o ⚙️ do cabeçalho.
  *
+ * 27/09 (dono: "a parte mais importante — configurar o treino e os exercícios —
+ * não faz sentido ser esse botãozinho"): o ⚙️ e a folha "editor do dia" viraram
+ * a aba 📋 PLANO, a 2ª da fila (HOJE · PLANO · SEMANA · EVOLUÇÃO). É o único
+ * lugar onde o plano se edita: tocar num dia na SEMANA abre esse dia no PLANO.
+ * Plano vazio abre direto no PLANO; `?aba=plano` (ou semana/evolucao) também.
+ * Na medição a aba continua com o id "config" (a série histórica do /admin).
+ *
  * Dados — tudo o que já existia continua lido e gravado do mesmo jeito:
  *  - plano `saude-workouts-v2` (alvo em sets/reps/carga, texto) — o `done` de
  *    cada exercício agora acompanha as séries (todas feitas = done);
@@ -19,9 +26,9 @@
  * muda; o padrão é o nº de dias de treino) e `treino-sessoes` (por data: dia do
  * plano, minutos e músculos — o carimbo do mês e as horas saem daqui).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Dumbbell, Flame, Settings } from "lucide-react";
+import { ArrowLeft, Dumbbell, Flame } from "lucide-react";
 import { toast } from "sonner";
 import { localDayKey, mesAtualExtenso, parseLocalDay, semanaAtualId } from "@/lib/utils";
 import { useTabReporter } from "@/hooks/use-module-tracker";
@@ -75,16 +82,11 @@ import { TreinoSemana, linhasDaSemana } from "@/components/treino/TreinoSemana";
 import { ConstanciaTreino } from "@/components/treino/ConstanciaTreino";
 import { TreinoEvolucao, type RecordeAnotado } from "@/components/treino/TreinoEvolucao";
 import { TreinoConcluido, type ResumoDoTreino } from "@/components/treino/TreinoConcluido";
-import { EditorDoDia, type AcoesDoEditor } from "@/components/treino/EditorDoDia";
-import { ConfigDoTreino, type ModeloDeTreino } from "@/components/treino/ConfigDoTreino";
+import { TreinoPlano, type AcoesDoPlano } from "@/components/treino/TreinoPlano";
 import { tomDoDia } from "@/components/treino/planner";
+import { aplicarModelo, exercicioNovo, moverNaLista, planoVazio, type DiaDoPlano } from "@/lib/treino-plano";
 
-interface DayPlan {
-  muscles: string[];
-  exercises: ExercicioDoPlano[];
-}
-
-type WorkoutPlan = Record<string, DayPlan>;
+type WorkoutPlan = Record<string, DiaDoPlano>;
 
 const defaultWorkoutPlan: WorkoutPlan = {
   SEGUNDA: { muscles: [], exercises: [] },
@@ -142,16 +144,32 @@ const bipeDoDescanso = () => {
   } catch { /* sem áudio no aparelho */ }
 };
 
-type Aba = "hoje" | "semana" | "evolucao";
+type Aba = "hoje" | "plano" | "semana" | "evolucao";
 const ABAS: { id: Aba; label: string; icon: string }[] = [
   { id: "hoje", label: "HOJE", icon: "🏋️" },
+  { id: "plano", label: "PLANO", icon: "📋" },
   { id: "semana", label: "SEMANA", icon: "📅" },
   { id: "evolucao", label: "EVOLUÇÃO", icon: "📈" },
 ];
+/** Id da aba no module_analytics: o PLANO segue como "config" (era o ⚙️ e,
+ *  antes de 26/09, a aba CONFIG) pra série do /admin não quebrar. */
+const ID_NA_MEDICAO: Record<Aba, string> = { hoje: "hoje", plano: "config", semana: "semana", evolucao: "evolucao" };
+
+/** `?aba=plano` (ou `config`, o id antigo), `semana`, `evolucao`, `hoje`. */
+const abaDaUrl = (): Aba | null => {
+  try {
+    const a = new URLSearchParams(window.location.search).get("aba");
+    if (a === "config") return "plano";
+    return ABAS.some((x) => x.id === a) ? (a as Aba) : null;
+  } catch {
+    return null;
+  }
+};
 
 const Treino = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Aba>("hoje");
+  const [abaPedida] = useState(abaDaUrl);
+  const [activeTab, setActiveTab] = useState<Aba>(() => abaPedida ?? "hoje");
   useScrollActiveTabIntoView(activeTab);
   const reportTab = useTabReporter();
   const currentMonth = mesAtualExtenso();
@@ -160,19 +178,42 @@ const Treino = () => {
   const todayDayName = DIAS[indiceDoDia(hojeData)];
 
   // Garantir que o tutorial encontra o alvo: força aba "hoje" quando há tutorial pendente.
-  const { get: getUserData, isGuest } = useUserData();
-  useEffect(() => {
+  const { get: getUserData, isGuest, loaded } = useUserData();
+  const tutorialPendente = useCallback(() => {
     const forceNewUser = !!getUserData<string>("force-new-user-tutorial", "") || (typeof localStorage !== "undefined" && localStorage.getItem("force-new-user-tutorial") === "true");
-    if (!isGuest && !forceNewUser) return;
-    const target = getUserData<string>("quickstart-target-module", "");
-    const done = getUserData<string>("spotlight-done-treino", "");
-    if (target === "treino" && !done) setActiveTab("hoje");
+    if (!isGuest && !forceNewUser) return false;
+    return getUserData<string>("quickstart-target-module", "") === "treino" && !getUserData<string>("spotlight-done-treino", "");
   }, [isGuest, getUserData]);
+  useEffect(() => {
+    if (tutorialPendente()) setActiveTab("hoje");
+  }, [tutorialPendente]);
+
+  /*
+   * PLANO VAZIO ABRE NO PLANO (27/09). Decidido UMA vez, com os dados já
+   * carregados (antes disso o plano sempre parece vazio) e lendo o store direto
+   * (o estado do usePersistedState hidrata no mesmo ciclo). Não vale com
+   * tutorial pendente (o alvo dele está no HOJE) nem com `?aba=` na URL. Nada é
+   * gravado: abrir o módulo continua sem escrever (escrita = "1º treino").
+   */
+  const abaInicialDecidida = useRef(false);
+  useEffect(() => {
+    if (!loaded || abaInicialDecidida.current) return;
+    abaInicialDecidida.current = true;
+    if (abaPedida) {
+      if (abaPedida !== "hoje") reportTab?.(ID_NA_MEDICAO[abaPedida]);
+      return;
+    }
+    if (tutorialPendente()) return;
+    if (planoVazio(getUserData<unknown>("saude-workouts-v2", null))) {
+      setActiveTab("plano");
+      reportTab?.(ID_NA_MEDICAO.plano);
+    }
+  }, [loaded, abaPedida, tutorialPendente, getUserData, reportTab]);
 
   const [rawPlan, setRawPlan] = usePersistedState("saude-workouts-v2", defaultWorkoutPlan);
   // Sem nenhum músculo ou exercício em nenhum dia, o módulo abre vazio — o
-  // "Próximo passo" diz o que fazer.
-  const treinoVazio = Object.values(rawPlan ?? {}).every((d) => !(d?.muscles?.length) && !(d?.exercises?.length));
+  // PLANO começa pelos modelos e as outras abas mostram o "Próximo passo".
+  const treinoVazio = planoVazio(rawPlan);
   const workoutPlan = useMemo(() => migratePlan(rawPlan), [rawPlan]);
   const setWorkoutPlan = useCallback(
     (p: WorkoutPlan | ((prev: WorkoutPlan) => WorkoutPlan)) => {
@@ -384,10 +425,10 @@ const Treino = () => {
       return { ...prev, [dia]: { ...d0, exercises: exs } };
     });
 
-  const adicionarExercicio = (dia: string, nome: string) => {
+  const adicionarExercicio = (dia: string, nome: string, extra?: Partial<ExercicioDoPlano>) => {
     setWorkoutPlan((prev) => {
       const d0 = prev[dia] ?? { muscles: [], exercises: [] };
-      return { ...prev, [dia]: { ...d0, exercises: [...(d0.exercises ?? []), { name: nome, sets: "", reps: "", carga: "", done: false, obs: "" }] } };
+      return { ...prev, [dia]: { ...d0, exercises: [...(d0.exercises ?? []), exercicioNovo(nome, extra)] } };
     });
     // dia que recebe exercício vira dia de treino (senão fica "descanso" com treino dentro)
     if (!diasAtivosLimpos.includes(dia)) setActiveDays((prev) => [...new Set([...(prev ?? []), dia])]);
@@ -431,7 +472,7 @@ const Treino = () => {
       if (d == null) setSessaoSalva(null);
       else mudarSessao((s) => ({ ...s, dia: d }));
     },
-    abrirConfig: () => abrirConfig(),
+    abrirPlano: () => abrirNoPlano(diaDoTreino, true),
   };
 
   /* ---------------- concluir ---------------- */
@@ -526,21 +567,24 @@ const Treino = () => {
   }, [historico, hojeData]);
   const cargas = useMemo(() => cargaPorExercicio(historico, today), [historico, today]);
 
-  /* ---------------- plano: editor do dia e ⚙️ ---------------- */
-  const [diaEditando, setDiaEditando] = useState<string | null>(null);
-  const [configAberta, setConfigAberta] = useState(false);
-  const abrirConfig = () => {
-    setConfigAberta(true);
-    reportTab?.("config");
-  };
-  const fecharConfig = () => {
-    setConfigAberta(false);
-    reportTab?.(activeTab);
-  };
+  /* ---------------- 📋 PLANO: a semana, o dia aberto, modelos e ajustes ---------------- */
+  const [diaDoPlano, setDiaDoPlano] = useState<string>(todayDayName);
 
-  const toggleDay = (day: string) => {
-    setActiveDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
-    setWorkoutPlan((prev) => (prev[day] ? prev : { ...prev, [day]: { muscles: [], exercises: [] } }));
+  const trocarAba = (id: Aba) => {
+    setActiveTab(id);
+    reportTab?.(ID_NA_MEDICAO[id]);
+  };
+  /** A SEMANA e o HOJE mandam pra cá: o dia já aberto e a página no topo —
+   *  ou nos modelos prontos, quando o convite foi "use um modelo pronto". */
+  const abrirNoPlano = (dia: string, nosModelos = false) => {
+    if (DIAS.includes(dia)) setDiaDoPlano(dia);
+    trocarAba("plano");
+    try { window.scrollTo({ top: 0 }); } catch { /* jsdom */ }
+    if (nosModelos) {
+      window.setTimeout(() => {
+        document.querySelector<HTMLElement>('[data-testid="modelos-prontos"]')?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      }, 60);
+    }
   };
 
   const toggleMuscleForDay = (day: string, muscle: string) => {
@@ -552,23 +596,8 @@ const Treino = () => {
     });
   };
 
-  const applyTemplate = (template: ModeloDeTreino) => {
-    const planoAntes = workoutPlan;
-    const diasAntes = activeDays;
-    const newPlan: WorkoutPlan = {};
-    const newActiveDays: string[] = [];
-    for (const day of DIAS) {
-      const muscles = template.plan[day] || [];
-      newPlan[day] = { muscles, exercises: workoutPlan[day]?.exercises || [] };
-      if (muscles.length > 0) newActiveDays.push(day);
-    }
-    setWorkoutPlan(() => newPlan);
-    setActiveDays(newActiveDays);
-    // trocava a semana inteira sem aviso nem volta (varredura 26/09)
-    avisarApagado(`Modelo "${template.name}" aplicado`, () => { setWorkoutPlan(() => planoAntes); setActiveDays(diasAntes); });
-  };
-
-  const acoesDoEditor: AcoesDoEditor = {
+  const acoesDoPlano: AcoesDoPlano = {
+    escolherDia: (d) => setDiaDoPlano(d),
     ativo: (d, on) => {
       setActiveDays((prev) => (on ? [...new Set([...(prev ?? []), d])] : (prev ?? []).filter((x) => x !== d)));
       if (on) setWorkoutPlan((prev) => (prev[d] ? prev : { ...prev, [d]: { muscles: [], exercises: [] } }));
@@ -576,6 +605,12 @@ const Treino = () => {
     musculo: toggleMuscleForDay,
     exercicio: mudarExercicio,
     adicionar: adicionarExercicio,
+    mover: (dia, de, para) =>
+      setWorkoutPlan((prev) => {
+        const d0 = prev[dia] ?? { muscles: [], exercises: [] };
+        const lista = moverNaLista(d0.exercises ?? [], de, para);
+        return lista === d0.exercises ? prev : { ...prev, [dia]: { ...d0, exercises: lista } };
+      }),
     // "Remover exercício": a lixeira apagava SEMPRE o último, sem volta (26/09).
     remover: (dia, i) => {
       const removido = workoutPlan[dia]?.exercises[i];
@@ -613,11 +648,23 @@ const Treino = () => {
         () => { setWorkoutPlan(() => planoAntes); setActiveDays(diasAntes); },
       );
     },
-  };
-
-  const trocarAba = (id: Aba) => {
-    setActiveTab(id);
-    reportTab?.(id);
+    // MODELO PRONTO (27/09: agora com exercícios nos dias vazios — antes só
+    // marcava os grupos e a semana continuava por digitar). Trocava a semana
+    // inteira sem aviso nem volta até a varredura de 26/09: segue com Desfazer.
+    modelo: (m) => {
+      const planoAntes = workoutPlan;
+      const diasAntes = activeDays;
+      const r = aplicarModelo(workoutPlan, m);
+      setWorkoutPlan(() => r.plano);
+      setActiveDays(r.diasAtivos);
+      setDiaDoPlano(r.diasAtivos.includes(todayDayName) ? todayDayName : r.diasAtivos[0] ?? todayDayName);
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch { /* jsdom */ }
+      trackEvent("treino_modelo", { modelo: m.name, dias: r.diasAtivos.length });
+      avisarApagado(`Modelo "${m.name}" aplicado`, () => { setWorkoutPlan(() => planoAntes); setActiveDays(diasAntes); });
+    },
+    meta: (n) => setMetaSalva(n),
+    descanso: (s) => setRestTime(s),
+    som: (v) => setSoundEnabled(v),
   };
 
   const [alturaRodape, setAlturaRodape] = useState(0);
@@ -651,23 +698,23 @@ const Treino = () => {
               </span>
             )}
             <span className="hidden min-[425px]:inline text-muted-foreground text-xs whitespace-nowrap">{currentMonth}</span>
-            <button type="button" onClick={abrirConfig} aria-label="Configurar treino" className="w-9 h-9 shrink-0 rounded-xl bg-muted hover:bg-muted/80 grid place-items-center" data-testid="abrir-config">
-              <Settings className="w-4 h-4" />
-            </button>
             <ThemeToggle />
           </div>
         </div>
-        <div className="max-w-5xl mx-auto px-4 pb-2.5 grid grid-cols-3 gap-2">
+        {/* 4 abas num celular de 360: largura pela palavra (EVOLUÇÃO é a maior),
+            não em colunas iguais — 4 colunas iguais cortavam o EVOLUÇÃO. */}
+        <div className="max-w-5xl mx-auto px-4 pb-2.5 flex gap-1.5 min-[400px]:gap-2">
           {ABAS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               data-spotlight={`tab-${tab.id}`}
               data-active={activeTab === tab.id}
+              data-testid={`aba-${tab.id}`}
               onClick={() => trocarAba(tab.id)}
-              className={`notion-tab justify-center gap-1.5 px-1 rounded-lg text-[11.5px] min-[400px]:text-[12.5px] font-semibold tracking-wide whitespace-nowrap ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+              className={`notion-tab flex-auto justify-center gap-1 min-[400px]:gap-1.5 px-1.5 rounded-lg text-[11px] min-[400px]:text-[12.5px] font-semibold tracking-wide whitespace-nowrap ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
             >
-              <span aria-hidden="true">{tab.icon}</span>
+              <span aria-hidden="true" className="max-[339px]:hidden">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
@@ -681,7 +728,7 @@ const Treino = () => {
         <ModuleTip
           moduleId="treino"
           tips={[
-            "No ⚙️ do topo tem modelos prontos pra montar a semana num toque",
+            "No 📋 PLANO você monta a semana: modelo pronto, exercícios, séries e carga",
             "Marque cada série no HOJE — o descanso começa sozinho",
             "Recordes e a carga de cada exercício aparecem em 📈 EVOLUÇÃO",
           ]}
@@ -712,8 +759,22 @@ const Treino = () => {
           />
         )}
 
+        {activeTab === "plano" && (
+          <TreinoPlano
+            hojeNome={todayDayName}
+            dia={diaDoPlano}
+            plano={workoutPlan}
+            diasAtivos={diasAtivosLimpos}
+            vazio={treinoVazio}
+            meta={meta}
+            descanso={Number(restTime) || 60}
+            som={soundEnabled !== false}
+            acoes={acoesDoPlano}
+          />
+        )}
+
         {activeTab === "semana" && (
-          <TreinoSemana linhas={linhas} onAbrirDia={setDiaEditando}>
+          <TreinoSemana linhas={linhas} onAbrirDia={abrirNoPlano}>
             <ConstanciaTreino
               meta={meta}
               onMeta={(n) => setMetaSalva(n)}
@@ -746,19 +807,19 @@ const Treino = () => {
           />
         )}
 
-        {treinoVazio && (
+        {treinoVazio && activeTab !== "plano" && (
           <div className="mt-4">
             <ProximoPasso
               emoji="💪"
               titulo="Monte seu treino da semana"
               passos={[
-                "Toque no ⚙️ e escolha um modelo pronto — ou monte dia a dia na SEMANA",
-                "Adicione os exercícios com séries, repetições e carga",
+                "No 📋 PLANO, escolha um modelo pronto — ou monte dia a dia",
+                "Ajuste séries, repetições e carga de cada exercício",
                 "No HOJE, marque cada série — o descanso começa sozinho",
               ]}
               acao={
-                <button type="button" onClick={abrirConfig} className="h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-bold">
-                  Ver modelos prontos
+                <button type="button" onClick={() => abrirNoPlano(todayDayName)} className="h-10 px-4 rounded-lg bg-foreground text-background text-[13px] font-bold">
+                  Montar meu plano
                 </button>
               }
             />
@@ -786,30 +847,6 @@ const Treino = () => {
         />
       )}
 
-      <EditorDoDia
-        dia={diaEditando}
-        hojeNome={todayDayName}
-        musculos={diaEditando ? workoutPlan[diaEditando]?.muscles ?? [] : []}
-        exercicios={diaEditando ? workoutPlan[diaEditando]?.exercises ?? [] : []}
-        ativo={!!diaEditando && diasAtivosLimpos.includes(diaEditando)}
-        onFechar={() => setDiaEditando(null)}
-        acoes={acoesDoEditor}
-        spotlight={false}
-      />
-      <ConfigDoTreino
-        aberto={configAberta}
-        onFechar={fecharConfig}
-        hojeNome={todayDayName}
-        diasAtivos={diasAtivosLimpos}
-        musculosPorDia={Object.fromEntries(DIAS.map((d) => [d, workoutPlan[d]?.muscles ?? []]))}
-        descanso={Number(restTime) || 60}
-        som={soundEnabled !== false}
-        onModelo={(m) => { applyTemplate(m); fecharConfig(); }}
-        onDia={toggleDay}
-        onMusculo={toggleMuscleForDay}
-        onDescanso={(s) => setRestTime(s)}
-        onSom={(v) => setSoundEnabled(v)}
-      />
       <TreinoConcluido resumo={resumo} aberto={concluidoAberto} onFechar={() => setConcluidoAberto(false)} />
     </div>
   );

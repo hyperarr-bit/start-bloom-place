@@ -68,6 +68,9 @@ const LIGHT_VARS = {
 } as CSSProperties;
 
 // VICTORY_PHRASE e GASTO_ANCHOR vêm de src/lib/funnel.ts (compartilhados com o quiz).
+/** As duas últimas palavras da promessa andam juntas: no celular de 360 px o
+ *  "só" de "num painel só" caía sozinho na linha de baixo. */
+const semViuva = (frase: string) => frase.replace(/ (\S+)$/, "\u00A0$1");
 
 /** Sinal de intenção de compra + abre o Pix in-app. A Compra (Purchase) em si
  *  continua server-side (CAPI da Cakto via webhook). */
@@ -804,7 +807,7 @@ function OfferScreenRoi2({
       <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
         Seu plano pra<br />
         {/* Instrument Serif itálica só aqui — editorial, como nas Conquistas. */}
-        <span className="text-accent text-[33px] leading-[1.05] inline-block" style={SERIF_ITALICO}>{victory}</span><br />
+        <span className="text-accent text-[33px] leading-[1.05] inline-block" style={SERIF_ITALICO}>{semViuva(victory)}</span><br />
         está pronto
       </motion.h1>
       <motion.p {...stagger(1)} className="text-muted-foreground text-sm leading-relaxed mb-3">
@@ -916,7 +919,7 @@ function OfferScreen({
         <Check className="w-7 h-7" strokeWidth={3} />
       </motion.div>
       <motion.h1 {...stagger(0)} className="text-[27px] font-bold tracking-tight leading-[1.12] mb-2">
-        Seu plano pra<br /><span className="text-accent">{victory}</span><br />está pronto
+        Seu plano pra<br /><span className="text-accent">{semViuva(victory)}</span><br />está pronto
       </motion.h1>
       <motion.p {...stagger(1)} className={`text-muted-foreground text-sm leading-relaxed ${braco === "b" ? "mb-4" : "mb-6"}`}>
         Você já viu como funciona. Agora é com os seus números de verdade.

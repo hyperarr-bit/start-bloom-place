@@ -85,6 +85,11 @@
 	<true/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>Usamos isso só pra saber qual anúncio te trouxe ao CORE. Nada é vendido nem compartilhado com outros apps.</string>
+	<!-- 27/09: o "Postar nos Stories" das Conquistas e da Retrospectiva abre a folha de
+	     compartilhar do iOS com imagem/vídeo; sem esta chave, tocar em "Salvar imagem" ou
+	     "Salvar vídeo" na folha FECHA o app (o iOS mata por falta do texto de permissão). -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Pra salvar na sua galeria as artes e os vídeos das suas conquistas e retrospectivas.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>

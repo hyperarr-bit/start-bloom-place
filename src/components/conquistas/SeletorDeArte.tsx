@@ -197,8 +197,10 @@ export const Previa = ({ titulo, elemento, transparente, video, acoes, onPostar,
       exit={{ opacity: 0 }}
       transition={{ duration: reduzir ? 0.1 : 0.22 }}
     >
-      {/* o recuo da câmera fica por fora e a faixa do X tem 52 px de verdade (dono 27/09: "quando clica não tem como sair") */}
-      <header className="shrink-0 pt-[env(safe-area-inset-top)] relative z-10 bg-background">
+      {/* o recuo da câmera fica por fora e a faixa do X tem 52 px de verdade (dono 27/09: "quando clica não tem como sair").
+          --app-safe-top e não env(): no Android de WebView velho o env() dá 0 e quem sabe a altura da barra é a
+          compensação de status-bar.ts — com env() o X ficava embaixo do .app-safe-top-guard (APK 27/09). */}
+      <header className="shrink-0 pt-[var(--app-safe-top)] relative z-10 bg-background">
         <div className="h-[52px] flex items-center gap-2 px-3 text-[14px] font-extrabold">
           <button type="button" onClick={onFechar} aria-label="Fechar a prévia" className="w-10 h-10 grid place-items-center rounded-full hover:bg-muted active:bg-muted" data-testid="previa-fechar"><X className="w-5 h-5" /></button>
           <span className="truncate">Prévia · {titulo}</span>

@@ -31,6 +31,12 @@ export interface Geometria {
 }
 
 /** Tudo cabe na moldura (largura × altura da capa): os tamanhos dos pins vêm daqui. */
+/** Coluna do herói de cima pra baixo, em px: rótulo, respiro, [pin], respiro, frase (2 linhas), respiro, linha do valor.
+ *  A geometria desconta EXATAMENTE isto do corpo — antes descontava 62 de 68 e o flex espremia o rótulo
+ *  (o acento de "MÊS" sumia no Android, 27/09) e cortaria a 2ª linha da frase. */
+export const COLUNA_HEROI = { rotulo: 11, antesPin: 3, antesFrase: 6, frase: 30, antesLinha: 4, linha: 14 } as const;
+const RESTO_DA_COLUNA = Object.values(COLUNA_HEROI).reduce((a, b) => a + b, 0);
+
 export const geometriaDaPagina = (largura: number, altura: number): Geometria => {
   const padE = 24, padD = 14, padT = 10, padB = 8;
   const W = largura - padE - padD;
@@ -40,7 +46,7 @@ export const geometriaDaPagina = (largura: number, altura: number): Geometria =>
   const linha = Math.floor((corpo - 6) / 2);
   const nome = 20;
   const pinGrade = Math.max(40, Math.min(linha - nome - 3, Math.floor(W / 4) - 8));
-  const heroiPin = Math.max(72, Math.floor(corpo - 10 - 30 - 14 - 8));
+  const heroiPin = Math.max(72, Math.floor(corpo - RESTO_DA_COLUNA));
   const heroiCol = heroiPin + 8;
   const gradeDir = W - heroiCol - 8;
   const pinDireita = Math.max(40, Math.min(linha - nome - 3, Math.floor(gradeDir / 2) - 10));
@@ -96,14 +102,14 @@ const Heroi = ({ h, conquistado, g, mesIdx, animar, estreita, onSelecionar }: { 
   const falta = h.proxima ? Math.max(0, h.proxima.alvo - h.valor) : 0;
   return (
     <button type="button" className="flex flex-col items-center text-left shrink-0" style={{ width: g.heroiCol, height: g.corpo }} onClick={() => onSelecionar(h)} data-heroi={h.id} data-testid="heroi-insignia">
-      <span className="pin-rot text-muted-foreground w-full text-center overflow-hidden text-ellipsis" style={{ fontSize: 8, height: 10, letterSpacing: estreita || !conquistado ? ".08em" : undefined }}>{conquistado ? (estreita ? "Conquista do mês" : "A conquista do mês") : "Primeiras insígnias"}</span>
-      <span className="pin-obj mt-1">
+      <span className="pin-rot text-muted-foreground w-full text-center overflow-hidden text-ellipsis shrink-0" style={{ fontSize: 8, height: COLUNA_HEROI.rotulo, lineHeight: `${COLUNA_HEROI.rotulo}px`, letterSpacing: estreita || !conquistado ? ".08em" : undefined }}>{conquistado ? (estreita ? "Conquista do mês" : "A conquista do mês") : "Primeiras insígnias"}</span>
+      <span className="pin-obj shrink-0" style={{ marginTop: COLUNA_HEROI.antesPin }}>
         <Insignia ins={h} tamanho={g.heroiPin} entrada={animar ? 330 : undefined} contar={animar} />
       </span>
-      <span className="pin-frase mt-1.5 w-full text-center" style={{ height: 30 }}>
+      <span className="pin-frase w-full text-center shrink-0" style={{ marginTop: COLUNA_HEROI.antesFrase, height: COLUNA_HEROI.frase }}>
         {conquistado ? fraseDe(h, mesIdx) : `${h.texto} ${h.unid}. Faltam ${falta} pro bronze.`}
       </span>
-      <span className="mt-1 flex items-center justify-center gap-1.5 w-full" style={{ height: 14 }}>
+      <span className="flex items-center justify-center gap-1.5 w-full shrink-0" style={{ marginTop: COLUNA_HEROI.antesLinha, height: COLUNA_HEROI.linha }}>
         <span className="text-[10.5px] font-bold text-muted-foreground truncate">{conquistado ? linhaDe(h, mesIdx) : "cada registro conta"}</span>
         {conquistado && h.faixa && <span className="chip-faixa" data-faixa={h.faixa}>{NOME_FAIXA[h.faixa]}</span>}
       </span>

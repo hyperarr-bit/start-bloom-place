@@ -13,7 +13,7 @@ import {
   AREAS, CATALOGO, CHAVE_MOSTRAR_VALORES, TOTAL_INSIGNIAS, candidatasAHeroi, chaveDoMesCongelado, congelarMesAnterior, fmtNum, fraseDe, herois,
   lerMesCongelado, linhaDe, medirInsignias, montarInsignia, montarInsignias, ordenarPagina, pontuar,
 } from "@/components/conquistas/insignias";
-import { geometriaDaPagina, paginasDoResto } from "@/components/conquistas/PaginaInsignias";
+import { COLUNA_HEROI, geometriaDaPagina, paginasDoResto } from "@/components/conquistas/PaginaInsignias";
 import { molduraDoPlanner } from "@/components/conquistas/PlannerAberto";
 import { artesDisponiveis } from "@/components/conquistas/SeletorDeArte";
 import { deveMostrarDica, lerDica } from "@/components/conquistas/DicaDoPlanner";
@@ -276,11 +276,13 @@ describe("a moldura do planner e a página", () => {
       expect(g.pinGrade).toBeGreaterThanOrEqual(44);
       expect(g.pinDireita).toBeGreaterThanOrEqual(44);
       expect(g.heroiPin).toBeGreaterThanOrEqual(90);
+      // a coluna do herói cabe no corpo SEM o flex espremer nada (o acento de "MÊS" sumia no Android)
+      expect(g.heroiPin + Object.values(COLUNA_HEROI).reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(g.corpo);
       expect(g.heroiCol + 8 + g.gradeDir).toBeLessThanOrEqual(g.W);
       expect(g.porPagina).toBe(8);
     }
-    expect(geometriaDaPagina(358, 269.85)).toMatchObject({ pinGrade: 66, pinDireita: 66, heroiPin: 123 });
-    expect(geometriaDaPagina(328, 247.24)).toMatchObject({ pinGrade: 55, pinDireita: 55, heroiPin: 101 });
+    expect(geometriaDaPagina(358, 269.85)).toMatchObject({ pinGrade: 66, pinDireita: 66, heroiPin: 117 });
+    expect(geometriaDaPagina(328, 247.24)).toMatchObject({ pinGrade: 55, pinDireita: 55, heroiPin: 95 });
   });
 
   it("50 visíveis: com herói, 4 na 1ª página e depois páginas de 8; sem herói, 8 desde a 1ª", () => {

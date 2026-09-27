@@ -274,8 +274,9 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
   return (
     <motion.div className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
       {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
-          câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora. */}
-      <div className="shrink-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora, e pela
+          --app-safe-top (a compensação do Android de WebView velho), igual à prévia. */}
+      <div className="shrink-0" style={{ paddingTop: "var(--app-safe-top)" }}>
       <div className="alb-topo">
         <button type="button" className="alb-redondo" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">

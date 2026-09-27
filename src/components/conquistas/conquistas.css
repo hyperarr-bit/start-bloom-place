@@ -230,7 +230,9 @@
 .pin-trilho { display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; outline: none; }
 .pin-trilho::-webkit-scrollbar { display: none; }
 .pin-trilho:focus-visible { box-shadow: 0 0 0 2px hsl(var(--accent) / .5); border-radius: 8px; }
-.pin-pagina { flex: none; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+/* cada página recorta o que é dela: o nome da 1ª vaga da página seguinte (mais largo que a coluna)
+   vazava 2 px pra dentro da atual e virava um "|" na borda (APK 27/09) */
+.pin-pagina { flex: none; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; }
 
 /* ============================== A DICA DO PLANNER (3 primeiras visitas) ============================== */
 /* o toque pulsando na capa (só transform/opacity) */

@@ -701,23 +701,27 @@ const Treino = () => {
             <ThemeToggle />
           </div>
         </div>
-        {/* 4 abas num celular de 360: largura pela palavra (EVOLUÇÃO é a maior),
-            não em colunas iguais — 4 colunas iguais cortavam o EVOLUÇÃO. */}
-        <div className="max-w-5xl mx-auto px-4 pb-2.5 flex gap-1.5 min-[400px]:gap-2">
-          {ABAS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              data-spotlight={`tab-${tab.id}`}
-              data-active={activeTab === tab.id}
-              data-testid={`aba-${tab.id}`}
-              onClick={() => trocarAba(tab.id)}
-              className={`notion-tab flex-auto justify-center gap-1 min-[400px]:gap-1.5 px-1.5 rounded-lg text-[11px] min-[400px]:text-[12.5px] font-semibold tracking-wide whitespace-nowrap ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
-            >
-              <span aria-hidden="true" className="max-[339px]:hidden">{tab.icon}</span>
-              {tab.label}
-            </button>
-          ))}
+        {/* 27/09 (dono): a barra do Treino tinha classes próprias (cantos mais redondos,
+            letra maior e mais espaçada, abas esticadas) e destoava dos outros módulos.
+            Agora é a MESMA faixa do AbasOcultaveis: notion-tab 11 px, largura natural,
+            rola pro lado quando não cabe (a aba ativa entra na tela sozinha). */}
+        <div className="relative max-w-5xl mx-auto px-4 pb-2">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide pt-2 -mt-2">
+            {ABAS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                data-spotlight={`tab-${tab.id}`}
+                data-active={activeTab === tab.id}
+                data-testid={`aba-${tab.id}`}
+                onClick={() => trocarAba(tab.id)}
+                className={`notion-tab shrink-0 whitespace-nowrap text-[11px] flex items-center gap-1 select-none ${activeTab === tab.id ? "notion-tab-active" : "hover:bg-muted"}`}
+              >
+                <span aria-hidden="true">{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 

@@ -2,7 +2,7 @@ import { useId, type CSSProperties, type ReactNode } from "react";
 import { Award } from "lucide-react";
 
 /**
- * ADESIVOS PRÓPRIOS (26/09) — no lugar dos emojis das insígnias.
+ * ADESIVOS PRÓPRIOS (26/09; coleção de 65 em 27/09) — no lugar dos emojis das insígnias.
  *
  * Estilo único (o da folha aprovada do Fable): desenho chapado em tons
  * pastel, contorno grafite, borda branca de adesivo recortado ("die-cut",
@@ -85,6 +85,29 @@ const ARTES: Record<string, ReactNode> = {
   "sequencia-7": chama("7 DIAS", "#d22d80"),
   "sequencia-30": chama("30 DIAS", "#7c3aed", "#fff", <><Brilho x={80} y={26} r={7} /><Brilho x={21} y={38} r={5} /></>),
   "sequencia-100": chama("100 DIAS", "#facc15", TRACO, <><Brilho x={80} y={24} r={8} /><Brilho x={20} y={30} r={6} /><Brilho x={84} y={52} r={4.5} cor="#fb923c" /></>),
+
+  // cubo de gelo com a chama guardada dentro (Salvo pelo Gelo)
+  "protetor-1": (
+    <>
+      <path d="M22,30 L50,16 L78,30 V70 L50,84 L22,70 Z" fill="#bae6fd" />
+      <path d="M22,30 L50,44 L78,30 M50,44 V84" fill="none" strokeWidth={2} />
+      <path d="M50,52 C53,58 58,60 58,66 C58,71 54,74 50,75 C46,74 42,71 42,66 C42,62 45,59 46,58 C46,62 48,63 49,63 C48,59 49,55 50,52 Z" fill="#fb923c" strokeWidth={1.8} />
+      <circle cx="30" cy="38" r="2.6" fill="#fff" stroke="none" />
+      <circle cx="36" cy="34" r="1.6" fill="#fff" stroke="none" />
+    </>
+  ),
+  // planner escuro com "365" em foil (Um Ano Anotado, lendário)
+  "ano-365": (
+    <>
+      <rect x="18" y="14" width="64" height="72" rx="7" fill="#2f3036" />
+      <rect x="24" y="14" width="6" height="72" fill="#d22d80" strokeWidth={1.6} />
+      <rect x="36" y="30" width="38" height="24" rx="4" fill="#fbf6ea" />
+      <text x="55" y="47" textAnchor="middle" fontFamily={FONTE} fontSize="14" fontWeight={900} fill="#b8860b" stroke="none">365</text>
+      <text x="55" y="70" textAnchor="middle" fontFamily={FONTE} fontSize="7" fontWeight={800} letterSpacing="1" fill="#fde047" stroke="none">DIAS</text>
+      <Brilho x={86} y={22} r={7} />
+      <Brilho x={14} y={66} r={5} />
+    </>
+  ),
 
   /* ---------------- Finanças ---------------- */
   // cédula (+ moeda "1º")
@@ -171,17 +194,18 @@ const ARTES: Record<string, ReactNode> = {
       <Brilho x={82} y={30} r={6} cor="#fff7cc" />
     </>
   ),
-  // formiguinha carregando a moeda
+  // formiguinha carregando a moeda (conserto 27/09: formiga de perfil — cabeça com antenas, tórax, abdome, 6 patas — com a moeda no alto)
   "saver-60": (
     <>
-      <path d="M50,67 L42,82 M55,68 L55,84 M60,67 L68,82" fill="none" strokeWidth={2.6} strokeLinecap="round" />
-      <path d="M72,50 C74,41 80,38 85,40 M67,50 C66,41 69,35 74,34" fill="none" strokeWidth={2.2} strokeLinecap="round" />
-      <ellipse cx="34" cy="64" rx="15" ry="11" fill="#f87171" />
-      <ellipse cx="55" cy="62" rx="8" ry="7" fill="#f87171" />
-      <circle cx="71" cy="57" r="10" fill="#f87171" />
-      <circle cx="74" cy="55" r="2" fill={TRACO} stroke="none" />
-      <path d="M68,62 C70,64 73,64 75,62" fill="none" strokeWidth={1.8} strokeLinecap="round" />
-      <Moeda x={46} y={36} r={14} texto="$" tam={15} />
+      <path d="M42,66 L34,82 M48,67 L47,84 M54,66 L62,82" fill="none" strokeWidth={2.6} strokeLinecap="round" />
+      <path d="M45,54 L41,40 M53,54 L58,40" fill="none" strokeWidth={2.6} strokeLinecap="round" />
+      <ellipse cx="29" cy="62" rx="15" ry="11" fill="#f87171" />
+      <ellipse cx="49" cy="60" rx="9" ry="7.5" fill="#f87171" />
+      <circle cx="67" cy="56" r="9.5" fill="#f87171" />
+      <path d="M64,47 C60,42 56,38 52,36 M70,47 C71,41 74,37 78,35" fill="none" strokeWidth={2.2} strokeLinecap="round" />
+      <circle cx="70" cy="54" r="2" fill={TRACO} stroke="none" />
+      <path d="M65,60 C67,62.5 70,62.5 72.5,60" fill="none" strokeWidth={1.8} strokeLinecap="round" />
+      <Moeda x={50} y={27} r={14} texto="$" tam={15} />
     </>
   ),
   // gráfico subindo
@@ -232,14 +256,12 @@ const ARTES: Record<string, ReactNode> = {
       <text x="50" y="80.5" textAnchor="middle" fontFamily={FONTE} fontSize="11.5" fontWeight={900} fill="#fff" stroke="none">100k</text>
     </>
   ),
-  // pizza com fatia saindo
+  // pizza com fatia saindo (conserto 27/09: 3 fatias limpas, a rosa puxada com folga)
   "diversified": (
     <>
-      <path d="M50,52 L50,18 A34,34 0 1 0 83.4,58.6 Z" fill="#93c5fd" />
-      <path d="M50,52 L83.4,58.6 A34,34 0 0 1 33,81.4 Z" fill="#fde047" />
-      <g transform="translate(4,-4)">
-        <path d="M50,52 L50,18 A34,34 0 0 1 83.4,58.6 Z" fill="#f9a8d4" />
-      </g>
+      <path d="M48,54 L48,20 A34,34 0 1 0 79.2,68.5 Z" fill="#93c5fd" />
+      <path d="M48,54 L79.2,68.5 A34,34 0 0 1 20,74 Z" fill="#fde047" />
+      <path d="M55,45 L55,11 A34,34 0 0 1 89,45 Z" fill="#f9a8d4" />
     </>
   ),
   // conta com check
@@ -308,25 +330,28 @@ const ARTES: Record<string, ReactNode> = {
       <Check x={71} y={72} s={0.8} />
     </>
   ),
-  // alvo com flecha
+  // alvo com flecha (conserto 27/09: ponta ENTERRADA no centro, haste saindo, penas na extremidade)
   "challenger": (
     <>
       <circle cx="44" cy="56" r="33" fill="#fff" />
       <circle cx="44" cy="56" r="25" fill="#f87171" />
       <circle cx="44" cy="56" r="16" fill="#fff" />
       <circle cx="44" cy="56" r="7.5" fill="#f87171" />
-      <path d="M44,56 L80,20" fill="none" strokeWidth={3.4} strokeLinecap="round" />
-      <path d="M76,12 L88,10 L84,20 L80,20 L80,16 Z" fill="#fde047" strokeWidth={1.8} />
+      <path d="M49.7,50.3 L82,18" fill="none" strokeWidth={3.4} strokeLinecap="round" />
+      <path d="M44,56 L52.9,53.5 L46.5,47.1 Z" fill="#fde047" strokeWidth={1.8} />
+      <path d="M82,18 L88.4,22.6 L79.6,31.2 L73.5,26.5 Z" fill="#fde047" strokeWidth={1.8} />
+      <path d="M82,18 L77.4,11.6 L68.8,20.4 L73.5,26.5 Z" fill="#fde047" strokeWidth={1.8} />
     </>
   ),
-  // luva de boxe + 5
+  // luva de boxe + 5 (conserto 27/09: punho branco separado e costura tracejada — lia como luva de forno)
   "challenger-5": (
     <>
-      <path d="M30,28 C30,18 40,12 52,12 H60 C72,12 80,22 80,34 V50 C80,61 72,68 61,68 H40 C34,68 30,64 30,58 Z" fill="#f87171" />
-      <path d="M30,38 C21,38 18,47 22,54 C25,59 30,59 33,56" fill="#f87171" />
-      <path d="M44,24 C50,20 60,20 66,24" fill="none" stroke="#fecaca" strokeWidth={3.4} strokeLinecap="round" />
-      <rect x="35" y="66" width="40" height="18" rx="4" fill="#fff" />
-      <path d="M35,75 H75" fill="none" stroke="#f87171" strokeWidth={2.4} />
+      <path d="M26,44 C26,26 40,14 58,14 C74,14 84,26 84,42 V52 C84,63 76,70 64,70 H44 C34,70 26,63 26,54 Z" fill="#f87171" />
+      <path d="M26,46 C17,44 13,52 17,59 C20,64 26,64 30,60" fill="#f87171" />
+      <path d="M40,26 C48,20 62,20 70,26" fill="none" stroke="#fecaca" strokeWidth={3.4} strokeLinecap="round" />
+      <path d="M46,44 H68 M46,52 H68" fill="none" stroke="#fecaca" strokeWidth={2.6} strokeLinecap="round" strokeDasharray="4 4" />
+      <rect x="36" y="68" width="40" height="18" rx="4" fill="#fff" />
+      <path d="M36,77 H76" fill="none" stroke="#f87171" strokeWidth={2.4} />
       <Moeda x={80} y={80} r={12} texto="5" tam={14} />
     </>
   ),
@@ -345,7 +370,32 @@ const ARTES: Record<string, ReactNode> = {
         );
       })}
       <Moeda x={50} y={52} r={18} texto="15" tam={17} cor="#fcd34d" />
-      <path d="M44,86 L50,80 L56,86" fill="none" stroke="#16a34a" strokeWidth={3} strokeLinecap="round" />
+      {/* conserto 27/09: o "^" verde solto virou um laço magenta no pé da coroa */}
+      <path d="M50,84 L42,90 L45,82 Z M50,84 L58,90 L55,82 Z" fill="#d22d80" strokeWidth={1.6} />
+      <circle cx="50" cy="83" r="3" fill="#d22d80" />
+    </>
+  ),
+
+  // pasta de arquivo com carimbo FECHADO (Mês Fechado)
+  "mes-fechado": (
+    <>
+      <path d="M12,28 a6,6 0 0 1 6,-6 H36 L43,30 H82 a6,6 0 0 1 6,6 V78 a6,6 0 0 1 -6,6 H18 a6,6 0 0 1 -6,-6 Z" fill="#fbbf24" />
+      <g transform="rotate(-10 56 58)">
+        <rect x="34" y="48" width="44" height="20" rx="4" fill="#fdf2f8" stroke="#d22d80" strokeWidth={2.6} />
+        <text x="56" y="62.5" textAnchor="middle" fontFamily={FONTE} fontSize="10" fontWeight={900} letterSpacing="1.2" fill="#d22d80" stroke="none">FECHADO</text>
+      </g>
+    </>
+  ),
+  // três meses em degrau, cada um no azul (3 Meses no Azul)
+  "azul-3": (
+    <>
+      <rect x="12" y="46" width="22" height="40" rx="4" fill="#bfdbfe" />
+      <rect x="39" y="32" width="22" height="54" rx="4" fill="#93c5fd" />
+      <rect x="66" y="18" width="22" height="68" rx="4" fill="#60a5fa" />
+      <path d="M19,62 H27 M23,58 V66 M46,48 H54 M50,44 V52 M73,34 H81 M77,30 V38" fill="none" stroke="#fff" strokeWidth={2.6} strokeLinecap="round" />
+      <path d="M14,40 L36,26 L58,14 L78,10" fill="none" stroke="#16a34a" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M68,8 L80,9 L77,20" fill="none" stroke="#16a34a" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+      <Moeda x={22} y={22} r={10} texto="3" tam={11} />
     </>
   ),
 
@@ -414,6 +464,38 @@ const ARTES: Record<string, ReactNode> = {
     </>
   ),
 
+  // carinha feliz com coração (Humor em Dia)
+  "humor-7": (
+    <>
+      <circle cx="50" cy="52" r="32" fill="#fde047" />
+      <circle cx="39" cy="46" r="3" fill={TRACO} stroke="none" />
+      <circle cx="61" cy="46" r="3" fill={TRACO} stroke="none" />
+      <path d="M36,60 C42,70 58,70 64,60" fill="none" strokeWidth={3} strokeLinecap="round" />
+      <circle cx="31" cy="58" r="4.5" fill="#f9a8d4" stroke="none" />
+      <circle cx="69" cy="58" r="4.5" fill="#f9a8d4" stroke="none" />
+      <path d="M84,22 C79,16 72,20 76,27 C79,31 84,34 84,34 C84,34 89,31 92,27 C96,20 89,16 84,22 Z" fill="#f43f5e" />
+    </>
+  ),
+  // tomate-relógio do pomodoro (Foco Total)
+  "foco-10h": (
+    <>
+      <path d="M50,30 C30,30 20,44 22,60 C24,76 36,86 50,86 C64,86 76,76 78,60 C80,44 70,30 50,30 Z" fill="#f87171" />
+      <path d="M50,30 C46,22 40,18 34,18 C40,22 44,26 44,30 M50,30 C54,22 60,18 66,18 C60,22 56,26 56,30" fill="#4ade80" />
+      <circle cx="50" cy="60" r="16" fill="#fff" />
+      <path d="M50,60 V49 M50,60 L58,64" fill="none" strokeWidth={2.6} strokeLinecap="round" />
+    </>
+  ),
+  // escudo de aço com o check da rotina + 60 (Rotina de Ferro, lendário)
+  "rotina-60": (
+    <>
+      <path d="M50,10 L82,22 V48 C82,68 67,82 50,90 C33,82 18,68 18,48 V22 Z" fill="#94a3b8" />
+      <path d="M50,20 L74,29 V48 C74,62 63,73 50,80 C37,73 26,62 26,48 V29 Z" fill="#cbd5e1" strokeWidth={1.6} />
+      <path d="M38,50 l9,9 l16,-18" fill="none" stroke="#16a34a" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />
+      <Brilho x={18} y={16} r={6} cor="#fff" />
+      <Moeda x={78} y={78} r={12} texto="60" tam={11} />
+    </>
+  ),
+
   /* ---------------- Leitura ---------------- */
   // livros na prateleira
   "leitura-estante": (
@@ -460,6 +542,45 @@ const ARTES: Record<string, ReactNode> = {
     </>
   ),
 
+  // livro fechado com marcador + 30 (Maratona de Leitura)
+  "leitura-30": (
+    <>
+      <rect x="18" y="16" width="56" height="70" rx="6" fill="#c4b5fd" />
+      <path d="M28,16 V86" fill="none" />
+      <rect x="36" y="30" width="26" height="14" rx="3" fill="#fff" strokeWidth={1.8} />
+      <path d="M58,16 H68 V44 L63,40 L58,44 Z" fill="#d22d80" />
+      <Moeda x={78} y={76} r={13} texto="30" tam={13} />
+    </>
+  ),
+  // pilha de livros com a bandeira no topo (Meta do Ano)
+  "meta-ano": (
+    <>
+      <rect x="18" y="66" width="60" height="16" rx="3" fill="#fde047" />
+      <rect x="22" y="52" width="60" height="16" rx="3" fill="#f472b6" />
+      <rect x="16" y="38" width="60" height="16" rx="3" fill="#60a5fa" />
+      <path d="M26,74 H70 M30,60 H74 M24,46 H68" fill="none" stroke="rgba(43,43,47,.35)" strokeWidth={1.8} strokeLinecap="round" />
+      <path d="M50,38 V10" fill="none" strokeWidth={3} strokeLinecap="round" />
+      <path d="M50,12 H74 L68,20 L74,28 H50 Z" fill="#d22d80" />
+      <Brilho x={86} y={30} r={6} />
+    </>
+  ),
+  // estante de duas prateleiras cheia + 25 (Biblioteca Viva, lendário)
+  "leitura-25": (
+    <>
+      <rect x="10" y="10" width="80" height="80" rx="8" fill="#d6a86c" />
+      <rect x="16" y="16" width="68" height="30" rx="3" fill="#fbf6ea" strokeWidth={1.8} />
+      <rect x="16" y="52" width="68" height="30" rx="3" fill="#fbf6ea" strokeWidth={1.8} />
+      <g strokeWidth={1.8}>
+        <rect x="19" y="20" width="9" height="26" rx="1.5" fill="#60a5fa" /><rect x="30" y="24" width="9" height="22" rx="1.5" fill="#f472b6" />
+        <rect x="41" y="20" width="10" height="26" rx="1.5" fill="#fde047" /><rect x="53" y="22" width="9" height="24" rx="1.5" fill="#86efac" />
+        <rect x="64" y="20" width="9" height="26" rx="1.5" fill="#c4b5fd" />
+        <rect x="19" y="58" width="10" height="24" rx="1.5" fill="#fb923c" /><rect x="31" y="56" width="9" height="26" rx="1.5" fill="#86efac" />
+        <rect x="42" y="60" width="9" height="22" rx="1.5" fill="#60a5fa" /><rect x="53" y="56" width="10" height="26" rx="1.5" fill="#f9a8d4" />
+      </g>
+      <Moeda x={76} y={72} r={12} texto="25" tam={11} />
+    </>
+  ),
+
   /* ---------------- Treino ---------------- */
   // tênis de corrida "1º" (o kettlebell do 1º rascunho lia como cadeado — e cadeado é o que falta)
   "treino-1": (
@@ -498,6 +619,51 @@ const ARTES: Record<string, ReactNode> = {
     </>
   ),
 
+  // barra olímpica com anilhas + 50 (Máquina)
+  "treino-50": (
+    <>
+      <rect x="8" y="44" width="84" height="8" rx="3" fill="#a3a3a3" />
+      <rect x="16" y="28" width="12" height="40" rx="3" fill="#2563eb" />
+      <rect x="72" y="28" width="12" height="40" rx="3" fill="#2563eb" />
+      <rect x="28" y="34" width="8" height="28" rx="2.5" fill="#60a5fa" />
+      <rect x="64" y="34" width="8" height="28" rx="2.5" fill="#60a5fa" />
+      <Moeda x={76} y={80} r={13} texto="50" tam={13} />
+    </>
+  ),
+  // halter de OURO com brilhos + 100 (Lenda da Academia, lendário)
+  "treino-100": (
+    <>
+      <g transform="rotate(-30 50 50)">
+        <rect x="30" y="46" width="40" height="8" rx="3" fill="#d9a72a" />
+        <rect x="16" y="34" width="12" height="32" rx="4" fill="#fcd34d" />
+        <rect x="72" y="34" width="12" height="32" rx="4" fill="#fcd34d" />
+        <rect x="8" y="39" width="8" height="22" rx="3" fill="#fde68a" />
+        <rect x="84" y="39" width="8" height="22" rx="3" fill="#fde68a" />
+      </g>
+      <Brilho x={84} y={20} r={7} cor="#fff7cc" />
+      <Brilho x={16} y={78} r={5} cor="#fff7cc" />
+      <Moeda x={76} y={80} r={13} texto="100" tam={10} />
+    </>
+  ),
+  // calendário do mês com as 4 semanas fechadas (Mês Completo)
+  "meta-semanal-4": (
+    <>
+      <rect x="14" y="14" width="72" height="72" rx="8" fill="#fff" />
+      <rect x="14" y="14" width="72" height="16" rx="8" fill="#2563eb" />
+      <rect x="14" y="22" width="72" height="8" fill="#2563eb" stroke="none" />
+      <g fill="#fff" stroke="none">
+        <rect x="41" y="20" width="18" height="4" rx="2" /><rect x="35" y="18" width="5" height="8" rx="1.5" /><rect x="60" y="18" width="5" height="8" rx="1.5" />
+      </g>
+      <g fill="#bfdbfe" strokeWidth={1.6}>
+        {[36, 48, 60, 72].map((y) => [21, 39, 57].map((x) => <rect key={`${x}-${y}`} x={x} y={y} width="10" height="9" rx="2.5" />))}
+      </g>
+      <g fill="none" stroke="#2563eb" strokeWidth={2.2} strokeLinecap="round">
+        {[36, 48, 60, 72].map((y) => [21, 39, 57].map((x) => <path key={`${x}-${y}`} d={`M${x + 2.5},${y + 4.5} l2,2 l3.5,-4`} />))}
+      </g>
+      <Moeda x={78} y={70} r={11} texto="4" tam={12} />
+    </>
+  ),
+
   /* ---------------- Dieta ---------------- */
   // tigela de salada
   "dieta-1": (
@@ -522,6 +688,31 @@ const ARTES: Record<string, ReactNode> = {
     </>
   ),
 
+  // chapéu de chef com coração (Chef de Casa)
+  "receita-1": (
+    <>
+      <circle cx="34" cy="36" r="13" fill="#fff" />
+      <circle cx="66" cy="36" r="13" fill="#fff" />
+      <circle cx="50" cy="28" r="16" fill="#fff" />
+      <rect x="30" y="42" width="40" height="32" rx="5" fill="#fff" />
+      <path d="M30,42 H70" fill="none" stroke="#fff" strokeWidth={4} />
+      <path d="M30,64 H70" fill="none" strokeWidth={1.8} />
+      <path d="M50,58 C46,53 40,56 43,61 C45,64 50,67 50,67 C50,67 55,64 57,61 C60,56 54,53 50,58 Z" fill="#f43f5e" strokeWidth={1.6} />
+      <Moeda x={78} y={78} r={12} texto="1º" tam={10.5} />
+    </>
+  ),
+  // maçã verde com medalha 30 (30 Dias Impecáveis)
+  "dieta-30": (
+    <>
+      <path d="M50,31 C50,24 52,18 57,14" fill="none" strokeWidth={3} strokeLinecap="round" />
+      <path d="M50,31 C42,24 25,26 23,45 C21,64 34,84 44,84 C47,84 48,82 50,82 C52,82 53,84 56,84 C66,84 79,64 77,45 C75,26 58,24 50,31 Z" fill="#86efac" />
+      <path d="M55,22 C61,13 72,13 76,18 C72,27 61,29 55,22 Z" fill="#4ade80" />
+      <path d="M33,46 C33,39 37,35 42,34" fill="none" stroke="#dcfce7" strokeWidth={3.6} strokeLinecap="round" />
+      <Brilho x={16} y={26} r={5} />
+      <Moeda x={78} y={78} r={13} texto="30" tam={13} />
+    </>
+  ),
+
   /* ---------------- Saúde ---------------- */
   // gota (Fable)
   "agua-7": (
@@ -530,6 +721,139 @@ const ARTES: Record<string, ReactNode> = {
       <path d="M36,60 C36,52 40,46 44,42" fill="none" stroke="#e0f2fe" strokeWidth={3.5} strokeLinecap="round" />
       <path d="M28,86 C36,80 44,92 52,86 C60,80 68,92 76,86" fill="none" stroke="#0ea5e9" strokeWidth={3} strokeLinecap="round" />
       <circle cx="76" cy="30" r="5" fill="#bae6fd" />
+    </>
+  ),
+
+  // garrafa de água + 30 (Hidratada)
+  "agua-30": (
+    <>
+      <rect x="42" y="14" width="16" height="12" rx="3" fill="#0ea5e9" />
+      <rect x="34" y="24" width="32" height="62" rx="9" fill="#7dd3fc" />
+      <path d="M34,50 C40,46 48,54 54,50 C58,47 62,48 66,50 V77 A9,9 0 0 1 57,86 H43 A9,9 0 0 1 34,77 Z" fill="#38bdf8" strokeWidth={1.6} />
+      <rect x="40" y="58" width="20" height="12" rx="2.5" fill="#fff" strokeWidth={1.8} />
+      <path d="M40,34 C40,31 42,30 44,30" fill="none" stroke="#e0f2fe" strokeWidth={3} strokeLinecap="round" />
+      <Moeda x={78} y={78} r={13} texto="30" tam={13} />
+    </>
+  ),
+  // fonte jorrando + 100 (Fonte, épico)
+  "agua-100": (
+    <>
+      <path d="M50,14 C40,22 34,34 34,44 M50,14 C60,22 66,34 66,44 M50,14 V46" fill="none" stroke="#38bdf8" strokeWidth={4} strokeLinecap="round" />
+      <circle cx="34" cy="48" r="3.5" fill="#bae6fd" strokeWidth={1.6} />
+      <circle cx="66" cy="48" r="3.5" fill="#bae6fd" strokeWidth={1.6} />
+      <circle cx="50" cy="12" r="4" fill="#bae6fd" strokeWidth={1.6} />
+      <rect x="44" y="46" width="12" height="18" rx="3" fill="#e5e7eb" />
+      <path d="M14,62 H86 C86,76 72,86 50,86 C28,86 14,76 14,62 Z" fill="#38bdf8" />
+      <path d="M22,68 C30,64 38,72 46,68 C54,64 62,72 70,68 C74,66 78,66 80,68" fill="none" stroke="#e0f2fe" strokeWidth={2.6} strokeLinecap="round" />
+      <Moeda x={80} y={80} r={12} texto="100" tam={9} />
+    </>
+  ),
+  // lua com zzz (Noites Bem Dormidas)
+  "sono-7": (
+    <>
+      <path d="M60,14 A34,34 0 1 0 86,58 A26,26 0 0 1 60,14 Z" fill="#fde047" />
+      <circle cx="34" cy="40" r="4" fill="#fef9c3" strokeWidth={1.6} />
+      <text x="72" y="30" fontFamily={FONTE} fontSize="14" fontWeight={900} fill="#93c5fd" stroke={TRACO} strokeWidth={1.2}>z</text>
+      <text x="82" y="20" fontFamily={FONTE} fontSize="11" fontWeight={900} fill="#93c5fd" stroke={TRACO} strokeWidth={1.1}>z</text>
+      <Brilho x={20} y={68} r={6} cor="#fff" />
+    </>
+  ),
+  // cápsula com check (Remédio em Dia)
+  "remedio-7": (
+    <>
+      <g transform="rotate(-35 50 50)">
+        <rect x="18" y="38" width="64" height="24" rx="12" fill="#fff" />
+        <path d="M50,38 V62" fill="none" />
+        <path d="M50,38 H70 a12,12 0 0 1 0,24 H50 Z" fill="#60a5fa" />
+      </g>
+      <circle cx="76" cy="74" r="13" fill="#4ade80" />
+      <path d="M69,74 l5,5 l9,-10" fill="none" stroke="#fff" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  ),
+  // fita métrica enrolada + 4 (Evolução Anotada)
+  "medidas-4": (
+    <>
+      <rect x="10" y="44" width="62" height="18" rx="3" fill="#fde047" />
+      <path d="M18,44 V51 M26,44 V49 M34,44 V51 M42,44 V49 M50,44 V51 M58,44 V49 M66,44 V51" fill="none" strokeWidth={1.8} strokeLinecap="round" />
+      <circle cx="72" cy="53" r="17" fill="#facc15" />
+      <circle cx="72" cy="53" r="8" fill="#fbf6ea" strokeWidth={1.8} />
+      <circle cx="72" cy="53" r="2.4" fill={TRACO} stroke="none" />
+      <Moeda x={22} y={78} r={12} texto="4" tam={13} />
+    </>
+  ),
+
+  /* ---------------- Vida ---------------- */
+  // bandeira no topo da montanha (Meta Concluída)
+  "meta-1": (
+    <>
+      <path d="M14,86 L40,46 L58,66 L72,50 L88,86 Z" fill="#86efac" />
+      <path d="M58,66 L40,46 L46,40" fill="none" />
+      <path d="M72,50 V16" fill="none" strokeWidth={3} strokeLinecap="round" />
+      <path d="M72,18 H92 L86,26 L92,34 H72 Z" fill="#d22d80" />
+    </>
+  ),
+  // envelope lacrado com estrela (Carta pro Futuro)
+  "carta-futuro": (
+    <>
+      <rect x="12" y="28" width="76" height="52" rx="6" fill="#fff" />
+      <path d="M12,34 L50,60 L88,34" fill="none" />
+      <path d="M12,74 L38,52 M88,74 L62,52" fill="none" />
+      <circle cx="50" cy="58" r="9" fill="#d22d80" />
+      <polygon transform="translate(50,58) scale(.9)" points={ESTRELA} fill="#fff" stroke="none" />
+      <Brilho x={84} y={20} r={6} />
+    </>
+  ),
+  // patinha (Diário do Pet)
+  "pet-7": (
+    <>
+      <ellipse cx="50" cy="62" rx="20" ry="16" fill="#fdba74" />
+      <circle cx="30" cy="42" r="8" fill="#fdba74" />
+      <circle cx="44" cy="30" r="8" fill="#fdba74" />
+      <circle cx="58" cy="30" r="8" fill="#fdba74" />
+      <circle cx="72" cy="42" r="8" fill="#fdba74" />
+      <path d="M78,72 C86,66 90,74 84,80" fill="none" strokeWidth={2.2} strokeLinecap="round" />
+      <Brilho x={18} y={74} r={6} cor="#f9a8d4" />
+    </>
+  ),
+  // duas polaroides com coração + 5 (Álbum de Momentos)
+  "momentos-5": (
+    <>
+      <g transform="rotate(9 58 52)">
+        <rect x="34" y="22" width="48" height="58" rx="3" fill="#f5f5f4" />
+        <rect x="40" y="28" width="36" height="36" rx="2" fill="#bfdbfe" strokeWidth={1.6} />
+      </g>
+      <g transform="rotate(-7 44 52)">
+        <rect x="18" y="20" width="50" height="60" rx="3" fill="#fff" />
+        <rect x="24" y="26" width="38" height="38" rx="2" fill="#fbcfe8" strokeWidth={1.6} />
+        <circle cx="52" cy="36" r="5" fill="#fde047" strokeWidth={1.4} />
+        <path d="M24,58 C30,48 38,48 44,56 C48,50 56,50 62,58 V64 H24 Z" fill="#86efac" strokeWidth={1.4} />
+        <path d="M43,74 C40,71 36,73 38,76 C40,78 43,79 43,79 C43,79 46,78 48,76 C50,73 46,71 43,74 Z" fill="#f43f5e" strokeWidth={1.4} />
+      </g>
+      <Moeda x={80} y={80} r={12} texto="5" tam={14} />
+    </>
+  ),
+  // celular coberto por uma folha (Semana Detox)
+  "detox-7": (
+    <>
+      <rect x="32" y="12" width="36" height="66" rx="7" fill="#2f3036" />
+      <rect x="37" y="20" width="26" height="46" rx="2.5" fill="#d4d4d8" strokeWidth={1.6} />
+      <circle cx="50" cy="72" r="2.2" fill="#a3a3a3" stroke="none" />
+      <path d="M52,88 C22,76 22,40 60,28 C74,50 70,76 52,88 Z" fill="#4ade80" />
+      <path d="M53,86 C48,68 50,50 60,32" fill="none" stroke="#16a34a" strokeWidth={2.4} strokeLinecap="round" />
+      <path d="M52,66 C46,62 42,58 40,54 M54,52 C50,48 48,44 47,40" fill="none" stroke="#16a34a" strokeWidth={1.8} strokeLinecap="round" />
+      <Moeda x={80} y={22} r={11} texto="7" tam={12} />
+    </>
+  ),
+  // flashcard com "?" e check (Revisão Feita)
+  "estudos-revisao-1": (
+    <>
+      <g transform="rotate(5 54 54)">
+        <rect x="26" y="34" width="54" height="40" rx="6" fill="#c4b5fd" />
+      </g>
+      <rect x="16" y="24" width="54" height="40" rx="6" fill="#fff" />
+      <text x="43" y="54" textAnchor="middle" fontFamily={FONTE} fontSize="26" fontWeight={900} fill="#7c3aed" stroke="none">?</text>
+      <circle cx="74" cy="70" r="14" fill="#4ade80" />
+      <Check x={75} y={70} s={0.85} />
     </>
   ),
 

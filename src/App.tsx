@@ -299,6 +299,9 @@ const MomentosNoApp = () => {
 // Suspense). O W segue lazy: vende no app (/app) e fica de teste em /funil-w.
 import ComecarDia14Eager from "./pages/funis/dia14/ComecarDia14";
 const TutorialLab = lazy(() => import("./pages/TutorialLab"));
+// Só no servidor de desenvolvimento: a tela de Conquistas com dados de demo
+// (some do build — a condição é substituída por `false` e o import cai fora).
+const DevConquistas = import.meta.env.DEV ? lazy(() => import("./pages/dev/DevConquistas")) : null;
 import NotFound from "./pages/NotFound";
 
 // Code-splitting: rotas pesadas (módulos do app, checkout, admin) saem do
@@ -555,6 +558,9 @@ const AnimatedRoutes = () => {
             uma conta sem pagamento. */}
         {import.meta.env.DEV && (
           <Route path="/dev/gate" element={<div className="px-5 pt-6 pb-4 bg-background min-h-full"><PaywallAssinatura contexto="gate" /></div>} />
+        )}
+        {import.meta.env.DEV && DevConquistas && (
+          <Route path="/dev/conquistas" element={<Suspense fallback={null}><DevConquistas /></Suspense>} />
         )}
         <Route path="/direto" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-direto"><ComecarDireto /></RouteErrorBoundary></PageTransition></SoNaWeb>} />
         <Route path="/comecar-v2" element={<SoNaWeb><PageTransition><RouteErrorBoundary routeName="funil-v2"><ComecarV2 /></RouteErrorBoundary></PageTransition></SoNaWeb>} />

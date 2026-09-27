@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Target, ChevronRight, RotateCcw, X } from "lucide-react";
+import { useUserData } from "@/hooks/use-user-data";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
@@ -22,8 +23,13 @@ interface Props {
  */
 export const WeeklyChallenge = ({ expenses }: Props) => {
   const [state, setState] = usePersistedState<ChallengesState>("finance-challenges", EMPTY_CHALLENGES);
-  // Opt-out: quem não curte a mecânica esconde de vez (reativa em Conquistas)
-  const [hidden, setHidden] = usePersistedState<boolean>("finance-challenges-hidden", false);
+  /* Opt-out: quem não curte a mecânica esconde de vez. Religa AQUI mesmo (27/09):
+     a linha tracejada fica no lugar onde o card estava — quem escondeu ali
+     reencontra ali. (Lida pelo store, não por snapshot: o adesivo "Desafiante"
+     em Conquistas também religa, e o card tem que voltar na hora.) */
+  const { get, set } = useUserData();
+  const hidden = get<unknown>("finance-challenges-hidden", false) === true;
+  const setHidden = (v: boolean) => set("finance-challenges-hidden", v);
 
   const thisMonday = mondayOf(new Date());
 
@@ -88,12 +94,28 @@ export const WeeklyChallenge = ({ expenses }: Props) => {
   const hide = () => {
     trackEvent("challenge_optout", {});
     setHidden(true);
-    toast("Desafios ocultos. Reative quando quiser na página de Conquistas.");
+    toast("Desafios ocultos. Reative quando quiser aqui no Painel.");
+  };
+
+  const religar = () => {
+    trackEvent("challenge_optin", {});
+    setHidden(false);
+    toast.success("Desafio da semana de volta no Painel! 🎯");
   };
 
   /* ------------------------------------------------------------- render */
 
-  if (hidden) return null;
+  if (hidden) {
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card px-3.5 py-2.5 flex items-center gap-2.5 text-[12px] text-muted-foreground" data-testid="desafios-desligados">
+        <Target className="w-4 h-4 shrink-0" aria-hidden />
+        <span className="min-w-0"><b className="text-foreground font-bold">Desafios semanais</b> estão desligados</span>
+        <button type="button" onClick={religar} className="ml-auto shrink-0 h-[30px] px-3 rounded-lg bg-foreground text-background text-[12px] font-bold whitespace-nowrap active:scale-[0.98] transition-transform">
+          Ligar de novo
+        </button>
+      </div>
+    );
+  }
 
   if (!active || !def) {
     return (

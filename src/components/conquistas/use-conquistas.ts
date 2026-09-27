@@ -8,10 +8,13 @@ import {
   calcularSequencia, diasEfetivos, semearDoHub, somarDias, type EstadoSequencia,
 } from "@/lib/sequencia";
 import { acaoMaisUsada, type AcaoDoDia } from "@/lib/conquistas-acao";
-import { CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo } from "@/lib/conquistas-registro";
+import { CHAVE_DESBLOQUEADAS, buildBadgesSequencia, mesclarDesbloqueios, ordenarParaFolha, proximoAdesivo, xpPelaTabelaAntiga } from "@/lib/conquistas-registro";
 import { buildBadgesFinancas } from "@/components/gamification/badges-financas";
 import { buildBadgesVida } from "@/components/gamification/badges-vida";
-import { getLevel, getNextLevel, type Badge, type Level } from "@/components/gamification/types";
+import {
+  CATEGORIAS, CHAVE_NIVEL_PISO, RARIDADES, getLevel, getNextLevel, indiceDoNivel, nivelPelaEscadaAntiga, nivelPeloXp, raridadeDe,
+  type Badge, type BadgeCategoria, type Level, type Raridade,
+} from "@/components/gamification/types";
 
 /* ------------------------------------------------------------------------- *
  * Sequência (26/09): leitura pra Home, Conquistas e o anel do dia
@@ -19,6 +22,8 @@ import { getLevel, getNextLevel, type Badge, type Level } from "@/components/gam
 
 export interface Sequencia extends EstadoSequencia {
   hoje: string;
+  /** Os dias anotados (lista limpa) — a linha da semana lê daqui. */
+  lista: string[];
   /** O que sugerir no "falta 1 coisa" (módulo que a pessoa mais usa). */
   acao: AcaoDoDia;
   /** Ontem ficou vazio e um protetor segurou (pra contar na tela). */
@@ -30,9 +35,10 @@ export function useSequencia(): Sequencia {
   const hoje = localDayKey();
   const lista = get<unknown>(CHAVE_DIAS_ANOTADOS, undefined);
   const hub = get<unknown>(CHAVE_HUB_STREAK, null);
-  const estado = useMemo(() => calcularSequencia(diasEfetivos(lista, hub, hoje), hoje), [lista, hub, hoje]);
+  const efetivos = useMemo(() => diasEfetivos(lista, hub, hoje), [lista, hub, hoje]);
+  const estado = useMemo(() => calcularSequencia(efetivos, hoje), [efetivos, hoje]);
   const acao = useMemo(() => acaoMaisUsada(get, hoje), [get, hoje]);
-  return { ...estado, hoje, acao, protegidoOntem: estado.usados.includes(somarDias(hoje, -1)) };
+  return { ...estado, hoje, lista: efetivos, acao, protegidoOntem: estado.usados.includes(somarDias(hoje, -1)) };
 }
 
 /**
@@ -71,6 +77,14 @@ export function useEfeitosSequencia(seq: Sequencia) {
 // Um evento por adesivo por sessão, mesmo com a tela e os momentos lendo juntos.
 const eventosDeAdesivo = new Set<string>();
 
+export interface Colecao {
+  id: BadgeCategoria;
+  label: string;
+  emoji: string;
+  abertos: number;
+  total: number;
+}
+
 export interface EstadoConquistas {
   /** Todas, com `unlocked` já somando o que está gravado. */
   adesivos: Badge[];
@@ -79,31 +93,60 @@ export interface EstadoConquistas {
   desbloqueadas: Record<string, string>;
   abertos: number;
   xp: number;
+  /** Nível efetivo (XP ou piso, o maior). */
   nivel: Level;
+  /** Nível só pelo XP — diferente do efetivo quando o piso está valendo. */
+  nivelPorXp: Level;
+  /** O piso gravado está segurando o nível (escada nova mais alta que a antiga). */
+  pisoValendo: boolean;
   proximoNivel: Level | null;
   proximo: Badge | null;
+  /** Conquistados e total por raridade ("1 de 14 épicos do CORE"). */
+  porRaridade: Record<Raridade, { abertos: number; total: number }>;
+  /** Por módulo ("Finanças 6/24"). */
+  colecoes: Colecao[];
   /** Já existe o registro gravado (fora a 1ª abertura desta versão). */
   registroPronto: boolean;
 }
+
+/** Contagem por raridade e por módulo — puro, pra testes e pras artes. */
+export const contarAdesivos = (adesivos: Badge[]) => {
+  const porRaridade = Object.fromEntries(RARIDADES.map((r) => [r, { abertos: 0, total: 0 }])) as Record<Raridade, { abertos: number; total: number }>;
+  for (const b of adesivos) {
+    const r = porRaridade[raridadeDe(b)];
+    r.total++;
+    if (b.unlocked) r.abertos++;
+  }
+  const colecoes: Colecao[] = CATEGORIAS.map((c) => {
+    const dela = adesivos.filter((b) => b.category === c.id);
+    return { id: c.id, label: c.label, emoji: c.emoji, abertos: dela.filter((b) => b.unlocked).length, total: dela.length };
+  }).filter((c) => c.total > 0);
+  return { porRaridade, colecoes };
+};
 
 export function useConquistas(): EstadoConquistas {
   const { get, set, loaded } = useUserData();
   const hoje = localDayKey();
   const lista = get<unknown>(CHAVE_DIAS_ANOTADOS, undefined);
   const hub = get<unknown>(CHAVE_HUB_STREAK, null);
-  const recorde = useMemo(() => calcularSequencia(diasEfetivos(lista, hub, hoje), hoje).recorde, [lista, hub, hoje]);
+  const seq = useMemo(() => {
+    const efetivos = diasEfetivos(lista, hub, hoje);
+    return { ...calcularSequencia(efetivos, hoje), diasAnotados: efetivos.length };
+  }, [lista, hub, hoje]);
   const gravadas = get<unknown>(CHAVE_DESBLOQUEADAS, undefined);
+  const piso = get<unknown>(CHAVE_NIVEL_PISO, undefined);
 
   const r = useMemo(() => {
+    const daSequencia = buildBadgesSequencia(seq.recorde, { protetoresUsados: seq.usados.length, diasAnotados: seq.diasAnotados });
     let calculadas: Badge[] = [];
     try {
-      calculadas = [...buildBadgesSequencia(recorde), ...buildBadgesFinancas(get), ...buildBadgesVida(get)];
+      calculadas = [...daSequencia, ...buildBadgesFinancas(get), ...buildBadgesVida(get, hoje)];
     } catch (e) {
       console.error("[conquistas] cálculo falhou:", e);
-      calculadas = buildBadgesSequencia(recorde);
+      calculadas = daSequencia;
     }
     return mesclarDesbloqueios(calculadas, gravadas, hoje);
-  }, [get, gravadas, recorde, hoje]);
+  }, [get, gravadas, seq, hoje]);
 
   // Grava o que abriu agora. Na 1ª vez (sem registro) grava tudo em silêncio:
   // é a linha de base, não "desbloqueio novo".
@@ -121,20 +164,45 @@ export function useConquistas(): EstadoConquistas {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, novasTxt]);
 
+  /*
+   * PISO DE NÍVEL (27/09): a escada nova é mais alta (Prata 300, Ouro 800…) e
+   * ninguém pode acordar num nível abaixo do que já tinha. Na 1ª vez, o piso é
+   * o nível pela escada ANTIGA com o XP que os adesivos valiam antes; depois,
+   * sobe sempre que o XP passa de um degrau. Só escreve com o servidor
+   * respondido (antes disso a lista de desbloqueios pode estar só no cache).
+   */
+  const nivelPorXp = nivelPeloXp(r.xp);
+  const pisoInicial = piso === undefined ? nivelPelaEscadaAntiga(xpPelaTabelaAntiga(r.adesivos)).name : null;
+  useEffect(() => {
+    if (!loaded) return;
+    if (piso === undefined) {
+      const inicial = indiceDoNivel(pisoInicial) > indiceDoNivel(nivelPorXp.name) ? pisoInicial : nivelPorXp.name;
+      set(CHAVE_NIVEL_PISO, inicial, { system: true });
+      return;
+    }
+    if (indiceDoNivel(nivelPorXp.name) > indiceDoNivel(piso)) set(CHAVE_NIVEL_PISO, nivelPorXp.name, { system: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, piso, pisoInicial, nivelPorXp.name]);
+
   return useMemo(() => {
     const folha = ordenarParaFolha(r.adesivos, r.desbloqueadas);
+    const pisoEfetivo = piso === undefined ? pisoInicial : piso;
+    const nivel = getLevel(r.xp, pisoEfetivo);
     return {
       adesivos: r.adesivos,
       folha,
       desbloqueadas: r.desbloqueadas,
       abertos: r.adesivos.filter((b) => b.unlocked).length,
       xp: r.xp,
-      nivel: getLevel(r.xp),
-      proximoNivel: getNextLevel(r.xp),
+      nivel,
+      nivelPorXp,
+      pisoValendo: indiceDoNivel(nivel.name) > indiceDoNivel(nivelPorXp.name),
+      proximoNivel: getNextLevel(r.xp, pisoEfetivo),
       proximo: proximoAdesivo(r.adesivos),
+      ...contarAdesivos(r.adesivos),
       registroPronto: gravadas !== undefined,
     };
-  }, [r, gravadas]);
+  }, [r, gravadas, piso, pisoInicial, nivelPorXp]);
 }
 
 /* ------------------------------------------------------------------------- *
@@ -150,6 +218,12 @@ export const membroDesdeTexto = (criadaEm: string | undefined | null, primeiroDi
   }
   if (!d) d = parseLocalDay(primeiroDia || hoje);
   return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+};
+
+/** "2026" — o ano do "membro desde", pra carteirinha ("DESDE 2026"). */
+export const anoDeMembro = (membroDesde: string, hoje: string = localDayKey()): number => {
+  const m = /(\d{4})/.exec(membroDesde);
+  return m ? Number(m[1]) : Number(hoje.slice(0, 4));
 };
 
 export function usePerfilConquistas() {

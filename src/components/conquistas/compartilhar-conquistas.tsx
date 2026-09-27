@@ -1,14 +1,18 @@
 import { toast } from "sonner";
 import { trackEvent } from "@/lib/analytics";
 import { compartilharImagem, type ResultadoCompartilhar } from "@/lib/compartilhar";
+import type { Raridade } from "@/components/gamification/types";
 import { gerarPng } from "./gerar-imagem";
-import { RECORTE_ROSETA, STORIES, StoriesAdesivo, StoriesCapa, StoriesRoseta } from "./Stories";
+import { RECORTE_INSIGNIAS, RECORTE_ROSETA, STORIES, StoriesAdesivo, StoriesCapa, StoriesCarteirinha, StoriesInsignias, StoriesRoseta } from "./Stories";
 import type { CapaId, DadosCapa } from "./CapaPlanner";
+import type { DadosCarteirinha } from "./Carteirinha";
+import type { Insignia } from "./insignias";
 
 /**
- * Compartilhar das Conquistas (26/09) — substitui o profile-share/badge-share
- * de canvas. Os nomes de evento antigos ficam (`profile_share`, `badge_share`)
- * pra série histórica não quebrar; `capa_share` é novo e diz a cor da capa.
+ * Compartilhar das Conquistas (26/09; carteirinha e insígnias em 27/09) —
+ * substitui o profile-share/badge-share de canvas. Os nomes de evento antigos
+ * ficam (`profile_share`, `badge_share`) pra série histórica não quebrar;
+ * `capa_share`, `carteirinha_share` e `insignias_share` dizem qual arte saiu.
  * O resultado é tratado como nos outros compartilhares do app: "downloaded"
  * avisa que salvou, "failed" diz a verdade.
  */
@@ -44,8 +48,22 @@ export async function compartilharRoseta(dados: { dias: number; nome: string; me
   return enviar(blob, `core-${dados.dias}-dias${dados.transparente ? "-adesivo" : ""}.png`, `${dados.dias} dias seguidos no CORE`, "conquista");
 }
 
-export async function compartilharAdesivo(dados: { id: string; titulo: string; descricao: string; nome: string; membroDesde: string }) {
-  trackEvent("badge_share", { badge: dados.id, formato: "adesivo" });
+export async function compartilharAdesivo(dados: { id: string; titulo: string; descricao: string; raridade?: Raridade; nome: string; membroDesde: string }) {
+  trackEvent("badge_share", { badge: dados.id, formato: "adesivo", raridade: dados.raridade ?? "comum" });
   const blob = await gerarPng(<StoriesAdesivo {...dados} />, { largura: STORIES.w, altura: STORIES.h });
   return enviar(blob, `core-adesivo-${dados.id}.png`, `Adesivo: ${dados.titulo}`, "conquista");
+}
+
+export async function compartilharCarteirinha(dados: DadosCarteirinha) {
+  trackEvent("carteirinha_share", { nivel: dados.nivel, dias: dados.dias, adesivos: dados.adesivos });
+  const blob = await gerarPng(<StoriesCarteirinha {...dados} />, { largura: STORIES.w, altura: STORIES.h });
+  return enviar(blob, "core-carteirinha.png", "Minha carteirinha do CORE", "carteirinha");
+}
+
+export async function compartilharInsignias(dados: { insignias: Insignia[]; nome: string; membroDesde: string; nivel: string; transparente?: boolean }) {
+  trackEvent("insignias_share", { nivel: dados.nivel, insignias: dados.insignias.filter((i) => i.temDado).map((i) => i.id).join(","), transparente: !!dados.transparente });
+  const blob = dados.transparente
+    ? await gerarPng(<StoriesInsignias {...dados} transparente />, { largura: RECORTE_INSIGNIAS.w, altura: RECORTE_INSIGNIAS.h })
+    : await gerarPng(<StoriesInsignias {...dados} />, { largura: STORIES.w, altura: STORIES.h });
+  return enviar(blob, `core-insignias${dados.transparente ? "-faixa" : ""}.png`, "Minhas insígnias no CORE", "insignias");
 }

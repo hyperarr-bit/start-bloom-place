@@ -1,5 +1,6 @@
 import "@fontsource/instrument-serif/latin-400-italic.css";
 import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import "./conquistas.css";
 import { Flame } from "lucide-react";
 import { NivelEmFoil, SeloNivel } from "./SeloNivel";
 import { FotoWebKit } from "./foto-contexto";
@@ -133,18 +134,19 @@ const G = {
  * como na peça aprovada (lá a argola fica no canto da caixa, 14 px antes do
  * tecido, e o furo aparece como a sombra do arame entrando).
  */
-const Espiral = ({ f }: { f: Formato }) => {
+export const Espiral = ({ f }: { f: Formato }) => {
   const { n, passo, topo, w, h, caixa } = G[f].espiral;
   // na foto do WebKit a sombrinha da argola girada vira um halo escuro em cima: sai
   const semSombra = useContext(FotoWebKit);
   return (
-    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: caixa }} aria-hidden>
+    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: caixa }} aria-hidden data-espiral="">
       {Array.from({ length: n }, (_, i) => {
         const y = topo + i * passo;
         return (
           <div key={i}>
             <i style={{ position: "absolute", left: w * 0.25, top: y + h * 0.3, width: w * 0.5, height: h * 0.4, borderRadius: "50%", background: "#101114", boxShadow: "inset 0 1px 2px rgba(0,0,0,.9)" }} />
-            <i style={{ position: "absolute", left: -w * 0.5, top: y, width: w, height: h, borderRadius: "50%", borderStyle: "solid", borderWidth: Math.max(2.5, w * 0.26), borderColor: "#fbe7a8 #c9932a #8f6a0c #e8c463", boxShadow: semSombra ? "none" : "0 1px 2px rgba(0,0,0,.6)", transform: "rotate(-10deg)", boxSizing: "border-box" }} />
+            {/* .capa-argola / --i: a entrada da tela acende as argolas em sequência */}
+            <i className="capa-argola" style={{ position: "absolute", left: -w * 0.5, top: y, width: w, height: h, borderRadius: "50%", borderStyle: "solid", borderWidth: Math.max(2.5, w * 0.26), borderColor: "#fbe7a8 #c9932a #8f6a0c #e8c463", boxShadow: semSombra ? "none" : "0 1px 2px rgba(0,0,0,.6)", transform: "rotate(-10deg)", boxSizing: "border-box", "--i": i } as CSSProperties} />
           </div>
         );
       })}
@@ -152,16 +154,24 @@ const Espiral = ({ f }: { f: Formato }) => {
   );
 };
 
+/** Furos e argolas no tamanho do app: `y` de cada argola (pra página do planner alinhar os furos). */
+export const ARGOLAS_APP = Array.from({ length: G.app.espiral.n }, (_, i) => G.app.espiral.topo + i * G.app.espiral.passo + G.app.espiral.h * 0.5);
+
 interface CapaPlannerProps extends DadosCapa {
   capa: CapaId;
   formato?: Formato;
   /** Toque no selo (abre o progresso do nível). Só no app. */
   onSelo?: () => void;
+  /** Sem a espiral (o planner aberto desenha a espiral numa camada própria). */
+  semEspiral?: boolean;
 }
 
 /** A capa no tamanho de desenho (398×300 ou 760×1080). Quem escala é o CapaResponsiva. */
-export const CapaPlanner = ({ capa, formato = "app", nome, membroDesde, dias, nivel, onSelo }: CapaPlannerProps) => {
+export const CapaPlanner = ({ capa, formato = "app", nome, membroDesde, dias, nivel, onSelo, semEspiral }: CapaPlannerProps) => {
   const c = CAPAS[capa] ?? CAPAS.grafite;
+  // a tag "13 dias" dá um pulinho quando o número muda com a capa na tela (não na 1ª pintura)
+  const diasIniciais = useRef(dias);
+  const tagPula = diasIniciais.current !== dias;
   const g = G[formato];
   const tex = g.texMult * c.texBase;
   const fotoWebKit = useContext(FotoWebKit);
@@ -200,9 +210,9 @@ export const CapaPlanner = ({ capa, formato = "app", nome, membroDesde, dias, ni
           boxShadow: fotoWebKit ? `inset 0 0 0 ${g.inset}px ${c.borda}` : `${g.sombra}, inset 0 0 0 ${g.inset}px ${c.borda}`,
         }}
       />
-      <Espiral f={formato} />
+      {!semEspiral && <Espiral f={formato} />}
       {/* elástico */}
-      <div style={{ position: "absolute", top: -g.elastico.sobra, bottom: -g.elastico.sobra, right: g.elastico.dir, width: g.elastico.w, background: c.elastico, boxShadow: g.elastico.sombra }} />
+      <div className="capa-elastico" style={{ position: "absolute", top: -g.elastico.sobra, bottom: -g.elastico.sobra, right: g.elastico.dir, width: g.elastico.w, background: c.elastico, boxShadow: g.elastico.sombra }} />
       {/* etiqueta */}
       <div
         style={{
@@ -226,6 +236,7 @@ export const CapaPlanner = ({ capa, formato = "app", nome, membroDesde, dias, ni
       </svg>
       {/* tag da sequência */}
       <div
+        className="capa-tag"
         style={{
           position: "absolute", right: g.tag.dir, top: g.tag.topo, background: "#f3e9d2", borderRadius: g.tag.raio, padding: g.tag.pad,
           transform: "rotate(-6deg)", transformOrigin: "right center", boxShadow: g.tag.sombra, display: "flex", alignItems: "center", gap: g.tag.gap, whiteSpace: "nowrap",
@@ -235,7 +246,7 @@ export const CapaPlanner = ({ capa, formato = "app", nome, membroDesde, dias, ni
         <Flame style={{ width: g.tag.chama, height: g.tag.chama, color: "#ea580c", flexShrink: 0 }} strokeWidth={2.2} aria-hidden />
         {dias > 0 ? (
           <>
-            <span style={{ fontSize: g.tag.num, fontWeight: 800, color: "#2b2b2f", fontVariantNumeric: "tabular-nums" }}>
+            <span key={dias} className={tagPula ? "capa-tag-pula" : undefined} data-tag-dias="" style={{ fontSize: g.tag.num, fontWeight: 800, color: "#2b2b2f", fontVariantNumeric: "tabular-nums" }}>
               {dias} {dias === 1 ? "dia" : "dias"}
             </span>
             <span style={{ fontSize: g.tag.seg, color: "#6f665a", fontWeight: 600 }}>{dias === 1 ? "seguido" : "seguidos"}</span>

@@ -1,23 +1,30 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Instagram, Loader2, Target, Trophy } from "lucide-react";
+import { AnimatePresence, useReducedMotion } from "framer-motion";
+import { ArrowLeft, Instagram, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useUserData } from "@/hooks/use-user-data";
-import { usePersistedState } from "@/hooks/use-persisted-state";
 import { trackEvent } from "@/lib/analytics";
-import { mesAtualExtenso } from "@/lib/utils";
+import { localDayKey, mesAtualExtenso } from "@/lib/utils";
 import { BadgeDetailSheet } from "@/components/gamification/BadgeDetailSheet";
-import { LEVELS, type Badge } from "@/components/gamification/types";
-import { CAPAS, CapaResponsiva, ORDEM_CAPAS, ehCapa, type CapaId } from "./CapaPlanner";
+import { LEVELS, raridadeDe, type Badge } from "@/components/gamification/types";
+import { CAPAS, ORDEM_CAPAS, ehCapa, type CapaId } from "./CapaPlanner";
 import { CardSequencia } from "./CardSequencia";
-import { GradeAdesivos } from "./GradeAdesivos";
+import { CardProximo, GradeAdesivos } from "./GradeAdesivos";
+import { PlannerAberto, mesDaPagina } from "./PlannerAberto";
 import { SeloNivel } from "./SeloNivel";
-import { compartilharCapa } from "./compartilhar-conquistas";
-import { useConquistas, usePerfilConquistas, useSequencia } from "./use-conquistas";
+import { Previa, SeletorDeArte, type ArteId, type DadosArtes } from "./SeletorDeArte";
+import { StoriesAdesivo } from "./Stories";
+import { compartilharAdesivo } from "./compartilhar-conquistas";
+import { escolherInsignias, montarInsignias } from "./insignias";
+import { anoDeMembro, useConquistas, usePerfilConquistas, useSequencia } from "./use-conquistas";
+import "./conquistas.css";
 
 export const CHAVE_CAPA = "conquistas-capa";
+/** Quem escondeu o card "Desafio da semana" no Painel de Finanças (o adesivo Desafiante oferece religar). */
+export const CHAVE_DESAFIOS_OCULTOS = "finance-challenges-hidden";
 
 /** "Set 2026" — o mês do cabeçalho quando a tela é estreita. */
 const mesCurto = (d = new Date()) => {
@@ -25,24 +32,34 @@ const mesCurto = (d = new Date()) => {
   return `${m.charAt(0).toUpperCase()}${m.slice(1)} ${d.getFullYear()}`;
 };
 const ORIGENS = ["home", "menu", "celebracao"];
+/** A coreografia da entrada dura 860 ms; depois disso o atributo sai (e as animações param de existir). */
+const DURACAO_ENTRADA = 950;
 
 /**
- * CONQUISTAS (refeita 26/09, aprovada pelo dono): a capa do planner como
- * cartão de membro, a sequência de dias anotados e a folha de adesivos.
+ * CONQUISTAS (refeita 26/09; v2 em 27/09, aprovada pelo dono): a capa do
+ * planner que ABRE na primeira página das insígnias, a sequência com a semana,
+ * a folha de adesivos com raridade, o próximo adesivo com as coleções, e o
+ * "Postar nos Stories" com 4 artes. A tela entra numa coreografia só (≤ 900
+ * ms, pulável, fade com movimento reduzido).
  */
 export const TelaConquistas = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const reduzir = useReducedMotion();
   const { get, set, loaded } = useUserData();
   const seq = useSequencia();
   const conq = useConquistas();
   const perfil = usePerfilConquistas();
   const [selecionado, setSelecionado] = useState<Badge | null>(null);
   const [nivelAberto, setNivelAberto] = useState(false);
-  const [postando, setPostando] = useState(false);
-  const [desafiosOcultos, setDesafiosOcultos] = usePersistedState<boolean>("finance-challenges-hidden", false);
+  const [plannerAberto, setPlannerAberto] = useState(false);
+  const [seletorAberto, setSeletorAberto] = useState(false);
+  const [arteDireta, setArteDireta] = useState<ArteId | null>(null);
+  const [previaAdesivo, setPreviaAdesivo] = useState<Badge | null>(null);
+  const desafiosOcultos = get<unknown>(CHAVE_DESAFIOS_OCULTOS, false) === true;
   const capaGravada = get<unknown>(CHAVE_CAPA, "grafite");
   const capa: CapaId = ehCapa(capaGravada) ? capaGravada : "grafite";
+  const hoje = localDayKey();
 
   useEffect(() => {
     const origem = (location.state as { origem?: string } | null)?.origem;
@@ -50,24 +67,46 @@ export const TelaConquistas = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ENTRADA (A): `data-entrada="1"` liga a coreografia em CSS (conquistas.css);
+   * um toque pula (o atributo sai e tudo assenta no lugar); com movimento
+   * reduzido é só um fade. */
+  const [entrada, setEntrada] = useState<"1" | "reduzida" | "">(() => (reduzir ? "reduzida" : "1"));
+  const main = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!loaded || !entrada) return;
+    const t = setTimeout(() => setEntrada(""), entrada === "reduzida" ? 250 : DURACAO_ENTRADA);
+    const pular = () => setEntrada("");
+    document.addEventListener("pointerdown", pular, { once: true, capture: true });
+    return () => { clearTimeout(t); document.removeEventListener("pointerdown", pular, { capture: true } as EventListenerOptions); };
+  }, [loaded, entrada]);
+
   const trocarCapa = (id: CapaId) => {
     if (id === capa) return;
     set(CHAVE_CAPA, id);
     trackEvent("capa_trocar", { capa: id });
   };
 
-  const postar = async () => {
-    setPostando(true);
-    try {
-      await compartilharCapa({ capa, nome: perfil.nome, membroDesde: perfil.membroDesde, dias: seq.dias, nivel: conq.nivel.name, adesivos: conq.abertos });
-    } finally {
-      setPostando(false);
-    }
-  };
-
-  const faltaXp = conq.proximoNivel ? conq.proximoNivel.minXP - conq.xp : 0;
+  const insignias = useMemo(() => escolherInsignias(montarInsignias(get, seq.dias, hoje)), [get, seq.dias, hoje]);
+  const faltaXp = conq.proximoNivel ? Math.max(0, conq.proximoNivel.minXP - conq.xp) : 0;
   const base = conq.nivel.minXP;
-  const fracaoNivel = conq.proximoNivel ? (conq.xp - base) / (conq.proximoNivel.minXP - base) : 1;
+  const fracaoNivel = conq.proximoNivel ? Math.max(0, Math.min(1, (conq.xp - base) / (conq.proximoNivel.minXP - base))) : 1;
+
+  const dadosArtes: DadosArtes = useMemo(() => ({
+    capa, nome: perfil.nome, membroDesde: perfil.membroDesde, dias: seq.dias, nivel: conq.nivel.name, xp: conq.xp,
+    adesivos: conq.abertos, total: conq.adesivos.length, insignias, ano: anoDeMembro(perfil.membroDesde, hoje),
+  }), [capa, perfil.nome, perfil.membroDesde, seq.dias, conq.nivel.name, conq.xp, conq.abertos, conq.adesivos.length, insignias, hoje]);
+
+  const abrirPlanner = () => {
+    setPlannerAberto(true);
+    trackEvent("planner_abrir", { insignias: insignias.filter((i) => i.temDado).length });
+  };
+  const compartilharInsignias = () => { setArteDireta("insignias"); setSeletorAberto(true); };
+  const consumirDireto = useCallback(() => setArteDireta(null), []);
+  const ligarDesafios = () => {
+    set(CHAVE_DESAFIOS_OCULTOS, false);
+    setSelecionado(null);
+    toast.success("Desafio da semana de volta no Painel de Finanças! 🎯");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,18 +129,29 @@ export const TelaConquistas = () => {
       </header>
 
       {loaded && (
-        <main className="max-w-lg mx-auto px-4 pt-4 pb-8 space-y-3.5">
-          <CapaResponsiva
+        <main ref={main} className="max-w-lg mx-auto px-4 pt-4 pb-8 space-y-3.5" data-entrada={entrada || undefined} data-testid="tela-conquistas">
+          <PlannerAberto
             capa={capa}
             nome={perfil.nome}
             membroDesde={perfil.membroDesde}
             dias={seq.dias}
             nivel={conq.nivel.name}
             onSelo={() => setNivelAberto(true)}
+            insignias={insignias}
+            xp={conq.xp}
+            faltaXp={faltaXp}
+            proximoNivel={conq.proximoNivel?.name ?? null}
+            adesivos={conq.abertos}
+            total={conq.adesivos.length}
+            mes={mesDaPagina()}
+            aberto={plannerAberto}
+            onAbrir={abrirPlanner}
+            onFechar={() => setPlannerAberto(false)}
+            onCompartilhar={compartilharInsignias}
           />
 
           {/* no 360 o rótulo "CAPA" sai pra caber na mesma fileira (as bolinhas logo embaixo da capa já dizem) */}
-          <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 min-[350px]:grid-cols-2 gap-2.5 entra-sobe" style={{ "--d": "120ms" } as React.CSSProperties}>
             <div role="radiogroup" aria-label="Capa do planner" className="h-11 rounded-xl border border-border flex items-center justify-center gap-2 px-1.5">
               <span className="hidden min-[400px]:inline text-[11px] font-extrabold tracking-[0.14em] text-muted-foreground">CAPA</span>
               <span className="flex items-center">
@@ -128,35 +178,26 @@ export const TelaConquistas = () => {
             </div>
             <button
               type="button"
-              onClick={postar}
-              disabled={postando}
-              className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform disabled:opacity-70"
+              onClick={() => setSeletorAberto(true)}
+              className="h-11 rounded-xl bg-foreground text-background font-bold text-[13.5px] inline-flex items-center justify-center gap-2 active:scale-[0.99] transition-transform"
+              data-testid="postar-stories"
             >
-              {postando ? <Loader2 className="w-[18px] h-[18px] animate-spin" /> : <Instagram className="w-[18px] h-[18px]" aria-hidden />}
+              <Instagram className="w-[18px] h-[18px]" aria-hidden />
               Postar nos Stories
             </button>
           </div>
 
-          <CardSequencia seq={seq} onAcao={(rota) => navigate(rota)} />
+          <div className="entra-sobe" style={{ "--d": "190ms" } as React.CSSProperties}>
+            <CardSequencia seq={seq} onAcao={(rota) => navigate(rota)} />
+          </div>
 
-          <GradeAdesivos
-            folha={conq.folha}
-            abertos={conq.abertos}
-            proximo={conq.proximo}
-            diasDeSequencia={seq.dias}
-            onSelecionar={setSelecionado}
-          />
+          <div className="entra-sobe" style={{ "--d": "370ms" } as React.CSSProperties}>
+            <GradeAdesivos folha={conq.folha} abertos={conq.abertos} onSelecionar={setSelecionado} />
+          </div>
 
-          {/* Quem escondeu os desafios semanais reativa por aqui (os adesivos de desafio dependem deles) */}
-          {desafiosOcultos && (
-            <button
-              type="button"
-              onClick={() => { setDesafiosOcultos(false); toast.success("Desafios semanais de volta no Dashboard! 🎯"); }}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-border py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Target className="w-3.5 h-3.5" /> Reativar desafios semanais
-            </button>
-          )}
+          <div className="entra-sobe" style={{ "--d": "520ms" } as React.CSSProperties}>
+            <CardProximo proximo={conq.proximo} colecoes={conq.colecoes} diasDeSequencia={seq.dias} onSelecionar={setSelecionado} />
+          </div>
         </main>
       )}
 
@@ -166,7 +207,26 @@ export const TelaConquistas = () => {
         desbloqueadoEm={selecionado ? conq.desbloqueadas[selecionado.id] : undefined}
         diasDeSequencia={seq.dias}
         perfil={{ nome: perfil.nome, membroDesde: perfil.membroDesde, nivel: conq.nivel.name }}
+        porRaridade={conq.porRaridade}
+        desafiosOcultos={desafiosOcultos}
+        onLigarDesafios={ligarDesafios}
+        onCompartilharAdesivo={(b) => { setSelecionado(null); setPreviaAdesivo(b); }}
       />
+
+      <SeletorDeArte aberto={seletorAberto} onFechar={() => setSeletorAberto(false)} dados={dadosArtes} direto={arteDireta} onDiretoConsumido={consumirDireto} />
+
+      {/* a prévia do adesivo (vinda do detalhe): fundo holográfico no épico, dourado no lendário */}
+      <AnimatePresence>
+        {previaAdesivo && (
+          <Previa
+            key={previaAdesivo.id}
+            titulo={previaAdesivo.name}
+            elemento={<StoriesAdesivo id={previaAdesivo.id} titulo={previaAdesivo.name} descricao={previaAdesivo.description} raridade={raridadeDe(previaAdesivo)} nome={perfil.nome} membroDesde={perfil.membroDesde} />}
+            onPostar={() => compartilharAdesivo({ id: previaAdesivo.id, titulo: previaAdesivo.name, descricao: previaAdesivo.description, raridade: raridadeDe(previaAdesivo), nome: perfil.nome, membroDesde: perfil.membroDesde })}
+            onFechar={() => setPreviaAdesivo(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Toque no selo da capa: o caminho até o próximo nível */}
       <Sheet open={nivelAberto} onOpenChange={setNivelAberto}>
@@ -176,25 +236,31 @@ export const TelaConquistas = () => {
             <SheetTitle className="text-2xl font-bold tracking-tight mt-3">Nível {conq.nivel.name}</SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground mt-1">
               {conq.proximoNivel
-                ? `${conq.xp} XP · faltam ${faltaXp} XP pra ${conq.proximoNivel.name}`
-                : `${conq.xp} XP · o nível mais alto do CORE`}
+                ? `${conq.xp.toLocaleString("pt-BR")} XP · faltam ${faltaXp.toLocaleString("pt-BR")} XP pra ${conq.proximoNivel.name}`
+                : `${conq.xp.toLocaleString("pt-BR")} XP · o nível mais alto do CORE`}
             </SheetDescription>
             <div className="mt-4 h-2 rounded-full bg-muted overflow-hidden">
-              <div className="h-full rounded-full bg-foreground/60" style={{ width: `${Math.round(Math.min(1, fracaoNivel) * 100)}%` }} />
+              <div className="h-full rounded-full bg-foreground/60" style={{ width: `${Math.round(fracaoNivel * 100)}%` }} />
             </div>
             <div className="mt-4 flex justify-between">
-              {LEVELS.map((l) => (
-                <div key={l.name} className={`flex flex-col items-center gap-1 ${conq.xp >= l.minXP ? "" : "opacity-35 grayscale"}`}>
+              {LEVELS.map((l, i) => (
+                <div key={l.name} className={`flex flex-col items-center gap-1 ${i <= LEVELS.findIndex((x) => x.name === conq.nivel.name) ? "" : "opacity-35 grayscale"}`}>
                   <SeloNivel nivel={l.name} tamanho={34} sombra={false} />
                   <span className="text-[10px] font-bold text-muted-foreground">{l.name}</span>
+                  <span className="text-[9px] text-muted-foreground tabular-nums">{l.minXP.toLocaleString("pt-BR")}</span>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">Cada adesivo vale XP — e o que você conquista fica: o nível nunca volta atrás.</p>
+            {conq.pisoValendo ? (
+              <p className="mt-4 text-xs text-muted-foreground" data-testid="aviso-piso">
+                Você chegou ao {conq.nivel.name} na escada antiga — e nível nunca volta atrás. Na escada nova, {conq.proximoNivel ? `${conq.proximoNivel.name} começa em ${conq.proximoNivel.minXP.toLocaleString("pt-BR")} XP` : "você já está no topo"}.
+              </p>
+            ) : (
+              <p className="mt-4 text-xs text-muted-foreground">Cada adesivo vale XP pela raridade (50 · 100 · 200 · 400) — e o que você conquista fica: o nível nunca volta atrás.</p>
+            )}
           </div>
         </SheetContent>
       </Sheet>
-
     </div>
   );
 };

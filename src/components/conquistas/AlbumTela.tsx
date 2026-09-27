@@ -273,13 +273,17 @@ export const AlbumTela = ({ aberto, paginas, adesivos, desbloqueadas, novas, mai
 
   return (
     <motion.div className="alb-tela" role="dialog" aria-modal="true" aria-label="Álbum de figurinhas" data-testid="album-tela" data-atual={atual} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0.1 : 0.2 }}>
-      <div className="alb-topo" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      {/* 27/09 (dono: "o X não tá aparecendo"): a faixa tinha 56 px FIXOS com o recuo da
+          câmera dentro — no iPhone o X subia pra baixo da barra de status. Recuo por fora. */}
+      <div className="shrink-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+      <div className="alb-topo">
         <button type="button" className="alb-redondo" onClick={onFechar} aria-label="Fechar o álbum" data-testid="album-fechar"><X className="w-5 h-5" /></button>
         <div className="flex-1 leading-[1.2] min-w-0">
           <b className="block text-[14px] font-black truncate">Álbum CORE {ano}</b>
           <span className="text-[11px] font-semibold tabular-nums" style={{ color: "rgba(255,255,255,.65)" }}>{abertos} de {total} · faltam {total - abertos}</span>
         </div>
         <button type="button" className="alb-redondo" onClick={onCompartilhar} aria-label="Compartilhar meu álbum"><Instagram className="w-[18px] h-[18px]" /></button>
+      </div>
       </div>
 
       <div className="alb-mesa">

@@ -24,9 +24,34 @@ export interface OpcoesCodificar {
   duracao: number;
   bitrate: number;
   onProgresso?: (fracao: number) => void;
+  /** Quanto o codificador pode ficar sem andar (fila parada, flush sem voltar) antes de a gente desistir. */
+  paradoMaxMs?: number;
+}
+
+/**
+ * VIGIA (27/09, simulador do iPhone): o `VideoEncoder` aceitou a config, fez 10
+ * quadros e PAROU — a fila ficou acima de 6 pra sempre, sem `error`. O laço de
+ * contrapressão esperava calado, a barra ficava em "Preparando o vídeo… 32%" e
+ * o plano B (MediaRecorder → imagem) nunca entrava, porque ninguém falhou.
+ * Agora: fila sem andar por `paradoMaxMs` (ou flush que não volta) = erro, e o
+ * gerar-video.ts segue pro próximo caminho.
+ */
+export const PARADO_MAX_MS = 5000;
+
+export class CodificadorParado extends Error {
+  constructor(onde: string) {
+    super(`codificador parado (${onde})`);
+    this.name = "CodificadorParado";
+  }
 }
 
 const respiro = () => new Promise<void>((ok) => setTimeout(ok, 0));
+
+const comLimite = <T,>(p: Promise<T>, ms: number, onde: string): Promise<T> =>
+  new Promise<T>((ok, falha) => {
+    const t = setTimeout(() => falha(new CodificadorParado(onde)), ms);
+    p.then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); falha(e); });
+  });
 
 const esperarFila = (enc: VideoEncoder) =>
   new Promise<void>((ok) => {
@@ -61,6 +86,7 @@ export async function codificarComWebCodecs(canvas: HTMLCanvasElement, desenhar:
     enc.configure({ codec: o.codec, width: o.largura, height: o.altura, bitrate: o.bitrate, framerate: o.fps, avc: { format: "avc" }, latencyMode: "quality" });
     const n = Math.round(o.duracao * o.fps);
     const dur = Math.round(1e6 / o.fps);
+    const paradoMax = o.paradoMaxMs ?? PARADO_MAX_MS;
     for (let i = 0; i < n; i++) {
       if (erro) throw erro;
       desenhar(i / o.fps);
@@ -70,13 +96,19 @@ export async function codificarComWebCodecs(canvas: HTMLCanvasElement, desenhar:
       } finally {
         frame.close();
       }
-      while (enc.encodeQueueSize > 6 && !erro) await esperarFila(enc);
+      let fila = enc.encodeQueueSize;
+      let andou = performance.now();
+      while (enc.encodeQueueSize > 6 && !erro) {
+        await esperarFila(enc);
+        if (enc.encodeQueueSize < fila) { fila = enc.encodeQueueSize; andou = performance.now(); }
+        else if (performance.now() - andou > paradoMax) throw new CodificadorParado(`fila em ${enc.encodeQueueSize} no quadro ${i + 1}/${n}`);
+      }
       if (i % 5 === 4) {
         o.onProgresso?.((i + 1) / n);
         await respiro();
       }
     }
-    await enc.flush();
+    await comLimite(enc.flush(), paradoMax * 2, "flush");
     if (erro) throw erro;
     if (!avcC) throw new Error("o codificador não entregou a avcC");
     if (amostras.length !== n) throw new Error(`codificação incompleta: ${amostras.length}/${n} quadros`);
@@ -116,7 +148,7 @@ export async function gravarComMediaRecorder(canvas: HTMLCanvasElement, desenhar
     requestAnimationFrame(passo);
   });
   rec.stop();
-  await fim;
+  await comLimite(fim, PARADO_MAX_MS, "gravador");
   stream.getTracks().forEach((tr) => tr.stop());
   o.onProgresso?.(1);
   return new Blob(partes, { type: "video/mp4" });
